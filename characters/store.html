@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYS — store visit POC</title>
+<style>
+  :root { color-scheme: light; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; transition: filter 120ms linear; }
+  canvas.squint { filter: blur(6px); }
+
+  .panel {
+    position: fixed; z-index: 10;
+    background: rgba(255,255,255,.86); backdrop-filter: blur(6px);
+    border: 1px solid rgba(0,0,0,.08); border-radius: 10px;
+    padding: 10px 12px; font-size: 12px; line-height: 1.5; color: #333;
+  }
+  #hud { left: 12px; bottom: 12px; max-width: 330px; }
+  #hud b { color: #111; }
+  #hud kbd {
+    background: #efefef; border: 1px solid #ddd; border-bottom-width: 2px;
+    border-radius: 4px; padding: 0 4px; font-size: 11px; font-family: ui-monospace, monospace;
+  }
+
+  /* perf overlay — copied from crowd.html so the two views report the same numbers */
+  #perf {
+    position: fixed; left: 12px; top: 12px; z-index: 10;
+    background: rgba(20,20,20,.82); color: #e8e8e8;
+    font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+    border-radius: 8px; padding: 9px 12px; min-width: 190px; pointer-events: none;
+  }
+  #perf b { color: #fff; font-weight: 600; }
+  #perf .warn { color: #ffb454; }
+  #perf .bad { color: #ff6b6b; }
+  #perf .ok { color: #8fd67a; }
+
+  /* the round / timer window */
+  #timer { right: 12px; top: 12px; width: 208px; }
+  #timer .round { font: 600 22px/1.1 ui-monospace, monospace; color: #111; }
+  #timer .sub { opacity: .6; font-size: 11px; margin-bottom: 8px; }
+  #timer button {
+    width: 100%; padding: 7px 10px; font: 600 12px ui-sans-serif, system-ui, sans-serif;
+    border: 1px solid #c2703f; background: #c2703f; color: #fff;
+    border-radius: 7px; cursor: pointer;
+  }
+  #timer button:hover { background: #ad6234; }
+  #timer button:disabled { background: #bbb; border-color: #bbb; cursor: default; }
+  #timer label { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11px; opacity: .8; }
+  #timer .bar { height: 3px; background: rgba(0,0,0,.09); border-radius: 2px; margin-top: 7px; overflow: hidden; }
+  #timer .bar i { display: block; height: 100%; background: #c2703f; width: 0; }
+
+  /* the NPC state debug window */
+  #debug {
+    right: 12px; top: 168px; width: 320px;
+    max-height: calc(100vh - 200px); overflow: auto;
+    font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  #debug .npc { border-top: 1px solid rgba(0,0,0,.1); padding: 7px 0 8px; }
+  #debug .npc:first-child { border-top: 0; padding-top: 0; }
+  #debug .who { font-weight: 700; color: #111; font-size: 12px; }
+  #debug .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+  #debug .state { float: right; font-size: 10px; padding: 1px 6px; border-radius: 9px; background: #ece7df; color: #5c5349; }
+  #debug .state.BROWSE   { background: #dbe9d5; color: #3f6b32; }
+  #debug .state.CLOSEOUT { background: #f2e2cd; color: #8a5a25; }
+  #debug .state.QUEUED,
+  #debug .state.ENTERING { background: #dde4f0; color: #3f5378; }
+  #debug .state.GONE,
+  #debug .state.LEAVING  { background: #e6e2e2; color: #7a6f6f; }
+  #debug .row { display: flex; justify-content: space-between; gap: 8px; }
+  #debug .row span:last-child { color: #111; text-align: right; }
+  #debug .k { opacity: .55; }
+  #debug .traits { margin-top: 4px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; font-size: 10px; }
+  #debug .traits div { display: flex; justify-content: space-between; }
+  #debug .traits b { font-weight: 700; color: #111; }
+  #debug .note { margin-top: 4px; color: #6a5f55; font-style: italic; }
+  #debug .got { color: #3f7f5a; font-weight: 700; }
+  #debug h4 { margin: 0 0 6px; font: 700 11px ui-sans-serif, system-ui, sans-serif; letter-spacing: .04em; text-transform: uppercase; opacity: .55; }
+  #debug .log { margin-top: 8px; border-top: 1px solid rgba(0,0,0,.1); padding-top: 6px; font-size: 10px; color: #6a5f55; }
+  #debug .log div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="perf"></div>
+
+<div id="timer" class="panel">
+  <div class="round" id="roundLabel">round 0</div>
+  <div class="sub" id="clockLabel">shop is opening</div>
+  <button id="advance">Advance round &rarr;</button>
+  <label><input type="checkbox" id="auto" /> auto-advance every 30s</label>
+  <div class="bar"><i id="autoBar"></i></div>
+</div>
+
+<div id="debug" class="panel"><h4>NPC state</h4><div id="npcState"></div></div>
+
+<div id="hud" class="panel">
+  <b>LYS store</b> — NPC visit state machine POC<br />
+  Drag to orbit · scroll to zoom<br />
+  <kbd>Space</kbd> advance round &nbsp; <kbd>R</kbd> restart visit<br />
+  <kbd>1</kbd> felted &nbsp; <kbd>2</kbd> grey &nbsp; <kbd>3</kbd> silhouette &nbsp; <kbd>B</kbd> squint<br />
+  <kbd>F</kbd> frame room &nbsp; <kbd>G</kbd> grid lines
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import GUI from 'three/addons/libs/lil-gui.module.min.js';
+import {
+  BASE_PARAMS, TONE_MAPPING, POSES, POSE_KEYS, BUILD,
+  createCharacter, applyPose, setViewMode, disposeCharacter,
+  setGeometryDetail, GEO_DETAIL, getSpecies, speciesIds, pick,
+} from './npc.js';
+import './owl.js';
+import './llama.js';
+
+import {
+  loadAtlas, cellRect, makeGridLines, makeField, makeEdge, makeShadows, makeBoxes, makeSizeAtlas,
+  setInstance, placeMatrix, placeBoxMatrix, placeLabelMatrix,
+} from '../inventory/notions.js';
+import { makeDisplay, gridSize, footprint, fits, place, slotRect } from '../inventory/grid.js';
+
+import {
+  TRAITS, ACTION, STATE, maxWips, makeNpc, makeWorld, advanceRound, labelOf,
+} from './visit.js';
+
+console.info('LYS build', BUILD);
+
+const ATLAS_URL = '../ai_planning_sessions/inventory/illustrations/build';
+// EU/metric only for MVP — matches inventory/stash-and-stuff.html.
+const HOOK_SIZES_MM = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 8.0];
+
+// ---------------------------------------------------------------- scale
+//
+// The one thing this POC exists to check: a character and a display in the SAME room. An NPC
+// normalises to ~1.0 units tall (npc.js), so every dimension below is a fraction of a customer.
+// Notions stay deliberately oversized per LYS.md — a 0.2 slot is a fifth of a person, which is
+// absurd in real life and correct here, because the player has to see and grab them.
+const CELL = 0.20;        // uniform across ALL displays — DISPLAYS.md rule 2, so items can move
+const BOX_H = 0.055;      // one 2.5D layer
+const SHELF_GAP = 0.28;   // must exceed headroom * BOX_H or a full stack pokes through the glass
+// doorH is generous on purpose: a 1.0-tall NPC needs the opening to read as a shop door, not a
+// hatch, and the tallest species (llama, per P1-SPIKE-PLAN) is ~1.33 before any hat.
+const ROOM = { w: 6.4, d: 6.4, wallH: 2.6, doorW: 1.2, doorH: 2.0 };
+const SEAT_H = 0.22;   // chair seat height — roughly one chibi leg
+
+const S = {
+  quality:     'high',
+  detail:      'high',
+  renderScale: 1.0,
+  partShadows: true,
+  mergeMeshes: true,
+  blobShadows: false,
+  shadows:     true,
+  view:        'felted',
+  npcCount:     2,
+  displayCount: 2,
+  chairCount:   2,
+  showGrid:    true,
+  autoSeconds: 30,      // CHARACTER-VISIT.md: a round is 15 in-game minutes, ~30s of real time
+  travel:      1.4,     // seconds of animation per round of movement
+  // How far a seated NPC rises so they rest ON the chair rather than through it. The rig grounds
+  // every pose to feet-at-zero, so this cannot be derived — it needs eyeballing per seat height.
+  seatLift:    0.16,
+  exposure:    BASE_PARAMS.exposure,
+  toneMapping: BASE_PARAMS.toneMapping,
+};
+
+const QUALITY = {
+  low:    { detail: 'low',  renderScale: 0.75, blobShadows: true,  partShadows: false },
+  medium: { detail: 'med',  renderScale: 1.00, blobShadows: true,  partShadows: false },
+  high:   { detail: 'high', renderScale: 1.00, blobShadows: false, partShadows: true  },
+};
+
+// ---------------------------------------------------------------- renderer
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+const applyRenderScale = () =>
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2) * S.renderScale);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = TONE_MAPPING[S.toneMapping];
+renderer.toneMappingExposure = S.exposure;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#e8e2d9');
+
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 200);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.minDistance = 2.5;
+// Hiding the near walls only works while the camera stays above the shop looking down into it.
+// Below the horizon you would be under the floor with every near wall culled, which is exactly the
+// "outside of the box" view the cutaway exists to prevent. 0.42π keeps a shallow angle available
+// (good for reading shelf faces) without ever reaching level with the floor.
+controls.maxPolarAngle = Math.PI * 0.42;
+controls.maxDistance = 16;   // beyond this the room is a small object on screen, not a diorama
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const key = new THREE.DirectionalLight('#ffe6c4', 2.4);
+key.position.set(3.5, 6, 4);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.near = 0.5;
+key.shadow.camera.far = 24;
+key.shadow.camera.left = -5;
+key.shadow.camera.right = 5;
+key.shadow.camera.top = 5;
+key.shadow.camera.bottom = -5;
+key.shadow.bias = -0.0012;
+key.shadow.radius = 3;
+scene.add(key);
+scene.add(new THREE.HemisphereLight('#cfe0ff', '#8b7a68', 0.6));
+const rim = new THREE.DirectionalLight('#bcd4ff', 0.9);
+rim.position.set(-4, 2.5, -5);
+scene.add(rim);
+
+// ---------------------------------------------------------------- the room shell
+//
+// TODO: this is a blockout, not the shop. DESIGN-DECISIONS.md wants a static room shell with baked
+// AO and no real-time shadow map at all. Walls are boxes and the door is a gap between two of them.
+const roomGroup = new THREE.Group();
+scene.add(roomGroup);
+
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(ROOM.w, ROOM.d),
+  new THREE.MeshStandardMaterial({ color: '#cbbfa9', roughness: 0.96 })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+roomGroup.add(floor);
+
+// You must never see the OUTSIDE of a wall. The room is an interior, and a diorama you can orbit
+// around the back of stops reading as one. Two halves to that, and both are needed:
+//
+//   1. Any wall between the camera and the room is hidden (this function plus cullWalls). Standard
+//      Sims / Two Point cutaway: the near walls vanish, the far walls stay, so you are always
+//      looking INTO a room rather than at a box.
+//   2. The camera is fenced in (see controls below) so it can never drop under the floor, where
+//      hidden near walls would leave you staring at the underside of everything.
+//
+// A wall knows which way is "in". That is the whole trick — visible when the camera is on its
+// inward side, hidden when it is not.
+const UP = new THREE.Vector3(0, 1, 0);
+const walls = [];
+
+const wallMat = new THREE.MeshStandardMaterial({ color: '#ded4c2', roughness: 0.95, side: THREE.DoubleSide });
+function wall(w, h, x, y, z, ry) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.08), wallMat);
+  m.position.set(x, y, z);
+  m.rotation.y = ry;
+  m.receiveShadow = true;
+  m.castShadow = true;
+  // local +Z turned by the wall's yaw, then flipped if it points away from the room's centre
+  const inward = new THREE.Vector3(0, 0, 1).applyAxisAngle(UP, ry);
+  if (inward.dot(new THREE.Vector3(-x, 0, -z)) < 0) inward.negate();
+  m.userData.inward = inward;
+  roomGroup.add(m);
+  walls.push(m);
+  return m;
+}
+
+const _toCamera = new THREE.Vector3();
+
+/**
+ * Hide the walls the camera is outside of. `castShadow` follows `visible`, or a wall you cannot
+ * see still throws a hard shadow across the shop and the cutaway reads as a lighting bug.
+ */
+function cullWalls() {
+  for (const w of walls) {
+    const inside = _toCamera.subVectors(camera.position, w.position).dot(w.userData.inward) > 0;
+    w.visible = inside;
+    w.castShadow = inside;
+  }
+}
+
+const HALF_W = ROOM.w / 2, HALF_D = ROOM.d / 2;
+wall(ROOM.w, ROOM.wallH, 0, ROOM.wallH / 2, -HALF_D, 0);                       // back
+wall(ROOM.d, ROOM.wallH, -HALF_W, ROOM.wallH / 2, 0, Math.PI / 2);             // left
+wall(ROOM.d, ROOM.wallH, HALF_W, ROOM.wallH / 2, 0, Math.PI / 2);              // right
+// front wall, split around the doorway
+const sideW = (ROOM.w - ROOM.doorW) / 2;
+wall(sideW, ROOM.wallH, -(ROOM.doorW / 2 + sideW / 2), ROOM.wallH / 2, HALF_D, 0);
+wall(sideW, ROOM.wallH, (ROOM.doorW / 2 + sideW / 2), ROOM.wallH / 2, HALF_D, 0);
+wall(ROOM.doorW, ROOM.wallH - ROOM.doorH, 0, ROOM.wallH - (ROOM.wallH - ROOM.doorH) / 2, HALF_D, 0);   // lintel
+
+// A doormat, purely so "the door" is a place you can see rather than a coordinate in a debug panel.
+const mat = new THREE.Mesh(
+  new THREE.PlaneGeometry(ROOM.doorW * 0.85, 0.34),
+  new THREE.MeshStandardMaterial({ color: '#9a8b74', roughness: 1 })
+);
+mat.rotation.x = -Math.PI / 2;
+mat.position.set(0, 0.004, HALF_D - 0.22);
+roomGroup.add(mat);
+
+// The counter (Guestbook lives on it) and the Drop Off floor area. Both are markers, not mechanics.
+// TODO: the Guestbook and the Drop Off floor display are real diegetic objects per LYS.md 5c —
+// signing and lending are logged to the console today and drawn as coloured rectangles.
+function marker(w, d, x, z, color, y = 0.005) {
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(w, d),
+    new THREE.MeshStandardMaterial({ color, roughness: 1, transparent: true, opacity: 0.75 })
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(x, y, z);
+  roomGroup.add(m);
+  return m;
+}
+const counter = new THREE.Mesh(
+  new THREE.BoxGeometry(1.4, 0.62, 0.45),
+  new THREE.MeshStandardMaterial({ color: '#a98f6d', roughness: 0.9 })
+);
+counter.position.set(-2.1, 0.31, 1.7);
+counter.castShadow = true;
+counter.receiveShadow = true;
+roomGroup.add(counter);
+marker(0.9, 0.7, -2.1, 1.15, '#c9a24a');      // where an NPC stands to sign
+marker(1.0, 1.0, 2.2, 1.7, '#7f9ec2');        // the Drop Off floor display
+
+// The Guestbook itself — an open book lying on the counter. Still a blockout (LYS.md 5c wants a
+// real object NPCs animate against) but the counter should not be bare, because the signing is
+// the emotional payoff of the whole loop and it needs somewhere to happen.
+const guestbook = new THREE.Group();
+guestbook.position.set(-2.1, 0.62, 1.6);
+guestbook.rotation.y = 0.12;
+{
+  const cover = new THREE.Mesh(
+    new THREE.BoxGeometry(0.34, 0.035, 0.26),
+    new THREE.MeshStandardMaterial({ color: '#7a3b3b', roughness: 0.7 }));
+  cover.castShadow = true;
+  guestbook.add(cover);
+  // two pages, tented slightly open down the spine
+  const paper = new THREE.MeshStandardMaterial({ color: '#f4ecd8', roughness: 0.95 });
+  for (const side of [-1, 1]) {
+    const page = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.012, 0.24), paper);
+    page.position.set(side * 0.085, 0.025, 0);
+    page.rotation.z = side * -0.06;
+    guestbook.add(page);
+  }
+  const ribbon = new THREE.Mesh(
+    new THREE.BoxGeometry(0.02, 0.004, 0.2),
+    new THREE.MeshStandardMaterial({ color: '#c9a24a', roughness: 0.6 }));
+  ribbon.position.set(0.03, 0.034, 0.03);
+  guestbook.add(ribbon);
+}
+roomGroup.add(guestbook);
+
+// ---------------------------------------------------------------- shared furniture materials
+const woodMat = new THREE.MeshStandardMaterial({ color: '#b59a76', roughness: 0.9 });
+const seatMat = new THREE.MeshStandardMaterial({ color: '#8f7f66', roughness: 0.85 });
+const glassMat = new THREE.MeshPhysicalMaterial({
+  color: '#eef4f2', transmission: 0.9, roughness: 0.45, thickness: 0.05,
+  ior: 1.3, clearcoat: 0.3, side: THREE.DoubleSide, transparent: true,
+});
+const GLASS_T = 0.012;
+
+/** Empty a group and free what it owns. Shared materials are left alone; per-build ones are not. */
+function clearGroup(group) {
+  for (const child of [...group.children]) {
+    child.traverse?.((n) => {
+      n.geometry?.dispose();
+      // makeGridLines mints a material per call, so it has to go too. The shared furniture
+      // materials above are reused every rebuild and must NOT be disposed.
+      if (n.material && n.material !== woodMat && n.material !== seatMat && n.material !== glassMat) {
+        n.material.dispose();
+      }
+    });
+    group.remove(child);
+  }
+}
+
+// ---------------------------------------------------------------- seating
+//
+// A chair is the third kind of place an NPC walks to and occupies, after a display's standing spot
+// and the Guestbook counter. Working on a WIP now requires one — an NPC standing in the middle of
+// the floor knitting looked like a bug, and parking them in front of a display blocked it.
+// TODO: a cube. Wants to be an actual chair, and probably a small table with it.
+//
+// A pool of positions rather than a fixed pair: the chair COUNT is a live control, so the layout
+// has to be authored for the largest case and taken from the front. Same pattern as the displays.
+const SEAT_SLOTS = [
+  { id: 'chair-a', x: -1.75, z: -0.55, facing: Math.PI * 0.62 },
+  { id: 'chair-b', x: -1.75, z: 0.35, facing: Math.PI * 0.38 },
+  { id: 'chair-c', x: -0.95, z: -0.95, facing: Math.PI * 0.75 },
+  { id: 'chair-d', x: -0.95, z: 0.75, facing: Math.PI * 0.25 },
+  { id: 'chair-e', x: -2.45, z: -0.10, facing: Math.PI * 0.50 },
+  { id: 'chair-f', x: -0.20, z: -0.10, facing: -Math.PI * 0.50 },
+];
+
+let seats = [];
+const chairGroup = new THREE.Group();
+roomGroup.add(chairGroup);
+
+function buildChairs(n) {
+  clearGroup(chairGroup);
+  seats = SEAT_SLOTS.slice(0, n).map((s) => ({ ...s }));
+  for (const s of seats) {
+    const chair = new THREE.Mesh(new THREE.BoxGeometry(0.34, SEAT_H, 0.34), seatMat);
+    chair.position.set(s.x, SEAT_H / 2, s.z);
+    chair.rotation.y = s.facing;
+    chair.castShadow = true;
+    chair.receiveShadow = true;
+    chairGroup.add(chair);
+  }
+}
+
+// ---------------------------------------------------------------- displays
+//
+// One of each type in DISPLAYS.md: a wall shelf and a floor/table pile. Copied from
+// inventory/stash-and-stuff.html rather than imported, because that file is a page, not a module.
+// TODO: extract the shared painting code (paintInstance/refresh below) into inventory/ so this and
+// stash-and-stuff.html stop being two copies of the same thirty lines.
+function makeFrame(position, quaternion) {
+  const frame = new THREE.Matrix4().compose(position, quaternion, new THREE.Vector3(1, 1, 1));
+  return { frame, frameInv: frame.clone().invert(), quat: quaternion.clone() };
+}
+
+const SHELF_BASE_Y = 0.34;   // the plinth: puts the top shelf at roughly NPC head height
+const TABLE_TOP_Y = 0.44;
+const STAND_OFF = 0.65;      // how far in front of a display an NPC stands to reach it
+
+// Authored positions, taken from the front as the count goes up. Shelves carry a yaw so they can
+// sit against a side wall; a pile is a free-standing table and always reads the same way round.
+const DISPLAY_SLOTS = [
+  { id: 'shelf-n', kind: 'shelf', cols: 5, rows: 2, shelves: 3, headroom: 3, x: 0,    z: -HALF_D + 0.5, yaw: 0 },
+  { id: 'table-a', kind: 'pile',  cols: 5, rows: 5, shelves: 1, headroom: 8, x: 1.5,  z: -0.2,          yaw: 0 },
+  { id: 'shelf-e', kind: 'shelf', cols: 5, rows: 2, shelves: 3, headroom: 3, x: HALF_W - 0.5, z: -1.1,  yaw: -Math.PI / 2 },
+  { id: 'shelf-w', kind: 'shelf', cols: 5, rows: 2, shelves: 3, headroom: 3, x: -HALF_W + 0.5, z: -1.6, yaw: Math.PI / 2 },
+  { id: 'table-b', kind: 'pile',  cols: 4, rows: 4, shelves: 1, headroom: 8, x: 1.45, z: 1.75,          yaw: 0 },
+  { id: 'table-c', kind: 'pile',  cols: 4, rows: 4, shelves: 1, headroom: 8, x: -0.35, z: -1.75,        yaw: 0 },
+];
+
+let displays = [];
+const displayGroup = new THREE.Group();
+scene.add(displayGroup);
+const byId = (id) => displays.find((d) => d.id === id);
+
+/**
+ * One display from a slot spec. The sim treats a display as an axis-aligned box, so a shelf turned
+ * 90° has to report its footprint swapped — otherwise the visibility test thinks a side-wall shelf
+ * is wide when it is actually deep, and NPCs "see" through it.
+ */
+function makeDisplayFromSlot(slot) {
+  const baseY = slot.kind === 'shelf' ? SHELF_BASE_Y : TABLE_TOP_Y;
+  const quat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), slot.yaw);
+  const gw = slot.cols * CELL, gd = slot.rows * CELL;
+  const turned = Math.abs(Math.sin(slot.yaw)) > 0.5;
+  // Local +Z is the display's front (local -Z, row 0, is the wall side), rotated into world space.
+  const front = { x: Math.sin(slot.yaw), z: Math.cos(slot.yaw) };
+
+  return {
+    id: slot.id, kind: slot.kind,
+    wallRow: slot.kind === 'shelf' ? 0 : -1,   // a table has no wall side
+    g: makeDisplay(slot.cols, slot.rows, {
+      shelves: slot.shelves, headroom: slot.headroom, cell: CELL,
+    }),
+    gap: SHELF_GAP, baseY,
+    x: slot.x, z: slot.z,
+    w: turned ? gd : gw,
+    d: turned ? gw : gd,
+    standAt: { x: slot.x + front.x * STAND_OFF, z: slot.z + front.z * STAND_OFF },
+    ...makeFrame(new THREE.Vector3(slot.x, baseY, slot.z), quat),
+    lines: [], panels: [],
+  };
+}
+
+function buildDisplays(n) {
+  clearGroup(displayGroup);
+  displays = DISPLAY_SLOTS.slice(0, n).map(makeDisplayFromSlot);
+  for (const d of displays) {
+    d.group = new THREE.Group();
+    d.group.matrixAutoUpdate = false;
+    d.group.matrix.copy(d.frame);
+    displayGroup.add(d.group);
+    buildFurniture(d);
+  }
+  paintGrids();
+}
+
+// Physical furniture under the grids, so the displays read as shop fittings and not floating slots.
+function buildFurniture(d) {
+  const { w, d: depth } = gridSize(d.g);
+  const surface = new THREE.Mesh(new THREE.BoxGeometry(w * 1.06, GLASS_T * 2, depth * 1.06), woodMat);
+  surface.position.y = -GLASS_T;
+  surface.receiveShadow = true;
+  d.group.add(surface);
+
+  for (let s = 0; s < d.g.shelves; s++) {
+    const lines = makeGridLines(d.g, s);
+    lines.position.y = s * d.gap + 0.002;
+    d.lines.push(lines);
+    d.group.add(lines);
+    if (s > 0) {
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(w * 1.06, GLASS_T, depth * 1.06), glassMat);
+      panel.position.y = s * d.gap - GLASS_T / 2;
+      d.panels.push(panel);
+      d.group.add(panel);
+    }
+  }
+
+  // The plinth and the shelf's back panel live in the display's LOCAL space too, so a rotated
+  // shelf brings its own furniture round with it instead of leaving it behind axis-aligned.
+  const leg = new THREE.Mesh(new THREE.BoxGeometry(w * 0.92, d.baseY, depth * 0.92), woodMat);
+  leg.position.y = -d.baseY / 2;
+  leg.castShadow = true;
+  leg.receiveShadow = true;
+  d.group.add(leg);
+
+  // the back panel of the wall shelf, so "wall-facing row" is visible as well as modelled
+  if (d.kind === 'shelf') {
+    const back = new THREE.Mesh(new THREE.BoxGeometry(w * 1.06, d.g.shelves * d.gap, 0.03), woodMat);
+    back.position.set(0, (d.g.shelves * d.gap) / 2, -depth / 2 - 0.02);
+    back.receiveShadow = true;
+    d.group.add(back);
+  }
+}
+
+const paintGrids = () => displays.forEach((d) => d.lines.forEach((l) => { l.visible = S.showGrid; }));
+
+// ---------------------------------------------------------------- notions
+let atlas = null, sizeAtlas = null;
+let field = null, edge = null, fieldTop = null, edgeTop = null, shadows = null, boxes = null;
+let sizeTag = null, sizeTop = null;
+const items = [];
+// Sized for the largest layout the dropdowns allow (6 displays plus every NPC's seeded targets),
+// with headroom. An InstancedMesh cannot grow after allocation, so this is a hard ceiling.
+const CAPACITY = 256;
+const FILL = 0.9;
+
+const _pos = new THREE.Vector3();
+const _mat = new THREE.Matrix4();
+const _topMat = new THREE.Matrix4();
+const _sizeMat = new THREE.Matrix4();
+const _sizeTopMat = new THREE.Matrix4();
+const _boxMat = new THREE.Matrix4();
+const _shadowMat = new THREE.Matrix4();
+const _col = new THREE.Color();
+const _hide = new THREE.Matrix4().makeScale(0, 0, 0);
+
+const baseY = (d, shelf, layer) => shelf * d.gap + layer * BOX_H;
+
+function paintInstance(display, index, cx, cz, boxBase, shadowBase, footW, footD, yaw) {
+  const item = items[index];
+  const boxW = footW, boxD = footD, boxH = BOX_H;
+  const F = display.frame;
+
+  _pos.set(cx, boxBase + boxH / 2, cz);
+  setInstance(boxes, index, { matrix: placeBoxMatrix(_pos, boxW, boxD, boxH, yaw, _boxMat).premultiply(F) });
+
+  const fx = Math.sin(yaw), fz = Math.cos(yaw);
+  const halfOut = boxD / 2 + 0.003;
+  _pos.set(cx + fx * halfOut, boxBase + boxH * 0.55, cz + fz * halfOut);
+  setInstance(field, index, {
+    matrix: placeLabelMatrix(_pos, boxW * 0.92, boxH * 0.82, yaw, _mat).premultiply(F),
+    rect: cellRect(atlas.manifest, item.name),
+    color: _col.set(item.color),
+  });
+
+  // The top icon is inset to leave a corner free for the size number below it.
+  _pos.set(cx, boxBase + boxH + 0.002, cz);
+  setInstance(fieldTop, index, {
+    matrix: placeMatrix(_pos, boxW * 0.70, boxD * 0.70, yaw, _topMat).premultiply(F),
+    rect: cellRect(atlas.manifest, item.name),
+    color: _col.set(item.color),
+  });
+
+  const sizeRect = cellRect(sizeAtlas.manifest, item.size != null ? item.size.toFixed(1) : 'blank');
+
+  // Size on the SIDE face, for when the camera is low and looking along the shelf.
+  const sx = Math.cos(yaw), sz = -Math.sin(yaw);
+  const sideOut = boxW / 2 + 0.003;
+  _pos.set(cx + sx * sideOut, boxBase + boxH * 0.55, cz + sz * sideOut);
+  setInstance(sizeTag, index, {
+    matrix: placeLabelMatrix(_pos, boxD * 0.5, boxH * 0.5, yaw + Math.PI / 2, _sizeMat).premultiply(F),
+    rect: sizeRect,
+  });
+
+  // Size on the TOP face too, in the front corner like a sticker. This is the one that matters:
+  // the game is an orbiting diorama looking DOWN, so a number only on the side is invisible in
+  // normal play — and hook size has to be readable at a glance for it to work as something the
+  // player arranges by.
+  const fwd = Math.sin(yaw), fwdZ = Math.cos(yaw);
+  _pos.set(
+    cx + fwd * boxD * 0.30 + sx * boxW * 0.28,
+    boxBase + boxH + 0.004,
+    cz + fwdZ * boxD * 0.30 + sz * boxW * 0.28,
+  );
+  setInstance(sizeTop, index, {
+    matrix: placeMatrix(_pos, boxW * 0.40, boxD * 0.40, yaw, _sizeTopMat).premultiply(F),
+    rect: sizeRect,
+  });
+
+  _pos.set(cx, shadowBase + 0.003, cz);
+  shadows.setMatrixAt(index, placeMatrix(_pos, boxW * 1.08, boxD * 1.08, yaw, _shadowMat).premultiply(F));
+  shadows.instanceMatrix.needsUpdate = true;
+}
+
+/** Draw an item at rest in its slot — or nowhere at all, once an NPC has bought it. */
+function refresh(index) {
+  const item = items[index];
+  if (item.gone) {
+    for (const m of [boxes, field, fieldTop, sizeTag, sizeTop]) setInstance(m, index, { matrix: _hide });
+    shadows.setMatrixAt(index, _hide);
+    shadows.instanceMatrix.needsUpdate = true;
+    return;
+  }
+  const disp = byId(item.display);
+  const rect = slotRect(disp.g, item.c, item.r, item.w, item.h);
+  const base = baseY(disp, item.shelf, item.layer);
+  paintInstance(disp, index, rect.x, rect.z, base, base, rect.w * FILL, rect.d * FILL, item.yaw);
+}
+
+const refreshAll = () => items.forEach((_, i) => refresh(i));
+
+const NOTION_NAMES = ['crochet-hook', 'darning-needle', 'stitch-markers'];
+const rnd = (n) => Math.floor(Math.random() * n);
+
+// Which notions have a size attribute AT ALL. Stitch markers and darning needles do not come in
+// millimetres, so a number on their box is not a cosmetic glitch — it invents an attribute the item
+// cannot have, in the one channel the player is supposed to read and arrange by.
+//
+// Enforced here, in the shared constructor, rather than at each call site: size arrives as a free
+// parameter from three different callers, and any of them getting it wrong produces the same wrong
+// box. A hook always gets a size, since a real one always has one.
+const SIZED_NOTIONS = new Set(['crochet-hook']);
+const sizeFor = (name, size) =>
+  (SIZED_NOTIONS.has(name) ? (size ?? pick(HOOK_SIZES_MM)) : null);
+
+/**
+ * Put one item in the first slot it fits, scanning from a random start. Returns its index or -1.
+ * `avoidWall` keeps it off a shelf's wall-facing row, which DISPLAYS.md says can never be noticed
+ * — without it a "guaranteed buyable" seed can land somewhere an NPC is not allowed to see.
+ */
+function addItem(display, shelf, name, size, { c, r, avoidWall = false } = {}) {
+  if (items.length >= CAPACITY) return -1;   // the instanced buffers cannot grow past this
+  const g = display.g;
+  const cells = [];
+  for (let rr = 0; rr < g.rows; rr++) for (let cc = 0; cc < g.cols; cc++) {
+    if (avoidWall && rr === display.wallRow) continue;
+    cells.push({ c: cc, r: rr });
+  }
+  const ordered = (c != null) ? [{ c, r }, ...cells] : cells.slice(rnd(cells.length)).concat(cells);
+
+  for (const cell of ordered) {
+    const keys = footprint(g, shelf, cell.c, cell.r, 1, 1);
+    if (!fits(g, keys)) continue;
+    const index = items.length;
+    items.push({
+      name, size: sizeFor(name, size), display: display.id, shelf, c: cell.c, r: cell.r, w: 1, h: 1,
+      keys, layer: place(g, keys, index), color: '#241e22',
+      yaw: (Math.random() - 0.5) * 0.18 * Math.PI, gone: false,
+    });
+    return index;
+  }
+  return -1;
+}
+
+// ---------------------------------------------------------------- the world
+const room = {
+  door:      { x: 0, z: HALF_D - 0.35 },
+  outside:   { x: 0, z: HALF_D + 1.4 },
+  queueAt:   { x: 0, z: HALF_D + 0.8 },
+  guestbook: { x: -2.1, z: 1.15 },
+  dropOff:   { x: 2.2, z: 1.7 },
+  personalSpace: 0.62,
+  doorClearance: 0.8,   // nobody may loiter this close to the door — it is the only way through
+  bounds: { minX: -HALF_W + 0.6, maxX: HALF_W - 0.6, minZ: -HALF_D + 1.4, maxZ: HALF_D - 0.9 },
+};
+
+let world = null;
+let cast = [];   // render records, parallel to world.npcs
+const castGroup = new THREE.Group();
+scene.add(castGroup);
+
+// Fill whatever displays currently exist. buildDisplays() has already made their grids fresh, so
+// this only has to place items — a shelf gets more because it has three levels to fill.
+function stockDisplays() {
+  items.length = 0;
+  for (const d of displays) {
+    const n = d.kind === 'shelf' ? 14 : 10;
+    for (let i = 0; i < n; i++) {
+      // Size is always offered; addItem keeps it only for notions that actually have one.
+      addItem(d, rnd(d.g.shelves), NOTION_NAMES[rnd(3)], pick(HOOK_SIZES_MM));
+    }
+  }
+}
+
+/**
+ * Guarantee each NPC can actually finish their visit: one copy of the target sitting where it can
+ * be noticed, and one buried under something so the Assertiveness "dig it out" branch of
+ * DISPLAYS.md gets exercised too.
+ */
+function seedTargets(npcs) {
+  npcs.forEach((npc, i) => {
+    const open = displays[i % displays.length];
+    const hidden = displays[(i + 1) % displays.length];
+    addItem(open, 0, npc.target.name, npc.target.size, { avoidWall: true });
+    const buried = addItem(hidden, 0, npc.target.name, npc.target.size, { avoidWall: true });
+    if (buried >= 0) {
+      const it = items[buried];
+      addItem(hidden, 0, 'darning-needle', null, { c: it.c, r: it.r });   // stacks on top of it
+    }
+  });
+}
+
+const NAMES = ['Marguerite', 'Bramble', 'Wilhelmina', 'Otto', 'Pernilla', 'Casimir', 'Juniper', 'Bo'];
+
+function spawnCast() {
+  for (const rec of cast) { castGroup.remove(rec.built.root); disposeCharacter(rec.built); }
+  cast = [];
+
+  const npcs = [];
+  for (let i = 0; i < S.npcCount; i++) {
+    const kit = getSpecies(pick(speciesIds()));
+    const P = kit.randomise(structuredClone(kit.defaults));
+    P.partShadows = S.partShadows;
+    P.mergeMeshes = S.mergeMeshes;
+    const built = createCharacter(P, kit);
+
+    // Target formation: for now literally one notion — a hook in a specific size, or stitch
+    // markers, which have no size attribute at all.
+    const wantsHook = i % 2 === 0;
+    const target = wantsHook
+      ? { name: 'crochet-hook', size: pick(HOOK_SIZES_MM) }
+      : { name: 'stitch-markers', size: null };
+
+    const npc = makeNpc({
+      id: `npc${i}`,
+      name: NAMES[i % NAMES.length],
+      species: kit.label,
+      target,
+    });
+    // queue up outside, single file, so entering one at a time is visible as well as modelled
+    npc.x = room.queueAt.x + (i - (S.npcCount - 1) / 2) * 0.0;
+    npc.z = room.queueAt.z + i * 0.7;
+    npc.from = { x: npc.x, z: npc.z };
+    npcs.push(npc);
+
+    built.root.position.set(npc.x, 0, npc.z);
+    castGroup.add(built.root);
+    applyPose(built, POSES.rest);
+
+    cast.push({
+      npc, built, color: P.bodyColor,
+      poseFrom: { ...POSES.rest }, poseTo: POSES.rest, pt: 1,
+      moveT: 1, travelled: 0, fromY: 0, toY: 0,
+      carriedName: null, carriedMesh: null,
+    });
+  }
+  setViewMode(castGroup, S.view);
+  return npcs;
+}
+
+function restart() {
+  buildDisplays(S.displayCount);
+  buildChairs(S.chairCount);
+  stockDisplays();
+  const npcs = spawnCast();
+  seedTargets(npcs);
+  world = makeWorld({ displays, items, room, seats });
+  world.npcs = npcs;
+  for (const m of [field, edge, fieldTop, edgeTop, shadows, boxes, sizeTag, sizeTop]) m.count = items.length;
+  refreshAll();
+  buildBlobs();
+  drawDebug();
+  drawTimer();
+}
+
+// ---------------------------------------------------------------- rounds
+let autoElapsed = 0;
+
+function doAdvanceRound() {
+  if (!world) return;
+  if (!world.npcs.some((n) => n.state !== STATE.GONE)) return;   // shop is empty, stop the clock
+  advanceRound(world);
+  autoElapsed = 0;
+
+  for (const rec of cast) {
+    const n = rec.npc;
+    rec.moveT = 0;
+    rec.travelled = Math.hypot(n.x - n.from.x, n.z - n.from.z);
+    rec.fromY = rec.built.root.position.y;
+    rec.toY = n.seat !== null ? S.seatLift : 0;   // rise onto the chair as they arrive at it
+  }
+  refreshAll();       // an interaction may have bought, tidied or restacked a display
+  drawDebug();
+  drawTimer();
+}
+
+// ---------------------------------------------------------------- carried notions
+//
+// A held notion follows a hand, so it CANNOT be instanced — it is a real mesh parented to the rig's
+// hold node. inventory/DESIGN-DECISIONS.md §4 calls this out as a deliberate exception to the
+// instancing rule: ~10 concurrent NPCs means ~10 extra meshes, which is nothing.
+//
+// It is a fixed card oriented to the HAND, not a camera-facing billboard — the same doc warns that
+// a billboard in a fist pivots independently of the fist and reads as detached. The UVs are baked
+// into the geometry rather than fed through the atlas shader, so it needs no per-instance plumbing.
+let heldMat = null;
+
+function makeHeldNotion(name) {
+  heldMat ??= new THREE.MeshBasicMaterial({
+    map: atlas.texture, color: new THREE.Color('#241e22'),
+    transparent: false, alphaTest: 0.45, side: THREE.DoubleSide,
+  });
+  const [u0, v0, du, dv] = cellRect(atlas.manifest, name);
+  const geo = new THREE.PlaneGeometry(0.12, 0.12);
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) * du, v0 + uv.getY(i) * dv);
+  uv.needsUpdate = true;
+
+  const mesh = new THREE.Mesh(geo, heldMat);
+  mesh.rotation.set(-0.5, 0, 0.35);   // tipped up out of the fist so it reads from the diorama camera
+  mesh.position.set(0, -0.02, 0.02);
+  return mesh;
+}
+
+/** Show what an NPC bought, in their hand, from the round they pick it up. */
+function syncCarried(rec) {
+  const want = rec.npc.carrying?.name ?? null;
+  if (rec.carriedName === want) return;
+  rec.carriedName = want;
+  if (rec.carriedMesh) {
+    rec.carriedMesh.removeFromParent();
+    rec.carriedMesh.geometry.dispose();
+    rec.carriedMesh = null;
+  }
+  if (!want) return;
+  rec.carriedMesh = makeHeldNotion(want);
+  rec.built.holds[0].add(rec.carriedMesh);
+  if (rec.built.held) rec.built.held.visible = false;   // hide the rig's default skein
+}
+
+/** Which static pose an NPC holds once they have arrived for the round. */
+function poseFor(npc) {
+  if (npc.state === STATE.GONE) return POSES.rest;
+  switch (npc.action?.type) {
+    case ACTION.INTERACT:       return POSES.reach;
+    case ACTION.WALK_TO_SEAT:   return POSES.sit;   // they arrive and sit down in the same round
+    case ACTION.WORK_ON_WIP:    return POSES.sit;
+    case ACTION.SIGN_GUESTBOOK: return POSES.reach;
+    case ACTION.DROP_OFF:       return POSES.delighted;
+    case ACTION.WALK_TO_NPC:
+    case ACTION.WAIT:           return POSES.browse;
+    default:                    return npc.carrying ? POSES.carry : POSES.rest;
+  }
+}
+
+// TODO: there is no walk cycle. Movement is a straight-line lerp between the round's start and end
+// positions, holding the static `walk` pose. P1-SPIKE-PLAN.md step E owns the real one, and
+// DESIGN-DECISIONS.md wants grid A* with string-pulling plus separation steering underneath it.
+const blended = {};
+const BLEND = 0.35;
+
+function tickCast(dt) {
+  for (const rec of cast) {
+    const n = rec.npc;
+
+    if (rec.moveT < 1) {
+      rec.moveT = Math.min(1, rec.moveT + dt / Math.max(S.travel, 0.05));
+      const e = rec.moveT * rec.moveT * (3 - 2 * rec.moveT);
+      rec.built.root.position.set(
+        n.from.x + (n.x - n.from.x) * e,
+        rec.fromY + (rec.toY - rec.fromY) * e,
+        n.from.z + (n.z - n.from.z) * e,
+      );
+      if (rec.travelled > 0.05) rec.built.root.rotation.y = n.facing;
+    }
+
+    const moving = rec.moveT < 1 && rec.travelled > 0.05;
+    const want = moving ? (n.carrying ? POSES['walk+carry'] : POSES.walk) : poseFor(n);
+    if (want !== rec.poseTo) {
+      for (const k of POSE_KEYS) rec.poseFrom[k] = blendedValue(rec, k);
+      rec.poseFrom.holdItem = rec.poseTo.holdItem;
+      rec.poseTo = want;
+      rec.pt = 0;
+    }
+    if (rec.pt < 1) {
+      rec.pt = Math.min(1, rec.pt + dt / BLEND);
+      const e = rec.pt * rec.pt * (3 - 2 * rec.pt);
+      for (const k of POSE_KEYS) blended[k] = rec.poseFrom[k] + (rec.poseTo[k] - rec.poseFrom[k]) * e;
+      blended.holdItem = rec.pt > 0.5 ? rec.poseTo.holdItem : rec.poseFrom.holdItem;
+      applyPose(rec.built, blended);
+    }
+
+    syncCarried(rec);
+    // applyPose re-shows the rig's own placeholder skein whenever holdItem is true, so a real
+    // carried notion has to re-hide it every frame rather than only once.
+    if (rec.carriedMesh && rec.built.held) rec.built.held.visible = false;
+
+    rec.built.root.visible = n.state !== STATE.GONE;
+  }
+  updateBlobs();
+}
+
+const blendedValue = (rec, k) => {
+  const e = rec.pt * rec.pt * (3 - 2 * rec.pt);
+  return rec.poseFrom[k] + (rec.poseTo[k] - rec.poseFrom[k]) * e;
+};
+
+// ---------------------------------------------------------------- blob shadows
+// Same trade as crowd.html: one instanced draw for the whole cast instead of a second shadow pass.
+// Unlike crowd.html these follow the characters, because here the characters actually move.
+let blobs = null, blobTex = null;
+
+function blobTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0.0, 'rgba(0,0,0,0.55)');
+  g.addColorStop(0.5, 'rgba(0,0,0,0.30)');
+  g.addColorStop(1.0, 'rgba(0,0,0,0.00)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+
+function buildBlobs() {
+  if (blobs) { scene.remove(blobs); blobs.geometry.dispose(); blobs.material.dispose(); blobs = null; }
+  if (!S.blobShadows || !cast.length) return;
+  blobTex ??= blobTexture();
+  blobs = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, opacity: 0.55 }),
+    cast.length,
+  );
+  blobs.frustumCulled = false;
+  scene.add(blobs);
+  updateBlobs();
+}
+
+const _bm = new THREE.Matrix4();
+const _bq = new THREE.Quaternion();
+const _bp = new THREE.Vector3();
+const _bs = new THREE.Vector3();
+
+function updateBlobs() {
+  if (!blobs) return;
+  const dx = -key.position.x, dz = -key.position.z;
+  const len = Math.hypot(dx, dz) || 1;
+  const lx = dx / len, lz = dz / len;
+  _bq.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(-lz, lx));
+  cast.forEach((rec, i) => {
+    const P = rec.built.params;
+    const rx = P.torsoW * 2.8 * 1.45, rz = P.torsoD * 2.8;
+    const off = rx * 0.22;
+    const p = rec.built.root.position;
+    _bp.set(p.x + lx * off, 0.004, p.z + lz * off);
+    _bs.set(rx, 1, rz);
+    blobs.setMatrixAt(i, _bm.compose(_bp, _bq, _bs));
+  });
+  blobs.instanceMatrix.needsUpdate = true;
+}
+
+// ---------------------------------------------------------------- debug window
+const npcStateEl = document.getElementById('npcState');
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+function drawDebug() {
+  if (!world) return;
+  npcStateEl.innerHTML = world.npcs.map((n, i) => {
+    const rec = cast[i];
+    const row = (k, v) => `<div class="row"><span class="k">${k}</span><span>${esc(v)}</span></div>`;
+    const traits = TRAITS.map((t) =>
+      `<div><span class="k">${t.slice(0, 9)}</span><b>${n.traits[t]}</b></div>`).join('');
+    return `<div class="npc">
+      <span class="state ${n.state}">${n.state}</span>
+      <div class="who"><i class="swatch" style="background:${rec?.color ?? '#999'}"></i>${esc(n.name)}
+        <span class="k">· ${esc(n.species)}</span></div>
+      ${row('wants', labelOf(n.target))}
+      ${n.carrying ? `<div class="row"><span class="k">carrying</span><span class="got">${esc(labelOf(n.carrying))} ✓</span></div>` : ''}
+      ${row('round', `${n.roundsInStore} / ${n.maxRounds} MAX_ROUNDS`)}
+      ${row('action', n.action ? n.action.type : '—')}
+      ${row('last action', n.lastAction ? n.lastAction.type : '—')}
+      ${row('prescribed', n.prescribed ? n.prescribed.type : 'None')}
+      ${row('at display', n.atDisplay ?? '—')}
+      ${row('seat', n.seat ?? '—')}
+      ${row('restructured', n.restructured.length ? n.restructured.join(', ') : '—')}
+      ${row('WIPs', `${n.wips.length} of max ${maxWips(n.traits)}`)}
+      ${row('position', `${n.x.toFixed(2)}, ${n.z.toFixed(2)}`)}
+      <div class="traits">${traits}</div>
+      ${n.note ? `<div class="note">${esc(n.note)}</div>` : ''}
+    </div>`;
+  }).join('') +
+  `<div class="log">${world.log.slice(-6).reverse().map((l) => `<div>${esc(l)}</div>`).join('')}</div>`;
+}
+
+// ---------------------------------------------------------------- timer window
+const roundLabel = document.getElementById('roundLabel');
+const clockLabel = document.getElementById('clockLabel');
+const autoBar = document.getElementById('autoBar');
+const autoBox = document.getElementById('auto');
+const advanceBtn = document.getElementById('advance');
+
+function drawTimer() {
+  if (!world) return;
+  roundLabel.textContent = `round ${world.round}`;
+  // CHARACTER-VISIT.md: one round is 15 minutes of in-game time.
+  const minutes = world.round * 15;
+  const hh = String(10 + Math.floor(minutes / 60)).padStart(2, '0');
+  const mm = String(minutes % 60).padStart(2, '0');
+  const live = world.npcs.filter((n) => n.state !== STATE.GONE).length;
+  const inDoor = world.npcs.find((n) => n.id === world.door.busy);
+  clockLabel.textContent = `${hh}:${mm} · ${live}/${world.npcs.length} visiting` +
+    (inDoor ? ` · door: ${inDoor.name}` : ' · door clear');
+  advanceBtn.disabled = live === 0;
+  advanceBtn.textContent = live === 0 ? 'everyone has gone home' : 'Advance round →';
+}
+
+advanceBtn.addEventListener('click', doAdvanceRound);
+autoBox.addEventListener('change', () => { autoElapsed = 0; });
+
+// ---------------------------------------------------------------- perf overlay
+// Copied from crowd.html unchanged, so numbers from the two views are directly comparable.
+const perfEl = document.getElementById('perf');
+let fps = 60, lastPerf = 0;
+
+function updatePerf(dt) {
+  fps += (1 / Math.max(dt, 1e-4) - fps) * 0.06;
+  if (performance.now() - lastPerf < 250) return;
+  lastPerf = performance.now();
+
+  const r = renderer.info.render;
+  const mem = renderer.info.memory;
+  const cls = (v, warn, bad) => (v >= bad ? 'bad' : v >= warn ? 'warn' : 'ok');
+  const tri = r.triangles;
+
+  perfEl.innerHTML =
+    `<b>${fps.toFixed(0)} fps</b><br>` +
+    `draw calls <span class="${cls(r.calls, 120, 400)}">${r.calls}</span><br>` +
+    `triangles  <span class="${cls(tri, 4e5, 1.2e6)}">${(tri / 1000).toFixed(0)}k</span><br>` +
+    `geometries ${mem.geometries}<br>` +
+    `textures   ${mem.textures}<br>` +
+    `programs   ${renderer.info.programs?.length ?? 0}<br>` +
+    `<span style="opacity:.65">${cast.length} NPCs @ ${S.detail} · ${items.length} notions</span><br />` +
+    `<span style="opacity:.65">${(r.calls / Math.max(cast.length, 1)).toFixed(0)} calls/character</span>`;
+}
+
+// ---------------------------------------------------------------- framing
+/**
+ * Self-check: sweep every camera position the controls allow and assert the two things that can
+ * actually go wrong.
+ *
+ * Note what is NOT asserted: "no visible wall shows its outside face" is unfalsifiable here, since
+ * cullWalls DEFINES visible as exactly that test. The failures worth catching are the ones on
+ * either side of it — hiding so eagerly that the shop becomes an open plane again, and letting the
+ * camera under the floor, where the cutaway would show you the underside of the whole set.
+ */
+function checkWallCulling() {
+  const home = camera.position.clone();
+  const t = controls.target;
+  let bare = 0, sunk = 0, samples = 0, fewest = walls.length;
+
+  for (let a = 0; a < Math.PI * 2; a += Math.PI / 32) {
+    for (let p = 0.01; p <= controls.maxPolarAngle; p += controls.maxPolarAngle / 20) {
+      for (const r of [controls.minDistance, 4, 8, controls.maxDistance]) {
+        camera.position.set(
+          t.x + r * Math.sin(p) * Math.sin(a),
+          t.y + r * Math.cos(p),
+          t.z + r * Math.sin(p) * Math.cos(a),
+        );
+        cullWalls();
+        samples++;
+        const shown = walls.reduce((n, w) => n + (w.visible ? 1 : 0), 0);
+        fewest = Math.min(fewest, shown);
+        if (shown < 2) bare++;
+        if (camera.position.y <= 0) sunk++;
+      }
+    }
+  }
+
+  camera.position.copy(home);
+  cullWalls();
+  console.assert(bare === 0, `wall culling: ${bare} camera angles show fewer than 2 walls`);
+  console.assert(sunk === 0, `wall culling: ${sunk} camera angles drop to or below the floor`);
+  console.info(`wall culling: ${samples} angles swept, fewest walls visible ${fewest}, ${sunk} below floor`);
+}
+
+/**
+ * Self-check: no item carries a size its kind cannot have, and every hook has one.
+ * The failure this catches is silent — a number appears on a box that should have none, and the
+ * only symptom is the player reading an attribute that does not exist.
+ */
+function checkItemSizes() {
+  const wrong = items.filter((it) => (it.size != null) !== SIZED_NOTIONS.has(it.name));
+  console.assert(wrong.length === 0,
+    `item sizes: ${wrong.length} wrong`, wrong.slice(0, 5).map((it) => `${it.name}=${it.size}`));
+  const sized = items.filter((it) => it.size != null).length;
+  console.info(`item sizes: ${items.length} items, ${sized} sized, ${wrong.length} wrong`);
+}
+
+function frameRoom() {
+  const box = new THREE.Box3(
+    new THREE.Vector3(-HALF_W, 0, -HALF_D),
+    new THREE.Vector3(HALF_W, ROOM.wallH, HALF_D),
+  );
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const extent = Math.max(size.x, size.z) * 1.05;
+  const dist = extent / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5));
+  controls.target.set(center.x, 0.5, center.z);
+  camera.position.set(center.x + dist * 0.30, dist * 0.72, center.z + dist * 0.82);
+  controls.update();
+}
+
+// ---------------------------------------------------------------- gui
+function applyQuality(name) {
+  const q = QUALITY[name] ?? QUALITY.high;
+  S.quality = name;
+  Object.assign(S, q);
+  setGeometryDetail(q.detail);
+  applyRenderScale();
+  restart();
+  gui.controllersRecursive().forEach((c) => c.updateDisplay());
+}
+
+const gui = new GUI({ title: 'store' });
+// Counts are dropdowns, not sliders: each value is an authored layout from a fixed pool, so the
+// legal values are discrete and the list makes that obvious.
+const counts = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => [String(i + 1), i + 1]));
+gui.add(S, 'npcCount', counts(NAMES.length)).name('NPCs').onChange(restart);
+gui.add(S, 'displayCount', counts(DISPLAY_SLOTS.length)).name('displays').onChange(restart);
+// 0 chairs is a legitimate case to test, not a mistake: it exercises the "went looking for a seat,
+// all taken" fallback, which is otherwise hard to reach.
+gui.add(S, 'chairCount', { 0: 0, ...counts(SEAT_SLOTS.length) }).name('chairs').onChange(restart);
+gui.add({ f: doAdvanceRound }, 'f').name('advance round  (Space)');
+gui.add({ f: restart }, 'f').name('restart visit  (R)');
+gui.add(S, 'autoSeconds', 2, 60, 1).name('auto interval (s)');
+gui.add(S, 'travel', 0.2, 4, 0.1).name('travel anim (s)');
+gui.add(S, 'seatLift', 0, 0.35, 0.005).name('seated height').onChange(() => {
+  for (const rec of cast) {
+    if (rec.npc.seat !== null) { rec.toY = S.seatLift; rec.built.root.position.y = S.seatLift; }
+  }
+});
+
+const gPerf = gui.addFolder('performance');
+gPerf.add(S, 'quality', Object.keys(QUALITY)).name('graphics quality').onChange(applyQuality);
+gPerf.add(S, 'detail', Object.keys(GEO_DETAIL)).name('geometry detail').onChange((v) => {
+  setGeometryDetail(v);
+  restart();
+});
+gPerf.add(S, 'renderScale', 0.5, 3, 0.25).name('render scale (GPU load)').onFinishChange(applyRenderScale);
+gPerf.add(S, 'partShadows').name('characters cast shadow').onChange(restart);
+gPerf.add(S, 'mergeMeshes').name('merge static meshes').onChange(restart);
+gPerf.add(S, 'blobShadows').name('blob shadows (1 draw)').onChange(buildBlobs);
+gPerf.add(S, 'shadows').name('shadow map').onChange((v) => { renderer.shadowMap.enabled = v; });
+
+const gLook = gui.addFolder('look');
+gLook.add(S, 'view', ['felted', 'grey', 'silhouette']).onChange((v) => setViewMode(castGroup, v));
+gLook.add(S, 'showGrid').name('grid lines  (G)').onChange(paintGrids);
+gLook.add(S, 'exposure', 0.1, 2, 0.01).onChange((v) => (renderer.toneMappingExposure = v));
+gLook.add(S, 'toneMapping', ['AgX', 'ACES', 'None']).onChange((v) => (renderer.toneMapping = TONE_MAPPING[v]));
+gui.add({ f: frameRoom }, 'f').name('frame room  (F)');
+
+addEventListener('keydown', (e) => {
+  const t = e.target;
+  if (t instanceof HTMLElement &&
+      (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+  const k = e.key.toLowerCase();
+  if (k === '1' || k === '2' || k === '3') {
+    S.view = { 1: 'felted', 2: 'grey', 3: 'silhouette' }[k];
+    setViewMode(castGroup, S.view);
+  }
+  if (k === 'r') restart();
+  if (k === 'f') frameRoom();
+  if (k === 'g') { S.showGrid = !S.showGrid; paintGrids(); }
+  if (k === 'b') renderer.domElement.classList.toggle('squint');
+  if (e.code === 'Space') { e.preventDefault(); doAdvanceRound(); }
+  gui.controllersRecursive().forEach((c) => c.updateDisplay());
+}, true);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ---------------------------------------------------------------- go
+const clock = new THREE.Clock();
+
+loadAtlas(ATLAS_URL).then((loaded) => {
+  atlas = loaded;
+  field = makeField(atlas.texture, CAPACITY, { unlit: true, shade: 0.28 });
+  edge = makeEdge(field, '#1b1418');
+  edge.material.userData.uniforms.uGrow.value = 1.07;
+  fieldTop = makeField(atlas.texture, CAPACITY, { unlit: true, shade: 0.28 });
+  edgeTop = makeEdge(fieldTop, '#1b1418');
+  edgeTop.material.userData.uniforms.uGrow.value = 1.07;
+  shadows = makeShadows(CAPACITY);
+  boxes = makeBoxes(CAPACITY, '#e7ddc9');
+  sizeAtlas = makeSizeAtlas(HOOK_SIZES_MM.map((mm) => mm.toFixed(1)));
+  sizeTag = makeField(sizeAtlas.texture, CAPACITY, { unlit: true, shade: 0 });
+  sizeTop = makeField(sizeAtlas.texture, CAPACITY, { unlit: true, shade: 0 });
+  scene.add(field, edge, fieldTop, edgeTop, shadows, boxes, sizeTag, sizeTop);
+
+  setGeometryDetail(S.detail);
+  paintGrids();
+  restart();
+  frameRoom();
+  checkWallCulling();
+  checkItemSizes();
+
+  renderer.setAnimationLoop(() => {
+    const dt = Math.min(clock.getDelta(), 0.1);
+    tickCast(dt);
+
+    if (autoBox.checked && world && world.npcs.some((n) => n.state !== STATE.GONE)) {
+      autoElapsed += dt;
+      autoBar.style.width = `${Math.min(100, (autoElapsed / S.autoSeconds) * 100)}%`;
+      if (autoElapsed >= S.autoSeconds) doAdvanceRound();
+    } else {
+      autoBar.style.width = '0%';
+    }
+
+    controls.update();
+    cullWalls();          // after controls.update(), so it sees where the camera actually ended up
+    renderer.render(scene, camera);
+    updatePerf(dt);
+  });
+}).catch((err) => {
+  document.getElementById('hud').innerHTML =
+    `<b>atlas failed to load</b><br>${err.message}<br>` +
+    `<span style="opacity:.7">run illustrations/notion_processing.py first, and serve over http</span>`;
+});
+</script>
+</body>
+</html>

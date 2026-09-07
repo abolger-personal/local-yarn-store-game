@@ -1,0 +1,100 @@
+// Display slot model: shelves × columns, with free stacking on each shelf.
+//
+// Pure: no three.js, no DOM. This is the `sim/grid` layer from DESIGN-DECISIONS.md — it decides
+// WHERE things sit; notions.js decides how they look. Node-testable (see grid.test.mjs).
+//
+// A display is O shelves at fixed heights. Each shelf is a cols×rows lattice of columns. Items have
+// a footprint (1×1, 2×1, 1×2, 2×2) and stack within a shelf up to `headroom` layers. A masked-off
+// slot is a hole — a shop window or a fancy shelf where only certain positions are available.
+
+export const EMPTY = -1;
+
+const key = (g, s, c, r) => (s * g.rows + r) * g.cols + c;
+
+/**
+ * @param mask (shelf,col,row) => boolean — false makes that slot a hole. Omit for a full lattice.
+ */
+export function makeDisplay(cols, rows, opts = {}) {
+  const { shelves = 1, headroom = 4, cell = 0.26, mask = null } = opts;
+  const g = { cols, rows, cell, shelves, headroom, usable: null, piles: null };
+  const n = shelves * cols * rows;
+  g.usable = new Uint8Array(n);
+  for (let s = 0; s < shelves; s++)
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++)
+        g.usable[key(g, s, c, r)] = mask ? (mask(s, c, r) ? 1 : 0) : 1;
+  g.piles = Array.from({ length: n }, () => []);   // pile[layer] = item index, bottom→top
+  return g;
+}
+
+export const gridSize = (g) => ({ w: g.cols * g.cell, d: g.rows * g.cell });
+
+export function usableAt(g, s, c, r) {
+  if (s < 0 || s >= g.shelves || c < 0 || c >= g.cols || r < 0 || r >= g.rows) return false;
+  return g.usable[key(g, s, c, r)] === 1;
+}
+
+/** Column keys a footprint would cover, or null if any cell is off-grid or masked. */
+export function footprint(g, s, c, r, w, h) {
+  const keys = [];
+  for (let dr = 0; dr < h; dr++)
+    for (let dc = 0; dc < w; dc++) {
+      if (!usableAt(g, s, c + dc, r + dr)) return null;
+      keys.push(key(g, s, c + dc, r + dr));
+    }
+  return keys;
+}
+
+/** Layer a footprint rests at: on top of the tallest column it covers (it bridges shorter ones). */
+export const dropLayer = (g, keys) => keys.reduce((m, k) => Math.max(m, g.piles[k].length), 0);
+
+/** Can this footprint be placed — cells all exist AND there is headroom left on the tallest column. */
+export const fits = (g, keys) => keys !== null && dropLayer(g, keys) < g.headroom;
+
+/** Place item into its columns; returns the layer it landed on. Assumes fits() is true. */
+export function place(g, keys, index) {
+  const L = dropLayer(g, keys);
+  for (const k of keys) {
+    while (g.piles[k].length < L) g.piles[k].push(EMPTY);   // bridge over a shorter neighbour
+    g.piles[k][L] = index;
+  }
+  return L;
+}
+
+/** Remove a top item from its columns. Only the top of a column is ever grabbable, so this pops. */
+export function lift(g, keys) {
+  for (const k of keys) {
+    g.piles[k].pop();
+    while (g.piles[k].length && g.piles[k][g.piles[k].length - 1] === EMPTY) g.piles[k].pop();
+  }
+}
+
+/** Top item index at a column, or EMPTY. This is the O(1) pick: one column lookup, no item raycast. */
+export function topAt(g, s, c, r) {
+  if (!usableAt(g, s, c, r)) return EMPTY;
+  const p = g.piles[key(g, s, c, r)];
+  return p.length ? p[p.length - 1] : EMPTY;
+}
+
+/** Empty every column on one shelf. "Tidy up" rebuilds a shelf from scratch rather than lifting
+ *  items one at a time in a carefully-ordered way. */
+export function clearShelf(g, s) {
+  for (let r = 0; r < g.rows; r++)
+    for (let c = 0; c < g.cols; c++)
+      g.piles[key(g, s, c, r)] = [];
+}
+
+/** Column under a surface point (shelf-local x,z), or null if outside the lattice bounds. */
+export function columnAt(g, x, z) {
+  const { w, d } = gridSize(g);
+  const c = Math.floor((x + w / 2) / g.cell);
+  const r = Math.floor((z + d / 2) / g.cell);
+  if (c < 0 || c >= g.cols || r < 0 || r >= g.rows) return null;
+  return { c, r };
+}
+
+/** Footprint centre + size in shelf-local space (y is the caller's job — shelf base + layer). */
+export function slotRect(g, c, r, w, h) {
+  const { w: W, d: D } = gridSize(g);
+  return { x: (c + w / 2) * g.cell - W / 2, z: (r + h / 2) * g.cell - D / 2, w: w * g.cell, d: h * g.cell };
+}

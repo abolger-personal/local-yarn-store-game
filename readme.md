@@ -35,17 +35,18 @@ If that value looks old, the browser is running cached code and nothing you chan
 
 ## Layout
 
+
+
+
 ```
+ai_planning_sessions/ Human and AI readable written out specs for how the game should work. "DESIGN-DECISIONS.md" files at each level contain more details as the result of planning sessions. 
+
+CODE (including demo and test code) lives here: 
+
 characters/      npc.js (shared rig) + owl.js / llama.js (species kits) + viewers
 inventory/       notions.js (instanced billboards, slot grid) + viewer
-ai_planning_sessions/
-  LYS.md                     original concept, annotated with [DECIDED]
-  DESIGN-DECISIONS.md        project-wide ADR
-  P1-SPIKE-PLAN.md           first phase of work
-  inventory/
-    DESIGN-DECISIONS.md      inventory ADR
-    NOTIONS.md               art briefing
-    illustrations/           notion atlas pipeline (Python)
+store/           depends on other pieces. 
+
 serve.py         no-cache dev server
 ```
 

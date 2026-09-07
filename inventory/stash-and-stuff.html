@@ -31,10 +31,12 @@
 <div id="app"></div>
 <div id="perf"></div>
 <div id="hud">
-  <b>LYS stash and stuff</b> — placement mechanic<br />
-  <b>Drag a notion</b> to move it between slots<br />
+  <b>LYS stash and stuff</b> — 2.5D placement<br />
+  <b>Click</b> a box to pick it up, <b>click</b> again to set it down<br />
+  Hover a shelf or the peg board while holding to target it<br />
   Right-drag to orbit · scroll to zoom<br />
-  <kbd>G</kbd> show grid &nbsp; <kbd>R</kbd> reshuffle &nbsp; <kbd>F</kbd> frame<br />
+  <kbd>[</kbd> <kbd>]</kbd> plane &nbsp; <kbd>D</kbd> display &nbsp; <kbd>G</kbd> grid &nbsp; <kbd>R</kbd> reshuffle<br />
+  <kbd>T</kbd> tidy up &nbsp; <kbd>F</kbd> frame<br />
   <span style="opacity:.7">one draw call for every notion</span>
 </div>
 
@@ -53,32 +55,93 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
-  EMPTY, loadAtlas, cellRect, makeGrid, gridSize, slotAt, slotCentre, pickSlot, makeGridLines,
-  makeField, makeEdge, setInstance, placeMatrix,
+  loadAtlas, cellRect, makeGridLines, makeField, makeEdge, makeShadows, makeBoxes, makeSizeAtlas,
+  setInstance, placeMatrix, placeBoxMatrix, placeLabelMatrix,
 } from './notions.js';
+import {
+  EMPTY, makeDisplay, gridSize, footprint, fits, dropLayer, place, lift, topAt, columnAt, slotRect,
+  usableAt, clearShelf,
+} from './grid.js';
 
 const ATLAS_URL = '../ai_planning_sessions/inventory/illustrations/build';
 
+// EU/metric only for MVP — US/UK/manufacturer hook sizing varies too much to pin down yet.
+const HOOK_SIZES_MM = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 8.0, 9.0, 10.0, 12.0];
+
 const S = {
-  theme:     'default',
-  cols:      8,
-  rows:      6,
-  cell:      0.26,
-  fill:      18,
-  scale:     0.20,
-  lying:     true,
-  yawJitter: 0.35,
-  tint:      '#241e22',
-  unlit:     true,
-  showGrid:  true,
-  liftHeight: 0.10,
-  edge:      true,
-  edgeGrow:  1.07,
-  edgePush:  0.014,
-  edgeColor: '#1b1418',
-  shade:     0.28,
-  grab:      0.8,
+  theme:      'default',
+  layout:     'shelf',   // shelf | pyramid | window
+  cols:       6,
+  rows:       4,
+  cell:       0.26,
+  shelves:    3,
+  shelfGap:   0.22,
+  headroom:   4,
+  fill:       34,
+  tint:       '#241e22',
+  boxHeight:  0.042,
+  boxColor:   '#e7ddc9',
+  unlit:      true,
+  showGrid:   true,
+  liftHeight: 0.14,
+  edge:       true,
+  edgeGrow:   1.07,
+  edgeColor:  '#1b1418',
+  shade:      0.28,
 };
+
+// Masked shelf shapes. A mask hides slots so a display can be a shop window or a stepped shelf,
+// not just a full rectangle — "only certain options are available".
+const LAYOUTS = {
+  shelf:   () => () => true,
+  pyramid: (cols) => (s, c) => c >= s && c < cols - s,                             // narrows as it rises
+  window:  (cols, rows) => (s, c, r) => c === 0 || c === cols - 1 || r === 0 || r === rows - 1,  // picture frame
+};
+
+// A real pegboard hook sits in ONE column of holes; items hang below it, spanning rows but not
+// columns. A full checkerboard mask (c%2 && r%2) would make every multi-cell footprint
+// impossible — no two usable cells would ever be adjacent. Column-only sparsity keeps 1-wide
+// items of any height placeable, while correctly ruling out anything 2 columns wide (which a
+// single hook genuinely can't hold).
+const PEG_COLS = 8, PEG_ROWS = 6;
+// Fixed, independent of the shelf's `S.headroom` slider: the peg board's grid is only ever built
+// once (it isn't reshuffled), so its headroom must not depend on a value the shelf freely retunes.
+const PEG_HEADROOM = 3;
+const pegMask = (s, c) => c % 2 === 0;
+
+let boxHeightCtl = null;   // GUI controller, its range gets clamped by clampBoxHeight()
+
+// ---------------------------------------------------------------- displays
+//
+// Every item's box/label/shadow matrix is computed in DISPLAY-LOCAL space — exactly the existing
+// col/row/shelf/layer math, unchanged — then premultiplied by the display's `frame` to place it
+// in the world. A shelf's frame is identity (local space === world space, so this is a strict
+// no-op for existing behaviour). A peg board's frame is a 90° rotation: local Y (the shelf/layer
+// axis — "out of the surface") becomes world Z ("out of the wall"), and local Z (rows) becomes
+// world -Y (rows count DOWN the wall, like reading a grid top-to-bottom). This can't be done by
+// just parenting things under a rotated Group, because every item shares ONE InstancedMesh across
+// BOTH displays — there is no per-item transform hierarchy to hang a group rotation on.
+function makeFrame(position, quaternion) {
+  const frame = new THREE.Matrix4().compose(position, quaternion, new THREE.Vector3(1, 1, 1));
+  return { frame, frameInv: frame.clone().invert(), quat: quaternion.clone() };
+}
+
+const displays = {
+  shelf: { id: 'shelf', ...makeFrame(new THREE.Vector3(0, 0, 0), new THREE.Quaternion()),
+           g: null, plane: 0, lines: [], panels: [] },
+  peg:   { id: 'peg', ...makeFrame(
+             new THREE.Vector3(2.1, 0.9, 0),
+             new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2),
+           ), g: null, plane: 0, lines: [], hooks: null },
+};
+let activeId = 'shelf';
+const activeDisplay = () => displays[activeId];
+
+for (const d of Object.values(displays)) {
+  d.group = new THREE.Group();
+  d.group.matrixAutoUpdate = false;
+  d.group.matrix.copy(d.frame);
+}
 
 // ---------------------------------------------------------------- scene
 const app = document.getElementById('app');
@@ -91,6 +154,7 @@ app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#ddd5c8');
+for (const d of Object.values(displays)) scene.add(d.group);
 
 const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.01, 100);
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -104,211 +168,653 @@ const key = new THREE.DirectionalLight('#ffe6c4', 1.6);
 key.position.set(2, 4, 2);
 scene.add(key);
 
-// ---------------------------------------------------------------- surface
+// ---------------------------------------------------------------- shelf display
 const surface = new THREE.Mesh(
   new THREE.PlaneGeometry(1, 1),
   new THREE.MeshStandardMaterial({ color: '#c9bda9', roughness: 0.95 })
 );
 surface.rotation.x = -Math.PI / 2;
-scene.add(surface);
+surface.userData = { dispId: 'shelf', plane: 0 };
+displays.shelf.group.add(surface);
+displays.shelf.floors = [surface];   // plane 0's floor never changes; levels 1+ pushed on rebuild
 
-let gridHelper = null;
-let grid = makeGrid(S.cols, S.rows, S.cell);
+// Shelves above the floor had only wireframe grid lines and no physical panel at all, which read
+// as "clear" rather than as a shelf. A real box (not a paper-thin plane) so the edge stays visible
+// at a grazing angle, one shared material so N shelves cost one extra material, not N.
+const GLASS_THICKNESS = 0.012;
+const glassMaterial = new THREE.MeshPhysicalMaterial({
+  color: '#eef4f2',
+  transmission: 0.9,     // see-through
+  roughness: 0.45,       // the "blur" in blurred glass — transmission scatters through this
+  thickness: 0.05,
+  ior: 1.3,
+  clearcoat: 0.3,
+  side: THREE.DoubleSide,
+  transparent: true,
+});
 
-function layoutSurface() {
-  const { w, d } = gridSize(grid);
-  surface.scale.set(w, d, 1);
-  gridHelper?.removeFromParent();
-  gridHelper = makeGridLines(grid);
-  gridHelper.position.y = 0.002;
-  gridHelper.visible = S.showGrid;
-  scene.add(gridHelper);
+function buildShelfGrid() {
+  const mask = LAYOUTS[S.layout](S.cols, S.rows, S.shelves);
+  displays.shelf.g = makeDisplay(S.cols, S.rows, { shelves: S.shelves, headroom: S.headroom, cell: S.cell, mask });
+}
+
+function layoutShelfDisplay() {
+  const disp = displays.shelf, g = disp.g;
+  const { w, d } = gridSize(g);
+  surface.scale.set(w * 1.04, d * 1.04, 1);
+  disp.lines.forEach((l) => l.removeFromParent());
+  disp.lines.length = 0;
+  disp.panels.forEach((p) => p.removeFromParent());
+  disp.panels.length = 0;
+  disp.floors = [surface];   // rebuilt fresh alongside the panels each level 1+ is re-tagged onto
+  for (let s = 0; s < S.shelves; s++) {
+    const lines = makeGridLines(g, s);
+    lines.position.y = s * S.shelfGap + 0.002;
+    disp.lines.push(lines);
+    disp.group.add(lines);
+
+    if (s > 0) {
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), glassMaterial);
+      panel.scale.set(w * 1.04, GLASS_THICKNESS, d * 1.04);
+      panel.position.y = s * S.shelfGap - GLASS_THICKNESS / 2;
+      panel.userData = { dispId: 'shelf', plane: s };
+      disp.panels.push(panel);
+      disp.floors.push(panel);
+      disp.group.add(panel);
+    }
+  }
+  paintActivePlane();
+}
+
+// ---------------------------------------------------------------- peg board display
+//
+// "Effectively a 90°-rotated shelf": same grid.js model (cols × rows × 1 plane, headroom for
+// how far a stack sticks out from the wall), reprojected by displays.peg.frame. The backing panel
+// and grid lines are built with the EXACT same local convention as the shelf's own surface/lines —
+// lying flat facing local +Y — because it's the display's `frame` (not the geometry itself) that
+// turns that into a vertical wall.
+const pegBacking = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshStandardMaterial({ color: '#b7a68d', roughness: 0.92 })
+);
+pegBacking.rotation.x = -Math.PI / 2;
+pegBacking.userData = { dispId: 'peg', plane: 0 };
+displays.peg.group.add(pegBacking);
+displays.peg.floors = [pegBacking];   // single plane, never rebuilt
+
+const hookMaterial = new THREE.MeshStandardMaterial({ color: '#8a8578', roughness: 0.55, metalness: 0.2 });
+
+/** One peg per usable column, anchored at its top row, sticking out as far as headroom allows. */
+function makeHooks(g, length) {
+  const { w, d } = gridSize(g);
+  const positions = [];
+  for (let c = 0; c < g.cols; c++) {
+    if (!usableAt(g, 0, c, 0)) continue;
+    positions.push((c + 0.5) * g.cell - w / 2, -d / 2 + g.cell * 0.18);
+  }
+  const mesh = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(0.006, 0.006, length, 8),
+    hookMaterial,
+    Math.max(positions.length / 2, 1),
+  );
+  const m = new THREE.Matrix4();
+  for (let i = 0; i < positions.length / 2; i++) {
+    m.makeTranslation(positions[i * 2], length / 2, positions[i * 2 + 1]);
+    mesh.setMatrixAt(i, m);
+  }
+  mesh.count = positions.length / 2;
+  return mesh;
+}
+
+function buildPegGrid() {
+  displays.peg.g = makeDisplay(PEG_COLS, PEG_ROWS, { shelves: 1, headroom: PEG_HEADROOM, cell: S.cell, mask: pegMask });
+}
+
+function layoutPegDisplay() {
+  const disp = displays.peg, g = disp.g;
+  const { w, d } = gridSize(g);
+  pegBacking.scale.set(w * 1.06, d * 1.06, 1);
+  disp.lines.forEach((l) => l.removeFromParent());
+  disp.lines.length = 0;
+  const lines = makeGridLines(g, 0);
+  lines.position.y = 0.002;
+  disp.lines.push(lines);
+  disp.group.add(lines);
+
+  disp.hooks?.removeFromParent();
+  disp.hooks = makeHooks(g, PEG_HEADROOM * S.boxHeight);
+  disp.group.add(disp.hooks);
+  paintActivePlane();
+}
+
+// ---------------------------------------------------------------- shared: which plane is lit up
+function paintActivePlane() {
+  for (const disp of Object.values(displays)) {
+    disp.lines.forEach((lines, s) => {
+      const isActive = disp === activeDisplay() && s === disp.plane;
+      lines.visible = S.showGrid;
+      lines.material.color.set(isActive ? '#c2703f' : '#9d9282');
+      lines.material.opacity = isActive ? 1 : 0.5;
+      lines.material.transparent = !isActive;
+    });
+  }
 }
 
 // ---------------------------------------------------------------- notions
 let atlas = null;
-let field = null;
+let field = null;      // label on the box's forward face
 let edge = null;
-const items = [];   // one per instance: { name, slot, color, yaw }
+let fieldTop = null;   // label on the box's top face
+let edgeTop = null;
+let shadows = null;
+let boxes = null;
+let sizeTag = null;    // a number on the box's side, for notions with a size option (e.g. hooks)
+let sizeAtlas = null;
+const items = [];   // { name, display, shelf, c, r, w, h, layer, keys, color, yaw, size }
 
+const SHAPES = [[1, 1], [2, 1], [1, 2], [2, 2]];
+const FILL = 0.9;   // card fills 90% of its footprint, leaving a hairline gap
 const CAPACITY = 256;
+
 const _pos = new THREE.Vector3();
 const _mat = new THREE.Matrix4();
+const _topMat = new THREE.Matrix4();
+const _sizeMat = new THREE.Matrix4();
+const _boxMat = new THREE.Matrix4();
+const _shadowMat = new THREE.Matrix4();
 const _col = new THREE.Color();
 
-function itemMatrix(item, lift = 0) {
-  slotCentre(grid, item.slot, _pos).y = lift + (S.lying ? 0.004 : S.scale * 0.5);
-  return placeMatrix(_pos, S.scale, S.lying, item.yaw, _mat);
-}
+const shelfBaseY = (shelf, layer) => shelf * S.shelfGap + layer * S.boxHeight;
 
-function refresh(index, lift = 0) {
+// A box gives the item real volume; the illustrated card becomes a label glued to the box's
+// forward face (standing, so it reads like a product on a shelf) AND a second copy lying flat on
+// the box's top, so the item is identifiable looking straight down as well as from the side.
+//
+// Everything here is computed in DISPLAY-LOCAL space, identically regardless of which display —
+// `.premultiply(display.frame)` is what projects it into the world, so a peg board needs no
+// separate version of this function. That's the concrete meaning of "just a rotated shelf".
+function paintInstance(display, index, cx, cz, boxBase, shadowBase, footW, footD, yaw, grow = 1) {
   const item = items[index];
+  const boxW = footW * grow, boxD = footD * grow;
+  const boxH = S.boxHeight;
+  const F = display.frame;
+
+  _pos.set(cx, boxBase + boxH / 2, cz);
+  setInstance(boxes, index, { matrix: placeBoxMatrix(_pos, boxW, boxD, boxH, yaw, _boxMat).premultiply(F) });
+
+  const fx = Math.sin(yaw), fz = Math.cos(yaw);
+  const halfOut = boxD / 2 + 0.003;
+  _pos.set(cx + fx * halfOut, boxBase + boxH * 0.55, cz + fz * halfOut);
   setInstance(field, index, {
-    matrix: itemMatrix(item, lift),
+    matrix: placeLabelMatrix(_pos, boxW * 0.92, boxH * 0.82, yaw, _mat).premultiply(F),
     rect: cellRect(atlas.manifest, item.name),
     color: _col.set(item.color),
   });
+
+  _pos.set(cx, boxBase + boxH + 0.002, cz);
+  setInstance(fieldTop, index, {
+    matrix: placeMatrix(_pos, boxW * 0.86, boxD * 0.86, yaw, _topMat).premultiply(F),
+    rect: cellRect(atlas.manifest, item.name),
+    color: _col.set(item.color),
+  });
+
+  // A size number on the box's SIDE face (perpendicular to the front label) — reuses
+  // placeLabelMatrix with the yaw rotated 90° further, since that's exactly the box's side normal.
+  const sx = Math.cos(yaw), sz = -Math.sin(yaw);
+  const sideOut = boxW / 2 + 0.003;
+  _pos.set(cx + sx * sideOut, boxBase + boxH * 0.55, cz + sz * sideOut);
+  setInstance(sizeTag, index, {
+    matrix: placeLabelMatrix(_pos, boxD * 0.5, boxH * 0.5, yaw + Math.PI / 2, _sizeMat).premultiply(F),
+    rect: cellRect(sizeAtlas.manifest, item.size != null ? item.size.toFixed(1) : 'blank'),
+  });
+
+  _pos.set(cx, shadowBase + 0.003, cz);
+  shadows.setMatrixAt(index, placeMatrix(_pos, boxW * 1.08, boxD * 1.08, yaw, _shadowMat).premultiply(F));
+  shadows.instanceMatrix.needsUpdate = true;
+}
+
+// Draw an item at rest in its slot.
+function refresh(index) {
+  const item = items[index];
+  const disp = displays[item.display];
+  const rect = slotRect(disp.g, item.c, item.r, item.w, item.h);
+  const base = shelfBaseY(item.shelf, item.layer);
+  paintInstance(disp, index, rect.x, rect.z, base, base, rect.w * FILL, rect.d * FILL, item.yaw);
+}
+
+// Draw an item floating under the pointer, on WHICHEVER display is currently active — that may
+// differ from the item's own display if the player switched displays mid-drag.
+function refreshFloating(index, x, z) {
+  const item = items[index];
+  const disp = activeDisplay();
+  const floor = disp.plane * S.shelfGap;
+  paintInstance(disp, index, x, z, floor + S.liftHeight, floor, item.w * S.cell * FILL, item.h * S.cell * FILL, item.yaw, 1.08);
 }
 
 function scatter() {
-  grid.slots.fill(EMPTY);
-  items.length = 0;
-  const free = grid.slots.map((_, i) => i).sort(() => Math.random() - 0.5);
-
-  for (let i = 0; i < Math.min(S.fill, free.length, CAPACITY); i++) {
-    const slot = free[i];
-    grid.slots[slot] = i;
+  if (drag.index !== EMPTY) return;   // avoid desyncing item indices out from under an active drag
+  const disp = displays.shelf;
+  buildShelfGrid();
+  layoutShelfDisplay();
+  // Only shelf items are cleared/regenerated — the peg board is a manually-curated experiment
+  // area, not something "reshuffle" should touch.
+  for (let i = items.length - 1; i >= 0; i--) if (items[i].display === 'shelf') items.splice(i, 1);
+  const target = Math.min(S.fill, CAPACITY);
+  for (let attempt = 0; items.length < target && attempt < target * 80; attempt++) {
+    const [w, h] = SHAPES[(Math.random() * SHAPES.length) | 0];
+    const shelf = (Math.random() * S.shelves) | 0;
+    const c = (Math.random() * S.cols) | 0;
+    const r = (Math.random() * S.rows) | 0;
+    const keys = footprint(disp.g, shelf, c, r, w, h);
+    if (!fits(disp.g, keys)) continue;
+    const index = items.length;
+    const layer = place(disp.g, keys, index);
+    const name = atlas.names[index % atlas.names.length];
     items.push({
-      name: atlas.names[i % atlas.names.length],
-      slot,
+      name, display: 'shelf',
+      shelf, c, r, w, h, layer, keys,
       color: S.tint,
-      yaw: (Math.random() - 0.5) * S.yawJitter * Math.PI,
+      yaw: (Math.random() - 0.5) * 0.22 * Math.PI,
+      size: name === 'crochet-hook' ? HOOK_SIZES_MM[(Math.random() * HOOK_SIZES_MM.length) | 0] : null,
     });
   }
   field.count = items.length;
-  if (edge) edge.count = items.length;
+  edge.count = items.length;
+  fieldTop.count = items.length;
+  edgeTop.count = items.length;
+  shadows.count = items.length;
+  boxes.count = items.length;
+  sizeTag.count = items.length;
   items.forEach((_, i) => refresh(i));
 }
 
+// A stack's total height (headroom * boxHeight) must stay under shelfGap, or a full stack pokes
+// through the glass shelf above it — that, not item-vs-item overlap, was the real "visual
+// collision": each (col,row,layer) triple already had its own dedicated Y slot.
+function clampBoxHeight() {
+  const maxH = S.shelfGap / S.headroom;
+  boxHeightCtl.max(maxH);
+  if (S.boxHeight > maxH) { S.boxHeight = maxH; boxHeightCtl.updateDisplay(); }
+}
+
 function rebuild() {
-  grid = makeGrid(S.cols, S.rows, S.cell);
-  layoutSurface();
+  displays.shelf.plane = Math.min(displays.shelf.plane, S.shelves - 1);
+  clampBoxHeight();
   scatter();
   frame();
 }
 
+// ---------------------------------------------------------------- tidy up
+//
+// Regroups one plane's items by kind into piles, zeroing yaw so each pile reads as a clean
+// stack rather than a scatter of jittered boxes. Rebuilds the plane from scratch (clearShelf)
+// rather than repacking in place, which sidesteps reasoning about the old layout at all.
+function tidyPlane(disp, s) {
+  const g = disp.g;
+  const byKind = new Map();
+  items.forEach((item, i) => {
+    if (item.display !== disp.id || item.shelf !== s) return;
+    if (!byKind.has(item.name)) byKind.set(item.name, []);
+    byKind.get(item.name).push(i);
+  });
+  clearShelf(g, s);
+
+  let cursor = 0;
+  const nextEmptyCell = () => {
+    while (cursor < g.cols * g.rows) {
+      const c = cursor % g.cols, r = (cursor / g.cols) | 0;
+      if (usableAt(g, s, c, r) && topAt(g, s, c, r) === EMPTY) return { c, r };
+      cursor++;
+    }
+    return null;   // plane is full
+  };
+
+  for (const [, indices] of [...byKind.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    let anchor = nextEmptyCell();   // a NEW kind always starts a fresh pile, never joins one in progress
+    for (const i of indices) {
+      if (!anchor) break;   // ponytail: plane ran out of room; leftovers just keep their old spot, unrendered
+      const item = items[i];
+      let keys = footprint(g, s, anchor.c, anchor.r, item.w, item.h);
+      if (!fits(g, keys)) {   // this pile hit headroom — start an overflow pile of the SAME kind
+        cursor++;
+        anchor = nextEmptyCell();
+        if (!anchor) break;
+        keys = footprint(g, s, anchor.c, anchor.r, item.w, item.h);
+      }
+      item.display = disp.id; item.shelf = s; item.c = anchor.c; item.r = anchor.r; item.yaw = 0;
+      item.keys = keys;
+      item.layer = place(g, keys, i);
+      refresh(i);
+    }
+  }
+}
+
+function tidyActive() {
+  if (drag.index !== EMPTY) return;   // no-op mid-drag rather than risk corrupting the grid
+  const disp = activeDisplay();
+  tidyPlane(disp, disp.plane);        // only the plane the player is currently arranging
+}
+
 // ---------------------------------------------------------------- dragging
 //
-// A horizontal plane is intersected, never the notions. That is the design record's O(1) rule,
-// and with instancing the notions are not individually raycastable objects in the first place.
+// One raycast against the ACTIVE display's plane, then columnAt() converts the hit to a column in
+// O(1). Notions are never raycast (they are instanced, so they aren't individual objects anyway).
+// Click to pick up, click again to put down — not press-and-hold. A continuous hold was hard on
+// the hands for what's meant to be the core moment-to-moment mechanic. Clicking always selects
+// whichever DISPLAY is under the cursor (see pickTarget below), even on an empty cell — you
+// should be able to point at where you're about to work, not only where a box already is. While
+// something is held, moving the mouse over a different display re-targets the hold the same way,
+// so switching where you're placing something is just "move the mouse there". [ ] still picks a
+// specific shelf LEVEL within a display — see pickTarget's own comment for why that stays
+// keyboard-only rather than also being click/hover-driven.
 //
-// The plane sits at the CARD's mid-height, not on the floor. An upright card is drawn well
-// above its own footprint, so a floor hit test asks the player to click the empty grid below
-// the thing they can see.
+// The pick plane is always "local Y = k" in a display's OWN SPACE — a horizontal plane for the
+// shelf, a vertical plane for the peg board, because that's what display.frame does to local Y.
+// castLocal() builds that plane in world space, intersects it, then transforms the hit back into
+// local space so columnAt()/topAt() (which only know about local col/row) work unchanged for
+// either display — and returns plain numbers (not an aliased Vector3), since pickTarget compares
+// hits across every plane of both displays in one pass and can't have a later call overwrite an
+// earlier result.
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
-const pickPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const pickPlane = new THREE.Plane();
 const _hit = new THREE.Vector3();
-const drag = { index: EMPTY, from: EMPTY };
+const _n = new THREE.Vector3();
+const _planePt = new THREE.Vector3();
+const _local = new THREE.Vector3();
+const drag = { index: EMPTY, target: null };
+// Last real pointer position, kept fresh on every pointermove — lets a KEYBOARD-triggered plane
+// or display switch mid-hold (see the keydown handler) recompute the ghost/drop target right away,
+// without waiting on the player to also jiggle the mouse after pressing [ ] / ] / D.
+const lastPointer = { clientX: innerWidth / 2, clientY: innerHeight / 2 };
 
-const cardHeight = () => (S.lying ? 0.004 : S.scale * 0.5);
-
-function surfacePoint(event, height = cardHeight()) {
+function setRayFromEvent(event) {
   pointer.set((event.clientX / innerWidth) * 2 - 1, -(event.clientY / innerHeight) * 2 + 1);
   raycaster.setFromCamera(pointer, camera);
-  pickPlane.constant = -height;
-  return raycaster.ray.intersectPlane(pickPlane, _hit);
+}
+
+function castLocal(disp, localY) {
+  _n.set(0, 1, 0).transformDirection(disp.frame);
+  _planePt.set(0, localY, 0).applyMatrix4(disp.frame);
+  pickPlane.setFromNormalAndCoplanarPoint(_n, _planePt);
+  const hit = raycaster.ray.intersectPlane(pickPlane, _hit);
+  if (!hit) return null;
+  const distSq = raycaster.ray.origin.distanceToSquared(hit);
+  _local.copy(hit).applyMatrix4(disp.frameInv);
+  return { x: _local.x, z: _local.z, distSq };
+}
+
+// Two-pass pick against ONE specific display (parallax-corrected — see the box-height comment
+// this replaced). Assumes the ray is already set (setRayFromEvent).
+function displayPoint(disp, event) {
+  setRayFromEvent(event);
+  const guess = castLocal(disp, disp.plane * S.shelfGap);
+  if (!guess) return null;
+
+  const col = columnAt(disp.g, guess.x, guess.z);
+  const topIndex = col ? topAt(disp.g, disp.plane, col.c, col.r) : EMPTY;
+  if (topIndex === EMPTY) return guess;
+
+  const refined = castLocal(disp, shelfBaseY(disp.plane, items[topIndex].layer) + S.boxHeight);
+  return refined ?? guess;
+}
+
+// Which DISPLAY the pointer is actually over right now, or null if neither — tested via a real
+// raycast against each display's currently-active floor/panel mesh (a couple of objects, nowhere
+// near the 1000-item scale the design record says never to raycast), so shelf vs. peg board is
+// resolved by true occlusion rather than an abstract "nearest math plane" test.
+//
+// This deliberately stops at DISPLAY granularity, not a specific shelf LEVEL. An earlier version
+// tried to also detect which of the 3 shelf levels was clicked, testing every level's panel and
+// keeping the nearest hit — but every level shares the exact same (col,row) footprint, and the
+// glass panels are only VISUALLY transparent (raycasting doesn't know about `transmission`), so a
+// click could resolve to the WRONG level: whichever panel physically sits in the way, even though
+// a player can clearly see through it to the level they actually meant. That's not fixable by
+// click position alone when levels are perfectly stacked and see-through — it needs an
+// unambiguous signal, which [ ] already is. So plane selection stays keyboard-only; a click just
+// confirms/selects whichever display (shelf unit vs. peg board — physically separate, never
+// ambiguous) you're pointing at, using its CURRENTLY ACTIVE plane for the column/item lookup.
+function pickTarget(event) {
+  setRayFromEvent(event);
+  const candidates = Object.values(displays).map((disp) => disp.floors[disp.plane]);
+  const hits = raycaster.intersectObjects(candidates, false);
+  if (!hits.length) return null;
+
+  const disp = displays[hits[0].object.userData.dispId];
+  _local.copy(hits[0].point).applyMatrix4(disp.frameInv);
+  if (!columnAt(disp.g, _local.x, _local.z)) return null;   // hit the panel, but outside the grid
+  return disp;
+}
+
+// A box doesn't land in exactly the same orientation every time it's set down — a small nudge
+// from wherever it currently sits, not a full re-roll. Any code path that places an item (this
+// drag-drop today, an NPC's own placement later) should call this rather than leaving yaw as-is.
+const YAW_SETTLE = 0.12 * Math.PI;
+const settleYaw = (item) => { item.yaw += (Math.random() - 0.5) * YAW_SETTLE; };
+
+// Picking a box is resolved against REAL geometry — every display's floors/panels at EVERY plane
+// (not just the currently active one) plus the shared `boxes` InstancedMesh, all in one raycast —
+// so whichever solid thing the ray hits FIRST decides the click. This is occlusion by true
+// distance, not a `boxes`-only test: a panel is a real solid mesh regardless of which plane is
+// "active", so a click on an empty top-shelf cell correctly stops at that shelf's own glass floor
+// instead of sailing on through (unblocked) to hit some unrelated box sitting on a lower shelf at
+// the same column — glass reads as solid to a raycast the same way it already did for pickTarget,
+// this just also lets it stop a click same as it stops the eye. If the nearest hit IS a box, that's
+// unambiguous regardless of which level it's on, so this switches the active plane to match rather
+// than requiring [ ] first.
+function pickUp(event) {
+  setRayFromEvent(event);
+  const candidates = [];
+  for (const disp of Object.values(displays)) candidates.push(...disp.floors);
+  candidates.push(boxes);
+  const hits = raycaster.intersectObjects(candidates, false);
+  if (hits.length && hits[0].object === boxes) {
+    const index = hits[0].instanceId;
+    const item = items[index];
+    const disp = displays[item.display];
+    if (activeId !== disp.id) setActiveId(disp.id, false);
+    if (disp.plane !== item.shelf) setPlane(item.shelf);
+
+    drag.index = index;
+    lift(disp.g, item.keys);   // pull it out of the grid so it can't block its own drop
+    const point = displayPoint(disp, event);
+    if (point) refreshFloating(index, point.x, point.z);
+    return;
+  }
+
+  // No box under the cursor — a click on an empty cell still selects whichever display it's on,
+  // so you can point at where you're about to work, not only where a box already is.
+  const disp = pickTarget(event);
+  if (disp && activeId !== disp.id) setActiveId(disp.id, false);
+}
+
+function putDown() {
+  const item = items[drag.index];
+  const t = drag.target;
+  if (t) {
+    // Moving to a NEW display/plane — may differ from where it was picked up.
+    item.display = activeId;
+    item.shelf = activeDisplay().plane;
+    item.c = t.c; item.r = t.r; item.keys = t.keys;
+  }
+  // else: no valid target on whichever display/plane is now active — falls back to wherever it
+  // actually still belongs (item.display/shelf/c/r), which is untouched if the branch above
+  // didn't run.
+  const home = displays[item.display];
+  if (!t) item.keys = footprint(home.g, item.shelf, item.c, item.r, item.w, item.h);
+  item.layer = place(home.g, item.keys, drag.index);
+  settleYaw(item);
+
+  refresh(drag.index);
+  marker.visible = false;
+  drag.index = EMPTY;
+  drag.target = null;
 }
 
 function onPointerDown(event) {
   if (event.button !== 0) return;
-  const point = surfacePoint(event);
-  if (!point) return;
-  const slot = pickSlot(grid, point.x, point.z, grid.cell * S.grab);
-  const index = slot === EMPTY ? EMPTY : grid.slots[slot];
-  if (index === EMPTY) return;
-
-  drag.index = index;
-  drag.from = slot;
-  renderer.domElement.setPointerCapture(event.pointerId);
-  refresh(index, S.liftHeight);
+  if (drag.index === EMPTY) pickUp(event);
+  else putDown();
 }
 
 function onPointerMove(event) {
-  if (drag.index === EMPTY) return;
-  const point = surfacePoint(event, S.liftHeight);
+  lastPointer.clientX = event.clientX; lastPointer.clientY = event.clientY;
+  if (drag.index === EMPTY) return;   // only relevant while holding something
+
+  // Hovering onto a different display TEMPORARILY activates it, no keyboard step required.
+  // Hovering into "dead space" (over neither display) snaps activation back to wherever the held
+  // item actually came from — items[drag.index].display never changes during a hold except on a
+  // successful drop, so it's already the single source of truth for "home", no extra state needed.
+  const hover = pickTarget(event);
+  const wantId = hover ? hover.id : items[drag.index].display;
+  if (wantId !== activeId) setActiveId(wantId, false);
+
+  const disp = activeDisplay();
+  const point = displayPoint(disp, event);
   if (!point) return;
-  hover(slotAt(grid, point.x, point.z));
-  // follow the pointer directly rather than snapping, so the drop target reads as a choice
-  _pos.set(point.x, S.liftHeight, point.z);
-  setInstance(field, drag.index, { matrix: placeMatrix(_pos, S.scale * 1.12, S.lying, items[drag.index].yaw, _mat) });
-}
-
-function onPointerUp(event) {
-  if (drag.index === EMPTY) return;
-  const point = surfacePoint(event, S.liftHeight);
-  const target = point ? slotAt(grid, point.x, point.z) : EMPTY;
   const item = items[drag.index];
+  const col = columnAt(disp.g, point.x, point.z);
 
-  if (target !== EMPTY && (grid.slots[target] === EMPTY || target === drag.from)) {
-    grid.slots[drag.from] = EMPTY;
-    grid.slots[target] = drag.index;
-    item.slot = target;
+  drag.target = null;
+  if (col) {
+    const c = col.c - ((item.w - 1) >> 1);
+    const r = col.r - ((item.h - 1) >> 1);
+    const keys = footprint(disp.g, disp.plane, c, r, item.w, item.h);
+    if (fits(disp.g, keys)) drag.target = { c, r, keys, layer: dropLayer(disp.g, keys) };
   }
-  refresh(drag.index);
-  hover(EMPTY);
-  drag.index = EMPTY;
-  renderer.domElement.releasePointerCapture?.(event.pointerId);
+  ghost(item);
+  refreshFloating(drag.index, point.x, point.z);
 }
 
+const FLAT_Q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
 const marker = new THREE.Mesh(
   new THREE.PlaneGeometry(1, 1),
-  new THREE.MeshBasicMaterial({ color: '#c2703f', transparent: true, opacity: 0.30, depthWrite: false })
+  new THREE.MeshBasicMaterial({ color: '#3f7f5a', transparent: true, opacity: 0.32, depthWrite: false })
 );
-marker.rotation.x = -Math.PI / 2;
 marker.visible = false;
 scene.add(marker);
 
-function hover(slot) {
-  marker.visible = slot !== EMPTY && drag.index !== EMPTY;
-  if (!marker.visible) return;
-  slotCentre(grid, slot, _pos).y = 0.004;
-  marker.position.copy(_pos);
-  marker.scale.set(grid.cell * 0.92, grid.cell * 0.92, 1);
-  marker.material.color.set(grid.slots[slot] === EMPTY || slot === drag.from ? '#3f7f5a' : '#b3402f');
+function ghost(item) {
+  const disp = activeDisplay();
+  const t = drag.target;
+  marker.visible = !!t;
+  if (!t) return;
+  const rect = slotRect(disp.g, t.c, t.r, item.w, item.h);
+  marker.position.set(rect.x, shelfBaseY(disp.plane, t.layer) + 0.004, rect.z).applyMatrix4(disp.frame);
+  marker.quaternion.copy(disp.quat).multiply(FLAT_Q);
+  marker.scale.set(rect.w * 0.96, rect.d * 0.96, 1);
+  marker.material.color.set('#3f7f5a');
 }
 
 renderer.domElement.addEventListener('pointerdown', onPointerDown);
-renderer.domElement.addEventListener('pointermove', onPointerMove);
-renderer.domElement.addEventListener('pointerup', onPointerUp);
+// Window-level, not canvas-level: movement must keep tracking (for the display hand-off above)
+// even if the cursor wanders over the HUD or GUI chrome while something is held.
+addEventListener('pointermove', onPointerMove);
 
 // ---------------------------------------------------------------- framing
+//
+// NOT "take the shelf's local offset and rotate it through the frame" — that seems tempting
+// (reuse the same trick paintInstance uses) but it's wrong here. For the shelf, world Y
+// (elevation) and world Z (pull the camera back) are two DIFFERENT axes that happen to both be
+// perpendicular to the "layer" axis. Rotating that same offset through the peg board's frame
+// collapses them onto the wrong axes — it puts the camera staring straight down at the wall
+// instead of standing in front of it. World Y is elevation and world Z is "pull back toward the
+// viewer" for BOTH displays (the peg board's frame was specifically built so rows still go up in
+// world Y) — so express the camera position directly in world space instead.
 function frame() {
-  const { w, d } = gridSize(grid);
-  const extent = Math.max(w, d) * 1.15;
+  const disp = activeDisplay();
+  const { w, d } = gridSize(disp.g);
+  const isShelf = disp.id === 'shelf';
+  const height = isShelf ? S.shelves * S.shelfGap : PEG_HEADROOM * S.boxHeight;
+  const center = new THREE.Vector3(0, height * 0.4, 0).applyMatrix4(disp.frame);   // a point, not a direction
+
+  // The peg board's "height" above is only how far a stack sticks OUT (small) — its actual size
+  // on the wall is (w, d), same as the shelf's own (w, d, height) volume.
+  const extent = (isShelf ? Math.max(w, d, height) : Math.max(w, d)) * 1.3;
   const dist = extent / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5));
-  controls.target.set(0, 0, 0);
-  camera.position.set(0, dist * 0.82, dist * 0.62);
+
+  controls.target.copy(center);
+  camera.position.set(
+    center.x,
+    center.y + dist * (isShelf ? 0.7 : 0.25),
+    center.z + dist * (isShelf ? 0.66 : 0.9),
+  );
   controls.update();
 }
 
 // ---------------------------------------------------------------- gui
-const gui = new GUI({ title: 'stash and stuff' });
-gui.add(S, 'fill', 1, 48, 1).name('notions').onFinishChange(scatter);
-gui.add({ f: scatter }, 'f').name('reshuffle  (R)');
+const planeCount = (disp) => (disp.id === 'shelf' ? S.shelves : 1);
+const setPlane = (p) => {
+  const disp = activeDisplay();
+  disp.plane = (p + planeCount(disp)) % planeCount(disp);
+  paintActivePlane();
+  planeCtl.updateDisplay();
+};
+// refocus=false is used when the switch happens incidentally mid-hold (hovering onto a different
+// display while carrying an item) — jumping the camera there would yank the view out from under
+// the player's hands. An explicit switch (D key, dropdown, or a fresh pickup) still recentres.
+const setActiveId = (id, refocus = true) => {
+  activeId = id;
+  planeCtl.max(planeCount(activeDisplay()) - 1);
+  paintActivePlane();
+  planeCtl.updateDisplay();
+  displayCtl?.updateDisplay();
+  if (refocus) frame();
+};
 
-const gGrid = gui.addFolder('surface');
-gGrid.add(S, 'cols', 2, 16, 1).onFinishChange(rebuild);
-gGrid.add(S, 'rows', 2, 16, 1).onFinishChange(rebuild);
-gGrid.add(S, 'cell', 0.10, 0.60, 0.01).name('slot size').onFinishChange(rebuild);
-gGrid.add(S, 'showGrid').name('show grid  (G)').onChange((v) => (gridHelper.visible = v));
+const gui = new GUI({ title: 'stash and stuff' });
+gui.add(S, 'fill', 1, 80, 1).name('notions').onFinishChange(scatter);
+gui.add({ f: scatter }, 'f').name('reshuffle  (R)');
+gui.add({ f: tidyActive }, 'f').name('tidy up  (T)');
+const displayCtl = gui.add(
+  { get d() { return activeId; }, set d(v) { setActiveId(v); } },
+  'd', { 'shelf unit': 'shelf', 'peg board': 'peg' },
+).name('display  (D)');
+const planeCtl = gui.add({ get s() { return activeDisplay().plane; }, set s(v) { setPlane(v | 0); } }, 's', 0, 5, 1)
+  .name('active plane  [ ]').listen();
+planeCtl.max(S.shelves - 1);
+
+const gGrid = gui.addFolder('shelf unit');
+gGrid.add(S, 'layout', Object.keys(LAYOUTS)).name('shape').onFinishChange(rebuild);
+gGrid.add(S, 'cols', 2, 12, 1).onFinishChange(rebuild);
+gGrid.add(S, 'rows', 2, 12, 1).onFinishChange(rebuild);
+gGrid.add(S, 'shelves', 1, 5, 1).onFinishChange(() => { if (activeId === 'shelf') planeCtl.max(S.shelves - 1); rebuild(); });
+gGrid.add(S, 'headroom', 1, 8, 1).name('stack height').onFinishChange(rebuild);
+gGrid.add(S, 'cell', 0.14, 0.5, 0.01).name('slot size').onFinishChange(rebuild);
+gGrid.add(S, 'shelfGap', 0.12, 0.4, 0.01).name('shelf spacing').onFinishChange(rebuild);
+gGrid.add(S, 'showGrid').name('show grid  (G)').onChange(paintActivePlane);
 
 const gLook = gui.addFolder('notion look');
-gLook.add(S, 'scale', 0.05, 0.60, 0.005).onChange(() => items.forEach((_, i) => refresh(i)));
-gLook.add(S, 'lying').name('lying flat').onChange(() => items.forEach((_, i) => refresh(i)));
-gLook.add(S, 'yawJitter', 0, 1, 0.01).name('yaw jitter').onFinishChange(scatter);
-gLook.addColor(S, 'tint').onChange(() => {
+boxHeightCtl = gLook.add(S, 'boxHeight', 0.02, 0.18, 0.005).name('box height').onChange(() => items.forEach((_, i) => refresh(i)));
+gLook.addColor(S, 'boxColor').name('box colour').onChange((v) => boxes.material.color.set(v));
+gLook.addColor(S, 'tint').name('label ink').onChange(() => {
   items.forEach((item, i) => { item.color = S.tint; refresh(i); });
 });
 gLook.add(S, 'shade', 0, 0.8, 0.01).name('gradient').onChange((v) => {
   field.material.userData.uniforms.uShade.value = v;
+  fieldTop.material.userData.uniforms.uShade.value = v;
 });
 
 const gEdge = gui.addFolder('thickness / outline');
-gEdge.add(S, 'edge').name('enabled').onChange((v) => (edge.visible = v));
+gEdge.add(S, 'edge').name('enabled').onChange((v) => { edge.visible = v; edgeTop.visible = v; });
 gEdge.add(S, 'edgeGrow', 1.0, 1.30, 0.005).name('outline width')
-  .onChange((v) => (edge.material.userData.uniforms.uGrow.value = v));
-gEdge.add(S, 'edgePush', 0, 0.08, 0.001).name('depth offset')
-  .onChange((v) => (edge.material.userData.uniforms.uPush.value = v));
-gEdge.addColor(S, 'edgeColor').name('colour').onChange((v) => edge.material.color.set(v));
-
-gui.add(S, 'grab', 0.3, 1.5, 0.05).name('grab radius (slots)');
+  .onChange((v) => { edge.material.userData.uniforms.uGrow.value = v; edgeTop.material.userData.uniforms.uGrow.value = v; });
+gEdge.addColor(S, 'edgeColor').name('colour').onChange((v) => { edge.material.color.set(v); edgeTop.material.color.set(v); });
 
 addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
-  if (k === 'g') { S.showGrid = !S.showGrid; gridHelper.visible = S.showGrid; }
+  if (k === 'g') { S.showGrid = !S.showGrid; paintActivePlane(); }
   if (k === 'r') scatter();
+  if (k === 't') tidyActive();
   if (k === 'f') frame();
+  if (k === 'd') { setActiveId(activeId === 'shelf' ? 'peg' : 'shelf'); displayCtl.updateDisplay(); }
+  if (e.key === '[') setPlane(activeDisplay().plane - 1);
+  if (e.key === ']') setPlane(activeDisplay().plane + 1);
+  // A keyboard switch changed WHERE a held item would drop (plane or display) but the mouse itself
+  // never moved, so nothing would normally recompute drag.target/the ghost until the next real
+  // pointermove — meaning a click right after [ / ] / D dropped the item back where it started.
+  // Re-run the move logic against the last known pointer position to pick that up immediately.
+  if (drag.index !== EMPTY) onPointerMove(lastPointer);
   gui.controllersRecursive().forEach((c) => c.updateDisplay());
 });
 
@@ -328,9 +834,10 @@ function updatePerf(dt) {
   if (performance.now() - lastPerf < 250) return;
   lastPerf = performance.now();
   const r = renderer.info.render;
+  const disp = activeDisplay();
   perfEl.textContent =
     `${fps.toFixed(0)} fps\ndraw calls ${r.calls}\ntriangles  ${r.triangles}\n` +
-    `notions    ${field ? field.count : 0}`;
+    `notions    ${field ? field.count : 0}   ${disp.id} plane ${disp.plane}`;
 }
 
 // ---------------------------------------------------------------- go
@@ -341,10 +848,64 @@ loadAtlas(ATLAS_URL, S.theme).then((loaded) => {
   field = makeField(atlas.texture, CAPACITY, { unlit: S.unlit, shade: S.shade });
   edge = makeEdge(field, S.edgeColor);
   edge.material.userData.uniforms.uGrow.value = S.edgeGrow;
-  edge.material.userData.uniforms.uPush.value = S.edgePush;
   edge.visible = S.edge;
-  scene.add(field, edge);
+
+  fieldTop = makeField(atlas.texture, CAPACITY, { unlit: S.unlit, shade: S.shade });
+  edgeTop = makeEdge(fieldTop, S.edgeColor);
+  edgeTop.material.userData.uniforms.uGrow.value = S.edgeGrow;
+  edgeTop.visible = S.edge;
+
+  shadows = makeShadows(CAPACITY);
+  boxes = makeBoxes(CAPACITY, S.boxColor);
+
+  sizeAtlas = makeSizeAtlas(HOOK_SIZES_MM.map((mm) => mm.toFixed(1)));
+  sizeTag = makeField(sizeAtlas.texture, CAPACITY, { unlit: true, shade: 0 });
+
+  scene.add(field, edge, fieldTop, edgeTop, shadows, boxes, sizeTag);
+
+  // The peg board is built once — it isn't reshuffled, and its own settings aren't GUI-exposed
+  // yet (add if that turns out to matter). rebuild() below only ever touches the shelf.
+  buildPegGrid();
+  layoutPegDisplay();
+
   rebuild();
+
+  if (location.hash === '#test') {
+    scene.updateMatrixWorld(true);
+    camera.updateMatrixWorld(true);
+    const g = displays.shelf.g;
+
+    // Isolate the mechanism under test (stale ghost/target after a KEYBOARD plane switch) from
+    // incidental scatter occlusion by bypassing pickUp's own box raycast — lift a known item
+    // directly and drive drag state exactly like pickUp would have left it.
+    const victimIndex = 0;
+    const victim = items[victimIndex];
+    lift(g, victim.keys);
+    drag.index = victimIndex;
+    displays.shelf.plane = 0;
+    if (activeId !== 'shelf') setActiveId('shelf', false);
+
+    // Column (2,2) — well inside the grid, not a corner — cleared on every shelf level so the
+    // hover test has nothing else to hit and no parallax round-trip pushes it out of bounds.
+    for (const it of items) {
+      if (it !== victim && it.display === 'shelf' && it.c === 2 && it.r === 2 && it.keys) lift(g, it.keys);
+    }
+    const rect = slotRect(g, 2, 2, 1, 1);
+    const worldPt = new THREE.Vector3(rect.x, shelfBaseY(0, 0) + S.boxHeight / 2, rect.z).applyMatrix4(displays.shelf.frame);
+    const proj = worldPt.clone().project(camera);
+    const clientX = (proj.x * 0.5 + 0.5) * innerWidth;
+    const clientY = (-proj.y * 0.5 + 0.5) * innerHeight;
+
+    onPointerMove({ clientX, clientY });   // establish a target on plane 0, like a real drag would
+    console.log('TEST target on plane 0:', JSON.stringify(drag.target));
+
+    dispatchEvent(new KeyboardEvent('keydown', { key: ']' }));   // switch to plane 1 WITHOUT moving the mouse
+    console.log('TEST after ]: plane', displays.shelf.plane, '(expect 1) target now', JSON.stringify(drag.target));
+
+    onPointerDown({ button: 0, clientX, clientY });   // drop, still at the same screen position
+    const after = items[victimIndex];
+    console.log('TEST after drop: shelf', after.shelf, 'c', after.c, 'r', after.r, '(expect 1 2 2)');
+  }
 
   renderer.setAnimationLoop(() => {
     controls.update();

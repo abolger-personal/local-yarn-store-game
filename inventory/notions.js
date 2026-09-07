@@ -3,14 +3,15 @@
 // Pure: nothing here touches a scene, camera or DOM.
 //
 // Two decisions from inventory/DESIGN-DECISIONS.md are load-bearing here:
-//   1. Every notion is the SAME quad. A hook differs from a button only by which cell of the
-//      atlas it samples, so the whole shop is one InstancedMesh and one draw call.
+//   1. Every LABEL is the SAME quad. A hook differs from a button only by which cell of the
+//      atlas it samples, so all labels are one InstancedMesh and one draw call (plus one more
+//      each for their ink outline, their box volume, and their contact shadow — still a small,
+//      fixed number of draw calls regardless of item count).
 //   2. The atlas stores shape in alpha with white RGB, so colour is per-instance and a theme
 //      that only recolours ships no new art.
 
 import * as THREE from 'three';
-
-export const EMPTY = -1;
+import { gridSize, usableAt } from './grid.js';
 
 // ---------------------------------------------------------------- atlas
 
@@ -31,71 +32,56 @@ export function cellRect(manifest, name) {
   return [c.u0, c.v0, c.u1 - c.u0, c.v1 - c.v0];
 }
 
-// ---------------------------------------------------------------- slot grid
+// ---------------------------------------------------------------- size atlas
+//
+// A second, tiny atlas for a size number — reuses the exact same cellRect/aCell/makeField
+// machinery as the illustration atlas (one canvas-drawn texture, one instanced mesh, one draw
+// call), rather than inventing a separate text-rendering path.
 
-export const makeGrid = (cols, rows, cell) => ({ cols, rows, cell, slots: new Array(cols * rows).fill(EMPTY) });
+/** A row of number labels baked into one canvas, plus a fully-transparent "blank" cell for items
+ *  with no size — alphaTest then draws nothing for those instances, no per-instance branching. */
+export function makeSizeAtlas(labels, { cell = 128 } = {}) {
+  const all = ['blank', ...labels];
+  const canvas = document.createElement('canvas');
+  canvas.width = cell * all.length;
+  canvas.height = cell;
+  const ctx = canvas.getContext('2d');
+  ctx.font = `700 ${Math.round(cell * 0.4)}px ui-sans-serif, system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#2a2a2a';
 
-export const gridSize = (grid) => ({ w: grid.cols * grid.cell, d: grid.rows * grid.cell });
+  const cells = {};
+  all.forEach((label, i) => {
+    if (label !== 'blank') ctx.fillText(label, i * cell + cell / 2, cell / 2);
+    cells[label] = { u0: i / all.length, u1: (i + 1) / all.length, v0: 0, v1: 1 };
+  });
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  return { texture, manifest: { cells } };
+}
+
+// ---------------------------------------------------------------- grid lines
 
 /**
- * Slot under a point on the surface, or -1 if outside.
- * This is the O(1) lookup the design record calls for: raycast the surface ONCE, convert to a
- * grid index. Items are never raycast, and with instancing they are not raycastable anyway.
+ * Outline of the USABLE slots on one shelf, drawn per-cell so a masked display (a shop window, a
+ * stepped shelf) shows its true silhouette instead of a full rectangle. `GridHelper` can't do this.
  */
-export function slotAt(grid, x, z) {
-  const { w, d } = gridSize(grid);
-  const col = Math.floor((x + w / 2) / grid.cell);
-  const row = Math.floor((z + d / 2) / grid.cell);
-  if (col < 0 || row < 0 || col >= grid.cols || row >= grid.rows) return EMPTY;
-  return row * grid.cols + col;
-}
-
-/** Centre of a slot, in surface-local space. */
-export function slotCentre(grid, index, target = new THREE.Vector3()) {
-  const { w, d } = gridSize(grid);
-  const col = index % grid.cols;
-  const row = Math.floor(index / grid.cols);
-  return target.set(
-    (col + 0.5) * grid.cell - w / 2,
-    0,
-    (row + 0.5) * grid.cell - d / 2,
-  );
-}
-
-const _centre = new THREE.Vector3();
-
-/**
- * The slot a click should grab, which is not always the slot it landed in.
- * An ink drawing occupies a fraction of its slot, so an exact hit test feels like the item is
- * not where it looks. Falls back to the nearest occupied neighbour within `radius`.
- */
-export function pickSlot(grid, x, z, radius = grid.cell * 0.75) {
-  const exact = slotAt(grid, x, z);
-  if (exact !== EMPTY && grid.slots[exact] !== EMPTY) return exact;
-
-  let best = EMPTY;
-  let bestDist = radius * radius;
-  for (let i = 0; i < grid.slots.length; i++) {
-    if (grid.slots[i] === EMPTY) continue;
-    slotCentre(grid, i, _centre);
-    const dist = (_centre.x - x) ** 2 + (_centre.z - z) ** 2;
-    if (dist < bestDist) [best, bestDist] = [i, dist];
-  }
-  return best;
-}
-
-/** Lines matching the ACTUAL slot grid. `GridHelper` only draws squares. */
-export function makeGridLines(grid, color = '#8d8172') {
-  const { w, d } = gridSize(grid);
+export function makeGridLines(g, shelf, color = '#8d8172') {
+  const { w, d } = gridSize(g);
   const points = [];
-  for (let c = 0; c <= grid.cols; c++) {
-    const x = c * grid.cell - w / 2;
-    points.push(x, 0, -d / 2, x, 0, d / 2);
-  }
-  for (let r = 0; r <= grid.rows; r++) {
-    const z = r * grid.cell - d / 2;
-    points.push(-w / 2, 0, z, w / 2, 0, z);
-  }
+  const seg = (x0, z0, x1, z1) => points.push(x0, 0, z0, x1, 0, z1);
+  for (let r = 0; r < g.rows; r++)
+    for (let c = 0; c < g.cols; c++) {
+      if (!usableAt(g, shelf, c, r)) continue;
+      const x = c * g.cell - w / 2, z = r * g.cell - d / 2, e = g.cell;
+      seg(x, z, x + e, z); seg(x, z + e, x + e, z + e);   // top / bottom
+      seg(x, z, x, z + e); seg(x + e, z, x + e, z + e);   // left / right
+    }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
   return new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color }));
@@ -110,7 +96,7 @@ function patchAtlasUV(material, extraVertex = '', extraFragment = '') {
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, material.userData.uniforms ?? {});
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec4 aCell;\nvarying vec2 vLocalUv;\nuniform float uGrow;\nuniform float uPush;')
+      .replace('#include <common>', '#include <common>\nattribute vec4 aCell;\nvarying vec2 vLocalUv;\nuniform float uGrow;')
       .replace('#include <uv_vertex>', '#include <uv_vertex>\nvLocalUv = vMapUv;\nvMapUv = aCell.xy + vMapUv * aCell.zw;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>\n${extraVertex}`);
     shader.fragmentShader = shader.fragmentShader
@@ -131,16 +117,26 @@ export function notionMaterial(texture, { unlit = true, shade = 0 } = {}) {
     side: THREE.DoubleSide,
     ...(unlit ? {} : { roughness: 0.85, metalness: 0 }),
   });
-  material.userData.uniforms = { uGrow: uniform(1), uPush: uniform(0), uShade: uniform(shade) };
+  material.userData.uniforms = { uGrow: uniform(1), uShade: uniform(shade) };
   // a gentle gradient across the card reads as form without leaving billboard territory
   patchAtlasUV(material, '', 'diffuseColor.rgb *= mix(1.0 - uShade, 1.0, vLocalUv.y);');
   return material;
 }
 
 /**
- * A dark copy rendered slightly larger and pushed behind the card.
- * Gives thickness AND the ink outline in ONE extra draw call for the whole field, because it
- * shares the main field's instance attributes rather than keeping its own copy in sync.
+ * A dark copy rendered slightly larger, coplanar with the card, in ONE extra draw call for the
+ * whole field (it shares the main field's instance attributes rather than keeping its own copy
+ * in sync). The ink outline comes from `uGrow` alone — scaling the copy up in its own local XY
+ * so it peeks out around the card's silhouette.
+ *
+ * This used to also push the copy back along its local Z ("depth") to dodge z-fighting with the
+ * card. That worked when cards lay flat on a surface (a tiny Z offset read as negligible from a
+ * top-down camera), but once labels stand flush against a box's face, "back" means "into the
+ * box" — the offset either buried the outline inside the opaque box or landed it exactly on the
+ * box's own surface, and depth precision can't consistently resolve that: the flicker. Fixed by
+ * `polygonOffset` instead, which biases the DEPTH TEST, not the geometry — the outline never
+ * moves in world space (so no more embedding-in-the-box), and it reliably loses the depth test
+ * to the card wherever the two overlap, leaving only the peeked-out border visible.
  */
 export function makeEdge(field, color = '#1b1418') {
   const material = new THREE.MeshBasicMaterial({
@@ -149,9 +145,12 @@ export function makeEdge(field, color = '#1b1418') {
     transparent: false,
     alphaTest: 0.45,
     side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1,
   });
-  material.userData.uniforms = { uGrow: uniform(1.06), uPush: uniform(0.012), uShade: uniform(0) };
-  patchAtlasUV(material, 'transformed.xy *= uGrow;\ntransformed.z -= uPush;');
+  material.userData.uniforms = { uGrow: uniform(1.06), uShade: uniform(0) };
+  patchAtlasUV(material, 'transformed.xy *= uGrow;');
 
   const edge = new THREE.InstancedMesh(field.geometry, material, field.instanceMatrix.count);
   edge.instanceMatrix = field.instanceMatrix;   // shared, so it can never drift out of sync
@@ -191,19 +190,84 @@ export function setInstance(field, index, { matrix, rect, color }) {
   }
 }
 
+// ---------------------------------------------------------------- contact shadows
+
+// A soft round blot; instanced flat on each layer so a stacked pile casts onto the thing below it.
+// Design record: items get fake contact-shadow quads rather than casting into a shadow map.
+function softDiscTexture() {
+  const size = 64, canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, 'rgba(0,0,0,0.55)');
+  g.addColorStop(0.7, 'rgba(0,0,0,0.28)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+export function makeShadows(capacity) {
+  const mesh = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ map: softDiscTexture(), transparent: true, depthWrite: false }),
+    capacity,
+  );
+  mesh.frustumCulled = false;
+  mesh.count = 0;
+  mesh.renderOrder = -2;   // under the cards and their edge shells
+  return mesh;
+}
+
+// ---------------------------------------------------------------- boxes
+//
+// A flat card left a stack full of dead air between layers. A plain box gives each item real
+// volume — cheap because it is one more shared InstancedMesh, not per-item geometry — and the
+// illustrated card becomes a label glued to the box's forward face instead of the whole item.
+
+/** One InstancedMesh for every box on the surface — plain, unlit by the atlas, one more draw call. */
+export function makeBoxes(capacity, color = '#e7ddc9') {
+  const mesh = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0 }),
+    capacity,
+  );
+  mesh.frustumCulled = false;
+  mesh.count = 0;
+  return mesh;
+}
+
 // ---------------------------------------------------------------- placement
 
 const _q = new THREE.Quaternion();
 const _s = new THREE.Vector3();
+const _zRot = new THREE.Quaternion();
+const _zAxis = new THREE.Vector3(0, 0, 1);
 const FLAT = new THREE.Euler(-Math.PI / 2, 0, 0);
 
 /**
- * Transform for a notion sitting in the world.
- * `lying` puts the card face-up on the surface; upright leaves it standing, which is what a
- * shelf wants. Which of these reads better under an orbiting camera is a P1 question.
+ * Transform for a notion lying face-up on a shelf. Cards lie flat and stack in Y — the pile IS the
+ * 2.5D. Footprint sizing is anisotropic (sx≠sy) so a 2×1 reads as a genuinely wider object; the
+ * atlas art stretches, which is fine for a spike whose real items will be 3D geometry anyway.
  */
-export function placeMatrix(position, scale, lying, yaw, target = new THREE.Matrix4()) {
-  _q.setFromEuler(lying ? FLAT : new THREE.Euler(0, yaw, 0));
-  if (lying) _q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), yaw));
-  return target.compose(position, _q, _s.set(scale, scale, scale));
+export function placeMatrix(position, sx, sy, yaw, target = new THREE.Matrix4()) {
+  _q.setFromEuler(FLAT);
+  _q.multiply(_zRot.setFromAxisAngle(_zAxis, yaw));
+  return target.compose(position, _q, _s.set(sx, sy, 1));
+}
+
+const _yaw = new THREE.Euler();
+
+/** A box standing on the shelf — the physical volume that gives an item real depth. */
+export function placeBoxMatrix(position, w, d, h, yaw, target = new THREE.Matrix4()) {
+  _q.setFromEuler(_yaw.set(0, yaw, 0));
+  return target.compose(position, _q, _s.set(w, h, d));
+}
+
+/** The illustrated label, standing upright and flush with the box's forward face. */
+export function placeLabelMatrix(position, w, h, yaw, target = new THREE.Matrix4()) {
+  _q.setFromEuler(_yaw.set(0, yaw, 0));
+  return target.compose(position, _q, _s.set(w, h, 1));
 }

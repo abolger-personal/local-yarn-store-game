@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>LYS concept — owl army</title>
+<title>LYS concept — crowd</title>
 <style>
   :root { color-scheme: light; }
   html, body { margin: 0; height: 100%; overflow: hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
@@ -51,7 +51,7 @@
 <div id="perf"></div>
 <div id="toast"></div>
 <div id="hud">
-  <b>LYS owl army</b> — does the randomiser make a cast, or a zoo?<br />
+  <b>LYS crowd</b> — does the randomiser make a cast, or a zoo?<br />
   Drag to orbit · scroll to zoom<br />
   <kbd>1</kbd> felted &nbsp; <kbd>2</kbd> grey &nbsp; <kbd>3</kbd> silhouette<br />
   <kbd>R</kbd> reroll crowd &nbsp; <kbd>F</kbd> frame &nbsp; <kbd>D</kbd> 150px test<br />
@@ -74,13 +74,20 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
-  DEFAULT_PARAMS, TONE_MAPPING, POSES, POSE_KEYS,
-  randomParams, createOwl, applyPose, setViewMode, disposeOwl,
-  setGeometryDetail, GEO_DETAIL,
-} from './owl.js';
+  BASE_PARAMS, TONE_MAPPING, POSES, POSE_KEYS,
+  createCharacter, applyPose, setViewMode, disposeCharacter,
+  setGeometryDetail, GEO_DETAIL, getSpecies, speciesIds, pick,
+} from './npc.js';
+
+// importing a species file is all it takes to put it in the crowd
+import './owl.js';
+import './llama.js';
+
+const SPECIES_MIX = ['mixed', ...speciesIds()];
 
 const S = {
   count:        14,
+  species:      'mixed',
   quality:      'medium',
   spacing:      0.95,
   jitter:       0.30,
@@ -98,8 +105,8 @@ const S = {
   shadows:      true,
   yarnWall:     false,
   yarnCount:    1000,
-  exposure:     DEFAULT_PARAMS.exposure,
-  toneMapping:  DEFAULT_PARAMS.toneMapping,
+  exposure:     BASE_PARAMS.exposure,
+  toneMapping:  BASE_PARAMS.toneMapping,
   seedFacing:   true,
 };
 
@@ -252,9 +259,18 @@ scene.add(crowdGroup);
 function clearCrowd() {
   for (const o of crowd) {
     crowdGroup.remove(o.built.root);
-    disposeOwl(o.built);
+    disposeCharacter(o.built);
   }
   crowd = [];
+}
+
+const nextSpecies = () => (S.species === 'mixed' ? pick(speciesIds()) : S.species);
+
+function spawn(speciesId) {
+  const kit = getSpecies(speciesId);
+  const P = kit.randomise(structuredClone(kit.defaults));
+  P.partShadows = S.partShadows;
+  return { kit, P, built: createCharacter(P, kit) };
 }
 
 function buildCrowd() {
@@ -265,8 +281,7 @@ function buildCrowd() {
   const rows = Math.ceil(S.count / cols);
 
   for (let i = 0; i < S.count; i++) {
-    const P = randomParams({ partShadows: S.partShadows });
-    const built = createOwl(P);
+    const { kit, P, built } = spawn(nextSpecies());
 
     const cx = (i % cols) - (cols - 1) / 2;
     const cz = Math.floor(i / cols) - (rows - 1) / 2;
@@ -283,6 +298,7 @@ function buildCrowd() {
     crowd.push({
       built,
       name: P.name,
+      species: kit.label,
       color: P.bodyColor,
       from: { ...start },
       to: { ...start },
@@ -345,7 +361,7 @@ function frameCrowd() {
   controls.update();
 }
 
-// distance at which ONE owl is 150px tall - the real readability check
+// distance at which ONE character is 150px tall - the real readability check
 function distanceTest() {
   const box = crowdBox();
   const center = box.getCenter(new THREE.Vector3());
@@ -422,15 +438,17 @@ function updatePerf(dt) {
     `geometries ${mem.geometries}<br>` +
     `textures   ${mem.textures}<br>` +
     `programs   ${renderer.info.programs?.length ?? 0}<br>` +
-    `<span style="opacity:.65">${S.count} owls @ ${S.detail}` +
-    `${S.yarnWall ? ` + ${S.yarnCount} yarn` : ''}</span><br>` +
-    `<span style="opacity:.65">${(r.calls / Math.max(S.count, 1)).toFixed(0)} calls/owl</span>`;
+    `<span style="opacity:.65">${S.count} × ${S.species} @ ${S.detail}` +
+    `${S.yarnWall ? ` + ${S.yarnCount} yarn` : ''}</span><br />` +
+    `<span style="opacity:.65">${(r.calls / Math.max(S.count, 1)).toFixed(0)} calls/character</span>`;
 }
 
 // ---------------------------------------------------------------- ui
 function updateRoster() {
   document.getElementById('roster').innerHTML =
-    crowd.map((o) => `<div><i style="background:${o.color}"></i>${o.name}</div>`).join('');
+    crowd.map((o) =>
+      `<div><i style="background:${o.color}"></i>${o.name}` +
+      `<span style="opacity:.5"> · ${o.species}</span></div>`).join('');
 }
 
 let toastTimer;
@@ -442,8 +460,9 @@ function toast(msg) {
   toastTimer = setTimeout(() => (el.style.opacity = '0'), 1600);
 }
 
-const gui = new GUI({ title: 'owl army' });
+const gui = new GUI({ title: 'crowd' });
 gui.add(S, 'count', 4, 40, 1).onFinishChange(buildCrowd);
+gui.add(S, 'species', SPECIES_MIX).onChange(buildCrowd);
 gui.add(S, 'quality', Object.keys(QUALITY)).name('graphics quality').onChange(applyQuality);
 gui.add({ f: buildCrowd }, 'f').name('reroll crowd  (R)');
 
@@ -497,7 +516,7 @@ addEventListener('keydown', (e) => {
     setViewMode(crowdGroup, S.view);
     gui.controllersRecursive().forEach((c) => c.updateDisplay());
   }
-  if (k === 'r') { buildCrowd(); toast(`${S.count} new owls`); }
+  if (k === 'r') { buildCrowd(); toast(`${S.count} new characters`); }
   if (k === 'f') frameCrowd();
   if (k === 'd') distanceTest();
   if (k === 'b') renderer.domElement.classList.toggle('squint');

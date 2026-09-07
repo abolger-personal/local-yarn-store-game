@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYS concept — owl army</title>
+<style>
+  :root { color-scheme: light; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; transition: filter 120ms linear; }
+  canvas.squint { filter: blur(6px); }
+  #hud {
+    position: fixed; left: 12px; bottom: 12px; z-index: 10;
+    background: rgba(255,255,255,.82); backdrop-filter: blur(6px);
+    border: 1px solid rgba(0,0,0,.08); border-radius: 10px;
+    padding: 10px 12px; font-size: 12px; line-height: 1.5; color: #333; max-width: 380px;
+  }
+  #hud b { color: #111; }
+  #hud kbd {
+    background: #efefef; border: 1px solid #ddd; border-bottom-width: 2px;
+    border-radius: 4px; padding: 0 4px; font-size: 11px; font-family: ui-monospace, monospace;
+  }
+  #roster {
+    position: fixed; right: 12px; bottom: 12px; z-index: 10;
+    background: rgba(255,255,255,.82); backdrop-filter: blur(6px);
+    border: 1px solid rgba(0,0,0,.08); border-radius: 10px;
+    padding: 8px 12px; font-size: 11px; line-height: 1.6; color: #444;
+    max-height: 40vh; overflow: auto; max-width: 200px;
+  }
+  #roster i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+  #toast {
+    position: fixed; left: 50%; top: 16px; transform: translateX(-50%); z-index: 20;
+    background: rgba(20,20,20,.88); color: #fff; font-size: 12px;
+    padding: 8px 14px; border-radius: 8px; pointer-events: none; opacity: 0; transition: opacity .2s;
+  }
+  #perf {
+    position: fixed; left: 12px; top: 12px; z-index: 10;
+    background: rgba(20,20,20,.82); color: #e8e8e8;
+    font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+    border-radius: 8px; padding: 9px 12px; min-width: 190px; pointer-events: none;
+  }
+  #perf b { color: #fff; font-weight: 600; }
+  #perf .warn { color: #ffb454; }
+  #perf .bad { color: #ff6b6b; }
+  #perf .ok { color: #8fd67a; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="perf"></div>
+<div id="toast"></div>
+<div id="hud">
+  <b>LYS owl army</b> — does the randomiser make a cast, or a zoo?<br />
+  Drag to orbit · scroll to zoom<br />
+  <kbd>1</kbd> felted &nbsp; <kbd>2</kbd> grey &nbsp; <kbd>3</kbd> silhouette<br />
+  <kbd>R</kbd> reroll crowd &nbsp; <kbd>F</kbd> frame &nbsp; <kbd>D</kbd> 150px test<br />
+  <kbd>B</kbd> squint/blur &nbsp; <kbd>Space</kbd> pause poses
+</div>
+<div id="roster"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import GUI from 'three/addons/libs/lil-gui.module.min.js';
+import {
+  DEFAULT_PARAMS, TONE_MAPPING, POSES, POSE_KEYS,
+  randomParams, createOwl, applyPose, setViewMode, disposeOwl,
+  setGeometryDetail, GEO_DETAIL,
+} from './owl.js';
+
+const S = {
+  count:        14,
+  quality:      'medium',
+  spacing:      0.95,
+  jitter:       0.30,
+  view:         'felted',
+  poseInterval: 3.0,
+  blend:        0.9,
+  cyclePoses:   true,
+  detail:       'high',
+  renderScale:  1.0,
+  partShadows:  true,
+  blobShadows:  false,
+  blobOpacity:  0.55,
+  blobStretch:  1.45,
+  blobOffset:   0.22,
+  shadows:      true,
+  yarnWall:     false,
+  yarnCount:    1000,
+  exposure:     DEFAULT_PARAMS.exposure,
+  toneMapping:  DEFAULT_PARAMS.toneMapping,
+  seedFacing:   true,
+};
+
+// One player-facing setting, not three technical switches. Each tier bundles every lever
+// that measured as mattering: tessellation (GPU), shadow strategy (CPU draws + tile resolve),
+// and resolution (fill rate). The individual controls below stay as developer overrides.
+const QUALITY = {
+  low:    { detail: 'low',  renderScale: 0.75, blobShadows: true,  partShadows: false },
+  medium: { detail: 'med',  renderScale: 1.00, blobShadows: true,  partShadows: false },
+  high:   { detail: 'high', renderScale: 1.00, blobShadows: false, partShadows: true  },
+};
+
+const QUALITY_KEY = 'lys.crowd.quality';
+S.quality = localStorage.getItem(QUALITY_KEY) ?? S.quality;
+if (!QUALITY[S.quality]) S.quality = 'medium';
+
+function applyQuality(name) {
+  const q = QUALITY[name] ?? QUALITY.medium;
+  S.quality = name;
+  Object.assign(S, q);
+  try { localStorage.setItem(QUALITY_KEY, name); } catch {}
+
+  setGeometryDetail(q.detail);
+  applyRenderScale();
+  clearCrowd();
+  buildCrowd();
+  gui.controllersRecursive().forEach((c) => c.updateDisplay());
+}
+
+// ---------------------------------------------------------------- renderer
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+const applyRenderScale = () =>
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2) * S.renderScale);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = TONE_MAPPING[S.toneMapping];
+renderer.toneMappingExposure = S.exposure;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#e8e2d9');
+
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 200);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.minDistance = 0.5;
+controls.maxDistance = 80;
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const key = new THREE.DirectionalLight('#ffe6c4', 2.6);
+key.position.set(4, 6, 3);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.near = 0.5;
+key.shadow.camera.far = 30;
+key.shadow.camera.left = -5;
+key.shadow.camera.right = 5;
+key.shadow.camera.top = 5;
+key.shadow.camera.bottom = -5;
+key.shadow.bias = -0.0012;
+key.shadow.radius = 3;
+scene.add(key);
+scene.add(new THREE.HemisphereLight('#cfe0ff', '#8b7a68', 0.55));
+const rim = new THREE.DirectionalLight('#bcd4ff', 1.1);
+rim.position.set(-4, 2.5, -5);
+scene.add(rim);
+
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(14, 96),
+  new THREE.ShadowMaterial({ opacity: 0.20 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ---------------------------------------------------------------- blob shadows
+// The shadow map is a second full pass over every caster - ~29 extra draws per character.
+// This replaces all of them with ONE instanced draw, which is the standard mobile trade.
+let blobTex = null;
+function blobTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0.0, 'rgba(0,0,0,0.55)');
+  g.addColorStop(0.5, 'rgba(0,0,0,0.30)');
+  g.addColorStop(1.0, 'rgba(0,0,0,0.00)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+
+let blobs = null;
+function buildBlobs() {
+  if (blobs) {
+    scene.remove(blobs);
+    blobs.geometry.dispose();
+    blobs.material.dispose();
+    blobs = null;
+  }
+  if (!S.blobShadows || !crowd.length) return;
+
+  blobTex ??= blobTexture();
+  const geo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  const mat = new THREE.MeshBasicMaterial({
+    map: blobTex, transparent: true, depthWrite: false, opacity: S.blobOpacity,
+  });
+
+  blobs = new THREE.InstancedMesh(geo, mat, crowd.length);
+  blobs.frustumCulled = false;
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const p = new THREE.Vector3();
+  const s = new THREE.Vector3();
+
+  // All shadows share the key light's ground direction. Per-character facing would be more
+  // literal but reads as decals; one direction is what sells "lit by the same lamp".
+  const dx = -key.position.x, dz = -key.position.z;
+  const len = Math.hypot(dx, dz) || 1;
+  const lx = dx / len, lz = dz / len;
+  q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(-lz, lx));
+
+  crowd.forEach((o, i) => {
+    const P = o.built.params;
+    const rz = P.torsoD * 2.8;
+    const rx = P.torsoW * 2.8 * S.blobStretch;
+    const off = rx * S.blobOffset;
+    p.set(
+      o.built.root.position.x + lx * off,
+      0.004,
+      o.built.root.position.z + lz * off
+    );
+    s.set(rx, 1, rz);
+    blobs.setMatrixAt(i, m.compose(p, q, s));
+  });
+  blobs.instanceMatrix.needsUpdate = true;
+  scene.add(blobs);
+}
+
+// ---------------------------------------------------------------- crowd
+let crowd = [];
+const crowdGroup = new THREE.Group();
+scene.add(crowdGroup);
+
+function clearCrowd() {
+  for (const o of crowd) {
+    crowdGroup.remove(o.built.root);
+    disposeOwl(o.built);
+  }
+  crowd = [];
+}
+
+function buildCrowd() {
+  clearCrowd();
+
+  // loose grid with jitter: reads as a gathering rather than a parade
+  const cols = Math.ceil(Math.sqrt(S.count));
+  const rows = Math.ceil(S.count / cols);
+
+  for (let i = 0; i < S.count; i++) {
+    const P = randomParams({ partShadows: S.partShadows });
+    const built = createOwl(P);
+
+    const cx = (i % cols) - (cols - 1) / 2;
+    const cz = Math.floor(i / cols) - (rows - 1) / 2;
+    built.root.position.set(
+      cx * S.spacing + (Math.random() - 0.5) * S.jitter,
+      0,
+      cz * S.spacing + (Math.random() - 0.5) * S.jitter
+    );
+    built.root.rotation.y = S.seedFacing ? Math.random() * Math.PI * 2 : 0;
+
+    crowdGroup.add(built.root);
+
+    const start = pickPose();
+    crowd.push({
+      built,
+      name: P.name,
+      color: P.bodyColor,
+      from: { ...start },
+      to: { ...start },
+      t: 1,
+      // desynchronised on purpose: a crowd changing pose in unison looks like a chorus line
+      wait: Math.random() * S.poseInterval,
+    });
+    applyPose(built, start);
+  }
+
+  setViewMode(crowdGroup, S.view);
+  updateRoster();
+  buildBlobs();
+  frameCrowd();
+}
+
+function pickPose() {
+  const names = Object.keys(POSES);
+  return POSES[names[Math.floor(Math.random() * names.length)]];
+}
+
+// ---------------------------------------------------------------- pose blending
+// Not an animation system - just interpolation between static poses so the crowd reads
+// as alive while we are still only validating rig topology.
+function tickPoses(dt) {
+  if (!S.cyclePoses) return;
+  for (const o of crowd) {
+    if (o.t < 1) {
+      o.t = Math.min(1, o.t + dt / S.blend);
+      const e = o.t * o.t * (3 - 2 * o.t);
+      const pose = {};
+      for (const k of POSE_KEYS) pose[k] = o.from[k] + (o.to[k] - o.from[k]) * e;
+      pose.holdItem = o.t > 0.5 ? o.to.holdItem : o.from.holdItem;
+      applyPose(o.built, pose);
+      continue;
+    }
+    o.wait -= dt;
+    if (o.wait <= 0) {
+      o.from = { ...o.to };
+      o.to = { ...pickPose() };
+      o.t = 0;
+      o.wait = S.poseInterval * (0.6 + Math.random() * 0.9);
+    }
+  }
+}
+
+// ---------------------------------------------------------------- framing
+function crowdBox() {
+  return new THREE.Box3().setFromObject(crowdGroup);
+}
+
+function frameCrowd() {
+  const box = crowdBox();
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const extent = Math.max(size.x, size.y, size.z) * 1.25;
+  const d = extent / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5));
+  controls.target.copy(center);
+  camera.position.copy(center).add(new THREE.Vector3(0.45, 0.42, 1).normalize().multiplyScalar(d));
+  controls.update();
+}
+
+// distance at which ONE owl is 150px tall - the real readability check
+function distanceTest() {
+  const box = crowdBox();
+  const center = box.getCenter(new THREE.Vector3());
+  const one = crowd[0] ? new THREE.Box3().setFromObject(crowd[0].built.root) : box;
+  const figureHeight = Math.max(one.max.y - one.min.y, 0.01);
+  const visible = figureHeight * innerHeight / 150;
+  const d = visible / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5));
+  controls.target.copy(center);
+  camera.position.copy(center).add(new THREE.Vector3(0.3, 0.25, 1).normalize().multiplyScalar(d));
+  controls.update();
+}
+
+// ---------------------------------------------------------------- yarn wall
+// Stands in for the shelf wall from the design docs: ONE InstancedMesh, per-instance colour.
+// The point is to see what characters cost once the merchandise is also on screen.
+let yarnMesh = null;
+
+function buildYarnWall() {
+  if (yarnMesh) { scene.remove(yarnMesh); yarnMesh.geometry.dispose(); yarnMesh.material.dispose(); yarnMesh = null; }
+  if (!S.yarnWall) return;
+
+  const n = S.yarnCount;
+  const geo = new THREE.SphereGeometry(1, 12, 8);
+  const mat = new THREE.MeshPhysicalMaterial({
+    roughness: 0.85, metalness: 0, sheen: 1, sheenRoughness: 0.8,
+    sheenColor: new THREE.Color('#ffffff'),
+  });
+  yarnMesh = new THREE.InstancedMesh(geo, mat, n);
+  yarnMesh.castShadow = false;   // per perf rule 6: items never cast into the shadow map
+  yarnMesh.receiveShadow = true;
+
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const pos = new THREE.Vector3();
+  const scl = new THREE.Vector3();
+  const col = new THREE.Color();
+
+  const shelves = 5, perShelf = Math.ceil(n / shelves), radius = 5.2;
+  for (let i = 0; i < n; i++) {
+    const shelf = Math.floor(i / perShelf);
+    const k = i % perShelf;
+    const a = (k / perShelf) * Math.PI * 1.55 - Math.PI * 0.28;
+    pos.set(Math.cos(a) * radius, 0.35 + shelf * 0.34, Math.sin(a) * radius);
+    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -a);
+    scl.setScalar(0.075).multiplyScalar(0.85 + Math.random() * 0.3);
+    m.compose(pos, q, scl);
+    yarnMesh.setMatrixAt(i, m);
+    col.setHSL(Math.random(), 0.35 + Math.random() * 0.35, 0.55 + Math.random() * 0.22);
+    yarnMesh.setColorAt(i, col);
+  }
+  yarnMesh.instanceMatrix.needsUpdate = true;
+  yarnMesh.instanceColor.needsUpdate = true;
+  scene.add(yarnMesh);
+}
+
+// ---------------------------------------------------------------- perf overlay
+const perfEl = document.getElementById('perf');
+let fps = 60, lastPerf = 0;
+
+function updatePerf(dt) {
+  fps += (1 / Math.max(dt, 1e-4) - fps) * 0.06;
+  if (performance.now() - lastPerf < 250) return;
+  lastPerf = performance.now();
+
+  const r = renderer.info.render;
+  const mem = renderer.info.memory;
+  const cls = (v, warn, bad) => (v >= bad ? 'bad' : v >= warn ? 'warn' : 'ok');
+  const tri = r.triangles;
+
+  perfEl.innerHTML =
+    `<b>${fps.toFixed(0)} fps</b><br>` +
+    `draw calls <span class="${cls(r.calls, 120, 400)}">${r.calls}</span><br>` +
+    `triangles  <span class="${cls(tri, 4e5, 1.2e6)}">${(tri / 1000).toFixed(0)}k</span><br>` +
+    `geometries ${mem.geometries}<br>` +
+    `textures   ${mem.textures}<br>` +
+    `programs   ${renderer.info.programs?.length ?? 0}<br>` +
+    `<span style="opacity:.65">${S.count} owls @ ${S.detail}` +
+    `${S.yarnWall ? ` + ${S.yarnCount} yarn` : ''}</span><br>` +
+    `<span style="opacity:.65">${(r.calls / Math.max(S.count, 1)).toFixed(0)} calls/owl</span>`;
+}
+
+// ---------------------------------------------------------------- ui
+function updateRoster() {
+  document.getElementById('roster').innerHTML =
+    crowd.map((o) => `<div><i style="background:${o.color}"></i>${o.name}</div>`).join('');
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (el.style.opacity = '0'), 1600);
+}
+
+const gui = new GUI({ title: 'owl army' });
+gui.add(S, 'count', 4, 40, 1).onFinishChange(buildCrowd);
+gui.add(S, 'quality', Object.keys(QUALITY)).name('graphics quality').onChange(applyQuality);
+gui.add({ f: buildCrowd }, 'f').name('reroll crowd  (R)');
+
+const gPerf = gui.addFolder('performance');
+gPerf.add(S, 'detail', Object.keys(GEO_DETAIL)).name('geometry detail').onChange((v) => {
+  clearCrowd();
+  setGeometryDetail(v);
+  buildCrowd();
+});
+gPerf.add(S, 'yarnWall').name('yarn wall').onChange(buildYarnWall);
+gPerf.add(S, 'yarnCount', 100, 3000, 100).name('yarn count').onFinishChange(buildYarnWall);
+// DevTools throttling slows the CPU only. Oversampling is the GPU-side proxy: a tablet is
+// fill-rate and bandwidth limited long before it runs out of draw calls.
+gPerf.add(S, 'renderScale', 0.5, 3, 0.25).name('render scale (GPU load)').onFinishChange(applyRenderScale);
+gPerf.add(S, 'partShadows').name('characters cast shadow').onChange(() => { clearCrowd(); buildCrowd(); });
+gPerf.add(S, 'blobShadows').name('blob shadows (1 draw)').onChange(buildBlobs);
+gPerf.add(S, 'blobOpacity', 0, 1, 0.01).name('blob opacity').onChange((v) => {
+  if (blobs) blobs.material.opacity = v;
+});
+gPerf.add(S, 'blobStretch', 1, 3, 0.05).name('blob stretch').onChange(buildBlobs);
+gPerf.add(S, 'blobOffset', 0, 1.2, 0.02).name('blob offset').onChange(buildBlobs);
+gPerf.add(S, 'shadows').name('shadow map').onChange((v) => {
+  renderer.shadowMap.enabled = v;
+  crowdGroup.traverse((o) => { if (o.isMesh) o.material.needsUpdate = true; });
+});
+
+gui.add(S, 'view', ['felted', 'grey', 'silhouette']).onChange((v) => setViewMode(crowdGroup, v));
+gui.add(S, 'cyclePoses').name('cycle poses');
+gui.add(S, 'poseInterval', 0.5, 8, 0.1).name('pose interval (s)');
+gui.add(S, 'blend', 0.1, 3, 0.05).name('blend time (s)');
+gui.add(S, 'spacing', 0.5, 2.5, 0.05).onFinishChange(buildCrowd);
+gui.add(S, 'jitter', 0, 1.2, 0.02).onFinishChange(buildCrowd);
+gui.add(S, 'seedFacing').name('random facing').onFinishChange(buildCrowd);
+gui.add({ f: frameCrowd }, 'f').name('frame crowd  (F)');
+gui.add({ f: distanceTest }, 'f').name('150px distance test  (D)');
+gui.add({ f: () => renderer.domElement.classList.toggle('squint') }, 'f').name('squint / blur  (B)');
+gui.add(S, 'exposure', 0.1, 2, 0.01).onChange((v) => (renderer.toneMappingExposure = v));
+gui.add(S, 'toneMapping', ['AgX', 'ACES', 'None']).onChange((v) => (renderer.toneMapping = TONE_MAPPING[v]));
+
+// Capture phase: lil-gui's own inputs handle keydown and can swallow it before it reaches
+// window. Bailing on form fields keeps typing in a GUI box from firing shortcuts.
+addEventListener('keydown', (e) => {
+  const t = e.target;
+  if (t instanceof HTMLElement &&
+      (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) {
+    return;
+  }
+  const k = e.key.toLowerCase();
+  if (k === '1' || k === '2' || k === '3') {
+    S.view = { 1: 'felted', 2: 'grey', 3: 'silhouette' }[k];
+    setViewMode(crowdGroup, S.view);
+    gui.controllersRecursive().forEach((c) => c.updateDisplay());
+  }
+  if (k === 'r') { buildCrowd(); toast(`${S.count} new owls`); }
+  if (k === 'f') frameCrowd();
+  if (k === 'd') distanceTest();
+  if (k === 'b') renderer.domElement.classList.toggle('squint');
+  if (e.code === 'Space') {
+    e.preventDefault();
+    S.cyclePoses = !S.cyclePoses;
+    gui.controllersRecursive().forEach((c) => c.updateDisplay());
+    toast(S.cyclePoses ? 'poses running' : 'poses paused');
+  }
+}, true);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ---------------------------------------------------------------- go
+applyQuality(S.quality);
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.1);
+  tickPoses(dt);
+  controls.update();
+  renderer.render(scene, camera);
+  updatePerf(dt);
+});
+</script>
+</body>
+</html>

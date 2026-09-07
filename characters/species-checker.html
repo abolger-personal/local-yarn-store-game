@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYS — species checker</title>
+<style>
+  :root { color-scheme: light; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; transition: filter 120ms linear; }
+  canvas.squint { filter: blur(6px); }
+
+  .plate {
+    position: fixed; z-index: 10; transform: translate(-50%, 0);
+    font-size: 13px; letter-spacing: .01em; color: #4a4038; text-align: center;
+    background: rgba(255,255,255,.72); backdrop-filter: blur(6px);
+    border: 1px solid rgba(0,0,0,.07); border-radius: 999px;
+    padding: 5px 14px; pointer-events: none; white-space: nowrap; line-height: 1.35;
+  }
+  .plate.active { border-color: #c2703f; box-shadow: 0 0 0 2px rgba(194,112,63,.22); }
+  .plate small { display: block; opacity: .6; font-size: 11px; }
+
+  #hud {
+    position: fixed; left: 12px; bottom: 12px; z-index: 10;
+    background: rgba(255,255,255,.82); backdrop-filter: blur(6px);
+    border: 1px solid rgba(0,0,0,.08); border-radius: 10px;
+    padding: 10px 12px; font-size: 12px; line-height: 1.5; color: #333; max-width: 330px;
+  }
+  #hud b { color: #111; }
+  #hud kbd {
+    background: #efefef; border: 1px solid #ddd; border-bottom-width: 2px;
+    border-radius: 4px; padding: 0 4px; font-size: 11px; font-family: ui-monospace, monospace;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="plateA" class="plate"></div>
+<div id="plateB" class="plate"></div>
+<div id="hud">
+  <b>LYS species checker</b><br />
+  Drag to orbit · scroll to zoom<br />
+  <kbd>Tab</kbd> switch slot &nbsp; <kbd>R</kbd> randomise &nbsp; <kbd>Shift R</kbd> both<br />
+  <kbd>1</kbd> felted &nbsp; <kbd>2</kbd> grey &nbsp; <kbd>3</kbd> silhouette<br />
+  <kbd>F</kbd> frame &nbsp; <kbd>D</kbd> 150px test &nbsp; <kbd>B</kbd> squint<br />
+  <kbd>P</kbd> cycle pose &nbsp; <kbd>E</kbd> export slot<br />
+  <span style="opacity:.7">both slots auto-save to this browser</span>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import GUI from 'three/addons/libs/lil-gui.module.min.js';
+import {
+  TONE_MAPPING, POSES, GEO_DETAIL,
+  createCharacter, applyPose, setViewMode, disposeCharacter,
+  setGeometryDetail, getSpecies, speciesList, slugify, shareRandomParams,
+} from './npc.js';
+
+// importing a species file is all it takes to register it
+import './owl.js';
+import './llama.js';
+
+const SLOTS = ['A', 'B'];
+const STORE_KEY = 'lys.speciesChecker.v1';
+
+const state = {
+  active: 'A',
+  detail: 'high',
+  view: 'felted',
+  pose: 'rest',
+  exposure: 0.40,
+  toneMapping: 'ACES',
+  spacing: 0.62,
+  linkShared: true,
+  slots: {
+    A: { speciesId: 'owl', params: null },
+    B: { speciesId: 'llama', params: null },
+  },
+};
+
+const freshParams = (speciesId) => structuredClone(getSpecies(speciesId).defaults);
+
+// ---------------------------------------------------------------- renderer
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#e8e2d9');
+
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 100);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.minDistance = 0.3;
+controls.maxDistance = 40;
+
+// sheen needs image-based light to read at all
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+function addLights() {
+  const key = new THREE.DirectionalLight('#ffe6c4', 2.6);
+  key.position.set(2.2, 3.4, 1.8);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  Object.assign(key.shadow.camera, { near: 0.5, far: 14, left: -2, right: 2, top: 2, bottom: -2 });
+  key.shadow.bias = -0.0012;
+  key.shadow.radius = 3;
+  const rim = new THREE.DirectionalLight('#bcd4ff', 1.1);
+  rim.position.set(-2.4, 1.6, -2.4);
+  scene.add(key, rim, new THREE.HemisphereLight('#cfe0ff', '#8b7a68', 0.55));
+}
+addLights();
+
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(2.6, 64),
+  new THREE.ShadowMaterial({ opacity: 0.22 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ---------------------------------------------------------------- characters
+const built = { A: null, B: null };
+
+function slotX(id) {
+  return (id === 'A' ? -1 : 1) * state.spacing;
+}
+
+function measureHeight(root) {
+  const box = new THREE.Box3().setFromObject(root);
+  return Math.max(box.max.y - box.min.y, 0.01);
+}
+
+function disposeSlot(id) {
+  if (!built[id]) return;
+  scene.remove(built[id].root);
+  disposeCharacter(built[id]);
+  built[id] = null;
+}
+
+function buildSlot(id) {
+  disposeSlot(id);
+  const slot = state.slots[id];
+  slot.params ??= freshParams(slot.speciesId);
+  const character = createCharacter(slot.params, slot.speciesId);
+  character.root.position.x = slotX(id);
+  setViewMode(character.root, state.view);
+  scene.add(character.root);
+  built[id] = character;
+  slot.height = measureHeight(character.root);
+}
+
+function buildAll() {
+  SLOTS.forEach(buildSlot);
+  updatePlates();
+}
+
+// ---------------------------------------------------------------- framing
+function sceneBounds() {
+  const box = new THREE.Box3();
+  SLOTS.forEach((id) => built[id] && box.expandByObject(built[id].root));
+  return box;
+}
+
+const VIEW_DIR = new THREE.Vector3(0.32, 0.20, 1).normalize();
+
+// Fits BOTH axes. Using vertical extent alone puts a wide pair of characters off the sides,
+// and the GUI panel covers the right third, so the target is nudged right to compensate.
+function frameAll(targetPx = 0) {
+  const box = sceneBounds();
+  if (box.isEmpty()) return;
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const vFov = THREE.MathUtils.degToRad(camera.fov);
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
+  const depth = Math.max(size.z, 0.01) * 0.5;
+
+  const dist = targetPx
+    ? (Math.max(size.y, 0.01) * innerHeight / targetPx) / (2 * Math.tan(vFov / 2)) + depth
+    : 1.15 * Math.max(size.y / (2 * Math.tan(vFov / 2)), size.x / (2 * Math.tan(hFov / 2))) + depth;
+
+  // a NaN anywhere in a mesh scale reaches the camera through the bounding box
+  if (!Number.isFinite(dist) || !Number.isFinite(center.y)) {
+    console.warn('frameAll: non-finite bounds, check for undefined params');
+    return;
+  }
+  center.x += size.x * 0.16;
+  controls.target.copy(center);
+  camera.position.copy(center).addScaledVector(VIEW_DIR, dist);
+  controls.update();
+}
+
+// ---------------------------------------------------------------- nameplates
+const plates = { A: document.getElementById('plateA'), B: document.getElementById('plateB') };
+const projected = new THREE.Vector3();
+
+function positionPlate(id) {
+  const el = plates[id];
+  const character = built[id];
+  if (!character) return;
+  projected.set(slotX(id), 0, 0).project(camera);
+  el.style.left = `${(projected.x * 0.5 + 0.5) * innerWidth}px`;
+  el.style.top = `${(-projected.y * 0.5 + 0.5) * innerHeight + 8}px`;
+}
+
+function updatePlates() {
+  for (const id of SLOTS) {
+    const slot = state.slots[id];
+    const height = slot.height?.toFixed(3) ?? '?';
+    plates[id].innerHTML =
+      `${slot.params?.name ?? ''}<small>${slot.speciesId} · height ${height} · torso ` +
+      `${slot.params?.torsoW.toFixed(2)}×${slot.params?.torsoH.toFixed(2)}</small>`;
+    plates[id].classList.toggle('active', id === state.active);
+  }
+}
+
+// ---------------------------------------------------------------- persistence
+function save() {
+  const payload = {
+    active: state.active, view: state.view, pose: state.pose, detail: state.detail,
+    exposure: state.exposure, toneMapping: state.toneMapping, spacing: state.spacing,
+    linkShared: state.linkShared,
+    slots: Object.fromEntries(SLOTS.map((id) => [id, {
+      speciesId: state.slots[id].speciesId,
+      params: state.slots[id].params,
+    }])),
+  };
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(payload)); } catch { /* quota */ }
+}
+
+// Saved params are merged OVER the species defaults, never used wholesale. A save written
+// before a parameter existed would otherwise leave it undefined, and one undefined number
+// turns a mesh scale into NaN, which propagates to the bounding box and the camera.
+function restoreSlot(id, savedSlot) {
+  const species = getSpecies(savedSlot?.speciesId);
+  if (!species) return;
+  state.slots[id] = {
+    speciesId: savedSlot.speciesId,
+    params: { ...structuredClone(species.defaults), ...savedSlot.params },
+  };
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    Object.assign(state, saved, { slots: state.slots });
+    for (const id of SLOTS) restoreSlot(id, saved.slots?.[id]);
+  } catch { /* corrupt save, fall back to defaults */ }
+}
+
+// ---------------------------------------------------------------- actions
+const activeSlot = () => state.slots[state.active];
+const refreshGui = () => gui?.controllersRecursive().forEach((c) => c.updateDisplay());
+
+function rebuildActive() {
+  buildSlot(state.active);
+  updatePlates();
+  save();
+}
+
+function randomiseSlot(id) {
+  const slot = state.slots[id];
+  getSpecies(slot.speciesId).randomise(slot.params);
+  buildSlot(id);
+  updatePlates();
+  refreshGui();
+  save();
+}
+
+// A is rolled normally, then B keeps its own species-specific roll but adopts everything the
+// two species randomise identically. Whatever still differs is the species kit's doing.
+function randomiseBoth() {
+  const [a, b] = SLOTS.map((id) => state.slots[id]);
+  SLOTS.forEach((id) => getSpecies(state.slots[id].speciesId).randomise(state.slots[id].params));
+  if (state.linkShared) {
+    shareRandomParams(a.params, b.params, getSpecies(a.speciesId), getSpecies(b.speciesId));
+  }
+  buildAll();
+  refreshGui();
+  save();
+}
+
+function setSpecies(id, speciesId) {
+  state.slots[id] = { speciesId, params: freshParams(speciesId) };
+  buildSlot(id);
+  buildGui();
+  frameAll();   // species differ enough in height that the old framing rarely still fits
+  save();
+}
+
+// A preset writes into each slot's params, so the rig sliders show what is actually applied.
+// Re-applying it on every rebuild instead would silently stomp any manual joint edit.
+function setPose(name) {
+  state.pose = name;
+  for (const id of SLOTS) {
+    Object.assign(state.slots[id].params, POSES[name]);
+    if (built[id]) applyPose(built[id], POSES[name]);
+  }
+  refreshGui();
+  save();
+}
+
+function setView(mode) {
+  state.view = mode;
+  scene.background = new THREE.Color(mode === 'silhouette' ? '#ffffff' : '#e8e2d9');
+  ground.visible = mode !== 'silhouette';
+  SLOTS.forEach((id) => built[id] && setViewMode(built[id].root, mode));
+}
+
+function exportActive() {
+  const slot = activeSlot();
+  const json = JSON.stringify({ speciesId: slot.speciesId, params: slot.params }, null, 2);
+  navigator.clipboard?.writeText(json).catch(() => {});
+  const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${slugify(slot.params.name)}.${slot.speciesId}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+// ---------------------------------------------------------------- gui
+let gui = null;
+
+// entry forms: [key, min, max, step?] | [key, 'color'] | [key, 'bool'] | [key, [options]]
+function addControl(folder, params, entry, onChange) {
+  const [key, a, b, step] = entry;
+  if (!(key in params)) return;
+  if (a === 'color') folder.addColor(params, key).onChange(onChange);
+  else if (a === 'bool') folder.add(params, key).onChange(onChange);
+  else if (Array.isArray(a)) folder.add(params, key, a).onChange(onChange);
+  else folder.add(params, key, a, b, step ?? 0.001).onChange(onChange);
+}
+
+function addSlotFolders(species, params, onChange) {
+  for (const [title, entries] of Object.entries(species.gui)) {
+    const folder = gui.addFolder(title);
+    entries.forEach((entry) => addControl(folder, params, entry, onChange));
+    folder.close();
+  }
+}
+
+function addTopControls(species) {
+  gui.add(state, 'active', SLOTS).name('editing slot  (Tab)').onChange(() => { buildGui(); updatePlates(); });
+  gui.add({ id: species.id }, 'id', speciesList().map((s) => s.id))
+    .name('species').onChange((v) => setSpecies(state.active, v));
+  gui.add(activeSlot().params, 'name').onChange(() => { updatePlates(); save(); });
+  gui.add({ f: () => randomiseSlot(state.active) }, 'f').name('randomise slot  (R)');
+  gui.add({ f: randomiseBoth }, 'f').name('randomise both  (Shift R)');
+  gui.add(state, 'linkShared').name('link shared params').onChange(save);
+  gui.add({ f: () => setSpecies(state.active, activeSlot().speciesId) }, 'f').name('reset slot');
+  gui.add({ f: exportActive }, 'f').name('export slot  (E)');
+}
+
+function addSceneFolder() {
+  const folder = gui.addFolder('scene');
+  folder.add(state, 'pose', Object.keys(POSES)).onChange(setPose);
+  folder.add(state, 'view', ['felted', 'grey', 'silhouette']).onChange(setView);
+  folder.add(state, 'detail', Object.keys(GEO_DETAIL)).name('geometry detail')
+    .onChange((v) => { setGeometryDetail(v); buildAll(); save(); });
+  folder.add(state, 'spacing', 0.2, 1.6, 0.01).onChange(() => { buildAll(); save(); });
+  folder.add({ f: () => frameAll() }, 'f').name('frame both  (F)');
+  folder.add({ f: () => frameAll(150) }, 'f').name('150px test  (D)');
+  folder.add({ f: () => renderer.domElement.classList.toggle('squint') }, 'f').name('squint  (B)');
+  folder.add(state, 'exposure', 0.1, 2, 0.01).onChange((v) => (renderer.toneMappingExposure = v));
+  folder.add(state, 'toneMapping', Object.keys(TONE_MAPPING))
+    .onChange((v) => (renderer.toneMapping = TONE_MAPPING[v]));
+}
+
+function buildGui() {
+  gui?.destroy();
+  gui = new GUI({ title: 'species checker' });
+  const slot = activeSlot();
+  const species = getSpecies(slot.speciesId);
+  addTopControls(species);
+  addSceneFolder();
+  addSlotFolders(species, slot.params, rebuildActive);
+  gui.onFinishChange(save);
+}
+
+// ---------------------------------------------------------------- keys
+const KEY_ACTIONS = {
+  tab: () => { state.active = state.active === 'A' ? 'B' : 'A'; buildGui(); updatePlates(); },
+  r: (e) => (e.shiftKey ? randomiseBoth() : randomiseSlot(state.active)),
+  f: () => frameAll(),
+  d: () => frameAll(150),
+  b: () => renderer.domElement.classList.toggle('squint'),
+  e: () => exportActive(),
+  1: () => setView('felted'),
+  2: () => setView('grey'),
+  3: () => setView('silhouette'),
+  p: () => {
+    const names = Object.keys(POSES);
+    setPose(names[(names.indexOf(state.pose) + 1) % names.length]);
+  },
+};
+
+const isFormField = (el) =>
+  el instanceof HTMLElement &&
+  (el.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName));
+
+// capture phase, because lil-gui handles keydown on its own inputs and can swallow it
+addEventListener('keydown', (e) => {
+  if (isFormField(e.target)) return;
+  const action = KEY_ACTIONS[e.key.toLowerCase()];
+  if (!action) return;
+  e.preventDefault();
+  action(e);
+}, true);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ---------------------------------------------------------------- go
+load();
+setGeometryDetail(state.detail);
+renderer.toneMapping = TONE_MAPPING[state.toneMapping];
+renderer.toneMappingExposure = state.exposure;
+buildAll();
+setView(state.view);
+buildGui();
+frameAll();
+
+renderer.setAnimationLoop(() => {
+  controls.update();
+  renderer.render(scene, camera);
+  SLOTS.forEach(positionPlate);
+});
+</script>
+</body>
+</html>

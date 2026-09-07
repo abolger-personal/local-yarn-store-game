@@ -100,6 +100,7 @@ const S = {
   detail:       'high',
   renderScale:  1.0,
   partShadows:  true,
+  mergeMeshes:  true,
   blobShadows:  false,
   blobOpacity:  0.55,
   blobStretch:  1.45,
@@ -272,6 +273,7 @@ function spawn(speciesId) {
   const kit = getSpecies(speciesId);
   const P = kit.randomise(structuredClone(kit.defaults));
   P.partShadows = S.partShadows;
+  P.mergeMeshes = S.mergeMeshes;
   return { kit, P, built: createCharacter(P, kit) };
 }
 
@@ -481,6 +483,7 @@ gPerf.add(S, 'yarnCount', 100, 3000, 100).name('yarn count').onFinishChange(buil
 // fill-rate and bandwidth limited long before it runs out of draw calls.
 gPerf.add(S, 'renderScale', 0.5, 3, 0.25).name('render scale (GPU load)').onFinishChange(applyRenderScale);
 gPerf.add(S, 'partShadows').name('characters cast shadow').onChange(() => { clearCrowd(); buildCrowd(); });
+gPerf.add(S, 'mergeMeshes').name('merge static meshes').onChange(() => { clearCrowd(); buildCrowd(); });
 gPerf.add(S, 'blobShadows').name('blob shadows (1 draw)').onChange(buildBlobs);
 gPerf.add(S, 'blobOpacity', 0, 1, 0.01).name('blob opacity').onChange((v) => {
   if (blobs) blobs.material.opacity = v;

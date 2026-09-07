@@ -13,7 +13,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
-export const BUILD = '2026-09-06.4-analytic-grounding';
+export const BUILD = '2026-09-06.6-shared-materials';
 
 // ---------------------------------------------------------------- species registry
 
@@ -108,6 +108,7 @@ export const BASE_PARAMS = Object.freeze({
   roughness:     1.00,
 
   partShadows:   true,    // small parts casting shadows roughly doubles their draw cost
+  mergeMeshes:   true,    // bake each joint's static meshes down to one per material
 
   // garment
   scarf:         true,
@@ -237,8 +238,12 @@ export function slugify(text) {
 // A noise normal map plus a fuzz shell were tried and removed: at crowd distance the
 // high-frequency relief read as granular stone rather than soft fibre. Felt is about how
 // light diffuses, not about surface bumps.
+//
+// `family` marks materials that differ ONLY by colour. The merge pass collapses each family
+// to one shared material and moves colour into a vertex attribute, which is what stops the
+// renderer re-uploading uniforms once per character per draw.
 export function feltMaterial(P, color) {
-  return new THREE.MeshPhysicalMaterial({
+  const material = new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(color),
     roughness: P.roughness,
     metalness: 0,
@@ -246,11 +251,13 @@ export function feltMaterial(P, color) {
     sheenRoughness: P.sheenRoughness,
     sheenColor: new THREE.Color(P.sheenTint),
   });
+  material.userData.family = 'felt';
+  return material;
 }
 
 // glassy against the matte body - the contrast is what makes the eyes read
 export function eyeMaterial(P, color) {
-  return new THREE.MeshPhysicalMaterial({
+  const material = new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(color),
     roughness: P.eyeRough,
     metalness: 0,
@@ -260,11 +267,13 @@ export function eyeMaterial(P, color) {
     clearcoat: P.eyeClearcoat,
     clearcoatRoughness: 0.06,
   });
+  material.userData.family = 'eye';
+  return material;
 }
 
 // knitted garments read crisper than the body - tighter sheen, less roughness
 export function knitMaterial(color) {
-  return new THREE.MeshPhysicalMaterial({
+  const material = new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(color),
     roughness: 0.72,
     metalness: 0,
@@ -272,6 +281,31 @@ export function knitMaterial(color) {
     sheenRoughness: 0.45,
     sheenColor: new THREE.Color('#ffffff'),
   });
+  material.userData.family = 'knit';
+  return material;
+}
+
+// One per family for the whole cast. Cloned from the first character's material, so the
+// non-colour properties still come from params -- they are not randomised, so every character
+// agrees on them anyway.
+const sharedMaterials = new Map();
+
+function sharedMaterial(source) {
+  const family = source.userData.family ?? 'felt';
+  if (!sharedMaterials.has(family)) {
+    const shared = source.clone();
+    shared.color = new THREE.Color(0xffffff);   // vertex colour multiplies this
+    shared.vertexColors = true;
+    shared.userData.family = family;
+    shared.userData.shared = true;
+    sharedMaterials.set(family, shared);
+  }
+  return sharedMaterials.get(family);
+}
+
+export function clearSharedMaterials() {
+  for (const material of sharedMaterials.values()) material.dispose();
+  sharedMaterials.clear();
 }
 
 export const greyMat = new THREE.MeshStandardMaterial({ color: '#b9b4ad', roughness: 0.9, metalness: 0 });
@@ -493,7 +527,7 @@ export function addEars(ctx, P, opts) {
   const scale = leaf ? [size, length * 0.5, size * flatten] : [size, length, size];
 
   for (const side of [-1, 1]) {
-    const ear = named(new THREE.Group(), `${sideName(side)}Ear`);
+    const ear = joint(new THREE.Group(), `${sideName(side)}Ear`);
     ear.position.set(side * P.headRadius * spread, P.headRadius * lift, P.headRadius * back);
     ear.rotation.set(P.earPerk ?? 0, 0, side * -(tilt + (P.earSplay ?? 0)));
     ear.add(part(geometry, material ?? ctx.mat.body, { pos: [0, length * 0.35, 0], scale }));
@@ -556,6 +590,13 @@ const named = (node, name) => {
   return node;
 };
 
+// Marks a node as articulated. Meshes beneath one move together and can be baked into a
+// single geometry; anything that rotates on its own has to stay a node of its own.
+const joint = (node, name) => {
+  node.userData.joint = true;
+  return named(node, name);
+};
+
 function buildFoot(shinLen, mat, side) {
   const foot = named(new THREE.Group(), `${sideName(side)}Foot`);
   foot.position.y = -shinLen;
@@ -596,13 +637,13 @@ const kneeAmount = (kneeBend, legSwing, side) =>
 function buildLeg(side, P, mat, joints) {
   const total = P.legHeight + P.hipInset;
   const [thigh, shin] = [total * 0.55, total * 0.45];
-  const upperLeg = named(new THREE.Group(), `${sideName(side)}UpperLeg`);
+  const upperLeg = joint(new THREE.Group(), `${sideName(side)}UpperLeg`);
   upperLeg.position.set(side * P.legSpread, P.hipInset, 0);
   upperLeg.rotation.x = P.legSwing * side - P.hipFlex;
   limbSegment(upperLeg, mat.body, P.limbThick, thigh, false);   // hip sits inside the torso
   joints.upperLeg.push({ node: upperLeg, side });
 
-  const lowerLeg = named(new THREE.Group(), `${sideName(side)}LowerLeg`);
+  const lowerLeg = joint(new THREE.Group(), `${sideName(side)}LowerLeg`);
   lowerLeg.position.y = -thigh;
   lowerLeg.rotation.x = kneeAmount(P.kneeBend, P.legSwing, side);
   limbSegment(lowerLeg, mat.body, P.limbThick * LIMB_TAPER, shin);
@@ -631,7 +672,7 @@ function buildHand(P, mat, side) {
   const hand = named(new THREE.Group(), `${sideName(side)}Hand`);
   hand.position.y = -P.forearmLen;
   hand.add(part(GEO.sphere, mat.body, { scale: [0.042, 0.038, 0.042] }));
-  const hold = named(new THREE.Group(), `${sideName(side)}Hold`);
+  const hold = joint(new THREE.Group(), `${sideName(side)}Hold`);
   hold.position.set(0, -0.030, 0.028);
   hand.add(hold);
   return { hand, hold };
@@ -644,13 +685,13 @@ function buildHand(P, mat, side) {
 // surface plus that, otherwise a thick coat swallows the whole limb and only the hand shows.
 function buildArm(side, P, mat, joints, bulge) {
   const upperR = P.limbThick * 1.05;
-  const upperArm = named(new THREE.Group(), `${sideName(side)}UpperArm`);
+  const upperArm = joint(new THREE.Group(), `${sideName(side)}UpperArm`);
   upperArm.position.set(side * P.torsoW * (P.shoulderOut + bulge), P.torsoH * P.shoulderLift, 0);
   upperArm.rotation.set(P.armSwing, 0, side * clampArmOut(P, bulge, P.armOut, P.armSwing));
   limbSegment(upperArm, mat.body, upperR, P.upperArmLen);
   joints.upperArm.push({ node: upperArm, side });
 
-  const lowerArm = named(new THREE.Group(), `${sideName(side)}LowerArm`);
+  const lowerArm = joint(new THREE.Group(), `${sideName(side)}LowerArm`);
   lowerArm.position.y = -P.upperArmLen;
   lowerArm.rotation.x = -P.elbowBend;
   limbSegment(lowerArm, mat.body, upperR * LIMB_TAPER, P.forearmLen);
@@ -712,7 +753,7 @@ function buildScarf(P, addMaterial) {
 
 // spine pivots at the waist plane, so a lean folds the whole upper body rather than shearing it
 function buildUpperBody(P, mat, joints, addMaterial, bulge) {
-  const spine = named(new THREE.Group(), 'spine');
+  const spine = joint(new THREE.Group(), 'spine');
   spine.rotation.x = P.spineBend;
   const chest = buildChest(P, mat);
   spine.add(chest);
@@ -729,7 +770,7 @@ function buildUpperBody(P, mat, joints, addMaterial, bulge) {
 
 function buildBody(P, mat, joints, addMaterial, bulge) {
   const root = named(new THREE.Group(), 'root');
-  const hips = named(new THREE.Group(), 'hips');
+  const hips = joint(new THREE.Group(), 'hips');
   hips.position.y = P.legHeight;
   root.add(hips);
   joints.hips = hips;
@@ -770,8 +811,88 @@ export function createCharacter(P, species) {
   kit.buildKit(ctx, P);
   if (P.scarf) body.neck.add(buildScarf(P, addMaterial));
   if (!P.partShadows) disableShadowCasting(body.root);
+  if (P.mergeMeshes !== false) mergeCharacter(ctx);
   groundCharacter(ctx);
   return ctx;
+}
+
+// ---------------------------------------------------------------- mesh merging
+//
+// Draw calls per character are the measured bottleneck, not triangles. Everything beneath one
+// articulated node shares that node's transform, so those meshes can be baked into a single
+// geometry per material -- with no change to the rig, the poses or the species kits.
+//
+// The cost is per-character geometry, which cannot be shared between characters. That trade
+// only pays while draw submission dominates, so it stays switchable.
+
+/** Every mesh under `node` that is not inside a nested joint. */
+function staticMeshes(node, out = []) {
+  for (const child of node.children) {
+    if (child.isMesh) out.push(child);
+    else if (!child.userData.joint) staticMeshes(child, out);
+  }
+  return out;
+}
+
+// geometry expressed in the joint's own space, so the merged mesh lands where the parts were
+function bakedGeometry(mesh, toJointSpace) {
+  const local = new THREE.Matrix4().multiplyMatrices(toJointSpace, mesh.matrixWorld);
+  return paintGeometry(mesh.geometry.clone().applyMatrix4(local), mesh.material.color);
+}
+
+// colour moves from the material to the vertices, which is what lets one material serve the
+// whole cast instead of one per character per part
+function paintGeometry(geometry, color) {
+  const count = geometry.attributes.position.count;
+  const colors = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    colors[i * 3] = color.r;
+    colors[i * 3 + 1] = color.g;
+    colors[i * 3 + 2] = color.b;
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return geometry;
+}
+
+function groupByFamily(meshes, toJointSpace) {
+  const groups = new Map();
+  for (const mesh of meshes) {
+    const family = mesh.material.userData.family ?? 'felt';
+    const entry = groups.get(family)
+      ?? { parts: [], shadow: mesh.castShadow, material: sharedMaterial(mesh.material) };
+    entry.parts.push(bakedGeometry(mesh, toJointSpace));
+    groups.set(family, entry);
+  }
+  return groups;
+}
+
+function mergedMesh({ parts, shadow, material }) {
+  const geometry = parts.length === 1 ? parts[0] : mergeGeometries(parts, false);
+  if (parts.length > 1) parts.forEach((part) => part.dispose());
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.castShadow = shadow;
+  mesh.receiveShadow = shadow;
+  mesh.userData.merged = true;   // per-character geometry, so disposal has to free it
+  return mesh;
+}
+
+function mergeAt(node) {
+  const meshes = staticMeshes(node);
+  if (!meshes.length) return;
+  const toJointSpace = new THREE.Matrix4().copy(node.matrixWorld).invert();
+  const groups = groupByFamily(meshes, toJointSpace);
+  meshes.forEach((mesh) => mesh.removeFromParent());
+  for (const entry of groups.values()) node.add(mergedMesh(entry));
+}
+
+/** Collapses each articulated node's static meshes down to one mesh per material. */
+export function mergeCharacter(built) {
+  built.root.updateMatrixWorld(true);
+  const roots = [];
+  built.root.traverse((node) => {
+    if (node.userData.joint) roots.push(node);
+  });
+  roots.forEach(mergeAt);
 }
 
 // the foot sphere sits at y +0.016 with a y radius of 0.028, so its sole is this far below
@@ -838,7 +959,13 @@ export function setViewMode(root, mode) {
 }
 
 export function disposeCharacter(built) {
-  for (const material of built.materials) material.dispose();
+  // shared materials outlive the character that first created them
+  for (const material of built.materials) {
+    if (!material.userData.shared) material.dispose();
+  }
+  built.root.traverse((o) => {
+    if (o.isMesh && o.userData.merged) o.geometry.dispose();
+  });
 }
 
 // ---------------------------------------------------------------- randomisation

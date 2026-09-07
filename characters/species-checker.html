@@ -92,7 +92,12 @@ const state = {
   },
 };
 
-const freshParams = (speciesId) => structuredClone(getSpecies(speciesId).defaults);
+const freshParams = (speciesId) => Object.assign(
+  structuredClone(getSpecies(speciesId).defaults),
+  // merging collapses per-character materials into shared ones, which would make the material
+  // sliders here edit the whole cast. Two characters cost nothing, so keep them un-merged.
+  { mergeMeshes: false },
+);
 
 // ---------------------------------------------------------------- renderer
 const app = document.getElementById('app');

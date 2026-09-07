@@ -179,16 +179,55 @@ items on an Apple-silicon laptop:
 2. **Draw calls are the entire budget, and characters own nearly all of them.** This inverts the
    assumption the plan was written under, where the 1000-item ceiling got the attention. Merchandise
    is free; characters are expensive.
-3. **The "<30 draw calls" target is unachievable for un-batched characters.** 29 per character is
-   the floor without batching. Either batch NPCs, or restate the budget honestly.
+3. **A per-scene draw call target is the wrong metric.** Profiling later showed draw submission is
+   only ~6% of frame time; node count and unique material count dominate. Budget those instead.
 4. **Per-character generated geometry blocks instancing.** Each owl built its own merged feather
    shells, so no two characters shared geometry. **Fixed:** feather settings are quantised to 8
    `FEATHER_PRESETS`, and shells are now built in **unit space** and scaled at the mesh — so a shell
    no longer bakes in one character's torso dimensions. Geometry count is now flat in owl count.
-5. **The win came from state changes, not draw calls.** Sharing feather geometry barely moved the
-   draw call count, but moved frame rate a lot under CPU throttling. Every unique geometry forces an
-   attribute rebind; shared geometry lets the renderer skip it. That cost is CPU-side, which is
-   exactly what CPU throttling multiplies. **Count binds, not just draws.**
+5. ~~**The win came from state changes, not draw calls.**~~ **RETRACTED.** This was measured with a
+   zoomed-in camera, so most of the crowd was frustum-culled and never drawn. The tell was in the
+   overlay the whole time: it read *12 draw calls per character* for characters that have ~35
+   meshes. Quantised feather geometry is still worth keeping for memory and build cost, but it did
+   not produce the frame rate gain claimed here.
+
+> **Measurement rule: frame the whole scene before reading the overlay.** Culled objects are not
+> drawn, so a zoomed-in camera silently reports a fraction of the real cost. Sanity-check
+> draw-calls-per-character against the known mesh count before believing any number.
+
+### Profiled, 2026-09-06 — where the frame time actually goes
+
+CPU profile at 40 characters under 20x throttle, self time:
+
+| Cost | Share | Scales with |
+| --- | --- | --- |
+| `projectObject`, `updateMatrixWorld`, `multiplyMatrices`, `sort` | **~20%** | Object3D **node count** |
+| `refreshMaterialUniforms`, `setProgram`, `markUniformsLightsNeedsUpdate` | **~11%** | **unique material count** |
+| `renderBufferDirect` | ~6% | actual draw calls |
+
+**Draw calls were never the dominant cost.** Node count and unique materials were. Every character
+carried nine materials that differed *only by colour* -- `sheen`, `roughness` and `sheenTint` are
+not randomised, so the whole cast already agreed on them.
+
+### Decision: merge static meshes, share materials, colour by vertex
+
+1. **Merge pass.** Everything beneath one articulated node shares its transform, so it is baked into
+   one geometry. Joint nodes carry `userData.joint`; everything else flattens into its nearest
+   joint. It runs *after* the species kit, so kits need no knowledge of it.
+2. **Three shared materials** for the entire cast -- felt, knit, eye -- with colour moved into a
+   vertex attribute. Replaces ~9 materials per character.
+3. **Switchable**, because the trade is per-character geometry that cannot be shared between
+   characters. The species checker leaves it OFF so its material sliders still edit one character.
+
+**Measured, 40 NPCs at 20x CPU throttle:**
+
+| | Before | After |
+| --- | --- | --- |
+| Draw calls per character | 35 | **15** |
+| Frame rate, `low` quality | 11-12 fps | **35 fps** |
+| Frame rate, `high` quality | — | **23 fps** |
+
+Roughly 3x, with no visual compromise. 40 characters is 4x the design target of ~10 concurrent NPCs.
 
 ### Verification standard — 20x CPU throttle
 

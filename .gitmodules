@@ -1,0 +1,3 @@
+[submodule "submodules/threejs-skills"]
+	path = submodules/threejs-skills
+	url = git@github.com:CloudAI-X/threejs-skills.git

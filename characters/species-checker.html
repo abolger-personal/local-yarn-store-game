@@ -63,10 +63,12 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
-  TONE_MAPPING, POSES, GEO_DETAIL,
+  TONE_MAPPING, POSES, GEO_DETAIL, BUILD,
   createCharacter, applyPose, setViewMode, disposeCharacter,
   setGeometryDetail, getSpecies, speciesList, slugify, shareRandomParams,
 } from './npc.js';
+
+console.info('LYS build', BUILD);
 
 // importing a species file is all it takes to register it
 import './owl.js';

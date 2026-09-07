@@ -11,6 +11,10 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
+// Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
+// old value in the console instead of as mysteriously unchanged behaviour.
+export const BUILD = '2026-09-06.4-analytic-grounding';
+
 // ---------------------------------------------------------------- species registry
 
 const SPECIES = new Map();
@@ -502,34 +506,33 @@ export const addConeEars = (ctx, P, opts) => addEars(ctx, P, { ...opts, shape: '
 
 // ---------------------------------------------------------------- arm clearance
 
-// Elbow position in torso-local space. three.js Euler XYZ applies as Rx * Ry * Rz, and with
-// no Y term that reduces to a closed form for the arm's downward vector.
-function elbowAt(P, bulge, armOut, armSwing) {
-  const L = P.upperArmLen;
-  const down = Math.cos(armOut) * L;
-  return {
-    x: P.torsoW * (P.shoulderOut + bulge) + Math.sin(armOut) * L,
-    y: P.torsoH * P.shoulderLift - down * Math.cos(armSwing),
-    z: -down * Math.sin(armSwing),
-  };
-}
+// Elbow clearance is scanned rather than solved: folding the coat scale and the elbow radius
+// into the ellipsoid test makes the closed form a quartic. Deliberately allocation-free -- it
+// runs per character per frame while poses blend.
 
 /**
  * The smallest armOut that keeps the elbow outside the body, coat included.
- *
- * Scanned rather than solved: folding the coat scale and the elbow's own radius into the
- * ellipsoid test makes the closed form a quartic, and 24 samples over a quarter turn is well
- * inside the precision a resting pose needs.
+ * 24 samples over a quarter turn is well inside the precision a resting pose needs.
  */
 export function minArmOut(P, bulge = 0, armSwing = 0) {
   const coat = 1 + bulge;   // the coat surface is exactly this multiple of the torso
   const pad = P.limbThick * 1.05 * LIMB_TAPER + (P.armClearance ?? 0);
-  const [a, b, c] = [coat * P.torsoW + pad, coat * P.torsoH + pad, coat * P.torsoD + pad];
+  const a = coat * P.torsoW + pad;
+  const b = coat * P.torsoH + pad;
+  const c = coat * P.torsoD + pad;
+  const reach = P.upperArmLen;
+  const x0 = P.torsoW * (P.shoulderOut + bulge);
+  const y0 = P.torsoH * P.shoulderLift;
+  const cs = Math.cos(armSwing);
+  const sn = Math.sin(armSwing);
 
   for (let i = 0; i <= 24; i++) {
     const t = (i / 24) * (Math.PI / 2);
-    const e = elbowAt(P, bulge, t, armSwing);
-    if ((e.x / a) ** 2 + (e.y / b) ** 2 + (e.z / c) ** 2 > 1) return t;
+    const down = Math.cos(t) * reach;
+    const x = (x0 + Math.sin(t) * reach) / a;
+    const y = (y0 - down * cs) / b;
+    const z = (down * sn) / c;
+    if (x * x + y * y + z * z > 1) return t;
   }
   return Math.PI / 2;
 }
@@ -603,9 +606,11 @@ function buildLeg(side, P, mat, joints) {
   lowerLeg.position.y = -thigh;
   lowerLeg.rotation.x = kneeAmount(P.kneeBend, P.legSwing, side);
   limbSegment(lowerLeg, mat.body, P.limbThick * LIMB_TAPER, shin);
-  lowerLeg.add(buildFoot(shin, mat, side));
+  const foot = buildFoot(shin, mat, side);
+  lowerLeg.add(foot);
   upperLeg.add(lowerLeg);
   joints.lowerLeg.push({ node: lowerLeg, side });
+  joints.foot.push({ node: foot, side });
   return upperLeg;
 }
 
@@ -756,7 +761,7 @@ export function createCharacter(P, species) {
   const mat = baseMaterials(P, addMaterial);
   const joints = {
     hips: null, spine: null, chest: null, neck: null, head: null,
-    upperArm: [], lowerArm: [], upperLeg: [], lowerLeg: [], ear: [],
+    upperArm: [], lowerArm: [], upperLeg: [], lowerLeg: [], foot: [], ear: [],
   };
   const bulge = Math.max(0, kit.coatBulge?.(P) ?? 0);
   const body = buildBody(P, mat, joints, addMaterial, bulge);
@@ -769,15 +774,37 @@ export function createCharacter(P, species) {
   return ctx;
 }
 
+// the foot sphere sits at y +0.016 with a y radius of 0.028, so its sole is this far below
+// the foot node's own origin
+const FOOT_SOLE = 0.012;
+
+// Height of the lower foot above the root, derived from the leg chain rather than measured.
+// Only hip and knee rotation affect it, and both are known -- so this needs no matrices.
+function lowestFoot(P, pose) {
+  const total = P.legHeight + P.hipInset;
+  const thigh = total * 0.55;
+  const shin = total * 0.45;
+  let lowest = Infinity;
+
+  for (const side of [-1, 1]) {
+    const hip = pose.legSwing * side - (pose.hipFlex ?? 0);
+    const knee = hip + kneeAmount(pose.kneeBend, pose.legSwing, side);
+    const y = total - Math.cos(hip) * thigh - Math.cos(knee) * shin;
+    if (y < lowest) lowest = y;
+  }
+  return lowest;
+}
+
 /**
- * Drops the character so its lowest point rests on y = 0.
- * Any knee bend shortens the leg, so a posed figure floats without this. Idempotent, because
- * a already-grounded character measures a minimum of zero.
+ * Drops the character so its feet rest on y = 0.
+ *
+ * Runs every frame while poses blend, so it is pure arithmetic. Measuring instead -- a world
+ * matrix pass plus a bounding box walk over every mesh -- cost far more frame time than the
+ * correction it was making.
  */
-export function groundCharacter(built) {
-  built.root.updateWorldMatrix(true, true);
-  const box = new THREE.Box3().setFromObject(built.root);
-  if (Number.isFinite(box.min.y)) built.root.position.y -= box.min.y;
+export function groundCharacter(built, pose = built.params) {
+  const y = FOOT_SOLE - lowestFoot(built.params, pose);
+  if (Number.isFinite(y)) built.root.position.y = y;
 }
 
 /** Re-poses an existing character without rebuilding it. */
@@ -798,7 +825,7 @@ export function applyPose(built, pose) {
     node.rotation.set(pose.earPerk ?? 0, 0, side * -(tilt + (pose.earSplay ?? 0)));
   }
   if (held && pose.holdItem !== undefined) held.visible = Boolean(pose.holdItem);
-  groundCharacter(built);
+  groundCharacter(built, pose);
 }
 
 /** Swaps every mesh to grey or flat black for the shape and silhouette checks. */

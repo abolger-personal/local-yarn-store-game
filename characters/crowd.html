@@ -74,10 +74,12 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
-  BASE_PARAMS, TONE_MAPPING, POSES, POSE_KEYS,
+  BASE_PARAMS, TONE_MAPPING, POSES, POSE_KEYS, BUILD,
   createCharacter, applyPose, setViewMode, disposeCharacter,
   setGeometryDetail, GEO_DETAIL, getSpecies, speciesIds, pick,
 } from './npc.js';
+
+console.info('LYS build', BUILD);
 
 // importing a species file is all it takes to put it in the crowd
 import './owl.js';
@@ -323,16 +325,17 @@ function pickPose() {
 // ---------------------------------------------------------------- pose blending
 // Not an animation system - just interpolation between static poses so the crowd reads
 // as alive while we are still only validating rig topology.
+const blended = {};   // reused: a fresh object per character per frame is real GC pressure
+
 function tickPoses(dt) {
   if (!S.cyclePoses) return;
   for (const o of crowd) {
     if (o.t < 1) {
       o.t = Math.min(1, o.t + dt / S.blend);
       const e = o.t * o.t * (3 - 2 * o.t);
-      const pose = {};
-      for (const k of POSE_KEYS) pose[k] = o.from[k] + (o.to[k] - o.from[k]) * e;
-      pose.holdItem = o.t > 0.5 ? o.to.holdItem : o.from.holdItem;
-      applyPose(o.built, pose);
+      for (const k of POSE_KEYS) blended[k] = o.from[k] + (o.to[k] - o.from[k]) * e;
+      blended.holdItem = o.t > 0.5 ? o.to.holdItem : o.from.holdItem;
+      applyPose(o.built, blended);
       continue;
     }
     o.wait -= dt;

@@ -15,6 +15,11 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store, must-revalidate")
         self.send_header("Pragma", "no-cache")
         self.send_header("Expires", "0")
+        # no-store stops NEW responses being cached but never evicts what a browser already
+        # holds. Purging on the document request clears modules cached before this server
+        # existed. Honoured on secure contexts only, which includes localhost.
+        if self.path.endswith((".html", "/")):
+            self.send_header("Clear-Site-Data", '"cache"')
         super().end_headers()
 
     def send_header(self, keyword, value):

@@ -4,7 +4,7 @@ Yarn, notions, and how the player arranges them. Scoped to P1's original questio
 merchandise look like, and how does the player put it places.**
 
 Written after the NPC spike, which produced measured evidence that changes several assumptions
-here. Cross-references `../DESIGN-DECISIONS.md` (project-wide) and `../../P1-SPIKE-PLAN.md`.
+here. Cross-references `../DESIGN-DECISIONS.md` (project-wide) and `../P1-SPIKE-PLAN.md`.
 
 ---
 
@@ -31,9 +31,30 @@ performance"* was right, and is now proven rather than asserted.
 
 ## 2. Decision: merchandise is instanced, one `InstancedMesh` per geometry family
 
-Eight geometry families (skein, ball, cake, hank, cone, mini-skein, booklet, notions) means **eight
-instanced meshes covering the entire shop** — eight nodes, eight draw calls, eight materials, at any
-item count.
+**Seven 3D families** (skein, ball, cake, hank, cone, mini-skein, booklet) plus **one billboard
+family** for every notion, covering the entire shop — eight nodes, eight draw calls, eight
+materials, at any item count.
+
+### Notions are not a geometry family
+
+The spike plan lists notions as the eighth *geometry* family, with a distinct mesh per notion:
+needles as cylinder pairs, hooks as a cylinder with a bent tip, buttons as short cylinders. Going
+2.5D (section 3) makes all of that unnecessary. **Every notion is the same quad**; what distinguishes
+a hook from a button is which cell of the texture atlas it samples.
+
+That is a larger simplification than it first appears:
+
+- **A new notion is content, not code.** Adding one means drawing an atlas cell. No modelling, no
+  geometry function, no new instanced mesh, no code change at all.
+- **The 30-item notions list in `LYS.md` stops being a modelling budget.** It becomes an
+  illustration budget, which is a far cheaper unit of work and one that can be handed to an artist.
+- **Anti-sameyness does not apply to notions.** The variety-axes system exists to stop a shelf of
+  yarn looking clone-stamped. A hook is already not a button; notions are distinct by definition and
+  need *legibility*, not jitter.
+
+> **Silhouette still matters — it just moves to the alpha channel.** The plan's core principle,
+> that different silhouettes are what break clone-stamping, holds exactly as before. The design work
+> does not disappear; it moves from modelling to illustration.
 
 Per-instance data that is free because it lives in the instance matrix or colour buffer:
 
@@ -49,6 +70,8 @@ plane, convert to UV, index the slot. That rule was written for performance; ins
 structural.
 
 ### Two variety axes do NOT survive instancing
+
+Both apply to the **yarn** families only; notions are unaffected.
 
 1. **Ball band variant.** A contrasting paper ring is separate geometry. Options: a second instanced
    family (doubles skein draws to 2 — trivially affordable), or bake the band into the texture and
@@ -89,6 +112,25 @@ Consequences:
 > Billboards must still be **instanced**. One `Object3D` per notion would reintroduce exactly the
 > node-count cost that dominates the character budget.
 
+### Which way does the card face — decide in P1
+
+The game is an **orbiting diorama**, so the camera moves and this choice is visible:
+
+| Mode | Behaviour | Suits |
+| --- | --- | --- |
+| Full billboard | always faces the camera | floating, carried, or UI-ish items |
+| **Y-axis billboard** | rotates only about up, stays upright | items standing on a shelf |
+| Fixed card | no rotation at all | items lying flat, seen from a limited arc |
+
+A full billboard on an item resting on a shelf looks wrong as the camera orbits — it pivots in place
+like a cardboard cutout. **Y-axis is the likely default**, with fixed cards for anything lying flat.
+
+### Flat notions next to 3D yarn is a feature, not an inconsistency
+
+The briefing asks for notions to read "as if they are an ink drawing". Sitting flat, outlined and
+stylised among fully modelled yarn is exactly that read. It also does useful work: it separates
+*tools* from *stock* at a glance, without a UI element saying so.
+
 ---
 
 ## 4. Held notions: the rig data the briefing was missing
@@ -108,9 +150,29 @@ inside the body, and it does that by forcing arms *outward*. Bringing both hands
 the chest is the opposite motion. Either the clamp becomes pose-aware, or two-handed poses opt out of
 it. **This will look like a bug when someone first authors a knitting pose.**
 
-**Notion scale is contested between shelf and hand.** Notions are deliberately oversized so they read
-on a shelf. At that scale, held, they may look absurd. Needs either a per-notion held-scale override
-or an accepted single scale.
+**A held billboard may not survive being held.** A camera-facing card in a hand pivots independently
+of the hand holding it, which reads as detached. The likely answer is that held notions leave the
+billboard family: the handful that matter get a small real mesh, or a fixed card oriented to the
+hand rather than the camera. This is cheap either way — ~10 concurrent NPCs means ~10 held items —
+but it means the shelf design and the held design are genuinely two different assets, which the
+briefing already anticipated.
+
+**Notion scale is per context, not per notion. DECIDED.** A notion carries a scale for each place it
+can appear, and they are allowed to disagree:
+
+| Context | Driven by |
+| --- | --- |
+| On a display | legibility at diorama distance — deliberately oversized |
+| Player manipulating it | legibility and tactility, oversized is fine and probably better |
+| Held by an NPC | looking right in a hand — usually the smallest of the three |
+
+This removes the conflict rather than compromising on one number. The oversizing exists so the
+player can see and grab things; an NPC holding a knitting needle the size of a fence post serves
+nobody. Scale is a property of the *situation*, so it belongs with the situation.
+
+> Worth watching for the transition: an item that visibly changes size when an NPC picks it up off a
+> shelf. Either hide the change behind the pickup animation, or accept it as a cartoon convention
+> — the game is already non-realistic about notion scale, so a second liberty is cheap.
 
 ### What the rig already gives us for free
 
@@ -130,8 +192,7 @@ or an accepted single scale.
    silhouette at diorama scale. Non-diegetic number, an inspect panel, or colour coding? The project
    is committed to *mostly* diegetic UI, so this needs an explicit exception, not a drift.
 2. **Fuzz tiers vs family split vs custom shader** (section 2).
-3. **Held scale vs shelf scale** (section 4).
-4. **Does a notion's pose belong to the notion or to the activity?** Knitting-with-needles and
+3. **Does a notion's pose belong to the notion or to the activity?** Knitting-with-needles and
    knitting-with-a-different-needle-size are the same pose. Suggests poses attach to *activities*,
    with notions declaring which activity they belong to.
 
@@ -141,11 +202,58 @@ or an accepted single scale.
 
 Back to the original scope — this is a merchandise and arrangement spike, not a character one.
 
-1. **Eight geometry families as instanced meshes**, with the variety axes applied per instance.
+1. **Seven 3D geometry families as instanced meshes**, with the variety axes applied per instance.
    The skein is the hero shape and deserves the most iteration.
 2. **A display with a slot grid**, and placement by raycasting the slot plane rather than the items.
 3. **The 1000-item wall**, checked for *sameyness* rather than frame rate — the perf question is
    already answered.
-4. **A notion atlas** with 2-3 visual treatments (outline / gold / sparkle) to choose between.
+4. **A notion atlas** with 2-3 visual treatments (outline / gold / sparkle) to choose between, and
+   the billboard facing mode settled against an orbiting camera.
 5. **One two-handed held notion**, purely to surface the `clampArmOut` conflict early while it is
    still cheap to fix.
+
+---
+
+## 7. Build state — 2026-09-06
+
+### Done
+
+**Atlas pipeline** — `illustrations/notion_processing.py`. Bakes a default set plus per-theme
+overrides into one atlas, a UV manifest, and a reviewable preview sheet. Three placeholder notions
+exist (`crochet-hook`, `darning-needle`, `stitch-markers`) purely to exercise the path; they are
+throwaway art.
+
+**Placement mechanic** — `inventory/stash-and-stuff.html` and `inventory/notions.js`. Notions on a
+slot grid, draggable between slots, with a green/red drop marker. Measured: **4 draw calls total**,
+independent of notion count. Section 2's central claim is now demonstrated rather than argued.
+
+### Decided while building
+
+**Thickness comes from an edge pass, not geometry.** A dark copy, grown slightly and pushed behind
+the card, delivers thickness *and* the ink outline in **one extra draw call for the whole field** —
+because it shares the main field's instance attributes rather than maintaining a synced copy. A
+fragment-stage gradient across the card adds form with no geometry at all. Billboards stay
+billboards.
+
+**Picking uses a plane at the card's mid-height, not the floor.** An upright card is drawn well
+above its own footprint, so a floor hit test asks the player to click empty grid below the thing
+they can see. Still one plane intersection, still O(1), still never raycasts an item.
+
+**Picking is forgiving by design.** An ink drawing occupies a fraction of its slot, so an exact hit
+test feels like the item is not where it looks. `pickSlot` falls back to the nearest occupied slot
+within a grab radius.
+
+> `GridHelper` only draws squares. On a non-square grid it silently draws the wrong pitch, so the
+> player aims at lines that are not the slots. Use `makeGridLines`.
+
+### Awaiting the next round of visual feedback
+
+- thickness and outline settings (`edgeGrow`, `edgePush`, gradient) \u2014 all live in the GUI
+- lying flat vs upright, now that upright picking works
+- whether placeholder line weights are consistent enough to judge anything
+- notion scale against slot size
+
+### Not started
+
+Held notions on a character (section 4), the seven 3D yarn families, and the 1000-item sameyness
+check.

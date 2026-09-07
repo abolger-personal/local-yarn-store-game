@@ -1,0 +1,33 @@
+{
+  "cell": 512,
+  "columns": 4,
+  "rows": 1,
+  "cells": {
+    "crochet-hook": {
+      "col": 0,
+      "row": 0,
+      "u0": 0.0,
+      "u1": 0.25,
+      "v0": 0.0,
+      "v1": 1.0
+    },
+    "darning-needle": {
+      "col": 1,
+      "row": 0,
+      "u0": 0.25,
+      "u1": 0.5,
+      "v0": 0.0,
+      "v1": 1.0
+    },
+    "stitch-markers": {
+      "col": 2,
+      "row": 0,
+      "u0": 0.5,
+      "u1": 0.75,
+      "v0": 0.0,
+      "v1": 1.0
+    }
+  },
+  "atlas": "default.png",
+  "theme": "default"
+}

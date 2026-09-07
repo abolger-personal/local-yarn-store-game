@@ -1,1 +1,79 @@
-python3 -m http.server 8765 --directory .
+# LYS — Local Yarn Store
+
+Concept prototypes for a 3D-in-browser yarn shop game. No build step: plain ES modules, three.js
+from a CDN, served statically.
+
+## Running
+
+```sh
+npm run serve      # http://localhost:8765  (no-cache dev server)
+npm run lint       # ESLint, flat config
+```
+
+Use `serve.py`, **not** `python3 -m http.server`. Plain `http.server` sends `Last-Modified`, so
+browsers answer 304 and keep serving stale ES modules. That is merely confusing when a function
+body changes and *fatal* when a module gains an export — the importing module fails to link and the
+page renders blank white. `serve.py` sends `no-store` and purges the origin cache on each document
+load.
+
+Every viewer logs a build marker on startup:
+
+```
+LYS build 2026-09-06.6-shared-materials
+```
+
+If that value looks old, the browser is running cached code and nothing you changed is live.
+
+## Viewers
+
+| Page | Question it answers |
+| --- | --- |
+| `characters/species-checker.html` | Do two species read as different animals? Tuning surface, one character at a time. |
+| `characters/crowd.html` | Does the randomiser make a cast or a zoo? Performance instrumentation lives here. |
+| `inventory/stash-and-stuff.html` | Does the placement mechanic feel good? Notion look and drag behaviour. |
+| `characters/felted-owl.html` | Original single-owl tuner. Superseded by the species checker. |
+
+## Layout
+
+```
+characters/      npc.js (shared rig) + owl.js / llama.js (species kits) + viewers
+inventory/       notions.js (instanced billboards, slot grid) + viewer
+ai_planning_sessions/
+  LYS.md                     original concept, annotated with [DECIDED]
+  DESIGN-DECISIONS.md        project-wide ADR
+  P1-SPIKE-PLAN.md           first phase of work
+  inventory/
+    DESIGN-DECISIONS.md      inventory ADR
+    NOTIONS.md               art briefing
+    illustrations/           notion atlas pipeline (Python)
+serve.py         no-cache dev server
+```
+
+## Notion atlas
+
+Source art is black line art; the pipeline bakes **shape only** into an alpha channel. Colour,
+outline and gradient are runtime work, so a theme that only recolours ships no new images.
+
+```sh
+cd ai_planning_sessions/inventory/illustrations
+pip install Pillow
+python3 notion_processing.py                      # default set
+python3 notion_processing.py --theme cottage      # a theme's overrides layered on top
+```
+
+Outputs `build/<theme>.png`, `build/<theme>.json` (UV manifest) and `build/<theme>-preview.png`.
+The atlas itself renders as a blank white rectangle — shape lives in alpha — so **the preview is
+what you review**.
+
+## Measuring performance
+
+Target is cheap tablets, so all claims are measured under **20x CPU throttling** in Chrome DevTools,
+not on unthrottled Apple silicon. DevTools must stay open for throttling to apply; that makes the
+number conservative rather than wrong.
+
+Two rules learned the hard way:
+
+1. **Frame the whole scene before reading the overlay** (`F` in the crowd view). Culled objects are
+   not drawn, so a zoomed-in camera silently reports a fraction of the real cost.
+2. **Sanity-check draw-calls-per-character against the known mesh count.** A reading of 12 for a
+   character with ~35 meshes means the scene is being culled, not that the code got faster.

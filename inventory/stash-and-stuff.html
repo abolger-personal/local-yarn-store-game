@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYS — stash and stuff</title>
+<style>
+  :root { color-scheme: light; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; touch-action: none; }
+  #hud {
+    position: fixed; left: 12px; bottom: 12px; z-index: 10;
+    background: rgba(255,255,255,.84); backdrop-filter: blur(6px);
+    border: 1px solid rgba(0,0,0,.08); border-radius: 10px;
+    padding: 10px 12px; font-size: 12px; line-height: 1.55; color: #333; max-width: 330px;
+  }
+  #hud b { color: #111; }
+  #hud kbd {
+    background: #efefef; border: 1px solid #ddd; border-bottom-width: 2px;
+    border-radius: 4px; padding: 0 4px; font-size: 11px; font-family: ui-monospace, monospace;
+  }
+  #perf {
+    position: fixed; right: 12px; top: 12px; z-index: 10;
+    background: rgba(20,20,20,.8); color: #eee; border-radius: 8px;
+    padding: 8px 11px; font: 11px/1.5 ui-monospace, monospace; white-space: pre;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="perf"></div>
+<div id="hud">
+  <b>LYS stash and stuff</b> — placement mechanic<br />
+  <b>Drag a notion</b> to move it between slots<br />
+  Right-drag to orbit · scroll to zoom<br />
+  <kbd>G</kbd> show grid &nbsp; <kbd>R</kbd> reshuffle &nbsp; <kbd>F</kbd> frame<br />
+  <span style="opacity:.7">one draw call for every notion</span>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import GUI from 'three/addons/libs/lil-gui.module.min.js';
+import {
+  EMPTY, loadAtlas, cellRect, makeGrid, gridSize, slotAt, slotCentre, pickSlot, makeGridLines,
+  makeField, makeEdge, setInstance, placeMatrix,
+} from './notions.js';
+
+const ATLAS_URL = '../ai_planning_sessions/inventory/illustrations/build';
+
+const S = {
+  theme:     'default',
+  cols:      8,
+  rows:      6,
+  cell:      0.26,
+  fill:      18,
+  scale:     0.20,
+  lying:     true,
+  yawJitter: 0.35,
+  tint:      '#241e22',
+  unlit:     true,
+  showGrid:  true,
+  liftHeight: 0.10,
+  edge:      true,
+  edgeGrow:  1.07,
+  edgePush:  0.014,
+  edgeColor: '#1b1418',
+  shade:     0.28,
+  grab:      0.8,
+};
+
+// ---------------------------------------------------------------- scene
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.55;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#ddd5c8');
+
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.01, 100);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.add(new THREE.HemisphereLight('#ffffff', '#8b7a68', 1.1));
+const key = new THREE.DirectionalLight('#ffe6c4', 1.6);
+key.position.set(2, 4, 2);
+scene.add(key);
+
+// ---------------------------------------------------------------- surface
+const surface = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshStandardMaterial({ color: '#c9bda9', roughness: 0.95 })
+);
+surface.rotation.x = -Math.PI / 2;
+scene.add(surface);
+
+let gridHelper = null;
+let grid = makeGrid(S.cols, S.rows, S.cell);
+
+function layoutSurface() {
+  const { w, d } = gridSize(grid);
+  surface.scale.set(w, d, 1);
+  gridHelper?.removeFromParent();
+  gridHelper = makeGridLines(grid);
+  gridHelper.position.y = 0.002;
+  gridHelper.visible = S.showGrid;
+  scene.add(gridHelper);
+}
+
+// ---------------------------------------------------------------- notions
+let atlas = null;
+let field = null;
+let edge = null;
+const items = [];   // one per instance: { name, slot, color, yaw }
+
+const CAPACITY = 256;
+const _pos = new THREE.Vector3();
+const _mat = new THREE.Matrix4();
+const _col = new THREE.Color();
+
+function itemMatrix(item, lift = 0) {
+  slotCentre(grid, item.slot, _pos).y = lift + (S.lying ? 0.004 : S.scale * 0.5);
+  return placeMatrix(_pos, S.scale, S.lying, item.yaw, _mat);
+}
+
+function refresh(index, lift = 0) {
+  const item = items[index];
+  setInstance(field, index, {
+    matrix: itemMatrix(item, lift),
+    rect: cellRect(atlas.manifest, item.name),
+    color: _col.set(item.color),
+  });
+}
+
+function scatter() {
+  grid.slots.fill(EMPTY);
+  items.length = 0;
+  const free = grid.slots.map((_, i) => i).sort(() => Math.random() - 0.5);
+
+  for (let i = 0; i < Math.min(S.fill, free.length, CAPACITY); i++) {
+    const slot = free[i];
+    grid.slots[slot] = i;
+    items.push({
+      name: atlas.names[i % atlas.names.length],
+      slot,
+      color: S.tint,
+      yaw: (Math.random() - 0.5) * S.yawJitter * Math.PI,
+    });
+  }
+  field.count = items.length;
+  if (edge) edge.count = items.length;
+  items.forEach((_, i) => refresh(i));
+}
+
+function rebuild() {
+  grid = makeGrid(S.cols, S.rows, S.cell);
+  layoutSurface();
+  scatter();
+  frame();
+}
+
+// ---------------------------------------------------------------- dragging
+//
+// A horizontal plane is intersected, never the notions. That is the design record's O(1) rule,
+// and with instancing the notions are not individually raycastable objects in the first place.
+//
+// The plane sits at the CARD's mid-height, not on the floor. An upright card is drawn well
+// above its own footprint, so a floor hit test asks the player to click the empty grid below
+// the thing they can see.
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const pickPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const _hit = new THREE.Vector3();
+const drag = { index: EMPTY, from: EMPTY };
+
+const cardHeight = () => (S.lying ? 0.004 : S.scale * 0.5);
+
+function surfacePoint(event, height = cardHeight()) {
+  pointer.set((event.clientX / innerWidth) * 2 - 1, -(event.clientY / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+  pickPlane.constant = -height;
+  return raycaster.ray.intersectPlane(pickPlane, _hit);
+}
+
+function onPointerDown(event) {
+  if (event.button !== 0) return;
+  const point = surfacePoint(event);
+  if (!point) return;
+  const slot = pickSlot(grid, point.x, point.z, grid.cell * S.grab);
+  const index = slot === EMPTY ? EMPTY : grid.slots[slot];
+  if (index === EMPTY) return;
+
+  drag.index = index;
+  drag.from = slot;
+  renderer.domElement.setPointerCapture(event.pointerId);
+  refresh(index, S.liftHeight);
+}
+
+function onPointerMove(event) {
+  if (drag.index === EMPTY) return;
+  const point = surfacePoint(event, S.liftHeight);
+  if (!point) return;
+  hover(slotAt(grid, point.x, point.z));
+  // follow the pointer directly rather than snapping, so the drop target reads as a choice
+  _pos.set(point.x, S.liftHeight, point.z);
+  setInstance(field, drag.index, { matrix: placeMatrix(_pos, S.scale * 1.12, S.lying, items[drag.index].yaw, _mat) });
+}
+
+function onPointerUp(event) {
+  if (drag.index === EMPTY) return;
+  const point = surfacePoint(event, S.liftHeight);
+  const target = point ? slotAt(grid, point.x, point.z) : EMPTY;
+  const item = items[drag.index];
+
+  if (target !== EMPTY && (grid.slots[target] === EMPTY || target === drag.from)) {
+    grid.slots[drag.from] = EMPTY;
+    grid.slots[target] = drag.index;
+    item.slot = target;
+  }
+  refresh(drag.index);
+  hover(EMPTY);
+  drag.index = EMPTY;
+  renderer.domElement.releasePointerCapture?.(event.pointerId);
+}
+
+const marker = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshBasicMaterial({ color: '#c2703f', transparent: true, opacity: 0.30, depthWrite: false })
+);
+marker.rotation.x = -Math.PI / 2;
+marker.visible = false;
+scene.add(marker);
+
+function hover(slot) {
+  marker.visible = slot !== EMPTY && drag.index !== EMPTY;
+  if (!marker.visible) return;
+  slotCentre(grid, slot, _pos).y = 0.004;
+  marker.position.copy(_pos);
+  marker.scale.set(grid.cell * 0.92, grid.cell * 0.92, 1);
+  marker.material.color.set(grid.slots[slot] === EMPTY || slot === drag.from ? '#3f7f5a' : '#b3402f');
+}
+
+renderer.domElement.addEventListener('pointerdown', onPointerDown);
+renderer.domElement.addEventListener('pointermove', onPointerMove);
+renderer.domElement.addEventListener('pointerup', onPointerUp);
+
+// ---------------------------------------------------------------- framing
+function frame() {
+  const { w, d } = gridSize(grid);
+  const extent = Math.max(w, d) * 1.15;
+  const dist = extent / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5));
+  controls.target.set(0, 0, 0);
+  camera.position.set(0, dist * 0.82, dist * 0.62);
+  controls.update();
+}
+
+// ---------------------------------------------------------------- gui
+const gui = new GUI({ title: 'stash and stuff' });
+gui.add(S, 'fill', 1, 48, 1).name('notions').onFinishChange(scatter);
+gui.add({ f: scatter }, 'f').name('reshuffle  (R)');
+
+const gGrid = gui.addFolder('surface');
+gGrid.add(S, 'cols', 2, 16, 1).onFinishChange(rebuild);
+gGrid.add(S, 'rows', 2, 16, 1).onFinishChange(rebuild);
+gGrid.add(S, 'cell', 0.10, 0.60, 0.01).name('slot size').onFinishChange(rebuild);
+gGrid.add(S, 'showGrid').name('show grid  (G)').onChange((v) => (gridHelper.visible = v));
+
+const gLook = gui.addFolder('notion look');
+gLook.add(S, 'scale', 0.05, 0.60, 0.005).onChange(() => items.forEach((_, i) => refresh(i)));
+gLook.add(S, 'lying').name('lying flat').onChange(() => items.forEach((_, i) => refresh(i)));
+gLook.add(S, 'yawJitter', 0, 1, 0.01).name('yaw jitter').onFinishChange(scatter);
+gLook.addColor(S, 'tint').onChange(() => {
+  items.forEach((item, i) => { item.color = S.tint; refresh(i); });
+});
+gLook.add(S, 'shade', 0, 0.8, 0.01).name('gradient').onChange((v) => {
+  field.material.userData.uniforms.uShade.value = v;
+});
+
+const gEdge = gui.addFolder('thickness / outline');
+gEdge.add(S, 'edge').name('enabled').onChange((v) => (edge.visible = v));
+gEdge.add(S, 'edgeGrow', 1.0, 1.30, 0.005).name('outline width')
+  .onChange((v) => (edge.material.userData.uniforms.uGrow.value = v));
+gEdge.add(S, 'edgePush', 0, 0.08, 0.001).name('depth offset')
+  .onChange((v) => (edge.material.userData.uniforms.uPush.value = v));
+gEdge.addColor(S, 'edgeColor').name('colour').onChange((v) => edge.material.color.set(v));
+
+gui.add(S, 'grab', 0.3, 1.5, 0.05).name('grab radius (slots)');
+
+addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (k === 'g') { S.showGrid = !S.showGrid; gridHelper.visible = S.showGrid; }
+  if (k === 'r') scatter();
+  if (k === 'f') frame();
+  gui.controllersRecursive().forEach((c) => c.updateDisplay());
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ---------------------------------------------------------------- perf
+const perfEl = document.getElementById('perf');
+let fps = 60;
+let lastPerf = 0;
+
+function updatePerf(dt) {
+  fps += (1 / Math.max(dt, 1e-4) - fps) * 0.06;
+  if (performance.now() - lastPerf < 250) return;
+  lastPerf = performance.now();
+  const r = renderer.info.render;
+  perfEl.textContent =
+    `${fps.toFixed(0)} fps\ndraw calls ${r.calls}\ntriangles  ${r.triangles}\n` +
+    `notions    ${field ? field.count : 0}`;
+}
+
+// ---------------------------------------------------------------- go
+const clock = new THREE.Clock();
+
+loadAtlas(ATLAS_URL, S.theme).then((loaded) => {
+  atlas = loaded;
+  field = makeField(atlas.texture, CAPACITY, { unlit: S.unlit, shade: S.shade });
+  edge = makeEdge(field, S.edgeColor);
+  edge.material.userData.uniforms.uGrow.value = S.edgeGrow;
+  edge.material.userData.uniforms.uPush.value = S.edgePush;
+  edge.visible = S.edge;
+  scene.add(field, edge);
+  rebuild();
+
+  renderer.setAnimationLoop(() => {
+    controls.update();
+    renderer.render(scene, camera);
+    updatePerf(Math.min(clock.getDelta(), 0.1));
+  });
+}).catch((err) => {
+  document.getElementById('hud').innerHTML =
+    `<b>atlas failed to load</b><br>${err.message}<br>` +
+    `<span style="opacity:.7">run notion_processing.py first</span>`;
+});
+</script>
+</body>
+</html>

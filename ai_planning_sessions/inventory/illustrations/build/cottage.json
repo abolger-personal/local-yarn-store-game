@@ -1,0 +1,33 @@
+{
+  "cell": 256,
+  "columns": 8,
+  "rows": 1,
+  "cells": {
+    "crochet-hook": {
+      "col": 0,
+      "row": 0,
+      "u0": 0.0,
+      "u1": 0.125,
+      "v0": 0.0,
+      "v1": 1.0
+    },
+    "darning-needle": {
+      "col": 1,
+      "row": 0,
+      "u0": 0.125,
+      "u1": 0.25,
+      "v0": 0.0,
+      "v1": 1.0
+    },
+    "stitch-marker": {
+      "col": 2,
+      "row": 0,
+      "u0": 0.25,
+      "u1": 0.375,
+      "v0": 0.0,
+      "v1": 1.0
+    }
+  },
+  "atlas": "cottage.png",
+  "theme": "cottage"
+}

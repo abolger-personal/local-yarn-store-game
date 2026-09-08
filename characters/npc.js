@@ -13,7 +13,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
-export const BUILD = '2026-09-06.6-shared-materials';
+export const BUILD = '2026-09-07.1-held-item-unmerged';
 
 // ---------------------------------------------------------------- species registry
 
@@ -711,6 +711,7 @@ function buildHeldItem(P, addMaterial) {
   held.add(part(GEO.sphere, skein, { scale: [0.052, 0.088, 0.052] }));
   held.add(part(GEO.torus, band, { scale: [0.050, 0.050, 0.030], rot: [Math.PI * 0.5, 0, 0] }));
   held.visible = Boolean(P.holdItem);
+  held.userData.noMerge = true;   // toggled at runtime, so it must survive mergeCharacter intact
   return held;
 }
 
@@ -828,6 +829,10 @@ export function createCharacter(P, species) {
 /** Every mesh under `node` that is not inside a nested joint. */
 function staticMeshes(node, out = []) {
   for (const child of node.children) {
+    // A subtree the game shows and hides at runtime is NOT static, whatever it looks like from
+    // here. Merging bakes it into the joint's single mesh, after which setting `.visible` on the
+    // group changes nothing on screen — the held item stayed in every NPC's fist for good.
+    if (child.userData.noMerge) continue;
     if (child.isMesh) out.push(child);
     else if (!child.userData.joint) staticMeshes(child, out);
   }

@@ -98,3 +98,17 @@ export function slotRect(g, c, r, w, h) {
   const { w: W, d: D } = gridSize(g);
   return { x: (c + w / 2) * g.cell - W / 2, z: (r + h / 2) * g.cell - D / 2, w: w * g.cell, d: h * g.cell };
 }
+
+/**
+ * Recompute which slots are holes, for a display that has MOVED (DISPLAYS.md rule 10). A cell that
+ * is holding stock is never revoked however the mask votes: the move brought its inventory with it,
+ * and there is nowhere to evict it to.
+ */
+export function remask(g, mask) {
+  for (let s = 0; s < g.shelves; s++)
+    for (let r = 0; r < g.rows; r++)
+      for (let c = 0; c < g.cols; c++) {
+        const k = key(g, s, c, r);
+        g.usable[k] = (mask(s, c, r) || g.piles[k].length > 0) ? 1 : 0;
+      }
+}

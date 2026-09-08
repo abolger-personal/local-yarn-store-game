@@ -8,7 +8,9 @@
   :root { color-scheme: light; }
   html, body { margin: 0; height: 100%; overflow: hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
   #app { position: fixed; inset: 0; }
-  canvas { display: block; transition: filter 120ms linear; }
+  /* touch-action: none or the browser claims one-finger drags for scroll/pinch and pointermove
+     never reaches the page — which would silently kill the touch preview below. */
+  canvas { display: block; touch-action: none; transition: filter 120ms linear; }
   canvas.squint { filter: blur(6px); }
 
   .panel {
@@ -23,6 +25,28 @@
     background: #efefef; border: 1px solid #ddd; border-bottom-width: 2px;
     border-radius: 4px; padding: 0 4px; font-size: 11px; font-family: ui-monospace, monospace;
   }
+  #hud .held {
+    margin: 7px 0; padding: 6px 8px; border-radius: 7px; background: rgba(0,0,0,.045);
+    font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; min-height: 34px;
+  }
+  #hud .held .k { opacity: .55; }
+  #hud .held b { color: #111; }
+  #hud .held .ok { color: #3f7f5a; }
+  #hud .held .no { color: #b4553f; }
+  #rotator {
+    position: fixed; z-index: 5; display: flex; gap: 6px;
+    transform: translate(-50%, -50%); pointer-events: none;
+  }
+  #rotator button {
+    pointer-events: auto; width: 40px; height: 40px; border-radius: 50%;
+    border: 1px solid rgba(0,0,0,.25); background: rgba(255,252,246,.94); color: #3d2b1f;
+    font: 22px/1 system-ui, sans-serif; cursor: pointer; padding: 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,.28);
+    /* A 40px target is the minimum comfortable touch size, and this is the touch alternative to
+       Q/E — so it must not shrink on small screens. */
+  }
+  #rotator button:hover { background: #fff; }
+  #rotator button:active { transform: scale(.92); }
 
   /* perf overlay — copied from crowd.html so the two views report the same numbers */
   #perf {
@@ -95,12 +119,24 @@
 
 <div id="debug" class="panel"><h4>NPC state</h4><div id="npcState"></div></div>
 
+<!-- Rotate handles for the selected piece of furniture. HTML rather than scene geometry: the
+     browser does the hit-testing, they stay a constant comfortable size however far the camera is,
+     and they cost no raycast. Positioned each frame by projecting the selection — see tickRotator. -->
+<div id="rotator" hidden>
+  <button data-step="-1" title="turn 45&deg; anticlockwise (Q)">&#8634;</button>
+  <button data-step="1" title="turn 45&deg; clockwise (E)">&#8635;</button>
+</div>
+
 <div id="hud" class="panel">
-  <b>LYS store</b> — NPC visit state machine POC<br />
-  Drag to orbit · scroll to zoom<br />
+  <b>LYS store</b> — visits + arranging POC <span id="build" class="k"></span><br />
+  <b>Left-click</b> a box to pick it up, click again to set it down<br />
+  <b>Right-drag</b> to orbit · scroll to zoom<br />
+  <div id="held" class="held"></div>
+  Point at a shelf level to make it active &nbsp;·&nbsp; <kbd>[</kbd> <kbd>]</kbd> nudge level<br />
+  <kbd>Tab</kbd> next display &nbsp; <kbd>G</kbd> grid<br />
   <kbd>Space</kbd> advance round &nbsp; <kbd>R</kbd> restart visit<br />
   <kbd>1</kbd> felted &nbsp; <kbd>2</kbd> grey &nbsp; <kbd>3</kbd> silhouette &nbsp; <kbd>B</kbd> squint<br />
-  <kbd>F</kbd> frame room &nbsp; <kbd>G</kbd> grid lines
+  <kbd>F</kbd> frame room
 </div>
 
 <script type="importmap">
@@ -129,13 +165,19 @@ import {
   loadAtlas, cellRect, makeGridLines, makeField, makeEdge, makeShadows, makeBoxes, makeSizeAtlas,
   setInstance, placeMatrix, placeBoxMatrix, placeLabelMatrix,
 } from '../inventory/notions.js';
-import { makeDisplay, gridSize, footprint, fits, place, slotRect } from '../inventory/grid.js';
+import {
+  EMPTY, makeDisplay, gridSize, footprint, fits, place, lift, dropLayer, topAt, columnAt, slotRect,
+  usableAt, remask,
+} from '../inventory/grid.js';
 
 import {
-  TRAITS, ACTION, STATE, maxWips, makeNpc, makeWorld, advanceRound, labelOf,
+  TRAITS, ACTION, STATE, maxWips, makeNpc, makeWorld, advanceRound, labelOf, fullyExposed, seatById,
 } from './visit.js';
 
 console.info('LYS build', BUILD);
+// On the HUD as well as in the console: when a fix "does not work", the first thing worth ruling
+// out is that the page is running an older module than the one on disk.
+document.getElementById('build').textContent = `build ${BUILD}`;
 
 const ATLAS_URL = '../ai_planning_sessions/inventory/illustrations/build';
 // EU/metric only for MVP — matches inventory/stash-and-stuff.html.
@@ -150,6 +192,12 @@ const HOOK_SIZES_MM = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 8.
 const CELL = 0.20;        // uniform across ALL displays — DISPLAYS.md rule 2, so items can move
 const BOX_H = 0.055;      // one 2.5D layer
 const SHELF_GAP = 0.28;   // must exceed headroom * BOX_H or a full stack pokes through the glass
+// DISPLAYS.md type A: a pile stacks with "close-to-infinite headroom", Jenga towers allowed. 10 is
+// the standard option; at BOX_H that is 0.55 units, so a full tower on a table reaches an NPC's
+// head. A SHELF cannot have this — its stack is physically stopped by the glass above it, so its
+// headroom stays bounded by SHELF_GAP / BOX_H, which is 3 at present. That difference is real
+// furniture, not an oversight.
+const PILE_HEADROOM = 10;
 // doorH is generous on purpose: a 1.0-tall NPC needs the opening to read as a shop door, not a
 // hatch, and the tallest species (llama, per P1-SPIKE-PLAN) is ~1.33 before any hat.
 const ROOM = { w: 6.4, d: 6.4, wallH: 2.6, doorW: 1.2, doorH: 2.0 };
@@ -168,11 +216,17 @@ const S = {
   displayCount: 2,
   chairCount:   2,
   showGrid:    true,
+  moveMode:    false,   // DISPLAYS.md rule 10: dragging rearranges the SHOP, not the stock
   autoSeconds: 30,      // CHARACTER-VISIT.md: a round is 15 in-game minutes, ~30s of real time
   travel:      1.4,     // seconds of animation per round of movement
+  travelJitter: 0.5,    // max random delay before an NPC sets off, so departures stagger
+  paceJitter:  0.25,    // +/- fraction on each NPC's own travel time, so arrivals stagger too
   // How far a seated NPC rises so they rest ON the chair rather than through it. The rig grounds
   // every pose to feet-at-zero, so this cannot be derived — it needs eyeballing per seat height.
   seatLift:    0.16,
+  glowColor:   '#ffcf5c',   // gold; '#ffffff' for the white variant
+  glowSpeed:   0.8,         // pulses per second
+  glowPad:     0.055,       // world units the halo extends past the box at its widest
   exposure:    BASE_PARAMS.exposure,
   toneMapping: BASE_PARAMS.toneMapping,
 };
@@ -209,6 +263,14 @@ controls.minDistance = 2.5;
 // (good for reading shelf faces) without ever reaching level with the floor.
 controls.maxPolarAngle = Math.PI * 0.42;
 controls.maxDistance = 16;   // beyond this the room is a small object on screen, not a diorama
+// Left button belongs to the PLAYER'S VERB, not the camera. Arranging is the only thing the player
+// does in this game (LYS.md), so it gets the primary button; orbiting moves to right-drag. Same
+// mapping as inventory/stash-and-stuff.html, so the muscle memory carries over.
+controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+// The touch equivalent of that decision, which was missing: ONE finger is the player's verb, TWO
+// fingers are the camera. Left at the default (ONE: ROTATE) a single-finger drag orbits the shop
+// instead of moving the box, so dragging an item was impossible on a tablet regardless of hover.
+controls.touches = { ONE: null, TWO: THREE.TOUCH.DOLLY_ROTATE };
 
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -322,11 +384,14 @@ function marker(w, d, x, z, color, y = 0.005) {
   roomGroup.add(m);
   return m;
 }
+// One source of truth for the counter's footprint: the mesh below and the slot mask both read it,
+// so moving the counter cannot leave displays generating slots inside it.
+const COUNTER = { x: -2.1, z: 1.7, w: 1.4, d: 0.45, h: 0.62 };
 const counter = new THREE.Mesh(
-  new THREE.BoxGeometry(1.4, 0.62, 0.45),
+  new THREE.BoxGeometry(COUNTER.w, COUNTER.h, COUNTER.d),
   new THREE.MeshStandardMaterial({ color: '#a98f6d', roughness: 0.9 })
 );
-counter.position.set(-2.1, 0.31, 1.7);
+counter.position.set(COUNTER.x, COUNTER.h / 2, COUNTER.z);
 counter.castShadow = true;
 counter.receiveShadow = true;
 roomGroup.add(counter);
@@ -394,6 +459,7 @@ function clearGroup(group) {
 //
 // A pool of positions rather than a fixed pair: the chair COUNT is a live control, so the layout
 // has to be authored for the largest case and taken from the front. Same pattern as the displays.
+const CHAIR_W = 0.34;
 const SEAT_SLOTS = [
   { id: 'chair-a', x: -1.75, z: -0.55, facing: Math.PI * 0.62 },
   { id: 'chair-b', x: -1.75, z: 0.35, facing: Math.PI * 0.38 },
@@ -408,14 +474,19 @@ const chairGroup = new THREE.Group();
 roomGroup.add(chairGroup);
 
 function buildChairs(n) {
+  mover.m = mover.sel = null;   // the chair objects below replace whatever was selected
   clearGroup(chairGroup);
   seats = SEAT_SLOTS.slice(0, n).map((s) => ({ ...s }));
   for (const s of seats) {
-    const chair = new THREE.Mesh(new THREE.BoxGeometry(0.34, SEAT_H, 0.34), seatMat);
+    const chair = new THREE.Mesh(new THREE.BoxGeometry(CHAIR_W, SEAT_H, CHAIR_W), seatMat);
     chair.position.set(s.x, SEAT_H / 2, s.z);
     chair.rotation.y = s.facing;
     chair.castShadow = true;
     chair.receiveShadow = true;
+    // Both directions: the mover raycasts the mesh and needs the seat, and applySeat holds the
+    // seat and needs the mesh. Chairs are few and solid, so unlike notions they ARE raycastable.
+    chair.userData.seat = s;
+    s.mesh = chair;
     chairGroup.add(chair);
   }
 }
@@ -437,13 +508,22 @@ const STAND_OFF = 0.65;      // how far in front of a display an NPC stands to r
 
 // Authored positions, taken from the front as the count goes up. Shelves carry a yaw so they can
 // sit against a side wall; a pile is a free-standing table and always reads the same way round.
+// `kind` is what the SIM branches on and stays the two types DISPLAYS.md defines: 'shelf' or
+// 'pile'. `form` is the specific piece of furniture — it drives how the thing is built and how high
+// it stands, and it is the hook for NPCs treating a floor pile differently from a table later
+// without needing a third set of stacking rules today.
+//
+// (Not to be confused with LYS.md §5b's "floor pile", the unslotted delivery inbox. This is
+// DISPLAYS.md type A, "Floor or Table Pile" — a real slotted display that sits on the ground.)
 const DISPLAY_SLOTS = [
-  { id: 'shelf-n', kind: 'shelf', cols: 5, rows: 2, shelves: 3, headroom: 3, x: 0,    z: -HALF_D + 0.5, yaw: 0 },
-  { id: 'table-a', kind: 'pile',  cols: 5, rows: 5, shelves: 1, headroom: 8, x: 1.5,  z: -0.2,          yaw: 0 },
-  { id: 'shelf-e', kind: 'shelf', cols: 5, rows: 2, shelves: 3, headroom: 3, x: HALF_W - 0.5, z: -1.1,  yaw: -Math.PI / 2 },
-  { id: 'shelf-w', kind: 'shelf', cols: 5, rows: 2, shelves: 3, headroom: 3, x: -HALF_W + 0.5, z: -1.6, yaw: Math.PI / 2 },
-  { id: 'table-b', kind: 'pile',  cols: 4, rows: 4, shelves: 1, headroom: 8, x: 1.45, z: 1.75,          yaw: 0 },
-  { id: 'table-c', kind: 'pile',  cols: 4, rows: 4, shelves: 1, headroom: 8, x: -0.35, z: -1.75,        yaw: 0 },
+  { id: 'shelf-n', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: 2, shelves: 3, headroom: 3, x: 0,    z: -HALF_D + 0.5, yaw: 0 },
+  { id: 'table-a', kind: 'pile',  form: 'table',      cols: 5, rows: 5, shelves: 1, headroom: PILE_HEADROOM, x: 1.5,  z: -0.2,          yaw: 0 },
+  { id: 'floor-a', kind: 'pile',  form: 'floor',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: 0.55, z: 0.85,          yaw: 0 },
+  { id: 'shelf-e', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: 2, shelves: 3, headroom: 3, x: HALF_W - 0.5, z: -1.1,  yaw: -Math.PI / 2 },
+  { id: 'shelf-w', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: 2, shelves: 3, headroom: 3, x: -HALF_W + 0.5, z: -1.6, yaw: Math.PI / 2 },
+  { id: 'floor-b', kind: 'pile',  form: 'floor',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: -1.20, z: 1.55,         yaw: 0 },
+  { id: 'table-b', kind: 'pile',  form: 'table',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: 1.45, z: 1.75,          yaw: 0 },
+  { id: 'table-c', kind: 'pile',  form: 'table',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: -0.35, z: -1.75,        yaw: 0 },
 ];
 
 let displays = [];
@@ -456,33 +536,117 @@ const byId = (id) => displays.find((d) => d.id === id);
  * 90° has to report its footprint swapped — otherwise the visibility test thinks a side-wall shelf
  * is wide when it is actually deep, and NPCs "see" through it.
  */
-function makeDisplayFromSlot(slot) {
-  const baseY = slot.kind === 'shelf' ? SHELF_BASE_Y : TABLE_TOP_Y;
-  const quat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), slot.yaw);
-  const gw = slot.cols * CELL, gd = slot.rows * CELL;
-  const turned = Math.abs(Math.sin(slot.yaw)) > 0.5;
-  // Local +Z is the display's front (local -Z, row 0, is the wall side), rotated into world space.
-  const front = { x: Math.sin(slot.yaw), z: Math.cos(slot.yaw) };
+/** World XZ centre of one slot, accounting for the display's yaw. */
+function slotCellWorld(slot, c, r) {
+  const lx = (c + 0.5) * CELL - (slot.cols * CELL) / 2;
+  const lz = (r + 0.5) * CELL - (slot.rows * CELL) / 2;
+  const sin = Math.sin(slot.yaw), cos = Math.cos(slot.yaw);
+  return { x: slot.x + lx * cos + lz * sin, z: slot.z - lx * sin + lz * cos };
+}
 
-  return {
-    id: slot.id, kind: slot.kind,
+/**
+ * Slots that would sit inside a wall, the counter, a chair or an already-placed display are masked
+ * out at GENERATION time, so a display simply comes out a funny shape — a 4x4 floor pile against
+ * the counter becomes a 3x2. grid.js already models a masked slot as a hole (`usable`), footprint()
+ * refuses to span one, and makeGridLines draws only usable cells, so the shape is honest all the
+ * way through to what the player sees. Nothing downstream needed changing.
+ *
+ * ponytail: axis-aligned boxes and a per-cell test. Exact at the axis-aligned yaws; at the 45°
+ * detents rule 10 allows, a turned cell is tested by its CIRCUMRADIUS instead — conservative, so a
+ * display may refuse a spot it would just barely have fitted, but never clips the counter. A real
+ * OBB test is the upgrade if that ever feels tight.
+ */
+// How close to a wall anything may stand: the panel is 0.08 thick and centred on the boundary, so
+// 0.04 of it is inside the room, plus 0.02 of slack. Named because the wall-shelf snap has to stand
+// a display off by AT LEAST this much — a snap that lands inside its own clearance makes the
+// display red against every wall in the shop, which is exactly the bug this constant prevents.
+const WALL_INSET = 0.04 + 0.02;
+
+/** An axis-aligned box on the floor, clear of the room shell and of everything else solid in it. */
+function boxIsClear(x, z, half, obstacles) {
+  if (Math.abs(x) + half > HALF_W - WALL_INSET) return false;
+  if (Math.abs(z) + half > HALF_D - WALL_INSET) return false;
+  return !obstacles.some((o) =>
+    Math.abs(x - o.x) < half + o.w / 2 + o.pad &&
+    Math.abs(z - o.z) < half + o.d / 2 + o.pad);
+}
+
+function cellIsClear(slot, c, r, obstacles) {
+  const p = slotCellWorld(slot, c, r);
+  return boxIsClear(p.x, p.z,
+    Math.abs(Math.sin(2 * slot.yaw)) < 1e-6 ? CELL / 2 : CELL * Math.SQRT1_2, obstacles);
+}
+
+/**
+ * Solid things already in the room. `dispList` gives earlier slots priority over later ones during
+ * the build; both lists are parameters because a thing being MOVED must not be an obstacle to
+ * itself — it would then be blocked by the very spot it is standing in.
+ */
+function roomObstacles(dispList, seatList = seats) {
+  // The doorway is the only way in, so nothing may be parked across it — the same thing
+  // room.doorClearance says for NPCs, in the form the grids are masked against. Every authored
+  // slot already sits well clear of this, so it only ever bites on something the player moved.
+  const out = [{ ...COUNTER, pad: 0.05 }, { x: 0, z: HALF_D - 0.45, w: ROOM.doorW + 0.4, d: 0.9, pad: 0 }];
+  for (const s of seatList) out.push({ x: s.x, z: s.z, w: CHAIR_W, d: CHAIR_W, pad: 0.10 });
+  for (const d of dispList) out.push({ x: d.x, z: d.z, w: d.w, d: d.d, pad: 0.02 });
+  return out;
+}
+
+/**
+ * Everything derived from a display's pose, in one place — because the player can now change that
+ * pose at runtime (DISPLAYS.md rule 10) and every one of these caches would otherwise go stale.
+ *
+ * This is also the whole of "all Inventory will stay with the move": an item's world matrix is
+ * composed against `frame` every time it is painted, so moving the frame carries the stock with it
+ * and not one line of the item code has to know a display can move.
+ */
+function applyTransform(d, x, z, yaw) {
+  d.x = x; d.z = z; d.yaw = yaw;
+  const quat = new THREE.Quaternion().setFromAxisAngle(UP, yaw);
+  Object.assign(d, makeFrame(new THREE.Vector3(x, d.plinthY, z), quat));
+
+  // The SIM treats a display as an axis-aligned box (line of sight, standing room), so report the
+  // AABB of the turned rectangle. At 0/90 that is the old width/depth swap; at a 45° detent it is
+  // the diagonal, which is the honest answer rather than a shelf NPCs can see straight through.
+  const { w: gw, d: gd } = gridSize(d.g);
+  const sin = Math.abs(Math.sin(yaw)), cos = Math.abs(Math.cos(yaw));
+  d.w = gw * cos + gd * sin;
+  d.d = gw * sin + gd * cos;
+  // Local +Z is the display's front (local -Z, row 0, is the wall side), rotated into world space.
+  d.standAt = { x: x + Math.sin(yaw) * STAND_OFF, z: z + Math.cos(yaw) * STAND_OFF };
+  if (d.group) d.group.matrix.copy(d.frame);
+}
+
+function makeDisplayFromSlot(slot, builtSoFar = []) {
+  const d = {
+    id: slot.id, kind: slot.kind, form: slot.form,
     wallRow: slot.kind === 'shelf' ? 0 : -1,   // a table has no wall side
     g: makeDisplay(slot.cols, slot.rows, {
       shelves: slot.shelves, headroom: slot.headroom, cell: CELL,
+      // Same holes on every level: what is blocked is blocked in plan, whatever the height.
+      mask: (s, c, r) => cellIsClear(slot, c, r, roomObstacles(builtSoFar)),
     }),
-    gap: SHELF_GAP, baseY,
-    x: slot.x, z: slot.z,
-    w: turned ? gd : gw,
-    d: turned ? gw : gd,
-    standAt: { x: slot.x + front.x * STAND_OFF, z: slot.z + front.z * STAND_OFF },
-    ...makeFrame(new THREE.Vector3(slot.x, baseY, slot.z), quat),
+    // Named plinthY, not baseY: baseY() is the function for an item's height WITHIN a display, and
+    // two different heights called the same thing is a bug waiting to happen.
+    gap: SHELF_GAP, plinthY: { 'wall-shelf': SHELF_BASE_Y, table: TABLE_TOP_Y, floor: 0 }[slot.form],
+    plane: 0,                                  // which shelf level the player is arranging
     lines: [], panels: [],
   };
+  applyTransform(d, slot.x, slot.z, slot.yaw);
+  return d;
 }
 
 function buildDisplays(n) {
+  // Every display object is replaced, so a drag holding an index into the old ones cannot survive.
+  abortDrag();
+  mover.m = null;
+  mover.sel = null;
   clearGroup(displayGroup);
-  displays = DISPLAY_SLOTS.slice(0, n).map(makeDisplayFromSlot);
+  // Built one at a time, each masked against the ones already placed — so where two slots overlap
+  // the earlier one keeps its cells and the later one loses them, rather than both interpenetrating.
+  displays = [];
+  for (const slot of DISPLAY_SLOTS.slice(0, n)) displays.push(makeDisplayFromSlot(slot, displays));
+  if (!byId(activeId)) activeId = displays[0]?.id ?? null;
   for (const d of displays) {
     d.group = new THREE.Group();
     d.group.matrixAutoUpdate = false;
@@ -490,16 +654,20 @@ function buildDisplays(n) {
     displayGroup.add(d.group);
     buildFurniture(d);
   }
-  paintGrids();
+  paintActivePlane();
 }
 
 // Physical furniture under the grids, so the displays read as shop fittings and not floating slots.
 function buildFurniture(d) {
   const { w, d: depth } = gridSize(d.g);
-  const surface = new THREE.Mesh(new THREE.BoxGeometry(w * 1.06, GLASS_T * 2, depth * 1.06), woodMat);
-  surface.position.y = -GLASS_T;
-  surface.receiveShadow = true;
-  d.group.add(surface);
+  // A floor pile gets no surface slab — it sits directly on the shop floor, and a full-rectangle
+  // slab would poke through the very counter and chairs its slots were just masked away from.
+  if (d.form !== 'floor') {
+    const surface = new THREE.Mesh(new THREE.BoxGeometry(w * 1.06, GLASS_T * 2, depth * 1.06), woodMat);
+    surface.position.y = -GLASS_T;
+    surface.receiveShadow = true;
+    d.group.add(surface);
+  }
 
   for (let s = 0; s < d.g.shelves; s++) {
     const lines = makeGridLines(d.g, s);
@@ -516,11 +684,14 @@ function buildFurniture(d) {
 
   // The plinth and the shelf's back panel live in the display's LOCAL space too, so a rotated
   // shelf brings its own furniture round with it instead of leaving it behind axis-aligned.
-  const leg = new THREE.Mesh(new THREE.BoxGeometry(w * 0.92, d.baseY, depth * 0.92), woodMat);
-  leg.position.y = -d.baseY / 2;
-  leg.castShadow = true;
-  leg.receiveShadow = true;
-  d.group.add(leg);
+  // A floor pile has no plinth at all — it IS on the floor, which is the whole point of it.
+  if (d.plinthY > 0) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(w * 0.92, d.plinthY, depth * 0.92), woodMat);
+    leg.position.y = -d.plinthY / 2;
+    leg.castShadow = true;
+    leg.receiveShadow = true;
+    d.group.add(leg);
+  }
 
   // the back panel of the wall shelf, so "wall-facing row" is visible as well as modelled
   if (d.kind === 'shelf') {
@@ -531,12 +702,14 @@ function buildFurniture(d) {
   }
 }
 
-const paintGrids = () => displays.forEach((d) => d.lines.forEach((l) => { l.visible = S.showGrid; }));
+// paintActivePlane (in the pick-and-place section) both shows/hides grids and highlights the one
+// the player is arranging, so "show grid" routes through it rather than having its own pass.
+const paintGrids = () => paintActivePlane();
 
 // ---------------------------------------------------------------- notions
 let atlas = null, sizeAtlas = null;
-let field = null, edge = null, fieldTop = null, edgeTop = null, shadows = null, boxes = null;
-let sizeTag = null, sizeTop = null;
+let sideField = null, sideEdge = null, fieldTop = null, edgeTop = null, shadows = null, boxes = null;
+let sizeSide = null, sizeTop = null;
 const items = [];
 // Sized for the largest layout the dropdowns allow (6 displays plus every NPC's seeded targets),
 // with headroom. An InstancedMesh cannot grow after allocation, so this is a hard ceiling.
@@ -554,6 +727,7 @@ const _col = new THREE.Color();
 const _hide = new THREE.Matrix4().makeScale(0, 0, 0);
 
 const baseY = (d, shelf, layer) => shelf * d.gap + layer * BOX_H;
+const LIFT_HEIGHT = 0.14;   // how far a carried item floats above the plane it is over
 
 function paintInstance(display, index, cx, cz, boxBase, shadowBase, footW, footD, yaw) {
   const item = items[index];
@@ -563,33 +737,44 @@ function paintInstance(display, index, cx, cz, boxBase, shadowBase, footW, footD
   _pos.set(cx, boxBase + boxH / 2, cz);
   setInstance(boxes, index, { matrix: placeBoxMatrix(_pos, boxW, boxD, boxH, yaw, _boxMat).premultiply(F) });
 
-  const fx = Math.sin(yaw), fz = Math.cos(yaw);
-  const halfOut = boxD / 2 + 0.003;
-  _pos.set(cx + fx * halfOut, boxBase + boxH * 0.55, cz + fz * halfOut);
-  setInstance(field, index, {
-    matrix: placeLabelMatrix(_pos, boxW * 0.92, boxH * 0.82, yaw, _mat).premultiply(F),
-    rect: cellRect(atlas.manifest, item.name),
-    color: _col.set(item.color),
-  });
+  // A label on EVERY side, not just the front. On an orbiting diorama any face can end up toward
+  // the camera, and an unlabelled back reads as a blank crate. Four faces share ONE instanced mesh
+  // at 4x capacity (instance index*4 + k), so this costs no extra draw call over the single-sided
+  // version it replaced.
+  const rect = cellRect(atlas.manifest, item.name);
+  const sizeRect = cellRect(sizeAtlas.manifest, item.size != null ? item.size.toFixed(1) : 'blank');
+  for (let k = 0; k < 4; k++) {
+    const a = yaw + k * Math.PI / 2;                 // k=0 front, 1 right, 2 back, 3 left
+    const alongDepth = k % 2 === 0;                  // front/back look across the depth, sides across the width
+    const out = (alongDepth ? boxD : boxW) / 2 + 0.003;
+    const face = (alongDepth ? boxW : boxD);
+    const nx = Math.sin(a), nz = Math.cos(a);
+    // Illustration in the upper part of the face, size number in the strip below it — stacked
+    // rather than overlaid, so neither obscures the other on a box only BOX_H tall.
+    _pos.set(cx + nx * out, boxBase + boxH * 0.62, cz + nz * out);
+    setInstance(sideField, index * 4 + k, {
+      matrix: placeLabelMatrix(_pos, face * 0.92, boxH * 0.56, a, _mat).premultiply(F),
+      rect,
+      color: _col.set(item.color),
+    });
+    // The size rides along on every face too, so a hook's millimetres are readable from any angle —
+    // it is meant to be something the player arranges by.
+    _pos.set(cx + nx * (out + 0.001), boxBase + boxH * 0.22, cz + nz * (out + 0.001));
+    setInstance(sizeSide, index * 4 + k, {
+      matrix: placeLabelMatrix(_pos, face * 0.46, boxH * 0.30, a, _sizeMat).premultiply(F),
+      rect: sizeRect,
+    });
+  }
 
   // The top icon is inset to leave a corner free for the size number below it.
   _pos.set(cx, boxBase + boxH + 0.002, cz);
   setInstance(fieldTop, index, {
     matrix: placeMatrix(_pos, boxW * 0.70, boxD * 0.70, yaw, _topMat).premultiply(F),
-    rect: cellRect(atlas.manifest, item.name),
+    rect,
     color: _col.set(item.color),
   });
 
-  const sizeRect = cellRect(sizeAtlas.manifest, item.size != null ? item.size.toFixed(1) : 'blank');
-
-  // Size on the SIDE face, for when the camera is low and looking along the shelf.
   const sx = Math.cos(yaw), sz = -Math.sin(yaw);
-  const sideOut = boxW / 2 + 0.003;
-  _pos.set(cx + sx * sideOut, boxBase + boxH * 0.55, cz + sz * sideOut);
-  setInstance(sizeTag, index, {
-    matrix: placeLabelMatrix(_pos, boxD * 0.5, boxH * 0.5, yaw + Math.PI / 2, _sizeMat).premultiply(F),
-    rect: sizeRect,
-  });
 
   // Size on the TOP face too, in the front corner like a sticker. This is the one that matters:
   // the game is an orbiting diorama looking DOWN, so a number only on the side is invisible in
@@ -615,7 +800,9 @@ function paintInstance(display, index, cx, cz, boxBase, shadowBase, footW, footD
 function refresh(index) {
   const item = items[index];
   if (item.gone) {
-    for (const m of [boxes, field, fieldTop, sizeTag, sizeTop]) setInstance(m, index, { matrix: _hide });
+    for (const m of [boxes, fieldTop, sizeTop]) setInstance(m, index, { matrix: _hide });
+    for (let k = 0; k < 4; k++)
+      for (const m of [sideField, sizeSide]) setInstance(m, index * 4 + k, { matrix: _hide });
     shadows.setMatrixAt(index, _hide);
     shadows.instanceMatrix.needsUpdate = true;
     return;
@@ -626,7 +813,23 @@ function refresh(index) {
   paintInstance(disp, index, rect.x, rect.z, base, base, rect.w * FILL, rect.d * FILL, item.yaw);
 }
 
-const refreshAll = () => items.forEach((_, i) => refresh(i));
+/**
+ * Draw an item floating under the pointer, lifted off whichever display is currently targeted —
+ * which may not be the one it was picked up from, if the player has moved the pointer across.
+ * Slightly enlarged, so a held item reads as picked-up rather than just badly placed.
+ */
+function refreshFloating(index, x, z) {
+  const item = items[index];
+  const disp = activeDisplay();
+  const floor = disp.plane * disp.gap;
+  paintInstance(disp, index, x, z, floor + LIFT_HEIGHT, floor,
+                item.w * CELL * FILL * 1.08, item.h * CELL * FILL * 1.08, item.yaw);
+}
+
+const refreshAll = () => items.forEach((_, i) => {
+  // A held item follows the pointer; it has no resting slot to be drawn in until it is dropped.
+  if (!items[i].held) refresh(i);
+});
 
 const NOTION_NAMES = ['crochet-hook', 'darning-needle', 'stitch-markers'];
 const rnd = (n) => Math.floor(Math.random() * n);
@@ -642,14 +845,30 @@ const SIZED_NOTIONS = new Set(['crochet-hook']);
 const sizeFor = (name, size) =>
   (SIZED_NOTIONS.has(name) ? (size ?? pick(HOOK_SIZES_MM)) : null);
 
+// The package a notion comes in, as a [cols, rows] footprint. Like the size attribute above this
+// belongs to the KIND, not to the instance — a random shape per box would be the same mistake as a
+// random size, inventing a property the product does not have.
+//
+// Each kind lists the packages it genuinely ships in, which is where the variety comes from: a
+// single hook is a small box, a hook set is a long one; markers come loose or in a big assorted tin.
+// Footprint is deliberately NOT part of target matching — an NPC wants "a 4.5mm hook", and does not
+// care which box it came in.
+const PACKAGES = {
+  'crochet-hook':   [[1, 1], [2, 1]],   // single hook, or a set in a long case
+  'darning-needle': [[1, 1], [1, 2]],   // a packet, or a deep sleeve of assorted sizes
+  'stitch-markers': [[1, 1], [2, 2]],   // a little bag, or a big assorted tin
+};
+const packageFor = (name) => pick(PACKAGES[name] ?? [[1, 1]]);
+
 /**
  * Put one item in the first slot it fits, scanning from a random start. Returns its index or -1.
  * `avoidWall` keeps it off a shelf's wall-facing row, which DISPLAYS.md says can never be noticed
  * — without it a "guaranteed buyable" seed can land somewhere an NPC is not allowed to see.
  */
-function addItem(display, shelf, name, size, { c, r, avoidWall = false } = {}) {
+function addItem(display, shelf, name, size, { c, r, avoidWall = false, shape } = {}) {
   if (items.length >= CAPACITY) return -1;   // the instanced buffers cannot grow past this
   const g = display.g;
+  const [w, h] = shape ?? packageFor(name);
   const cells = [];
   for (let rr = 0; rr < g.rows; rr++) for (let cc = 0; cc < g.cols; cc++) {
     if (avoidWall && rr === display.wallRow) continue;
@@ -658,17 +877,790 @@ function addItem(display, shelf, name, size, { c, r, avoidWall = false } = {}) {
   const ordered = (c != null) ? [{ c, r }, ...cells] : cells.slice(rnd(cells.length)).concat(cells);
 
   for (const cell of ordered) {
-    const keys = footprint(g, shelf, cell.c, cell.r, 1, 1);
+    // footprint() returns null the moment any covered cell runs off the grid or hits a mask, and
+    // fits() treats null as "no" — so an oversized package simply fails over to the next cell.
+    const keys = footprint(g, shelf, cell.c, cell.r, w, h);
     if (!fits(g, keys)) continue;
     const index = items.length;
     items.push({
-      name, size: sizeFor(name, size), display: display.id, shelf, c: cell.c, r: cell.r, w: 1, h: 1,
+      name, size: sizeFor(name, size), display: display.id, shelf, c: cell.c, r: cell.r, w, h,
       keys, layer: place(g, keys, index), color: '#241e22',
-      yaw: (Math.random() - 0.5) * 0.18 * Math.PI, gone: false,
+      yaw: (Math.random() - 0.5) * 0.18 * Math.PI, gone: false, held: false,
     });
     return index;
   }
   return -1;
+}
+
+// ---------------------------------------------------------------- pick and place
+//
+// The player's ONLY verb (LYS.md): rearranging stock into formations. Ported from
+// inventory/stash-and-stuff.html, keeping the decisions recorded in inventory/DESIGN-DECISIONS.md
+// §7 rather than re-litigating them:
+//
+//   - NEVER raycast items. Cast the display's own slot plane, convert the hit to a column in O(1).
+//     Items are instanced and are not scene objects, so they are not raycastable in the first place.
+//   - Click to pick up, click again to put down. Not press-and-hold, which was hard on the hands
+//     for the core moment-to-moment mechanic.
+//   - Pick against a plane at the CARD's height, not the floor: an upright card is drawn well above
+//     its own footprint, so a floor test asks the player to click empty grid below what they see.
+//
+// What is new here, and is the reason this needed porting rather than copying: there are now up to
+// six displays at arbitrary yaw, and NPCs are mutating the same grids between rounds.
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const pickPlane = new THREE.Plane();
+const _hit = new THREE.Vector3();
+const _n = new THREE.Vector3();
+const _planePt = new THREE.Vector3();
+const _localPt = new THREE.Vector3();
+const drag = {
+  index: EMPTY, target: null, displayId: null,
+  // Gesture bookkeeping, so one rule serves mouse and touch — see onPointerDown.
+  downX: 0, downY: 0, moved: false, pickedThisPress: false,
+};
+const TAP_SLOP = 8;   // px of finger jitter still counted as a tap rather than a drag
+
+let activeId = null;                                   // which display the player is aiming at
+// Distinct from activeId on purpose: activeId must PERSIST when the pointer wanders off a display,
+// so a carried item keeps its drop target. hoveredId goes null the moment the pointer leaves, which
+// is what lets a floor grid hide again.
+let hoveredId = null;
+const activeDisplay = () => byId(activeId) ?? displays[0];
+
+function setRayFromEvent(event) {
+  pointer.set((event.clientX / innerWidth) * 2 - 1, -(event.clientY / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+}
+
+/**
+ * Intersect the plane "local Y = k" of one display, in world space, and return the hit back in that
+ * display's LOCAL coordinates. This is what lets a shelf turned 90° against a side wall use exactly
+ * the same column maths as a flat table: the frame does the rotating, columnAt() never learns about
+ * it. Returns plain numbers, not a shared Vector3 — the callers below compare hits from many
+ * displays and levels in one pass, and cannot have a later call overwrite an earlier result.
+ */
+function castLocal(disp, localY) {
+  _n.set(0, 1, 0).transformDirection(disp.frame);
+  _planePt.set(0, localY, 0).applyMatrix4(disp.frame);
+  pickPlane.setFromNormalAndCoplanarPoint(_n, _planePt);
+  const hit = raycaster.ray.intersectPlane(pickPlane, _hit);
+  if (!hit) return null;
+  const distSq = raycaster.ray.origin.distanceToSquared(hit);
+  _localPt.copy(hit).applyMatrix4(disp.frameInv);
+  return { x: _localPt.x, z: _localPt.z, distSq };
+}
+
+/** Where on a display's ACTIVE plane the pointer is — used to float a carried item, not to pick. */
+function displayPoint(disp, event) {
+  setRayFromEvent(event);
+  const guess = castLocal(disp, disp.plane * disp.gap);
+  if (!guess) return null;
+  const col = columnAt(disp.g, guess.x, guess.z);
+  const topIndex = col ? topAt(disp.g, disp.plane, col.c, col.r) : EMPTY;
+  if (topIndex === EMPTY) return guess;
+  const refined = castLocal(disp, baseY(disp, disp.plane, items[topIndex].layer) + BOX_H);
+  return refined ?? guess;
+}
+
+/**
+ * What the player actually clicked on, across EVERY display and EVERY shelf level.
+ *
+ * This replaced a version that tested only the active plane, which had two compounding faults and
+ * made items on a multi-level shelf unpickable:
+ *
+ *   1. Only one plane was ever considered, so anything not on the active level was invisible to
+ *      the pick — and the active level defaults to 0, the bottom shelf, underneath the other two.
+ *   2. The single test intersected the shelf FLOOR while the player had clicked a box TOP. At a
+ *      diorama angle that parallax is ~0.11 units — over half a slot — which frequently landed
+ *      outside the lattice altogether. The two-pass refine meant to fix this only ran once a
+ *      column had already been found, so on a tall shelf it never got the chance.
+ *
+ * The fix removes the guesswork: every occupied column already knows exactly how tall its stack is,
+ * so test each one against ITS OWN top face and require the ray to land in that very cell. No
+ * parallax to correct, no plane to guess. Nearest hit to the camera wins, which is the box in
+ * front. Still never raycasts an item — these are plane intersections, a few dozen per click.
+ */
+function pickCandidate(event) {
+  setRayFromEvent(event);
+  let best = null;
+  for (const disp of displays) {
+    for (let s = 0; s < disp.g.shelves; s++) {
+      for (let r = 0; r < disp.g.rows; r++) {
+        for (let c = 0; c < disp.g.cols; c++) {
+          const index = topAt(disp.g, s, c, r);
+          if (index === EMPTY) continue;
+          // A package bridging two columns with something stacked on its other half is not
+          // grabbable — lift() would pop that other column too and evict whatever sits there.
+          if (!fullyExposed(disp, items, index)) continue;
+          const hit = castLocal(disp, baseY(disp, s, items[index].layer) + BOX_H);
+          if (!hit) continue;
+          const col = columnAt(disp.g, hit.x, hit.z);
+          if (!col || col.c !== c || col.r !== r) continue;   // must land in THIS cell, not a neighbour
+          if (!best || hit.distSq < best.distSq) {
+            best = { disp, shelf: s, index, distSq: hit.distSq };
+          }
+        }
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Which display (and which of its levels) the pointer is over while carrying something. Unlike the
+ * pick, this does not need an item there — it needs somewhere to PUT one — so it tests each shelf's
+ * floor plane and takes the nearest in-bounds hit.
+ */
+function hoverTarget(event) {
+  setRayFromEvent(event);
+  let best = null;
+  for (const disp of displays) {
+    for (let s = 0; s < disp.g.shelves; s++) {
+      const hit = castLocal(disp, s * disp.gap);
+      if (!hit || !columnAt(disp.g, hit.x, hit.z)) continue;
+      if (!best || hit.distSq < best.distSq) best = { disp, shelf: s, distSq: hit.distSq };
+    }
+  }
+  return best;
+}
+
+// A box does not land in exactly the same orientation every time it is set down.
+const YAW_SETTLE = 0.12 * Math.PI;
+
+/** Anywhere on this display the item still fits, or null. The last resort when its own slot filled up. */
+function firstFreeSlot(disp, item) {
+  for (let shelf = 0; shelf < disp.g.shelves; shelf++)
+    for (let r = 0; r < disp.g.rows; r++)
+      for (let c = 0; c < disp.g.cols; c++) {
+        const keys = footprint(disp.g, shelf, c, r, item.w, item.h);
+        if (fits(disp.g, keys)) return { shelf, c, r, keys };
+      }
+  return null;
+}
+
+function pickUp(event, found = pickCandidate(event)) {
+  if (!found) return;
+  const { disp, index } = found;
+
+  activeId = disp.id;
+  disp.plane = found.shelf;      // arranging follows what you just grabbed, so it drops back easily
+  paintActivePlane();
+  const point = displayPoint(disp, event) ?? { x: 0, z: 0 };
+  drag.index = index;
+  drag.displayId = disp.id;
+  // Out of the grid AND out of the simulation: see `available()` in visit.js. An NPC must not tidy
+  // around it, stack onto its column, or buy it out of the player's hand.
+  lift(disp.g, items[index].keys);
+  items[index].held = true;
+  refreshFloating(index, point.x, point.z);
+  updateHeldReadout();
+}
+
+function putDown() {
+  const item = items[drag.index];
+  const t = drag.target;
+  if (t) {
+    item.display = activeId;
+    item.shelf = activeDisplay().plane;
+    item.c = t.c; item.r = t.r; item.keys = t.keys;
+  }
+  // No valid target under the pointer: it goes back where it actually still belongs. Its own
+  // display/shelf/c/r were never touched if the branch above did not run.
+  const home = byId(item.display);
+  if (!t) item.keys = footprint(home.g, item.shelf, item.c, item.r, item.w, item.h);
+  // ...except an NPC may have tidied that column full while the player was holding it. place()
+  // does not check headroom, so without this the item would sit floating above a full stack.
+  if (!fits(home.g, item.keys)) {
+    const spot = firstFreeSlot(home, item);
+    if (spot) { item.shelf = spot.shelf; item.c = spot.c; item.r = spot.r; item.keys = spot.keys; }
+  }
+  item.layer = place(home.g, item.keys, drag.index);
+  item.held = false;
+  item.yaw += (Math.random() - 0.5) * YAW_SETTLE;
+
+  refresh(drag.index);
+  dropMarker.visible = false;
+  drag.index = EMPTY;
+  drag.target = null;
+  drag.displayId = null;
+  // Setting down can end the "carrying" reason a floor grid was revealed, so re-evaluate now
+  // rather than leaving it lit until the pointer next moves.
+  paintActivePlane();
+  updateHeldReadout();
+}
+
+/** Put whatever is held back, without asking where the pointer is. Used before any rebuild. */
+function abortDrag() {
+  if (drag.index === EMPTY) return;
+  drag.target = null;
+  putDown();
+}
+
+/**
+ * ONE gesture rule for mouse and touch: **the press previews, the release commits.**
+ *
+ * Touch has no hover, so the preview cannot live between gestures — it has to live *inside* one.
+ * Pressing aims (ghost appears, slide to adjust), lifting places. That is the same motion a mouse
+ * click already makes, so nothing changes for mouse; and because pointermove fires throughout a
+ * touch-drag, a finger gets exactly the continuous preview a cursor gets from hovering.
+ *
+ * Deliberately NOT a long-press timer: a hold-to-commit delay is invisible, unlearnable, fights the
+ * browser's own long-press menu, and punishes the player for being careful — the opposite of what a
+ * preview is for.
+ *
+ * Releasing without moving keeps the item held, which preserves click-to-pick / click-to-place for
+ * mouse (rejected press-and-hold as hard on the hands, per inventory/DESIGN-DECISIONS.md §7) and
+ * gives touch a tap-tap fallback. So all three gestures work off the same two lines:
+ *   press item, drag, lift          -> drag and drop        (natural on touch)
+ *   click item, move, click target  -> click-click          (natural on mouse)
+ *   tap item, press target, adjust, lift -> aim then commit (touch without a hover)
+ */
+function onPointerDown(event) {
+  if (event.target !== renderer.domElement) return;   // a press on the HUD or GUI is not a shop press
+  if (event.button !== 0 || !event.isPrimary) return;
+  // isPrimary: only the FIRST finger drives the verb. Without it, putting a second finger down to
+  // pinch-zoom would grab whatever happened to be under it, mid-gesture.
+  drag.downX = event.clientX;
+  drag.downY = event.clientY;
+  drag.moved = false;
+
+  // Move mode takes the whole gesture: one finger moves a display if there is one under it, and
+  // orbits the camera if there is not — the same "verb or camera" split the stock drag uses below.
+  if (S.moveMode) {
+    controls.touches.ONE = grabMovable(event) ? null : THREE.TOUCH.ROTATE;
+    return;
+  }
+
+  drag.pickedThisPress = drag.index === EMPTY;
+  const found = drag.pickedThisPress ? pickCandidate(event) : null;
+  // One finger, two jobs. It belongs to the player's verb when there is something under it (or
+  // something already in hand), and to the CAMERA otherwise — so dragging bare floor orbits, which
+  // is what a touch user expects and what `TWO: DOLLY_ROTATE` alone does not deliver: two-finger
+  // rotation tracks the midpoint while dolly tracks the finger SEPARATION, and separation is so
+  // much the more sensitive of the two that any two-finger drag reads as pure zoom.
+  //
+  // Only meaningful on touch; the mouse takes its orbit from `controls.mouseButtons` (right-drag).
+  controls.touches.ONE = (found || !drag.pickedThisPress) ? null : THREE.TOUCH.ROTATE;
+
+  if (drag.pickedThisPress) { if (found) pickUp(event, found); }
+  else onPointerMove(event);   // aiming press: refresh the ghost NOW, before anything commits
+}
+
+function onPointerUp(event) {
+  if (event.button !== 0 || !event.isPrimary) return;
+  if (mover.m) { dropMovable(); return; }
+  if (drag.index === EMPTY) return;
+  // A press that went somewhere is a completed drag; a press that stayed put while already
+  // carrying is a tap on the target. Either way the release is the commit. Only a stationary
+  // release on the pickup itself keeps the item in hand.
+  if (drag.moved || !drag.pickedThisPress) putDown();
+}
+
+/**
+ * The pointer chooses BOTH the display and the shelf level, whether or not something is being
+ * carried. Previously the level could only be changed from the GUI slider, which meant a
+ * multi-level shelf could not really be arranged with the mouse at all.
+ *
+ * "Nearest in-bounds" is what makes per-level pointing work: looking down, an upper shelf's plane
+ * is always hit closer to the camera, but only where it is actually over the lattice — so pointing
+ * at the exposed front strip of a lower shelf misses the upper plane and correctly selects the
+ * lower one.
+ */
+function onPointerMove(event) {
+  if (mover.m) {
+    const p = floorPoint(event);
+    if (p) proposeMove(mover.m, p.x + mover.ox, p.z + mover.oz, movePose(mover.m).yaw);
+    return;
+  }
+  if (drag.index !== EMPTY && !drag.moved &&
+      Math.hypot(event.clientX - drag.downX, event.clientY - drag.downY) > TAP_SLOP) {
+    drag.moved = true;
+  }
+  const hover = hoverTarget(event);
+  const nowHovered = hover ? hover.disp.id : null;
+  const changed = nowHovered !== hoveredId ||
+                  (hover && (hover.disp.id !== activeId || hover.disp.plane !== hover.shelf));
+  hoveredId = nowHovered;
+  if (hover) {
+    // No camera jump on a switch: yanking the view while carrying something is disorienting.
+    // activeId is deliberately NOT cleared when hover is null — see its declaration.
+    activeId = hover.disp.id;
+    hover.disp.plane = hover.shelf;
+  }
+  if (changed) { paintActivePlane(); updateHeldReadout(); }
+  if (drag.index === EMPTY) return;
+
+  const disp = activeDisplay();
+  const point = displayPoint(disp, event);
+  if (!point) return;
+  const item = items[drag.index];
+  const col = columnAt(disp.g, point.x, point.z);
+
+  drag.target = null;
+  if (col) {
+    const c = col.c - ((item.w - 1) >> 1);
+    const r = col.r - ((item.h - 1) >> 1);
+    const keys = footprint(disp.g, disp.plane, c, r, item.w, item.h);
+    if (fits(disp.g, keys)) drag.target = { c, r, keys, layer: dropLayer(disp.g, keys) };
+  }
+  ghost(item);
+  refreshFloating(drag.index, point.x, point.z);
+  updateHeldReadout();
+}
+
+const FLAT_Q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+const dropMarker = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshBasicMaterial({ color: '#3f7f5a', transparent: true, opacity: 0.35, depthWrite: false })
+);
+dropMarker.visible = false;
+scene.add(dropMarker);
+
+/** The green drop shadow, laid into the target slot in the display's own orientation. */
+function ghost(item) {
+  const disp = activeDisplay();
+  const t = drag.target;
+  dropMarker.visible = !!t;
+  if (!t) return;
+  dropMarker.material.color.set(GHOST_OK);
+  const rect = slotRect(disp.g, t.c, t.r, item.w, item.h);
+  dropMarker.position.set(rect.x, baseY(disp, disp.plane, t.layer) + 0.004, rect.z).applyMatrix4(disp.frame);
+  dropMarker.quaternion.copy(disp.quat).multiply(FLAT_Q);
+  dropMarker.scale.set(rect.w * 0.96, rect.d * 0.96, 1);
+}
+
+// ---------------------------------------------------------------- moving the shop
+//
+// DISPLAYS.md rule 10: the player may pick up a whole display and put it somewhere else. Chairs
+// move by the same verb — they are shop furniture the player arranges, and having one of the two
+// things on the floor be immovable reads as a bug rather than a rule.
+//
+// This is the SHOP-LAYOUT verb, as opposed to the stock-arranging verb above, and the two share a
+// pointer, so they are separated by a mode (M) rather than by a modifier key — holding a chord down
+// while dragging furniture around is exactly the hand strain DESIGN-DECISIONS.md §7 already
+// rejected.
+//
+// Inventory needs no special handling at all: see applyTransform.
+const YAW_STEP = Math.PI / 4;   // MVP detent, per rule 10
+// At least WALL_INSET, or a shelf snaps flush to a wall and is then refused for being too close to
+// it — which leaves the display red everywhere and undroppable. Derived, never a loose number.
+const WALL_GAP = WALL_INSET + 0.02;
+const GHOST_OK = '#3f7f5a', GHOST_NO = '#a2382f';
+
+// The four walls as lines, each with the yaw that turns a display's front (local +Z) into the room.
+const WALL_LINES = [
+  { yaw: 0,            axis: 'z', at: -HALF_D },
+  { yaw: Math.PI,      axis: 'z', at:  HALF_D },
+  { yaw: Math.PI / 2,  axis: 'x', at: -HALF_W },
+  { yaw: -Math.PI / 2, axis: 'x', at:  HALF_W },
+];
+
+// A movable is a display or a chair. A display owns a slot grid and a chair does not, which is the
+// only question the four functions below ever need to ask — so it is the discriminator, rather than
+// a `type` field that could disagree with the object it is on.
+const isSeat = (m) => !m.g;
+const moveSize = (m) => (isSeat(m) ? { w: CHAIR_W, d: CHAIR_W } : gridSize(m.g));
+const movePose = (m) => ({ x: m.x, z: m.z, yaw: isSeat(m) ? m.facing : m.yaw });
+
+// `m` is what is being dragged RIGHT NOW; `sel` is what stays chosen after the release. Same shape
+// as picking up a box — the press previews and the release commits — except that furniture set down
+// stays selected, which is what gives the on-screen rotate handles something to point at.
+const mover = { m: null, sel: null, ox: 0, oz: 0, from: null, ok: true };
+const _floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const _floorHit = new THREE.Vector3();
+
+/** Where on the shop floor the pointer is. Moving furniture is a plan-view act, so this is the one
+ *  cast that does not care which display or shelf level is under the cursor. */
+function floorPoint(event) {
+  setRayFromEvent(event);
+  if (!raycaster.ray.intersectPlane(_floorPlane, _floorHit)) return null;
+  return { x: _floorHit.x, z: _floorHit.z };
+}
+
+/** Put a chair somewhere. The sim keeps its OWN copy of the seat list (makeWorld clones it, so that
+ *  occupancy lives in the sim and not in the scene), so both have to be told. */
+function applySeat(s, x, z, yaw) {
+  s.x = x; s.z = z; s.facing = yaw;
+  s.mesh.position.set(x, SEAT_H / 2, z);
+  s.mesh.rotation.y = yaw;
+  const live = world && seatById(world, s.id);
+  if (live) { live.x = x; live.z = z; live.facing = yaw; }
+}
+
+const moveApply = (m, x, z, yaw) => (isSeat(m) ? applySeat : applyTransform)(m, x, z, yaw);
+
+/**
+ * Rule 10's per-type restrictions, as a pose filter:
+ *   - a WALL SHELF stays against a wall. It snaps to the nearest one and takes that wall's facing,
+ *     so the only freedom it has is sliding along — which is what "stays against the wall" means.
+ *   - a FLOOR PILE stays on the floor, which it does by construction: its plinth height is 0 and
+ *     nothing in the move path touches Y at all.
+ *   - everything else is free in XZ, with yaw on 45° detents.
+ * A peg board would clamp to a wall the same way a shelf does, at wall height. Deferred with the
+ * rest of DISPLAYS.md type C.
+ *
+ * One rule for every movable: whatever the player has turned sits on a detent. A chair therefore
+ * snaps out of its authored decorative angle the first time it is touched, which is the honest
+ * trade for not having two different rotation rules in the same gesture.
+ */
+function constrainPose(m, x, z, yaw) {
+  yaw = Math.round(yaw / YAW_STEP) * YAW_STEP;
+  const clamp = (v, limit) => Math.max(-limit, Math.min(limit, v));
+
+  if (isSeat(m)) {
+    const edge = CHAIR_W * Math.SQRT1_2 + WALL_INSET;   // a turned chair needs its diagonal
+    return { x: clamp(x, HALF_W - edge), z: clamp(z, HALF_D - edge), yaw };
+  }
+  if (m.form !== 'wall-shelf') return { x, z, yaw };
+
+  const gap = (w) => Math.abs((w.axis === 'x' ? x : z) - w.at);
+  const wall = WALL_LINES.reduce((a, b) => (gap(b) < gap(a) ? b : a));
+  const back = (m.g.rows * CELL) / 2 + WALL_GAP;       // centre stands off by half its own depth
+  const inward = wall.at < 0 ? 1 : -1;
+  // Slide freely, but not so far that an end pokes through the wall it is running along.
+  const halfRun = (m.g.cols * CELL) / 2 + WALL_INSET;
+  return wall.axis === 'x'
+    ? { x: wall.at + inward * back, z: clamp(z, HALF_D - halfRun), yaw: wall.yaw }
+    : { x: clamp(x, HALF_W - halfRun), z: wall.at + inward * back, yaw: wall.yaw };
+}
+
+/**
+ * May this stand here? For a display, every slot it still HAS must be clear of the walls, the
+ * counter, the chairs, the doorway and every other display. Testing the slots rather than a
+ * bounding box is what lets an L-shaped display (one already carved by the counter) tuck into a
+ * spot its full rectangle would never fit — and it reuses the exact predicate the masking uses, so
+ * the two cannot disagree. A chair is just its own box.
+ *
+ * Level 0 only: the mask ignores the shelf index by construction, so every level has the same holes.
+ *
+ * ponytail: a chair is tested against a display's full RECTANGLE, not its usable slots, so a chair
+ * cannot tuck into the notch a display had carved out of it. Displays get the finer test because
+ * they are the ones that come out funny shapes.
+ */
+function canPlaceAt(m, pose) {
+  if (isSeat(m)) {
+    return boxIsClear(pose.x, pose.z, CHAIR_W * Math.SQRT1_2,
+      roomObstacles(displays, seats.filter((s) => s !== m)));
+  }
+  const probe = { ...pose, cols: m.g.cols, rows: m.g.rows };
+  const others = roomObstacles(displays.filter((o) => o !== m));
+  for (let r = 0; r < m.g.rows; r++)
+    for (let c = 0; c < m.g.cols; c++)
+      if (usableAt(m.g, 0, c, r) && !cellIsClear(probe, c, r, others)) return false;
+  return true;
+}
+
+/** The footprint preview: green where it may land, red where it may not. */
+function paintMoveGhost(m) {
+  const { w, d: depth } = moveSize(m);
+  const pose = movePose(m);
+  dropMarker.visible = true;
+  dropMarker.material.color.set(mover.ok ? GHOST_OK : GHOST_NO);
+  dropMarker.position.set(pose.x, 0.006, pose.z);
+  dropMarker.quaternion.setFromAxisAngle(UP, pose.yaw).multiply(FLAT_Q);
+  dropMarker.scale.set(w * 1.06, depth * 1.06, 1);
+}
+
+/**
+ * Move it there and say whether that was legal. It goes to the pose either way, so a blocked spot
+ * is something the player can SEE their shelf sitting in rather than an invisible wall that stops
+ * the drag dead; dropMovable() is what refuses it.
+ */
+function proposeMove(m, x, z, yaw) {
+  const pose = constrainPose(m, x, z, yaw);
+  moveApply(m, pose.x, pose.z, pose.yaw);
+  mover.ok = canPlaceAt(m, pose);
+  refreshAll();
+  paintMoveGhost(m);
+  updateHeldReadout();
+  return mover.ok;
+}
+
+/**
+ * Re-cut the holes for a display that has landed somewhere new — otherwise a shelf carved to fit
+ * beside the counter keeps that bite out of it for the rest of the game. Safe by the order it runs
+ * in: canPlaceAt has already proved every slot the display currently has is clear here, so this can
+ * only ever open holes back up, and remask() refuses to revoke an occupied slot regardless.
+ */
+function remaskDisplay(d) {
+  const probe = { x: d.x, z: d.z, yaw: d.yaw, cols: d.g.cols, rows: d.g.rows };
+  const others = roomObstacles(displays.filter((o) => o !== d));
+  remask(d.g, (s, c, r) => cellIsClear(probe, c, r, others));
+  // makeGridLines draws only the usable cells, so the lattice has to be rebuilt to match.
+  clearGroup(d.group);
+  d.lines = []; d.panels = [];
+  buildFurniture(d);
+  paintActivePlane();
+}
+
+/**
+ * Anyone stood at — or already walking to — a display that just moved goes with it. The cast tween
+ * reads the sim position live on every frame, so retargeting here makes them turn and walk after
+ * their shelf instead of miming at the empty floor it used to be on.
+ *
+ * ponytail: no re-separation, so two customers followed to the same shelf can briefly overlap.
+ * advanceRound() relaxes them apart on the next round, which is soon enough for furniture the
+ * player only moves between rounds anyway.
+ */
+function followDisplay(d) {
+  for (const npc of world?.npcs ?? []) {
+    if (npc.atDisplay !== d.id) continue;
+    npc.facing = Math.atan2(d.x - d.standAt.x, d.z - d.standAt.z);
+    npc.x = d.standAt.x;
+    npc.z = d.standAt.z;
+  }
+}
+
+/** Whoever is IN a moved chair rides it. Somebody still walking to it is left to walk — the tween
+ *  reads the sim position live, so they simply re-aim at wherever the chair ended up. */
+function followSeat(s) {
+  for (const rec of cast) {
+    if (rec.npc.seat !== s.id) continue;
+    rec.npc.x = s.x; rec.npc.z = s.z; rec.npc.facing = s.facing;
+    if (rec.moveT < 1) continue;
+    // Seated, so they move WITH the chair rather than walking to it. fromX/fromZ too, or the
+    // in-flight tween drags them straight back to where the chair used to be.
+    rec.fromX = rec.built.root.position.x = s.x;
+    rec.fromZ = rec.built.root.position.z = s.z;
+    rec.built.root.rotation.y = s.facing;
+  }
+}
+
+/** The chair under the pointer, if any. Tried before displays: a chair is small, exact to raycast,
+ *  and usually sitting on top of some display's slot plane. */
+function chairAt(event) {
+  setRayFromEvent(event);
+  return raycaster.intersectObjects(chairGroup.children, false)[0]?.object.userData.seat ?? null;
+}
+
+function grabMovable(event) {
+  const p = floorPoint(event);
+  const m = p ? (chairAt(event) ?? hoverTarget(event)?.disp) : null;
+  if (!m) { clearSelection(); return false; }   // a press on bare floor deselects and orbits
+  mover.m = m;
+  mover.from = movePose(m);
+  mover.ox = m.x - p.x;   // grab offset, so the thing does not snap its centre to the cursor
+  mover.oz = m.z - p.z;
+  if (!isSeat(m)) { activeId = hoveredId = m.id; paintActivePlane(); }
+  const pose = movePose(m);
+  proposeMove(m, pose.x, pose.z, pose.yaw);
+  return true;
+}
+
+/** Release: a legal pose sticks, an illegal one goes back where it came from. Either way the piece
+ *  stays selected, so the rotate handles are still on it. */
+function dropMovable() {
+  const m = mover.m;
+  mover.m = null;
+  if (!m) return;
+  if (!mover.ok) {
+    moveApply(m, mover.from.x, mover.from.z, mover.from.yaw);
+    mover.ok = canPlaceAt(m, mover.from);
+  } else if (isSeat(m)) {
+    followSeat(m);
+    // A chair that has moved away frees the slots it was masking out of every display near it.
+    // Safe in this direction only: canPlaceAt refused to let the chair land on a display at all,
+    // so this can add slots back but never revoke one.
+    for (const d of displays) remaskDisplay(d);
+  } else {
+    remaskDisplay(m);
+    followDisplay(m);
+  }
+  mover.sel = m;
+  paintMoveGhost(m);            // the footprint stays under the selection rather than blinking out
+  refreshAll();
+  drawDebug();
+  updateHeldReadout();
+}
+
+function clearSelection() {
+  mover.sel = null;
+  dropMarker.visible = false;
+  updateHeldReadout();
+}
+
+/**
+ * Turn by one detent. Mid-drag it just turns the thing in hand; otherwise it is its own little
+ * move, committed or reverted on the spot. Driven by Q/E and by the on-screen handles, which are
+ * the same call — so the touch path cannot drift from the keyboard one.
+ *
+ * A wall shelf will not budge: its yaw belongs to the wall it is on, which is rule 10 working
+ * rather than the button failing.
+ */
+function rotateMovable(step) {
+  const m = mover.m ?? mover.sel ?? activeDisplay();
+  if (!m) return;
+  const from = movePose(m);
+  const ok = proposeMove(m, from.x, from.z, from.yaw + step);
+  if (mover.m) return;
+  if (ok) {
+    if (!isSeat(m)) remaskDisplay(m);
+  } else {
+    moveApply(m, from.x, from.z, from.yaw);
+    mover.ok = canPlaceAt(m, from);
+  }
+  mover.sel = m;
+  refreshAll();
+  paintMoveGhost(m);
+}
+
+// ---- the on-screen rotate handles
+const rotator = document.getElementById('rotator');
+const _screen = new THREE.Vector3();
+for (const b of rotator.querySelectorAll('button')) {
+  // pointerdown, not click: onPointerDown is a window CAPTURE listener, so a click here would
+  // otherwise be preceded by the canvas handler clearing the very selection being rotated. It
+  // bails on `event.target !== renderer.domElement`, but stopping here is what makes that certain.
+  b.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    rotateMovable(Number(b.dataset.step) * YAW_STEP);
+  });
+}
+
+/** Park the handles over the selection. Projected every frame because the camera orbits freely and
+ *  a handle left behind on screen points at the wrong thing. */
+function tickRotator() {
+  const m = S.moveMode ? (mover.m ?? mover.sel) : null;
+  rotator.hidden = !m;
+  if (!m) return;
+  // Just above the piece, so the handles do not sit under the finger that is dragging it.
+  _screen.set(m.x, (isSeat(m) ? SEAT_H : (m.plinthY ?? 0)) + 0.55, m.z).project(camera);
+  rotator.style.left = `${(_screen.x * 0.5 + 0.5) * innerWidth}px`;
+  rotator.style.top = `${(-_screen.y * 0.5 + 0.5) * innerHeight}px`;
+  // Behind the camera projects to a mirrored on-screen point; hide rather than lie about it.
+  rotator.hidden = _screen.z > 1;
+}
+
+function setMoveMode(on) {
+  S.moveMode = on;
+  if (mover.m) dropMovable();
+  if (on) abortDrag();          // you cannot carry a notion and the shelf it came off at once
+  clearSelection();
+  updateHeldReadout();
+}
+
+// ---------------------------------------------------------------- held-item glow
+//
+// "Something is in your hand" needs to be visible on the ITEM, not only in the HUD — especially on
+// touch, where a finger covers the thing it just picked up.
+//
+// A slightly larger box rendered BackSide: only its rear faces draw, so it reads as a halo around
+// the item's silhouette and nowhere else. One mesh, one draw call, no shader and no post pass —
+// which matters because DESIGN-DECISIONS.md rules out an extra render target on tile-based mobile
+// GPUs, and this is exactly the effect that would otherwise want one.
+const glow = new THREE.Mesh(
+  new THREE.BoxGeometry(1, 1, 1),
+  new THREE.MeshBasicMaterial({
+    color: S.glowColor, transparent: true, opacity: 0,
+    side: THREE.BackSide, depthWrite: false,
+  }),
+);
+glow.visible = false;
+glow.renderOrder = 3;
+scene.add(glow);
+
+const _glowM = new THREE.Matrix4();
+const _glowP = new THREE.Vector3();
+const _glowQ = new THREE.Quaternion();
+const _glowS = new THREE.Vector3();
+
+/**
+ * Pulse the halo around whatever is held. Reads the item's live matrix straight out of the
+ * instanced box mesh, so it follows the drag exactly without duplicating any placement maths —
+ * including the display frame, which is already baked into that matrix.
+ */
+function tickGlow(elapsed) {
+  const on = drag.index !== EMPTY;
+  glow.visible = on;
+  if (!on || !boxes) return;
+  boxes.getMatrixAt(drag.index, _glowM);
+  _glowM.decompose(_glowP, _glowQ, _glowS);
+  const pulse = 0.5 + 0.5 * Math.sin(elapsed * S.glowSpeed * Math.PI * 2);
+  glow.position.copy(_glowP);
+  glow.quaternion.copy(_glowQ);
+  // Padded in world units rather than scaled by a factor: a 2x2 package would otherwise wear a
+  // halo twice as thick as a 1x1, and the glow would read as "bigger item" instead of "held".
+  glow.scale.copy(_glowS).addScalar(S.glowPad * (0.72 + 0.28 * pulse));
+  // Peaks fully opaque. The pulse is carried mostly by the fade rather than the size, so the halo
+  // never shrinks back far enough to stop reading as a deliberate highlight.
+  glow.material.opacity = 0.55 + 0.45 * pulse;
+}
+
+// On WINDOW in the capture phase, not on the canvas. Listeners on the same element fire in
+// registration order whatever their capture flag, and OrbitControls registered its canvas
+// pointerdown first — so capturing at window is the only way to run BEFORE it, which is what lets
+// the handler above hand this gesture to either the verb or the camera.
+addEventListener('pointerdown', onPointerDown, true);
+// Window-level, so a release outside the canvas still commits instead of stranding a held item.
+addEventListener('pointerup', onPointerUp);
+addEventListener('pointercancel', onPointerUp);   // touch interrupted (call, gesture stolen)
+// Window-level, so carrying keeps tracking even when the cursor crosses the HUD or the GUI.
+addEventListener('pointermove', onPointerMove);
+
+/** What the player is holding and where it would land — the arranging equivalent of the NPC panel. */
+function updateHeldReadout() {
+  const el = document.getElementById('held');
+  if (!el) return;
+  const disp = activeDisplay();
+  const where = disp ? `${disp.id} · plane ${disp.plane + 1}/${disp.g.shelves}` : '—';
+  if (S.moveMode) {
+    const m = mover.m ?? disp;
+    el.innerHTML =
+      `<span class="k">moving the shop</span> <b>${esc(m ? m.id : '—')}</b>` +
+      `<br /><span class="k">drag a display or a chair · ↺ ↻ or Q/E turn 45° · M to arrange stock again</span>` +
+      (mover.m
+        ? `<br /><span class="${mover.ok ? 'ok' : 'no'}">${mover.ok
+            ? 'fits here' : 'blocked — releasing puts it back'}</span>`
+        : '');
+    return;
+  }
+  if (drag.index === EMPTY) {
+    el.innerHTML = `<span class="k">arranging</span> ${where}` +
+      `<br /><span class="k">click a box to pick it up</span>`;
+    return;
+  }
+  const item = items[drag.index];
+  const ok = !!drag.target;
+  el.innerHTML =
+    `<span class="k">holding</span> <b>${esc(labelOf(item))}</b>` +
+    `<br /><span class="k">over</span> ${where}` +
+    `<br /><span class="${ok ? 'ok' : 'no'}">${ok
+      ? `drops at col ${drag.target.c}, row ${drag.target.r}, layer ${drag.target.layer + 1}`
+      : 'no room here — click puts it back'}</span>`;
+}
+
+/** Step the active display's plane, for reaching a shelf level the pointer cannot single out. */
+function setPlane(p) {
+  const disp = activeDisplay();
+  if (!disp) return;
+  disp.plane = (p + disp.g.shelves) % disp.g.shelves;
+  paintActivePlane();
+  updateHeldReadout();
+}
+
+/** The plane the player is arranging is lit; every other grid is muted. */
+function paintActivePlane() {
+  const carrying = drag.index !== EMPTY;
+  for (const disp of displays) {
+    // A floor grid lies flat across open floor, so leaving it on litters the whole room with
+    // lines. It shows only while the pointer is over it — or while it is the drop target of
+    // something being carried, which is exactly when the player needs to see the slots.
+    // Shelves and tables keep their grids on: they are small and read as furniture detail.
+    const revealed = disp.form !== 'floor' || disp.id === hoveredId || (carrying && disp.id === activeId);
+    disp.lines.forEach((lines, s) => {
+      const isActive = disp === activeDisplay() && s === disp.plane;
+      lines.visible = S.showGrid && revealed;
+      // ponytail: LineBasicMaterial.linewidth is ignored by WebGL — every line is 1px however
+      // thick you ask for. "Stronger" therefore has to come from contrast, not width: a much
+      // darker ink at full opacity against the pale floor. If genuinely fat lines are wanted,
+      // that needs three's Line2/LineMaterial addon, which is a real dependency on a fat-line
+      // shader rather than a settings change.
+      lines.material.color.set(isActive ? '#5e2408' : '#6f6456');
+      lines.material.opacity = isActive ? 1 : 0.6;
+      lines.material.transparent = !isActive;
+    });
+  }
 }
 
 // ---------------------------------------------------------------- the world
@@ -692,12 +1684,25 @@ scene.add(castGroup);
 // this only has to place items — a shelf gets more because it has three levels to fill.
 function stockDisplays() {
   items.length = 0;
+  // Size is always offered; addItem keeps it only for notions that actually have one.
+  const stock = (d, shelf, opts) => addItem(d, shelf, NOTION_NAMES[rnd(3)], pick(HOOK_SIZES_MM), opts);
+
   for (const d of displays) {
-    const n = d.kind === 'shelf' ? 14 : 10;
-    for (let i = 0; i < n; i++) {
-      // Size is always offered; addItem keeps it only for notions that actually have one.
-      addItem(d, rnd(d.g.shelves), NOTION_NAMES[rnd(3)], pick(HOOK_SIZES_MM));
+    if (d.kind === 'shelf') {
+      for (let i = 0; i < 14; i++) stock(d, rnd(d.g.shelves));
+      continue;
     }
+    // A pile is meant to be a PILE. addItem takes the first cell that FITS, so left to itself it
+    // spreads one item per cell and nothing ever stacks — however much headroom the display has.
+    // THAT, not the headroom value, is why piles looked flat. Reusing a few anchor columns builds
+    // real towers, which is also what finally gives DISPLAYS.md's "buried inventory cannot be
+    // noticed" rule something to do.
+    for (let a = 0; a < 4; a++) {
+      const c = rnd(d.g.cols), r = rnd(d.g.rows);
+      const tall = 2 + rnd(4);                     // 2-5 high, well inside PILE_HEADROOM
+      for (let i = 0; i < tall; i++) stock(d, 0, { c, r });
+    }
+    for (let i = 0; i < 4; i++) stock(d, 0);       // plus a few loose ones around them
   }
 }
 
@@ -707,16 +1712,25 @@ function stockDisplays() {
  * DISPLAYS.md gets exercised too.
  */
 function seedTargets(npcs) {
+  const unseeded = [];
   npcs.forEach((npc, i) => {
     const open = displays[i % displays.length];
     const hidden = displays[(i + 1) % displays.length];
-    addItem(open, 0, npc.target.name, npc.target.size, { avoidWall: true });
-    const buried = addItem(hidden, 0, npc.target.name, npc.target.size, { avoidWall: true });
+    const placed = addItem(open, 0, npc.target.name, npc.target.size, { avoidWall: true });
+    // Silent failure worth catching: a full or heavily masked display can refuse the seed, and the
+    // only symptom is an NPC wandering for MAX_ROUNDS and leaving empty-handed — which reads as the
+    // browse logic being broken rather than the shop having nowhere to put their hook.
+    if (placed < 0) unseeded.push(`${npc.name} wants ${labelOf(npc.target)} (no room on ${open.id})`);
+    const buried = addItem(hidden, 0, npc.target.name, npc.target.size,
+                           { avoidWall: true, shape: [1, 1] });
     if (buried >= 0) {
       const it = items[buried];
-      addItem(hidden, 0, 'darning-needle', null, { c: it.c, r: it.r });   // stacks on top of it
+      // Same footprint as the item below, or it would bridge onto neighbouring columns instead of
+      // sitting squarely on top and burying it.
+      addItem(hidden, 0, 'darning-needle', null, { c: it.c, r: it.r, shape: [it.w, it.h] });
     }
   });
+  console.assert(unseeded.length === 0, 'target seeding failed:', unseeded);
 }
 
 const NAMES = ['Marguerite', 'Bramble', 'Wilhelmina', 'Otto', 'Pernilla', 'Casimir', 'Juniper', 'Bo'];
@@ -759,8 +1773,10 @@ function spawnCast() {
     cast.push({
       npc, built, color: P.bodyColor,
       poseFrom: { ...POSES.rest }, poseTo: POSES.rest, pt: 1,
-      moveT: 1, travelled: 0, fromY: 0, toY: 0,
+      moveT: 1, travelled: 0, fromX: npc.x, fromY: 0, fromZ: npc.z, toY: 0,
+      wait: 0, dur: S.travel,
       carriedName: null, carriedMesh: null,
+      celebrate: 0, hop: 0,
     });
   }
   setViewMode(castGroup, S.view);
@@ -768,22 +1784,25 @@ function spawnCast() {
 }
 
 function restart() {
+  buildChairs(S.chairCount);      // before the displays: their slots get masked against the chairs
   buildDisplays(S.displayCount);
-  buildChairs(S.chairCount);
   stockDisplays();
   const npcs = spawnCast();
   seedTargets(npcs);
   world = makeWorld({ displays, items, room, seats });
   world.npcs = npcs;
-  for (const m of [field, edge, fieldTop, edgeTop, shadows, boxes, sizeTag, sizeTop]) m.count = items.length;
+  for (const m of [fieldTop, edgeTop, shadows, boxes, sizeTop]) m.count = items.length;
+  for (const m of [sideField, sideEdge, sizeSide]) m.count = items.length * 4;
   refreshAll();
   buildBlobs();
   drawDebug();
   drawTimer();
+  updateHeldReadout();
 }
 
 // ---------------------------------------------------------------- rounds
 let autoElapsed = 0;
+let elapsed = 0;      // seconds since load, for anything that animates on its own clock
 
 function doAdvanceRound() {
   if (!world) return;
@@ -794,9 +1813,21 @@ function doAdvanceRound() {
   for (const rec of cast) {
     const n = rec.npc;
     rec.moveT = 0;
-    rec.travelled = Math.hypot(n.x - n.from.x, n.z - n.from.z);
+    // Interpolate from where the NPC is actually DRAWN, not from where the sim says it was. With a
+    // stagger an NPC may not have set off at all when the next round lands, and n.from is already
+    // last round's destination — using it would teleport them. Reading the live transform makes an
+    // interrupted move continue from wherever it got to.
+    rec.fromX = rec.built.root.position.x;
+    rec.fromZ = rec.built.root.position.z;
     rec.fromY = rec.built.root.position.y;
+    rec.travelled = Math.hypot(n.x - rec.fromX, n.z - rec.fromZ);
     rec.toY = n.seat !== null ? S.seatLift : 0;   // rise onto the chair as they arrive at it
+    // The SIM is lockstep, but the animation must not be: a cast that sets off and arrives in
+    // unison reads as a chorus line, which is the same note crowd.html records about pose cycling.
+    // Two independent knobs, because they fix different tells — a stagger breaks up the departure,
+    // a pace difference breaks up the arrival.
+    rec.wait = Math.random() * S.travelJitter;
+    rec.dur = Math.max(S.travel * (1 + (Math.random() * 2 - 1) * S.paceJitter), 0.05);
   }
   refreshAll();       // an interaction may have bought, tidied or restacked a display
   drawDebug();
@@ -812,37 +1843,90 @@ function doAdvanceRound() {
 // It is a fixed card oriented to the HAND, not a camera-facing billboard — the same doc warns that
 // a billboard in a fist pivots independently of the fist and reads as detached. The UVs are baked
 // into the geometry rather than fed through the atlas shader, so it needs no per-instance plumbing.
-let heldMat = null;
+let heldMat = null, heldBoxMat = null, heldSizeMat = null;
 
-function makeHeldNotion(name) {
+// Matched to a shelf box so the thing in the fist is recognisably the thing off the display:
+// CELL * FILL wide, one layer tall. A customer walking out should be carrying the PACKAGE they
+// took, not a floating illustration of its contents.
+const HELD_W = CELL * FILL, HELD_H = BOX_H;
+
+/** One face of the carried package: an atlas cell baked straight into the plane's UVs. */
+function heldLabel(atlasPack, material, key, w, h) {
+  const [u0, v0, du, dv] = cellRect(atlasPack.manifest, key);
+  const geo = new THREE.PlaneGeometry(w, h);
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) * du, v0 + uv.getY(i) * dv);
+  uv.needsUpdate = true;
+  return new THREE.Mesh(geo, material);
+}
+
+function makeHeldNotion(name, size = null) {
   heldMat ??= new THREE.MeshBasicMaterial({
     map: atlas.texture, color: new THREE.Color('#241e22'),
     transparent: false, alphaTest: 0.45, side: THREE.DoubleSide,
   });
-  const [u0, v0, du, dv] = cellRect(atlas.manifest, name);
-  const geo = new THREE.PlaneGeometry(0.12, 0.12);
-  const uv = geo.attributes.uv;
-  for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) * du, v0 + uv.getY(i) * dv);
-  uv.needsUpdate = true;
+  heldBoxMat ??= new THREE.MeshStandardMaterial({ color: '#e7ddc9', roughness: 0.85, metalness: 0 });
+  heldSizeMat ??= new THREE.MeshBasicMaterial({
+    map: sizeAtlas.texture, transparent: false, alphaTest: 0.45, side: THREE.DoubleSide,
+  });
 
-  const mesh = new THREE.Mesh(geo, heldMat);
-  mesh.rotation.set(-0.5, 0, 0.35);   // tipped up out of the fist so it reads from the diorama camera
-  mesh.position.set(0, -0.02, 0.02);
-  return mesh;
+  const group = new THREE.Group();
+  const box = new THREE.Mesh(new THREE.BoxGeometry(HELD_W, HELD_H, HELD_W), heldBoxMat);
+  box.castShadow = true;
+  group.add(box);
+
+  // Top and front, which is all an orbiting diorama camera can see of something held at chest
+  // height. The shelf boxes label all four sides; a fist hides two of them, so this is not worth
+  // the extra geometry per NPC.
+  const top = heldLabel(atlas, heldMat, name, HELD_W * 0.7, HELD_W * 0.7);
+  top.rotation.x = -Math.PI / 2;
+  top.position.y = HELD_H / 2 + 0.002;
+  group.add(top);
+
+  const front = heldLabel(atlas, heldMat, name, HELD_W * 0.9, HELD_H * 0.56);
+  front.position.set(0, HELD_H * 0.12, HELD_W / 2 + 0.002);
+  group.add(front);
+
+  // A hook's millimetres are the whole point of the target, so they ride out of the shop with it.
+  if (size != null) {
+    const mm = heldLabel(sizeAtlas, heldSizeMat, size.toFixed(1), HELD_W * 0.46, HELD_H * 0.30);
+    mm.position.set(0, -HELD_H * 0.22, HELD_W / 2 + 0.003);
+    group.add(mm);
+  }
+
+  // Tipped up out of the fist so the top face reads from the diorama camera, per
+  // inventory/DESIGN-DECISIONS.md §4: oriented to the HAND, never a camera-facing billboard, which
+  // pivots independently of the fist and reads as detached.
+  group.rotation.set(-0.5, 0, 0.35);
+  group.position.set(0, -0.02, 0.02);
+  return group;
 }
+
+// Finding the thing you came for is the payoff of the whole visit, and until now the only sign of
+// it was a line in the debug panel — an NPC left looking exactly like an NPC who had given up.
+// Placeholder per P1-SPIKE-PLAN: the `delighted` pose plus a few decaying hops.
+// TODO: a real celebration beat — squash on landing, and the ear perk timed to the apex.
+const CELEBRATE_S = 1.6;
+const CELEBRATE_HOPS = 3;
+const HOP_H = 0.10;
 
 /** Show what an NPC bought, in their hand, from the round they pick it up. */
 function syncCarried(rec) {
   const want = rec.npc.carrying?.name ?? null;
   if (rec.carriedName === want) return;
+  // null -> something is the moment of the buy, and the only place in the render layer that knows
+  // it happened. Not on the way back: putting an item down is not worth a dance.
+  if (!rec.carriedName && want) rec.celebrate = CELEBRATE_S;
   rec.carriedName = want;
   if (rec.carriedMesh) {
     rec.carriedMesh.removeFromParent();
-    rec.carriedMesh.geometry.dispose();
+    // A group now, not a single plane: the box, its labels and the size sticker each own geometry.
+    // Materials are module-level and shared across every NPC, so they must NOT be disposed here.
+    rec.carriedMesh.traverse((n) => n.geometry?.dispose());
     rec.carriedMesh = null;
   }
   if (!want) return;
-  rec.carriedMesh = makeHeldNotion(want);
+  rec.carriedMesh = makeHeldNotion(want, rec.npc.carrying?.size ?? null);
   rec.built.holds[0].add(rec.carriedMesh);
   if (rec.built.held) rec.built.held.visible = false;   // hide the rig's default skein
 }
@@ -872,19 +1956,38 @@ function tickCast(dt) {
   for (const rec of cast) {
     const n = rec.npc;
 
-    if (rec.moveT < 1) {
-      rec.moveT = Math.min(1, rec.moveT + dt / Math.max(S.travel, 0.05));
+    // Undo last frame's hop before anything else reads or writes y. Both the walk tween and
+    // applyPose (via groundCharacter) rewrite y while they are running and neither is running once
+    // an NPC has settled — so adding an offset in place would be correct half the time and would
+    // launch a stationary NPC through the ceiling the other half. Removing it first composes with
+    // both, and needs no captured baseline.
+    if (rec.hop) { rec.built.root.position.y -= rec.hop; rec.hop = 0; }
+    // The buy lands in syncCarried, so read it BEFORE choosing this frame's pose or the
+    // celebration starts a frame late — visible at 60fps on a beat this short.
+    syncCarried(rec);
+
+    // Hold at the round's start position until this NPC's own stagger elapses. No position write
+    // is needed while waiting: the root is already sitting at `from`, where last round left it.
+    if (rec.wait > 0) rec.wait -= dt;
+    else if (rec.moveT < 1) {
+      rec.moveT = Math.min(1, rec.moveT + dt / (rec.dur ?? S.travel));
       const e = rec.moveT * rec.moveT * (3 - 2 * rec.moveT);
       rec.built.root.position.set(
-        n.from.x + (n.x - n.from.x) * e,
+        rec.fromX + (n.x - rec.fromX) * e,
         rec.fromY + (rec.toY - rec.fromY) * e,
-        n.from.z + (n.z - n.from.z) * e,
+        rec.fromZ + (n.z - rec.fromZ) * e,
       );
       if (rec.travelled > 0.05) rec.built.root.rotation.y = n.facing;
     }
 
-    const moving = rec.moveT < 1 && rec.travelled > 0.05;
-    const want = moving ? (n.carrying ? POSES['walk+carry'] : POSES.walk) : poseFor(n);
+    // Still waiting is NOT moving — without this they walk on the spot before setting off.
+    const celebrating = rec.celebrate > 0;
+    const moving = !celebrating && rec.wait <= 0 && rec.moveT < 1 && rec.travelled > 0.05;
+    // Delight outranks everything, including the walk. An NPC who buys as they turn away should
+    // stop and cheer; a customer gliding out mid-cheer is the tell that this is a placeholder.
+    const want = celebrating ? POSES.delighted
+      : moving ? (n.carrying ? POSES['walk+carry'] : POSES.walk)
+      : poseFor(n);
     if (want !== rec.poseTo) {
       for (const k of POSE_KEYS) rec.poseFrom[k] = blendedValue(rec, k);
       rec.poseFrom.holdItem = rec.poseTo.holdItem;
@@ -899,10 +2002,21 @@ function tickCast(dt) {
       applyPose(rec.built, blended);
     }
 
-    syncCarried(rec);
-    // applyPose re-shows the rig's own placeholder skein whenever holdItem is true, so a real
-    // carried notion has to re-hide it every frame rather than only once.
-    if (rec.carriedMesh && rec.built.held) rec.built.held.visible = false;
+    // The rig's placeholder skein is never correct in this game: a customer is either carrying the
+    // real package or carrying nothing at all. So it is forced off every frame, unconditionally,
+    // rather than only when a real notion has replaced it — applyPose turns it back on for any pose
+    // with holdItem set (carry, walk+carry), and relying on the pose to keep it off is what left
+    // every NPC holding one. It belongs to crowd.html's pose demo, not here.
+    if (rec.built.held) rec.built.held.visible = false;
+
+    if (rec.celebrate > 0) {
+      rec.celebrate = Math.max(0, rec.celebrate - dt);
+      const t = 1 - rec.celebrate / CELEBRATE_S;
+      // abs(sin) touches down between hops instead of floating; the (1 - t) taper lands them
+      // softly on the last one rather than cutting the bounce off mid-air.
+      rec.hop = Math.abs(Math.sin(t * Math.PI * CELEBRATE_HOPS)) * HOP_H * (1 - t);
+      rec.built.root.position.y += rec.hop;
+    }
 
     rec.built.root.visible = n.state !== STATE.GONE;
   }
@@ -1106,6 +2220,145 @@ function checkItemSizes() {
   console.info(`item sizes: ${items.length} items, ${sized} sized, ${wrong.length} wrong`);
 }
 
+/**
+ * Self-check: slot masking must carve displays, not delete them.
+ * The failure it catches is silent — a display whose every slot overlapped something ends up with
+ * nowhere to put anything, and simply never shows stock, which looks like a stocking bug.
+ */
+function checkSlotMasking() {
+  const report = displays.map((d) => {
+    let usable = 0, total = 0;
+    for (let s = 0; s < d.g.shelves; s++)
+      for (let r = 0; r < d.g.rows; r++)
+        for (let c = 0; c < d.g.cols; c++) { total++; if (usableAt(d.g, s, c, r)) usable++; }
+    return { id: d.id, form: d.form, usable, total };
+  });
+  const dead = report.filter((x) => x.usable === 0);
+  console.assert(dead.length === 0,
+    'slot masking: display(s) left with no usable slots', dead.map((x) => x.id));
+  const carved = report.filter((x) => x.usable < x.total);
+  console.info(`slot masking: ${carved.length} of ${report.length} displays carved` +
+    (carved.length ? ` — ${carved.map((x) => `${x.id} ${x.usable}/${x.total}`).join(', ')}` : ''));
+}
+
+/**
+ * Self-check: DISPLAYS.md rule 10. Everything the player can move can be moved and turned, stock
+ * comes with it, and the per-type restrictions hold. Runs against the live layout and restores
+ * every pose afterwards.
+ */
+function checkDisplayMoves() {
+  const fails = [];
+  const saved = [...displays, ...seats].map((m) => ({ m, ...movePose(m) }));
+  const shelf = displays.find((d) => d.form === 'wall-shelf');
+  const pile = displays.find((d) => d.kind === 'pile');
+  const chair = seats[0];
+
+  if (shelf) {
+    // "Wall shelves stay against the wall": dropped anywhere at all, one ends up on a wall,
+    // facing in.
+    for (const [x, z] of [[0, 0], [3, 0], [-3, 0], [0, 3], [0, -3], [2.5, 2.5], [-2.9, -1]]) {
+      const q = constrainPose(shelf, x, z, 0.3);
+      // Front (local +Z) must point back toward the middle of the room, not out through the wall.
+      if (Math.sin(q.yaw) * -q.x + Math.cos(q.yaw) * -q.z <= 0) fails.push(`shelf from ${x},${z} faces out`);
+      if (Math.abs(q.x) > HALF_W || Math.abs(q.z) > HALF_D) fails.push(`shelf from ${x},${z} left the room`);
+    }
+    // The bug this exists to catch: the snap put the shelf's back row inside the very wall
+    // clearance the placement test enforces, so a wall shelf was refused on EVERY wall — it
+    // snapped nicely into place and then went red, with nowhere in the shop it could be dropped.
+    let legal = 0, tried = 0;
+    for (const along of [-2, -1, 0, 1, 2])
+      for (const [x, z] of [[along, -9], [along, 9], [-9, along], [9, along]]) {
+        tried++;
+        if (canPlaceAt(shelf, constrainPose(shelf, x, z, 0))) legal++;
+      }
+    if (legal < tried * 0.5) fails.push(`wall shelf legal at only ${legal}/${tried} wall positions`);
+  }
+
+  if (pile) {
+    // Rotation is on 45° detents, whatever angle it is asked for.
+    for (const raw of [0.1, 0.9, -2.2, 3.9]) {
+      const q = constrainPose(pile, pile.x, pile.z, raw);
+      if (Math.abs(q.yaw / YAW_STEP - Math.round(q.yaw / YAW_STEP)) > 1e-9)
+        fails.push(`yaw ${raw} snapped to ${q.yaw}, not a 45° detent`);
+    }
+    // "All Inventory will stay with the move": a box on this display shifts by exactly what the
+    // display shifted by. This is the claim the whole mechanic rests on.
+    const index = items.findIndex((it) => it.display === pile.id && !it.gone && !it.held);
+    if (index >= 0 && boxes) {
+      const m = new THREE.Matrix4(), before = new THREE.Vector3(), after = new THREE.Vector3();
+      boxes.getMatrixAt(index, m); before.setFromMatrixPosition(m);
+      applyTransform(pile, pile.x + 0.5, pile.z - 0.25, pile.yaw);
+      refresh(index);
+      boxes.getMatrixAt(index, m); after.setFromMatrixPosition(m);
+      if (Math.abs(after.x - before.x - 0.5) > 1e-6 || Math.abs(after.z - before.z + 0.25) > 1e-6)
+        fails.push(`stock did not travel with ${pile.id}`);
+    }
+    if (canPlaceAt(pile, { x: HALF_W + 1, z: 0, yaw: 0 })) fails.push('a display outside the room was allowed');
+    if (canPlaceAt(pile, { x: COUNTER.x, z: COUNTER.z, yaw: 0 })) fails.push('a display inside the counter was allowed');
+    if (canPlaceAt(pile, { x: 0, z: HALF_D - 0.45, yaw: 0 })) fails.push('a display across the doorway was allowed');
+  }
+
+  if (chair) {
+    // A chair is free on the floor, so it must have somewhere to go — and must still be refused
+    // inside the counter and on top of a display.
+    if (!canPlaceAt(chair, constrainPose(chair, chair.x, chair.z, chair.facing)))
+      fails.push('a chair is illegal where it already stands');
+    if (canPlaceAt(chair, { x: COUNTER.x, z: COUNTER.z, yaw: 0 })) fails.push('a chair inside the counter was allowed');
+    if (pile && canPlaceAt(chair, { x: pile.x, z: pile.z, yaw: 0 })) fails.push('a chair on top of a display was allowed');
+    if (canPlaceAt(chair, constrainPose(chair, 99, 99, 0)) === false) fails.push('a chair cannot reach the room corner');
+    // Both the scene and the SIM's own copy of the seat list have to follow it.
+    applySeat(chair, chair.x + 0.3, chair.z, chair.facing);
+    if (Math.abs(chair.mesh.position.x - chair.x) > 1e-9) fails.push('chair mesh did not follow the seat');
+    const live = world && seatById(world, chair.id);
+    if (live && Math.abs(live.x - chair.x) > 1e-9) fails.push('the sim did not learn the chair moved');
+  }
+
+  for (const s of saved) moveApply(s.m, s.x, s.z, s.yaw);
+  refreshAll();
+  console.assert(fails.length === 0, 'display moves:', fails);
+  console.info(`display moves: ${fails.length ? `${fails.length} FAILED` : 'ok'}`);
+}
+
+/**
+ * Self-check: nobody walks in holding anything, and the thing they DO hold can still be hidden.
+ *
+ * Not visible as a crash, and not visible as a wrong flag either: the rig hid its placeholder
+ * skein exactly as intended (`held.visible = false`), and then mergeCharacter lifted that skein's
+ * meshes OUT of the hidden group and re-parented them into the always-visible joint. Every NPC
+ * walked in holding one, so "is this customer carrying something?" — the only read the player gets
+ * on whether a visit succeeded — was stuck on yes.
+ */
+function checkHeldItem() {
+  const fails = [];
+  // Nobody starts a visit carrying, in the sim or on screen.
+  for (const rec of cast) {
+    if (rec.npc.carrying) fails.push(`${rec.npc.name} spawned carrying ${labelOf(rec.npc.carrying)}`);
+    if (rec.built.held?.visible) fails.push(`${rec.npc.name} spawned with the skein showing`);
+    if (rec.carriedMesh) fails.push(`${rec.npc.name} spawned with a notion in hand`);
+  }
+  // And the skein survives the merge as its own hideable subtree, at the quality setting that
+  // actually merges — testing with merging off would have passed throughout the bug.
+  const kit = getSpecies(speciesIds()[0]);
+  const probe = createCharacter(
+    { ...structuredClone(kit.defaults), holdItem: true, mergeMeshes: true }, kit);
+  let meshes = 0;
+  probe.held?.traverse((n) => { if (n.isMesh) meshes++; });
+  if (!meshes) fails.push('the held item was merged away — .visible can no longer hide it');
+  probe.held.visible = false;
+  let shown = 0;
+  probe.root.traverse((n) => { if (n.isMesh && n.visible && !isUnder(n, probe.held)) shown++; });
+  if (!shown) fails.push('hiding the held item hid the whole character');
+  disposeCharacter(probe);
+
+  console.assert(fails.length === 0, 'held item:', fails);
+  console.info(`held item: ${fails.length ? `${fails.length} FAILED` : `ok (${meshes} mesh in hand, hideable)`}`);
+}
+
+const isUnder = (node, ancestor) => {
+  for (let n = node; n; n = n.parent) if (n === ancestor) return true;
+  return false;
+};
+
 function frameRoom() {
   const box = new THREE.Box3(
     new THREE.Vector3(-HALF_W, 0, -HALF_D),
@@ -1144,6 +2397,8 @@ gui.add({ f: doAdvanceRound }, 'f').name('advance round  (Space)');
 gui.add({ f: restart }, 'f').name('restart visit  (R)');
 gui.add(S, 'autoSeconds', 2, 60, 1).name('auto interval (s)');
 gui.add(S, 'travel', 0.2, 4, 0.1).name('travel anim (s)');
+gui.add(S, 'travelJitter', 0, 2, 0.05).name('start stagger (s)');
+gui.add(S, 'paceJitter', 0, 0.6, 0.05).name('pace variation (±)');
 gui.add(S, 'seatLift', 0, 0.35, 0.005).name('seated height').onChange(() => {
   for (const rec of cast) {
     if (rec.npc.seat !== null) { rec.toY = S.seatLift; rec.built.root.position.y = S.seatLift; }
@@ -1165,6 +2420,10 @@ gPerf.add(S, 'shadows').name('shadow map').onChange((v) => { renderer.shadowMap.
 const gLook = gui.addFolder('look');
 gLook.add(S, 'view', ['felted', 'grey', 'silhouette']).onChange((v) => setViewMode(castGroup, v));
 gLook.add(S, 'showGrid').name('grid lines  (G)').onChange(paintGrids);
+gui.add(S, 'moveMode').name('move displays  (M)').onChange(setMoveMode);
+gLook.addColor(S, 'glowColor').name('held glow').onChange((v) => glow.material.color.set(v));
+gLook.add(S, 'glowSpeed', 0.2, 2.5, 0.1).name('glow pulse (Hz)');
+gLook.add(S, 'glowPad', 0.005, 0.15, 0.005).name('glow thickness');
 gLook.add(S, 'exposure', 0.1, 2, 0.01).onChange((v) => (renderer.toneMappingExposure = v));
 gLook.add(S, 'toneMapping', ['AgX', 'ACES', 'None']).onChange((v) => (renderer.toneMapping = TONE_MAPPING[v]));
 gui.add({ f: frameRoom }, 'f').name('frame room  (F)');
@@ -1181,6 +2440,18 @@ addEventListener('keydown', (e) => {
   if (k === 'r') restart();
   if (k === 'f') frameRoom();
   if (k === 'g') { S.showGrid = !S.showGrid; paintGrids(); }
+  if (k === 'm') setMoveMode(!S.moveMode);
+  if (S.moveMode && (k === 'q' || k === 'e')) rotateMovable(k === 'q' ? -YAW_STEP : YAW_STEP);
+  if (e.key === '[') setPlane(activeDisplay().plane - 1);
+  if (e.key === ']') setPlane(activeDisplay().plane + 1);
+  // Cycle which display the player is arranging, for the ones the pointer struggles to hit.
+  if (k === 'tab') {
+    e.preventDefault();
+    const i = displays.findIndex((d) => d.id === activeId);
+    activeId = displays[(i + 1) % displays.length].id;
+    paintActivePlane();
+    updateHeldReadout();
+  }
   if (k === 'b') renderer.domElement.classList.toggle('squint');
   if (e.code === 'Space') { e.preventDefault(); doAdvanceRound(); }
   gui.controllersRecursive().forEach((c) => c.updateDisplay());
@@ -1197,18 +2468,20 @@ const clock = new THREE.Clock();
 
 loadAtlas(ATLAS_URL).then((loaded) => {
   atlas = loaded;
-  field = makeField(atlas.texture, CAPACITY, { unlit: true, shade: 0.28 });
-  edge = makeEdge(field, '#1b1418');
-  edge.material.userData.uniforms.uGrow.value = 1.07;
+  // 4x capacity: instance index*4 + k is face k of item `index`. One mesh, one draw call, four
+  // labelled sides — see paintInstance.
+  sideField = makeField(atlas.texture, CAPACITY * 4, { unlit: true, shade: 0.28 });
+  sideEdge = makeEdge(sideField, '#1b1418');
+  sideEdge.material.userData.uniforms.uGrow.value = 1.07;
   fieldTop = makeField(atlas.texture, CAPACITY, { unlit: true, shade: 0.28 });
   edgeTop = makeEdge(fieldTop, '#1b1418');
   edgeTop.material.userData.uniforms.uGrow.value = 1.07;
   shadows = makeShadows(CAPACITY);
   boxes = makeBoxes(CAPACITY, '#e7ddc9');
   sizeAtlas = makeSizeAtlas(HOOK_SIZES_MM.map((mm) => mm.toFixed(1)));
-  sizeTag = makeField(sizeAtlas.texture, CAPACITY, { unlit: true, shade: 0 });
+  sizeSide = makeField(sizeAtlas.texture, CAPACITY * 4, { unlit: true, shade: 0 });
   sizeTop = makeField(sizeAtlas.texture, CAPACITY, { unlit: true, shade: 0 });
-  scene.add(field, edge, fieldTop, edgeTop, shadows, boxes, sizeTag, sizeTop);
+  scene.add(sideField, sideEdge, fieldTop, edgeTop, shadows, boxes, sizeSide, sizeTop);
 
   setGeometryDetail(S.detail);
   paintGrids();
@@ -1216,10 +2489,17 @@ loadAtlas(ATLAS_URL).then((loaded) => {
   frameRoom();
   checkWallCulling();
   checkItemSizes();
+  checkSlotMasking();
+  checkDisplayMoves();
+  checkHeldItem();
 
   renderer.setAnimationLoop(() => {
     const dt = Math.min(clock.getDelta(), 0.1);
+    elapsed += dt;   // accumulated here rather than via clock.getElapsedTime(), which would call
+                     // getDelta() a second time and halve every dt the rest of the loop sees
     tickCast(dt);
+    tickGlow(elapsed);
+    tickRotator();
 
     if (autoBox.checked && world && world.npcs.some((n) => n.state !== STATE.GONE)) {
       autoElapsed += dt;

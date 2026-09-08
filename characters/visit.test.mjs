@@ -5,11 +5,11 @@
 // the buy/rearrange branch, and the hardcoded closeout order.
 
 import assert from 'node:assert/strict';
-import { makeDisplay, footprint, place } from '../inventory/grid.js';
+import { makeDisplay, footprint, place, topAt } from '../inventory/grid.js';
 import {
   TRAITS, randomTraits, maxWips, maxRounds, ACTION, STATE, CLOSEOUT_SEQUENCE,
   makeNpc, makeWorld, advanceRound, browseActionSet, DetermineNextBrowseAction,
-  interact, noticeable, buyableTargets, visibleTo, labelOf, inDoorway, seatById,
+  interact, noticeable, buyableTargets, visibleTo, labelOf, inDoorway, seatById, fullyExposed,
 } from './visit.js';
 
 // A deterministic stand-in for Math.random, so a test asserts behaviour and not luck.
@@ -236,6 +236,48 @@ function fixture({ rng = seq(0.5), traits, seats = SEATS } = {}) {
   assert.equal(interact(npc, pile, world), 'complete', 'the next interaction buys it');
   assert.ok(items[buried].gone, 'the purchase removes the item from the display');
   assert.deepEqual(npc.carrying, { name: 'crochet-hook', size: 4.5 }, 'and the NPC carries it out');
+}
+
+// --- a multi-cell package is exposed only when ALL its columns are clear ----
+{
+  const { world, pile, items, npc, add } = fixture();
+  // a 2x1 bridging columns 0 and 1
+  const wide = items.length;
+  const keys = footprint(pile.g, 0, 0, 0, 2, 1);
+  items.push({ name: 'crochet-hook', size: 4.5, display: 'pile', shelf: 0, c: 0, r: 0, w: 2, h: 1,
+               keys, layer: place(pile.g, keys, wide), gone: false, held: false });
+
+  assert.ok(fullyExposed(pile, items, wide), 'nothing on it yet, so it is exposed');
+  assert.ok(noticeable(pile, items, wide), 'and noticeable');
+
+  add(pile, 0, 0, 0, 'darning-needle', null);   // lands on column 0 only, half-burying the 2x1
+  assert.equal(topAt(pile.g, 0, 1, 0), wide, 'it is still the top of its OTHER column');
+  assert.ok(!fullyExposed(pile, items, wide), 'but half of it is buried, so it is not exposed');
+  assert.ok(!noticeable(pile, items, wide),
+    'a partly buried package cannot be noticed — an anchor-cell-only test would wrongly say it can');
+  assert.equal(buyableTargets(pile, items, npc.target).length, 0, 'and cannot be bought');
+}
+
+// --- a deep package straddles the wall row and stays sellable ---------------
+{
+  const { shelf, items } = fixture();
+  const deep = items.length;
+  const keys = footprint(shelf.g, 0, 0, 0, 1, 2);   // rows 0 and 1; row 0 is the wall
+  items.push({ name: 'crochet-hook', size: 4.5, display: 'shelf', shelf: 0, c: 0, r: 0, w: 1, h: 2,
+               keys, layer: place(shelf.g, keys, deep), gone: false, held: false });
+  assert.ok(noticeable(shelf, items, deep),
+    'part of it reaches the outside face, so the wall-row rule must not hide the whole package');
+}
+
+// --- an item in the player's hand is invisible to NPCs ----------------------
+{
+  const { pile, items, npc, add } = fixture();
+  const idx = add(pile, 0, 0, 0, 'crochet-hook', 4.5);
+  assert.equal(buyableTargets(pile, items, npc.target).length, 1, 'on the display it is buyable');
+  items[idx].held = true;
+  assert.ok(!noticeable(pile, items, idx), 'held by the player, it is not on the display at all');
+  assert.equal(buyableTargets(pile, items, npc.target).length, 0,
+    'so an NPC cannot buy it out of the hand');
 }
 
 // --- a shelf never sells off its wall-facing row ----------------------------

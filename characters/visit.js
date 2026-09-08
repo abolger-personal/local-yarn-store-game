@@ -205,9 +205,19 @@ export function visibleTo(world, from, display) {
 
 // ---------------------------------------------------------------- display contents
 
+/**
+ * An item is in play only if it is still in the shop AND not currently in the player's hand.
+ *
+ * `held` is the player picking something up. It matters to the SIM, not just the renderer: a held
+ * item has been lifted out of its grid column, so an NPC who tidied around it would place things
+ * into a slot the player is about to drop into, and an NPC who "bought" it would take it out of a
+ * hand. While carried, it is simply not on the display.
+ */
+const available = (it) => !it.gone && !it.held;
+
 const onPlane = (display, items, shelf) =>
   items.map((it, i) => [it, i])
-       .filter(([it]) => !it.gone && it.display === display.id && it.shelf === shelf)
+       .filter(([it]) => available(it) && it.display === display.id && it.shelf === shelf)
        .map(([, i]) => i);
 
 const matchesTarget = (item, target) =>
@@ -218,25 +228,49 @@ const matchesTarget = (item, target) =>
  *   Pile:  only the TOP of a 2.5D stack can be noticed. Buried is invisible.
  *   Shelf: must be on an OUTSIDE face. The wall-facing row never counts.
  */
+/**
+ * Is this item the top of EVERY column it covers?
+ *
+ * A multi-cell package can bridge two columns and then have something stacked on just one half —
+ * `place()` drops the newcomer onto that column alone. The item is then still the "top" of its
+ * other column, which makes a single anchor-cell test say it is exposed when half of it is buried.
+ *
+ * Two things depend on getting this right, which is why it lives here rather than in either caller:
+ *   - NPCs, per DISPLAYS.md: partly buried inventory cannot be noticed or bought.
+ *   - The player's pick: `lift()` pops the top of every column the footprint covers, so lifting a
+ *     half-buried package silently evicts whatever was resting on it.
+ */
+export function fullyExposed(display, items, index) {
+  const item = items[index];
+  for (let dr = 0; dr < (item.h ?? 1); dr++)
+    for (let dc = 0; dc < (item.w ?? 1); dc++)
+      if (topAt(display.g, item.shelf, item.c + dc, item.r + dr) !== index) return false;
+  return true;
+}
+
 export function noticeable(display, items, index) {
   const item = items[index];
-  if (!item || item.gone) return false;
-  if (topAt(display.g, item.shelf, item.c, item.r) !== index) return false;
-  if (display.kind === 'shelf' && item.r === display.wallRow) return false;
+  if (!item || !available(item)) return false;
+  if (!fullyExposed(display, items, index)) return false;
+  // DISPLAYS.md: on a shelf, only inventory on an OUTSIDE face can be noticed, and the wall-facing
+  // row is not one. A multi-row package straddles both — part of it IS on the outside face — so it
+  // is hidden only when its ENTIRE footprint sits in the wall row.
+  const rowsCovered = item.h ?? 1;
+  if (display.kind === 'shelf' && item.r === display.wallRow && rowsCovered === 1) return false;
   return true;
 }
 
 /** Every index on this display that satisfies the NPC's target formation AND can be noticed. */
 export const buyableTargets = (display, items, target) =>
   items.reduce((acc, it, i) => {
-    if (!it.gone && it.display === display.id && matchesTarget(it, target) &&
+    if (available(it) && it.display === display.id && matchesTarget(it, target) &&
         noticeable(display, items, i)) acc.push(i);
     return acc;
   }, []);
 
 /** Present on the display at all, buried or not. What makes a display worth walking to. */
 export const holdsTarget = (display, items, target) =>
-  items.some((it) => !it.gone && it.display === display.id && matchesTarget(it, target));
+  items.some((it) => available(it) && it.display === display.id && matchesTarget(it, target));
 
 // ---------------------------------------------------------------- attractiveness
 //

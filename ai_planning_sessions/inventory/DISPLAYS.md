@@ -12,11 +12,15 @@ Gameplay mechanics:
 
 9. An NPC may RESTRUCTURE a given display (Spread, Tidy or Rearrange - see the per-type scoring rules below) at most ONCE per visit. After that, further interactions with the same display can only Buy or Look.
 
+10. The Player may MOVE entire displays whereever they want as long as it follows the rules of: peg boards stay on the wall, floor piles stay on the floor, and wall shelves stay against the wall. All Inventory will stay with the move. Displays may be rotated as well. For MVP, rotations may be every 45 degrees. 
+
    This is the rule that makes "Interaction Not Complete" terminate. The restructure happens, the NEXT round's interaction resolves into a Buy or a Look, and the NPC moves on. Without it, an NPC with an Orderliness of 1 or 5 re-tidies the same display every single round forever, because "Interaction Not Complete" prescribes another interaction with that same display.
 
    The budget is per NPC per display: a second NPC can still restructure a display the first one has already touched, and an NPC who leaves and comes back on a later visit starts fresh.
 
-10. Interaction psuedocode routine for action inside a round:  
+10. The Player may MOVE entire displays whereever they want as long as it follows the rules of: peg boards stay on the wall, floor piles stay on the floor, and wall shelves stay against the wall. All Inventory will stay with the move. Displays may be rotated as well. For MVP, rotations may be every 45 degrees.
+
+11. Interaction psuedocode routine for action inside a round:  
 if (can Buy from pile): 
   NPC picks up all parts of visiable Inventory as part of round animation (MVP: 'bend,'reach', 'carry')
   Inventory removed from display 
@@ -64,9 +68,6 @@ Interaction scoring rules in order of satisfying:
   NPC with an Assertiveness attribute > 4 will "Rearrange" a stack in place to move an item or formation they want to the edge of the stack, thus satisfying the "Buy" condition. Remaining items should get randomly ordered, but pushed to the X+ edge. 
   
   
-
 C. Peg Board (NOT PART OF MVP, DEFER)
 
-❯ Also, shelves look ok, now it's time to start experiementing with other display options. I want a wall-display style for the user to use. We can call this a "peg board".  This effectively is just a 90 degree
-  rotated shelf, but with additional restrictions for where items can be placed.  I also want the player to be able to move something from a shelf to a wall display and have the orientation work properly.
-  Visually the wall display also has an additional mechanic: there should be a "hook" that sticks out as far as the headroom allows in the top-center of some grid squares
+A wall-display style for the user to use is an extension of the Table Pile, with a 90 degree orientation: it goes on a wall.  We can call this a "peg board".  It has additional restrictions for where items can be placed, as visually this wall display has an additional mechanic: there should be a "hook" that sticks out as far as the headroom allows in the top-center of some grid squares, indicating where a user can "hang" merchandise boxes or cylinders of yarn

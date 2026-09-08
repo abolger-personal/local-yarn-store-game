@@ -7,11 +7,18 @@
 //   ai_planning_sessions/characters/CHARACTER-VISIT.md       round loop, action set, prescriptions
 //   ai_planning_sessions/characters/CHARACTER-ATTRIBUTES.md  the 10 trait assets
 //   ai_planning_sessions/inventory/DISPLAYS.md               what happens inside one interaction
+//   ai_planning_sessions/characters/WIP-AND-FINISHED-OBJ-FORMATION.md   what they are shopping FOR
+//   ai_planning_sessions/characters/WEARABLE-FINISHED-OBJ.md            what happens to what they make
 //
 // Where a spec section is blank or undefined, the placeholder is marked `TODO(spec)` and listed in
 // VISIT-POC-TODO.md rather than being quietly invented and forgotten.
 
 import { EMPTY, footprint, fits, place, topAt, clearShelf, usableAt } from '../inventory/grid.js';
+import {
+  WIP_STATE, WEAR_SLOTS, makeCraftPrefs, makeWip, wantsOf, wantFor, stow, workRound,
+  wearOrOffer, finishedOf, everythingMade, photoSubject, lend, slotFor, describeWip,
+} from './wip.js';
+import { labelOf as labelItem, TOOL_NOTIONS } from '../inventory/catalog.js';
 
 // ---------------------------------------------------------------- traits
 //
@@ -91,12 +98,20 @@ export const STATE = Object.freeze({
 
 // ---------------------------------------------------------------- npc record
 
-export function makeNpc({ id, name, species, target, traits, rng = Math.random }) {
+export function makeNpc({ id, name, species, target, traits, prefs, rng = Math.random }) {
   const t = traits ?? randomTraits(rng);
-  return {
+  // "personal craft preferences completely unrelated to personality" — rolled from their own
+  // stream, not derived from the traits above, because CHARACTER-ATTRIBUTES.md says so.
+  const p = prefs ?? makeCraftPrefs(rng);
+  // Every NPC arrives mid-project. WIP-AND-FINISHED-OBJ-FORMATION.md's initialisation rules are
+  // what make an NPC arrive needing something specific, which is what gives them a reason to shop.
+  const wips = Array.from({ length: 1 + Math.floor(rng() * 3) },
+                          (_, i) => makeWip(`WIP ${i + 1}`, t, p, rng));
+  const npc = {
     id, name, species,
     traits: t,
-    target,                       // the target formation: one notion. { name, size }
+    prefs: p,                     // { skill, crafts, materials, weights }
+    target,                       // headline want, for the debug panel — see matchesAnyWant
     state: STATE.QUEUED,
     x: 0, z: 0,                   // centroid at the END of the round just resolved
     from: { x: 0, z: 0 },         // where it was at the start of it, so the scene can interpolate
@@ -107,24 +122,32 @@ export function makeNpc({ id, name, species, target, traits, rng = Math.random }
     lastAction: null,             // the round before that — the "Round N-1" the spec keeps citing
     prescribed: null,             // { type, params } forced for the NEXT round, or null
     atDisplay: null,
-    // TODO(spec): WIPs are a placeholder count. The real model (P5) carries a pattern, yarn and
-    // progress. Only the COUNT matters to the browse set today: more WIPs, more chance of the
-    // "work on a WIP" action being drawn.
-    wips: Array.from({ length: 1 + Math.floor(rng() * 3) }, (_, i) => `WIP ${i + 1}`),
-    // CHARACTER-VISIT.md's closeout turns on whether an NPC HAS a finished object — either one
-    // they brought with them or one they completed during the visit.
-    // TODO(spec): neither the chance of arriving with one nor the chance of finishing one is
-    // specified. Both are placeholders here, shaped so that CHARACTER-ATTRIBUTES.md's stated goal
-    // holds — keeping NPCs in the store longer should produce more Finished Objects.
-    finished: rng() < 0.3 ? ['a finished object from home'] : [],
-    carrying: null,               // the notion once bought — CHARACTER-VISIT has them leave with it
+    wips,
+    // WEARABLE-FINISHED-OBJ.md: four clothing slots. An NPC wears what they make by default and
+    // only lends the overflow, so this is what decides whether the Drop Off step happens at all.
+    worn: Object.fromEntries(WEAR_SLOTS.map((s) => [s, null])),
+    // The item currently being turned over. DISPLAYS.md makes buying a two-round beat: consider in
+    // one round, buy in the next.
+    considering: null,
+    bought: [],                   // everything they have picked up this visit
+    carrying: null,               // the most recent of those, for the hand and the HUD
     path: [],                     // this round's waypoints, last one is the destination
     seat: null,                   // id of the seat this NPC currently occupies, or null
     restructured: [],             // displays this NPC has already tidied/spread/dug through
     closeoutStep: 0,
     closeout: [],                 // the steps this visit will actually take, fixed when it starts
+    toLend: [],                   // finished objects with no free clothing slot — the shop's share
+    // Small flags the Guestbook entry is written from. Kept as state rather than derived at
+    // signing time because none of them can be reconstructed afterwards.
+    chatted: false,
+    satAndWorked: false,
+    stormedOut: false,
+    // Set the moment they buy anything or get some crafting done; read when they walk out.
+    willReturn: false,
+    visits: 1,                    // how many times this customer has been in
     note: '',                     // one line of "why", for the debug panel
   };
+  return npc;
 }
 
 // ---------------------------------------------------------------- world
@@ -149,6 +172,12 @@ export function makeWorld({ displays, items, room, seats = [], rng = Math.random
     // it as a book yet.
     guestbook: [],
     dropOff: [],
+    // WEARABLE-FINISHED-OBJ.md: handing a borrowed object back to its maker displaces whatever they
+    // were already wearing, which "[goes] in a pile in the shop behind the guestbook".
+    backPile: [],
+    // CHARACTER-VISIT.md: customers who bought something or got some crafting done are worth
+    // coming back. This is the shop's regulars.
+    returning: [],
     rng,
     log: [],
   };
@@ -413,6 +442,14 @@ const matchesTarget = (item, target) =>
   item.name === target.name && (target.size == null || item.size === target.size);
 
 /**
+ * What this NPC is shopping for is now a PROPERTY OF THEIR PROJECTS, not a single hardcoded notion:
+ * WIP-AND-FINISHED-OBJ-FORMATION.md gives every open WIP slot a list of wants, and an NPC with a
+ * pattern and no yarn is looking for yarn. `npc.target` survives as the headline want — what the
+ * debug panel shows and what attractiveness weighs — but the buy rule asks this.
+ */
+const matchesAnyWant = (npc, item) => wantFor(npc, item) !== null;
+
+/**
  * DISPLAYS.md "Interaction Buy scoring", per display type.
  *   Pile:  only the TOP of a 2.5D stack can be noticed. Buried is invisible.
  *   Shelf: must be on an OUTSIDE face. The wall-facing row never counts.
@@ -457,6 +494,17 @@ export const buyableTargets = (display, items, target) =>
     return acc;
   }, []);
 
+/**
+ * Everything on this display that the NPC's open WIP slots want AND that is accessible — the
+ * "accessible items (Top Z+ layers) match a want" of DISPLAYS.md's consideration rule.
+ */
+export const consideredHere = (npc, display, items) =>
+  items.reduce((acc, it, i) => {
+    if (available(it) && it.display === display.id && noticeable(display, items, i) &&
+        wantFor(npc, it)) acc.push(i);
+    return acc;
+  }, []);
+
 /** Present on the display at all, buried or not. What makes a display worth walking to. */
 export const holdsTarget = (display, items, target) =>
   items.some((it) => available(it) && it.display === display.id && matchesTarget(it, target));
@@ -471,8 +519,11 @@ export const holdsTarget = (display, items, target) =>
 export function attractiveness(npc, display, items) {
   const t = npc.traits;
   let a = 0.20;
-  if (holdsTarget(display, items, npc.target)) a += 0.45;   // it has what they came for
-  if (buyableTargets(display, items, npc.target).length) a += 0.10;   // and it is right there
+  // "What they came for" is now everything their open WIP slots need, so a display holding the
+  // yarn for a half-finished sweater pulls as hard as one holding the hook.
+  const wanted = items.some((it) => available(it) && it.display === display.id && matchesAnyWant(npc, it));
+  if (wanted) a += 0.45;
+  if (consideredHere(npc, display, items).length) a += 0.10;   // and it is right there on top
   a += 0.10 * (t.Openness / 5);                             // browses for the pleasure of it
   a += 0.10 * (t.Intellect / 5);
   // An orderly NPC is drawn to a neat display; a messy one does not care either way.
@@ -520,14 +571,20 @@ export function browseActionSet(npc, world, snapshot) {
   // You cannot work on a project standing in the middle of the shop, so an NPC who is not already
   // sitting has to go and find a chair first — the same walk-then-do shape as a display. The
   // per-WIP duplication stays, it just weights the walk instead of the work.
+  // A finished object is not something you sit down and work on, so only live slots weight the
+  // draw. Params carry `wip.id`, not the object: an action travels through the debug panel and
+  // through a prescription, and a whole WIP in there is a snapshot that can go stale.
+  const workable = npc.wips.filter((w) => w.state !== WIP_STATE.FINISHED);
   if (npc.seat !== null) {
-    for (const wip of npc.wips) set.push({ type: ACTION.WORK_ON_WIP, params: { wip, seatId: npc.seat } });
+    for (const wip of workable) {
+      set.push({ type: ACTION.WORK_ON_WIP, params: { wip: wip.id, seatId: npc.seat } });
+    }
   } else {
     const open = freeSeats(world, npc);
     if (open.length) {
       const nearest = open.reduce((m, s) => (dist2(npc, s) < dist2(npc, m) ? s : m));
-      for (const wip of npc.wips) {
-        set.push({ type: ACTION.WALK_TO_SEAT, params: { wip, seatId: nearest.id } });
+      for (const wip of workable) {
+        set.push({ type: ACTION.WALK_TO_SEAT, params: { wip: wip.id, seatId: nearest.id } });
       }
     }
   }
@@ -597,16 +654,16 @@ function rebuildPlane(display, items, shelf, order, { spread = false } = {}) {
     for (let attempt = 0; attempt < cells.length; attempt++) {
       const cell = cells[(cursor + attempt) % cells.length];
       const keys = footprint(g, shelf, cell.c, cell.r, item.w, item.h);
-      if (!fits(g, keys)) continue;
+      if (!fits(g, keys, item.layers ?? 1)) continue;
       item.c = cell.c; item.r = cell.r; item.keys = keys;
-      item.layer = place(g, keys, index);
+      item.layer = place(g, keys, index, item.layers ?? 1);
       if (spread) cursor = (cursor + attempt + 1) % cells.length;   // one per column: flatten
       placed = true;
       break;
     }
     // ponytail: a plane with no room left keeps the item's old slot record, which the renderer
     // still draws. Only reachable if headroom is set absurdly low; revisit if it shows up.
-    if (!placed) item.layer = place(g, item.keys, index);
+    if (!placed) item.layer = place(g, item.keys, index, item.layers ?? 1);
   }
 }
 
@@ -618,37 +675,59 @@ export function interact(npc, display, world) {
   const items = world.items;
   const t = npc.traits;
 
-  // if (can Buy from pile)
-  const buyable = buyableTargets(display, items, npc.target);
-  if (buyable.length) {
-    const index = buyable[0];
-    const item = items[index];
-    item.gone = true;                      // "Inventory removed from display"
-    rebuildPlane(display, items, item.shelf,
-                 onPlane(display, items, item.shelf));   // the stack settles into the gap
-    npc.carrying = { name: item.name, size: item.size };
-    say(world, npc, `picked up ${labelOf(npc.target)} — target formation satisfied`);
-    return 'complete';
-  }
-
-  // CHARACTER-VISIT.md: "Volatility=5: an interaction with a Noticed Display that does not result
-  // in finding what they need will reduce original calculation of MAX_ROUNDS to 1, causing NPC to
-  // leave immediately." Everything below this point is a non-buy, so this is the one place it goes.
+  // --- "if (can Buy from pile)" -------------------------------------------------------------
   //
-  // NOTE(spec): read literally, that includes an interaction that RESTRUCTURES the display — a
-  // tidy or a dig sets up a buy next round but does not itself find anything. So a Volatility 5
-  // shopper storms out having just rearranged a shelf, which is in character but does mean the
-  // restructure never pays off for them. Flag if the intent was the terminal "looked, nothing
-  // doing" outcome only.
-  if (t.Volatility === 5 && npc.maxRounds > 1) {
-    npc.maxRounds = 1;
-    say(world, npc, `Volatility 5 — no luck at the ${display.id}, MAX_ROUNDS cut to 1`);
+  // DISPLAYS.md now gates the buy on the PREVIOUS round: "An item will be *bought* if it was
+  // *considered* in the previous round AND the consideration interaction came back 'true'."
+  // So buying is no longer something that can happen the instant an NPC walks up — they pick a
+  // thing up, turn it over, and decide next round. That deliberate beat is the whole point of the
+  // new mechanic, and it is why `npc.considering` is state rather than a local.
+  //
+  // MVP: "100% of considered items will be purchased. Later this wont be true."
+  const pending = npc.considering;
+  if (pending && pending.displayId === display.id && available(items[pending.index]) &&
+      noticeable(display, items, pending.index)) {
+    const index = pending.index;
+    const item = items[index];
+    const want = wantFor(npc, item);
+    npc.considering = null;
+    if (want) {
+      item.gone = true;                      // "Inventory removed from display"
+      rebuildPlane(display, items, item.shelf, onPlane(display, items, item.shelf));
+      const bought = { ...item };
+      npc.bought.push(bought);
+      npc.carrying = bought;
+      const wip = stow(npc, bought, want);
+      npc.willReturn = true;      // "NPC Visitors who manage to either buy any items or..."
+      say(world, npc, `bought ${labelOf(bought)} for ${want.wip}` +
+        (wip?.state === WIP_STATE.IN_PROGRESS ? ' — that WIP can be started now' : ''));
+      return 'complete';
+    }
+  }
+  // Whatever they were holding is no longer wanted, or has gone. Put it down.
+  npc.considering = null;
+
+  // --- "If (Rules for display result in Consideration)" -------------------------------------
+  //
+  // "An NPC with OPEN WIP SLOTS has a list of wants that can be satisfied by the items in the
+  // display inventory. If any accessible items match a want (this is determined by Formation and
+  // is independent of NPC personality or preference), the NPC will consider the item."
+  //
+  // Note what is NOT consulted here: personality, craft preference, taste. The spec is explicit
+  // that consideration is a formation question — does this complete a project — so an NPC picks up
+  // a ball of a colour they dislike if it is the yarn their pattern needs.
+  const candidates = consideredHere(npc, display, items);
+  if (candidates.length) {
+    const index = candidates[0];
+    npc.considering = { displayId: display.id, index, round: world.round };
+    say(world, npc, `considered ${labelOf(items[index])}`);
+    return 'incomplete';
   }
 
-  // else: does this NPC's personality make them rearrange it?
+  // --- "else If (Rules for display result in Rearrange or Tidy)" ----------------------------
   const shelf = pickPlane(display, items, npc);
   const present = onPlane(display, items, shelf);
-  const mine = present.filter((i) => matchesTarget(items[i], npc.target));
+  const mine = present.filter((i) => matchesAnyWant(npc, items[i]));
 
   // Order matters: DISPLAYS.md lists these "in order of satisfying".
   // DISPLAYS.md rule 9: an NPC may restructure a given display at most ONCE per visit, after which
@@ -673,11 +752,23 @@ export function interact(npc, display, world) {
   if (canRestructure && mine.length && t.Assertiveness > rearrangeGate) {
     npc.restructured.push(display.id);
     const rest = present.filter((i) => !mine.includes(i));
-    rebuildPlane(display, items, shelf, [...rest, ...mine]);   // target placed last => on top
-    say(world, npc, `Assertiveness ${t.Assertiveness} — dug their ${labelOf(npc.target)} out to the top`);
+    rebuildPlane(display, items, shelf, [...rest, ...mine]);   // wanted items placed last => on top
+    say(world, npc, `Assertiveness ${t.Assertiveness} — dug out what they needed to the top`);
     return 'incomplete';
   }
 
+  // --- "else" — they look, and that is the end of it ----------------------------------------
+  //
+  // CHARACTER-VISIT.md: "Volatility=5: an interaction with a Noticed Display that does not result
+  // in finding what they need will reduce original calculation of MAX_ROUNDS to 1". This is the
+  // one branch that genuinely finds nothing — a consideration or a restructure returns above, and
+  // both are on their way to finding something.
+  if (t.Volatility === 5 && npc.maxRounds > 1) {
+    npc.maxRounds = 1;
+    npc.stormedOut = true;
+    say(world, npc, `Volatility 5 — nothing at the ${display.id}, MAX_ROUNDS cut to 1`);
+    return 'complete';
+  }
   say(world, npc, `looked over the ${display.id}, nothing doing`);
   return 'complete';
 }
@@ -690,8 +781,10 @@ function pickPlane(display, items, npc) {
   return 0;
 }
 
-export const labelOf = (target) =>
-  target.size == null ? target.name : `${target.name} ${target.size.toFixed(1)}mm`;
+// One label function for the whole game, in catalog.js — it is the only place that knows a yarn
+// is named by its weight and material rather than by the word "yarn". Re-exported here because
+// every consumer of the sim already imports from this module.
+export const labelOf = labelItem;
 
 // ---------------------------------------------------------------- the round
 
@@ -931,24 +1024,30 @@ function stepBrowse(npc, world, snapshot) {
       const seat = npc.seat !== null ? seatById(world, npc.seat) : null;
       if (seat) npc.facing = seat.facing ?? npc.facing;
       npc.prescribed = null;
-      // A round's work sometimes finishes the project. This is what makes CHARACTER-ATTRIBUTES.md's
-      // stated goal real — keeping NPCs in the store longer produces more Finished Objects — and it
-      // is what puts a photo rather than a note in the Guestbook on the way out.
-      // TODO(spec): the chance is a placeholder. Industriousness drives it because it is the
-      // conscientiousness aspect, but the doc does not say so.
-      if (world.rng() < npc.traits.Industriousness / 10) {
-        npc.wips = npc.wips.filter((w) => w !== action.params.wip);
-        npc.finished.push(action.params.wip);
-        say(world, npc, `finished ${action.params.wip}!`);
+      const wip = npc.wips.find((w) => w.id === action.params.wip);
+      if (!wip) return;                     // it finished, or the slot went away
+      if (wip.state !== WIP_STATE.IN_PROGRESS) {
+        // Sitting down with a project you cannot start yet is still what the round was spent on.
+        say(world, npc, `sat with ${wip.id}, but it is ${wip.state.toLowerCase()}`);
         return;
       }
-      say(world, npc, `sat and worked on ${action.params.wip}`);
+      // Deterministic progress, per the spec's formula — no dice. How long a thing takes is a
+      // property of the pattern and the crafter, which is what lets the player reason about it.
+      // "work on a WIP" means actually working on it — sitting down with something you cannot
+      // start yet, handled above, is not the same thing and does not earn a return.
+      npc.satAndWorked = true;
+      npc.willReturn = true;
+      const done = workRound(npc, wip, world.round);
+      say(world, npc, done
+        ? `finished ${labelOf(wip.pattern)}! (crafter skill now ${npc.prefs.skill})`
+        : `worked on ${labelOf(wip.pattern)} — ${Math.round(wip.progress)}%`);
       return;
     }
 
     case ACTION.WAIT: {
       const near = world.npcs.some((o) => o.id !== npc.id && o.state === STATE.BROWSE &&
                                           dist2(npc, o) < world.room.personalSpace ** 2);
+      if (near) npc.chatted = true;
       npc.prescribed = near && world.rng() < keepChattingChance(npc.traits)
         ? { type: ACTION.WAIT, params: {} }
         : null;
@@ -972,31 +1071,67 @@ function stepBrowse(npc, world, snapshot) {
  * TODO(spec): CHARACTER-ATTRIBUTES.md wants these written by a generator that makes an NPC sound
  * like themselves. This records WHAT the entry is; the prose is P5's job.
  */
+/**
+ * The tags on one entry, per CHARACTER-VISIT.md's icon list. Everything here is read off state the
+ * visit already tracked, which is the point: a guestbook page should be a legible summary of what
+ * actually happened, not a second set of bookkeeping that can disagree with the first.
+ */
+function guestbookTags(npc) {
+  const tags = [];
+  if (npc.bought.some((it) => it.name === 'yarn')) tags.push('yarn');
+  if (npc.bought.some((it) => it.name === 'pattern')) tags.push('pattern');
+  if (npc.bought.some((it) => TOOL_NOTIONS.includes(it.name))) tags.push('tool');
+  if (npc.toLend.length) tags.push('lent');
+  if (npc.chatted) tags.push('chatted');
+  if (npc.satAndWorked) tags.push('sat');
+  if (npc.roundsInStore >= npc.maxRounds && !npc.bought.length) tags.push('ranOut');
+  if (npc.stormedOut) tags.push('huff');
+  return tags;
+}
+
 function signGuestbook(world, npc) {
-  const object = npc.finished[0] ?? null;
+  // "The item in the PHOTO should be the most recently finished object, and the NPC should be
+  // pictured in/with it even if they are not currently wearing it." Signing is 3rd-to-last and the
+  // Drop Off 2nd-to-last, so anything being lent is still in their hands here — they are
+  // photographed wearing it, and hand it over on the next step.
+  const made = photoSubject(npc);
+  const object = made ? labelOf(made.pattern) : null;
   const entry = object
-    ? { npc: npc.name, kind: 'photo', object, mood: null, round: world.round }
+    // `wornInPhoto` is what tells the renderer to put the object ON them for the picture even
+    // though it is about to leave: the photo is the payoff, and the shop's copy is the leftover.
+    ? { npc: npc.name, kind: 'photo', object, mood: null, round: world.round,
+        wip: made, wornInPhoto: !Object.values(npc.worn).includes(made), tags: guestbookTags(npc) }
     // "happy (found what they are looking for) or disappointed (did not find what they needed)" —
-    // carrying their target IS having found it, which is what the buy branch of interact() sets.
+    // buying something IS having found it, which is what the buy branch of interact() records.
     : { npc: npc.name, kind: 'note', object: null,
-        mood: npc.carrying ? 'happy' : 'disappointed', round: world.round };
+        mood: npc.bought.length ? 'happy' : 'disappointed', round: world.round,
+        tags: guestbookTags(npc) };
   world.guestbook.push(entry);
   return entry;
 }
 
 /**
- * The steps THIS visit will take. The Drop Off is conditional — you cannot lend a finished object
- * you do not have — while signing and leaving always happen.
+ * The steps THIS visit will take. Signing and leaving always happen; the Drop Off happens only if
+ * there is something LEFT OVER to lend.
+ *
+ * WEARABLE-FINISHED-OBJ.md puts wearing first: an NPC keeps a finished object if its clothing slot
+ * is free and "will not offer it to the shop to lend". So somebody who knits one hat walks out
+ * wearing it and never visits the Drop Off at all — the shop only gets the second hat.
  */
 export const closeoutFor = (npc) =>
-  CLOSEOUT_SEQUENCE.filter((step) => step !== ACTION.DROP_OFF || npc.finished.length > 0);
+  CLOSEOUT_SEQUENCE.filter((step) => step !== ACTION.DROP_OFF || npc.toLend.length > 0);
 
 function stepCloseout(npc, world) {
   releaseSeat(world, npc);            // you do not stay in the chair on your way out
   // Decided once, when the closeout begins, and then followed. Recomputing it every round would
-  // drop the Drop Off step out from under the sequence the moment lending empties npc.finished —
+  // drop the Drop Off step out from under the sequence the moment lending empties npc.toLend —
   // leaving the NPC mid-walk with no step to take.
-  if (npc.closeoutStep === 0) npc.closeout = closeoutFor(npc);
+  if (npc.closeoutStep === 0) {
+    // Decide what is worn and what is spare BEFORE the plan is built, since that is what the
+    // Drop Off step is conditional on.
+    npc.toLend = wearOrOffer(npc);
+    npc.closeout = closeoutFor(npc);
+  }
   const type = npc.closeout[npc.closeoutStep];
   npc.action = { type, params: {} };
 
@@ -1012,10 +1147,14 @@ function stepCloseout(npc, world) {
   if (type === ACTION.DROP_OFF) {
     moveTo(world, npc, world.room.dropOff);
     npc.closeoutStep += 1;
-    // Lent, not given: it leaves the NPC and goes on display in the shop.
-    const object = npc.finished.shift();
-    world.dropOff.push({ npc: npc.name, object, round: world.round });
-    say(world, npc, `lent ${object} to the Drop Off`);
+    // Lent, not given: it goes on display in the shop and the NPC can be handed it back later
+    // (returnToNpc in wip.js), which is why the WIP itself is recorded rather than a label.
+    // THIS is where it leaves the WIP slots, per the spec — not earlier, and so not before the
+    // Guestbook photo two steps back.
+    const wip = lend(npc, npc.toLend.shift());
+    world.dropOff.push({ npc: npc.name, npcId: npc.id, wip, object: labelOf(wip.pattern),
+                         round: world.round });
+    say(world, npc, `lent ${labelOf(wip.pattern)} to the Drop Off`);
     return;
   }
   // LEAVE — needs the door, and may have to queue for it behind an arrival.

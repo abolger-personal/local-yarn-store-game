@@ -61,4 +61,52 @@ import { makeDisplay, footprint, fits, place, lift, topAt, dropLayer, columnAt, 
   assert.equal(topAt(g, 1, 0, 0), 2, 'other shelf is untouched');
 }
 
+// --- tall items occupy every layer they are tall -----------------------------
+//
+// YARN.md runs from 1x1x1 to 3x3x3, so an item has a HEIGHT in layers as well as a footprint. The
+// failure this guards is silent: a tall item that only registers one layer lets the next item
+// clip through it, and a lift that pops one layer leaves ghost layers a column never recovers from.
+{
+  const g = makeDisplay(3, 3, { shelves: 1, headroom: 10, cell: 0.2 });
+  const keys = footprint(g, 0, 0, 0, 1, 1);
+
+  assert.equal(place(g, keys, 7, 3), 0, 'a three-layer item still lands on layer 0');
+  assert.equal(topAt(g, 0, 0, 0), 7, 'and is the top of its column');
+  assert.equal(dropLayer(g, keys), 3, 'the next item lands ON it, at layer 3 — not inside it');
+
+  const above = place(g, keys, 8, 1);
+  assert.equal(above, 3, 'so a 1-layer item stacks at layer 3');
+  assert.equal(topAt(g, 0, 0, 0), 8, 'and is now the top');
+
+  lift(g, keys);
+  assert.equal(topAt(g, 0, 0, 0), 7, 'lifting the small one exposes the tall one again');
+  lift(g, keys);
+  assert.equal(topAt(g, 0, 0, 0), EMPTY,
+    'lifting the tall one clears ALL three of its layers, not just the top');
+  assert.equal(dropLayer(g, keys), 0, 'so the column is genuinely empty again');
+}
+
+// --- headroom counts an item's whole height ----------------------------------
+{
+  const g = makeDisplay(2, 2, { shelves: 1, headroom: 4, cell: 0.2 });
+  const keys = footprint(g, 0, 0, 0, 1, 1);
+  place(g, keys, 1, 2);                       // two layers used, two left
+
+  assert.ok(fits(g, keys, 2), 'a two-layer item still fits in the remaining two');
+  assert.ok(!fits(g, keys, 3), 'a three-layer item does not — height is checked, not just the top');
+  assert.ok(fits(g, keys), 'and a plain one-layer item fits, as before');
+}
+
+// --- a tall item bridging two columns ----------------------------------------
+{
+  const g = makeDisplay(3, 3, { shelves: 1, headroom: 10, cell: 0.2 });
+  const wide = footprint(g, 0, 0, 0, 2, 1);   // spans columns 0 and 1
+  place(g, wide, 5, 3);
+
+  for (const c of [0, 1]) assert.equal(topAt(g, 0, c, 0), 5, `column ${c} is topped by the tall item`);
+  assert.equal(dropLayer(g, footprint(g, 0, 0, 0, 1, 1)), 3, 'both its columns are three deep');
+  lift(g, wide);
+  for (const c of [0, 1]) assert.equal(topAt(g, 0, c, 0), EMPTY, `column ${c} fully cleared`);
+}
+
 console.log('grid.js self-check: all assertions passed');

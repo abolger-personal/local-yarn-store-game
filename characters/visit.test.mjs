@@ -10,8 +10,27 @@ import {
   TRAITS, randomTraits, maxWips, maxRounds, ACTION, STATE, CLOSEOUT_SEQUENCE,
   makeNpc, makeWorld, advanceRound, browseActionSet, DetermineNextBrowseAction,
   interact, noticeable, buyableTargets, visibleTo, labelOf, inDoorway, seatById, fullyExposed,
-  findPath, obstacles, closeoutFor,
+  findPath, obstacles, closeoutFor, consideredHere,
 } from './visit.js';
+import { WIP_STATE, wantsOf, canStart, workRound, wearOrOffer, returnToNpc } from './wip.js';
+
+// A WIP built by hand rather than rolled, so a test asserts behaviour and not luck. Defaults to a
+// crochet hat that already has its yarn and is short only a hook — which makes `crochet-hook` the
+// NPC's one and only want, and keeps the buy tests below reading the way they did before WIPs.
+const PATTERN = (over = {}) => ({
+  name: 'pattern', patternType: 'hat', craft: 'crochet', yarnUnits: 5, minColors: 1,
+  // toolSize and weight are what the strict match compares against — a pattern without them
+  // matches nothing, which shows up as an NPC who wants nothing rather than as an error.
+  toolSize: 4.5, weight: 'bulky', materials: ['wool'], hints: [], w: 2, h: 2, ...over,
+});
+const YARN = (over = {}) => ({
+  name: 'yarn', material: 'wool', weight: 'bulky', shape: 'ball', colorIndex: 0, w: 3, h: 3, ...over,
+});
+const WIP = (over = {}) => ({
+  id: 'WIP 1', state: WIP_STATE.UNSTARTED, pattern: PATTERN(), yarn: [YARN()], tool: null,
+  progress: 0, ...over,
+});
+const PREFS = { skill: 3, crafts: ['crochet'], materials: ['wool'], weights: ['bulky'] };
 
 // A deterministic stand-in for Math.random, so a test asserts behaviour and not luck.
 const seq = (...values) => { let i = 0; return () => values[i++ % values.length]; };
@@ -29,7 +48,7 @@ const ROOM = {
 
 const SEATS = [{ id: 'chair-a', x: -1.5, z: -0.5, facing: 0 }, { id: 'chair-b', x: -1.5, z: 0.5, facing: 0 }];
 
-function fixture({ rng = seq(0.5), traits, seats = SEATS } = {}) {
+function fixture({ rng = seq(0.5), traits, seats = SEATS, wips } = {}) {
   const pile = {
     id: 'pile', kind: 'pile', x: 0, z: 0, w: 1, d: 1, wallRow: -1,
     standAt: { x: 0, z: 0.9 },
@@ -55,8 +74,11 @@ function fixture({ rng = seq(0.5), traits, seats = SEATS } = {}) {
     id: 'n1', name: 'Test', species: 'Owl',
     target: { name: 'crochet-hook', size: 4.5 },
     traits: traits ?? Object.fromEntries(TRAITS.map((t) => [t, 3])),
-    rng,
+    prefs: { ...PREFS }, rng,
   });
+  // Overwrite the rolled WIPs with the fixed one, so every assertion below knows exactly what this
+  // NPC is shopping for.
+  npc.wips = wips ?? [WIP()];
   world.npcs.push(npc);
   return { world, pile, shelf, items, npc, add };
 }
@@ -234,9 +256,17 @@ function fixture({ rng = seq(0.5), traits, seats = SEATS } = {}) {
   assert.equal(interact(npc, pile, world), 'incomplete', 'rearranging does not finish the interaction');
   assert.equal(buyableTargets(pile, items, npc.target).length, 1, 'the target is now on top');
 
-  assert.equal(interact(npc, pile, world), 'complete', 'the next interaction buys it');
+  // DISPLAYS.md now puts a CONSIDERATION round between noticing and buying: "An item will be
+  // bought if it was considered in the previous round AND the consideration interaction came back
+  // true." So digging it out no longer buys it next round — it gets picked up and turned over.
+  assert.equal(interact(npc, pile, world), 'incomplete', 'the next interaction considers it');
+  assert.equal(npc.considering?.index, buried, 'and records what is being turned over');
+  assert.ok(!items[buried].gone, 'considering does not remove it from the display');
+
+  assert.equal(interact(npc, pile, world), 'complete', 'the round after that buys it');
   assert.ok(items[buried].gone, 'the purchase removes the item from the display');
-  assert.deepEqual(npc.carrying, { name: 'crochet-hook', size: 4.5 }, 'and the NPC carries it out');
+  assert.equal(npc.carrying.name, 'crochet-hook', 'and the NPC carries it out');
+  assert.equal(npc.considering, null, 'the consideration is spent');
 }
 
 // --- a multi-cell package is exposed only when ALL its columns are clear ----
@@ -326,7 +356,7 @@ const runCloseout = (world, npc) => {
   const { world, npc } = fixture();
   npc.state = STATE.CLOSEOUT;
   npc.closeoutStep = 0;
-  npc.finished = [];
+  npc.wips = [WIP()];                       // nothing finished
 
   assert.deepEqual(closeoutFor(npc), [ACTION.SIGN_GUESTBOOK, ACTION.LEAVE],
     'nothing to lend, so no Drop Off step exists at all');
@@ -346,32 +376,192 @@ const runCloseout = (world, npc) => {
 }
 
 {
+  // WEARABLE-FINISHED-OBJ.md: one finished hat and a free head slot means they WEAR it and
+  // "will not offer it to the shop to lend" — so there is no Drop Off step at all.
   const { world, npc } = fixture();
   npc.state = STATE.CLOSEOUT;
   npc.closeoutStep = 0;
-  npc.finished = ['a striped scarf'];
+  npc.wips = [WIP({ state: WIP_STATE.FINISHED, progress: 100 })];
 
-  assert.deepEqual(closeoutFor(npc), [...CLOSEOUT_SEQUENCE],
-    'with a finished object the full three-step sequence is back');
   const seen = runCloseout(world, npc);
-  assert.deepEqual(seen.slice(0, 3), [...CLOSEOUT_SEQUENCE],
-    'sign the Guestbook, lend the finished object, then leave — in that order');
-
-  assert.equal(world.guestbook[0].kind, 'photo', 'a finished object makes it a picture, not a note');
-  assert.equal(world.guestbook[0].object, 'a striped scarf', 'and the picture is of that object');
-  assert.deepEqual(world.dropOff.map((d) => d.object), ['a striped scarf'], 'which is then lent');
-  assert.deepEqual(npc.finished, [], 'lent means it leaves the NPC — they do not take it home');
+  assert.deepEqual(seen.slice(0, 2), [ACTION.SIGN_GUESTBOOK, ACTION.LEAVE],
+    'they wear it home rather than lending it');
+  assert.equal(npc.worn.head?.id, 'WIP 1', 'the hat is on their head');
+  assert.equal(world.dropOff.length, 0, 'and the shop gets nothing');
+  assert.equal(world.guestbook[0].kind, 'photo', 'a finished object still makes it a picture');
 }
 
 {
-  // Happy is "found what they are looking for", which is carrying their target.
+  // A SECOND hat has nowhere to go, so that one is lent. The overflow is the shop's share.
   const { world, npc } = fixture();
   npc.state = STATE.CLOSEOUT;
   npc.closeoutStep = 0;
-  npc.finished = [];
-  npc.carrying = { name: 'crochet-hook', size: 4.5 };
+  npc.wips = [
+    WIP({ id: 'WIP 1', state: WIP_STATE.FINISHED, progress: 100 }),
+    WIP({ id: 'WIP 2', state: WIP_STATE.FINISHED, progress: 100 }),
+  ];
+
+  const seen = runCloseout(world, npc);
+  assert.deepEqual(seen.slice(0, 3), [...CLOSEOUT_SEQUENCE],
+    'sign the Guestbook, lend the spare, then leave — in that order');
+  assert.equal(npc.worn.head?.id, 'WIP 1', 'the first hat is worn');
+  assert.deepEqual(world.dropOff.map((d) => d.wip.id), ['WIP 2'], 'the second is lent');
+  assert.deepEqual(npc.toLend, [], 'and nothing is left over');
+}
+
+{
+  // ORDER MATTERS: signing is 3rd-to-last and the Drop Off 2nd-to-last, so an NPC is photographed
+  // with the object still in hand and hands it over afterwards. Asserted round by round, because
+  // "it leaves the WIP slots" is easy to implement one step too early — where the photo would be
+  // taken of somebody who had already given the thing away.
+  const { world, npc } = fixture();
+  npc.state = STATE.CLOSEOUT;
+  npc.closeoutStep = 0;
+  npc.worn.head = WIP({ id: 'already worn', state: WIP_STATE.FINISHED, progress: 100 });
+  npc.wips = [WIP({ id: 'spare hat', state: WIP_STATE.FINISHED, progress: 100 })];
+
+  advanceRound(world);   // sign
+  assert.equal(npc.action.type, ACTION.SIGN_GUESTBOOK, 'signing comes first');
+  assert.equal(world.guestbook.length, 1, 'and writes the entry');
+  assert.deepEqual(npc.wips.map((w) => w.id), ['spare hat'],
+    'the object being lent is STILL theirs while they sign');
+  assert.equal(world.dropOff.length, 0, 'nothing has been handed over yet');
+
+  advanceRound(world);   // lend
+  assert.equal(npc.action.type, ACTION.DROP_OFF, 'the Drop Off comes second');
+  assert.deepEqual(world.dropOff.map((d) => d.wip.id), ['spare hat'], 'now the shop has it');
+  assert.deepEqual(npc.wips, [], 'and only now does it leave the WIP slots');
+
+  advanceRound(world);   // leave
+  assert.equal(npc.action.type, ACTION.LEAVE, 'and leaving is last');
+}
+
+{
+  // Happy is "found what they are looking for", which is having bought something.
+  const { world, npc } = fixture();
+  npc.state = STATE.CLOSEOUT;
+  npc.closeoutStep = 0;
+  npc.wips = [WIP()];
+  npc.bought.push({ name: 'crochet-hook', size: 4.5 });
   runCloseout(world, npc);
-  assert.equal(world.guestbook[0].mood, 'happy', 'leaving with their target reads as happy');
+  assert.equal(world.guestbook[0].mood, 'happy', 'leaving with a purchase reads as happy');
+}
+
+// --- WIPs: wants, starting, progress, and handing an object back -------------
+{
+  // The fixture WIP has its pattern and enough yarn, and is short only a hook.
+  const { npc } = fixture();
+  assert.deepEqual(wantsOf(npc).map((w) => w.kind), ['tool'],
+    'a WIP with pattern and yarn wants only the tool');
+  assert.ok(!canStart(npc.wips[0], npc.prefs), 'and cannot start without it');
+
+  npc.wips[0].tool = { name: 'crochet-hook', size: 4.5 };
+  assert.deepEqual(wantsOf(npc), [], 'with the hook it needs nothing');
+  assert.ok(canStart(npc.wips[0], npc.prefs), 'and can be started');
+
+  // A knitting pattern needs knitting needles specifically — a hook will not do.
+  const knit = WIP({ pattern: PATTERN({ craft: 'knitting' }), tool: { name: 'crochet-hook', size: 4.5 } });
+  assert.deepEqual(wantsOf({ ...npc, wips: [knit] }).map((w) => w.tool), ['knitting-needles'],
+    'the pattern names the craft, and the craft names the tool');
+}
+
+{
+  // "1/(number of units of yarn called for by pattern) * characterWeight", characterWeight =
+  // (skill/3) * (Industriousness/3). At skill 3 and Industriousness 3 that is exactly 1, so a
+  // 5-unit hat is a 5-round job.
+  const { npc } = fixture();
+  const wip = npc.wips[0];
+  wip.tool = { name: 'crochet-hook', size: 4.5 };
+  wip.state = WIP_STATE.IN_PROGRESS;
+  npc.prefs.skill = 3;
+  npc.traits.Industriousness = 3;
+
+  for (let i = 1; i <= 4; i++) {
+    assert.equal(workRound(npc, wip), false, `round ${i} does not finish a 5-unit hat`);
+    assert.equal(Math.round(wip.progress), i * 20, `and it is ${i * 20}% done`);
+  }
+  assert.equal(workRound(npc, wip), true, 'the fifth round finishes it');
+  assert.equal(wip.state, WIP_STATE.FINISHED, 'which makes it a finished object');
+  assert.equal(npc.prefs.skill, 4, 'and permanently raises their crafter skill');
+
+  // "up to a max of 5"
+  npc.prefs.skill = 5;
+  const another = WIP({ id: 'WIP 2', state: WIP_STATE.IN_PROGRESS, progress: 99 });
+  workRound(npc, another);
+  assert.equal(npc.prefs.skill, 5, 'crafter skill is capped at five');
+}
+
+{
+  // A faster crafter takes fewer rounds. Same pattern, better hands.
+  const { npc } = fixture();
+  const wip = WIP({ state: WIP_STATE.IN_PROGRESS });
+  npc.prefs.skill = 5;
+  npc.traits.Industriousness = 5;
+  let rounds = 0;
+  while (!workRound(npc, wip) && rounds < 20) rounds++;
+  assert.ok(rounds < 4, `skill 5 and Industriousness 5 should beat 5 rounds, took ${rounds + 1}`);
+}
+
+{
+  // "return borrowed FO to NPC": it goes into the worn slot, and whatever was there lands in the
+  // pile behind the guestbook.
+  const { world, npc } = fixture();
+  const worn = WIP({ id: 'old hat', state: WIP_STATE.FINISHED });
+  const lent = WIP({ id: 'new hat', state: WIP_STATE.FINISHED });
+  npc.worn.head = worn;
+  world.dropOff.push({ npc: npc.name, npcId: npc.id, wip: lent, object: 'hat', round: 1 });
+
+  assert.ok(returnToNpc(world, npc, lent), 'the shop can hand it back');
+  assert.equal(npc.worn.head, lent, 'it goes on their head');
+  assert.equal(world.dropOff.length, 0, 'and off the Drop Off display');
+  assert.deepEqual(world.backPile.map((b) => b.wip.id), ['old hat'],
+    'the one they were wearing goes in the pile behind the guestbook');
+}
+
+// --- guestbook tags ----------------------------------------------------------
+{
+  // Every tag has to be readable off state the visit already kept — a tag that needs its own
+  // bookkeeping can disagree with what actually happened.
+  const { world, npc } = fixture();
+  npc.state = STATE.CLOSEOUT;
+  npc.closeoutStep = 0;
+  npc.wips = [WIP()];
+  npc.bought.push({ name: 'yarn', weight: 'bulky', material: 'wool' },
+                  { name: 'crochet-hook', size: 4.5 });
+  npc.chatted = true;
+  npc.satAndWorked = true;
+
+  runCloseout(world, npc);
+  const entry = world.guestbook[0];
+  assert.equal(entry.mood, 'happy', 'they bought something, so the mood icon is happy');
+  assert.deepEqual(entry.tags.sort(), ['chatted', 'sat', 'tool', 'yarn'].sort(),
+    'and the tags name what they actually did — no pattern tag, because they bought none');
+}
+
+{
+  // An empty-handed visit that ran out of rounds, with nothing else to report.
+  const { world, npc } = fixture();
+  npc.state = STATE.CLOSEOUT;
+  npc.closeoutStep = 0;
+  npc.wips = [WIP()];
+  npc.roundsInStore = npc.maxRounds;
+
+  runCloseout(world, npc);
+  assert.deepEqual(world.guestbook[0].tags, ['ranOut'], 'only the one thing worth recording');
+  assert.equal(world.guestbook[0].mood, 'disappointed');
+}
+
+{
+  // A finished object gives the photo AND the lend tag, since the spare goes to the shop.
+  const { world, npc } = fixture();
+  npc.state = STATE.CLOSEOUT;
+  npc.closeoutStep = 0;
+  npc.worn.head = WIP({ id: 'worn hat', state: WIP_STATE.FINISHED, progress: 100 });
+  npc.wips = [WIP({ id: 'spare hat', state: WIP_STATE.FINISHED, progress: 100 })];
+
+  runCloseout(world, npc);
+  assert.equal(world.guestbook[0].kind, 'photo', 'making something outranks happy/disappointed');
+  assert.ok(world.guestbook[0].tags.includes('lent'), 'and the spare being lent is tagged');
 }
 
 // --- MAX_ROUNDS -------------------------------------------------------------
@@ -406,9 +596,12 @@ const runCloseout = (world, npc) => {
   npc.maxRounds = 12;
   add(pile, 0, 0, 0, 'crochet-hook', 4.5);
 
-  assert.equal(interact(npc, pile, world), 'complete', 'the target was there to buy');
+  // Considering is not a fruitless interaction — they have found the thing, they are deciding.
+  assert.equal(interact(npc, pile, world), 'incomplete', 'the hook is there, so they consider it');
+  assert.equal(npc.maxRounds, 12, 'and MAX_ROUNDS is left alone');
+  assert.equal(interact(npc, pile, world), 'complete', 'then buy it next round');
   assert.ok(npc.carrying, 'so they picked it up');
-  assert.equal(npc.maxRounds, 12, 'a successful interaction leaves MAX_ROUNDS alone');
+  assert.equal(npc.maxRounds, 12, 'a successful interaction still leaves MAX_ROUNDS alone');
 }
 
 {

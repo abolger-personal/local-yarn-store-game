@@ -26,7 +26,10 @@ if (can Buy from pile):
   Inventory removed from display 
   return "Interaction Complete"
 else: 
-  If (Rules for display result in Rearrange or Tidy):
+  If (Rules for display result in Consideration)
+    Animation for NPC considering yarn or notion plays (yarn should squish, and NPC should either be pleased or not depending on consideration outcome)
+    return "Interaction Not Complete"
+  else If (Rules for display result in Rearrange or Tidy):
     Inventory rearranged or tidy per Display logic and NPC attributes 
     Animation for NPC rearranging pile (default to a cartoon cloud Poof)
     return "Interaction Not Complete"
@@ -46,7 +49,13 @@ Rules: 2.5d stacking with close-to-infinite headroom in the 2.5D direction. Gian
 
 Formation scoring: Inventory should be XYZ adjacent. 
 
-Interaction "Buy" scoring: An NPC can only notice a single inventory item or formation if part of it is on the TOP (Z+) of a 2.5D stack. A partial or full formation that is buried in a stack cannot be noticed or bought by an NPC.  
+Interaction "Buy" scoring: An NPC can only notice a single inventory item or formation if part of it is on the TOP (Z+) of a 2.5D stack. A partial or full formation that is buried in a stack cannot be noticed or bought by an NPC. An item will be *bought* if it was *considered* in the previous round AND the consideration interaction came back 'true'.  
+
+Interaction "Consideration" scoring: 
+   An NPC with *OPEN WIP SLOTS* has a list of *wants* that can be satisfied by the items in the display inventory (see WIP-AND-FINISHED-OBJ-FORMATION.md). If any accessible items (Top Z+ layers) match a want (this is determined by Formation and is independent of NPC personality or preference), the NPC will *consider* the item. 
+ 
+   MVP: For NOW, just add this mechanic in and 100% of considered items will be purchased. Later this wont be true 
+
 
 Interaction scoring rules in order of satisfying: 
     NPC with an Orderliness attribute = 1 should "spread out" the stack to make a mess: all items will get randomly flattened to as low in Z as possible. (thus allowing them to SOMETIMES satisfy the "Buy" condition afterwards)

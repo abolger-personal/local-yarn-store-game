@@ -48,15 +48,22 @@ export function footprint(g, s, c, r, w, h) {
 /** Layer a footprint rests at: on top of the tallest column it covers (it bridges shorter ones). */
 export const dropLayer = (g, keys) => keys.reduce((m, k) => Math.max(m, g.piles[k].length), 0);
 
-/** Can this footprint be placed — cells all exist AND there is headroom left on the tallest column. */
-export const fits = (g, keys) => keys !== null && dropLayer(g, keys) < g.headroom;
+/**
+ * Can this footprint be placed — cells all exist AND the tallest column it covers has room for all
+ * `layers` of it. A tall item needs tall clearance: YARN.md runs from 1x1x1 up to 3x3x3, and a
+ * super-bulky ball that is three cells wide is three layers high as well.
+ */
+export const fits = (g, keys, layers = 1) =>
+  keys !== null && dropLayer(g, keys) + layers <= g.headroom;
 
 /** Place item into its columns; returns the layer it landed on. Assumes fits() is true. */
-export function place(g, keys, index) {
+export function place(g, keys, index, layers = 1) {
   const L = dropLayer(g, keys);
   for (const k of keys) {
     while (g.piles[k].length < L) g.piles[k].push(EMPTY);   // bridge over a shorter neighbour
-    g.piles[k][L] = index;
+    // The same index occupies every layer it is tall, so anything stacked on top of it lands on
+    // its ACTUAL surface rather than clipping through it, and topAt still answers in O(1).
+    for (let i = 0; i < layers; i++) g.piles[k][L + i] = index;
   }
   return L;
 }
@@ -64,8 +71,12 @@ export function place(g, keys, index) {
 /** Remove a top item from its columns. Only the top of a column is ever grabbable, so this pops. */
 export function lift(g, keys) {
   for (const k of keys) {
-    g.piles[k].pop();
-    while (g.piles[k].length && g.piles[k][g.piles[k].length - 1] === EMPTY) g.piles[k].pop();
+    const pile = g.piles[k];
+    // Pop EVERY layer this item occupies, not just one — a three-layer ball would otherwise leave
+    // two ghost layers behind, and the column would never come back down.
+    const top = pile[pile.length - 1];
+    while (pile.length && pile[pile.length - 1] === top) pile.pop();
+    while (pile.length && pile[pile.length - 1] === EMPTY) pile.pop();
   }
 }
 

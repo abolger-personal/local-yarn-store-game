@@ -25,6 +25,66 @@ export async function loadAtlas(baseUrl, theme = 'default') {
   return { texture, manifest, names: Object.keys(manifest.cells) };
 }
 
+/**
+ * Add procedurally drawn cells to a loaded atlas, returning a NEW atlas that contains both.
+ *
+ * Yarn and patterns have no illustrations yet, and the alternative — a second texture — costs a
+ * second instanced mesh and a second draw call for every label channel. Compositing the loaded PNG
+ * and the placeholder shapes into one canvas keeps the whole shop at the same draw-call count it
+ * had with three notions, and means nothing downstream learns that some art is stand-in.
+ *
+ * Drawn WHITE-on-transparent, per DESIGN-DECISIONS.md: the atlas stores shape in the alpha channel
+ * so that colour stays per-instance. A yarn cell drawn in an actual yarn colour could not be
+ * recoloured, which is exactly what yarn most needs.
+ *
+ * TODO(YARN.md): real illustrations, with ball bands, gradients, sparkle and fuzziness. These are
+ * silhouettes — they read at diorama distance and they are not the art.
+ */
+export function extendAtlas(loaded, shapes, { cell = 128 } = {}) {
+  const names = Object.keys(shapes);
+  const source = loaded.texture.image;
+  // The source is drawn at its NATIVE size and the new row is fitted to it. Scaling the sheet up
+  // to fit a 128px-per-cell row instead would resample every existing illustration — the notions
+  // all went soft the first time this was written that way.
+  const width = source.width;
+  const band = Math.min(cell, Math.floor(width / Math.max(1, names.length)));
+  const topH = source.height;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = topH + band;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(source, 0, 0);
+
+  const cells = {};
+  // The loaded cells keep their content but are squashed into the top band of the taller canvas.
+  const vScale = topH / canvas.height;
+  for (const [name, c] of Object.entries(loaded.manifest.cells)) {
+    cells[name] = { u0: c.u0, u1: c.u1, v0: 1 - (1 - c.v0) * vScale, v1: 1 - (1 - c.v1) * vScale };
+  }
+
+  ctx.strokeStyle = '#ffffff';
+  ctx.fillStyle = '#ffffff';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  names.forEach((name, i) => {
+    ctx.save();
+    ctx.translate(i * band, topH);
+    shapes[name](ctx, band);
+    ctx.restore();
+    cells[name] = {
+      u0: (i * band) / width, u1: ((i + 1) * band) / width,
+      v0: 0, v1: band / canvas.height,
+    };
+  });
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  return { texture, manifest: { ...loaded.manifest, cells }, names: Object.keys(cells) };
+}
+
 /** Atlas rect for one notion, as the shader wants it: origin plus size. */
 export function cellRect(manifest, name) {
   const c = manifest.cells[name];

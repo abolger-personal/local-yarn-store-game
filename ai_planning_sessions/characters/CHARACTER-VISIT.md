@@ -10,9 +10,29 @@ BROWSE is a set of actions with order chosen randomly. At then end of each round
 
 (closing sequence is entered when no more options exist )
 CLOSEOUT SEQUENCE: 
-- ALWAYS 3rd to LAST: NPC moves to sign guest book (hardcoded). Event where a picture of a finished object gets added to the LYS guestbook (always happens. If if they made a finished object while in visit or if they brought one in with them, a picture generated of them holding object. Otherwise, a note about whether or not they are happy (found what they are looking for) or disappointed (did not find what they needed) is added) 
+- ALWAYS 3rd to LAST: NPC moves to sign guest book (hardcoded). Event where a picture of a finished object gets added to the LYS guestbook (always happens. If if they made a finished object while in visit or if they brought one in with them, a picture generated of them holding object. The item in the PHOTO should be the most recently finished object, and the NPC should be pictured in/with it even if they are not currently wearing it (e.g. it is being lent to the shop). Otherwise, a note about whether or not they are happy (found what they are looking for) or disappointed (did not find what they needed) is added) 
 - 2nd to LAST IF NPC HAS A FINISHED OBJECT: NPC (fancy animation here!) will all the player to borrow a finished object for display in the LYS, and place the object in a hard coded "Drop Off" Floor Display area with infinite headroom. 
 - ALWAYS LAST: leaving through the door
+
+RETURNING VISITORS:
+- An NPC who manages to either *buy any items* or *work on a WIP* during a visit is marked for *return*: they go on a list of returning NPCs who can re-enter the shop at a later time.
+- A returning NPC comes back as themselves: same traits and craft preferences, same crafter skill level (including any +1 earned by finishing something), same WIP slots at the progress they left them at, and still wearing whatever they were wearing.
+- This is what lets a long project span more than one visit, and so is a primary driver of Finished Object count.
+
+GUESTBOOK ENTRY ICONS (MVP: the entry is one line with a leading icon, so a page of the book reads at a glance):
+- 📷 they made a finished object — the photo, of the most recently finished one
+- 🙂 happy: they found what they were looking for (bought something for a WIP)
+- 🙁 disappointed: they did not find what they needed
+- 🧶 they bought yarn
+- 📖 they bought a pattern
+- 🪡 they bought a tool notion (hook or needles)
+- 🎁 they lent a finished object to the shop
+- 🧑‍🤝‍🧑 they chatted with another customer during the visit
+- 🪑 they sat and worked on a WIP in the shop
+- ⏳ they ran out of MAX_ROUNDS before finding anything
+- 💨 Volatility 5: they gave up and left in a huff
+
+(An entry always has exactly one MOOD icon — 📷 if they made something, otherwise 🙂 or 🙁 — plus any number of the others as tags on what happened during the visit.)
 
 
 
@@ -95,4 +115,6 @@ Calculation of MAX_ROUNDS from Character attributes:
     Starting value:  (Openness+Industriousness+Enthusiasm)*(Uniform random chance value from 1 to 2), for a range of MAX_ROUNDS from worst case 3 to longest visit 30. 
 
     - Volatility=5: an interaction with a Noticed Display that does not result in finding what they need will reduce original calculation of MAX_ROUNDS to 1, causing NPC to leave immediately. 
-   
+
+
+NPC Visitors who manage to either *buy any items* or *work on a WIP* should be marked for *return* to the shop: they go on a list of returning NPCs. 

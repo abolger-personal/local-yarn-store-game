@@ -41,3 +41,9 @@ Examples:
 - Intellect -> complex patterns with high Ravelry difficulty level: Pattern level high, crochet and needle size tiny, needing many yarn colors. 
 - High Volatility -> lots of WIPs, preference will be for something unlike their previous items. 
 
+
+NPCs will also have personal craft preferences completely unrelated to personality that should be generated at start:
+- a crafter skill level (used for determining FO speed and success) from 1 to 5
+- a preference for knitting, crochet, or both
+- a set of between 2 and 6 preferred yarn materials
+- a set of between 2 and 6 preferred yarn weights

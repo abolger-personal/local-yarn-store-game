@@ -207,6 +207,101 @@ plain sight. That is a catalog problem, not a browse-logic one — P6 owns it.
 
 ---
 
+## Yarn, patterns, WIPs and finished objects
+
+The new specs are implemented. Three new pure modules, all node-testable:
+
+| File | What it owns |
+| --- | --- |
+| `inventory/catalog.js` | What the shop sells: yarn, patterns, notions, and the shop's RANGE |
+| `characters/wip.js` | WIP slots, the shopping list, the progress formula, wearing and lending |
+| `characters/wip.test.mjs` | Self-check for all of the above — `node characters/wip.test.mjs` |
+
+**Buying is now a two-round beat.** DISPLAYS.md's consideration rule means an NPC picks a thing up
+in one round and decides in the next ("bought if it was considered in the previous round AND the
+consideration came back true"). MVP: 100% of considered items are purchased.
+
+**What an NPC shops for is now a property of their projects,** not a hardcoded target notion.
+`MatchObservedInventory(npc, items)` answers for a whole shelf at once, per the spec's own naming.
+The match is strict, and deliberately independent of personality or preference:
+
+| WIP state | Wants | Matches on |
+| --- | --- | --- |
+| no pattern | a pattern, and nothing else | any pattern — or, if holding yarn, one whose weight and material suit it |
+| pattern, short of yarn | yarn | material in the pattern's list AND the pattern's weight |
+| pattern, wrong/no tool | that tool | the craft's tool kind AND the pattern's exact millimetres |
+
+A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
+
+### Decisions this forced, which are worth a look
+
+- **Patterns needed two attributes PATTERNS.md does not list.** The match rules require a tool
+  `size` ("the notion is the correct size") and a yarn `weight` ("the same yarn attributes (weight,
+  material)"), so `makePattern` sets both. CHARACTER-ATTRIBUTES.md already assumes a tool size
+  exists ("crochet and needle size tiny"). **Worth adding to PATTERNS.md's attribute list.**
+- **The shop needed a RANGE** (`SHOP_RANGE` in catalog.js). This is a balance decision, not a spec
+  rule, and it is load-bearing. Measured against uniformly random stock, the chance one shelf item
+  satisfies a given want is **0.9% for yarn and 0.5% for a tool** — roughly 117 and 192 items
+  before one fits, where a display holds about twenty. Nothing would ever get made. Drawing both
+  the stock and the NPCs' own patterns from a curated 4x4 palette lifts that to **3.4% and 1.5%**.
+  It is also just true of a real yarn store: a curated range, carried deeply.
+- **Even so, projects rarely finish under RANDOM stock** — a 400-seed soak completes about 0.2% of
+  WIPs. That is the mechanic working, not failing: the soak models *a shop nobody is running*.
+  Making projects finish is the player's job, and it is the first time the player's verb has had a
+  measurable effect on an NPC outcome. Worth re-measuring once formations score.
+- **A finished object leaves the WIP slot — but WHEN depends on where it goes.** A WIP slot is a
+  limited resource (`maxWips`), so an object cannot sit in one forever; finishing has to give the
+  capacity back. Worn objects leave immediately ("store FO in a worn slot" is a move). Objects
+  being **lent leave at the Drop Off**, which is 2nd-to-last — *after* signing, which is
+  3rd-to-last. That ordering is the point: the NPC is photographed for the Guestbook still holding
+  what they made, and hands it over on the next step. Getting this one step early is an easy and
+  invisible mistake, so `visit.test.mjs` walks the three closeout rounds and asserts the object is
+  still in its slot at signing time and gone after the Drop Off.
+  **Nothing refills a freed slot**: an NPC who finishes mid-visit has capacity for a new project
+  and no way to start one. That is the natural home for a "cast on something new" action.
+- **`stow` refuses a null want** rather than filing an item into the nearest slot. A wrong guess
+  there puts a hook in the yarn slot and is invisible until a WIP will not start.
+
+### Still open here
+
+- **`minColors` is unenforced.** It is a property of the whole yarn collection, not of one ball, so
+  it cannot live in the per-item match. It wants a completeness test over `wip.yarn`.
+- **The match is strict by design and flagged as loosenable** — the spec says "we can make this a
+  messy match later if we want". That is a change to one function, `yarnSuitsPattern`.
+- **Two regressions this session's work introduced, both now fixed and guarded:**
+  - *Yarn rendered as flat slabs.* A super-bulky ball got its 3x3 footprint but `place()` only ever
+    occupied one layer and the box was always `BOX_H` tall, so it drew as a 0.6 x 0.6 x 0.055
+    pancake covering most of a table. YARN.md is 1x1x1 to 3x3x3 — the height scales too. `grid.js`
+    now takes a `layers` count: `place` fills every layer an item is tall, `lift` pops all of them,
+    and `fits` checks the whole height against headroom. Mutation-tested three ways.
+  - *Notion art went blurry.* `extendAtlas` was scaling the loaded sheet UP to fit a 128px
+    placeholder row, resampling every existing illustration. It now draws the source at native size
+    and fits the new row to it.
+- **Guestbook entries carry icon tags** from CHARACTER-VISIT.md's list: one mood icon (📷 photo, or
+  🙂 / 🙁) plus tags for what happened — 🧶 📖 🪡 bought, 🎁 lent, 🧑‍🤝‍🧑 chatted, 🪑 sat and worked,
+  ⏳ ran out of rounds, 💨 left in a huff. Every one is read off state the visit already tracked, so
+  the book cannot disagree with what happened. All ten fire across a 400-seed soak.
+- **Yarn and pattern art is placeholder.** Procedural silhouettes (three yarn shapes, four pattern
+  covers, knitting needles) composited into the loaded atlas by `extendAtlas`, so the whole shop
+  still costs one draw call per label channel. YARN.md wants ball bands, gradients, sparkle and
+  fuzziness; PATTERNS.md wants a box that reads as a BOOK. Both belong in
+  `illustrations/notion_processing.py`, not in the page.
+- **Nothing renders a worn finished object.** The model is there — `npc.worn` has the four slots,
+  wearing takes priority over lending — but the rig only has a scarf. WEARABLE-FINISHED-OBJ.md's
+  payoff is seeing the hat, and `pattern.hints` (`stripes`, `pom pom`, `fringe`, `star`) exists to
+  drive exactly that and is currently unread.
+- **"Return borrowed FO to NPC" has no UI.** `returnToNpc()` implements it, including the displaced
+  object landing in `world.backPile` "behind the guestbook", but nothing clicks it and nothing
+  draws the back pile.
+- **Craft preferences barely matter yet.** `prefs.materials` and `prefs.weights` are generated per
+  CHARACTER-ATTRIBUTES.md and shown in the debug panel, but only `skill` and `crafts` feed any
+  rule — because the spec is explicit that matching ignores preference. They want a home in
+  attractiveness or in a satisfaction score.
+- **The FROG PILE does not exist.** Post-MVP per the spec, and `WIP_STATE` deliberately has no
+  `FROGGED` member rather than an unreachable one.
+
+---
+
 ## Spec gaps found while building — these need a decision, not just code
 
 1. **`MAX_ROUNDS` — formula landed, range annotation disagrees with it.** Now

@@ -101,8 +101,13 @@
   #debug .note { margin-top: 4px; color: #6a5f55; font-style: italic; }
   #debug .got { color: #3f7f5a; font-weight: 700; }
   #debug h4 { margin: 0 0 6px; font: 700 11px ui-sans-serif, system-ui, sans-serif; letter-spacing: .04em; text-transform: uppercase; opacity: .55; }
+  #debug .wips { margin: 2px 0 2px 0; }
+  #debug .wip { font-size: 10px; color: #5a4f45; white-space: nowrap; overflow: hidden;
+                text-overflow: ellipsis; padding-left: 6px; border-left: 2px solid rgba(0,0,0,.12); }
+  #debug .wip.done { color: #2f6b4a; border-left-color: #3f7f5a; }
   #debug .book { margin-top: 8px; border-top: 1px solid rgba(0,0,0,.1); padding-top: 6px; font-size: 10px; color: #4a3f35; }
   #debug .book div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #debug .book .tags { opacity: .9; letter-spacing: 1px; }
   #debug .log { margin-top: 8px; border-top: 1px solid rgba(0,0,0,.1); padding-top: 6px; font-size: 10px; color: #6a5f55; }
   #debug .log div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
@@ -164,9 +169,17 @@ import './owl.js';
 import './llama.js';
 
 import {
-  loadAtlas, cellRect, makeGridLines, makeField, makeEdge, makeShadows, makeBoxes, makeSizeAtlas,
-  setInstance, placeMatrix, placeBoxMatrix, placeLabelMatrix,
+  loadAtlas, extendAtlas, cellRect, makeGridLines, makeField, makeEdge, makeShadows, makeBoxes,
+  makeSizeAtlas, setInstance, placeMatrix, placeBoxMatrix, placeLabelMatrix,
 } from '../inventory/notions.js';
+import {
+  NOTION_NAMES, SIZED_NOTIONS, HOOK_SIZES_MM, PATTERN_NAMES, TOOL_FOR_CRAFT, YARN_SHAPES,
+  makeStockYarn, makeStockPattern, makeStockNotion, yarnWeight, SHOP_RANGE,
+  labelOf as labelItem,
+} from '../inventory/catalog.js';
+import {
+  makeCraftPrefs, describeWip, wantsOf, satisfies, MatchObservedInventory, WIP_STATE, WEAR_SLOTS,
+} from './wip.js';
 import {
   EMPTY, makeDisplay, gridSize, footprint, fits, place, lift, dropLayer, topAt, columnAt, slotRect,
   usableAt, remask,
@@ -182,8 +195,8 @@ console.info('LYS build', BUILD);
 document.getElementById('build').textContent = `build ${BUILD}`;
 
 const ATLAS_URL = '../ai_planning_sessions/inventory/illustrations/build';
-// EU/metric only for MVP — matches inventory/stash-and-stuff.html.
-const HOOK_SIZES_MM = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 8.0];
+// What the shop sells now lives in inventory/catalog.js — the sim reasons about it too, so it
+// cannot be page-local. HOOK_SIZES_MM, SIZED_NOTIONS and the notion list all moved there.
 
 // ---------------------------------------------------------------- scale
 //
@@ -734,7 +747,9 @@ const LIFT_HEIGHT = 0.14;   // how far a carried item floats above the plane it 
 
 function paintInstance(display, index, cx, cz, boxBase, shadowBase, footW, footD, yaw) {
   const item = items[index];
-  const boxW = footW, boxD = footD, boxH = BOX_H;
+  // Height follows the item's own depth in 2.5D layers. A super-bulky ball is 3x3x3 per YARN.md,
+  // and drawing it one layer tall made it a slab covering most of a table instead of a ball.
+  const boxW = footW, boxD = footD, boxH = BOX_H * (item.layers ?? 1);
   const F = display.frame;
 
   _pos.set(cx, boxBase + boxH / 2, cz);
@@ -744,7 +759,7 @@ function paintInstance(display, index, cx, cz, boxBase, shadowBase, footW, footD
   // the camera, and an unlabelled back reads as a blank crate. Four faces share ONE instanced mesh
   // at 4x capacity (instance index*4 + k), so this costs no extra draw call over the single-sided
   // version it replaced.
-  const rect = cellRect(atlas.manifest, item.name);
+  const rect = cellRect(atlas.manifest, cellNameFor(item));
   const sizeRect = cellRect(sizeAtlas.manifest, item.size != null ? item.size.toFixed(1) : 'blank');
   for (let k = 0; k < 4; k++) {
     const a = yaw + k * Math.PI / 2;                 // k=0 front, 1 right, 2 back, 3 left
@@ -834,44 +849,164 @@ const refreshAll = () => items.forEach((_, i) => {
   if (!items[i].held) refresh(i);
 });
 
-const NOTION_NAMES = ['crochet-hook', 'darning-needle', 'stitch-markers'];
 const rnd = (n) => Math.floor(Math.random() * n);
 
-// Which notions have a size attribute AT ALL. Stitch markers and darning needles do not come in
-// millimetres, so a number on their box is not a cosmetic glitch — it invents an attribute the item
-// cannot have, in the one channel the player is supposed to read and arrange by.
-//
-// Enforced here, in the shared constructor, rather than at each call site: size arrives as a free
-// parameter from three different callers, and any of them getting it wrong produces the same wrong
-// box. A hook always gets a size, since a real one always has one.
-const SIZED_NOTIONS = new Set(['crochet-hook']);
-const sizeFor = (name, size) =>
-  (SIZED_NOTIONS.has(name) ? (size ?? pick(HOOK_SIZES_MM)) : null);
+/**
+ * Stand-in silhouettes for the things that have no illustration yet: yarn in its three shapes, the
+ * four pattern covers, and knitting needles. Drawn white on transparent, because the atlas carries
+ * shape in alpha and colour per instance — see extendAtlas.
+ *
+ * TODO(YARN.md, PATTERNS.md): these are silhouettes, not the art. YARN.md wants ball bands,
+ * gradients, sparkle and fuzziness; PATTERNS.md wants a box "given labels to make it look like a
+ * BOOK" with per-type cover icons. Both need real illustration work, and the atlas build script
+ * (illustrations/notion_processing.py) is where it should land rather than here.
+ */
+const PLACEHOLDER_ART = {
+  'yarn-ball': (ctx, s) => {
+    ctx.beginPath();
+    ctx.arc(s / 2, s / 2, s * 0.34, 0, Math.PI * 2);
+    ctx.fill();
+    // A couple of strand grooves, so a ball reads as wound rather than as a dot.
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.lineWidth = s * 0.045;
+    for (const k of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(s / 2, s / 2, s * 0.30, s * 0.12, k * 0.6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  },
+  'yarn-cone': (ctx, s) => {
+    ctx.beginPath();
+    ctx.moveTo(s * 0.5, s * 0.14);
+    ctx.lineTo(s * 0.74, s * 0.82);
+    ctx.lineTo(s * 0.26, s * 0.82);
+    ctx.closePath();
+    ctx.fill();
+  },
+  'yarn-skein': (ctx, s) => {
+    // A twisted hank: a fat lozenge pinched in the middle.
+    ctx.beginPath();
+    ctx.ellipse(s * 0.36, s / 2, s * 0.20, s * 0.30, 0.5, 0, Math.PI * 2);
+    ctx.ellipse(s * 0.64, s / 2, s * 0.20, s * 0.30, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.lineWidth = s * 0.06;
+    ctx.beginPath();
+    ctx.moveTo(s * 0.5, s * 0.22);
+    ctx.lineTo(s * 0.5, s * 0.78);
+    ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
+  },
+  'knitting-needles': (ctx, s) => {
+    ctx.lineWidth = s * 0.07;
+    for (const k of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(s * 0.5 + k * s * 0.16, s * 0.84);
+      ctx.lineTo(s * 0.5 + k * s * 0.30, s * 0.16);
+      ctx.stroke();
+    }
+  },
+};
 
-// The package a notion comes in, as a [cols, rows] footprint. Like the size attribute above this
-// belongs to the KIND, not to the instance — a random shape per box would be the same mistake as a
-// random size, inventing a property the product does not have.
+// A pattern cover: the book, plus the icon PATTERNS.md names for its type.
+const PATTERN_COVER = {
+  sweater: (ctx, s) => {   // a jumper: body plus two sleeves
+    ctx.fillRect(s * 0.38, s * 0.36, s * 0.24, s * 0.30);
+    ctx.fillRect(s * 0.24, s * 0.36, s * 0.14, s * 0.10);
+    ctx.fillRect(s * 0.62, s * 0.36, s * 0.14, s * 0.10);
+  },
+  hat: (ctx, s) => {       // a beanie with a pom
+    ctx.beginPath();
+    ctx.arc(s * 0.5, s * 0.56, s * 0.16, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(s * 0.32, s * 0.56, s * 0.36, s * 0.06);
+    ctx.beginPath();
+    ctx.arc(s * 0.5, s * 0.34, s * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+  },
+  cowl: (ctx, s) => {      // a droopy donut
+    ctx.beginPath();
+    ctx.ellipse(s * 0.5, s * 0.52, s * 0.19, s * 0.15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.ellipse(s * 0.5, s * 0.52, s * 0.09, s * 0.06, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+  },
+  shawl: (ctx, s) => {     // a triangle
+    ctx.beginPath();
+    ctx.moveTo(s * 0.30, s * 0.38);
+    ctx.lineTo(s * 0.70, s * 0.38);
+    ctx.lineTo(s * 0.50, s * 0.68);
+    ctx.closePath();
+    ctx.fill();
+  },
+};
+
+for (const type of PATTERN_NAMES) {
+  PLACEHOLDER_ART[`pattern-${type}`] = (ctx, s) => {
+    // The book itself: a cover with a spine down one edge, per PATTERNS.md.
+    ctx.fillRect(s * 0.16, s * 0.14, s * 0.68, s * 0.72);
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillRect(s * 0.26, s * 0.14, s * 0.03, s * 0.72);          // the spine crease
+    ctx.fillRect(s * 0.22, s * 0.20, s * 0.56, s * 0.60);          // knock out the cover panel
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillRect(s * 0.16, s * 0.14, s * 0.68, s * 0.06);
+    PATTERN_COVER[type](ctx, s);
+  };
+}
+
+/**
+ * Which atlas cell an item draws. Yarn and patterns vary their icon by an ATTRIBUTE — shape and
+ * type respectively — so this is not simply the item's name.
+ */
+const cellNameFor = (item) =>
+  item.name === 'yarn' ? `yarn-${item.shape}`
+  : item.name === 'pattern' ? `pattern-${item.patternType}`
+  : item.name;
+
+// The package a NOTION comes in, as a [cols, rows] footprint. It belongs to the KIND, not to the
+// instance — a random shape per box would invent a property the product does not have.
 //
-// Each kind lists the packages it genuinely ships in, which is where the variety comes from: a
-// single hook is a small box, a hook set is a long one; markers come loose or in a big assorted tin.
-// Footprint is deliberately NOT part of target matching — an NPC wants "a 4.5mm hook", and does not
-// care which box it came in.
+// Yarn and patterns do NOT appear here: their footprints are not packaging choices but real
+// attributes the sim reads. A yarn's size comes from its weight and decides how many units it is
+// worth (PATTERNS.md), and a pattern is always 2x2. Both come from catalog.js instead.
 const PACKAGES = {
-  'crochet-hook':   [[1, 1], [2, 1]],   // single hook, or a set in a long case
-  'darning-needle': [[1, 1], [1, 2]],   // a packet, or a deep sleeve of assorted sizes
-  'stitch-markers': [[1, 1], [2, 2]],   // a little bag, or a big assorted tin
+  'crochet-hook':     [[1, 1], [2, 1]],   // single hook, or a set in a long case
+  'knitting-needles': [[1, 1], [1, 2]],   // a pair, or a long circular set
+  'darning-needle':   [[1, 1], [1, 2]],   // a packet, or a deep sleeve of assorted sizes
+  'stitch-markers':   [[1, 1], [2, 2]],   // a little bag, or a big assorted tin
 };
 const packageFor = (name) => pick(PACKAGES[name] ?? [[1, 1]]);
+
+// Yarn colours. YARN.md wants "an overwhelming variety" with gradients and sparkle; this is a flat
+// palette standing in for that, indexed by the yarn's own colorIndex so the sim can carry colour
+// without importing a palette.
+const YARN_COLORS = [
+  '#b5453f', '#c97b3c', '#d9b04a', '#7d9a52', '#3f7f5a', '#3d7f92',
+  '#40567f', '#6a4f8f', '#a3487e', '#8c6a4f', '#4a4a52', '#c9b7a2',
+];
+const INK = '#241e22';
 
 /**
  * Put one item in the first slot it fits, scanning from a random start. Returns its index or -1.
  * `avoidWall` keeps it off a shelf's wall-facing row, which DISPLAYS.md says can never be noticed
  * — without it a "guaranteed buyable" seed can land somewhere an NPC is not allowed to see.
+ *
+ * Takes a catalog OBJECT now rather than a name and a size. Yarn and patterns carry attributes a
+ * two-argument signature cannot express, and having the caller build the thing means the shop
+ * cannot invent a yarn weight or a pattern that catalog.js would not have produced.
  */
-function addItem(display, shelf, name, size, { c, r, avoidWall = false, shape } = {}) {
+function addItem(display, shelf, spec, { c, r, avoidWall = false, shape } = {}) {
   if (items.length >= CAPACITY) return -1;   // the instanced buffers cannot grow past this
   const g = display.g;
-  const [w, h] = shape ?? packageFor(name);
+  // Yarn and patterns bring their own footprint; a notion gets one of its packagings.
+  const [w, h] = shape ?? (spec.w ? [spec.w, spec.h] : packageFor(spec.name));
+  // How many 2.5D layers tall. A forced `shape` is a deliberate 1x1 override (the burial seed), so
+  // it flattens the item's own height too rather than leaving a tall thing on a small footprint.
+  const layers = shape ? 1 : (spec.layers ?? 1);
   const cells = [];
   for (let rr = 0; rr < g.rows; rr++) for (let cc = 0; cc < g.cols; cc++) {
     if (avoidWall && rr === display.wallRow) continue;
@@ -883,11 +1018,14 @@ function addItem(display, shelf, name, size, { c, r, avoidWall = false, shape } 
     // footprint() returns null the moment any covered cell runs off the grid or hits a mask, and
     // fits() treats null as "no" — so an oversized package simply fails over to the next cell.
     const keys = footprint(g, shelf, cell.c, cell.r, w, h);
-    if (!fits(g, keys)) continue;
+    if (!fits(g, keys, layers)) continue;
     const index = items.length;
     items.push({
-      name, size: sizeFor(name, size), display: display.id, shelf, c: cell.c, r: cell.r, w, h,
-      keys, layer: place(g, keys, index), color: '#241e22',
+      ...spec,
+      display: display.id, shelf, c: cell.c, r: cell.r, w, h, layers,
+      keys, layer: place(g, keys, index, layers),
+      // Yarn is the one thing whose colour is an attribute rather than ink.
+      color: spec.name === 'yarn' ? YARN_COLORS[spec.colorIndex % YARN_COLORS.length] : INK,
       yaw: (Math.random() - 0.5) * 0.18 * Math.PI, gone: false, held: false,
     });
     return index;
@@ -1037,7 +1175,7 @@ function firstFreeSlot(disp, item) {
     for (let r = 0; r < disp.g.rows; r++)
       for (let c = 0; c < disp.g.cols; c++) {
         const keys = footprint(disp.g, shelf, c, r, item.w, item.h);
-        if (fits(disp.g, keys)) return { shelf, c, r, keys };
+        if (fits(disp.g, keys, item.layers ?? 1)) return { shelf, c, r, keys };
       }
   return null;
 }
@@ -1074,11 +1212,11 @@ function putDown() {
   if (!t) item.keys = footprint(home.g, item.shelf, item.c, item.r, item.w, item.h);
   // ...except an NPC may have tidied that column full while the player was holding it. place()
   // does not check headroom, so without this the item would sit floating above a full stack.
-  if (!fits(home.g, item.keys)) {
+  if (!fits(home.g, item.keys, item.layers ?? 1)) {
     const spot = firstFreeSlot(home, item);
     if (spot) { item.shelf = spot.shelf; item.c = spot.c; item.r = spot.r; item.keys = spot.keys; }
   }
-  item.layer = place(home.g, item.keys, drag.index);
+  item.layer = place(home.g, item.keys, drag.index, item.layers ?? 1);
   item.held = false;
   item.yaw += (Math.random() - 0.5) * YAW_SETTLE;
 
@@ -1205,7 +1343,7 @@ function onPointerMove(event) {
     const c = col.c - ((item.w - 1) >> 1);
     const r = col.r - ((item.h - 1) >> 1);
     const keys = footprint(disp.g, disp.plane, c, r, item.w, item.h);
-    if (fits(disp.g, keys)) drag.target = { c, r, keys, layer: dropLayer(disp.g, keys) };
+    if (fits(disp.g, keys, item.layers ?? 1)) drag.target = { c, r, keys, layer: dropLayer(disp.g, keys) };
   }
   ghost(item);
   refreshFloating(drag.index, point.x, point.z);
@@ -1688,10 +1826,19 @@ scene.add(castGroup);
 
 // Fill whatever displays currently exist. buildDisplays() has already made their grids fresh, so
 // this only has to place items — a shelf gets more because it has three levels to fill.
+// What a shop actually sells, weighted. Yarn dominates because YARN.md calls it "a centerpiece of
+// this game" and because it is what the WIP mechanic consumes most of — a pattern needs one tool
+// but up to twenty units of wool.
+function randomStock() {
+  const roll = Math.random();
+  if (roll < 0.55) return makeStockYarn();
+  if (roll < 0.75) return makeStockPattern();
+  return makeStockNotion();
+}
+
 function stockDisplays() {
   items.length = 0;
-  // Size is always offered; addItem keeps it only for notions that actually have one.
-  const stock = (d, shelf, opts) => addItem(d, shelf, NOTION_NAMES[rnd(3)], pick(HOOK_SIZES_MM), opts);
+  const stock = (d, shelf, opts) => addItem(d, shelf, randomStock(), opts);
 
   for (const d of displays) {
     if (d.kind === 'shelf') {
@@ -1717,26 +1864,65 @@ function stockDisplays() {
  * be noticed, and one buried under something so the Assertiveness "dig it out" branch of
  * DISPLAYS.md gets exercised too.
  */
-function seedTargets(npcs) {
+/**
+ * Guarantee each NPC can actually finish what they came in with. Their WIPs now generate a whole
+ * shopping list rather than one notion, so this seeds ONE thing per want — enough that no visit is
+ * doomed by random stock, without simply handing them the lot.
+ *
+ * One copy of the first want is buried under something, so the Assertiveness "dig it out" branch of
+ * DISPLAYS.md still gets exercised.
+ */
+function seedWants(npcs) {
   const unseeded = [];
   npcs.forEach((npc, i) => {
-    const open = displays[i % displays.length];
+    const wants = wantsOf(npc);
+    wants.forEach((want, k) => {
+      const open = displays[(i + k) % displays.length];
+      const spec = specFor(want, npc);
+      console.assert(satisfies(spec, want), 'seeded item does not satisfy its own want', spec, want);
+      const placed = addItem(open, 0, spec, { avoidWall: true });
+      // Silent failure worth catching: a full or heavily masked display can refuse the seed, and
+      // the only symptom is an NPC wandering for MAX_ROUNDS and leaving empty-handed — which reads
+      // as the browse logic being broken rather than the shop having nowhere to put their hook.
+      if (placed < 0) unseeded.push(`${npc.name} wants ${want.kind} (no room on ${open.id})`);
+    });
+    if (!wants.length) return;
     const hidden = displays[(i + 1) % displays.length];
-    const placed = addItem(open, 0, npc.target.name, npc.target.size, { avoidWall: true });
-    // Silent failure worth catching: a full or heavily masked display can refuse the seed, and the
-    // only symptom is an NPC wandering for MAX_ROUNDS and leaving empty-handed — which reads as the
-    // browse logic being broken rather than the shop having nowhere to put their hook.
-    if (placed < 0) unseeded.push(`${npc.name} wants ${labelOf(npc.target)} (no room on ${open.id})`);
-    const buried = addItem(hidden, 0, npc.target.name, npc.target.size,
-                           { avoidWall: true, shape: [1, 1] });
+    const buried = addItem(hidden, 0, specFor(wants[0], npc), { avoidWall: true, shape: [1, 1] });
     if (buried >= 0) {
       const it = items[buried];
       // Same footprint as the item below, or it would bridge onto neighbouring columns instead of
       // sitting squarely on top and burying it.
-      addItem(hidden, 0, 'darning-needle', null, { c: it.c, r: it.r, shape: [it.w, it.h] });
+      addItem(hidden, 0, makeStockNotion(Math.random, 'darning-needle'),
+              { c: it.c, r: it.r, shape: [it.w, it.h] });
     }
   });
-  console.assert(unseeded.length === 0, 'target seeding failed:', unseeded);
+  console.assert(unseeded.length === 0, 'want seeding failed:', unseeded);
+}
+
+/**
+ * One catalog item that would actually satisfy this want.
+ *
+ * Matching is strict now — MatchObservedInventory wants the yarn's material AND weight to match
+ * the pattern, and the tool's millimetres to match exactly — so a seed cannot be a random item of
+ * the right KIND. It has to be built from the want. Asserted below, because a seed that silently
+ * fails to match is indistinguishable from browse logic that does not work.
+ */
+function specFor(want, npc) {
+  if (want.kind === 'pattern') {
+    const p = makeStockPattern();
+    // A WIP already holding yarn only matches patterns that suit THAT yarn.
+    if (want.forYarn) { p.weight = want.forYarn.weight; p.materials = [want.forYarn.material]; }
+    return p;
+  }
+  if (want.kind === 'yarn') {
+    const y = makeStockYarn();
+    y.weight = want.weight;
+    y.w = y.h = yarnWeight(want.weight).size;
+    y.material = pick(want.materials);
+    return y;
+  }
+  return { name: want.tool, size: want.size };
 }
 
 const NAMES = ['Marguerite', 'Bramble', 'Wilhelmina', 'Otto', 'Pernilla', 'Casimir', 'Juniper', 'Bo'];
@@ -1753,19 +1939,15 @@ function spawnCast() {
     P.mergeMeshes = S.mergeMeshes;
     const built = createCharacter(P, kit);
 
-    // Target formation: for now literally one notion — a hook in a specific size, or stitch
-    // markers, which have no size attribute at all.
-    const wantsHook = i % 2 === 0;
-    const target = wantsHook
-      ? { name: 'crochet-hook', size: pick(HOOK_SIZES_MM) }
-      : { name: 'stitch-markers', size: null };
-
     const npc = makeNpc({
       id: `npc${i}`,
       name: NAMES[i % NAMES.length],
       species: kit.label,
-      target,
+      // target is no longer authored: makeNpc rolls WIPs, and what those WIPs still need IS the
+      // shopping list. This is just the headline one, for the debug panel.
+      target: null,
     });
+    npc.target = wantsOf(npc)[0] ?? null;
     // queue up outside, single file, so entering one at a time is visible as well as modelled
     npc.x = room.queueAt.x + (i - (S.npcCount - 1) / 2) * 0.0;
     npc.z = room.queueAt.z + i * 0.7;
@@ -1794,7 +1976,7 @@ function restart() {
   buildDisplays(S.displayCount);
   stockDisplays();
   const npcs = spawnCast();
-  seedTargets(npcs);
+  seedWants(npcs);
   world = makeWorld({ displays, items, room, seats });
   world.npcs = npcs;
   for (const m of [fieldTop, edgeTop, shadows, boxes, sizeTop]) m.count = items.length;
@@ -1872,7 +2054,7 @@ function heldLabel(atlasPack, material, key, w, h) {
   return new THREE.Mesh(geo, material);
 }
 
-function makeHeldNotion(name, size = null) {
+function makeHeldNotion(item) {
   heldMat ??= new THREE.MeshBasicMaterial({
     map: atlas.texture, color: new THREE.Color('#241e22'),
     transparent: false, alphaTest: 0.45, side: THREE.DoubleSide,
@@ -1882,6 +2064,8 @@ function makeHeldNotion(name, size = null) {
     map: sizeAtlas.texture, transparent: false, alphaTest: 0.45, side: THREE.DoubleSide,
   });
 
+  const cellName = cellNameFor(item);
+  const size = item.size ?? null;
   const group = new THREE.Group();
   const box = new THREE.Mesh(new THREE.BoxGeometry(HELD_W, HELD_H, HELD_W), heldBoxMat);
   box.castShadow = true;
@@ -1890,12 +2074,12 @@ function makeHeldNotion(name, size = null) {
   // Top and front, which is all an orbiting diorama camera can see of something held at chest
   // height. The shelf boxes label all four sides; a fist hides two of them, so this is not worth
   // the extra geometry per NPC.
-  const top = heldLabel(atlas, heldMat, name, HELD_W * 0.7, HELD_W * 0.7);
+  const top = heldLabel(atlas, heldMat, cellName, HELD_W * 0.7, HELD_W * 0.7);
   top.rotation.x = -Math.PI / 2;
   top.position.y = HELD_H / 2 + 0.002;
   group.add(top);
 
-  const front = heldLabel(atlas, heldMat, name, HELD_W * 0.9, HELD_H * 0.56);
+  const front = heldLabel(atlas, heldMat, cellName, HELD_W * 0.9, HELD_H * 0.56);
   front.position.set(0, HELD_H * 0.12, HELD_W / 2 + 0.002);
   group.add(front);
 
@@ -1924,7 +2108,10 @@ const HOP_H = 0.10;
 
 /** Show what an NPC bought, in their hand, from the round they pick it up. */
 function syncCarried(rec) {
-  const want = rec.npc.carrying?.name ?? null;
+  const carried = rec.npc.carrying ?? null;
+  // Keyed by the CELL, not the bare name: an NPC swapping a ball of yarn for a cone is carrying a
+  // different-looking thing even though both are "yarn".
+  const want = carried ? cellNameFor(carried) : null;
   if (rec.carriedName === want) return;
   // null -> something is the moment of the buy, and the only place in the render layer that knows
   // it happened. Not on the way back: putting an item down is not worth a dance.
@@ -1938,7 +2125,7 @@ function syncCarried(rec) {
     rec.carriedMesh = null;
   }
   if (!want) return;
-  rec.carriedMesh = makeHeldNotion(want, rec.npc.carrying?.size ?? null);
+  rec.carriedMesh = makeHeldNotion(carried);
   rec.built.holds[0].add(rec.carriedMesh);
   if (rec.built.held) rec.built.held.visible = false;   // hide the rig's default skein
 }
@@ -2147,7 +2334,9 @@ function drawDebug() {
       <span class="state ${n.state}">${n.state}</span>
       <div class="who"><i class="swatch" style="background:${rec?.color ?? '#999'}"></i>${esc(n.name)}
         <span class="k">· ${esc(n.species)}</span></div>
-      ${row('wants', labelOf(n.target))}
+      ${row('wants', n.target ? `${n.target.kind}${n.target.units > 1 ? ` x${n.target.units}` : ''}` : 'nothing')}
+      ${row('craft', `skill ${n.prefs.skill} · ${n.prefs.crafts.join('/')}`)}
+      ${n.considering ? `<div class="row"><span class="k">considering</span><span class="got">${esc(labelOf(items[n.considering.index]))}</span></div>` : ''}
       ${n.carrying ? `<div class="row"><span class="k">carrying</span><span class="got">${esc(labelOf(n.carrying))} ✓</span></div>` : ''}
       ${row('round', `${n.roundsInStore} / ${n.maxRounds} MAX_ROUNDS`)}
       ${row('action', n.action ? n.action.type : '—')}
@@ -2157,7 +2346,10 @@ function drawDebug() {
       ${row('seat', n.seat ?? '—')}
       ${row('restructured', n.restructured.length ? n.restructured.join(', ') : '—')}
       ${row('WIPs', `${n.wips.length} of max ${maxWips(n.traits)}`)}
-      ${row('finished', n.finished.length ? n.finished.join(', ') : '—')}
+      <div class="wips">${n.wips.map((w) =>
+        `<div class="wip ${w.state === WIP_STATE.FINISHED ? 'done' : ''}">` +
+        `<span class="k">${esc(w.state.toLowerCase())}</span> ${esc(describeWip(w))}</div>`).join('')}</div>
+      ${row('worn', WEAR_SLOTS.filter((s) => n.worn[s]).map((s) => s).join(', ') || '—')}
       ${n.closeout.length
         ? row('closeout', n.closeout.map((s) => (s === n.closeout[n.closeoutStep] ? `▸${s}` : s)).join(' · '))
         : ''}
@@ -2170,11 +2362,34 @@ function drawDebug() {
   // than a log line — so it gets its own block. A photo means they had a finished object; a note
   // means they did not, and says whether they left happy.
   `<div class="book"><span class="k">guestbook</span>${world.guestbook.length
-    ? world.guestbook.slice(-6).reverse().map((g) => `<div>${g.kind === 'photo'
-        ? `📷 ${esc(g.npc)} holding ${esc(g.object)}`
-        : `${g.mood === 'happy' ? '🙂' : '🙁'} ${esc(g.npc)} — ${esc(g.mood)}`}</div>`).join('')
+    ? world.guestbook.slice(-6).reverse().map(guestbookLine).join('')
     : '<div>no entries yet</div>'}</div>` +
   `<div class="log">${world.log.slice(-6).reverse().map((l) => `<div>${esc(l)}</div>`).join('')}</div>`;
+}
+
+// CHARACTER-VISIT.md's guestbook icon list. One mood icon — the photo if they made something,
+// otherwise happy or disappointed — plus a tag per thing that happened on the visit, so a page of
+// the book reads at a glance instead of as a paragraph.
+const TAG_ICONS = {
+  yarn: ['🧶', 'bought yarn'],
+  pattern: ['📖', 'bought a pattern'],
+  tool: ['🪡', 'bought a hook or needles'],
+  lent: ['🎁', 'lent a finished object to the shop'],
+  chatted: ['🧑‍🤝‍🧑', 'chatted with another customer'],
+  sat: ['🪑', 'sat and worked on a WIP'],
+  ranOut: ['⏳', 'ran out of rounds before finding anything'],
+  huff: ['💨', 'gave up and left in a huff'],
+};
+
+function guestbookLine(g) {
+  const mood = g.kind === 'photo'
+    ? `📷 ${esc(g.npc)} in ${esc(g.object)}`
+    : `${g.mood === 'happy' ? '🙂' : '🙁'} ${esc(g.npc)} — ${esc(g.mood)}`;
+  const tags = (g.tags ?? [])
+    .filter((k) => TAG_ICONS[k])
+    .map((k) => `<span title="${esc(TAG_ICONS[k][1])}">${TAG_ICONS[k][0]}</span>`)
+    .join('');
+  return `<div>${mood}${tags ? ` <span class="tags">${tags}</span>` : ''}</div>`;
 }
 
 // ---------------------------------------------------------------- timer window
@@ -2274,11 +2489,25 @@ function checkWallCulling() {
  * only symptom is the player reading an attribute that does not exist.
  */
 function checkItemSizes() {
+  // A millimetre size belongs to hooks and needles and to nothing else — a number on a ball of
+  // yarn invents an attribute the product does not have, in the one channel the player reads.
   const wrong = items.filter((it) => (it.size != null) !== SIZED_NOTIONS.has(it.name));
   console.assert(wrong.length === 0,
     `item sizes: ${wrong.length} wrong`, wrong.slice(0, 5).map((it) => `${it.name}=${it.size}`));
-  const sized = items.filter((it) => it.size != null).length;
-  console.info(`item sizes: ${items.length} items, ${sized} sized, ${wrong.length} wrong`);
+  // Every item must resolve to a real atlas cell, or it silently draws the whole sheet.
+  const noArt = items.filter((it) => !atlas.manifest.cells[cellNameFor(it)]);
+  console.assert(noArt.length === 0, 'items with no atlas cell:',
+    [...new Set(noArt.map(cellNameFor))]);
+  // And a yarn's footprint has to match its weight, since that is what its unit value is read from.
+  const badUnits = items.filter((it) => it.name === 'yarn' && it.w !== yarnWeight(it.weight).size);
+  console.assert(badUnits.length === 0, 'yarn footprints that do not match their weight:',
+    badUnits.slice(0, 5).map((it) => `${it.weight}=${it.w}`));
+
+  const kinds = {};
+  for (const it of items) kinds[it.name] = (kinds[it.name] ?? 0) + 1;
+  console.info(`stock: ${items.length} items —`,
+    Object.entries(kinds).map(([k, n]) => `${k} ${n}`).join(', '),
+    `| ${wrong.length} wrong sizes, ${noArt.length} missing art`);
 }
 
 /**
@@ -2528,7 +2757,9 @@ addEventListener('resize', () => {
 const clock = new THREE.Clock();
 
 loadAtlas(ATLAS_URL).then((loaded) => {
-  atlas = loaded;
+  // Yarn, patterns and knitting needles have no illustrations yet. Compositing placeholders into
+  // the SAME atlas keeps the whole shop on one draw call per label channel — see extendAtlas.
+  atlas = extendAtlas(loaded, PLACEHOLDER_ART);
   // 4x capacity: instance index*4 + k is face k of item `index`. One mesh, one draw call, four
   // labelled sides — see paintInstance.
   sideField = makeField(atlas.texture, CAPACITY * 4, { unlit: true, shade: 0.28 });

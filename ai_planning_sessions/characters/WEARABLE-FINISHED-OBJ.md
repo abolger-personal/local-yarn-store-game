@@ -1,0 +1,5 @@
+- After an object is finished, the NPC will bring it to the finished objects drop area to let the store borrow it. The item should LEAVE the NPC's WIPs slots at this point.  That will make it available for the player to decorate a space with, however it's also pleasing to let the NPC *wear* their finished objects. Basic mechanic for now: 
+    - if NPC is not wearing an FO yet of a type in their clothing slot (4 slots: head: hat, torso: sweater or shawl, hands: mittens, neck: cowl or scarf), NPC should store FO in a "worn" slot and will not offer it to the shop to lend 
+    - At any time IN THE SHOP, the player can choose to click on an FO and "return borrowed FO to NPC", which will, off screen, move that item into the worn slot for the NPC and place any *previously offscreen* item the NPC was wearing in a pile in the shop behind the guestbook. 
+
+      

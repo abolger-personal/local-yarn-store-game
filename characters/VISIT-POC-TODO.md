@@ -144,6 +144,38 @@ Still open here:
 
 ---
 
+## The closeout, after the spec update
+
+CHARACTER-VISIT.md changed two of the three steps, and both are implemented:
+
+- **Signing always leaves an entry.** `world.guestbook` is real data now, one entry per visit. With
+  a finished object it is a photo of them holding it; without one it is a note reading **happy**
+  (they are carrying their target) or **disappointed** (they are not). Shown in the debug panel.
+- **The Drop Off is conditional** on having a finished object to lend. The step no longer exists in
+  the sequence otherwise, rather than being skipped at runtime — `closeoutFor(npc)` builds it.
+- **Lending removes the object** from the NPC. It is a loan to the shop, so `world.dropOff` records
+  it and `npc.finished` loses it.
+
+Two things that needed deciding to make that work:
+
+- **The closeout plan is frozen when closeout begins**, not recomputed each round. Lending empties
+  `npc.finished`, and a recomputed plan would drop the Drop Off step out from under the NPC
+  mid-sequence, leaving them with no step to take. Caught by the tests.
+- **Finished objects had to exist at all.** NPCs now arrive with one at a flat 30% chance, and a
+  round of `WORK_ON_WIP` completes the project at `Industriousness / 10`. Neither number is in any
+  spec — both are placeholders, shaped so CHARACTER-ATTRIBUTES.md's stated goal holds (keeping NPCs
+  in the store longer should yield more Finished Objects). **Worth tuning:** at these values a
+  400-seed soak leaves 777 photos to 423 notes, so roughly two thirds of visits end with a lend.
+  That may be too generous for something meant to feel like a gift.
+
+**Volatility 5** now cuts `MAX_ROUNDS` to 1 after any interaction with a noticed display that does
+not end in a buy. Read literally that includes an interaction that *restructures* the display — a
+tidy or a dig sets up a buy next round but does not itself find anything — so a volatile shopper
+storms out having just rearranged a shelf. In character, but it means the restructure never pays
+off for them. **Flag if** the intent was the terminal "looked, nothing doing" outcome only.
+
+---
+
 ## Reading a visit from the outside
 
 The player's only read on whether a customer found what they came for is what they walk out
@@ -177,9 +209,12 @@ plain sight. That is a catalog problem, not a browse-logic one — P6 owns it.
 
 ## Spec gaps found while building — these need a decision, not just code
 
-1. **`MAX_ROUNDS` is undefined.** CHARACTER-VISIT.md ends with the heading "Calculation of
-   MAX_ROUNDS from Character attributes:" and no body. Placeholder in use:
-   `clamp(4 + Enthusiasm + Industriousness - Withdrawal, 3, 18)`.
+1. **`MAX_ROUNDS` — formula landed, range annotation disagrees with it.** Now
+   `(Openness + Industriousness + Enthusiasm) * uniform(1, 2)`, rolled once per visit, per the
+   spec. The doc annotates the range as "worst case 3 to longest visit 45"; with traits at 1-5 the
+   formula gives **3 to 30** — 45 would need a x3 multiplier. The formula is explicit and the range
+   reads like arithmetic done in passing, so the formula is what shipped. **Decision needed:** was
+   the range the intent, and should the multiplier be 1-3?
 2. ~~**Prescriptions have no termination bound.**~~ **RESOLVED, both in spec.** 22% of visits never
    ended before this; two prescription chains were unbounded, and both are now fixed in the specs
    rather than worked around in code.
@@ -219,12 +254,40 @@ plain sight. That is a catalog problem, not a browse-logic one — P6 owns it.
   something. Wants squash on landing and the ear perk timed to the apex. Delight outranks the walk
   pose, so an NPC who buys as they turn away stops to cheer rather than gliding out mid-celebration.
 
-- **No walk cycle.** Movement is a straight-line lerp between the round's start and end positions
-  holding the static `walk` pose. No pathfinding either — NPCs walk through the furniture.
-  DESIGN-DECISIONS.md wants grid A* with string-pulling plus separation steering.
-- **Separation is at REST only.** Two NPCs never *stand* inside each other, but they still walk
-  through each other in transit, because the sim resolves a round as a teleport and the scene
-  interpolates. Real steering during the walk is part of the pathfinding work above.
+- **No walk cycle.** Movement follows the round's route holding the static `walk` pose — the feet
+  do not move. P1-SPIKE-PLAN.md step E owns the real one.
+- **NPCs no longer walk through furniture.** `findPath` in `visit.js` builds a visibility graph over
+  the corners of every display, chair and room solid, grown by a `PATH_CLEARANCE` berth, and runs
+  Dijkstra over it; the renderer walks the resulting polyline at constant speed instead of lerping
+  start-to-end, turning at each leg. Chosen over the grid A* DESIGN-DECISIONS.md asks for because
+  the room holds under a dozen rectangles that the player can move at any moment (rule 10), so a
+  graph over their corners needs nothing rebuilt when they do. Grid A* is still the right answer
+  once there is real walkable geometry rather than a flat floor.
+
+  Three things worth knowing about it:
+  - **Endpoints inside furniture drop that obstacle.** That is how an NPC reaches a *chair* — the
+    goal is inside the thing they are walking to — and how somebody escapes a display the player
+    just dropped on them. Tested against the real box, not the berth: standing *near* a chair must
+    not buy permission to walk through it.
+  - **Endpoints inside the berth are nudged clear** before the graph is built. Without that, every
+    ray out of them collides, they disconnect from the graph entirely, and the straight-line
+    fallback walks them through the table the routing exists to avoid.
+  - **A berth can seal a walkable gap** — a display parked a shoulder's width from a wall leaves a
+    strip of real floor that 0.22 swallows whole. `findPath` retries at `TIGHT_CLEARANCE` before
+    giving up, because squeezing past is right and walking through is not. The straight line
+    remains the last resort: a customer frozen mid-shop with no explanation is worse than one who
+    clips a table the player has deliberately boxed them into.
+
+- **Separation is at REST only.** Two NPCs never *stand* inside each other and no longer stand
+  inside furniture (`pushOutOfFurniture`, on a tighter radius than the routing berth so an NPC who
+  has correctly walked up to a display is not shoved off it). They still pass through each other in
+  transit: the sim resolves a round as a teleport and the scene interpolates. Steering during the
+  walk is separate work.
+- **Separation needed a tangential term.** Two NPCs pinned in the slot between two chairs are
+  pushed apart along a line the furniture blocks, so the radial push cancels exactly against the
+  push-out and the pair never separates however many passes it gets. Rotating the pair is the only
+  escape from a collinear pin. It switches on only after progress stalls, and takes its sign from
+  the pair's indices, so a seed still replays identically.
 - **The carried notion is the shelf card, shrunk.** It reads at diorama distance, but the same doc
   says the held design is genuinely a second asset — and knitting is two-handed, which will surface
   the `clampArmOut` conflict the moment someone authors that pose.

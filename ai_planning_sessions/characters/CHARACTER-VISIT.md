@@ -10,8 +10,8 @@ BROWSE is a set of actions with order chosen randomly. At then end of each round
 
 (closing sequence is entered when no more options exist )
 CLOSEOUT SEQUENCE: 
-- ALWAYS 3rd to LAST: NPC moves to sign guest book (hardcoded). Event where a picture of a finished object gets added to the LYS guestbook (happens either if they made a finished object while in visit or if they brought one in with them) 
-- ALWAYS 2nd to LAST: NPC (fancy animation here!) will all the player to borrow a finished object for display in the LYS, and place the object in a hard coded "Drop Off" Floor Display area with infinite headroom. 
+- ALWAYS 3rd to LAST: NPC moves to sign guest book (hardcoded). Event where a picture of a finished object gets added to the LYS guestbook (always happens. If if they made a finished object while in visit or if they brought one in with them, a picture generated of them holding object. Otherwise, a note about whether or not they are happy (found what they are looking for) or disappointed (did not find what they needed) is added) 
+- 2nd to LAST IF NPC HAS A FINISHED OBJECT: NPC (fancy animation here!) will all the player to borrow a finished object for display in the LYS, and place the object in a hard coded "Drop Off" Floor Display area with infinite headroom. 
 - ALWAYS LAST: leaving through the door
 
 
@@ -91,6 +91,8 @@ ACTIONS WITHOUT PRESCRIPTIONS:
     PRESCRIBED NEXT ACTION: None
 
 
-
-
 Calculation of MAX_ROUNDS from Character attributes: 
+    Starting value:  (Openness+Industriousness+Enthusiasm)*(Uniform random chance value from 1 to 2), for a range of MAX_ROUNDS from worst case 3 to longest visit 30. 
+
+    - Volatility=5: an interaction with a Noticed Display that does not result in finding what they need will reduce original calculation of MAX_ROUNDS to 1, causing NPC to leave immediately. 
+   

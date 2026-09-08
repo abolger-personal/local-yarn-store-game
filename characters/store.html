@@ -101,6 +101,8 @@
   #debug .note { margin-top: 4px; color: #6a5f55; font-style: italic; }
   #debug .got { color: #3f7f5a; font-weight: 700; }
   #debug h4 { margin: 0 0 6px; font: 700 11px ui-sans-serif, system-ui, sans-serif; letter-spacing: .04em; text-transform: uppercase; opacity: .55; }
+  #debug .book { margin-top: 8px; border-top: 1px solid rgba(0,0,0,.1); padding-top: 6px; font-size: 10px; color: #4a3f35; }
+  #debug .book div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #debug .log { margin-top: 8px; border-top: 1px solid rgba(0,0,0,.1); padding-top: 6px; font-size: 10px; color: #6a5f55; }
   #debug .log div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
@@ -476,7 +478,8 @@ roomGroup.add(chairGroup);
 function buildChairs(n) {
   mover.m = mover.sel = null;   // the chair objects below replace whatever was selected
   clearGroup(chairGroup);
-  seats = SEAT_SLOTS.slice(0, n).map((s) => ({ ...s }));
+  // w/d travel with the seat so the sim can route around a chair without being told a size.
+  seats = SEAT_SLOTS.slice(0, n).map((s) => ({ ...s, w: CHAIR_W, d: CHAIR_W }));
   for (const s of seats) {
     const chair = new THREE.Mesh(new THREE.BoxGeometry(CHAIR_W, SEAT_H, CHAIR_W), seatMat);
     chair.position.set(s.x, SEAT_H / 2, s.z);
@@ -1672,6 +1675,9 @@ const room = {
   dropOff:   { x: 2.2, z: 1.7 },
   personalSpace: 0.62,
   doorClearance: 0.8,   // nobody may loiter this close to the door — it is the only way through
+  // Solid things the sim must route around that are not displays or chairs. Displays and seats it
+  // already knows about; the counter it does not, so it is handed over here rather than duplicated.
+  solids: [{ x: COUNTER.x, z: COUNTER.z, w: COUNTER.w, d: COUNTER.d }],
   bounds: { minX: -HALF_W + 0.6, maxX: HALF_W - 0.6, minZ: -HALF_D + 1.4, maxZ: HALF_D - 0.9 },
 };
 
@@ -1776,7 +1782,7 @@ function spawnCast() {
       moveT: 1, travelled: 0, fromX: npc.x, fromY: 0, fromZ: npc.z, toY: 0,
       wait: 0, dur: S.travel,
       carriedName: null, carriedMesh: null,
-      celebrate: 0, hop: 0,
+      celebrate: 0, hop: 0, route: [{ x: npc.x, z: npc.z }, { x: npc.x, z: npc.z }],
     });
   }
   setViewMode(castGroup, S.view);
@@ -1820,7 +1826,13 @@ function doAdvanceRound() {
     rec.fromX = rec.built.root.position.x;
     rec.fromZ = rec.built.root.position.z;
     rec.fromY = rec.built.root.position.y;
-    rec.travelled = Math.hypot(n.x - rec.fromX, n.z - rec.fromZ);
+    // The sim's route, rooted at where the NPC is actually DRAWN and ending at the live
+    // destination. The last point is rewritten every frame (see walkRoute) so a display moved
+    // out from under someone still drags them along, as it did when this was a straight line.
+    rec.route = [{ x: rec.fromX, z: rec.fromZ },
+                 ...(n.path ?? []).slice(0, -1).map((p) => ({ x: p.x, z: p.z })),
+                 { x: n.x, z: n.z }];
+    rec.travelled = routeLength(rec.route);
     rec.toY = n.seat !== null ? S.seatLift : 0;   // rise onto the chair as they arrive at it
     // The SIM is lockstep, but the animation must not be: a cast that sets off and arrives in
     // unison reads as a chorus line, which is the same note crowd.html records about pose cycling.
@@ -1946,9 +1958,46 @@ function poseFor(npc) {
   }
 }
 
-// TODO: there is no walk cycle. Movement is a straight-line lerp between the round's start and end
-// positions, holding the static `walk` pose. P1-SPIKE-PLAN.md step E owns the real one, and
-// DESIGN-DECISIONS.md wants grid A* with string-pulling plus separation steering underneath it.
+const routeLength = (pts) => {
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z);
+  return total;
+};
+
+/**
+ * Where along this round's route the NPC is at eased fraction `e`, and which way they are facing.
+ *
+ * Constant SPEED along the polyline, not constant time per leg — otherwise a short dodge around a
+ * corner takes as long as the long stretch after it, and the walk visibly stalls at every turn.
+ */
+function walkRoute(rec, n, e) {
+  const pts = rec.route;
+  const last = pts[pts.length - 1];
+  last.x = n.x;   // the destination can move after the round begins: a display dragged out from
+  last.z = n.z;   // under them, or separation nudging them clear of a neighbour
+  const total = routeLength(pts);
+  const want = total * e;
+  let acc = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i];
+    const seg = Math.hypot(b.x - a.x, b.z - a.z);
+    if (acc + seg >= want || i === pts.length - 1) {
+      const f = seg < 1e-6 ? 1 : Math.min(1, (want - acc) / seg);
+      return {
+        x: a.x + (b.x - a.x) * f,
+        z: a.z + (b.z - a.z) * f,
+        facing: seg < 1e-6 ? n.facing : Math.atan2(b.x - a.x, b.z - a.z),
+        total,
+      };
+    }
+    acc += seg;
+  }
+  return { x: n.x, z: n.z, facing: n.facing, total };
+}
+
+// TODO: there is no walk cycle. Movement follows the round's route holding the static `walk` pose.
+// P1-SPIKE-PLAN.md step E owns the real one. The route itself comes from findPath() in visit.js —
+// a visibility graph over the furniture, which is what stopped NPCs walking through tables.
 const blended = {};
 const BLEND = 0.35;
 
@@ -1972,12 +2021,12 @@ function tickCast(dt) {
     else if (rec.moveT < 1) {
       rec.moveT = Math.min(1, rec.moveT + dt / (rec.dur ?? S.travel));
       const e = rec.moveT * rec.moveT * (3 - 2 * rec.moveT);
-      rec.built.root.position.set(
-        rec.fromX + (n.x - rec.fromX) * e,
-        rec.fromY + (rec.toY - rec.fromY) * e,
-        rec.fromZ + (n.z - rec.fromZ) * e,
-      );
-      if (rec.travelled > 0.05) rec.built.root.rotation.y = n.facing;
+      const at = walkRoute(rec, n, e);
+      rec.built.root.position.set(at.x, rec.fromY + (rec.toY - rec.fromY) * e, at.z);
+      rec.travelled = at.total;
+      // Facing comes from the LEG being walked, not from the start-to-end line: rounding a table
+      // means turning, and an NPC who keeps facing their final destination crabs sideways.
+      if (at.total > 0.05) rec.built.root.rotation.y = at.facing;
     }
 
     // Still waiting is NOT moving — without this they walk on the spot before setting off.
@@ -2108,11 +2157,23 @@ function drawDebug() {
       ${row('seat', n.seat ?? '—')}
       ${row('restructured', n.restructured.length ? n.restructured.join(', ') : '—')}
       ${row('WIPs', `${n.wips.length} of max ${maxWips(n.traits)}`)}
+      ${row('finished', n.finished.length ? n.finished.join(', ') : '—')}
+      ${n.closeout.length
+        ? row('closeout', n.closeout.map((s) => (s === n.closeout[n.closeoutStep] ? `▸${s}` : s)).join(' · '))
+        : ''}
       ${row('position', `${n.x.toFixed(2)}, ${n.z.toFixed(2)}`)}
       <div class="traits">${traits}</div>
       ${n.note ? `<div class="note">${esc(n.note)}</div>` : ''}
     </div>`;
   }).join('') +
+  // The Guestbook is the emotional payoff of the loop (LYS.md 5c), and it is now real data rather
+  // than a log line — so it gets its own block. A photo means they had a finished object; a note
+  // means they did not, and says whether they left happy.
+  `<div class="book"><span class="k">guestbook</span>${world.guestbook.length
+    ? world.guestbook.slice(-6).reverse().map((g) => `<div>${g.kind === 'photo'
+        ? `📷 ${esc(g.npc)} holding ${esc(g.object)}`
+        : `${g.mood === 'happy' ? '🙂' : '🙁'} ${esc(g.npc)} — ${esc(g.mood)}`}</div>`).join('')
+    : '<div>no entries yet</div>'}</div>` +
   `<div class="log">${world.log.slice(-6).reverse().map((l) => `<div>${esc(l)}</div>`).join('')}</div>`;
 }
 

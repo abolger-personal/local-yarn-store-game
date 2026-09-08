@@ -10,6 +10,7 @@ import {
   TRAITS, randomTraits, maxWips, maxRounds, ACTION, STATE, CLOSEOUT_SEQUENCE,
   makeNpc, makeWorld, advanceRound, browseActionSet, DetermineNextBrowseAction,
   interact, noticeable, buyableTargets, visibleTo, labelOf, inDoorway, seatById, fullyExposed,
+  findPath, obstacles, closeoutFor,
 } from './visit.js';
 
 // A deterministic stand-in for Math.random, so a test asserts behaviour and not luck.
@@ -308,20 +309,196 @@ function fixture({ rng = seq(0.5), traits, seats = SEATS } = {}) {
   assert.equal(second.state, STATE.BROWSE, 'who then gets their turn');
 }
 
-// --- closeout is the hardcoded three, in order, ending at the door ----------
+// --- closeout: signing and leaving always, the Drop Off only with something to lend -------
+//
+// CHARACTER-VISIT.md moved the Drop Off from "ALWAYS 2nd to LAST" to "2nd to LAST IF NPC HAS A
+// FINISHED OBJECT", so the sequence is now per-visit rather than hardcoded.
+const runCloseout = (world, npc) => {
+  const seen = [];
+  for (let i = 0; i < 5 && npc.state !== STATE.GONE; i++) {
+    advanceRound(world);
+    if (npc.action) seen.push(npc.action.type);
+  }
+  return seen;
+};
+
 {
   const { world, npc } = fixture();
   npc.state = STATE.CLOSEOUT;
   npc.closeoutStep = 0;
+  npc.finished = [];
 
-  const seen = [];
-  for (let i = 0; i < 4 && npc.state !== STATE.GONE; i++) {
-    advanceRound(world);
-    if (npc.action) seen.push(npc.action.type);
-  }
-  assert.deepEqual(seen.slice(0, 3), [...CLOSEOUT_SEQUENCE],
-    'sign the Guestbook, lend a finished object, then leave — always in that order');
+  assert.deepEqual(closeoutFor(npc), [ACTION.SIGN_GUESTBOOK, ACTION.LEAVE],
+    'nothing to lend, so no Drop Off step exists at all');
+  const seen = runCloseout(world, npc);
+  assert.deepEqual(seen.slice(0, 2), [ACTION.SIGN_GUESTBOOK, ACTION.LEAVE],
+    'sign the Guestbook, then leave');
+  assert.ok(!seen.includes(ACTION.DROP_OFF), 'an empty-handed NPC must not visit the Drop Off');
   assert.equal(npc.state, STATE.GONE, 'and the visit is over');
+
+  // Signing ALWAYS writes an entry now. No finished object and nothing bought: a disappointed note.
+  assert.equal(world.guestbook.length, 1, 'signing always leaves an entry');
+  assert.deepEqual(
+    { kind: world.guestbook[0].kind, mood: world.guestbook[0].mood },
+    { kind: 'note', mood: 'disappointed' },
+    'no object and no purchase reads as disappointed');
+  assert.equal(world.dropOff.length, 0, 'and nothing was lent');
+}
+
+{
+  const { world, npc } = fixture();
+  npc.state = STATE.CLOSEOUT;
+  npc.closeoutStep = 0;
+  npc.finished = ['a striped scarf'];
+
+  assert.deepEqual(closeoutFor(npc), [...CLOSEOUT_SEQUENCE],
+    'with a finished object the full three-step sequence is back');
+  const seen = runCloseout(world, npc);
+  assert.deepEqual(seen.slice(0, 3), [...CLOSEOUT_SEQUENCE],
+    'sign the Guestbook, lend the finished object, then leave — in that order');
+
+  assert.equal(world.guestbook[0].kind, 'photo', 'a finished object makes it a picture, not a note');
+  assert.equal(world.guestbook[0].object, 'a striped scarf', 'and the picture is of that object');
+  assert.deepEqual(world.dropOff.map((d) => d.object), ['a striped scarf'], 'which is then lent');
+  assert.deepEqual(npc.finished, [], 'lent means it leaves the NPC — they do not take it home');
+}
+
+{
+  // Happy is "found what they are looking for", which is carrying their target.
+  const { world, npc } = fixture();
+  npc.state = STATE.CLOSEOUT;
+  npc.closeoutStep = 0;
+  npc.finished = [];
+  npc.carrying = { name: 'crochet-hook', size: 4.5 };
+  runCloseout(world, npc);
+  assert.equal(world.guestbook[0].mood, 'happy', 'leaving with their target reads as happy');
+}
+
+// --- MAX_ROUNDS -------------------------------------------------------------
+{
+  // (Openness + Industriousness + Enthusiasm) * uniform(1, 2), rolled once per visit.
+  const traits = (o, i, e) => ({ Openness: o, Industriousness: i, Enthusiasm: e });
+  assert.equal(maxRounds(traits(1, 1, 1), () => 0), 3, 'the floor is three rounds');
+  assert.equal(maxRounds(traits(5, 5, 5), () => 1), 30, 'and the ceiling is thirty');
+  assert.equal(maxRounds(traits(4, 2, 3), () => 0.5), 14, '(4+2+3) * 1.5');
+
+  // The roll is per visit, so two identical characters can have different patience.
+  const same = { Openness: 3, Industriousness: 3, Enthusiasm: 3 };
+  const rolls = new Set([0, 0.25, 0.5, 0.75, 1].map((r) => maxRounds(same, () => r)));
+  assert.ok(rolls.size > 1, 'identical traits must still give a spread of dwell times');
+}
+
+// --- Volatility 5 walks out after a fruitless interaction --------------------
+{
+  const impatient = { ...Object.fromEntries(TRAITS.map((x) => [x, 3])), Volatility: 5 };
+  const { world, pile, npc, add } = fixture({ traits: impatient });
+  npc.maxRounds = 12;
+  add(pile, 0, 0, 0, 'darning-needle', null);   // present, but not what they came for
+
+  assert.equal(interact(npc, pile, world), 'complete', 'nothing to buy and nothing to restructure');
+  assert.equal(npc.maxRounds, 1, 'Volatility 5 cuts MAX_ROUNDS to 1 after a fruitless interaction');
+}
+
+{
+  // ...and does NOT cut it when the interaction actually found the thing.
+  const impatient = { ...Object.fromEntries(TRAITS.map((x) => [x, 3])), Volatility: 5 };
+  const { world, pile, npc, add } = fixture({ traits: impatient });
+  npc.maxRounds = 12;
+  add(pile, 0, 0, 0, 'crochet-hook', 4.5);
+
+  assert.equal(interact(npc, pile, world), 'complete', 'the target was there to buy');
+  assert.ok(npc.carrying, 'so they picked it up');
+  assert.equal(npc.maxRounds, 12, 'a successful interaction leaves MAX_ROUNDS alone');
+}
+
+{
+  // A calmer shopper is unaffected by the same fruitless interaction.
+  const { world, pile, npc, add } = fixture();
+  npc.maxRounds = 12;
+  add(pile, 0, 0, 0, 'darning-needle', null);
+  interact(npc, pile, world);
+  assert.equal(npc.maxRounds, 12, 'Volatility 3 shrugs it off');
+}
+
+// --- routing around the furniture -------------------------------------------
+//
+// The invariant is checked by SAMPLING the returned polyline against the raw boxes, deliberately
+// not by reusing segmentHitsBox — a bug in that primitive must not be able to hide behind itself.
+{
+  const room = {
+    ...ROOM,
+    bounds: { minX: -2.6, maxX: 2.6, minZ: -2.6, maxZ: 2.6 },
+    solids: [{ x: -2.1, z: 1.7, w: 1.4, d: 0.45 }],            // the counter
+  };
+  const displays = [
+    { id: 'table-a', x: 1.5, z: -0.2, w: 1.0, d: 1.0 },
+    { id: 'floor-a', x: 0.55, z: 0.85, w: 0.8, d: 0.8 },
+    { id: 'table-c', x: -0.35, z: -1.75, w: 0.8, d: 0.8 },
+  ];
+  const seats = [{ id: 'chair-a', x: -1.75, z: -0.55, facing: 0, w: 0.34, d: 0.34 }];
+  const world = makeWorld({ displays, items: [], room, seats });
+  const boxes = obstacles(world);
+
+  const inside = (p, b, slack = 0) =>
+    Math.abs(p.x - b.x) <= b.w / 2 - slack && Math.abs(p.z - b.z) <= b.d / 2 - slack;
+
+  // Number of samples along the route that land well inside furniture neither end is already in.
+  const clips = (from, path) => {
+    const to = path[path.length - 1];
+    let bad = 0, a = from;
+    for (const b of path) {
+      const steps = Math.max(2, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.01));
+      for (let i = 0; i <= steps; i++) {
+        const p = { x: a.x + (b.x - a.x) * (i / steps), z: a.z + (b.z - a.z) * (i / steps) };
+        for (const box of boxes) {
+          // An endpoint genuinely INSIDE furniture — the chair you are walking to — has that
+          // obstacle dropped on purpose, so the route is allowed into it.
+          if (inside(p, box, 0.04) && !inside(from, box) && !inside(to, box)) bad++;
+        }
+      }
+      a = b;
+    }
+    return bad;
+  };
+
+  // Along the top of the room, clear of the counter's berth and of everything else.
+  assert.deepEqual(findPath(world, { x: -2, z: 2.4 }, { x: 2, z: 2.4 }), [{ x: 2, z: 2.4 }],
+    'a clear line is left alone — no waypoints, no detour');
+
+  // Straight through table-a: must go round, and must still arrive.
+  const around = findPath(world, { x: 1.5, z: -1.6 }, { x: 1.5, z: 1.2 });
+  assert.ok(around.length > 1, 'a route through a table should have been diverted');
+  assert.deepEqual(around[around.length - 1], { x: 1.5, z: 1.2 }, 'and must still end at the goal');
+  assert.equal(clips({ x: 1.5, z: -1.6 }, around), 0, 'the diverted route still crosses the table');
+
+  // Walking to a chair: the goal is inside an obstacle and must stay reachable.
+  const toChair = findPath(world, { x: 2.2, z: 1.8 }, { x: -1.75, z: -0.55 });
+  assert.deepEqual(toChair[toChair.length - 1], { x: -1.75, z: -0.55 }, 'must reach the seat itself');
+  assert.equal(clips({ x: 2.2, z: 1.8 }, toChair), 0, 'the route to a chair crosses other furniture');
+
+  // The case that made routing worth having: a berth wide enough to SEAL a walkable gap. The
+  // fallback tries a narrower berth before giving up, because squeezing past is right and walking
+  // through is not.
+  const pinched = makeWorld({
+    displays: [{ id: 'wide', x: 0, z: 0, w: 1.0, d: 4.4 }], items: [], room, seats: [],
+  });
+  const squeeze = findPath(pinched, { x: -2, z: 0 }, { x: 2, z: 0 });
+  assert.ok(squeeze.length > 1, 'should have routed around the divider rather than through it');
+
+  // A deterministic sweep of the whole floor, which is what actually catches the corner cases.
+  let checked = 0, routed = 0, crossings = 0;
+  for (let ax = -25; ax <= 25; ax += 5)
+    for (let az = -25; az <= 25; az += 5)
+      for (let bx = -25; bx <= 25; bx += 10)
+        for (let bz = -25; bz <= 25; bz += 10) {
+          const from = { x: ax / 10, z: az / 10 }, to = { x: bx / 10, z: bz / 10 };
+          const path = findPath(world, from, to);
+          checked++;
+          if (path.length > 1) routed++;
+          crossings += clips(from, path);
+        }
+  assert.equal(crossings, 0, `${crossings} route samples cut through furniture across ${checked} routes`);
+  assert.ok(routed > checked * 0.1, 'suspiciously few routes were diverted — is the pathing running?');
 }
 
 // --- labels ------------------------------------------------------------------

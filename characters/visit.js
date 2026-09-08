@@ -36,13 +36,16 @@ export function randomTraits(rng = Math.random) {
 export const maxWips = (t) => t.Enthusiasm + t.Openness + t.Volatility;
 
 /**
- * TODO(spec): CHARACTER-VISIT.md ends with the heading "Calculation of MAX_ROUNDS from Character
- * attributes:" and no body. This placeholder is shaped like the real thing so the loop runs, and is
- * deliberately trait-driven rather than constant so the debug panel shows two different dwell times:
- * an eager, dogged shopper stays; an anxious one leaves early.
+ * CHARACTER-VISIT.md: "(Openness+Industriousness+Enthusiasm) * (Uniform random chance value from
+ * 1 to 2)". Rolled ONCE per visit, so two identical characters can still have different patience.
+ *
+ * NOTE(spec): the doc annotates the range as "worst case 3 to longest visit 45". With traits at
+ * 1-5 the formula gives 3 to 30 — 45 would need a x3 multiplier, not x2. The formula is explicit
+ * and the range reads like arithmetic done in passing, so the formula is what is implemented. Say
+ * the word if the range was the intent and the multiplier should be 1-3.
  */
-export function maxRounds(t) {
-  return clamp(4 + t.Enthusiasm + t.Industriousness - t.Withdrawal, 3, 18);
+export function maxRounds(t, rng = Math.random) {
+  return Math.max(1, Math.round((t.Openness + t.Industriousness + t.Enthusiasm) * (1 + rng())));
 }
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -99,7 +102,7 @@ export function makeNpc({ id, name, species, target, traits, rng = Math.random }
     from: { x: 0, z: 0 },         // where it was at the start of it, so the scene can interpolate
     facing: 0,
     roundsInStore: 0,
-    maxRounds: maxRounds(t),
+    maxRounds: maxRounds(t, rng),
     action: null,                 // { type, params } chosen for the round just resolved
     lastAction: null,             // the round before that — the "Round N-1" the spec keeps citing
     prescribed: null,             // { type, params } forced for the NEXT round, or null
@@ -108,10 +111,18 @@ export function makeNpc({ id, name, species, target, traits, rng = Math.random }
     // progress. Only the COUNT matters to the browse set today: more WIPs, more chance of the
     // "work on a WIP" action being drawn.
     wips: Array.from({ length: 1 + Math.floor(rng() * 3) }, (_, i) => `WIP ${i + 1}`),
+    // CHARACTER-VISIT.md's closeout turns on whether an NPC HAS a finished object — either one
+    // they brought with them or one they completed during the visit.
+    // TODO(spec): neither the chance of arriving with one nor the chance of finishing one is
+    // specified. Both are placeholders here, shaped so that CHARACTER-ATTRIBUTES.md's stated goal
+    // holds — keeping NPCs in the store longer should produce more Finished Objects.
+    finished: rng() < 0.3 ? ['a finished object from home'] : [],
     carrying: null,               // the notion once bought — CHARACTER-VISIT has them leave with it
+    path: [],                     // this round's waypoints, last one is the destination
     seat: null,                   // id of the seat this NPC currently occupies, or null
     restructured: [],             // displays this NPC has already tidied/spread/dug through
     closeoutStep: 0,
+    closeout: [],                 // the steps this visit will actually take, fixed when it starts
     note: '',                     // one line of "why", for the debug panel
   };
 }
@@ -133,6 +144,11 @@ export function makeWorld({ displays, items, room, seats = [], rng = Math.random
     room,
     seats: seats.map((s) => ({ ...s, occupiedBy: null })),
     door: { ...room.door, busy: null },   // busy = npc id currently in the doorway: one at a time
+    // The two things a visit leaves behind. LYS.md calls the Guestbook the emotional payoff of the
+    // loop, so it is real data from the start rather than a log line — even though nothing draws
+    // it as a book yet.
+    guestbook: [],
+    dropOff: [],
     rng,
     log: [],
   };
@@ -201,6 +217,179 @@ function segmentHitsBox(a, b, box) {
 /** CHARACTER-VISIT.md: visible unless something intersects the line to the display's centroid. */
 export function visibleTo(world, from, display) {
   return !world.displays.some((d) => d.id !== display.id && segmentHitsBox(from, display, d));
+}
+
+// ---------------------------------------------------------------- getting there
+//
+// Until now an NPC teleported to the round's destination and the renderer drew a straight line
+// between the two, so they walked through tables. They now get a ROUTE — a short list of waypoints
+// the renderer follows instead — which keeps the round-based sim exactly as it was: the destination
+// is still reached this round, it is just no longer reached through the furniture.
+//
+// A visibility graph rather than a nav grid: this room holds under a dozen rectangles, the player
+// can move them anywhere at any moment (DISPLAYS.md rule 10), and a graph over their corners needs
+// no grid to rebuild when they do. DESIGN-DECISIONS.md asks for grid A* with string-pulling, which
+// is the right answer once there is real geometry to walk on; against a handful of boxes it would
+// be more code for a coarser path.
+//
+// ponytail: O(n²) edges rebuilt per query, no caching. ~34 nodes and ~1k segment tests per NPC per
+// ROUND (not per frame), which is nothing. Cache the graph per layout if the room ever gets busy.
+
+/** How wide a berth to give furniture. A shoulder, not a body: enough that a walker rounds a
+ *  corner rather than clipping it, without opening a gap they visibly steer through. */
+const PATH_CLEARANCE = 0.22;
+/** The fallback berth, used only when the generous one seals the room. A display parked a
+ *  shoulder's width from a wall leaves a strip of real floor that a 0.22 berth swallows whole, and
+ *  the honest answer to a tight gap is to squeeze through it, not to walk through the display. */
+const TIGHT_CLEARANCE = 0.05;
+/** Standing INSIDE something is a harder error than brushing it, so the push-out is tighter. It
+ *  must stay well under a display's standing clearance (STAND_OFF minus its half depth) or an NPC
+ *  who has correctly walked up to a display gets shoved back off it. */
+const BODY_RADIUS = 0.12;
+
+const insideBox = (p, b, pad = 0) =>
+  Math.abs(p.x - b.x) <= b.w / 2 + pad && Math.abs(p.z - b.z) <= b.d / 2 + pad;
+
+const grow = (b, pad) => ({ x: b.x, z: b.z, w: b.w + pad * 2, d: b.d + pad * 2 });
+
+/**
+ * Everything solid an NPC has to walk around. Displays and chairs come from the world; the counter
+ * and anything else built into the room arrive as `room.solids`, because the sim does not own the
+ * scene's furniture — it is told about it, the same way it is told where the door is.
+ */
+export function obstacles(world) {
+  const out = world.displays.map((d) => ({ x: d.x, z: d.z, w: d.w, d: d.d }));
+  for (const s of world.seats) out.push({ x: s.x, z: s.z, w: s.w ?? 0.34, d: s.d ?? 0.34 });
+  for (const b of world.room.solids ?? []) out.push({ x: b.x, z: b.z, w: b.w, d: b.d });
+  return out;
+}
+
+/** Corners of a box grown by the walker's berth — the only places a shortest path can turn. */
+const cornersOf = (b, pad) => {
+  const hw = b.w / 2 + pad, hd = b.d / 2 + pad;
+  return [{ x: b.x - hw, z: b.z - hd }, { x: b.x + hw, z: b.z - hd },
+          { x: b.x + hw, z: b.z + hd }, { x: b.x - hw, z: b.z + hd }];
+};
+
+/**
+ * Slide a point just clear of every obstacle's berth, so the graph has somewhere to start from.
+ *
+ * An endpoint sitting inside the BERTH but outside the furniture itself — a customer a hand's width
+ * from a chair, a destination tucked against a table — makes every ray out of it collide. That
+ * disconnects it from the graph entirely, and the straight-line escape hatch then walked them
+ * through the very table the routing exists to avoid. Nudging is the fix rather than shrinking the
+ * berth, because the berth is what keeps them from clipping corners in the first place.
+ */
+function nudgeClear(p, boxes, pad) {
+  const out = { x: p.x, z: p.z };
+  // A push out of one box can push into another, so settle. Four passes is plenty for a shop; it
+  // stops early the moment nothing moves.
+  for (let pass = 0; pass < 4; pass++) {
+    let moved = false;
+    for (const b of boxes) {
+      if (!insideBox(out, b, pad)) continue;
+      const hw = b.w / 2 + pad, hd = b.d / 2 + pad;
+      const dx = out.x - b.x, dz = out.z - b.z;
+      if (hw - Math.abs(dx) < hd - Math.abs(dz)) out.x = b.x + (dx < 0 ? -hw : hw);
+      else out.z = b.z + (dz < 0 ? -hd : hd);
+      moved = true;
+    }
+    if (!moved) break;
+  }
+  return out;
+}
+
+/**
+ * The visibility graph at one berth width. Returns the waypoints, or null when the goal cannot be
+ * reached at this width — which is the signal to try again with a narrower one.
+ */
+function routeAt(world, from, to, solid, pad) {
+  // Tested against a slightly SMALLER box than the corners are placed on, or a corner sits exactly
+  // on the boundary of its own obstacle and floating point calls that a collision — which would
+  // disconnect every turn from the graph and route nothing.
+  const hit = solid.map((b) => grow(b, Math.max(0, pad - 0.02)));
+  const blocked = (a, c) => hit.some((b) => segmentHitsBox(a, c, b));
+
+  const { minX, maxX, minZ, maxZ } = world.room.bounds;
+  const start = nudgeClear(from, solid, pad);
+  const goal = nudgeClear(to, solid, pad);
+  if (!blocked(start, goal)) {
+    const direct = [to];
+    if (start.x !== from.x || start.z !== from.z) direct.unshift(start);
+    return direct;
+  }
+
+  const nodes = [start, goal];
+  for (const b of solid)
+    for (const c of cornersOf(b, pad))
+      if (c.x >= minX && c.x <= maxX && c.z >= minZ && c.z <= maxZ &&
+          !hit.some((o) => insideBox(c, o))) nodes.push(c);
+
+  // Dijkstra. Small enough that a linear scan for the nearest unvisited node beats a heap.
+  const n = nodes.length;
+  const dist = new Array(n).fill(Infinity);
+  const prev = new Array(n).fill(-1);
+  const done = new Array(n).fill(false);
+  dist[0] = 0;
+  for (;;) {
+    let u = -1;
+    for (let i = 0; i < n; i++) if (!done[i] && dist[i] < (u < 0 ? Infinity : dist[u])) u = i;
+    if (u < 0 || u === 1) break;
+    done[u] = true;
+    for (let v = 0; v < n; v++) {
+      if (done[v] || v === u) continue;
+      const step = Math.hypot(nodes[v].x - nodes[u].x, nodes[v].z - nodes[u].z);
+      if (dist[u] + step >= dist[v] || blocked(nodes[u], nodes[v])) continue;
+      dist[v] = dist[u] + step;
+      prev[v] = u;
+    }
+  }
+  if (prev[1] < 0) return null;
+
+  const path = [];
+  for (let i = 1; i !== 0; i = prev[i]) path.unshift(nodes[i]);
+  // The graph ran between the nudged copies; the walker has to leave from where it actually is and
+  // arrive where it was actually sent. The stitched-on legs are short and point straight out of (or
+  // into) the berth they were nudged from, so neither can cut a corner.
+  path[path.length - 1] = to;
+  if (start.x !== from.x || start.z !== from.z) path.unshift(start);
+  return path;
+}
+
+/**
+ * Waypoints from `from` to `to` that miss the furniture, `to` last. Returns `[to]` when the way is
+ * already clear, which is the common case and costs one test per obstacle.
+ *
+ * Obstacles genuinely CONTAINING either end are dropped rather than treated as walls. That is what
+ * lets an NPC reach a CHAIR — the goal is inside the thing they are walking to — and it also means
+ * a display dropped on top of somebody lets them walk out instead of trapping them. The test is
+ * against the real box, not the berth: merely standing NEAR a chair must not buy permission to walk
+ * straight through it.
+ */
+export function findPath(world, from, to) {
+  const solid = obstacles(world).filter((b) => !insideBox(from, b) && !insideBox(to, b));
+  if (!solid.some((b) => segmentHitsBox(from, to, grow(b, PATH_CLEARANCE - 0.02)))) return [to];
+
+  for (const pad of [PATH_CLEARANCE, TIGHT_CLEARANCE]) {
+    const path = routeAt(world, from, to, solid, pad);
+    if (path) return path;
+  }
+  // Genuinely walled in. Walk the straight line rather than refuse to move: a customer frozen
+  // mid-shop with no explanation is a worse failure than one who clips a table the player has
+  // deliberately boxed them into.
+  return [to];
+}
+
+/** Shove an NPC out of anything they have ended up standing inside, by the shortest way out. */
+function pushOutOfFurniture(world, npc) {
+  for (const b of obstacles(world)) {
+    if (!insideBox(npc, b, BODY_RADIUS)) continue;
+    const hw = b.w / 2 + BODY_RADIUS, hd = b.d / 2 + BODY_RADIUS;
+    const dx = npc.x - b.x, dz = npc.z - b.z;
+    // Whichever face is nearest: overlap along X versus along Z.
+    if (hw - Math.abs(dx) < hd - Math.abs(dz)) npc.x = b.x + (dx < 0 ? -hw : hw);
+    else npc.z = b.z + (dz < 0 ? -hd : hd);
+  }
 }
 
 // ---------------------------------------------------------------- display contents
@@ -442,6 +631,20 @@ export function interact(npc, display, world) {
     return 'complete';
   }
 
+  // CHARACTER-VISIT.md: "Volatility=5: an interaction with a Noticed Display that does not result
+  // in finding what they need will reduce original calculation of MAX_ROUNDS to 1, causing NPC to
+  // leave immediately." Everything below this point is a non-buy, so this is the one place it goes.
+  //
+  // NOTE(spec): read literally, that includes an interaction that RESTRUCTURES the display — a
+  // tidy or a dig sets up a buy next round but does not itself find anything. So a Volatility 5
+  // shopper storms out having just rearranged a shelf, which is in character but does mean the
+  // restructure never pays off for them. Flag if the intent was the terminal "looked, nothing
+  // doing" outcome only.
+  if (t.Volatility === 5 && npc.maxRounds > 1) {
+    npc.maxRounds = 1;
+    say(world, npc, `Volatility 5 — no luck at the ${display.id}, MAX_ROUNDS cut to 1`);
+  }
+
   // else: does this NPC's personality make them rearrange it?
   const shelf = pickPlane(display, items, npc);
   const present = onPlane(display, items, shelf);
@@ -535,7 +738,16 @@ function separate(world) {
   // Generous pass budget: this is pairwise (Gauss-Seidel) relaxation, which converges slowly when
   // several NPCs form a CHAIN pinned against a boundary — the dropOff row is exactly that. It runs
   // once per round, not per frame, so ~64 passes over ~10 NPCs costs nothing worth measuring.
+  //
+  // `slide` is a TANGENTIAL term, switched on only once the straight push has stopped making
+  // progress. Two NPCs in a slot between two chairs are pushed apart along a line the furniture
+  // blocks: the straight term cancels exactly against the push-out and the pair never separates,
+  // however many passes it gets. Rotating the pair is the only way out of a collinear pin, and
+  // nothing in a purely radial push can find it. The sign comes from the pair's own indices, so a
+  // seed still replays identically.
+  let stalled = 0, previous = Infinity;
   for (let pass = 0; pass < 64; pass++) {
+    const slide = stalled > 2 ? 0.5 : 0;
     for (let i = 0; i < movable.length; i++) {
       for (let j = i + 1; j < movable.length; j++) {
         const a = movable[i], b = movable[j];
@@ -547,12 +759,17 @@ function separate(world) {
         // pulls them together instead.
         const [ux, uz] = len < 1e-6 ? [1, 0] : [dx / len, dz / len];
         const push = (gap - len) / 2 + 1e-4;   // overshoot a hair, so it converges instead of grazing
-        a.x -= ux * push; a.z -= uz * push;
-        b.x += ux * push; b.z += uz * push;
+        const turn = slide * ((i + j) % 2 ? 1 : -1);
+        const vx = ux - uz * turn, vz = uz + ux * turn;
+        a.x -= vx * push; a.z -= vz * push;
+        b.x += vx * push; b.z += vz * push;
       }
     }
     for (const npc of movable) constrain(world, npc);
-    if (worstOverlap(movable, gap) <= 0) break;
+    const worst = worstOverlap(movable, gap);
+    if (worst <= 0) break;
+    stalled = worst >= previous - 1e-6 ? stalled + 1 : 0;
+    previous = worst;
   }
 }
 
@@ -567,6 +784,11 @@ function worstOverlap(movable, gap) {
 /** Keep one NPC inside the room and off the doormat. */
 function constrain(world, npc) {
   const { minX, maxX, minZ, maxZ } = world.room.bounds;
+  npc.x = clamp(npc.x, minX, maxX);
+  npc.z = clamp(npc.z, minZ, maxZ);
+  // Routing keeps them out of the furniture in TRANSIT; this keeps them out of it at REST, where
+  // separation nudges and random wander spots can both drop somebody inside a table.
+  pushOutOfFurniture(world, npc);
   npc.x = clamp(npc.x, minX, maxX);
   npc.z = clamp(npc.z, minZ, maxZ);
   if (!inDoorway(world, npc)) return;
@@ -595,6 +817,10 @@ function admitOne(world) {
 function stepNpc(npc, world, snapshot) {
   npc.from = { x: npc.x, z: npc.z };
   npc.lastAction = npc.action;
+  // A round that resolves WITHOUT a move must not inherit last round's waypoints: the renderer
+  // would walk that stale detour and loop back to where it started, since the destination is now
+  // where the NPC already is. Cleared here, at the one point every round passes through.
+  npc.path = [];
 
   switch (npc.state) {
     case STATE.QUEUED:
@@ -604,7 +830,7 @@ function stepNpc(npc, world, snapshot) {
 
     case STATE.ENTERING:
       npc.action = { type: ACTION.ENTER, params: {} };
-      moveTo(npc, world.room.door);
+      moveTo(world, npc, world.room.door);
       npc.state = STATE.BROWSE;
       world.door.busy = null;
       say(world, npc, `came in looking for ${labelOf(npc.target)}`);
@@ -620,7 +846,7 @@ function stepNpc(npc, world, snapshot) {
 
     case STATE.LEAVING:
       npc.action = { type: ACTION.LEAVE, params: {} };
-      moveTo(npc, world.room.outside);
+      moveTo(world, npc, world.room.outside);
       npc.state = STATE.GONE;
       world.door.busy = null;
       say(world, npc, 'left');
@@ -653,7 +879,7 @@ function stepBrowse(npc, world, snapshot) {
 
   switch (action.type) {
     case ACTION.WALK_TO_DISPLAY:
-      moveTo(npc, display.standAt);
+      moveTo(world, npc, display.standAt);
       npc.atDisplay = display.id;
       // "PRESCRIBED NEXT ACTION: Interact with noticed display."
       npc.prescribed = { type: ACTION.INTERACT, params: { displayId: display.id } };
@@ -673,7 +899,7 @@ function stepBrowse(npc, world, snapshot) {
 
     case ACTION.WALK_TO_NPC: {
       const other = snapshot.find((o) => o.id === action.params.npcId);
-      moveTo(npc, approach(npc, other, world.room.personalSpace));
+      moveTo(world, npc, approach(npc, other, world.room.personalSpace));
       npc.atDisplay = null;
       npc.prescribed = { type: ACTION.WAIT, params: {} };   // "NPC wait 1 round"
       say(world, npc, `went over to ${world.npcs.find((n) => n.id === other.id).name}`);
@@ -686,14 +912,14 @@ function stepBrowse(npc, world, snapshot) {
       const free = seat && seat.occupiedBy === null ? seat : freeSeats(world, npc)[0];
       if (!free) {                       // every chair is taken; wander instead of standing still
         npc.action = { type: ACTION.MOVE, params: {} };
-        moveTo(npc, randomSpot(world));
+        moveTo(world, npc, randomSpot(world));
         npc.atDisplay = null;
         npc.prescribed = null;
         say(world, npc, 'went looking for a seat, all taken');
         return;
       }
       claimSeat(world, npc, free);
-      moveTo(npc, free);
+      moveTo(world, npc, free);
       npc.facing = free.facing ?? npc.facing;
       npc.atDisplay = null;
       npc.prescribed = { type: ACTION.WORK_ON_WIP, params: { ...action.params, seatId: free.id } };
@@ -705,6 +931,17 @@ function stepBrowse(npc, world, snapshot) {
       const seat = npc.seat !== null ? seatById(world, npc.seat) : null;
       if (seat) npc.facing = seat.facing ?? npc.facing;
       npc.prescribed = null;
+      // A round's work sometimes finishes the project. This is what makes CHARACTER-ATTRIBUTES.md's
+      // stated goal real — keeping NPCs in the store longer produces more Finished Objects — and it
+      // is what puts a photo rather than a note in the Guestbook on the way out.
+      // TODO(spec): the chance is a placeholder. Industriousness drives it because it is the
+      // conscientiousness aspect, but the doc does not say so.
+      if (world.rng() < npc.traits.Industriousness / 10) {
+        npc.wips = npc.wips.filter((w) => w !== action.params.wip);
+        npc.finished.push(action.params.wip);
+        say(world, npc, `finished ${action.params.wip}!`);
+        return;
+      }
       say(world, npc, `sat and worked on ${action.params.wip}`);
       return;
     }
@@ -720,7 +957,7 @@ function stepBrowse(npc, world, snapshot) {
     }
 
     case ACTION.MOVE:
-      moveTo(npc, randomSpot(world));
+      moveTo(world, npc, randomSpot(world));
       npc.atDisplay = null;
       npc.prescribed = null;
       say(world, npc, 'wandered across the store');
@@ -728,21 +965,57 @@ function stepBrowse(npc, world, snapshot) {
   }
 }
 
+/**
+ * CHARACTER-VISIT.md: signing ALWAYS produces an entry. What goes in it depends on whether they
+ * have a finished object — one they brought in or one they completed here.
+ *
+ * TODO(spec): CHARACTER-ATTRIBUTES.md wants these written by a generator that makes an NPC sound
+ * like themselves. This records WHAT the entry is; the prose is P5's job.
+ */
+function signGuestbook(world, npc) {
+  const object = npc.finished[0] ?? null;
+  const entry = object
+    ? { npc: npc.name, kind: 'photo', object, mood: null, round: world.round }
+    // "happy (found what they are looking for) or disappointed (did not find what they needed)" —
+    // carrying their target IS having found it, which is what the buy branch of interact() sets.
+    : { npc: npc.name, kind: 'note', object: null,
+        mood: npc.carrying ? 'happy' : 'disappointed', round: world.round };
+  world.guestbook.push(entry);
+  return entry;
+}
+
+/**
+ * The steps THIS visit will take. The Drop Off is conditional — you cannot lend a finished object
+ * you do not have — while signing and leaving always happen.
+ */
+export const closeoutFor = (npc) =>
+  CLOSEOUT_SEQUENCE.filter((step) => step !== ACTION.DROP_OFF || npc.finished.length > 0);
+
 function stepCloseout(npc, world) {
   releaseSeat(world, npc);            // you do not stay in the chair on your way out
-  const type = CLOSEOUT_SEQUENCE[npc.closeoutStep];
+  // Decided once, when the closeout begins, and then followed. Recomputing it every round would
+  // drop the Drop Off step out from under the sequence the moment lending empties npc.finished —
+  // leaving the NPC mid-walk with no step to take.
+  if (npc.closeoutStep === 0) npc.closeout = closeoutFor(npc);
+  const type = npc.closeout[npc.closeoutStep];
   npc.action = { type, params: {} };
 
   if (type === ACTION.SIGN_GUESTBOOK) {
-    moveTo(npc, world.room.guestbook);
+    moveTo(world, npc, world.room.guestbook);
     npc.closeoutStep += 1;
-    say(world, npc, npc.carrying ? 'signed the Guestbook with their haul' : 'signed the Guestbook');
+    const entry = signGuestbook(world, npc);
+    say(world, npc, entry.kind === 'photo'
+      ? `signed the Guestbook — a picture of them holding ${entry.object}`
+      : `signed the Guestbook — a ${entry.mood} note`);
     return;
   }
   if (type === ACTION.DROP_OFF) {
-    moveTo(npc, world.room.dropOff);
+    moveTo(world, npc, world.room.dropOff);
     npc.closeoutStep += 1;
-    say(world, npc, 'lent a finished object to the Drop Off');
+    // Lent, not given: it leaves the NPC and goes on display in the shop.
+    const object = npc.finished.shift();
+    world.dropOff.push({ npc: npc.name, object, round: world.round });
+    say(world, npc, `lent ${object} to the Drop Off`);
     return;
   }
   // LEAVE — needs the door, and may have to queue for it behind an arrival.
@@ -751,7 +1024,7 @@ function stepCloseout(npc, world) {
     return;
   }
   world.door.busy = npc.id;
-  moveTo(npc, world.room.door);
+  moveTo(world, npc, world.room.door);
   npc.state = STATE.LEAVING;
   say(world, npc, 'heading for the door');
 }
@@ -762,8 +1035,12 @@ function stepCloseout(npc, world) {
 // DESIGN-DECISIONS.md calls for grid A* with string-pulling plus separation steering, and there is
 // no walk animation yet either. Both are on the list in VISIT-POC-TODO.md.
 
-function moveTo(npc, to) {
-  npc.facing = Math.atan2(to.x - npc.x, to.z - npc.z);
+function moveTo(world, npc, to) {
+  // The route is from where they ARE to where they are going. The renderer walks it; the sim still
+  // arrives this round, which is what keeps rounds lockstep.
+  npc.path = findPath(world, npc, to);
+  const first = npc.path[0] ?? to;
+  npc.facing = Math.atan2(first.x - npc.x, first.z - npc.z);
   npc.x = to.x;
   npc.z = to.z;
 }

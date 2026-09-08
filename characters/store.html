@@ -161,7 +161,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
-  BASE_PARAMS, TONE_MAPPING, POSES, POSE_KEYS, BUILD,
+  BASE_PARAMS, TONE_MAPPING, POSES, POSE_KEYS, BUILD, NAMES,
   createCharacter, applyPose, setViewMode, disposeCharacter,
   setGeometryDetail, GEO_DETAIL, getSpecies, speciesIds, pick,
 } from './npc.js';
@@ -187,6 +187,7 @@ import {
 
 import {
   TRAITS, ACTION, STATE, maxWips, makeNpc, makeWorld, advanceRound, labelOf, fullyExposed, seatById,
+  rejoin, regulars,
 } from './visit.js';
 
 console.info('LYS build', BUILD);
@@ -1925,28 +1926,55 @@ function specFor(want, npc) {
   return { name: want.tool, size: want.size };
 }
 
-const NAMES = ['Marguerite', 'Bramble', 'Wilhelmina', 'Otto', 'Pernilla', 'Casimir', 'Juniper', 'Bo'];
+// Names are CLAIMED, never cycled. `NAMES[i % NAMES.length]` was fine when every customer was new
+// each restart, but regulars persist across days and keep their names, so an index stopped
+// tracking identity — a new arrival could walk in wearing the name of somebody already in the
+// room. Two different characters sharing a name is worse than a dull name, because the whole
+// point of the roster is recognising who came back.
+const usedNames = new Set();
+
+function claimName() {
+  const free = NAMES.filter((n) => !usedNames.has(n));
+  // Deliberately never freed, even for customers who will not return: within one session a name
+  // belongs to one character, full stop. The numbered fallback is visible on purpose — if the shop
+  // ever gets through 110 regulars, "Hazel 2" says so rather than quietly pretending.
+  let name = free.length ? pick(free) : null;
+  for (let k = 2; !name; k++) {
+    const candidate = `${NAMES[usedNames.size % NAMES.length]} ${k}`;
+    if (!usedNames.has(candidate)) name = candidate;
+  }
+  usedNames.add(name);
+  return name;
+}
 
 function spawnCast() {
   for (const rec of cast) { castGroup.remove(rec.built.root); disposeCharacter(rec.built); }
   cast = [];
 
   const npcs = [];
+  // Regulars fill the queue first, then new faces make up the numbers. A returning customer is
+  // rebuilt as a body but rejoined as a MIND: rejoin() keeps their traits, preferences, earned
+  // skill and part-finished projects, and clears only what belongs to one visit.
+  const coming = roster.slice(0, S.npcCount);
   for (let i = 0; i < S.npcCount; i++) {
-    const kit = getSpecies(pick(speciesIds()));
+    const returning = coming[i] ?? null;
+    const kit = getSpecies(returning ? returning.speciesId : pick(speciesIds()));
     const P = kit.randomise(structuredClone(kit.defaults));
     P.partShadows = S.partShadows;
     P.mergeMeshes = S.mergeMeshes;
     const built = createCharacter(P, kit);
 
-    const npc = makeNpc({
-      id: `npc${i}`,
-      name: NAMES[i % NAMES.length],
-      species: kit.label,
-      // target is no longer authored: makeNpc rolls WIPs, and what those WIPs still need IS the
-      // shopping list. This is just the headline one, for the debug panel.
-      target: null,
-    });
+    const npc = returning
+      ? rejoin(returning)
+      : makeNpc({
+          id: `npc-${nextNpcId++}`,
+          name: claimName(),
+          species: kit.label,
+          // target is no longer authored: makeNpc rolls WIPs, and what those WIPs still need IS
+          // the shopping list. This is just the headline one, for the debug panel.
+          target: null,
+        });
+    npc.speciesId = kit.id;
     npc.target = wantsOf(npc)[0] ?? null;
     // queue up outside, single file, so entering one at a time is visible as well as modelled
     npc.x = room.queueAt.x + (i - (S.npcCount - 1) / 2) * 0.0;
@@ -1971,10 +1999,21 @@ function spawnCast() {
   return npcs;
 }
 
-function restart() {
+// The shop's regulars, surviving a restart. CHARACTER-VISIT.md: an NPC who bought something or got
+// some crafting done comes back — and comes back as themselves, with their skill and their
+// half-finished projects. That has to outlive `world`, which restart() throws away, so it lives
+// here rather than on the world.
+let roster = [];
+// Ids have to be unique across days too — a regular is matched to the roster by id, so a new
+// customer reusing "npc0" would be mistaken for one.
+let nextNpcId = 0;
+
+/** Start a new day. Regulars from the last one come back first, with everything they had. */
+function restart({ keepRegulars = true } = {}) {
   buildChairs(S.chairCount);      // before the displays: their slots get masked against the chairs
   buildDisplays(S.displayCount);
   stockDisplays();
+  if (!keepRegulars) roster = [];
   const npcs = spawnCast();
   seedWants(npcs);
   world = makeWorld({ displays, items, room, seats });
@@ -1996,6 +2035,11 @@ function doAdvanceRound() {
   if (!world) return;
   if (!world.npcs.some((n) => n.state !== STATE.GONE)) return;   // shop is empty, stop the clock
   advanceRound(world);
+  // Regulars are collected as they leave rather than at restart, because restart() replaces the
+  // world and the list would go with it.
+  for (const npc of world.returning) {
+    if (!roster.some((r) => r.id === npc.id)) roster.push(npc);
+  }
   autoElapsed = 0;
 
   for (const rec of cast) {
@@ -2336,6 +2380,7 @@ function drawDebug() {
         <span class="k">· ${esc(n.species)}</span></div>
       ${row('wants', n.target ? `${n.target.kind}${n.target.units > 1 ? ` x${n.target.units}` : ''}` : 'nothing')}
       ${row('craft', `skill ${n.prefs.skill} · ${n.prefs.crafts.join('/')}`)}
+      ${n.visits > 1 ? row('regular', `visit #${n.visits}`) : ''}
       ${n.considering ? `<div class="row"><span class="k">considering</span><span class="got">${esc(labelOf(items[n.considering.index]))}</span></div>` : ''}
       ${n.carrying ? `<div class="row"><span class="k">carrying</span><span class="got">${esc(labelOf(n.carrying))} ✓</span></div>` : ''}
       ${row('round', `${n.roundsInStore} / ${n.maxRounds} MAX_ROUNDS`)}
@@ -2678,13 +2723,17 @@ const gui = new GUI({ title: 'store' });
 // Counts are dropdowns, not sliders: each value is an authored layout from a fixed pool, so the
 // legal values are discrete and the list makes that obvious.
 const counts = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => [String(i + 1), i + 1]));
-gui.add(S, 'npcCount', counts(NAMES.length)).name('NPCs').onChange(restart);
+// Capped on what the scene can carry, not on how many names exist — the name list is now deep
+// enough to serve a roster across many days and would otherwise offer a 110-entry dropdown.
+const MAX_NPCS = 8;
+gui.add(S, 'npcCount', counts(MAX_NPCS)).name('NPCs').onChange(restart);
 gui.add(S, 'displayCount', counts(DISPLAY_SLOTS.length)).name('displays').onChange(restart);
 // 0 chairs is a legitimate case to test, not a mistake: it exercises the "went looking for a seat,
 // all taken" fallback, which is otherwise hard to reach.
 gui.add(S, 'chairCount', { 0: 0, ...counts(SEAT_SLOTS.length) }).name('chairs').onChange(restart);
 gui.add({ f: doAdvanceRound }, 'f').name('advance round  (Space)');
-gui.add({ f: restart }, 'f').name('restart visit  (R)');
+gui.add({ f: () => restart() }, 'f').name('next day — regulars return  (R)');
+gui.add({ f: () => restart({ keepRegulars: false }) }, 'f').name('all new customers');
 gui.add(S, 'autoSeconds', 2, 60, 1).name('auto interval (s)');
 gui.add(S, 'travel', 0.2, 4, 0.1).name('travel anim (s)');
 gui.add(S, 'travelJitter', 0, 2, 0.05).name('start stagger (s)');

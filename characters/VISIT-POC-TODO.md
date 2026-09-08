@@ -277,6 +277,35 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
   - *Notion art went blurry.* `extendAtlas` was scaling the loaded sheet UP to fit a 128px
     placeholder row, resampling every existing illustration. It now draws the source at native size
     and fits the new row to it.
+- **Returning visitors — and they are what makes Finished Objects happen.** An NPC who buys
+  anything or actually works on a WIP is marked for return and joins the shop's regulars;
+  `rejoin(npc)` brings them back as themselves — same traits and preferences, same crafter skill
+  including any +1 they earned, same WIP slots at the progress they left them at, still wearing
+  what they were wearing. Only visit-scoped state resets (and DISPLAYS.md rule 9 says the
+  restructure budget is one of those, so a regular may tidy the same display again).
+
+  Measured over repeated days on the same shop, comparing with and without the roster:
+
+  | Days | FOs with regulars | Without | Lift |
+  | --- | --- | --- | --- |
+  | 1 | 0.00% | 0.00% | — |
+  | 3 | 3.33% | 0.14% | 24x |
+  | 5 | 7.50% | 0.17% | 45x |
+  | 10 | **23.54%** | 0.42% | **56x** |
+
+  Day one produces nothing, which is correct: a 20-unit sweater is twenty rounds of *sitting*, more
+  than one visit's rounds even before browsing. Nothing but a cowl could ever be finished in a
+  single visit, which is exactly why the roster matters. It also supersedes the earlier note that
+  "projects rarely finish" — they rarely finish *in one day*.
+
+  `rejoin` lists every field it resets explicitly rather than rebuilding the NPC and copying a few
+  back, because the dangerous failure is not a crash: it is a customer who quietly returns a
+  stranger, with their skill or their half-knitted sweater silently gone. Mutation-tested four ways.
+
+  Still open: the roster is unbounded and unordered (everyone who qualifies comes back, oldest
+  first, up to the NPC count) and lives only in memory. Who returns *when* wants to be a real
+  scheduling decision, and it is the hook for LYS.md's day cycle.
+
 - **Guestbook entries carry icon tags** from CHARACTER-VISIT.md's list: one mood icon (📷 photo, or
   🙂 / 🙁) plus tags for what happened — 🧶 📖 🪡 bought, 🎁 lent, 🧑‍🤝‍🧑 chatted, 🪑 sat and worked,
   ⏳ ran out of rounds, 💨 left in a huff. Every one is read off state the visit already tracked, so

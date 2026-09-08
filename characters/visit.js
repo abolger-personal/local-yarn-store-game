@@ -1165,8 +1165,64 @@ function stepCloseout(npc, world) {
   world.door.busy = npc.id;
   moveTo(world, npc, world.room.door);
   npc.state = STATE.LEAVING;
+  if (npc.willReturn && !world.returning.some((r) => r.id === npc.id)) {
+    world.returning.push(npc);
+    say(world, npc, 'heading for the door — and will be back');
+    return;
+  }
   say(world, npc, 'heading for the door');
 }
+
+// ---------------------------------------------------------------- coming back
+//
+// CHARACTER-VISIT.md: "A returning NPC comes back as themselves: same traits and craft
+// preferences, same crafter skill level (including any +1 earned by finishing something), same WIP
+// slots at the progress they left them at, and still wearing whatever they were wearing."
+//
+// This is the mechanic that makes long projects possible at all. A sweater is twenty units, which
+// at an average crafter is twenty rounds of SITTING — more than one visit's worth of rounds even
+// before browsing. Without carrying progress across visits, nothing but a cowl would ever be
+// finished, and CHARACTER-ATTRIBUTES.md's promise that knowing your customers yields more Finished
+// Objects would have no way to come true.
+
+/**
+ * Everything a fresh visit resets. Listed explicitly rather than as "rebuild the NPC and copy a
+ * few fields over", because the interesting failure is the opposite of a crash: a customer who
+ * quietly comes back a stranger, with their skill or their half-knitted sweater silently gone.
+ * Anything NOT named here persists on purpose.
+ */
+export function rejoin(npc, { at, rng = Math.random } = {}) {
+  npc.state = STATE.QUEUED;
+  npc.roundsInStore = 0;
+  npc.maxRounds = maxRounds(npc.traits, rng);   // fresh patience, same temperament
+  npc.action = null;
+  npc.lastAction = null;
+  npc.prescribed = null;
+  npc.atDisplay = null;
+  npc.considering = null;
+  npc.bought = [];
+  npc.carrying = null;
+  npc.seat = null;
+  npc.path = [];
+  // DISPLAYS.md rule 9 is explicitly per-visit: "an NPC who leaves and comes back on a later visit
+  // starts fresh", so they may restructure the same display again.
+  npc.restructured = [];
+  npc.closeoutStep = 0;
+  npc.closeout = [];
+  npc.toLend = [];
+  npc.chatted = false;
+  npc.satAndWorked = false;
+  npc.stormedOut = false;
+  npc.willReturn = false;
+  npc.note = '';
+  npc.visits += 1;
+  // Kept, deliberately: traits, prefs (including earned skill), wips and their progress, worn.
+  if (at) { npc.x = at.x; npc.z = at.z; npc.from = { ...at }; }
+  return npc;
+}
+
+/** The shop's regulars, most recently seen first. */
+export const regulars = (world) => [...world.returning].reverse();
 
 // ---------------------------------------------------------------- movement
 //

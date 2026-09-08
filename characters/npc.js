@@ -188,11 +188,24 @@ export const FUR_MODES = [
 export const ACCENT_SAT = [0.42, 0.78];
 export const ACCENT_LIGHT = [0.32, 0.62];
 
+// Deep enough that a shop with returning regulars does not run out. Customers accumulate on the
+// roster across days and a name is never handed to a second character, so this list is consumed
+// rather than cycled — see claimName in store.html.
 export const NAMES = [
   'Marguerite', 'Bramble', 'Winifred', 'Otto', 'Pip', 'Hazel', 'Thistle', 'Cormac',
   'Juniper', 'Barnaby', 'Wren', 'Fennel', 'Rosalind', 'Mabel', 'Tobias', 'Clementine',
   'Rook', 'Sorrel', 'Agnes', 'Linus', 'Perpetua', 'Alder', 'Marlow', 'Bea',
   'Ivo', 'Nesta', 'Quill', 'Dorcas', 'Ambrose', 'Tamsin',
+  'Bertie', 'Cressida', 'Dunstan', 'Elspeth', 'Ferdinand', 'Greta', 'Horace', 'Isolde',
+  'Jasper', 'Katriona', 'Lumen', 'Merrily', 'Nolan', 'Ottoline', 'Peregrine', 'Quenby',
+  'Rufus', 'Saffron', 'Tovah', 'Ursula', 'Vesper', 'Wilbur', 'Xanthe', 'Yolanda',
+  'Zephyr', 'Aubrey', 'Blythe', 'Caspian', 'Delphine', 'Edwin', 'Flossie', 'Gideon',
+  'Harriet', 'Inigo', 'Jemima', 'Kester', 'Lavender', 'Montague', 'Nettle', 'Orla',
+  'Primrose', 'Quilla', 'Rowan', 'Seraphina', 'Tarquin', 'Una', 'Verity', 'Wendell',
+  'Xenia', 'Yarrow', 'Zinnia', 'Aloysius', 'Birdie', 'Clover', 'Dilly', 'Eustace',
+  'Fintan', 'Gilbert', 'Hattie', 'Idris', 'Josephine', 'Kingsley', 'Lettice', 'Mordecai',
+  'Norah', 'Osric', 'Petronella', 'Quinlan', 'Rosamund', 'Silas', 'Temperance', 'Ulric',
+  'Violetta', 'Wilhelmina', 'Ximena', 'Yusuf', 'Zadie', 'Archibald', 'Bluebell', 'Casimir',
 ];
 
 export const rand = (a, b) => a + Math.random() * (b - a);

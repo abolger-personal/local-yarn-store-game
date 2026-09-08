@@ -10,7 +10,7 @@ import {
   TRAITS, randomTraits, maxWips, maxRounds, ACTION, STATE, CLOSEOUT_SEQUENCE,
   makeNpc, makeWorld, advanceRound, browseActionSet, DetermineNextBrowseAction,
   interact, noticeable, buyableTargets, visibleTo, labelOf, inDoorway, seatById, fullyExposed,
-  findPath, obstacles, closeoutFor, consideredHere,
+  findPath, obstacles, closeoutFor, consideredHere, rejoin, regulars,
 } from './visit.js';
 import { WIP_STATE, wantsOf, canStart, workRound, wearOrOffer, returnToNpc } from './wip.js';
 
@@ -516,6 +516,143 @@ const runCloseout = (world, npc) => {
   assert.equal(world.dropOff.length, 0, 'and off the Drop Off display');
   assert.deepEqual(world.backPile.map((b) => b.wip.id), ['old hat'],
     'the one they were wearing goes in the pile behind the guestbook');
+}
+
+// --- returning visitors -------------------------------------------------------
+{
+  // "NPC Visitors who manage to either buy any items or work on a WIP should be marked for return"
+  const bought = fixture();
+  bought.npc.state = STATE.CLOSEOUT;
+  bought.npc.closeoutStep = 0;
+  bought.npc.wips = [WIP()];
+  bought.npc.willReturn = true;               // as the buy branch sets it
+  runCloseout(bought.world, bought.npc);
+  assert.deepEqual(bought.world.returning.map((n) => n.id), ['n1'], 'a buyer goes on the list');
+
+  // ...and one who did neither does not.
+  const idle = fixture();
+  idle.npc.state = STATE.CLOSEOUT;
+  idle.npc.closeoutStep = 0;
+  idle.npc.wips = [WIP()];
+  runCloseout(idle.world, idle.npc);
+  assert.deepEqual(idle.world.returning, [], 'a browser who bought nothing is not a regular');
+}
+
+{
+  // Buying marks them, through the real interact() path rather than by setting the flag.
+  const { world, pile, npc, add } = fixture();
+  add(pile, 0, 0, 0, 'crochet-hook', 4.5);
+  assert.equal(npc.willReturn, false, 'not marked on arrival');
+  interact(npc, pile, world);                 // consider
+  assert.equal(npc.willReturn, false, 'considering alone is not enough');
+  interact(npc, pile, world);                 // buy
+  assert.ok(npc.willReturn, 'buying marks them for return');
+}
+
+{
+  // Working on a WIP marks them — but only real work. Sitting down with something that cannot be
+  // started yet is explicitly not "working on a WIP".
+  const { world, npc } = fixture();
+  npc.state = STATE.BROWSE;
+  npc.seat = 'chair-a';
+  npc.wips = [WIP({ id: 'stuck' })];           // UNSTARTED: no tool
+  npc.prescribed = { type: ACTION.WORK_ON_WIP, params: { wip: 'stuck', seatId: 'chair-a' } };
+  advanceRound(world);
+  assert.equal(npc.willReturn, false, 'sitting with an unstartable project earns nothing');
+
+  npc.wips = [WIP({ id: 'live', state: WIP_STATE.IN_PROGRESS,
+                    tool: { name: 'crochet-hook', size: 4.5 } })];
+  npc.seat = 'chair-a';
+  npc.prescribed = { type: ACTION.WORK_ON_WIP, params: { wip: 'live', seatId: 'chair-a' } };
+  advanceRound(world);
+  assert.ok(npc.willReturn, 'actually working on it does');
+}
+
+{
+  // A returning NPC comes back as THEMSELVES. This is the assertion that matters: the whole point
+  // of the roster is that a twenty-round sweater can span visits.
+  const { world, npc } = fixture();
+  npc.prefs.skill = 5;                                    // earned by finishing something
+  npc.traits.Openness = 1;
+  const sweater = WIP({ id: 'sweater', state: WIP_STATE.IN_PROGRESS, progress: 64,
+                        tool: { name: 'crochet-hook', size: 4.5 } });
+  npc.wips = [sweater];
+  npc.worn.head = WIP({ id: 'their hat', state: WIP_STATE.FINISHED, progress: 100 });
+  npc.restructured = ['pile'];
+  npc.bought = [{ name: 'yarn' }];
+  npc.roundsInStore = 9;
+  npc.chatted = true;
+  npc.willReturn = true;
+  npc.seat = 'chair-a';
+
+  rejoin(npc, { at: { x: 0, z: 3 }, rng: seq(0.5) });
+
+  // Kept
+  assert.equal(npc.prefs.skill, 5, 'crafter skill is permanent, including the +1 they earned');
+  assert.equal(npc.traits.Openness, 1, 'temperament does not change between visits');
+  assert.equal(npc.wips[0], sweater, 'the same WIP slot comes back');
+  assert.equal(npc.wips[0].progress, 64, 'at the progress they left it at — this is the point');
+  assert.equal(npc.worn.head?.id, 'their hat', 'and they are still wearing their hat');
+  assert.equal(npc.visits, 2, 'their visit count goes up');
+
+  // Reset
+  assert.equal(npc.state, STATE.QUEUED, 'they queue outside like anyone else');
+  assert.equal(npc.roundsInStore, 0, 'with a fresh clock');
+  assert.deepEqual(npc.bought, [], 'and an empty basket');
+  assert.equal(npc.seat, null, 'not still holding last visit\'s chair');
+  assert.equal(npc.chatted, false, 'the guestbook tags start clean');
+  assert.equal(npc.willReturn, false, 'they have to earn the next return');
+  // DISPLAYS.md rule 9: "an NPC who leaves and comes back on a later visit starts fresh".
+  assert.deepEqual(npc.restructured, [], 'so they may tidy the same display again');
+  assert.deepEqual([npc.x, npc.z], [0, 3], 'and they start where they were put');
+}
+
+{
+  // A rejoined regular can finish the project they came back for.
+  const { world, npc } = fixture();
+  npc.prefs.skill = 3;
+  npc.traits.Industriousness = 3;
+  const wip = WIP({ id: 'cowl', state: WIP_STATE.IN_PROGRESS, progress: 0,
+                    pattern: PATTERN({ patternType: 'cowl', yarnUnits: 5 }),
+                    tool: { name: 'crochet-hook', size: 4.5 } });
+  npc.wips = [wip];
+  npc.state = STATE.BROWSE;
+
+  // Three rounds of work this visit, then home.
+  for (let i = 0; i < 3; i++) {
+    npc.seat = 'chair-a';
+    npc.prescribed = { type: ACTION.WORK_ON_WIP, params: { wip: 'cowl', seatId: 'chair-a' } };
+    advanceRound(world);
+  }
+  assert.equal(Math.round(wip.progress), 60, 'three of the five rounds are done');
+  assert.equal(wip.state, WIP_STATE.IN_PROGRESS, 'not finished yet');
+
+  rejoin(npc, { rng: seq(0.5) });
+  npc.state = STATE.BROWSE;
+  for (let i = 0; i < 2; i++) {
+    npc.seat = 'chair-a';
+    npc.prescribed = { type: ACTION.WORK_ON_WIP, params: { wip: 'cowl', seatId: 'chair-a' } };
+    advanceRound(world);
+  }
+  assert.equal(wip.state, WIP_STATE.FINISHED, 'and the next visit finishes it');
+  assert.equal(npc.prefs.skill, 4, 'earning the skill point on the second visit');
+}
+
+{
+  // The roster does not double-count somebody who leaves twice.
+  const { world, npc } = fixture();
+  npc.state = STATE.CLOSEOUT;
+  npc.closeoutStep = 0;
+  npc.wips = [WIP()];
+  npc.willReturn = true;
+  runCloseout(world, npc);
+  rejoin(npc);
+  npc.state = STATE.CLOSEOUT;
+  npc.closeoutStep = 0;
+  npc.willReturn = true;
+  runCloseout(world, npc);
+  assert.equal(world.returning.length, 1, 'one entry per customer, however often they visit');
+  assert.equal(regulars(world)[0].id, 'n1', 'and regulars() lists them');
 }
 
 // --- guestbook tags ----------------------------------------------------------

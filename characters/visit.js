@@ -13,10 +13,11 @@
 // Where a spec section is blank or undefined, the placeholder is marked `TODO(spec)` and listed in
 // VISIT-POC-TODO.md rather than being quietly invented and forgotten.
 
-import { EMPTY, footprint, fits, place, topAt, clearShelf, usableAt } from '../inventory/grid.js';
+import { EMPTY, footprint, fits, place, clearShelf, usableAt, fullyExposed }
+  from '../inventory/grid.js';
 import {
   WIP_STATE, WEAR_SLOTS, makeCraftPrefs, makeWip, wantsOf, wantFor, stow, workRound,
-  wearOrOffer, finishedOf, everythingMade, photoSubject, lend, slotFor, describeWip,
+  wearOrOffer, finishedOf, everythingMade, photoSubject, lend, slotFor, describeWip, labelWant,
 } from './wip.js';
 import { labelOf as labelItem, TOOL_NOTIONS } from '../inventory/catalog.js';
 
@@ -466,13 +467,9 @@ const matchesAnyWant = (npc, item) => wantFor(npc, item) !== null;
  *   - The player's pick: `lift()` pops the top of every column the footprint covers, so lifting a
  *     half-buried package silently evicts whatever was resting on it.
  */
-export function fullyExposed(display, items, index) {
-  const item = items[index];
-  for (let dr = 0; dr < (item.h ?? 1); dr++)
-    for (let dc = 0; dc < (item.w ?? 1); dc++)
-      if (topAt(display.g, item.shelf, item.c + dc, item.r + dr) !== index) return false;
-  return true;
-}
+// Moved to inventory/grid.js — it is pure grid occupancy, and the player's pick needs the same
+// answer the NPC does. Re-exported so every existing caller keeps its import.
+export { fullyExposed };
 
 export function noticeable(display, items, index) {
   const item = items[index];
@@ -773,10 +770,17 @@ export function interact(npc, display, world) {
   return 'complete';
 }
 
-/** Which plane of a multi-level display this NPC is looking at: the one holding their target. */
+/**
+ * Which plane of a multi-level display this NPC is looking at: the one holding something they want.
+ *
+ * Asks `matchesAnyWant`, not `matchesTarget`. `matchesTarget` compares `item.name` against
+ * `target.name`, and a want has no `name` — so once `npc.target` became a want this silently
+ * matched nothing and every NPC restructured shelf 0 regardless of where their yarn was. It is
+ * also the right question on its own terms: an NPC has a whole shopping list, not one headline.
+ */
 function pickPlane(display, items, npc) {
   for (let s = 0; s < display.g.shelves; s++) {
-    if (onPlane(display, items, s).some((i) => matchesTarget(items[i], npc.target))) return s;
+    if (onPlane(display, items, s).some((i) => matchesAnyWant(npc, items[i]))) return s;
   }
   return 0;
 }
@@ -785,6 +789,9 @@ function pickPlane(display, items, npc) {
 // is named by its weight and material rather than by the word "yarn". Re-exported here because
 // every consumer of the sim already imports from this module.
 export const labelOf = labelItem;
+// Wants are named by wip.js, which owns their shape. Re-exported for the same reason labelOf is:
+// every consumer of the sim already imports from this module.
+export { labelWant };
 
 // ---------------------------------------------------------------- the round
 
@@ -926,7 +933,7 @@ function stepNpc(npc, world, snapshot) {
       moveTo(world, npc, world.room.door);
       npc.state = STATE.BROWSE;
       world.door.busy = null;
-      say(world, npc, `came in looking for ${labelOf(npc.target)}`);
+      say(world, npc, `came in looking for ${labelWant(npc.target)}`);
       return;
 
     case STATE.BROWSE:

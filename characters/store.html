@@ -253,13 +253,13 @@ import {
   makeCraftPrefs, describeWip, wantsOf, satisfies, MatchObservedInventory, WIP_STATE, WEAR_SLOTS,
 } from './wip.js';
 import {
-  EMPTY, makeDisplay, gridSize, footprint, fits, place, lift, dropLayer, topAt, columnAt, slotRect,
-  nearestSlot, anySlot,
+  EMPTY, makeDisplay, gridSize, footprint, fits, place, lift, slotRect, anySlot,
   usableAt, remask,
 } from '../inventory/grid.js';
+import { makePicker, placeItem, scatterYaw, settleYaw } from '../inventory/pick-place.js';
 
 import {
-  TRAITS, ACTION, STATE, maxWips, makeNpc, makeWorld, advanceRound, labelOf, fullyExposed, seatById,
+  TRAITS, ACTION, STATE, maxWips, makeNpc, makeWorld, advanceRound, labelOf, labelWant, fullyExposed, seatById,
   rejoin, regulars,
 } from './visit.js';
 
@@ -1278,7 +1278,7 @@ function addItem(display, shelf, spec, { c, r, avoidWall = false, shape } = {}) 
       keys, layer: place(g, keys, index, layers),
       // Yarn is the one thing whose colour is an attribute rather than ink.
       color: spec.name === 'yarn' ? YARN_COLORS[spec.colorIndex % YARN_COLORS.length] : INK,
-      yaw: (Math.random() - 0.5) * 0.18 * Math.PI, gone: false, held: false,
+      yaw: scatterYaw(), gone: false, held: false,
     });
     return index;
   }
@@ -1300,13 +1300,6 @@ function addItem(display, shelf, spec, { c, r, avoidWall = false, shape } = {}) 
 //
 // What is new here, and is the reason this needed porting rather than copying: there are now up to
 // six displays at arbitrary yaw, and NPCs are mutating the same grids between rounds.
-const raycaster = new THREE.Raycaster();
-const pointer = new THREE.Vector2();
-const pickPlane = new THREE.Plane();
-const _hit = new THREE.Vector3();
-const _n = new THREE.Vector3();
-const _planePt = new THREE.Vector3();
-const _localPt = new THREE.Vector3();
 const drag = {
   index: EMPTY, target: null, displayId: null,
   // Gesture bookkeeping, so one rule serves mouse and touch — see onPointerDown.
@@ -1321,167 +1314,34 @@ let activeId = null;                                   // which display the play
 let hoveredId = null;
 const activeDisplay = () => byId(activeId) ?? displays[0];
 
-function setRayFromEvent(event) {
-  pointer.set((event.clientX / innerWidth) * 2 - 1, -(event.clientY / innerHeight) * 2 + 1);
-  raycaster.setFromCamera(pointer, camera);
-}
-
-/**
- * Intersect the plane "local Y = k" of one display, in world space, and return the hit back in that
- * display's LOCAL coordinates. This is what lets a shelf turned 90° against a side wall use exactly
- * the same column maths as a flat table: the frame does the rotating, columnAt() never learns about
- * it. Returns plain numbers, not a shared Vector3 — the callers below compare hits from many
- * displays and levels in one pass, and cannot have a later call overwrite an earlier result.
- */
-function castLocal(disp, shelf, height = 0) {
-  const lv = disp.levels?.[shelf];
-  const F = lv ? lv.frame : disp.frame;
-  const Finv = lv ? lv.frameInv : disp.frameInv;
-  _n.set(0, 1, 0).transformDirection(F);
-  _planePt.set(0, height, 0).applyMatrix4(F);
-  pickPlane.setFromNormalAndCoplanarPoint(_n, _planePt);
-  const hit = raycaster.ray.intersectPlane(pickPlane, _hit);
-  if (!hit) return null;
-  const distSq = raycaster.ray.origin.distanceToSquared(hit);
-  _localPt.copy(hit).applyMatrix4(Finv);
-  return { x: _localPt.x, z: _localPt.z, distSq };
-}
+// The pick/place geometry now lives in ../inventory/pick-place.js, shared with the yarn demo.
+// It was extracted FROM here — this file had grown the good version (forgiving screen-space pick,
+// fits-aware snap, multi-layer) while the demo still ran the one-layer original, and the two had
+// silently diverged on what a click means. The adapter below is the whole difference between the
+// two scenes: how a level is placed, and how tall an item is.
+const picker = makePicker({
+  camera,
+  displays: () => displays,
+  items: () => items,
+  levelFrame,
+  // A level's frame already carries its height AND its tilt, so an item's height is purely its
+  // own stack position — which is why layerY needs no shelf index.
+  itemHeight: (_disp, item) => layerY(item.layer) + BOX_H * (item.layers ?? 1),
+  exposed: (disp, all, index) => fullyExposed(disp, all, index),
+  grabRadius: () => S.grabRadius,
+  snapCells: () => S.snapCells,
+});
+// setRayFromEvent and the raycaster are taken from the picker so the whole file aims ONE ray:
+// floorPoint() and the chair pick below reuse it after the picker has set it from the event.
+const { pickCandidate, hoverTarget, snapTo, raycaster, setRay: setRayFromEvent } = picker;
 
 /** Where on a display's ACTIVE plane the pointer is — used to float a carried item, not to pick. */
-function displayPoint(disp, event) {
-  setRayFromEvent(event);
-  const guess = castLocal(disp, disp.plane);
-  if (!guess) return null;
-  const col = columnAt(disp.g, guess.x, guess.z);
-  const topIndex = col ? topAt(disp.g, disp.plane, col.c, col.r) : EMPTY;
-  if (topIndex === EMPTY) return guess;
-  const refined = castLocal(disp, disp.plane, layerY(items[topIndex].layer) + BOX_H);
-  return refined ?? guess;
-}
-
-/**
- * What the player actually clicked on, across EVERY display and EVERY shelf level.
- *
- * This replaced a version that tested only the active plane, which had two compounding faults and
- * made items on a multi-level shelf unpickable:
- *
- *   1. Only one plane was ever considered, so anything not on the active level was invisible to
- *      the pick — and the active level defaults to 0, the bottom shelf, underneath the other two.
- *   2. The single test intersected the shelf FLOOR while the player had clicked a box TOP. At a
- *      diorama angle that parallax is ~0.11 units — over half a slot — which frequently landed
- *      outside the lattice altogether. The two-pass refine meant to fix this only ran once a
- *      column had already been found, so on a tall shelf it never got the chance.
- *
- * The fix removes the guesswork: every occupied column already knows exactly how tall its stack is,
- * so test each one against ITS OWN top face. No parallax to correct, no plane to guess.
- *
- * FORGIVING PICK. Requiring the ray to land inside the item's own cell was too strict to play with
- * a finger, and measurably so: a 0.2-unit slot at the framing camera is about 20px across, and
- * nearer 12px once a diorama angle foreshortens it. Apple and Material both put the minimum touch
- * target at 44px. So an exact hit still wins outright, and failing that the nearest box within a
- * SCREEN-SPACE radius is taken instead.
- *
- * Screen space, not world space, is the whole point: the tolerance has to mean the same thing to a
- * fingertip whatever the zoom, the resolution or the viewing angle, and a world-space radius means
- * none of those. Still never raycasts an item — these are plane intersections and a projection,
- * a few dozen per press.
- */
-const _grabNdc = new THREE.Vector3();
-
-/** Where a slot's top face lands on screen, in CSS pixels. */
-function slotScreenPos(disp, shelf, item) {
-  const rect = slotRect(disp.g, item.c, item.r, item.w, item.h);
-  _grabNdc.set(rect.x, layerY(item.layer) + BOX_H * (item.layers ?? 1), rect.z)
-    .applyMatrix4(levelFrame(disp, shelf))
-    .project(camera);
-  // Behind the camera projects to a mirrored point; reject rather than believe it.
-  if (_grabNdc.z > 1) return null;
-  return { x: (_grabNdc.x * 0.5 + 0.5) * innerWidth, y: (-_grabNdc.y * 0.5 + 0.5) * innerHeight };
-}
-
-function pickCandidate(event) {
-  setRayFromEvent(event);
-  const px = event.clientX, py = event.clientY;
-  // A finger needs the full 44px; a mouse is precise enough that a big radius would start
-  // grabbing things the user was clearly not pointing at.
-  const radius = S.grabRadius * (matchMedia('(pointer: coarse)').matches ? 1 : 0.5);
-  let exact = null, near = null;
-
-  for (const disp of displays) {
-    for (let s = 0; s < disp.g.shelves; s++) {
-      for (let r = 0; r < disp.g.rows; r++) {
-        for (let c = 0; c < disp.g.cols; c++) {
-          const index = topAt(disp.g, s, c, r);
-          if (index === EMPTY) continue;
-          // A package bridging two columns with something stacked on its other half is not
-          // grabbable — lift() would pop that other column too and evict whatever sits there.
-          if (!fullyExposed(disp, items, index)) continue;
-          const item = items[index];
-          // Only the item's ANCHOR cell is considered, or a 2x2 package would be offered four
-          // times over and the nearest-centre test would answer about a corner instead of the box.
-          if (item.c !== c || item.r !== r) continue;
-          const top = layerY(item.layer) + BOX_H * (item.layers ?? 1);
-          const hit = castLocal(disp, s, top);
-          if (!hit) continue;
-          const col = columnAt(disp.g, hit.x, hit.z);
-          const inside = col && topAt(disp.g, s, col.c, col.r) === index;
-          if (inside) {
-            // Landed on the box itself. Nearest to the camera wins, which is the one in front.
-            if (!exact || hit.distSq < exact.distSq) exact = { disp, shelf: s, index, distSq: hit.distSq };
-            continue;
-          }
-          if (exact) continue;                       // an exact hit always beats a near miss
-          const at = slotScreenPos(disp, s, item);
-          if (!at) continue;
-          const d = Math.hypot(at.x - px, at.y - py);
-          if (d > radius) continue;
-          // Among near misses take the closest ON SCREEN, and only then the closest to the camera,
-          // so two boxes overlapping in the picture resolve to the front one.
-          if (!near || d < near.d - 1 || (Math.abs(d - near.d) <= 1 && hit.distSq < near.distSq)) {
-            near = { disp, shelf: s, index, distSq: hit.distSq, d };
-          }
-        }
-      }
-    }
-  }
-  return exact ?? near;
-}
-
-/**
- * Which display (and which of its levels) the pointer is over while carrying something. Unlike the
- * pick, this does not need an item there — it needs somewhere to PUT one — so it tests each shelf's
- * floor plane and takes the nearest in-bounds hit.
- */
-const nearGrid = (g, x, z, pad) => {
-  const { w, d } = gridSize(g);
-  return Math.abs(x) <= w / 2 + pad && Math.abs(z) <= d / 2 + pad;
-};
-
-function hoverTarget(event) {
-  setRayFromEvent(event);
-  let best = null;
-  for (const disp of displays) {
-    for (let s = 0; s < disp.g.shelves; s++) {
-      const hit = castLocal(disp, s);
-      // Half a slot of slack outside the lattice: without it the outermost row of every display
-      // could only be aimed at from one side, since anything past the edge selected no display at
-      // all and the snap below never got a chance to run.
-      if (!hit || !nearGrid(disp.g, hit.x, hit.z, CELL * 0.5)) continue;
-      if (!best || hit.distSq < best.distSq) best = { disp, shelf: s, distSq: hit.distSq };
-    }
-  }
-  return best;
-}
-
-// A box does not land in exactly the same orientation every time it is set down.
-const YAW_SETTLE = 0.12 * Math.PI;
-
-/** The drop target: the nearest slot the item FITS in, within S.snapCells of the pointer. */
-const snapTo = (disp, shelf, item, x, z) =>
-  nearestSlot(disp.g, shelf, item, x, z, S.snapCells * CELL);
+const displayPoint = (disp, event) => picker.displayPoint(disp, disp.plane, event);
 
 /** Anywhere on this display at all, or null — the last resort when an item's own slot filled up. */
 const firstFreeSlot = (disp, item) => anySlot(disp.g, item);
+
+
 
 function pickUp(event, found = pickCandidate(event)) {
   if (!found) return;
@@ -1507,21 +1367,16 @@ function putDown() {
   if (t) {
     item.display = activeId;
     item.shelf = activeDisplay().plane;
-    item.c = t.c; item.r = t.r; item.keys = t.keys;
   }
-  // No valid target under the pointer: it goes back where it actually still belongs. Its own
-  // display/shelf/c/r were never touched if the branch above did not run.
+  // No valid target under the pointer: it goes back where it actually still belongs — placeItem
+  // reads that off the item, whose display/shelf/c/r were never touched if the branch above did
+  // not run. It also carries the layer count and applies a turned drop, both of which this
+  // function used to do by hand and one of which it would now be silently dropping.
   const home = byId(item.display);
-  if (!t) item.keys = footprint(home.g, item.shelf, item.c, item.r, item.w, item.h);
-  // ...except an NPC may have tidied that column full while the player was holding it. place()
-  // does not check headroom, so without this the item would sit floating above a full stack.
-  if (!fits(home.g, item.keys, item.layers ?? 1)) {
-    const spot = firstFreeSlot(home, item);
-    if (spot) { item.shelf = spot.shelf; item.c = spot.c; item.r = spot.r; item.keys = spot.keys; }
-  }
-  item.layer = place(home.g, item.keys, drag.index, item.layers ?? 1);
+  placeItem(item, drag.index, t, home, item.shelf,
+            { layers: (i) => i.layers ?? 1, anySlot });
   item.held = false;
-  item.yaw += (Math.random() - 0.5) * YAW_SETTLE;
+  settleYaw(item);
 
   refresh(drag.index);
   dropMarker.visible = false;
@@ -1720,7 +1575,9 @@ function ghost(item) {
   dropMarker.material.depthTest = true;
   dropMarker.material.opacity = GHOST_ALPHA;
   dropMarker.renderOrder = 0;
-  const rect = slotRect(disp.g, t.c, t.r, item.w, item.h);
+  // The target's own footprint, not the item's: a turned drop swaps them, and the preview has
+  // to show where it will ACTUALLY land or the turn is a surprise at release.
+  const rect = slotRect(disp.g, t.c, t.r, t.w ?? item.w, t.h ?? item.h);
   dropMarker.position.set(rect.x, layerY(t.layer) + 0.004, rect.z)
     .applyMatrix4(levelFrame(disp, disp.plane));
   dropMarker.quaternion.copy(disp.levels?.[disp.plane]?.quat ?? disp.quat).multiply(FLAT_Q);
@@ -2775,7 +2632,7 @@ function drawDebug() {
       <span class="state ${n.state}">${n.state}</span>
       <div class="who"><i class="swatch" style="background:${rec?.color ?? '#999'}"></i>${esc(n.name)}
         <span class="k">· ${esc(n.species)}</span></div>
-      ${row('wants', n.target ? `${n.target.kind}${n.target.units > 1 ? ` x${n.target.units}` : ''}` : 'nothing')}
+      ${row('wants', esc(labelWant(n.target)))}
       ${row('craft', `skill ${n.prefs.skill} · ${n.prefs.crafts.join('/')}`)}
       ${n.visits > 1 ? row('regular', `visit #${n.visits}`) : ''}
       ${n.considering ? `<div class="row"><span class="k">considering</span><span class="got">${esc(labelOf(items[n.considering.index]))}</span></div>` : ''}

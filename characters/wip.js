@@ -176,6 +176,29 @@ function wantsFor(wip) {
 export const wantsOf = (npc) => npc.wips.flatMap(wantsFor);
 
 /**
+ * One line for a WANT — what an NPC is still shopping FOR.
+ *
+ * Deliberately not `labelOf`. That names a thing that EXISTS, and reads fields off it that a want
+ * simply does not have: a want has no `name`, and carries `materials` (a list of what would do)
+ * rather than the one `material` an actual ball is dyed in. Passing a want to `labelOf` therefore
+ * fell through to `thing.name` and rendered the word "undefined" — which is exactly the bug this
+ * exists to stop recurring, since `npc.target` became a want when WIPs replaced hardcoded targets.
+ */
+export const labelWant = (want) => {
+  if (!want) return 'nothing in particular';
+  if (want.kind === 'pattern') {
+    return want.forYarn ? `a pattern for ${labelOf(want.forYarn)}` : 'a pattern';
+  }
+  if (want.kind === 'yarn') {
+    // labelOf still does the naming; it is handed a shape it understands. "or" because the want is
+    // satisfied by ANY of the pattern's materials, and "and" would read as needing all of them.
+    return `${want.units} unit${want.units === 1 ? '' : 's'} of ` +
+           labelOf({ name: 'yarn', weight: want.weight, material: want.materials.join(' or ') });
+  }
+  return labelOf({ name: want.tool, size: want.size });
+};
+
+/**
  * Does this shelf item satisfy that want?
  *
  * Formation-level only, per DISPLAYS.md — "determined by Formation and is independent of NPC

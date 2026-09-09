@@ -111,6 +111,22 @@ export function slotRect(g, c, r, w, h) {
 }
 
 /**
+ * Is every cell of this item's footprint topped by the item itself?
+ *
+ * A package bridging two columns with something stacked on its other half is NOT exposed: lifting
+ * it would pop that column too and evict whatever sits on it. Both the NPC's "can I notice this"
+ * test and the player's pick need the same answer, and it is pure grid occupancy — no NPC, no
+ * scene — so it lives here rather than in either caller.
+ */
+export function fullyExposed(display, items, index) {
+  const item = items[index];
+  for (let dr = 0; dr < (item.h ?? 1); dr++)
+    for (let dc = 0; dc < (item.w ?? 1); dc++)
+      if (topAt(display.g, item.shelf, item.c + dc, item.r + dr) !== index) return false;
+  return true;
+}
+
+/**
  * The slot a drop should land in: the nearest one on this shelf that `item` ACTUALLY FITS IN,
  * within `reach` (in the display's own units) of the point (x,z). Null if nothing fits in range.
  *
@@ -126,28 +142,63 @@ export function slotRect(g, c, r, w, h) {
  * Anchored on the footprint CENTRE, so a 2x2 package centres on the pointer rather than hanging
  * off one corner of it.
  */
-export function nearestSlot(g, s, item, x, z, reach) {
+export function nearestSlot(g, s, item, x, z, reach, { turn = true, turnPenalty = 0.6 } = {}) {
   let best = null;
-  for (let r = 0; r < g.rows; r++)
-    for (let c = 0; c < g.cols; c++) {
-      const keys = footprint(g, s, c, r, item.w, item.h);
-      if (!fits(g, keys, item.layers ?? 1)) continue;
-      const rect = slotRect(g, c, r, item.w, item.h);
-      const d = Math.hypot(rect.x - x, rect.z - z);
-      if (d > reach || (best && d >= best.d)) continue;
-      best = { c, r, keys, layer: dropLayer(g, keys), d };
-    }
+  for (const o of orientations(item, turn, turnPenalty * g.cell))
+    for (let r = 0; r < g.rows; r++)
+      for (let c = 0; c < g.cols; c++) {
+        const keys = footprint(g, s, c, r, o.w, o.h);
+        if (!fits(g, keys, item.layers ?? 1)) continue;
+        const rect = slotRect(g, c, r, o.w, o.h);
+        const d = Math.hypot(rect.x - x, rect.z - z);
+        if (d > reach) continue;
+        // Rank by distance PLUS the turn's bias, so a turn has to actually earn itself. Report the
+        // plain distance, since that is what a caller means by "how close was this".
+        const score = d + o.bias;
+        if (best && score >= best.score) continue;
+        best = { c, r, keys, layer: dropLayer(g, keys), d, score, turned: o.turned, w: o.w, h: o.h };
+      }
   return best;
 }
 
-/** Anywhere on this display at all, on any shelf, that `item` fits — or null. */
-export function anySlot(g, item) {
-  for (let s = 0; s < g.shelves; s++)
-    for (let r = 0; r < g.rows; r++)
-      for (let c = 0; c < g.cols; c++) {
-        const keys = footprint(g, s, c, r, item.w, item.h);
-        if (fits(g, keys, item.layers ?? 1)) return { shelf: s, c, r, keys };
-      }
+/**
+ * The orientations a footprint may be tried in: as given, and turned a quarter turn.
+ *
+ * A 2x1 package simply does not fit a one-column peg board, but a 1x2 obviously does, and making
+ * the player rotate it first is asking them to do the search by hand. So the snap does the search.
+ *
+ * The turn carries a small distance PENALTY rather than being free. Without it, a turned slot half
+ * a millimetre nearer would win and things would spin as the pointer wandered — the placement has
+ * to be predictable, so a turn should happen when it is *needed*, not when it is marginally
+ * closer. 0.6 of a slot is enough that the unturned fit wins wherever one exists nearby.
+ *
+ * A square footprint is skipped rather than turned. That is a COST guard, not a correctness one:
+ * a turned square is the same square, so the penalty would make it lose anyway — it would just
+ * double the search first. No test can fail on it, which is why this says so.
+ */
+function orientations(item, turn, bias) {
+  const asGiven = { w: item.w, h: item.h, turned: false, bias: 0 };
+  if (!turn || item.w === item.h) return [asGiven];
+  return [asGiven, { w: item.h, h: item.w, turned: true, bias }];
+}
+
+/**
+ * Anywhere on this display at all, on any shelf, that `item` fits — or null.
+ *
+ * Turns too, and must: this is what the "this display is full" warning is built on, and telling
+ * the player a display cannot take an item that would fit perfectly well sideways is worse than
+ * saying nothing.
+ */
+export function anySlot(g, item, { turn = true } = {}) {
+  for (const o of orientations(item, turn, 0))
+    for (let s = 0; s < g.shelves; s++)
+      for (let r = 0; r < g.rows; r++)
+        for (let c = 0; c < g.cols; c++) {
+          const keys = footprint(g, s, c, r, o.w, o.h);
+          if (fits(g, keys, item.layers ?? 1)) {
+            return { shelf: s, c, r, keys, turned: o.turned, w: o.w, h: o.h };
+          }
+        }
   return null;
 }
 

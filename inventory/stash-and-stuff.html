@@ -37,7 +37,10 @@
   Right-drag to orbit · scroll to zoom<br />
   <kbd>[</kbd> <kbd>]</kbd> plane &nbsp; <kbd>D</kbd> display &nbsp; <kbd>G</kbd> grid &nbsp; <kbd>R</kbd> reshuffle<br />
   <kbd>T</kbd> tidy up &nbsp; <kbd>F</kbd> frame<br />
-  <span style="opacity:.7">one draw call for every notion</span>
+  <b>yarn spike</b> — <kbd>1</kbd>-<kbd>5</kbd> shading &nbsp; <kbd>Y</kbd> one of each &nbsp;
+  <kbd>N</kbd> zoom to 64px<br />
+  <span style="opacity:.7">shading 5 is the silhouette test: if you can't name the seven
+  shapes at 64px, no shading will save them</span>
 </div>
 
 <script type="importmap">
@@ -59,9 +62,16 @@ import {
   setInstance, placeMatrix, placeBoxMatrix, placeLabelMatrix,
 } from './notions.js';
 import {
-  EMPTY, makeDisplay, gridSize, footprint, fits, dropLayer, place, lift, topAt, columnAt, slotRect,
-  usableAt, clearShelf,
+  EMPTY, makeDisplay, gridSize, footprint, fits, place, lift, topAt, columnAt, slotRect,
+  usableAt, clearShelf, fullyExposed, anySlot,
 } from './grid.js';
+import { makePicker, placeItem, scatterYaw, settleYaw } from './pick-place.js';
+import {
+  YARN_FAMILIES, TIERS, BANDS, TAILS, buildFamily, buildBand, buildTail, bandMatrix, tailMatrix,
+  familyFootprint, familyExtent, triangleCount, aspectDistance,
+} from './yarn-geometry.js';
+import { SHADING, makeMatcap, makePaperMatcap, makeToonRamp, yarnMaterial, bakeVertexAO, makeHull,
+         yarnColor, applyHatching, addHatchScale } from './yarn-look.js';
 
 const ATLAS_URL = '../ai_planning_sessions/inventory/illustrations/build';
 
@@ -70,16 +80,27 @@ const HOOK_SIZES_MM = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 8.
 
 const S = {
   theme:      'default',
+  exposure:   0.95,   // see the note where toneMappingExposure is set
   layout:     'shelf',   // shelf | pyramid | window
-  cols:       6,
+  cols:       7,   // one column per yarn family, so the silhouette row fits on one line
   rows:       4,
   cell:       0.26,
-  shelves:    3,
-  shelfGap:   0.22,
+  shelves:    2,   // two tall shelves rather than three short ones, given the gap below
+  // Tall enough for the biggest yarn the shop carries. With the uniform fit a 3x3x3 super-bulky
+  // ball is ~0.70 tall, so a shorter shelf simply cannot hold one — and `fits` would refuse it
+  // silently, leaving bulky yarn mysteriously absent rather than visibly too big.
+  shelfGap:   0.78,
+  // DERIVED: how many layer-pitches fit in the shelf gap. See syncBoxHeight.
   headroom:   4,
   fill:       34,
   tint:       '#241e22',
-  boxHeight:  0.042,
+  // DERIVED = cell * layerRatio. Not an input.
+  boxHeight:  0.0325,
+  // The O axis's pitch, as a fraction of the slot pitch. This is the quantum an item's height gets
+  // rounded to, and it needs to be FINE: at a coarse pitch a rounded shape cannot be represented
+  // by any whole number of layers, so it either overflows its reservation (and overlaps whatever
+  // stacks on it) or falls short (and holds that thing up in the air). Both were happening.
+  layerRatio: 0.125,
   boxColor:   '#e7ddc9',
   unlit:      true,
   showGrid:   true,
@@ -88,6 +109,41 @@ const S = {
   edgeGrow:   1.07,
   edgeColor:  '#1b1418',
   shade:      0.28,
+
+  // ---- yarn asset spike (YARN-ASSET-SPIKE.md) ----
+  stock:      'yarn',     // notions | yarn | both  — what the shelf is filled with
+  shading:    'matcap',   // matcap | toon | sheen | flat | silhouette
+  tier:       'low',      // tessellation, the poly-count axis this spike is about
+  familyRow:  true,       // one of each family in a line, for the silhouette test
+  yarnCount:  40,
+  bands:      true,       // the ball band, as a second instanced family
+  tails:      true,       // the loose yarn end, as a third
+  hatch:      true,       // wound-strand hatching, from the UVs the families already have
+  // 0 = the original tight pastel; 1 = the full range a real shop carries. See yarnColor.
+  paletteSpread: 1.0,
+  hatchFreq:  26,
+  hatchDepth: 0.16,
+  // Strand count per yarn WEIGHT, as a multiplier on the base frequency. Physically real rather
+  // than decorative: a lace-weight ball genuinely carries far more, far finer strands than a
+  // super-bulky one. Costs one float per instance (see addHatchScale).
+  perWeight:  true,
+  outline:    true,       // ink outline, as an inverted hull
+  // Both of these are FROM PLAY, not from theory: the fake sheen reads best at full strength, and
+  // a medium-weight line beats a hairline. See YARN-ASSET-SPIKE.md §8.
+  outlineWidth: 0.016,
+  // matcap knobs, live — the whole reason the matcap is generated rather than loaded
+  // Near-white and neutral: the matcap is a MULTIPLIER on albedo, so its lit midtone belongs at
+  // ~1.0 or it silently darkens every colour. See makeMatcap.
+  mcBase:     '#f0ebe3',
+  mcLight:    '#ffffff',
+  mcShadow:   '#4a3550',
+  mcRim:      1.0,
+  // The band's own response. Matte: no rim (the rim IS the fake sheen) and a tighter terminator,
+  // because paper does not scatter light into itself the way fibre does.
+  paperRim:   0.0,
+  paperWrap:  0.22,
+  mcWrap:     0.55,
+  toonSteps:  3,
 };
 
 // Masked shelf shapes. A mask hides slots so a display can be a shop window or a stepped shelf,
@@ -104,12 +160,15 @@ const LAYOUTS = {
 // items of any height placeable, while correctly ruling out anything 2 columns wide (which a
 // single hook genuinely can't hold).
 const PEG_COLS = 8, PEG_ROWS = 6;
-// Fixed, independent of the shelf's `S.headroom` slider: the peg board's grid is only ever built
-// once (it isn't reshuffled), so its headroom must not depend on a value the shelf freely retunes.
-const PEG_HEADROOM = 3;
+// How far a stack may stick OUT from the wall, in world units rather than in layers. It has to be
+// a distance now that the layer pitch is fine: a fixed "3 layers" was 0.098 once the pitch became
+// cell/8, which is shorter than every yarn item there is — so nothing could be hung on the board
+// at all. Converted to layers against the live pitch instead.
+const PEG_REACH = 0.55;
+const pegHeadroom = () => Math.max(1, Math.floor(PEG_REACH / S.boxHeight));
 const pegMask = (s, c) => c % 2 === 0;
 
-let boxHeightCtl = null;   // GUI controller, its range gets clamped by clampBoxHeight()
+let boxHeightCtl = null, headroomCtl = null;   // read-only displays of DERIVED values
 
 // ---------------------------------------------------------------- displays
 //
@@ -149,7 +208,12 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.55;
+// 0.95, not 0.55. The old value was tuned when the shelf held nothing but ink-on-card notions,
+// whose lightness came from the illustration rather than from a palette. Yarn's does come from a
+// palette, and ACES at 0.55 was throwing most of it away: a pastel authored at 73% lightness
+// arrived at 58% even with a near-white matcap. At 0.95 it arrives at ~73%, so what the palette
+// says is what the screen shows. Exposed on the GUI, since it is a look decision.
+renderer.toneMappingExposure = S.exposure;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -267,7 +331,7 @@ function makeHooks(g, length) {
 }
 
 function buildPegGrid() {
-  displays.peg.g = makeDisplay(PEG_COLS, PEG_ROWS, { shelves: 1, headroom: PEG_HEADROOM, cell: S.cell, mask: pegMask });
+  displays.peg.g = makeDisplay(PEG_COLS, PEG_ROWS, { shelves: 1, headroom: pegHeadroom(), cell: S.cell, mask: pegMask });
 }
 
 function layoutPegDisplay() {
@@ -282,7 +346,7 @@ function layoutPegDisplay() {
   disp.group.add(lines);
 
   disp.hooks?.removeFromParent();
-  disp.hooks = makeHooks(g, PEG_HEADROOM * S.boxHeight);
+  disp.hooks = makeHooks(g, PEG_REACH);
   disp.group.add(disp.hooks);
   paintActivePlane();
 }
@@ -326,6 +390,246 @@ const _col = new THREE.Color();
 
 const shelfBaseY = (shelf, layer) => shelf * S.shelfGap + layer * S.boxHeight;
 
+// ---------------------------------------------------------------- yarn assets (the spike)
+//
+// See ../ai_planning_sessions/inventory/YARN-ASSET-SPIKE.md. Three questions, one instrument:
+//
+//   1. Does low-poly 3D cost what the spike measured?      -> the perf overlay, at yarnCount 1000
+//   2. Can these seven shapes be told apart?               -> familyRow + shading 'silhouette'
+//   3. Which shading reads as cosy?                        -> the shading switch, live
+//
+// One InstancedMesh per family, one hull per family for the ink outline, and ONE band mesh for
+// every family at once — the band's per-family placement is baked into the instance matrix
+// (bandMatrix premultiplied), so it needs no mesh of its own per family.
+// Sized for the 1000-item sameyness check in DESIGN-DECISIONS.md §4, per family, so any single
+// family can hold the whole wall. 7 x 1024 matrices is about half a megabyte — a non-issue.
+const YARN_CAPACITY = 1024;
+const UP = new THREE.Vector3(0, 1, 0);
+const yarnMeshes = {};     // family -> InstancedMesh
+const yarnHulls = {};      // family -> InstancedMesh sharing the above's instanceMatrix
+let bandMesh = null;
+let tailMesh = null;
+let matcapTex = null;
+let paperTex = null;      // the band's own matte response — see PAPER in yarn-look.js
+let toonRamp = null;
+
+const _yarnMat = new THREE.Matrix4();
+const _bandLocal = new THREE.Matrix4();
+const _tailLocal = new THREE.Matrix4();
+const _yarnCol = new THREE.Color();
+const _q = new THREE.Quaternion();
+const _s3 = new THREE.Vector3();
+const _p3 = new THREE.Vector3();
+
+/**
+ * Strand density for a yarn's weight, relative to the base frequency.
+ *
+ * Inverse to bulk, and by more than 1/bulk: a bulky ball is drawn THREE TIMES LARGER as well, so
+ * without the extra falloff its strands would still be finer on screen than a lace ball's. What
+ * should stay roughly constant is the strand's WORLD thickness growing with the yarn's thickness,
+ * which is what these numbers do.
+ */
+const HATCH_FOR_BULK = [1.8, 1.0, 0.62];
+const hatchScaleOf = (item) => (S.perWeight ? HATCH_FOR_BULK[(item.bulk ?? 1) - 1] : 1);
+
+/**
+ * Fit a yarn family into the slots its footprint gives it, WITHOUT wrecking its proportions.
+ *
+ * This replaces scaling x, y and z independently to fill the slot box, which had two consequences
+ * that looked like separate bugs and were the same one:
+ *
+ *   - **Donuts.** A skein is 1.00 x 0.44 x 0.40 by design — a flat figure eight. Stretching y to
+ *     fill a tall layer turned it into a fat ring. Every family was being distorted by a different
+ *     arbitrary amount, because none of them fill the unit box equally.
+ *   - **Floating.** The reverse of the same thing: a family whose unit height is 0.44 drew only
+ *     44% of the height it had RESERVED, so whatever stacked on top sat on empty air.
+ *
+ * So: one uniform scale from the footprint, and then the LAYER COUNT is derived from the height
+ * that produces — rather than the layer count being assumed and the shape stretched to meet it.
+ * A flat skein therefore reserves fewer layers than a round ball of the same footprint, which is
+ * both what fixes the float and what is physically true.
+ *
+ * The leftover half-layer is taken up by `settle`: a small vertical squash, clamped, so the item
+ * meets its slot exactly. Clamped because unclamped is precisely the distortion being removed —
+ * and a *little* squash is right anyway, since yarn sits under its own weight.
+ */
+// How far an item may be squashed to meet the layer grid. Only ever a SQUASH, never a stretch:
+// drawn height must not exceed reserved height or the thing above it overlaps, which is the bug
+// this whole path exists to avoid. With a fine pitch the correction is a couple of percent.
+const SETTLE_MIN = 0.82;
+
+function yarnFit(family, bulk) {
+  const [uw, uh, ud] = familyExtent(family, S.tier);
+  const [fw, fd] = familyFootprint(family, bulk);
+  // One scale for both horizontal axes: whichever of width or depth runs out first.
+  const k = Math.min((fw * S.cell * FILL) / uw, (fd * S.cell * FILL) / ud);
+  const natural = k * uh;
+  // CEIL, not round: the reservation must be at least as tall as the thing in it. Rounding down
+  // and stretching the slot to fit is how a ball came to poke 15% out of the top of its own
+  // reservation and into whatever was stacked above.
+  const layers = Math.max(1, Math.ceil((natural * SETTLE_MIN) / S.boxHeight));
+  // Then settle DOWN into the reservation, so the top of the item is the top of its layers and the
+  // next item rests on it rather than on air. Capped at 1: never stretched.
+  const settle = Math.min(1, (layers * S.boxHeight) / natural);
+  return { k, ky: k * settle, layers, w: fw, h: fd };
+}
+
+/** How many 2.5D layers an item occupies. Derived from its shape for yarn; a notion is flat. */
+const itemLayers = (item) => (item.kind === 'yarn' ? (item.layers ?? 1) : 1);
+
+/**
+ * How tall an item is drawn — which is EXACTLY the space it reserves in the grid, and that
+ * identity is the whole point.
+ *
+ * The demo previously drew yarn at "true volume" (bulk x cell) while reserving bulk LAYERS, and a
+ * layer is much shorter than a slot is wide: a bulky ball drew 0.70 tall into 0.13 of reserved
+ * height, so it grew straight up through whatever was stacked above it and through the shelf. That
+ * is the stacking bug — not the grid, which was reserving correctly all along.
+ *
+ * store.html never had it because it has only ever had one height function. So does this now: the
+ * O axis of the NxMxO grid is `boxHeight` per layer, and a thing that occupies O layers is O
+ * layers tall. If yarn should look chunkier, the lever is `shelf spacing` (which syncBoxHeight
+ * turns into a taller layer) — NOT a second, disagreeing notion of how tall something is.
+ */
+const itemTall = (item) => itemLayers(item) * S.boxHeight;
+
+function buildYarnMeshes() {
+  for (const f of YARN_FAMILIES) {
+    yarnMeshes[f]?.removeFromParent();
+    yarnHulls[f]?.removeFromParent();
+    const geo = bakeVertexAO(buildFamily(f, S.tier));
+    const mesh = new THREE.InstancedMesh(geo, currentYarnMaterial(), YARN_CAPACITY);
+    mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(YARN_CAPACITY * 3).fill(1), 3);
+    mesh.frustumCulled = false;
+    mesh.count = 0;
+    mesh.userData.owner = [];        // instance slot -> items[] index, for picking
+    if (mesh.material.userData.hatch) addHatchScale(mesh, YARN_CAPACITY);
+    yarnMeshes[f] = mesh;
+    scene.add(mesh);
+
+    const hull = makeHull(mesh, { color: S.edgeColor, width: S.outlineWidth });
+    yarnHulls[f] = hull;
+    scene.add(hull);
+  }
+  // The band and the tail are the same structure as a family: one instanced mesh each, and the
+  // per-family placement baked into the instance matrix, so neither needs a mesh per family.
+  bandMesh?.removeFromParent();
+  bandMesh = makeDetailMesh(buildBand(S.tier));
+  tailMesh?.removeFromParent();
+  tailMesh = makeDetailMesh(buildTail(S.tier));
+  applyShading();
+}
+
+function makeDetailMesh(geometry) {
+  const mesh = new THREE.InstancedMesh(geometry, currentYarnMaterial(), YARN_CAPACITY);
+  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(YARN_CAPACITY * 3).fill(1), 3);
+  mesh.frustumCulled = false;
+  mesh.count = 0;
+  scene.add(mesh);
+  return mesh;
+}
+
+function currentYarnMaterial({ hatch = S.hatch, paper = false } = {}) {
+  matcapTex ??= makeMatcap({ base: S.mcBase, light: S.mcLight, shadow: S.mcShadow,
+                             rim: S.mcRim, wrap: S.mcWrap });
+  paperTex ??= makePaperMatcap({ rim: S.paperRim, wrap: S.paperWrap });
+  toonRamp ??= makeToonRamp(S.toonSteps);
+  // A second matcap is the entire cost of giving paper its own surface: no extra draw call, no
+  // extra material slot, no shader variant. See PAPER in yarn-look.js.
+  const m = yarnMaterial(S.shading, { matcap: paper ? paperTex : matcapTex, ramp: toonRamp });
+  // Hatching goes on the yarn, never on the band or the tail: a paper band is not wound, and a
+  // single strand hatched with strand marks reads as a tiny rope.
+  if (hatch) applyHatching(m, { freq: S.hatchFreq, depth: S.hatchDepth });
+  return m;
+}
+
+/** Swap every yarn material, and strip the scene back to shapes alone for the silhouette test. */
+function applyShading() {
+  const solo = S.shading === 'silhouette';
+  for (const f of YARN_FAMILIES) {
+    const mesh = yarnMeshes[f];
+    mesh.material.dispose();
+    mesh.material = currentYarnMaterial();
+    // The per-instance attribute lives on the GEOMETRY and survives a material swap, but the
+    // define that reads it lives on the MATERIAL — so a fresh material has to be told again.
+    if (mesh.material.userData.hatch && mesh.geometry.getAttribute('aHatchScale')) {
+      mesh.material.defines = { ...mesh.material.defines, USE_HATCH_SCALE: '' };
+      mesh.material.needsUpdate = true;
+      mesh.userData.hatchScale = mesh.geometry.getAttribute('aHatchScale');
+    }
+    yarnHulls[f].visible = S.outline && !solo;
+  }
+  // The band gets the matte PAPER response; the tail is yarn and keeps the yarn's.
+  for (const [mesh, on, paper] of [[bandMesh, S.bands, true], [tailMesh, S.tails, false]]) {
+    mesh.material.dispose();
+    mesh.material = currentYarnMaterial({ hatch: false, paper });
+    // The silhouette test keeps them: they are part of the shape being judged. A tail in
+    // particular is there precisely to change an outline.
+    mesh.visible = on;
+  }
+
+  // The silhouette test is only a test if nothing else is in the picture: white ground, no shelf,
+  // no grid, no shadows, no notions. If the shapes cannot be named like this, no amount of
+  // shading will rescue them at 40px on a busy shelf.
+  scene.background.set(solo ? '#ffffff' : '#ddd5c8');
+  surface.visible = !solo;
+  pegBacking.visible = !solo;
+  displays.shelf.panels.forEach((p) => { p.visible = !solo; });
+  displays.peg.hooks && (displays.peg.hooks.visible = !solo);
+  if (shadows) shadows.visible = !solo;
+  paintActivePlane();
+}
+
+/** One yarn item, at rest or floating. Unit-space geometry scaled into the slot. */
+function paintYarn(display, index, cx, cz, base, yaw) {
+  const item = items[index];
+  const mesh = yarnMeshes[item.family];
+  // UNIFORM horizontally, settled vertically — see yarnFit. Never one scale per axis: that is what
+  // turned skeins into donuts and left everything stacked on air.
+  const fit = yarnFit(item.family, item.bulk);
+  _yarnMat.compose(_p3.set(cx, base, cz), _q.setFromAxisAngle(UP, yaw), _s3.set(fit.k, fit.ky, fit.k))
+    .premultiply(display.frame);
+  mesh.setMatrixAt(item.slot, _yarnMat);
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.setColorAt(item.slot, item.color);
+  mesh.instanceColor.needsUpdate = true;
+  const hs = mesh.userData.hatchScale;
+  if (hs) { hs.setX(item.slot, hatchScaleOf(item)); hs.needsUpdate = true; }
+
+  if (item.bandSlot != null) {
+    const bm = bandMatrix(item.family, _bandLocal);
+    bandMesh.setMatrixAt(item.bandSlot, bm.premultiply(_yarnMat));
+    bandMesh.instanceMatrix.needsUpdate = true;
+    // A band is PAPER, not yarn: near-white and independent of the ball's colour, which is the
+    // readability win DESIGN-DECISIONS.md §2 wanted from making it a separate family at all.
+    bandMesh.setColorAt(item.bandSlot, _yarnCol.set('#f6efe1'));
+    bandMesh.instanceColor.needsUpdate = true;
+  }
+
+  if (item.tailSlot != null) {
+    const tm = tailMatrix(item.family, _tailLocal);
+    tailMesh.setMatrixAt(item.tailSlot, tm.premultiply(_yarnMat));
+    // ponytail: a non-square parent (the 2x1 skein) stretches the curl along with it. It reads
+    // fine at 2x1; if a family ever goes wider, undo the parent's aspect on the tail instead.
+    tailMesh.instanceMatrix.needsUpdate = true;
+    // The end IS the yarn, so it takes the ball's own colour — that is what makes it read as a
+    // strand escaping the wind rather than as a separate object stuck on.
+    tailMesh.setColorAt(item.tailSlot, item.color);
+    tailMesh.instanceColor.needsUpdate = true;
+  }
+
+  // Rule 6 of the perf rules: items never cast into a shadow map, they get a fake contact quad.
+  // Without one, a ball reads as hovering above the shelf rather than resting on it.
+  // Rule 6 again: the contact shadow sized to what is actually DRAWN, not to the slot. With a
+  // uniform fit a family rarely fills its footprint exactly, and a shadow bigger than the object
+  // is the other way to make something look like it is hovering.
+  const [uw, , ud] = familyExtent(item.family, S.tier);
+  _pos.set(cx, base + 0.003, cz);
+  shadows.setMatrixAt(item.shadowSlot,
+    placeMatrix(_pos, fit.k * uw * 1.02, fit.k * ud * 1.02, yaw, _shadowMat).premultiply(display.frame));
+  shadows.instanceMatrix.needsUpdate = true;
+}
+
 // A box gives the item real volume; the illustrated card becomes a label glued to the box's
 // forward face (standing, so it reads like a product on a shelf) AND a second copy lying flat on
 // the box's top, so the item is identifiable looking straight down as well as from the side.
@@ -335,24 +639,27 @@ const shelfBaseY = (shelf, layer) => shelf * S.shelfGap + layer * S.boxHeight;
 // separate version of this function. That's the concrete meaning of "just a rotated shelf".
 function paintInstance(display, index, cx, cz, boxBase, shadowBase, footW, footD, yaw, grow = 1) {
   const item = items[index];
+  // Instance index, NOT the items[] index: yarn and notions now share one item list but have
+  // separate meshes, so an item's position in the list is no longer its position in a buffer.
+  const slot = item.slot;
   const boxW = footW * grow, boxD = footD * grow;
   const boxH = S.boxHeight;
   const F = display.frame;
 
   _pos.set(cx, boxBase + boxH / 2, cz);
-  setInstance(boxes, index, { matrix: placeBoxMatrix(_pos, boxW, boxD, boxH, yaw, _boxMat).premultiply(F) });
+  setInstance(boxes, slot, { matrix: placeBoxMatrix(_pos, boxW, boxD, boxH, yaw, _boxMat).premultiply(F) });
 
   const fx = Math.sin(yaw), fz = Math.cos(yaw);
   const halfOut = boxD / 2 + 0.003;
   _pos.set(cx + fx * halfOut, boxBase + boxH * 0.55, cz + fz * halfOut);
-  setInstance(field, index, {
+  setInstance(field, slot, {
     matrix: placeLabelMatrix(_pos, boxW * 0.92, boxH * 0.82, yaw, _mat).premultiply(F),
     rect: cellRect(atlas.manifest, item.name),
     color: _col.set(item.color),
   });
 
   _pos.set(cx, boxBase + boxH + 0.002, cz);
-  setInstance(fieldTop, index, {
+  setInstance(fieldTop, slot, {
     matrix: placeMatrix(_pos, boxW * 0.86, boxD * 0.86, yaw, _topMat).premultiply(F),
     rect: cellRect(atlas.manifest, item.name),
     color: _col.set(item.color),
@@ -363,13 +670,13 @@ function paintInstance(display, index, cx, cz, boxBase, shadowBase, footW, footD
   const sx = Math.cos(yaw), sz = -Math.sin(yaw);
   const sideOut = boxW / 2 + 0.003;
   _pos.set(cx + sx * sideOut, boxBase + boxH * 0.55, cz + sz * sideOut);
-  setInstance(sizeTag, index, {
+  setInstance(sizeTag, slot, {
     matrix: placeLabelMatrix(_pos, boxD * 0.5, boxH * 0.5, yaw + Math.PI / 2, _sizeMat).premultiply(F),
     rect: cellRect(sizeAtlas.manifest, item.size != null ? item.size.toFixed(1) : 'blank'),
   });
 
   _pos.set(cx, shadowBase + 0.003, cz);
-  shadows.setMatrixAt(index, placeMatrix(_pos, boxW * 1.08, boxD * 1.08, yaw, _shadowMat).premultiply(F));
+  shadows.setMatrixAt(item.shadowSlot, placeMatrix(_pos, boxW * 1.08, boxD * 1.08, yaw, _shadowMat).premultiply(F));
   shadows.instanceMatrix.needsUpdate = true;
 }
 
@@ -379,6 +686,7 @@ function refresh(index) {
   const disp = displays[item.display];
   const rect = slotRect(disp.g, item.c, item.r, item.w, item.h);
   const base = shelfBaseY(item.shelf, item.layer);
+  if (item.kind === 'yarn') return paintYarn(disp, index, rect.x, rect.z, base, item.yaw);
   paintInstance(disp, index, rect.x, rect.z, base, base, rect.w * FILL, rect.d * FILL, item.yaw);
 }
 
@@ -388,7 +696,134 @@ function refreshFloating(index, x, z) {
   const item = items[index];
   const disp = activeDisplay();
   const floor = disp.plane * S.shelfGap;
+  if (item.kind === 'yarn') return paintYarn(disp, index, x, z, floor + S.liftHeight, item.yaw);
   paintInstance(disp, index, x, z, floor + S.liftHeight, floor, item.w * S.cell * FILL, item.h * S.cell * FILL, item.yaw, 1.08);
+}
+
+/**
+ * Hand every item a slot in its own mesh and redraw.
+ *
+ * Separated from scatter because the slot mapping has to be rebuilt whenever the SET of drawn
+ * items changes for any reason — a stock switch, a band toggle, a family retessellation — not only
+ * when the shelf is reshuffled. items[] index and instance slot are two different numbers now.
+ */
+function restage() {
+  let notion = 0, band = 0, tail = 0, shadow = 0;
+  for (const f of YARN_FAMILIES) { yarnMeshes[f].count = 0; yarnMeshes[f].userData.owner.length = 0; }
+  boxes.userData.owner.length = 0;
+
+  items.forEach((item, i) => {
+    item.shadowSlot = shadow++;
+    if (item.kind === 'yarn') {
+      const mesh = yarnMeshes[item.family];
+      item.slot = mesh.count++;
+      mesh.userData.owner[item.slot] = i;
+      item.bandSlot = S.bands && BANDS[item.family] ? band++ : null;
+      item.tailSlot = S.tails && TAILS[item.family] ? tail++ : null;
+    } else {
+      item.slot = notion++;
+      boxes.userData.owner[item.slot] = i;
+    }
+  });
+
+  field.count = edge.count = fieldTop.count = edgeTop.count = sizeTag.count = notion;
+  boxes.count = notion;
+  bandMesh.count = band;
+  tailMesh.count = tail;
+  shadows.count = shadow;
+  for (const f of YARN_FAMILIES) yarnHulls[f].count = yarnMeshes[f].count;
+  items.forEach((_, i) => refresh(i));
+}
+
+const rnd = (n) => (Math.random() * n) | 0;
+
+/** `bulk` is YARN.md's 1x1x1..3x3x3 grid size — NOT a notion's `size`, which is hook millimetres. */
+function pushYarn(disp, family, bulk, shelf, c, r, keys) {
+  const index = items.length;
+  const fit = yarnFit(family, bulk);
+  items.push({
+    kind: 'yarn', family, bulk, display: 'shelf',
+    shelf, c, r, w: fit.w, h: fit.h, keys,
+    // Layers come from the SHAPE, not from bulk — a flat skein reserves fewer than a round ball of
+    // the same footprint. Stored rather than recomputed so the grid and the renderer can never
+    // disagree about how many layers an item is holding.
+    layers: fit.layers,
+    layer: place(disp.g, keys, index, fit.layers),
+    color: yarnColor(Math.random, undefined, { spread: S.paletteSpread }),
+    // Booklets stand square to the shelf like books; everything round gets a nudge.
+    // Booklets stand square to the shelf like books; everything round gets the same nudge a
+    // notion gets, from the shared jitter rather than a third private number.
+    yaw: family === 'booklet' ? 0 : scatterYaw(),
+  });
+}
+
+/**
+ * The silhouette test, as a layout: one of each family, all the SAME size, in a line.
+ *
+ * Same size is the point — a size difference would let the eye tell two families apart for a
+ * reason that says nothing about whether their shapes are distinguishable, which is the one thing
+ * this row exists to answer.
+ */
+function addFamilyRow(disp) {
+  // Walk a cursor rather than indexing by family, since footprints now differ — a 2x1 skein must
+  // not be laid on top of the ball to its left.
+  let c = 0, r = 0;
+  for (const family of YARN_FAMILIES) {
+    const { w, h, layers } = yarnFit(family, 1);
+    let keys = null;
+    while (r + h <= disp.g.rows) {
+      if (c + w > disp.g.cols) { c = 0; r += 1; continue; }
+      keys = footprint(disp.g, 0, c, r, w, h);
+      if (keys && fits(disp.g, keys, layers)) break;
+      keys = null;
+      c += 1;
+    }
+    if (!keys) break;                       // out of room; the rest of the row is simply not shown
+    pushYarn(disp, family, 1, 0, c, r, keys);
+    c += w;
+  }
+}
+
+/** The biggest bulk of this family that will actually fit under a shelf. At least 1. */
+function maxBulk(family) {
+  for (let bulk = 3; bulk > 1; bulk--) if (yarnFit(family, bulk).layers <= S.headroom) return bulk;
+  return 1;
+}
+
+function addYarn(disp) {
+  if (S.familyRow) return addFamilyRow(disp);
+  const target = Math.min(S.yarnCount, YARN_CAPACITY);
+  for (let attempt = 0; items.length < target && attempt < target * 80; attempt++) {
+    const family = YARN_FAMILIES[rnd(YARN_FAMILIES.length)];
+    // YARN.md: "anywhere from 1x1x1 (thread, lace weight) to 3x3x3 (super bulky housewares yarn)".
+    // Clamped to what the shelf can actually take: an unclamped roll on a short shelf throws away
+    // most of its attempts and quietly produces a shop with no bulky yarn in it at all.
+    const bulk = 1 + rnd(maxBulk(family));
+    const fit = yarnFit(family, bulk);
+    const shelf = rnd(S.shelves), c = rnd(S.cols), r = rnd(S.rows);
+    const keys = footprint(disp.g, shelf, c, r, fit.w, fit.h);
+    if (!fits(disp.g, keys, fit.layers)) continue;
+    pushYarn(disp, family, bulk, shelf, c, r, keys);
+  }
+}
+
+function addNotions(disp) {
+  const target = Math.min(S.fill + items.length, CAPACITY);
+  for (let attempt = 0; items.length < target && attempt < target * 80; attempt++) {
+    const [w, h] = SHAPES[rnd(SHAPES.length)];
+    const shelf = rnd(S.shelves), c = rnd(S.cols), r = rnd(S.rows);
+    const keys = footprint(disp.g, shelf, c, r, w, h);
+    if (!fits(disp.g, keys)) continue;
+    const index = items.length;
+    const name = atlas.names[index % atlas.names.length];
+    items.push({
+      kind: 'notion', name, display: 'shelf',
+      shelf, c, r, w, h, keys, layer: place(disp.g, keys, index, 1),
+      color: S.tint,
+      yaw: scatterYaw(),
+      size: name === 'crochet-hook' ? HOOK_SIZES_MM[rnd(HOOK_SIZES_MM.length)] : null,
+    });
+  }
 }
 
 function scatter() {
@@ -399,47 +834,38 @@ function scatter() {
   // Only shelf items are cleared/regenerated — the peg board is a manually-curated experiment
   // area, not something "reshuffle" should touch.
   for (let i = items.length - 1; i >= 0; i--) if (items[i].display === 'shelf') items.splice(i, 1);
-  const target = Math.min(S.fill, CAPACITY);
-  for (let attempt = 0; items.length < target && attempt < target * 80; attempt++) {
-    const [w, h] = SHAPES[(Math.random() * SHAPES.length) | 0];
-    const shelf = (Math.random() * S.shelves) | 0;
-    const c = (Math.random() * S.cols) | 0;
-    const r = (Math.random() * S.rows) | 0;
-    const keys = footprint(disp.g, shelf, c, r, w, h);
-    if (!fits(disp.g, keys)) continue;
-    const index = items.length;
-    const layer = place(disp.g, keys, index);
-    const name = atlas.names[index % atlas.names.length];
-    items.push({
-      name, display: 'shelf',
-      shelf, c, r, w, h, layer, keys,
-      color: S.tint,
-      yaw: (Math.random() - 0.5) * 0.22 * Math.PI,
-      size: name === 'crochet-hook' ? HOOK_SIZES_MM[(Math.random() * HOOK_SIZES_MM.length) | 0] : null,
-    });
-  }
-  field.count = items.length;
-  edge.count = items.length;
-  fieldTop.count = items.length;
-  edgeTop.count = items.length;
-  shadows.count = items.length;
-  boxes.count = items.length;
-  sizeTag.count = items.length;
-  items.forEach((_, i) => refresh(i));
+
+  if (S.stock !== 'notions') addYarn(disp);
+  if (S.stock !== 'yarn') addNotions(disp);
+  restage();
 }
 
-// A stack's total height (headroom * boxHeight) must stay under shelfGap, or a full stack pokes
-// through the glass shelf above it — that, not item-vs-item overlap, was the real "visual
-// collision": each (col,row,layer) triple already had its own dedicated Y slot.
-function clampBoxHeight() {
-  const maxH = S.shelfGap / S.headroom;
-  boxHeightCtl.max(maxH);
-  if (S.boxHeight > maxH) { S.boxHeight = maxH; boxHeightCtl.updateDisplay(); }
+/**
+ * The layer height is DERIVED, not set: `boxHeight = (shelfGap / headroom) * boxFill`.
+ *
+ * It used to be an independent slider that was merely clamped down when it exceeded the gap, and
+ * that made "raise the shelf spacing to get chunkier yarn" quietly not work: raising the gap
+ * raised the CEILING and left the height sitting exactly where it was. The two numbers describe
+ * one physical thing — how tall a slot of the O axis is — so only one of them can be the input.
+ *
+ * `boxFill` is the knob that survives: what fraction of the available pitch a layer actually
+ * occupies, for when a stack should have air in it. At 1 a full stack exactly fills the gap.
+ */
+function syncBoxHeight() {
+  S.boxHeight = S.cell * S.layerRatio;
+  // Headroom is now DERIVED too: it is simply how many layer-pitches fit under the next shelf.
+  // Making it an input alongside the gap and the pitch was over-determining one physical fact.
+  S.headroom = Math.max(1, Math.floor(S.shelfGap / S.boxHeight));
+  boxHeightCtl?.updateDisplay();
+  headroomCtl?.updateDisplay();
 }
 
 function rebuild() {
   displays.shelf.plane = Math.min(displays.shelf.plane, S.shelves - 1);
-  clampBoxHeight();
+  syncBoxHeight();
+  // The peg board's headroom follows the layer pitch too, so it is no longer a build-once display:
+  // leaving it stale would let a stack stick further out from the wall than its hooks reach.
+  if (displays.peg.g) { buildPegGrid(); layoutPegDisplay(); }
   scatter();
   frame();
 }
@@ -454,8 +880,11 @@ function tidyPlane(disp, s) {
   const byKind = new Map();
   items.forEach((item, i) => {
     if (item.display !== disp.id || item.shelf !== s) return;
-    if (!byKind.has(item.name)) byKind.set(item.name, []);
-    byKind.get(item.name).push(i);
+    // Yarn has no `name` — it has a family. Without this every yarn item grouped under the key
+    // `undefined` and tidying piled all seven families into one indiscriminate stack.
+    const kind = item.kind === 'yarn' ? `yarn:${item.family}` : item.name;
+    if (!byKind.has(kind)) byKind.set(kind, []);
+    byKind.get(kind).push(i);
   });
   clearShelf(g, s);
 
@@ -474,8 +903,9 @@ function tidyPlane(disp, s) {
     for (const i of indices) {
       if (!anchor) break;   // ponytail: plane ran out of room; leftovers just keep their old spot, unrendered
       const item = items[i];
+      const tall = itemLayers(item);
       let keys = footprint(g, s, anchor.c, anchor.r, item.w, item.h);
-      if (!fits(g, keys)) {   // this pile hit headroom — start an overflow pile of the SAME kind
+      if (!fits(g, keys, tall)) {   // this pile hit headroom — start an overflow pile of the SAME kind
         cursor++;
         anchor = nextEmptyCell();
         if (!anchor) break;
@@ -483,7 +913,7 @@ function tidyPlane(disp, s) {
       }
       item.display = disp.id; item.shelf = s; item.c = anchor.c; item.r = anchor.r; item.yaw = 0;
       item.keys = keys;
-      item.layer = place(g, keys, i);
+      item.layer = place(g, keys, i, tall);
       refresh(i);
     }
   }
@@ -497,133 +927,94 @@ function tidyActive() {
 
 // ---------------------------------------------------------------- dragging
 //
-// One raycast against the ACTIVE display's plane, then columnAt() converts the hit to a column in
-// O(1). Notions are never raycast (they are instanced, so they aren't individual objects anyway).
-// Click to pick up, click again to put down — not press-and-hold. A continuous hold was hard on
-// the hands for what's meant to be the core moment-to-moment mechanic. Clicking always selects
-// whichever DISPLAY is under the cursor (see pickTarget below), even on an empty cell — you
-// should be able to point at where you're about to work, not only where a box already is. While
-// something is held, moving the mouse over a different display re-targets the hold the same way,
-// so switching where you're placing something is just "move the mouse there". [ ] still picks a
-// specific shelf LEVEL within a display — see pickTarget's own comment for why that stays
-// keyboard-only rather than also being click/hover-driven.
+// The geometry of this now lives in ./pick-place.js, shared with characters/store.html. It was
+// EXTRACTED FROM store.html rather than from here: the game had grown the better version — a
+// forgiving screen-space pick, a snap onto the nearest slot the item actually fits in, and layer
+// awareness throughout — while this demo still ran the one-plane, one-layer original it was
+// ported from. Adding yarn (which is genuinely 1-3 layers tall) is what made the divergence bite:
+// a bulky ball picked up off a stack came back down flattened into a single layer.
 //
-// The pick plane is always "local Y = k" in a display's OWN SPACE — a horizontal plane for the
-// shelf, a vertical plane for the peg board, because that's what display.frame does to local Y.
-// castLocal() builds that plane in world space, intersects it, then transforms the hit back into
-// local space so columnAt()/topAt() (which only know about local col/row) work unchanged for
-// either display — and returns plain numbers (not an aliased Vector3), since pickTarget compares
-// hits across every plane of both displays in one pass and can't have a later call overwrite an
-// earlier result.
-const raycaster = new THREE.Raycaster();
-const pointer = new THREE.Vector2();
-const pickPlane = new THREE.Plane();
-const _hit = new THREE.Vector3();
-const _n = new THREE.Vector3();
-const _planePt = new THREE.Vector3();
-const _local = new THREE.Vector3();
+// The decisions themselves are unchanged and recorded in
+// ../ai_planning_sessions/inventory/DESIGN-DECISIONS.md §7 — click to pick up rather than
+// press-and-hold, cast the slot plane rather than the items, be forgiving about aim.
+//
+// The adapter below is the entire difference between this scene and the game's: how a shelf level
+// is positioned (here, stacked flat at shelfGap; there, tilted 45°) and how tall an item is.
 const drag = { index: EMPTY, target: null };
 // Last real pointer position, kept fresh on every pointermove — lets a KEYBOARD-triggered plane
 // or display switch mid-hold (see the keydown handler) recompute the ghost/drop target right away,
 // without waiting on the player to also jiggle the mouse after pressing [ ] / ] / D.
 const lastPointer = { clientX: innerWidth / 2, clientY: innerHeight / 2 };
 
-function setRayFromEvent(event) {
-  pointer.set((event.clientX / innerWidth) * 2 - 1, -(event.clientY / innerHeight) * 2 + 1);
-  raycaster.setFromCamera(pointer, camera);
-}
+const _levelFrame = new THREE.Matrix4();
+const _levelOffset = new THREE.Matrix4();
 
-function castLocal(disp, localY) {
-  _n.set(0, 1, 0).transformDirection(disp.frame);
-  _planePt.set(0, localY, 0).applyMatrix4(disp.frame);
-  pickPlane.setFromNormalAndCoplanarPoint(_n, _planePt);
-  const hit = raycaster.ray.intersectPlane(pickPlane, _hit);
-  if (!hit) return null;
-  const distSq = raycaster.ray.origin.distanceToSquared(hit);
-  _local.copy(hit).applyMatrix4(disp.frameInv);
-  return { x: _local.x, z: _local.z, distSq };
-}
+const picker = makePicker({
+  camera,
+  displays: () => Object.values(displays),
+  items: () => items,
+  // A level here is the display's frame lifted along its own local Y. store.html builds these once
+  // because its levels are tilted and never move; this one has live GUI sliders for shelfGap, so
+  // it composes on demand instead.
+  levelFrame: (disp, shelf) => _levelFrame.copy(disp.frame)
+    .multiply(_levelOffset.makeTranslation(0, shelf * S.shelfGap, 0)),
+  itemHeight: (_disp, item) => item.layer * S.boxHeight + itemTall(item),
+  exposed: fullyExposed,
+  grabRadius: () => S.grabRadius,
+  snapCells: () => S.snapCells,
+});
+// hoverTarget is deliberately NOT taken: see pickTarget below for why this scene resolves the
+// display by occlusion instead. store.html uses it because its levels are tilted apart.
+const { pickCandidate, snapTo, raycaster, setRay: setRayFromEvent } = picker;
+const displayPoint = (disp, event) => picker.displayPoint(disp, disp.plane, event);
 
-// Two-pass pick against ONE specific display (parallax-corrected — see the box-height comment
-// this replaced). Assumes the ray is already set (setRayFromEvent).
-function displayPoint(disp, event) {
-  setRayFromEvent(event);
-  const guess = castLocal(disp, disp.plane * S.shelfGap);
-  if (!guess) return null;
-
-  const col = columnAt(disp.g, guess.x, guess.z);
-  const topIndex = col ? topAt(disp.g, disp.plane, col.c, col.r) : EMPTY;
-  if (topIndex === EMPTY) return guess;
-
-  const refined = castLocal(disp, shelfBaseY(disp.plane, items[topIndex].layer) + S.boxHeight);
-  return refined ?? guess;
-}
-
-// Which DISPLAY the pointer is actually over right now, or null if neither — tested via a real
-// raycast against each display's currently-active floor/panel mesh (a couple of objects, nowhere
-// near the 1000-item scale the design record says never to raycast), so shelf vs. peg board is
-// resolved by true occlusion rather than an abstract "nearest math plane" test.
-//
-// This deliberately stops at DISPLAY granularity, not a specific shelf LEVEL. An earlier version
-// tried to also detect which of the 3 shelf levels was clicked, testing every level's panel and
-// keeping the nearest hit — but every level shares the exact same (col,row) footprint, and the
-// glass panels are only VISUALLY transparent (raycasting doesn't know about `transmission`), so a
-// click could resolve to the WRONG level: whichever panel physically sits in the way, even though
-// a player can clearly see through it to the level they actually meant. That's not fixable by
-// click position alone when levels are perfectly stacked and see-through — it needs an
-// unambiguous signal, which [ ] already is. So plane selection stays keyboard-only; a click just
-// confirms/selects whichever display (shelf unit vs. peg board — physically separate, never
-// ambiguous) you're pointing at, using its CURRENTLY ACTIVE plane for the column/item lookup.
+/**
+ * Which DISPLAY the pointer is over, by a real raycast against its floor/panel meshes.
+ *
+ * Kept separate from the picker's own hoverTarget: this demo has two PHYSICALLY separate displays
+ * (a shelf unit and a peg board on a wall), and which one you are pointing at is settled by true
+ * occlusion rather than by which math plane happens to be nearest. A couple of objects, nowhere
+ * near the scale the "never raycast items" rule is about.
+ *
+ * Deliberately stops at DISPLAY granularity, not shelf LEVEL. Every level shares the same (col,row)
+ * footprint and the glass panels are only VISUALLY transparent — a raycast knows nothing about
+ * `transmission` — so a click could resolve to whichever panel physically sits in the way rather
+ * than the level the player can plainly see through to. That needs an unambiguous signal, which
+ * [ ] already is. (store.html can do per-level hover because its levels are tilted and therefore
+ * do not stack into the same screen area.)
+ */
 function pickTarget(event) {
   setRayFromEvent(event);
   const candidates = Object.values(displays).map((disp) => disp.floors[disp.plane]);
   const hits = raycaster.intersectObjects(candidates, false);
   if (!hits.length) return null;
-
   const disp = displays[hits[0].object.userData.dispId];
-  _local.copy(hits[0].point).applyMatrix4(disp.frameInv);
-  if (!columnAt(disp.g, _local.x, _local.z)) return null;   // hit the panel, but outside the grid
+  const local = hits[0].point.clone().applyMatrix4(disp.frameInv);
+  if (!columnAt(disp.g, local.x, local.z)) return null;   // hit the panel, but outside the grid
   return disp;
 }
 
-// A box doesn't land in exactly the same orientation every time it's set down — a small nudge
-// from wherever it currently sits, not a full re-roll. Any code path that places an item (this
-// drag-drop today, an NPC's own placement later) should call this rather than leaving yaw as-is.
-const YAW_SETTLE = 0.12 * Math.PI;
-const settleYaw = (item) => { item.yaw += (Math.random() - 0.5) * YAW_SETTLE; };
-
-// Picking a box is resolved against REAL geometry — every display's floors/panels at EVERY plane
-// (not just the currently active one) plus the shared `boxes` InstancedMesh, all in one raycast —
-// so whichever solid thing the ray hits FIRST decides the click. This is occlusion by true
-// distance, not a `boxes`-only test: a panel is a real solid mesh regardless of which plane is
-// "active", so a click on an empty top-shelf cell correctly stops at that shelf's own glass floor
-// instead of sailing on through (unblocked) to hit some unrelated box sitting on a lower shelf at
-// the same column — glass reads as solid to a raycast the same way it already did for pickTarget,
-// this just also lets it stop a click same as it stops the eye. If the nearest hit IS a box, that's
-// unambiguous regardless of which level it's on, so this switches the active plane to match rather
-// than requiring [ ] first.
+/**
+ * Pick up whatever is under the pointer.
+ *
+ * Two-stage, and the order matters. The shared forgiving pick runs FIRST, because it is the one
+ * that can grab a box the pointer merely came close to — the thing that makes this usable with a
+ * finger. Only if it finds nothing does the display raycast run, so that clicking bare shelf still
+ * selects the display you are pointing at: you should be able to point at where you are about to
+ * work, not only at where a box already is.
+ */
 function pickUp(event) {
-  setRayFromEvent(event);
-  const candidates = [];
-  for (const disp of Object.values(displays)) candidates.push(...disp.floors);
-  candidates.push(boxes);
-  const hits = raycaster.intersectObjects(candidates, false);
-  if (hits.length && hits[0].object === boxes) {
-    const index = hits[0].instanceId;
-    const item = items[index];
-    const disp = displays[item.display];
+  const found = pickCandidate(event);
+  if (found) {
+    const { disp, index, shelf } = found;
     if (activeId !== disp.id) setActiveId(disp.id, false);
-    if (disp.plane !== item.shelf) setPlane(item.shelf);
-
+    if (disp.plane !== shelf) setPlane(shelf);
     drag.index = index;
-    lift(disp.g, item.keys);   // pull it out of the grid so it can't block its own drop
+    lift(disp.g, items[index].keys);   // out of the grid, so it can't block its own drop
     const point = displayPoint(disp, event);
     if (point) refreshFloating(index, point.x, point.z);
     return;
   }
-
-  // No box under the cursor — a click on an empty cell still selects whichever display it's on,
-  // so you can point at where you're about to work, not only where a box already is.
   const disp = pickTarget(event);
   if (disp && activeId !== disp.id) setActiveId(disp.id, false);
 }
@@ -635,14 +1026,14 @@ function putDown() {
     // Moving to a NEW display/plane — may differ from where it was picked up.
     item.display = activeId;
     item.shelf = activeDisplay().plane;
-    item.c = t.c; item.r = t.r; item.keys = t.keys;
   }
-  // else: no valid target on whichever display/plane is now active — falls back to wherever it
-  // actually still belongs (item.display/shelf/c/r), which is untouched if the branch above
-  // didn't run.
+  // else: no valid target on whichever display/plane is now active — it falls back to wherever it
+  // actually still belongs, which placeItem reads off the item itself.
   const home = displays[item.display];
-  if (!t) item.keys = footprint(home.g, item.shelf, item.c, item.r, item.w, item.h);
-  item.layer = place(home.g, item.keys, drag.index);
+  // Through placeItem, NOT place() directly: it carries the layer count, and forgetting that is
+  // precisely the bug this refactor exists to kill — a three-layer bulky ball placed as one layer
+  // looks fine until something stacks into the two layers it was silently not occupying.
+  placeItem(item, drag.index, t, home, item.shelf, { layers: itemLayers, anySlot });
   settleYaw(item);
 
   refresh(drag.index);
@@ -673,15 +1064,9 @@ function onPointerMove(event) {
   const point = displayPoint(disp, event);
   if (!point) return;
   const item = items[drag.index];
-  const col = columnAt(disp.g, point.x, point.z);
-
-  drag.target = null;
-  if (col) {
-    const c = col.c - ((item.w - 1) >> 1);
-    const r = col.r - ((item.h - 1) >> 1);
-    const keys = footprint(disp.g, disp.plane, c, r, item.w, item.h);
-    if (fits(disp.g, keys)) drag.target = { c, r, keys, layer: dropLayer(disp.g, keys) };
-  }
+  // The shared snap: the nearest slot the item ACTUALLY FITS IN, layers included, rather than
+  // whichever column the ray happened to land in.
+  drag.target = snapTo(disp, disp.plane, { ...item, layers: itemLayers(item) }, point.x, point.z);
   ghost(item);
   refreshFloating(drag.index, point.x, point.z);
 }
@@ -699,7 +1084,9 @@ function ghost(item) {
   const t = drag.target;
   marker.visible = !!t;
   if (!t) return;
-  const rect = slotRect(disp.g, t.c, t.r, item.w, item.h);
+  // The target's own footprint, not the item's: a turned drop swaps them, and the preview has
+  // to show where it will ACTUALLY land or the turn is a surprise at release.
+  const rect = slotRect(disp.g, t.c, t.r, t.w ?? item.w, t.h ?? item.h);
   marker.position.set(rect.x, shelfBaseY(disp.plane, t.layer) + 0.004, rect.z).applyMatrix4(disp.frame);
   marker.quaternion.copy(disp.quat).multiply(FLAT_Q);
   marker.scale.set(rect.w * 0.96, rect.d * 0.96, 1);
@@ -725,7 +1112,7 @@ function frame() {
   const disp = activeDisplay();
   const { w, d } = gridSize(disp.g);
   const isShelf = disp.id === 'shelf';
-  const height = isShelf ? S.shelves * S.shelfGap : PEG_HEADROOM * S.boxHeight;
+  const height = isShelf ? S.shelves * S.shelfGap : PEG_REACH;
   const center = new THREE.Vector3(0, height * 0.4, 0).applyMatrix4(disp.frame);   // a point, not a direction
 
   // The peg board's "height" above is only how far a stack sticks OUT (small) — its actual size
@@ -739,6 +1126,27 @@ function frame() {
     center.y + dist * (isShelf ? 0.7 : 0.25),
     center.z + dist * (isShelf ? 0.66 : 0.9),
   );
+  controls.update();
+}
+
+/**
+ * Pull back until one slot is about 64 CSS pixels across — roughly what a shelved item occupies at
+ * the game's own diorama distance.
+ *
+ * This is the actual test. A shape that cannot be named at this size will not be nameable in play
+ * however good the model is, and judging silhouettes at a comfortable working zoom is how a set of
+ * shapes gets approved and then reads as mush in the game.
+ */
+function frameSilhouette(px = 64) {
+  const disp = displays.shelf;
+  const halfFov = THREE.MathUtils.degToRad(camera.fov) * 0.5;
+  const dist = (S.cell * innerHeight) / (2 * Math.tan(halfFov) * px);
+  // The family row lives on row 0 of the shelf, which is the grid's near edge; the grid itself is
+  // centred on x, so the row's midpoint is x = 0.
+  const { d } = gridSize(disp.g);
+  const center = new THREE.Vector3(0, S.cell * 0.45, -d / 2 + S.cell / 2);
+  controls.target.copy(center);
+  camera.position.set(center.x, center.y + dist * 0.18, center.z + dist);
   controls.update();
 }
 
@@ -779,13 +1187,21 @@ gGrid.add(S, 'layout', Object.keys(LAYOUTS)).name('shape').onFinishChange(rebuil
 gGrid.add(S, 'cols', 2, 12, 1).onFinishChange(rebuild);
 gGrid.add(S, 'rows', 2, 12, 1).onFinishChange(rebuild);
 gGrid.add(S, 'shelves', 1, 5, 1).onFinishChange(() => { if (activeId === 'shelf') planeCtl.max(S.shelves - 1); rebuild(); });
-gGrid.add(S, 'headroom', 1, 8, 1).name('stack height').onFinishChange(rebuild);
+headroomCtl = gGrid.add(S, 'headroom').name('layers per shelf (derived)').listen().disable();
 gGrid.add(S, 'cell', 0.14, 0.5, 0.01).name('slot size').onFinishChange(rebuild);
-gGrid.add(S, 'shelfGap', 0.12, 0.4, 0.01).name('shelf spacing').onFinishChange(rebuild);
+// onChange, not onFinishChange: this now drives how tall the stock is drawn, so it should be
+// visible while dragging rather than only on release.
+gGrid.add(S, 'shelfGap', 0.12, 0.9, 0.01).name('shelf spacing').onChange(() => {
+  syncBoxHeight();
+  items.forEach((_, i) => refresh(i));
+}).onFinishChange(rebuild);
 gGrid.add(S, 'showGrid').name('show grid  (G)').onChange(paintActivePlane);
 
 const gLook = gui.addFolder('notion look');
-boxHeightCtl = gLook.add(S, 'boxHeight', 0.02, 0.18, 0.005).name('box height').onChange(() => items.forEach((_, i) => refresh(i)));
+// The input is the layer RATIO — how finely the O axis is subdivided. Everything else about the
+// vertical axis follows from it and the shelf gap, and is shown read-only so nothing can disagree.
+gLook.add(S, 'layerRatio', 0.05, 0.5, 0.005).name('layer pitch (of a slot)').onFinishChange(rebuild);
+boxHeightCtl = gLook.add(S, 'boxHeight').name('layer height (derived)').listen().disable();
 gLook.addColor(S, 'boxColor').name('box colour').onChange((v) => boxes.material.color.set(v));
 gLook.addColor(S, 'tint').name('label ink').onChange(() => {
   items.forEach((item, i) => { item.color = S.tint; refresh(i); });
@@ -793,6 +1209,64 @@ gLook.addColor(S, 'tint').name('label ink').onChange(() => {
 gLook.add(S, 'shade', 0, 0.8, 0.01).name('gradient').onChange((v) => {
   field.material.userData.uniforms.uShade.value = v;
   fieldTop.material.userData.uniforms.uShade.value = v;
+});
+
+// ---------------------------------------------------------------- yarn spike controls
+const remakeMatcap = () => {
+  matcapTex?.dispose();
+  paperTex?.dispose();
+  toonRamp?.dispose();
+  matcapTex = paperTex = toonRamp = null;
+  applyShading();
+};
+const retessellate = () => { buildYarnMeshes(); restage(); };
+
+const gYarn = gui.addFolder('yarn assets  (spike)');
+gYarn.add(S, 'stock', ['notions', 'yarn', 'both']).name('shelf holds').onChange(scatter);
+gYarn.add(S, 'shading', SHADING).name('shading  (1-5)').onChange(applyShading);
+gYarn.add(S, 'tier', TIERS).name('tessellation').onChange(retessellate);
+gYarn.add(S, 'familyRow').name('one of each  (Y)').onChange(scatter);
+gYarn.add(S, 'yarnCount', 1, 1000, 1).name('yarn count').onFinishChange(scatter);
+gYarn.add({ f: () => { S.yarnCount = 1000; S.cols = 12; S.rows = 12; S.shelves = 5; S.familyRow = false;
+                       gui.controllersRecursive().forEach((c) => c.updateDisplay()); rebuild(); } }, 'f')
+  .name('the 1000-item wall');
+gYarn.add(S, 'paletteSpread', 0, 1, 0.05).name('colour range').onFinishChange(scatter);
+gYarn.add(S, 'bands').name('ball bands').onChange(() => { restage(); applyShading(); });
+gYarn.add(S, 'tails').name('yarn ends').onChange(() => { restage(); applyShading(); });
+
+const gHatch = gYarn.addFolder('strand hatching');
+gHatch.add(S, 'hatch').name('enabled').onChange(applyShading);
+gHatch.add(S, 'hatchFreq', 4, 90, 1).name('strands').onChange((v) => {
+  for (const f of YARN_FAMILIES) {
+    const u = yarnMeshes[f].material.userData.hatch;
+    if (u) u.uHatchFreq.value = v;
+  }
+});
+gHatch.add(S, 'perWeight').name('vary by weight').onChange(() => items.forEach((_, i) => refresh(i)));
+gHatch.add(S, 'hatchDepth', 0, 0.6, 0.01).name('depth').onChange((v) => {
+  for (const f of YARN_FAMILIES) {
+    const u = yarnMeshes[f].material.userData.hatch;
+    if (u) u.uHatchDepth.value = v;
+  }
+});
+gYarn.add({ f: () => frameSilhouette() }, 'f').name('zoom to 64px  (N)');
+
+const gMat = gYarn.addFolder('matcap');
+gMat.addColor(S, 'mcBase').name('midtone (keep near-white)').onChange(remakeMatcap);
+gMat.addColor(S, 'mcLight').name('light').onChange(remakeMatcap);
+gMat.addColor(S, 'mcShadow').name('shadow').onChange(remakeMatcap);
+gMat.add(S, 'mcRim', 0, 1, 0.01).name('rim (fake sheen)').onChange(remakeMatcap);
+gMat.add(S, 'mcWrap', 0, 1.2, 0.01).name('terminator wrap').onChange(remakeMatcap);
+gMat.add(S, 'toonSteps', 2, 6, 1).name('toon bands').onChange(remakeMatcap);
+gMat.add(S, 'paperRim', 0, 1, 0.01).name('band sheen (paper)').onChange(remakeMatcap);
+gMat.add(S, 'paperWrap', 0, 1.2, 0.01).name('band softness').onChange(remakeMatcap);
+gLook.add(S, 'exposure', 0.2, 2, 0.01).name('exposure')
+  .onChange((v) => { renderer.toneMappingExposure = v; });
+
+const gHull = gYarn.addFolder('ink outline');
+gHull.add(S, 'outline').name('enabled').onChange(applyShading);
+gHull.add(S, 'outlineWidth', 0, 0.05, 0.001).name('width').onChange((v) => {
+  for (const f of YARN_FAMILIES) yarnHulls[f].material.userData.uniforms.uWidth.value = v;
 });
 
 const gEdge = gui.addFolder('thickness / outline');
@@ -807,6 +1281,9 @@ addEventListener('keydown', (e) => {
   if (k === 'r') scatter();
   if (k === 't') tidyActive();
   if (k === 'f') frame();
+  if (k === 'n') frameSilhouette();
+  if (k === 'y') { S.familyRow = !S.familyRow; scatter(); }
+  if (k >= '1' && k <= '5') { S.shading = SHADING[+k - 1]; applyShading(); }
   if (k === 'd') { setActiveId(activeId === 'shelf' ? 'peg' : 'shelf'); displayCtl.updateDisplay(); }
   if (e.key === '[') setPlane(activeDisplay().plane - 1);
   if (e.key === ']') setPlane(activeDisplay().plane + 1);
@@ -835,9 +1312,35 @@ function updatePerf(dt) {
   lastPerf = performance.now();
   const r = renderer.info.render;
   const disp = activeDisplay();
+  let yarnN = 0, yarnTris = 0;
+  for (const f of YARN_FAMILIES) {
+    const m = yarnMeshes[f];
+    if (!m) continue;
+    yarnN += m.count;
+    yarnTris += m.count * triangleCount(m.geometry) * (S.outline && S.shading !== 'silhouette' ? 2 : 1);
+  }
+  // Headroom derives from the gap, so a full stack fits by construction. What CAN fail is the
+  // shelf being too short for the biggest yarn the shop carries — say so, rather than letting
+  // `fits` silently omit it.
+  const capped = YARN_FAMILIES.filter((f) => maxBulk(f) < 3);
+  const clash = capped.length
+    ? `\n!! shelf too short for bulky ${capped.slice(0, 3).join(', ')}` : '';
+  let closest = '';
+  if (S.familyRow) {
+    let worst = { d: Infinity, pair: '' };
+    for (let i = 0; i < YARN_FAMILIES.length; i++)
+      for (let j = i + 1; j < YARN_FAMILIES.length; j++) {
+        const d = aspectDistance(YARN_FAMILIES[i], YARN_FAMILIES[j], S.tier);
+        if (d < worst.d) worst = { d, pair: `${YARN_FAMILIES[i]}/${YARN_FAMILIES[j]}` };
+      }
+    closest = `\nclosest    ${worst.pair} ${worst.d.toFixed(2)}`;
+  }
   perfEl.textContent =
     `${fps.toFixed(0)} fps\ndraw calls ${r.calls}\ntriangles  ${r.triangles}\n` +
-    `notions    ${field ? field.count : 0}   ${disp.id} plane ${disp.plane}`;
+    `notions    ${field ? field.count : 0}\n` +
+    `yarn       ${yarnN}  (${(yarnTris / 1000).toFixed(1)}k tris)\n` +
+    `per 1000   ${yarnN ? ((yarnTris / yarnN) * 1000 / 1000).toFixed(0) : 0}k tris\n` +
+    `${S.shading} / ${S.tier}   ${disp.id} plane ${disp.plane}${closest}${clash}`;
 }
 
 // ---------------------------------------------------------------- go
@@ -855,16 +1358,22 @@ loadAtlas(ATLAS_URL, S.theme).then((loaded) => {
   edgeTop.material.userData.uniforms.uGrow.value = S.edgeGrow;
   edgeTop.visible = S.edge;
 
-  shadows = makeShadows(CAPACITY);
+  // Shadows are shared by notions and yarn, so the mesh is sized for both at once.
+  shadows = makeShadows(CAPACITY + YARN_CAPACITY);
   boxes = makeBoxes(CAPACITY, S.boxColor);
+  boxes.userData.owner = [];   // instance slot -> items[] index, for picking
 
   sizeAtlas = makeSizeAtlas(HOOK_SIZES_MM.map((mm) => mm.toFixed(1)));
   sizeTag = makeField(sizeAtlas.texture, CAPACITY, { unlit: true, shade: 0 });
 
   scene.add(field, edge, fieldTop, edgeTop, shadows, boxes, sizeTag);
 
-  // The peg board is built once — it isn't reshuffled, and its own settings aren't GUI-exposed
-  // yet (add if that turns out to matter). rebuild() below only ever touches the shelf.
+  // Yarn meshes before the first scatter: restage() hands out their instance slots.
+  buildYarnMeshes();
+
+  // Derived values first: the peg board's headroom is now a function of the layer pitch, so it
+  // cannot be built before that pitch exists.
+  syncBoxHeight();
   buildPegGrid();
   layoutPegDisplay();
 

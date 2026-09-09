@@ -12,6 +12,7 @@ import {
   WIP_STATE, WEAR_SLOTS, makeCraftPrefs, makeWip, heldUnits, unitsShort, toolFits, canStart,
   wantsOf, satisfies, wantFor, stow, workRound, wearOrOffer, finishedOf, everythingMade, slotFor,
   returnToNpc, lend, photoSubject, MatchObservedInventory, yarnSuitsPattern, toolSuitsPattern,
+  labelWant,
 } from './wip.js';
 
 // Deterministic stand-in for Math.random, so a test asserts behaviour and not luck.
@@ -426,6 +427,37 @@ const npcWith = (wips, over = {}) => ({
     seen.add(`${p.skill}|${p.crafts.join()}`);
   }
   assert.ok(seen.size > 5, 'preferences must actually vary across a cast');
+}
+
+// --- every want can be NAMED -------------------------------------------------------------------
+// The guestbook read "Horace came in looking for undefined": npc.target became a want when WIPs
+// replaced hardcoded targets, and a want has no `name` for labelOf to read. Generated from real
+// wantsOf output rather than hand-built literals, so a new want kind is covered the day it appears.
+{
+  const kinds = new Set();
+  for (let seed = 0; seed < 400; seed++) {
+    const rng = seq(...Array.from({ length: 24 }, (_, i) => ((seed * 7 + i * 13) % 97) / 97));
+    const prefs = makeCraftPrefs(rng);
+    const npc = { wips: [makeWip('WIP 1', TRAITS(), prefs, rng), makeWip('WIP 2', TRAITS(), prefs, rng)] };
+    for (const want of wantsOf(npc)) {
+      const line = labelWant(want);
+      kinds.add(want.kind);
+      assert.ok(typeof line === 'string' && line.length > 0, 'a want always names itself');
+      assert.ok(!/undefined|null|NaN|\[object/.test(line), `want (${want.kind}) rendered "${line}"`);
+    }
+  }
+  assert.deepEqual([...kinds].sort(), ['pattern', 'tool', 'yarn'], 'all three want kinds exercised');
+
+  // The empty case is a sentence too — an NPC with nothing outstanding still has to read.
+  assert.ok(!/undefined/.test(labelWant(null)), 'no want at all still renders');
+
+  // And the specifics survive: a want names WHAT, not just its kind. This is what the debug panel
+  // and the guestbook line both lost when they each grew their own half-version of this.
+  const yarnWant = { kind: 'yarn', wip: 'WIP 1', units: 5, materials: ['wool', 'alpaca'], weight: 'aran' };
+  const line = labelWant(yarnWant);
+  for (const bit of ['5 units', 'aran', 'wool', 'alpaca']) assert.ok(line.includes(bit), `"${line}" names ${bit}`);
+  assert.ok(labelWant({ ...yarnWant, units: 1 }).includes('1 unit of'), 'singular unit reads correctly');
+  assert.ok(labelWant({ kind: 'tool', tool: 'crochet-hook', size: 4 }).includes('4.0'), 'a tool want names its size');
 }
 
 console.log('wip.js self-check: all assertions passed');

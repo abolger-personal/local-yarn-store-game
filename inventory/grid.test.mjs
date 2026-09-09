@@ -144,6 +144,41 @@ import { makeDisplay, footprint, fits, place, lift, topAt, dropLayer, columnAt, 
   assert.equal(nearestSlot(g, 0, one, mid.x, mid.z, 99), null, 'a full level offers no target');
 }
 
+// --- a drop turns itself a quarter turn when that is what fits -------------------------
+// The reported case: a 2x1 skein against a one-column peg board. There is no legal placement
+// as-given and an obvious one turned, so refusing it makes the display look broken.
+{
+  const CELL = 0.2, REACH = 1.6 * CELL;
+  const peg = makeDisplay(1, 5, { shelves: 1, headroom: 3, cell: CELL });   // one column, five rows
+  const log = { w: 2, h: 1, layers: 1 };
+
+  assert.equal(footprint(peg, 0, 0, 0, 2, 1), null, 'a 2x1 genuinely does not fit a 1-wide board');
+  const got = nearestSlot(peg, 0, log, 0, 0, REACH);
+  assert.ok(got, 'but the snap finds a placement anyway');
+  assert.ok(got.turned, 'by turning it');
+  assert.deepEqual([got.w, got.h], [1, 2], 'so the footprint comes back swapped');
+  assert.ok(fits(peg, got.keys, 1), 'and the turned footprint is legal');
+  assert.ok(anySlot(peg, log)?.turned, 'anySlot agrees, so the display is not reported as full');
+
+  // A turn must be a LAST resort, not a preference: where the natural orientation fits, it wins.
+  const open = makeDisplay(5, 5, { shelves: 1, headroom: 3, cell: CELL });
+  const easy = nearestSlot(open, 0, log, 0, 0, REACH);
+  assert.ok(easy && !easy.turned, 'an unturned fit is preferred when one is in reach');
+
+  // ...and a square is never turned, since there would be nothing to see.
+  const square = nearestSlot(open, 0, { w: 2, h: 2, layers: 1 }, 0, 0, REACH);
+  assert.ok(square && !square.turned, 'a square footprint is never reported as turned');
+
+  // The turn can be refused, for a caller that wants the literal answer.
+  assert.equal(nearestSlot(peg, 0, log, 0, 0, REACH, { turn: false }), null, 'turning is optional');
+  assert.equal(anySlot(peg, log, { turn: false }), null, 'for anySlot too');
+
+  // Layers still count when turned — the turn must not smuggle a tall item into a shallow stack.
+  const shallow = makeDisplay(1, 5, { shelves: 1, headroom: 1, cell: CELL });
+  assert.equal(nearestSlot(shallow, 0, { w: 2, h: 1, layers: 2 }, 0, 0, REACH), null,
+               'a turned drop is still refused when it does not fit vertically');
+}
+
 // --- anySlot: is there room ANYWHERE, for THIS item ------------------------------------
 // What the red "this display cannot take it" warning is built on. The answer depends on the item:
 // a 3x3x3 super-bulky ball and a 1x1 hook get different answers about the same shelf.

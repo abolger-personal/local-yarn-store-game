@@ -253,7 +253,48 @@ within a grab radius.
 - whether placeholder line weights are consistent enough to judge anything
 - notion scale against slot size
 
+### Yarn asset spike — 2026-09-08
+
+The seven 3D yarn families are built: `inventory/yarn-geometry.js` (geometry) and
+`inventory/yarn-look.js` (shading), compared live in `inventory/stash-and-stuff.html`. Full
+write-up in [YARN-ASSET-SPIKE.md](YARN-ASSET-SPIKE.md).
+
+**Section 2 of this document stands; `YARN.md`'s reversal of it does not.** YARN.md (09-08) says
+yarn is 2.5D because "a flat illustration is cheaper than a model". Measured against the built
+geometry, all 1000 items at the `low` tier cost **174k triangles** in a scene already running
+120fps at 264k — at the same one node, one material, one draw call a billboard field costs. The
+`chunky` tier (106k) is cheaper than the billboards it would replace, ink outline included. The
+outline half of that argument is also gone: the inverted hull is the same trick section 7 above
+already adopted for the cards.
+
+**The real constraint is the fragment shader, not the polygon count** — which §4's own finding
+(tessellation high→low moved frame rate *not at all*) already implied. So `MeshMatcapMaterial` is
+the recommendation: measured from `THREE.ShaderLib`, it evaluates **no lights at all** while
+keeping instancing and `instanceColor`, so the OKLCH palette system is untouched. A rim in the
+matcap approximates sheen, which also collapses the section 2 "fuzz cannot vary per instance"
+problem into a texture swap. Sheen stays, but only for close-ups: the inspect popup and the
+portrait rig.
+
+Two things the build corrected that the analysis alone had wrong: the mini-skein cannot be a
+*scaled* skein (identical proportions read as the same object at shelf distance, which
+P1-SPIKE-PLAN.md warned about and a uniform scale cannot satisfy by construction), and **bulk-as-
+height clashes with the shelf gap** — a 3×3×3 ball at true volume is 0.70 units against a 0.22 gap.
+That one is unresolved and is the substantive layout question the spike surfaced.
+
+### Pick and place is now shared — 2026-09-08
+
+`inventory/pick-place.js`, used by both `characters/store.html` and `inventory/stash-and-stuff.html`.
+Extracted from the former, which had grown the better version while the demo still ran the original
+it was ported from. The divergence was invisible while every item was a flat notion and broke the
+moment items had heights: a three-layer bulky yarn, picked up and put back, returned as one layer,
+in three separate call sites. `placeItem()` now carries the layer count so it cannot be dropped
+again.
+
+`fullyExposed` moved from `characters/visit.js` into `grid.js` — it is pure grid occupancy, the
+player's pick needs the same answer the NPC does, and `inventory/` must not depend on `characters/`.
+Re-exported from `visit.js`, so existing callers are unchanged.
+
 ### Not started
 
-Held notions on a character (section 4), the seven 3D yarn families, and the 1000-item sameyness
-check.
+Held notions on a character (section 4), and the 1000-item sameyness check — the tooling for the
+latter now exists (one button in the demo), but nobody has looked at it yet.

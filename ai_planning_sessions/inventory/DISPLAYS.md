@@ -67,6 +67,7 @@ Interaction scoring rules in order of satisfying:
   
 
 B. Wall Shelf (arbitrary grid size options, default 5x2x10 and 5x2x10)
+Orientation: shelf levels are TILTED 45 degrees, like a Montessori forward-facing bookshelf — the wall edge high, the front edge low, so stock faces up and out toward the player rather than lying flat under the level above. This is a playability requirement, not decoration: a horizontal level seen from the shop's own camera is foreshortened to a sliver and is not a usable touch target on a tablet. The grid itself is unchanged; only the plane it sits on is angled.
 Rules: A display with limited XY and 2.5d stacking with Z headroom stopped by the next level of shelf. X- edge is considered "wall facing": items on this edge will not contribute to formation scoring. Shelves do NOT have to be the same XY size or offset 
 
 Formation scoring: Inventory for a formation can be counted if it is anywhere on the shelf AND on an outside "face" (X+, Y+, Y-, Z+)

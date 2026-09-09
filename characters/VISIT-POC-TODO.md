@@ -302,6 +302,15 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
   back, because the dangerous failure is not a crash: it is a customer who quietly returns a
   stranger, with their skill or their half-knitted sweater silently gone. Mutation-tested four ways.
 
+  The timer panel now has **two** checkboxes: `auto-advance rounds` paces the rounds, and
+  `then roll into the next day` closes up and reopens once the shop is empty. They are independent
+  on purpose — rolling the day is useful whether rounds are being advanced by the timer or by hand.
+  `pause between days` (default 4s) holds the empty shop for a beat, because without it the
+  changeover is a single-frame pop and you cannot see who left with what. The Advance button
+  becomes "start next day" when the shop empties, so a manual player is never stuck on a disabled
+  control. Day number shows in the timer panel; "all new customers" resets it to day 1, since
+  wiping the regulars means there is no history to count.
+
   Still open: the roster is unbounded and unordered (everyone who qualifies comes back, oldest
   first, up to the NPC count) and lives only in memory. Who returns *when* wants to be a real
   scheduling decision, and it is the hook for LYS.md's day cycle.
@@ -328,6 +337,94 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
   attractiveness or in a satisfaction score.
 - **The FROG PILE does not exist.** Post-MVP per the spec, and `WIP_STATE` deliberately has no
   `FROGGED` member rather than an unreachable one.
+
+---
+
+## Touch and small screens
+
+- **Total inventory is a setting** (`total inventory`, default **10**). Customer seeds are placed
+  first and count against the budget, then general stock fills the remainder — filling with random
+  stock and then finding no room for anybody's yarn is the wrong way round, and at 10 boxes it
+  would happen every time. The console reports the split and says so if the shop had no room.
+- **Rounds default to continuous.** Both timer checkboxes start ticked, the round interval is 3s
+  (just over the longest a staggered walk can take, so a round ends about when the motion does) and
+  the pause between days is 0. At the old 30s the cast walked for ~1.5s and stood frozen for 28.
+- **Grabbing was near-impossible on a tablet, and the measurement says it was bad everywhere.** A
+  0.2-unit slot renders **12-20px** across at the framing camera once a diorama angle foreshortens
+  it; Apple and Material both put the minimum touch target at 44px. The pick required the ray to
+  land inside the item's own cell.
+
+  There is now a **screen-space** grab radius (`grab slack (px, touch)`, default 44, halved for a
+  mouse). Screen space is the point: the tolerance has to mean the same thing to a fingertip
+  whatever the zoom, resolution or viewing angle. An exact hit still wins outright; failing that
+  the nearest box centre within the radius is taken. Modelled against a 7px fingertip scatter,
+  reachability goes from 13-58% to ~100%.
+
+  **What it cannot fix:** on a packed shelf the boxes sit ~13px apart, which is closer than a
+  fingertip is accurate, so ~42% of taps resolve to the box the player meant — and that is the same
+  ~41% the strict test managed among the taps that hit anything at all. Slack is never worse, and
+  on an isolated box (the common case at 10 items) it is 100%. The real fix for dense piles is
+  making boxes bigger on screen — a closer default framing, or a zoom-to-display control.
+- **The camera spun on touch. Two causes, both fixed; the first one I got wrong once.**
+  1. *Ownership was signalled by rewriting `controls.touches.ONE`* from a capture-phase handler
+     that runs BEFORE OrbitControls reads it. Replaced by withholding the event instead.
+  2. *Withholding only the FIRST finger was not enough* — and this is why the spin survived the
+     first fix. OrbitControls keeps its own `pointers` array built from the pointerdowns it
+     receives. A second finger joining a player-owned drag still got through, so OrbitControls
+     treated it as its *first* pointer, began a rotation from it, and its bookkeeping stopped
+     matching the hand. Every later move measured against a start point for a finger that had
+     already lifted, and a stale delta at damping speed is the view whipping round.
+
+     Ownership is now decided once per GESTURE: the first finger decides, and while the gesture is
+     the player's, *every* pointerdown is withheld until the last finger lifts. OrbitControls sees
+     a whole gesture or none of it. The truth table asserts exactly that, in both directions — a
+     player gesture leaks 0 of 3 pointerdowns, a camera gesture passes 2 of 2.
+- **Two fingers PAN and zoom, they no longer rotate.** `TWO: DOLLY_ROTATE` was the default and it
+  made every two-finger drag spin the room: dolly tracks finger SEPARATION while rotate tracks the
+  midpoint, and separation is so much the more sensitive that a pan attempt reads as a spin. Now
+  `DOLLY_PAN`, which is also what every map on a tablet does. Rotation stays on one finger over
+  empty floor, and `screenSpacePanning` is off so the shop cannot be dragged off screen.
+- **`frameRoom` now stands INSIDE the shop.** It used to fit the whole 6.4-unit room on screen,
+  which is what made a slot 12-20px and no amount of grab slack could fix that. The distance is now
+  solved FROM a target slot size (56px flat, ~34px foreshortened) rather than from how much room
+  should be visible, clamped to the controls' range. Measured 1.6-2.9x bigger depending on screen,
+  and it fixes the density problem the slack could not: on a packed shelf the intended box is now
+  chosen **98%** of the time, up from 42%. Pinching out to see the whole room still works; the
+  corner button is how you get back in.
+- **Wall shelves are tilted 45 degrees**, Montessori-style: wall edge high, front edge low. A flat
+  level is not so much hidden by the one above it as *foreshortened* — at the shop's camera
+  elevation (35 degrees) a horizontal cell presents 58% of its area, which is what made a stack of
+  three shelves unusable on a tablet. Tilted it presents 95%, so a cell is **1.64x bigger on
+  screen**. 45 degrees is within 1% of the best angle available for this camera (55 degrees would
+  be ideal), and past 60 it stops being a shelf and becomes a peg board.
+
+  This needed a real refactor, not a rotation: a level used to be "the display frame, at
+  y = shelf * gap", and a tilt cannot be expressed as a height. Each level now owns a **frame**,
+  and painting, picking, the drop ghost, the grid lines and the furniture all go through it.
+  `baseY(display, shelf, layer)` became `layerY(layer)` — height above the level — so a caller that
+  forgets the matching level frame now gets an obviously wrong position rather than a subtly wrong
+  one. Piles get an untilted frame, so nothing had to learn which kind it was holding.
+
+  Three consequences worth knowing:
+  - `SHELF_GAP` is now **derived** (`rows * CELL * sin(tilt) + 2 * BOX_H + margin`), because a
+    tilted level eats vertical space and a constant is how levels end up intersecting the first
+    time someone changes the row count. Checked: a full stack reaches 0.258u, the next level's low
+    edge is at 0.311u.
+  - **No plinth and no surface slab under a tilted shelf.** Both were horizontal boxes at y = 0,
+    and the bottom level's front edge now hangs 0.141u below that — so each cut straight through
+    the level it was meant to support. Removing them is also what the furniture actually is: a
+    *wall* shelf is carried by its back panel, and a real one has nothing underneath. The back
+    panel now runs from the floor to the top level and does the supporting. The low corner sits
+    0.199u clear of the floor.
+  - The shelf is **1.84u tall** overall against a ~1.0u customer. Tall for a person, normal for a
+    shop, but it is the thing to revisit if shelves start blocking the view.
+  - A tilted level takes up **less floor** than its grid is deep, so `applyTransform` and the slot
+    mask both foreshorten it. Reporting the flat depth would fence off floor the shelf does not
+    stand on — the sim routes NPCs around that box and rule 10 places furniture against it.
+- **Two corner buttons** (bottom right, 48px each): reset the camera, and **lock** it. Locking
+  disables OrbitControls outright rather than only rotation, because a pinch that dollies mid-drag
+  is the same problem in another axis; the player's verb is untouched, since picking up and placing
+  never went through the camera. Also on **L**, and latched in colour because it is a mode.
 
 ---
 
@@ -459,6 +556,41 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
 > **44.6% correct before, 99.4% after.** The pointer now also *sets* the active level, which
 > previously could only be changed from the GUI slider.
 - **Round advance is manual by design.** Auto-advance exists behind a checkbox at the spec's 30s.
+- **Dropping snaps; the drop feedback is per-display.** Three player-test findings, all touch:
+> A drop used to demand the pointer land in a column the item happened to fit in. `nearestSlot`
+> (grid.js) now takes the nearest slot within `S.snapCells` (1.6) that the item *actually fits in*,
+> anchored on the footprint centre. Modelled against a 12px fingertip sigma on a part-full 5×2
+> shelf: **83–86% of honest attempts landed before, 100% after**, and only 1–5% land on a neighbour
+> of the intended slot. Reach is measured in the display's own plane, so it is a fixed number of
+> slots at any zoom.
+>
+> A held item lifts along **screen up**, not the level's up. The level's up is nearly useless on the
+> display that needed it most: a 45° shelf at a 35° camera elevation converts only `cos(80°)` of a
+> world lift into screen rise, so the old 0.14 was worth **15px** there (69px on a flat table).
+> `S.liftHeight` 0.30 along screen up is 84px everywhere. The shadow stays under the pointer.
+>
+> A display that cannot take the held item **anywhere** now says so: its lattice goes red, and
+> pointing at it washes the level red. Both draw with `depthTest` off, because a display with no
+> room is by definition covered in the boxes that would otherwise hide the warning. Answered per
+> item — a 3×3×3 super-bulky ball and a 1×1 hook get different answers about the same shelf.
+>
+> TODO: the wash paints the *active* level only (the lattice covers them all), and the reach is a
+> flat constant rather than something that scales with how coarse the pointer is.
+- **UI colour does not go through the tone mapper.** The warning red first shipped as `#a2382f`
+and arrived on screen as maroon. The hex was not the problem:
+> The shop renders through ACES at exposure **0.40** — a look chosen for felted wool, and ruinous
+> for a signal colour, because the exposure halves the value in linear space before the curve even
+> runs. `#a2382f` is delivered as `#640b0e`: **41% lightness down to 22%**. The old ghost green
+> `#3f7f5a` fared worse, arriving at **17%**. No hex survives that, so every UI material now sets
+> `toneMapped = false` and the colours can be plain: `GHOST_OK #25e06a`, `GHOST_NO #ff2d16`.
+> Measured in `scratchpad/uicolor.mjs`, which ports three r160's ACES + sRGB encode exactly and
+> also asserts the source keeps the flags — mutation-tested against re-tone-mapping each material.
+>
+> The held-item halo and the drop ghost now share `GHOST_OK` **by reference**, not by two matching
+> hexes: the thing in your hand and the slot it is going into are two halves of one statement, and
+> the player should not have to pair them up. Both nearly solid (`GHOST_ALPHA` 0.85); the halo
+> pulses between 0.70 and 0.85 rather than fading to a hint. The red *wash* stays at 0.5 on
+> purpose — it covers a whole display, and at full strength it hides the stock it is ruling out.
 
 ---
 

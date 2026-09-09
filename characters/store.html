@@ -13,6 +13,25 @@
   canvas { display: block; touch-action: none; transition: filter 120ms linear; }
   canvas.squint { filter: blur(6px); }
 
+  /* Every window folds. <details>/<summary> is the platform's own disclosure widget: it collapses
+     with no JavaScript, is keyboard-operable and screen-reader-labelled for free, and survives
+     whatever the panel's contents are. The only script involved is remembering the state. */
+  .fold > summary {
+    cursor: pointer; user-select: none; list-style: none;
+    font: 700 10px ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .06em; text-transform: uppercase; opacity: .55;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .fold > summary::-webkit-details-marker { display: none; }   /* Safari's default triangle */
+  .fold > summary::before {
+    content: '▸'; font-size: 11px; line-height: 1; transition: transform 120ms ease;
+  }
+  .fold[open] > summary::before { transform: rotate(90deg); }
+  .fold > summary:hover { opacity: .9; }
+  /* Shut, a panel is just its title bar — no leftover padding pretending there is content. */
+  .fold:not([open]) { padding-bottom: 6px; }
+  .fold[open] > summary { margin-bottom: 6px; }
+
   .panel {
     position: fixed; z-index: 10;
     background: rgba(255,255,255,.86); backdrop-filter: blur(6px);
@@ -47,21 +66,50 @@
   }
   #rotator button:hover { background: #fff; }
   #rotator button:active { transform: scale(.92); }
+  #camBtns { position: fixed; right: 12px; bottom: 12px; z-index: 11; display: flex; gap: 8px; }
+  #camBtns button {
+    width: 48px; height: 48px; border-radius: 50%;      /* over the 44px minimum touch target */
+    border: 1px solid rgba(0,0,0,.18); background: rgba(255,252,246,.94); color: #3d2b1f;
+    font: 22px/1 system-ui, sans-serif; cursor: pointer; padding: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  }
+  #camBtns button:hover { background: #fff; }
+  #camBtns button:active { transform: scale(.94); }
+  /* Locked is a MODE, so it has to look latched rather than just having swapped its glyph. */
+  #lockBtn[aria-pressed="true"] { background: #c2703f; border-color: #a85f33; color: #fff; }
 
   /* perf overlay — copied from crowd.html so the two views report the same numbers */
   #perf {
     position: fixed; left: 12px; top: 12px; z-index: 10;
     background: rgba(20,20,20,.82); color: #e8e8e8;
     font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
-    border-radius: 8px; padding: 9px 12px; min-width: 190px; pointer-events: none;
+    border-radius: 8px; padding: 9px 12px; min-width: 190px;
+    /* Was pointer-events:none so the overlay never stole a click from the shop. The SUMMARY has to
+       take clicks to fold, so the exemption moves down to the body only. */
   }
+  #perf #perfBody { pointer-events: none; }
+  #perf > summary { color: #e8e8e8; }
   #perf b { color: #fff; font-weight: 600; }
   #perf .warn { color: #ffb454; }
   #perf .bad { color: #ff6b6b; }
   #perf .ok { color: #8fd67a; }
 
   /* the round / timer window */
-  #timer { right: 12px; top: 12px; width: 208px; }
+  #rail {
+    position: fixed; right: 12px; top: 12px; z-index: 10;
+    width: 268px; max-height: calc(100vh - 24px);
+    display: flex; flex-direction: column; gap: 10px;
+    overflow-y: auto; overflow-x: hidden;
+    /* The rail itself is not a surface — only the panels in it take clicks, so the gaps between
+       them stay part of the shop and an orbit drag started there still works. */
+    pointer-events: none;
+  }
+  #rail > * { pointer-events: auto; }
+  /* Inside the rail they are stacked, not placed: the flex column owns their position. */
+  #rail > .panel { position: static; flex: 0 0 auto; }
+  /* NPC state is the one that grows without bound, so it is the one that gives up space first. */
+  #rail > #debug { min-height: 0; }
+  #rail .lil-gui { width: 100%; }
   #timer .round { font: 600 22px/1.1 ui-monospace, monospace; color: #111; }
   #timer .sub { opacity: .6; font-size: 11px; margin-bottom: 8px; }
   #timer button {
@@ -77,8 +125,7 @@
 
   /* the NPC state debug window */
   #debug {
-    right: 12px; top: 168px; width: 320px;
-    max-height: calc(100vh - 200px); overflow: auto;
+    max-height: 46vh; overflow: auto;
     font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   #debug .npc { border-top: 1px solid rgba(0,0,0,.1); padding: 7px 0 8px; }
@@ -100,7 +147,7 @@
   #debug .traits b { font-weight: 700; color: #111; }
   #debug .note { margin-top: 4px; color: #6a5f55; font-style: italic; }
   #debug .got { color: #3f7f5a; font-weight: 700; }
-  #debug h4 { margin: 0 0 6px; font: 700 11px ui-sans-serif, system-ui, sans-serif; letter-spacing: .04em; text-transform: uppercase; opacity: .55; }
+
   #debug .wips { margin: 2px 0 2px 0; }
   #debug .wip { font-size: 10px; color: #5a4f45; white-space: nowrap; overflow: hidden;
                 text-overflow: ellipsis; padding-left: 6px; border-left: 2px solid rgba(0,0,0,.12); }
@@ -114,17 +161,35 @@
 </head>
 <body>
 <div id="app"></div>
-<div id="perf"></div>
+<details id="perf" class="fold" open>
+  <summary>performance</summary>
+  <div id="perfBody"></div>
+</details>
 
-<div id="timer" class="panel">
-  <div class="round" id="roundLabel">round 0</div>
+<!-- Everything on the right lives in ONE column. The panels used to be individually fixed at
+     hard-coded tops (timer at 12px, NPC state at 168px) with lil-gui auto-placing over both, so
+     any panel that grew — the timer did, when it gained a second checkbox — silently buried the
+     one below it. A flex column cannot overlap itself whatever the contents do. -->
+<div id="rail">
+<details id="timer" class="panel fold" open>
+  <!-- The day/round line lives in the SUMMARY, so it is still readable when the panel is shut —
+       collapsing a window should hide the controls, not the thing you are watching. -->
+  <summary><span class="round" id="roundLabel">round 0</span></summary>
   <div class="sub" id="clockLabel">shop is opening</div>
   <button id="advance">Advance round &rarr;</button>
-  <label><input type="checkbox" id="auto" /> auto-advance every 30s</label>
+  <!-- Both default ON: the shop should be alive the moment the page loads, not waiting to be
+       clicked through a round at a time. -->
+  <label><input type="checkbox" id="auto" checked /> auto-advance rounds</label>
+  <label><input type="checkbox" id="autoDay" checked /> then roll into the next day</label>
   <div class="bar"><i id="autoBar"></i></div>
-</div>
+</details>
 
-<div id="debug" class="panel"><h4>NPC state</h4><div id="npcState"></div></div>
+<details id="debug" class="panel fold" open>
+  <summary>NPC state</summary>
+  <div id="npcState"></div>
+</details>
+<div id="guiSlot"></div>
+</div>
 
 <!-- Rotate handles for the selected piece of furniture. HTML rather than scene geometry: the
      browser does the hit-testing, they stay a constant comfortable size however far the camera is,
@@ -134,8 +199,15 @@
   <button data-step="1" title="turn 45&deg; clockwise (E)">&#8635;</button>
 </div>
 
-<div id="hud" class="panel">
-  <b>LYS store</b> — visits + arranging POC <span id="build" class="k"></span><br />
+<!-- Reset the camera. A corner button rather than only the F key, because a tablet has no F key
+     and getting lost is the one state you cannot orbit your way out of. -->
+<div id="camBtns">
+  <button id="lockBtn" title="lock the camera" aria-label="Lock the camera" aria-pressed="false">&#128275;</button>
+  <button id="frameBtn" title="reset the camera (F)" aria-label="Reset the camera">&#9974;</button>
+</div>
+
+<details id="hud" class="panel fold" open>
+  <summary>controls <span id="build" class="k"></span></summary>
   <b>Left-click</b> a box to pick it up, click again to set it down<br />
   <b>Right-drag</b> to orbit · scroll to zoom<br />
   <div id="held" class="held"></div>
@@ -143,8 +215,8 @@
   <kbd>Tab</kbd> next display &nbsp; <kbd>G</kbd> grid<br />
   <kbd>Space</kbd> advance round &nbsp; <kbd>R</kbd> restart visit<br />
   <kbd>1</kbd> felted &nbsp; <kbd>2</kbd> grey &nbsp; <kbd>3</kbd> silhouette &nbsp; <kbd>B</kbd> squint<br />
-  <kbd>F</kbd> frame room
-</div>
+  <kbd>F</kbd> frame room &nbsp; <kbd>L</kbd> lock camera
+</details>
 
 <script type="importmap">
 {
@@ -182,6 +254,7 @@ import {
 } from './wip.js';
 import {
   EMPTY, makeDisplay, gridSize, footprint, fits, place, lift, dropLayer, topAt, columnAt, slotRect,
+  nearestSlot, anySlot,
   usableAt, remask,
 } from '../inventory/grid.js';
 
@@ -191,9 +264,26 @@ import {
 } from './visit.js';
 
 console.info('LYS build', BUILD);
+
+// Remember which windows are folded. The collapse itself is native <details>; this only persists
+// the choice, because a POC is reloaded constantly and re-folding four panels every time is
+// exactly the tedium the folding was meant to remove.
+//
+// Every read and write is guarded: localStorage throws outright in some contexts (a browser set to
+// block site data, a screenshot/preview harness), and a dev overlay must not be able to take the
+// whole shop down with it.
+for (const el of document.querySelectorAll('.fold')) {
+  try {
+    const saved = localStorage.getItem(`lys.fold.${el.id}`);
+    if (saved !== null) el.open = saved === '1';
+  } catch { /* no stored state: the markup's own default stands */ }
+  el.addEventListener('toggle', () => {
+    try { localStorage.setItem(`lys.fold.${el.id}`, el.open ? '1' : '0'); } catch { /* ignore */ }
+  });
+}
 // On the HUD as well as in the console: when a fix "does not work", the first thing worth ruling
 // out is that the page is running an older module than the one on disk.
-document.getElementById('build').textContent = `build ${BUILD}`;
+document.getElementById('build').textContent = BUILD;
 
 const ATLAS_URL = '../ai_planning_sessions/inventory/illustrations/build';
 // What the shop sells now lives in inventory/catalog.js — the sim reasons about it too, so it
@@ -207,7 +297,34 @@ const ATLAS_URL = '../ai_planning_sessions/inventory/illustrations/build';
 // absurd in real life and correct here, because the player has to see and grab them.
 const CELL = 0.20;        // uniform across ALL displays — DISPLAYS.md rule 2, so items can move
 const BOX_H = 0.055;      // one 2.5D layer
-const SHELF_GAP = 0.28;   // must exceed headroom * BOX_H or a full stack pokes through the glass
+// Yes and no, as colours. Declared up here because the drop ghost, the move ghost, the held-item
+// halo and the grid lattice all speak them, and paintActivePlane runs while the shop is built.
+//
+// These are UI, not paint, so every material that uses them sets `toneMapped = false`. The shop
+// renders through ACES at exposure 0.40, which is a look chosen for felted wool and is ruinous for
+// a signal colour: it crushed the old warning red #a2382f to #640b0e on the way to the screen —
+// 41% lightness down to 22% — which is why it arrived as maroon rather than as "no". Measured in
+// scratchpad/uicolor.mjs. No hex survives that; the flag is the fix, and then the hex can be a
+// plain bright green and a plain alarm red that mean what they look like.
+const GHOST_OK = '#25e06a', GHOST_NO = '#ff2d16';
+// Nearly solid. A hint is the wrong register for "this is what is about to happen": the ghost and
+// the halo are the answer to "where does this land", and a 35% wash made that a guess.
+const GHOST_ALPHA = 0.85;
+/**
+ * Wall shelves are TILTED, like a Montessori forward-facing bookshelf: each level is a ramp with
+ * its wall edge high and its front edge low, so the stock faces up and out toward the camera.
+ *
+ * A stack of flat shelves is nearly unusable on a tablet — from the shop's own viewing angle each
+ * level hides under the one above it, and only the front strip is visible or reachable. Tilting
+ * presents the whole level at once, which widens the grabbable area without standing the shelf
+ * vertical (where boxes would have nothing to rest on and the 2.5D stacking would read as wrong).
+ */
+const SHELF_TILT = Math.PI / 4;
+// Derived, not chosen: a tilted level's own depth eats vertical space (rows * CELL * sin(tilt)),
+// and picking a constant here is how levels end up intersecting each other the first time anyone
+// changes the row count. The margin is the stack that sits ON the level, plus air.
+const SHELF_ROWS = 2;
+const SHELF_GAP = SHELF_ROWS * CELL * Math.sin(SHELF_TILT) + BOX_H * 2 + 0.06;
 // DISPLAYS.md type A: a pile stacks with "close-to-infinite headroom", Jenga towers allowed. 10 is
 // the standard option; at BOX_H that is 0.55 units, so a full tower on a table reaches an NPC's
 // head. A SHELF cannot have this — its stack is physically stopped by the glass above it, so its
@@ -233,14 +350,36 @@ const S = {
   chairCount:   2,
   showGrid:    true,
   moveMode:    false,   // DISPLAYS.md rule 10: dragging rearranges the SHOP, not the stock
-  autoSeconds: 30,      // CHARACTER-VISIT.md: a round is 15 in-game minutes, ~30s of real time
+  lockCamera:  false,   // freeze the view so arranging cannot knock it askew
+  // Screen-space slack on a grab, in CSS pixels, for a coarse pointer. Halved for a mouse. 44 is
+  // the Apple/Material minimum touch target, and a notion box measures 12-20px on a tablet.
+  grabRadius:  44,
+  // How far a carried item floats above the pointer, in world units, measured along SCREEN up
+  // (see refreshFloating). A fingertip hides roughly its own width of the picture, so this is
+  // the knob that decides whether the player can see what they are holding. ~0.30 clears a
+  // finger at the framing camera; it is exposed because that depends on the real device.
+  liftHeight: 0.30,
+  // How far a drop reaches for a slot it actually fits in, in SLOTS. See nearestSlot.
+  snapCells: 1.6,
+  // How many boxes the shop puts out in total, customer seeds included. Small on purpose: a
+  // sparse shop is the readable one, and it is the arrangement the player is meant to be fixing.
+  stockCount: 10,
+  // Round pacing defaults to CONTINUOUS. A round is 15 in-game minutes (CHARACTER-VISIT.md), but
+  // that says nothing about real seconds — and at the old 30s the cast walked for ~1.5s and then
+  // stood frozen for 28. This is just over the longest a staggered walk can take
+  // (travelJitter + travel * (1 + paceJitter)), so a round ends about when the motion does.
+  autoSeconds: 3,
+  dayGap: 0,            // seconds the shop sits empty between closing and the next day's queue
   travel:      1.4,     // seconds of animation per round of movement
   travelJitter: 0.5,    // max random delay before an NPC sets off, so departures stagger
   paceJitter:  0.25,    // +/- fraction on each NPC's own travel time, so arrivals stagger too
   // How far a seated NPC rises so they rest ON the chair rather than through it. The rig grounds
   // every pose to feet-at-zero, so this cannot be derived — it needs eyeballing per seat height.
   seatLift:    0.16,
-  glowColor:   '#ffcf5c',   // gold; '#ffffff' for the white variant
+  // The halo and the drop ghost are deliberately ONE colour: the thing in your hand and the
+  // slot it is going into are two halves of the same statement, and colouring them separately
+  // made the player match them up themselves. Same green, so the eye pairs them for free.
+  glowColor:   GHOST_OK,
   glowSpeed:   0.8,         // pulses per second
   glowPad:     0.055,       // world units the halo extends past the box at its widest
   exposure:    BASE_PARAMS.exposure,
@@ -283,10 +422,26 @@ controls.maxDistance = 16;   // beyond this the room is a small object on screen
 // does in this game (LYS.md), so it gets the primary button; orbiting moves to right-drag. Same
 // mapping as inventory/stash-and-stuff.html, so the muscle memory carries over.
 controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
-// The touch equivalent of that decision, which was missing: ONE finger is the player's verb, TWO
-// fingers are the camera. Left at the default (ONE: ROTATE) a single-finger drag orbits the shop
-// instead of moving the box, so dragging an item was impossible on a tablet regardless of hover.
-controls.touches = { ONE: null, TWO: THREE.TOUCH.DOLLY_ROTATE };
+// ONE finger is the player's verb when there is something under it, and the camera otherwise.
+//
+// That used to be done by REWRITING controls.touches.ONE on every pointerdown, and it caused the
+// camera to spin on its own: this page's handler runs on the window in the CAPTURE phase, so it
+// flipped the setting before OrbitControls had read it, and OrbitControls then measured a drag
+// against a start point it had recorded under the other setting. One stale delta, amplified by
+// damping, reads as the view suddenly whipping round.
+//
+// The config is now constant and the EVENT is what gets withheld instead: a press that belongs to
+// the player is stopped before it reaches OrbitControls, so no rotation is ever begun that has to
+// be cancelled. See onPointerDown.
+//
+// TWO fingers PAN and zoom, they do not rotate. DOLLY_ROTATE was the default here and it made
+// every two-finger drag spin the room, because dolly tracks finger SEPARATION while rotate tracks
+// the midpoint — and separation is so much the more sensitive of the two that a pan attempt reads
+// as a spin. Pinch-to-zoom plus two-finger-pan is also what every map on a tablet does, so it is
+// the gesture a player already has. Rotation stays on one finger over empty floor.
+controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+// Panning must not let the player drag the shop off screen and lose it.
+controls.screenSpacePanning = false;
 
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -533,11 +688,11 @@ const STAND_OFF = 0.65;      // how far in front of a display an NPC stands to r
 // (Not to be confused with LYS.md §5b's "floor pile", the unslotted delivery inbox. This is
 // DISPLAYS.md type A, "Floor or Table Pile" — a real slotted display that sits on the ground.)
 const DISPLAY_SLOTS = [
-  { id: 'shelf-n', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: 2, shelves: 3, headroom: 3, x: 0,    z: -HALF_D + 0.5, yaw: 0 },
+  { id: 'shelf-n', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: SHELF_ROWS, shelves: 3, headroom: 3, x: 0,    z: -HALF_D + 0.5, yaw: 0 },
   { id: 'table-a', kind: 'pile',  form: 'table',      cols: 5, rows: 5, shelves: 1, headroom: PILE_HEADROOM, x: 1.5,  z: -0.2,          yaw: 0 },
   { id: 'floor-a', kind: 'pile',  form: 'floor',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: 0.55, z: 0.85,          yaw: 0 },
-  { id: 'shelf-e', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: 2, shelves: 3, headroom: 3, x: HALF_W - 0.5, z: -1.1,  yaw: -Math.PI / 2 },
-  { id: 'shelf-w', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: 2, shelves: 3, headroom: 3, x: -HALF_W + 0.5, z: -1.6, yaw: Math.PI / 2 },
+  { id: 'shelf-e', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: SHELF_ROWS, shelves: 3, headroom: 3, x: HALF_W - 0.5, z: -1.1,  yaw: -Math.PI / 2 },
+  { id: 'shelf-w', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: SHELF_ROWS, shelves: 3, headroom: 3, x: -HALF_W + 0.5, z: -1.6, yaw: Math.PI / 2 },
   { id: 'floor-b', kind: 'pile',  form: 'floor',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: -1.20, z: 1.55,         yaw: 0 },
   { id: 'table-b', kind: 'pile',  form: 'table',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: 1.45, z: 1.75,          yaw: 0 },
   { id: 'table-c', kind: 'pile',  form: 'table',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: -0.35, z: -1.75,        yaw: 0 },
@@ -556,7 +711,10 @@ const byId = (id) => displays.find((d) => d.id === id);
 /** World XZ centre of one slot, accounting for the display's yaw. */
 function slotCellWorld(slot, c, r) {
   const lx = (c + 0.5) * CELL - (slot.cols * CELL) / 2;
-  const lz = (r + 0.5) * CELL - (slot.rows * CELL) / 2;
+  // Plan view, so a tilted level's rows are foreshortened onto the floor — the masking and the
+  // placement tests both work in XZ and would otherwise reserve depth the shelf does not occupy.
+  const squash = Math.cos(slot.tilt ?? 0);
+  const lz = ((r + 0.5) * CELL - (slot.rows * CELL) / 2) * squash;
   const sin = Math.sin(slot.yaw), cos = Math.cos(slot.yaw);
   return { x: slot.x + lx * cos + lz * sin, z: slot.z - lx * sin + lz * cos };
 }
@@ -619,20 +777,58 @@ function roomObstacles(dispList, seatList = seats) {
  */
 function applyTransform(d, x, z, yaw) {
   d.x = x; d.z = z; d.yaw = yaw;
+  d.tilt = d.kind === 'shelf' ? SHELF_TILT : 0;
   const quat = new THREE.Quaternion().setFromAxisAngle(UP, yaw);
   Object.assign(d, makeFrame(new THREE.Vector3(x, d.plinthY, z), quat));
 
   // The SIM treats a display as an axis-aligned box (line of sight, standing room), so report the
   // AABB of the turned rectangle. At 0/90 that is the old width/depth swap; at a 45° detent it is
   // the diagonal, which is the honest answer rather than a shelf NPCs can see straight through.
-  const { w: gw, d: gd } = gridSize(d.g);
+  const { w: gw, d: gd0 } = gridSize(d.g);
+  // A tilted level leans back, so it takes up LESS floor than its grid is deep. The sim routes
+  // NPCs around this box and rule 10 places furniture against it, so reporting the flat depth
+  // would fence off floor the shelf does not actually stand on.
+  const gd = gd0 * Math.cos(d.tilt);
   const sin = Math.abs(Math.sin(yaw)), cos = Math.abs(Math.cos(yaw));
   d.w = gw * cos + gd * sin;
   d.d = gw * sin + gd * cos;
   // Local +Z is the display's front (local -Z, row 0, is the wall side), rotated into world space.
   d.standAt = { x: x + Math.sin(yaw) * STAND_OFF, z: z + Math.cos(yaw) * STAND_OFF };
+  buildLevelFrames(d);
   if (d.group) d.group.matrix.copy(d.frame);
 }
+
+/**
+ * One frame per shelf LEVEL, so a level is a plane in its own right rather than a height above the
+ * display. Everything that used to be "the display frame, at y = shelf * gap" now goes through
+ * these: painting, picking, the drop ghost and the grid lines. That is what lets a level be
+ * tilted at all — a tilt cannot be expressed as a height.
+ *
+ * A pile's levels are simply untilted, so piles keep behaving exactly as before and no caller has
+ * to know which kind it is holding.
+ */
+function buildLevelFrames(d) {
+  const tilt = d.kind === 'shelf' ? SHELF_TILT : 0;
+  d.tilt = tilt;
+  d.levels = [];
+  for (let s = 0; s < d.g.shelves; s++) {
+    const m = new THREE.Matrix4()
+      .makeTranslation(0, s * d.gap, 0)
+      // +X is the shelf's width, so tilting about it lifts the wall edge (local -Z) and drops the
+      // front edge (local +Z) — items lean back into the shelf, exactly like the real furniture.
+      .multiply(new THREE.Matrix4().makeRotationX(tilt));
+    const frame = d.frame.clone().multiply(m);
+    d.levels.push({
+      frame,
+      frameInv: frame.clone().invert(),
+      quat: new THREE.Quaternion().setFromRotationMatrix(frame),
+      local: m,
+    });
+  }
+}
+
+/** The world frame of one shelf level. Falls back to the display's own for anything unbuilt. */
+const levelFrame = (d, shelf) => (d.levels?.[shelf]?.frame ?? d.frame);
 
 function makeDisplayFromSlot(slot, builtSoFar = []) {
   const d = {
@@ -641,7 +837,8 @@ function makeDisplayFromSlot(slot, builtSoFar = []) {
     g: makeDisplay(slot.cols, slot.rows, {
       shelves: slot.shelves, headroom: slot.headroom, cell: CELL,
       // Same holes on every level: what is blocked is blocked in plan, whatever the height.
-      mask: (s, c, r) => cellIsClear(slot, c, r, roomObstacles(builtSoFar)),
+      mask: (s, c, r) => cellIsClear({ ...slot, tilt: slot.kind === 'shelf' ? SHELF_TILT : 0 },
+                                      c, r, roomObstacles(builtSoFar)),
     }),
     // Named plinthY, not baseY: baseY() is the function for an item's height WITHIN a display, and
     // two different heights called the same thing is a bug waiting to happen.
@@ -679,30 +876,60 @@ function buildFurniture(d) {
   const { w, d: depth } = gridSize(d.g);
   // A floor pile gets no surface slab — it sits directly on the shop floor, and a full-rectangle
   // slab would poke through the very counter and chairs its slots were just masked away from.
-  if (d.form !== 'floor') {
+  //
+  // A TILTED shelf gets none either, and for a sharper reason: the slab is horizontal at y≈0, and
+  // the bottom level's front edge now dips BELOW that, so the slab cut straight through the very
+  // level it was supposed to be supporting. Each tilted level carries its own board instead.
+  if (d.form !== 'floor' && !d.tilt) {
     const surface = new THREE.Mesh(new THREE.BoxGeometry(w * 1.06, GLASS_T * 2, depth * 1.06), woodMat);
     surface.position.y = -GLASS_T;
     surface.receiveShadow = true;
     d.group.add(surface);
   }
 
+  // Each level's furniture is parented to a node carrying that level's own transform, so a tilted
+  // shelf brings its board, its glass and its lattice round with it. `d.group` already holds the
+  // display frame, so these are the LOCAL part only.
   for (let s = 0; s < d.g.shelves; s++) {
+    const node = new THREE.Group();
+    node.matrixAutoUpdate = false;
+    node.matrix.copy(d.levels[s].local);
+    d.group.add(node);
+
     const lines = makeGridLines(d.g, s);
-    lines.position.y = s * d.gap + 0.002;
+    lines.position.y = 0.002;
     d.lines.push(lines);
-    d.group.add(lines);
-    if (s > 0) {
+    node.add(lines);
+
+    // The board the stock rests ON. A flat display gets this from the surface slab below, but a
+    // tilted level needs its own or the boxes float on nothing.
+    if (d.tilt) {
+      const board = new THREE.Mesh(new THREE.BoxGeometry(w * 1.04, GLASS_T * 2, depth * 1.04), woodMat);
+      board.position.y = -GLASS_T;
+      board.receiveShadow = true;
+      node.add(board);
+      // A lip along the low edge, so the stock reads as resting against something rather than
+      // sliding off. This is the detail that makes the tilt look deliberate.
+      const lip = new THREE.Mesh(new THREE.BoxGeometry(w * 1.04, BOX_H * 0.7, GLASS_T * 2), woodMat);
+      lip.position.set(0, BOX_H * 0.3, depth / 2);
+      lip.castShadow = true;
+      node.add(lip);
+    } else if (s > 0) {
       const panel = new THREE.Mesh(new THREE.BoxGeometry(w * 1.06, GLASS_T, depth * 1.06), glassMat);
-      panel.position.y = s * d.gap - GLASS_T / 2;
+      panel.position.y = -GLASS_T / 2;
       d.panels.push(panel);
-      d.group.add(panel);
+      node.add(panel);
     }
   }
 
-  // The plinth and the shelf's back panel live in the display's LOCAL space too, so a rotated
-  // shelf brings its own furniture round with it instead of leaving it behind axis-aligned.
-  // A floor pile has no plinth at all — it IS on the floor, which is the whole point of it.
-  if (d.plinthY > 0) {
+  // The plinth lives in the display's LOCAL space too, so a rotated display brings it round rather
+  // than leaving it behind axis-aligned. A floor pile has no plinth at all — it IS on the floor.
+  //
+  // Nor does a tilted shelf: the plinth is a solid box from the floor up to y = 0, and the bottom
+  // level's front edge hangs below that, so the box swallowed the corner of the shelf. It is also
+  // simply not what the furniture is — this is a WALL shelf, carried by the back panel against the
+  // wall, and a real one has nothing underneath it.
+  if (d.plinthY > 0 && !d.tilt) {
     const leg = new THREE.Mesh(new THREE.BoxGeometry(w * 0.92, d.plinthY, depth * 0.92), woodMat);
     leg.position.y = -d.plinthY / 2;
     leg.castShadow = true;
@@ -710,10 +937,16 @@ function buildFurniture(d) {
     d.group.add(leg);
   }
 
-  // the back panel of the wall shelf, so "wall-facing row" is visible as well as modelled
+  // The back panel of the wall shelf, so "wall-facing row" is visible as well as modelled. It has
+  // to clear the tilted levels, whose wall edges rise above the level's own origin.
   if (d.kind === 'shelf') {
-    const back = new THREE.Mesh(new THREE.BoxGeometry(w * 1.06, d.g.shelves * d.gap, 0.03), woodMat);
-    back.position.set(0, (d.g.shelves * d.gap) / 2, -depth / 2 - 0.02);
+    const rise = (depth / 2) * Math.sin(d.tilt);
+    // With no plinth this panel is the whole support, so it runs from the floor to the top level.
+    const tall = d.g.shelves * d.gap + rise + (d.tilt ? d.plinthY : 0);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(w * 1.06, tall, 0.03), woodMat);
+    back.position.set(0, tall / 2 - (d.tilt ? d.plinthY : 0),
+                      -(depth / 2) * Math.cos(d.tilt) - 0.02);
+    back.castShadow = true;
     back.receiveShadow = true;
     d.group.add(back);
   }
@@ -743,15 +976,18 @@ const _shadowMat = new THREE.Matrix4();
 const _col = new THREE.Color();
 const _hide = new THREE.Matrix4().makeScale(0, 0, 0);
 
-const baseY = (d, shelf, layer) => shelf * d.gap + layer * BOX_H;
-const LIFT_HEIGHT = 0.14;   // how far a carried item floats above the plane it is over
+// Height of a stack layer ABOVE ITS OWN LEVEL. The level's height (and tilt) live in its frame,
+// so this no longer needs the shelf index — and a caller that forgets to use the matching level
+// frame now gets an obviously wrong position rather than a subtly wrong one.
+const layerY = (layer) => layer * BOX_H;
 
-function paintInstance(display, index, cx, cz, boxBase, shadowBase, footW, footD, yaw) {
+function paintInstance(display, index, cx, cz, boxBase, shadowBase, footW, footD, yaw, shelf,
+                       shX = cx, shZ = cz) {
   const item = items[index];
   // Height follows the item's own depth in 2.5D layers. A super-bulky ball is 3x3x3 per YARN.md,
   // and drawing it one layer tall made it a slab covering most of a table instead of a ball.
   const boxW = footW, boxD = footD, boxH = BOX_H * (item.layers ?? 1);
-  const F = display.frame;
+  const F = levelFrame(display, shelf ?? item.shelf);
 
   _pos.set(cx, boxBase + boxH / 2, cz);
   setInstance(boxes, index, { matrix: placeBoxMatrix(_pos, boxW, boxD, boxH, yaw, _boxMat).premultiply(F) });
@@ -810,7 +1046,9 @@ function paintInstance(display, index, cx, cz, boxBase, shadowBase, footW, footD
     rect: sizeRect,
   });
 
-  _pos.set(cx, shadowBase + 0.003, cz);
+  // The shadow can be told to stay put while the box floats away from it — that offset IS the
+  // read that the thing is in hand, and it is the only cue left once the box is off the plane.
+  _pos.set(shX, shadowBase + 0.003, shZ);
   shadows.setMatrixAt(index, placeMatrix(_pos, boxW * 1.08, boxD * 1.08, yaw, _shadowMat).premultiply(F));
   shadows.instanceMatrix.needsUpdate = true;
 }
@@ -828,8 +1066,9 @@ function refresh(index) {
   }
   const disp = byId(item.display);
   const rect = slotRect(disp.g, item.c, item.r, item.w, item.h);
-  const base = baseY(disp, item.shelf, item.layer);
-  paintInstance(disp, index, rect.x, rect.z, base, base, rect.w * FILL, rect.d * FILL, item.yaw);
+  const base = layerY(item.layer);
+  paintInstance(disp, index, rect.x, rect.z, base, base, rect.w * FILL, rect.d * FILL, item.yaw,
+                item.shelf);
 }
 
 /**
@@ -837,12 +1076,24 @@ function refresh(index) {
  * which may not be the one it was picked up from, if the player has moved the pointer across.
  * Slightly enlarged, so a held item reads as picked-up rather than just badly placed.
  */
+const _lift = new THREE.Vector3();
+
 function refreshFloating(index, x, z) {
   const item = items[index];
   const disp = activeDisplay();
-  const floor = disp.plane * disp.gap;
-  paintInstance(disp, index, x, z, floor + LIFT_HEIGHT, floor,
-                item.w * CELL * FILL * 1.08, item.h * CELL * FILL * 1.08, item.yaw);
+  // Lifted along SCREEN up, not the level's own up, because the job is to get the box out from
+  // under a finger and a finger covers PIXELS. The level's up buys almost none of them on the one
+  // display that needs it most: a 45° shelf tilts its up axis toward the camera, so at a 35°
+  // elevation the same world lift is worth about a fifth of the screen rise a flat table gives.
+  // Screen up is worth all of it, on every display, at every camera angle.
+  _lift.set(0, 1, 0).applyQuaternion(camera.quaternion)
+    .transformDirection(disp.levels?.[disp.plane]?.frameInv ?? disp.frameInv)
+    .multiplyScalar(S.liftHeight);
+  // The shadow stays under the pointer, on the plane, so the box reads as lifted OFF somewhere
+  // rather than as badly placed somewhere else.
+  paintInstance(disp, index, x + _lift.x, z + _lift.z, _lift.y, 0,
+                item.w * CELL * FILL * 1.08, item.h * CELL * FILL * 1.08, item.yaw, disp.plane,
+                x, z);
 }
 
 const refreshAll = () => items.forEach((_, i) => {
@@ -1082,26 +1333,29 @@ function setRayFromEvent(event) {
  * it. Returns plain numbers, not a shared Vector3 — the callers below compare hits from many
  * displays and levels in one pass, and cannot have a later call overwrite an earlier result.
  */
-function castLocal(disp, localY) {
-  _n.set(0, 1, 0).transformDirection(disp.frame);
-  _planePt.set(0, localY, 0).applyMatrix4(disp.frame);
+function castLocal(disp, shelf, height = 0) {
+  const lv = disp.levels?.[shelf];
+  const F = lv ? lv.frame : disp.frame;
+  const Finv = lv ? lv.frameInv : disp.frameInv;
+  _n.set(0, 1, 0).transformDirection(F);
+  _planePt.set(0, height, 0).applyMatrix4(F);
   pickPlane.setFromNormalAndCoplanarPoint(_n, _planePt);
   const hit = raycaster.ray.intersectPlane(pickPlane, _hit);
   if (!hit) return null;
   const distSq = raycaster.ray.origin.distanceToSquared(hit);
-  _localPt.copy(hit).applyMatrix4(disp.frameInv);
+  _localPt.copy(hit).applyMatrix4(Finv);
   return { x: _localPt.x, z: _localPt.z, distSq };
 }
 
 /** Where on a display's ACTIVE plane the pointer is — used to float a carried item, not to pick. */
 function displayPoint(disp, event) {
   setRayFromEvent(event);
-  const guess = castLocal(disp, disp.plane * disp.gap);
+  const guess = castLocal(disp, disp.plane);
   if (!guess) return null;
   const col = columnAt(disp.g, guess.x, guess.z);
   const topIndex = col ? topAt(disp.g, disp.plane, col.c, col.r) : EMPTY;
   if (topIndex === EMPTY) return guess;
-  const refined = castLocal(disp, baseY(disp, disp.plane, items[topIndex].layer) + BOX_H);
+  const refined = castLocal(disp, disp.plane, layerY(items[topIndex].layer) + BOX_H);
   return refined ?? guess;
 }
 
@@ -1119,13 +1373,40 @@ function displayPoint(disp, event) {
  *      column had already been found, so on a tall shelf it never got the chance.
  *
  * The fix removes the guesswork: every occupied column already knows exactly how tall its stack is,
- * so test each one against ITS OWN top face and require the ray to land in that very cell. No
- * parallax to correct, no plane to guess. Nearest hit to the camera wins, which is the box in
- * front. Still never raycasts an item — these are plane intersections, a few dozen per click.
+ * so test each one against ITS OWN top face. No parallax to correct, no plane to guess.
+ *
+ * FORGIVING PICK. Requiring the ray to land inside the item's own cell was too strict to play with
+ * a finger, and measurably so: a 0.2-unit slot at the framing camera is about 20px across, and
+ * nearer 12px once a diorama angle foreshortens it. Apple and Material both put the minimum touch
+ * target at 44px. So an exact hit still wins outright, and failing that the nearest box within a
+ * SCREEN-SPACE radius is taken instead.
+ *
+ * Screen space, not world space, is the whole point: the tolerance has to mean the same thing to a
+ * fingertip whatever the zoom, the resolution or the viewing angle, and a world-space radius means
+ * none of those. Still never raycasts an item — these are plane intersections and a projection,
+ * a few dozen per press.
  */
+const _grabNdc = new THREE.Vector3();
+
+/** Where a slot's top face lands on screen, in CSS pixels. */
+function slotScreenPos(disp, shelf, item) {
+  const rect = slotRect(disp.g, item.c, item.r, item.w, item.h);
+  _grabNdc.set(rect.x, layerY(item.layer) + BOX_H * (item.layers ?? 1), rect.z)
+    .applyMatrix4(levelFrame(disp, shelf))
+    .project(camera);
+  // Behind the camera projects to a mirrored point; reject rather than believe it.
+  if (_grabNdc.z > 1) return null;
+  return { x: (_grabNdc.x * 0.5 + 0.5) * innerWidth, y: (-_grabNdc.y * 0.5 + 0.5) * innerHeight };
+}
+
 function pickCandidate(event) {
   setRayFromEvent(event);
-  let best = null;
+  const px = event.clientX, py = event.clientY;
+  // A finger needs the full 44px; a mouse is precise enough that a big radius would start
+  // grabbing things the user was clearly not pointing at.
+  const radius = S.grabRadius * (matchMedia('(pointer: coarse)').matches ? 1 : 0.5);
+  let exact = null, near = null;
+
   for (const disp of displays) {
     for (let s = 0; s < disp.g.shelves; s++) {
       for (let r = 0; r < disp.g.rows; r++) {
@@ -1135,18 +1416,35 @@ function pickCandidate(event) {
           // A package bridging two columns with something stacked on its other half is not
           // grabbable — lift() would pop that other column too and evict whatever sits there.
           if (!fullyExposed(disp, items, index)) continue;
-          const hit = castLocal(disp, baseY(disp, s, items[index].layer) + BOX_H);
+          const item = items[index];
+          // Only the item's ANCHOR cell is considered, or a 2x2 package would be offered four
+          // times over and the nearest-centre test would answer about a corner instead of the box.
+          if (item.c !== c || item.r !== r) continue;
+          const top = layerY(item.layer) + BOX_H * (item.layers ?? 1);
+          const hit = castLocal(disp, s, top);
           if (!hit) continue;
           const col = columnAt(disp.g, hit.x, hit.z);
-          if (!col || col.c !== c || col.r !== r) continue;   // must land in THIS cell, not a neighbour
-          if (!best || hit.distSq < best.distSq) {
-            best = { disp, shelf: s, index, distSq: hit.distSq };
+          const inside = col && topAt(disp.g, s, col.c, col.r) === index;
+          if (inside) {
+            // Landed on the box itself. Nearest to the camera wins, which is the one in front.
+            if (!exact || hit.distSq < exact.distSq) exact = { disp, shelf: s, index, distSq: hit.distSq };
+            continue;
+          }
+          if (exact) continue;                       // an exact hit always beats a near miss
+          const at = slotScreenPos(disp, s, item);
+          if (!at) continue;
+          const d = Math.hypot(at.x - px, at.y - py);
+          if (d > radius) continue;
+          // Among near misses take the closest ON SCREEN, and only then the closest to the camera,
+          // so two boxes overlapping in the picture resolve to the front one.
+          if (!near || d < near.d - 1 || (Math.abs(d - near.d) <= 1 && hit.distSq < near.distSq)) {
+            near = { disp, shelf: s, index, distSq: hit.distSq, d };
           }
         }
       }
     }
   }
-  return best;
+  return exact ?? near;
 }
 
 /**
@@ -1154,13 +1452,21 @@ function pickCandidate(event) {
  * pick, this does not need an item there — it needs somewhere to PUT one — so it tests each shelf's
  * floor plane and takes the nearest in-bounds hit.
  */
+const nearGrid = (g, x, z, pad) => {
+  const { w, d } = gridSize(g);
+  return Math.abs(x) <= w / 2 + pad && Math.abs(z) <= d / 2 + pad;
+};
+
 function hoverTarget(event) {
   setRayFromEvent(event);
   let best = null;
   for (const disp of displays) {
     for (let s = 0; s < disp.g.shelves; s++) {
-      const hit = castLocal(disp, s * disp.gap);
-      if (!hit || !columnAt(disp.g, hit.x, hit.z)) continue;
+      const hit = castLocal(disp, s);
+      // Half a slot of slack outside the lattice: without it the outermost row of every display
+      // could only be aimed at from one side, since anything past the edge selected no display at
+      // all and the snap below never got a chance to run.
+      if (!hit || !nearGrid(disp.g, hit.x, hit.z, CELL * 0.5)) continue;
       if (!best || hit.distSq < best.distSq) best = { disp, shelf: s, distSq: hit.distSq };
     }
   }
@@ -1170,16 +1476,12 @@ function hoverTarget(event) {
 // A box does not land in exactly the same orientation every time it is set down.
 const YAW_SETTLE = 0.12 * Math.PI;
 
-/** Anywhere on this display the item still fits, or null. The last resort when its own slot filled up. */
-function firstFreeSlot(disp, item) {
-  for (let shelf = 0; shelf < disp.g.shelves; shelf++)
-    for (let r = 0; r < disp.g.rows; r++)
-      for (let c = 0; c < disp.g.cols; c++) {
-        const keys = footprint(disp.g, shelf, c, r, item.w, item.h);
-        if (fits(disp.g, keys, item.layers ?? 1)) return { shelf, c, r, keys };
-      }
-  return null;
-}
+/** The drop target: the nearest slot the item FITS in, within S.snapCells of the pointer. */
+const snapTo = (disp, shelf, item, x, z) =>
+  nearestSlot(disp.g, shelf, item, x, z, S.snapCells * CELL);
+
+/** Anywhere on this display at all, or null — the last resort when an item's own slot filled up. */
+const firstFreeSlot = (disp, item) => anySlot(disp.g, item);
 
 function pickUp(event, found = pickCandidate(event)) {
   if (!found) return;
@@ -1258,19 +1560,51 @@ function abortDrag() {
  *   click item, move, click target  -> click-click          (natural on mouse)
  *   tap item, press target, adjust, lift -> aim then commit (touch without a hover)
  */
+// Which fingers are currently down on the canvas, and who this GESTURE belongs to.
+//
+// Ownership is per-gesture, not per-pointer, and that distinction is the whole bug. OrbitControls
+// keeps its own `pointers` array, built from the pointerdown events it receives. Withholding only
+// the FIRST finger left the second one getting through: OrbitControls then saw that second finger
+// as its first pointer, started a rotation from it, and its bookkeeping no longer matched what the
+// hand was doing. Every subsequent move measured against a start point for a finger that had
+// already lifted — and a stale delta at damping speed is the camera spinning on its own.
+//
+// So: the first finger down decides who owns the gesture, and while it is the player's, EVERY
+// pointerdown is withheld until the last finger lifts. OrbitControls either sees a whole gesture
+// or none of it, never half.
+const livePointers = new Set();
+let gestureOwner = null;             // 'player' | 'camera' | null
+
+function endPointer(event) {
+  livePointers.delete(event.pointerId);
+  if (livePointers.size === 0) gestureOwner = null;
+}
+
 function onPointerDown(event) {
   if (event.target !== renderer.domElement) return;   // a press on the HUD or GUI is not a shop press
-  if (event.button !== 0 || !event.isPrimary) return;
-  // isPrimary: only the FIRST finger drives the verb. Without it, putting a second finger down to
-  // pinch-zoom would grab whatever happened to be under it, mid-gesture.
+  if (event.button !== 0) return;                     // right/middle belong to the camera
+  livePointers.add(event.pointerId);
+
+  // An extra finger joining a gesture the player owns is withheld too, so OrbitControls cannot
+  // start half a rotation underneath a drag.
+  if (livePointers.size > 1) {
+    if (gestureOwner === 'player') event.stopPropagation();
+    return;
+  }
+
   drag.downX = event.clientX;
   drag.downY = event.clientY;
   drag.moved = false;
 
+  // Claim this gesture for the player: stop it reaching OrbitControls, which has not seen it yet
+  // because this listener captures at the window.
+  const claim = () => { gestureOwner = 'player'; event.stopPropagation(); };
+  gestureOwner = 'camera';
+
   // Move mode takes the whole gesture: one finger moves a display if there is one under it, and
   // orbits the camera if there is not — the same "verb or camera" split the stock drag uses below.
   if (S.moveMode) {
-    controls.touches.ONE = grabMovable(event) ? null : THREE.TOUCH.ROTATE;
+    if (grabMovable(event)) claim();
     return;
   }
 
@@ -1283,14 +1617,16 @@ function onPointerDown(event) {
   // much the more sensitive of the two that any two-finger drag reads as pure zoom.
   //
   // Only meaningful on touch; the mouse takes its orbit from `controls.mouseButtons` (right-drag).
-  controls.touches.ONE = (found || !drag.pickedThisPress) ? null : THREE.TOUCH.ROTATE;
+  if (found || !drag.pickedThisPress) claim();
 
   if (drag.pickedThisPress) { if (found) pickUp(event, found); }
   else onPointerMove(event);   // aiming press: refresh the ghost NOW, before anything commits
 }
 
 function onPointerUp(event) {
-  if (event.button !== 0 || !event.isPrimary) return;
+  const wasFirst = livePointers.size === 1 && livePointers.has(event.pointerId);
+  endPointer(event);
+  if (event.button !== 0 || !wasFirst) return;   // only the finger that started the verb commits it
   if (mover.m) { dropMovable(); return; }
   if (drag.index === EMPTY) return;
   // A press that went somewhere is a completed drag; a press that stayed put while already
@@ -1337,15 +1673,7 @@ function onPointerMove(event) {
   const point = displayPoint(disp, event);
   if (!point) return;
   const item = items[drag.index];
-  const col = columnAt(disp.g, point.x, point.z);
-
-  drag.target = null;
-  if (col) {
-    const c = col.c - ((item.w - 1) >> 1);
-    const r = col.r - ((item.h - 1) >> 1);
-    const keys = footprint(disp.g, disp.plane, c, r, item.w, item.h);
-    if (fits(disp.g, keys, item.layers ?? 1)) drag.target = { c, r, keys, layer: dropLayer(disp.g, keys) };
-  }
+  drag.target = snapTo(disp, disp.plane, item, point.x, point.z);
   ghost(item);
   refreshFloating(drag.index, point.x, point.z);
   updateHeldReadout();
@@ -1354,21 +1682,48 @@ function onPointerMove(event) {
 const FLAT_Q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
 const dropMarker = new THREE.Mesh(
   new THREE.PlaneGeometry(1, 1),
-  new THREE.MeshBasicMaterial({ color: '#3f7f5a', transparent: true, opacity: 0.35, depthWrite: false })
+  new THREE.MeshBasicMaterial({
+    color: GHOST_OK, transparent: true, opacity: GHOST_ALPHA, depthWrite: false, toneMapped: false,
+  })
 );
 dropMarker.visible = false;
 scene.add(dropMarker);
 
-/** The green drop shadow, laid into the target slot in the display's own orientation. */
+/** The green drop shadow in the slot it will land in — or the whole display red if it cannot. */
 function ghost(item) {
   const disp = activeDisplay();
   const t = drag.target;
   dropMarker.visible = !!t;
-  if (!t) return;
+  if (!t) {
+    // The negative case, which said nothing at all before. In a 3D room a far display reads as
+    // having room it does not have: perspective hides how full a level is, and the absence of a
+    // green ghost is indistinguishable from "you aimed badly". So a display that cannot take this
+    // item ANYWHERE washes its level red — an answer about the display, not about the aim.
+    if (firstFreeSlot(disp, item)) return;
+    const { w, d } = gridSize(disp.g);
+    dropMarker.visible = true;
+    dropMarker.material.color.set(GHOST_NO);
+    // Drawn THROUGH the stock. A level with no room is by definition covered in boxes, so a wash
+    // that respects depth would be hidden behind exactly the thing it is warning about.
+    dropMarker.material.depthTest = false;
+    dropMarker.renderOrder = 4;
+    // Deliberately thinner than the green. The green answers "this exact slot" and covers one cell,
+    // so solid is right; the red covers a whole display, and at full strength it would hide the
+    // stock instead of ruling it out — a red rectangle reads as broken, a red wash reads as no.
+    dropMarker.material.opacity = 0.5;
+    dropMarker.position.set(0, 0.004, 0).applyMatrix4(levelFrame(disp, disp.plane));
+    dropMarker.quaternion.copy(disp.levels?.[disp.plane]?.quat ?? disp.quat).multiply(FLAT_Q);
+    dropMarker.scale.set(w, d, 1);
+    return;
+  }
   dropMarker.material.color.set(GHOST_OK);
+  dropMarker.material.depthTest = true;
+  dropMarker.material.opacity = GHOST_ALPHA;
+  dropMarker.renderOrder = 0;
   const rect = slotRect(disp.g, t.c, t.r, item.w, item.h);
-  dropMarker.position.set(rect.x, baseY(disp, disp.plane, t.layer) + 0.004, rect.z).applyMatrix4(disp.frame);
-  dropMarker.quaternion.copy(disp.quat).multiply(FLAT_Q);
+  dropMarker.position.set(rect.x, layerY(t.layer) + 0.004, rect.z)
+    .applyMatrix4(levelFrame(disp, disp.plane));
+  dropMarker.quaternion.copy(disp.levels?.[disp.plane]?.quat ?? disp.quat).multiply(FLAT_Q);
   dropMarker.scale.set(rect.w * 0.96, rect.d * 0.96, 1);
 }
 
@@ -1388,7 +1743,6 @@ const YAW_STEP = Math.PI / 4;   // MVP detent, per rule 10
 // At least WALL_INSET, or a shelf snaps flush to a wall and is then refused for being too close to
 // it — which leaves the display red everywhere and undroppable. Derived, never a loose number.
 const WALL_GAP = WALL_INSET + 0.02;
-const GHOST_OK = '#3f7f5a', GHOST_NO = '#a2382f';
 
 // The four walls as lines, each with the yaw that turns a display's front (local +Z) into the room.
 const WALL_LINES = [
@@ -1485,7 +1839,7 @@ function canPlaceAt(m, pose) {
     return boxIsClear(pose.x, pose.z, CHAIR_W * Math.SQRT1_2,
       roomObstacles(displays, seats.filter((s) => s !== m)));
   }
-  const probe = { ...pose, cols: m.g.cols, rows: m.g.rows };
+  const probe = { ...pose, cols: m.g.cols, rows: m.g.rows, tilt: m.tilt ?? 0 };
   const others = roomObstacles(displays.filter((o) => o !== m));
   for (let r = 0; r < m.g.rows; r++)
     for (let c = 0; c < m.g.cols; c++)
@@ -1499,6 +1853,9 @@ function paintMoveGhost(m) {
   const pose = movePose(m);
   dropMarker.visible = true;
   dropMarker.material.color.set(mover.ok ? GHOST_OK : GHOST_NO);
+  dropMarker.material.depthTest = true;
+  dropMarker.material.opacity = GHOST_ALPHA;
+  dropMarker.renderOrder = 0;
   dropMarker.position.set(pose.x, 0.006, pose.z);
   dropMarker.quaternion.setFromAxisAngle(UP, pose.yaw).multiply(FLAT_Q);
   dropMarker.scale.set(w * 1.06, depth * 1.06, 1);
@@ -1526,7 +1883,7 @@ function proposeMove(m, x, z, yaw) {
  * only ever open holes back up, and remask() refuses to revoke an occupied slot regardless.
  */
 function remaskDisplay(d) {
-  const probe = { x: d.x, z: d.z, yaw: d.yaw, cols: d.g.cols, rows: d.g.rows };
+  const probe = { x: d.x, z: d.z, yaw: d.yaw, cols: d.g.cols, rows: d.g.rows, tilt: d.tilt ?? 0 };
   const others = roomObstacles(displays.filter((o) => o !== d));
   remask(d.g, (s, c, r) => cellIsClear(probe, c, r, others));
   // makeGridLines draws only the usable cells, so the lattice has to be rebuilt to match.
@@ -1695,7 +2052,7 @@ const glow = new THREE.Mesh(
   new THREE.BoxGeometry(1, 1, 1),
   new THREE.MeshBasicMaterial({
     color: S.glowColor, transparent: true, opacity: 0,
-    side: THREE.BackSide, depthWrite: false,
+    side: THREE.BackSide, depthWrite: false, toneMapped: false,
   }),
 );
 glow.visible = false;
@@ -1726,7 +2083,7 @@ function tickGlow(elapsed) {
   glow.scale.copy(_glowS).addScalar(S.glowPad * (0.72 + 0.28 * pulse));
   // Peaks fully opaque. The pulse is carried mostly by the fade rather than the size, so the halo
   // never shrinks back far enough to stop reading as a deliberate highlight.
-  glow.material.opacity = 0.55 + 0.45 * pulse;
+  glow.material.opacity = GHOST_ALPHA * (0.82 + 0.18 * pulse);
 }
 
 // On WINDOW in the capture phase, not on the canvas. Listeners on the same element fire in
@@ -1769,7 +2126,9 @@ function updateHeldReadout() {
     `<br /><span class="k">over</span> ${where}` +
     `<br /><span class="${ok ? 'ok' : 'no'}">${ok
       ? `drops at col ${drag.target.c}, row ${drag.target.r}, layer ${drag.target.layer + 1}`
-      : 'no room here — click puts it back'}</span>`;
+      : disp && !firstFreeSlot(disp, item)
+        ? `${esc(disp.id)} is full — nothing this size fits on it`
+        : 'no room here — click puts it back'}</span>`;
 }
 
 /** Step the active display's plane, for reaching a shelf level the pointer cannot single out. */
@@ -1784,12 +2143,19 @@ function setPlane(p) {
 /** The plane the player is arranging is lit; every other grid is muted. */
 function paintActivePlane() {
   const carrying = drag.index !== EMPTY;
+  const held = carrying ? items[drag.index] : null;
   for (const disp of displays) {
+    // Full FOR WHAT IS IN HAND — a 3x3 bulky ball and a 1x1 hook get different answers about the
+    // same shelf. Whole-display, so the warning is there before the pointer arrives, which is the
+    // point: the display the player is about to drag across the room to is the one that has to
+    // say no. Recomputed rather than cached because an NPC restructures displays between rounds.
+    const noRoom = held && !firstFreeSlot(disp, held);
     // A floor grid lies flat across open floor, so leaving it on litters the whole room with
     // lines. It shows only while the pointer is over it — or while it is the drop target of
     // something being carried, which is exactly when the player needs to see the slots.
     // Shelves and tables keep their grids on: they are small and read as furniture detail.
-    const revealed = disp.form !== 'floor' || disp.id === hoveredId || (carrying && disp.id === activeId);
+    const revealed = disp.form !== 'floor' || disp.id === hoveredId ||
+                     (carrying && disp.id === activeId) || noRoom;
     disp.lines.forEach((lines, s) => {
       const isActive = disp === activeDisplay() && s === disp.plane;
       lines.visible = S.showGrid && revealed;
@@ -1798,9 +2164,15 @@ function paintActivePlane() {
       // darker ink at full opacity against the pale floor. If genuinely fat lines are wanted,
       // that needs three's Line2/LineMaterial addon, which is a real dependency on a fat-line
       // shader rather than a settings change.
-      lines.material.color.set(isActive ? '#5e2408' : '#6f6456');
-      lines.material.opacity = isActive ? 1 : 0.6;
-      lines.material.transparent = !isActive;
+      lines.material.color.set(noRoom ? GHOST_NO : isActive ? '#5e2408' : '#6f6456');
+      lines.material.opacity = noRoom || isActive ? 1 : 0.6;
+      lines.material.transparent = !(noRoom || isActive);
+      // A full lattice is drawn through its own stock, for the same reason the wash is: the boxes
+      // that make it full are sitting on top of the lines saying so — and it opts out of the tone
+      // mapper, without which the alarm red arrives as maroon. The ordinary lattice keeps its tone
+      // mapping: it is furniture detail and belongs in the shop's own light.
+      lines.material.depthTest = !noRoom;
+      lines.material.toneMapped = !noRoom;
     });
   }
 }
@@ -1837,27 +2209,33 @@ function randomStock() {
   return makeStockNotion();
 }
 
-function stockDisplays() {
-  items.length = 0;
-  const stock = (d, shelf, opts) => addItem(d, shelf, randomStock(), opts);
-
-  for (const d of displays) {
+/**
+ * Put `n` more boxes out, spread across the displays. Returns how many actually landed — a full or
+ * heavily masked shop can refuse some, and the caller reports the shortfall rather than the shop
+ * quietly holding less than it was asked to.
+ *
+ * A pile is meant to be a PILE, so piles get anchor columns and build real towers: addItem takes
+ * the first cell that FITS, so left to itself it spreads one item per cell and nothing ever stacks,
+ * however much headroom the display has. THAT, not the headroom value, is why piles looked flat —
+ * and stacking is what gives DISPLAYS.md's "buried inventory cannot be noticed" rule something to
+ * do at all.
+ */
+function fillStock(n) {
+  if (n <= 0 || !displays.length) return 0;
+  let placed = 0, tries = 0;
+  // Round-robin across displays so a small shop is not all piled on one table.
+  for (let i = 0; placed < n && tries < n * 8; i++, tries++) {
+    const d = displays[i % displays.length];
     if (d.kind === 'shelf') {
-      for (let i = 0; i < 14; i++) stock(d, rnd(d.g.shelves));
+      if (addItem(d, rnd(d.g.shelves), randomStock()) >= 0) placed++;
       continue;
     }
-    // A pile is meant to be a PILE. addItem takes the first cell that FITS, so left to itself it
-    // spreads one item per cell and nothing ever stacks — however much headroom the display has.
-    // THAT, not the headroom value, is why piles looked flat. Reusing a few anchor columns builds
-    // real towers, which is also what finally gives DISPLAYS.md's "buried inventory cannot be
-    // noticed" rule something to do.
-    for (let a = 0; a < 4; a++) {
-      const c = rnd(d.g.cols), r = rnd(d.g.rows);
-      const tall = 2 + rnd(4);                     // 2-5 high, well inside PILE_HEADROOM
-      for (let i = 0; i < tall; i++) stock(d, 0, { c, r });
-    }
-    for (let i = 0; i < 4; i++) stock(d, 0);       // plus a few loose ones around them
+    // Two or three onto one anchor column, so a pile reads as a pile even at a small stock count.
+    const c = rnd(d.g.cols), r = rnd(d.g.rows);
+    const tall = Math.min(n - placed, 1 + rnd(3));
+    for (let k = 0; k < tall; k++) if (addItem(d, 0, randomStock(), { c, r }) >= 0) placed++;
   }
+  return placed;
 }
 
 /**
@@ -1875,6 +2253,7 @@ function stockDisplays() {
  */
 function seedWants(npcs) {
   const unseeded = [];
+  let placedCount = 0;
   npcs.forEach((npc, i) => {
     const wants = wantsOf(npc);
     wants.forEach((want, k) => {
@@ -1882,6 +2261,7 @@ function seedWants(npcs) {
       const spec = specFor(want, npc);
       console.assert(satisfies(spec, want), 'seeded item does not satisfy its own want', spec, want);
       const placed = addItem(open, 0, spec, { avoidWall: true });
+      if (placed >= 0) placedCount++;
       // Silent failure worth catching: a full or heavily masked display can refuse the seed, and
       // the only symptom is an NPC wandering for MAX_ROUNDS and leaving empty-handed — which reads
       // as the browse logic being broken rather than the shop having nowhere to put their hook.
@@ -1891,14 +2271,16 @@ function seedWants(npcs) {
     const hidden = displays[(i + 1) % displays.length];
     const buried = addItem(hidden, 0, specFor(wants[0], npc), { avoidWall: true, shape: [1, 1] });
     if (buried >= 0) {
+      placedCount++;
       const it = items[buried];
       // Same footprint as the item below, or it would bridge onto neighbouring columns instead of
       // sitting squarely on top and burying it.
-      addItem(hidden, 0, makeStockNotion(Math.random, 'darning-needle'),
-              { c: it.c, r: it.r, shape: [it.w, it.h] });
+      if (addItem(hidden, 0, makeStockNotion(Math.random, 'darning-needle'),
+                  { c: it.c, r: it.r, shape: [it.w, it.h] }) >= 0) placedCount++;
     }
   });
   console.assert(unseeded.length === 0, 'want seeding failed:', unseeded);
+  return placedCount;
 }
 
 /**
@@ -2007,15 +2389,30 @@ let roster = [];
 // Ids have to be unique across days too — a regular is matched to the roster by id, so a new
 // customer reusing "npc0" would be mistaken for one.
 let nextNpcId = 0;
+// The day cycle. `day` starts at 0 because the first restart() call is itself day one opening.
+let day = 0;
+let dayElapsed = 0;
 
 /** Start a new day. Regulars from the last one come back first, with everything they had. */
 function restart({ keepRegulars = true } = {}) {
+  // Keeping the regulars IS what makes it the next day rather than a fresh game; wiping them
+  // resets the calendar too, so the day counter never claims a history the customers do not have.
+  day = keepRegulars ? day + 1 : 1;
+  dayElapsed = 0;
+  autoElapsed = 0;
   buildChairs(S.chairCount);      // before the displays: their slots get masked against the chairs
   buildDisplays(S.displayCount);
-  stockDisplays();
+  items.length = 0;
   if (!keepRegulars) roster = [];
   const npcs = spawnCast();
-  seedWants(npcs);
+  // Seeds go down FIRST and count against the budget. What the customers in the shop actually need
+  // is the inventory that matters — filling up with random stock and then discovering there is no
+  // room left for anybody's yarn is the wrong way round, and at a stock count of 10 it would
+  // happen constantly.
+  const seeded = seedWants(npcs);
+  const filled = fillStock(S.stockCount - seeded);
+  console.info(`stock: ${items.length} boxes — ${seeded} seeded for customers, ${filled} general` +
+    (items.length < S.stockCount ? ` (asked for ${S.stockCount}; the shop had no room for more)` : ''));
   world = makeWorld({ displays, items, room, seats });
   world.npcs = npcs;
   for (const m of [fieldTop, edgeTop, shadows, boxes, sizeTop]) m.count = items.length;
@@ -2442,11 +2839,12 @@ const roundLabel = document.getElementById('roundLabel');
 const clockLabel = document.getElementById('clockLabel');
 const autoBar = document.getElementById('autoBar');
 const autoBox = document.getElementById('auto');
+const autoDayBox = document.getElementById('autoDay');
 const advanceBtn = document.getElementById('advance');
 
 function drawTimer() {
   if (!world) return;
-  roundLabel.textContent = `round ${world.round}`;
+  roundLabel.textContent = `day ${day} · round ${world.round}`;
   // CHARACTER-VISIT.md: one round is 15 minutes of in-game time.
   const minutes = world.round * 15;
   const hh = String(10 + Math.floor(minutes / 60)).padStart(2, '0');
@@ -2455,16 +2853,24 @@ function drawTimer() {
   const inDoor = world.npcs.find((n) => n.id === world.door.busy);
   clockLabel.textContent = `${hh}:${mm} · ${live}/${world.npcs.length} visiting` +
     (inDoor ? ` · door: ${inDoor.name}` : ' · door clear');
-  advanceBtn.disabled = live === 0;
-  advanceBtn.textContent = live === 0 ? 'everyone has gone home' : 'Advance round →';
+  advanceBtn.disabled = live === 0 && !autoDayBox.checked;
+  advanceBtn.textContent = live === 0
+    ? (autoDayBox.checked ? 'closing up…' : 'everyone has gone home — start next day')
+    : 'Advance round →';
 }
 
-advanceBtn.addEventListener('click', doAdvanceRound);
+// Once the shop is empty the button becomes the way to open tomorrow, so a manual player is not
+// stuck staring at a disabled control with the GUI folder as their only way on.
+advanceBtn.addEventListener('click', () => {
+  if (world && world.npcs.every((n) => n.state === STATE.GONE)) restart();
+  else doAdvanceRound();
+});
 autoBox.addEventListener('change', () => { autoElapsed = 0; });
+autoDayBox.addEventListener('change', () => { dayElapsed = 0; drawTimer(); });
 
 // ---------------------------------------------------------------- perf overlay
 // Copied from crowd.html unchanged, so numbers from the two views are directly comparable.
-const perfEl = document.getElementById('perf');
+const perfEl = document.getElementById('perfBody');
 let fps = 60, lastPerf = 0;
 
 function updatePerf(dt) {
@@ -2694,17 +3100,33 @@ const isUnder = (node, ancestor) => {
   return false;
 };
 
+/**
+ * Put the camera INSIDE the shop, close enough that a slot is a usable touch target.
+ *
+ * This used to frame the whole room, and that was the root of the tablet problem: fitting a
+ * 6.4-unit room to the screen renders a 0.2-unit slot at 12-20px, well under the 44px minimum
+ * touch target, so no amount of grab slack could make a packed shelf comfortable. The distance is
+ * now DERIVED from how big a slot should look rather than from how much room should be visible —
+ * the shop is a place you stand in, not a diagram you view.
+ *
+ * Zooming out to see the whole room is still one pinch away; getting back in is this button.
+ */
+const TARGET_SLOT_PX = 56;   // on-screen size of one slot; a diorama angle foreshortens it to ~34
+
 function frameRoom() {
-  const box = new THREE.Box3(
-    new THREE.Vector3(-HALF_W, 0, -HALF_D),
-    new THREE.Vector3(HALF_W, ROOM.wallH, HALF_D),
-  );
-  const size = box.getSize(new THREE.Vector3());
-  const center = box.getCenter(new THREE.Vector3());
-  const extent = Math.max(size.x, size.z) * 1.05;
-  const dist = extent / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5));
-  controls.target.set(center.x, 0.5, center.z);
-  camera.position.set(center.x + dist * 0.30, dist * 0.72, center.z + dist * 0.82);
+  const center = new THREE.Vector3(0, 0, 0);
+  // Solve the perspective projection for distance: a slot of CELL*FILL world units should cover
+  // TARGET_SLOT_PX of the viewport's height.
+  const halfFov = THREE.MathUtils.degToRad(camera.fov) * 0.5;
+  const wanted = (CELL * FILL * innerHeight) / (2 * Math.tan(halfFov) * TARGET_SLOT_PX);
+  // Never closer than the controls allow, and never so far that the room is a small object again.
+  const dist = THREE.MathUtils.clamp(wanted, controls.minDistance + 0.3, controls.maxDistance);
+
+  controls.target.set(center.x, 0.55, center.z);
+  // Shallower than the old framing (0.62 up rather than 0.72): from inside the room a steeper
+  // angle looks down at shelf TOPS, and the faces carrying the labels are what needs reading.
+  const v = new THREE.Vector3(0.30, 0.62, 0.82).normalize().multiplyScalar(dist);
+  camera.position.set(center.x + v.x, v.y, center.z + v.z);
   controls.update();
 }
 
@@ -2719,7 +3141,9 @@ function applyQuality(name) {
   gui.controllersRecursive().forEach((c) => c.updateDisplay());
 }
 
-const gui = new GUI({ title: 'store' });
+// Into the rail, not auto-placed. lil-gui's default is fixed to the top-right corner, which is
+// exactly where the timer is — it was sitting on top of the controls it shares a corner with.
+const gui = new GUI({ title: 'store', container: document.getElementById('guiSlot') });
 // Counts are dropdowns, not sliders: each value is an authored layout from a fixed pool, so the
 // legal values are discrete and the list makes that obvious.
 const counts = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => [String(i + 1), i + 1]));
@@ -2734,7 +3158,9 @@ gui.add(S, 'chairCount', { 0: 0, ...counts(SEAT_SLOTS.length) }).name('chairs').
 gui.add({ f: doAdvanceRound }, 'f').name('advance round  (Space)');
 gui.add({ f: () => restart() }, 'f').name('next day — regulars return  (R)');
 gui.add({ f: () => restart({ keepRegulars: false }) }, 'f').name('all new customers');
-gui.add(S, 'autoSeconds', 2, 60, 1).name('auto interval (s)');
+gui.add(S, 'stockCount', 2, 120, 1).name('total inventory').onChange(restart);
+gui.add(S, 'autoSeconds', 1, 60, 0.5).name('round interval (s)');
+gui.add(S, 'dayGap', 0, 20, 0.5).name('pause between days (s)');
 gui.add(S, 'travel', 0.2, 4, 0.1).name('travel anim (s)');
 gui.add(S, 'travelJitter', 0, 2, 0.05).name('start stagger (s)');
 gui.add(S, 'paceJitter', 0, 0.6, 0.05).name('pace variation (±)');
@@ -2759,6 +3185,9 @@ gPerf.add(S, 'shadows').name('shadow map').onChange((v) => { renderer.shadowMap.
 const gLook = gui.addFolder('look');
 gLook.add(S, 'view', ['felted', 'grey', 'silhouette']).onChange((v) => setViewMode(castGroup, v));
 gLook.add(S, 'showGrid').name('grid lines  (G)').onChange(paintGrids);
+gLook.add(S, 'grabRadius', 0, 90, 2).name('grab slack (px, touch)');
+gLook.add(S, 'liftHeight', 0, 0.8, 0.02).name('held item lift');
+gLook.add(S, 'snapCells', 0, 4, 0.1).name('drop snap (slots)');
 gui.add(S, 'moveMode').name('move displays  (M)').onChange(setMoveMode);
 gLook.addColor(S, 'glowColor').name('held glow').onChange((v) => glow.material.color.set(v));
 gLook.add(S, 'glowSpeed', 0.2, 2.5, 0.1).name('glow pulse (Hz)');
@@ -2766,6 +3195,28 @@ gLook.add(S, 'glowPad', 0.005, 0.15, 0.005).name('glow thickness');
 gLook.add(S, 'exposure', 0.1, 2, 0.01).onChange((v) => (renderer.toneMappingExposure = v));
 gLook.add(S, 'toneMapping', ['AgX', 'ACES', 'None']).onChange((v) => (renderer.toneMapping = TONE_MAPPING[v]));
 gui.add({ f: frameRoom }, 'f').name('frame room  (F)');
+gui.add(S, 'lockCamera').name('lock camera  (L)').onChange(setCameraLock);
+// The same call as the key and the GUI row, so the three can never drift apart.
+document.getElementById('frameBtn').addEventListener('click', frameRoom);
+
+/**
+ * Lock the camera. On a tablet the shop is easy to knock askew while reaching for a box — every
+ * stray drag on empty floor is an orbit — and a locked view makes arranging safe. It disables
+ * OrbitControls outright rather than only rotation, because a pinch that dollies the view mid-drag
+ * is the same problem in a different axis.
+ *
+ * The player's verb is untouched: picking up and placing never went through the camera.
+ */
+const lockBtn = document.getElementById('lockBtn');
+function setCameraLock(on) {
+  S.lockCamera = on;
+  controls.enabled = !on;
+  lockBtn.setAttribute('aria-pressed', String(on));
+  lockBtn.textContent = on ? '🔒' : '🔓';
+  lockBtn.title = on ? 'unlock the camera' : 'lock the camera';
+  gui.controllersRecursive().forEach((c) => c.updateDisplay());
+}
+lockBtn.addEventListener('click', () => setCameraLock(!S.lockCamera));
 
 addEventListener('keydown', (e) => {
   const t = e.target;
@@ -2780,6 +3231,7 @@ addEventListener('keydown', (e) => {
   if (k === 'f') frameRoom();
   if (k === 'g') { S.showGrid = !S.showGrid; paintGrids(); }
   if (k === 'm') setMoveMode(!S.moveMode);
+  if (k === 'l') setCameraLock(!S.lockCamera);
   if (S.moveMode && (k === 'q' || k === 'e')) rotateMovable(k === 'q' ? -YAW_STEP : YAW_STEP);
   if (e.key === '[') setPlane(activeDisplay().plane - 1);
   if (e.key === ']') setPlane(activeDisplay().plane + 1);
@@ -2842,10 +3294,20 @@ loadAtlas(ATLAS_URL).then((loaded) => {
     tickGlow(elapsed);
     tickRotator();
 
-    if (autoBox.checked && world && world.npcs.some((n) => n.state !== STATE.GONE)) {
+    // Two independent clocks: one paces the ROUNDS, one closes the shop and opens tomorrow. They
+    // are separate because rolling the day is useful whether the rounds are being advanced by the
+    // timer or by hand — the point is not having to click through the changeover either way.
+    const openForBusiness = world && world.npcs.some((n) => n.state !== STATE.GONE);
+    if (autoBox.checked && openForBusiness) {
       autoElapsed += dt;
       autoBar.style.width = `${Math.min(100, (autoElapsed / S.autoSeconds) * 100)}%`;
       if (autoElapsed >= S.autoSeconds) doAdvanceRound();
+    } else if (autoDayBox.checked && world && !openForBusiness) {
+      // A deliberate beat with the shop empty before the next day's queue walks in — without it
+      // the changeover is a single-frame pop and it is impossible to see who left with what.
+      dayElapsed += dt;
+      autoBar.style.width = `${Math.min(100, (dayElapsed / S.dayGap) * 100)}%`;
+      if (dayElapsed >= S.dayGap) restart();     // regulars come back; see the roster
     } else {
       autoBar.style.width = '0%';
     }

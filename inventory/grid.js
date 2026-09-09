@@ -111,6 +111,47 @@ export function slotRect(g, c, r, w, h) {
 }
 
 /**
+ * The slot a drop should land in: the nearest one on this shelf that `item` ACTUALLY FITS IN,
+ * within `reach` (in the display's own units) of the point (x,z). Null if nothing fits in range.
+ *
+ * Not the same question as columnAt, and the difference is the whole point. columnAt answers
+ * "which cell is under the pointer", which asks the input for a precision it does not have: a slot
+ * is a couple of dozen pixels once a diorama angle foreshortens it, against a fingertip that lands
+ * somewhere inside forty or fifty. Worse, the honest answer is often "a column that is full", and
+ * a drop that silently does nothing is indistinguishable from a broken one.
+ *
+ * Reach is measured in the display's plane rather than on screen deliberately: it is then a fixed
+ * number of SLOTS, which is what the player is reasoning about, and it does not drift with zoom.
+ *
+ * Anchored on the footprint CENTRE, so a 2x2 package centres on the pointer rather than hanging
+ * off one corner of it.
+ */
+export function nearestSlot(g, s, item, x, z, reach) {
+  let best = null;
+  for (let r = 0; r < g.rows; r++)
+    for (let c = 0; c < g.cols; c++) {
+      const keys = footprint(g, s, c, r, item.w, item.h);
+      if (!fits(g, keys, item.layers ?? 1)) continue;
+      const rect = slotRect(g, c, r, item.w, item.h);
+      const d = Math.hypot(rect.x - x, rect.z - z);
+      if (d > reach || (best && d >= best.d)) continue;
+      best = { c, r, keys, layer: dropLayer(g, keys), d };
+    }
+  return best;
+}
+
+/** Anywhere on this display at all, on any shelf, that `item` fits — or null. */
+export function anySlot(g, item) {
+  for (let s = 0; s < g.shelves; s++)
+    for (let r = 0; r < g.rows; r++)
+      for (let c = 0; c < g.cols; c++) {
+        const keys = footprint(g, s, c, r, item.w, item.h);
+        if (fits(g, keys, item.layers ?? 1)) return { shelf: s, c, r, keys };
+      }
+  return null;
+}
+
+/**
  * Recompute which slots are holes, for a display that has MOVED (DISPLAYS.md rule 10). A cell that
  * is holding stock is never revoked however the mask votes: the move brought its inventory with it,
  * and there is nowhere to evict it to.

@@ -1,6 +1,7 @@
 // Self-check for the pure display model. Run: node inventory/grid.test.mjs
 import assert from 'node:assert/strict';
-import { makeDisplay, footprint, fits, place, lift, topAt, dropLayer, columnAt, clearShelf, EMPTY } from './grid.js';
+import { makeDisplay, footprint, fits, place, lift, topAt, dropLayer, columnAt, clearShelf,
+         nearestSlot, anySlot, slotRect, EMPTY } from './grid.js';
 
 // --- footprint bounds + mask ------------------------------------------------
 {
@@ -107,6 +108,60 @@ import { makeDisplay, footprint, fits, place, lift, topAt, dropLayer, columnAt, 
   assert.equal(dropLayer(g, footprint(g, 0, 0, 0, 1, 1)), 3, 'both its columns are three deep');
   lift(g, wide);
   for (const c of [0, 1]) assert.equal(topAt(g, 0, c, 0), EMPTY, `column ${c} fully cleared`);
+}
+
+// --- nearestSlot: a drop snaps to the nearest slot it FITS in --------------------------
+// The rule the player actually feels. columnAt answers "which cell is under the pointer", which is
+// the wrong question for a finger: it misses by half a slot, and the cell it lands on is often full.
+{
+  const CELL = 0.2, REACH = 1.6 * CELL;
+  const g = makeDisplay(5, 2, { shelves: 1, headroom: 2, cell: CELL });
+  const one = { w: 1, h: 1, layers: 1 };
+  const at = (c, r) => slotRect(g, c, r, 1, 1);
+  const pick = (slot) => [slot.c, slot.r];
+
+  // Dead centre of a free slot picks that slot.
+  const mid = at(2, 1);
+  assert.deepEqual(pick(nearestSlot(g, 0, one, mid.x, mid.z, REACH)), [2, 1], 'an accurate aim is unchanged');
+
+  // Fill column 2 to the roof: the same aim now snaps to a neighbour instead of failing.
+  for (let l = 0; l < 2; l++) place(g, footprint(g, 0, 2, 1, 1, 1), 90 + l);
+  assert.equal(columnAt(g, mid.x, mid.z).c, 2, 'the pointer is still over the full column');
+  const spill = nearestSlot(g, 0, one, mid.x, mid.z, REACH);
+  assert.ok(spill && fits(g, spill.keys, 1), 'a full column spills onto a neighbour rather than refusing');
+  assert.ok(Math.hypot(at(spill.c, spill.r).x - mid.x, at(spill.c, spill.r).z - mid.z) <= REACH,
+            'and stays inside the reach');
+
+  // Missing the lattice by less than the reach still lands; missing it by a mile does not.
+  const edge = at(0, 0);
+  assert.ok(nearestSlot(g, 0, one, edge.x - CELL * 0.9, edge.z, REACH), 'just off the edge still snaps');
+  assert.equal(nearestSlot(g, 0, one, 0, 5, REACH), null, 'a wild aim snaps to nothing');
+
+  // It never invents a target: fill the level and there is none, at any reach.
+  for (let r = 0; r < g.rows; r++)
+    for (let c = 0; c < g.cols; c++)
+      for (let l = 0; l < 2; l++) place(g, footprint(g, 0, c, r, 1, 1), 90);
+  assert.equal(nearestSlot(g, 0, one, mid.x, mid.z, 99), null, 'a full level offers no target');
+}
+
+// --- anySlot: is there room ANYWHERE, for THIS item ------------------------------------
+// What the red "this display cannot take it" warning is built on. The answer depends on the item:
+// a 3x3x3 super-bulky ball and a 1x1 hook get different answers about the same shelf.
+{
+  const g = makeDisplay(5, 2, { shelves: 2, headroom: 3, cell: 0.2 });
+  assert.ok(anySlot(g, { w: 1, h: 1, layers: 1 }), 'an empty shelf has room');
+  assert.equal(anySlot(g, { w: 3, h: 3, layers: 3 }), null, 'a 3x3 never fits a 5x2, however empty');
+  for (let s = 0; s < g.shelves; s++)
+    for (let r = 0; r < g.rows; r++)
+      for (let c = 0; c < g.cols; c++)
+        for (let l = 0; l < 3; l++) place(g, footprint(g, s, c, r, 1, 1), 90);
+  assert.equal(anySlot(g, { w: 1, h: 1, layers: 1 }), null, 'a full display has room for nothing');
+
+  // Height counts, not just floor area: a super-bulky ball is three layers tall (YARN.md).
+  const t = makeDisplay(2, 2, { shelves: 1, headroom: 3, cell: 0.2 });
+  place(t, footprint(t, 0, 0, 0, 2, 2), 7, 1);          // one layer used everywhere, two left
+  assert.ok(anySlot(t, { w: 1, h: 1, layers: 2 }), 'a two-layer ball fits the two layers left');
+  assert.equal(anySlot(t, { w: 1, h: 1, layers: 3 }), null, 'a three-layer one does not');
 }
 
 console.log('grid.js self-check: all assertions passed');

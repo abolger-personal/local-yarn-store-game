@@ -174,6 +174,19 @@ export function proposeMove(m, x, z, yaw) {
  * in: canPlaceAt has already proved every slot the display currently has is clear here, so this can
  * only ever open holes back up, and remask() refuses to revoke an occupied slot regardless.
  */
+/**
+ * Remask a display that has moved, AND the floor underneath it.
+ *
+ * The floor is masked against every other display, so anything that moves opens a hole where it
+ * has gone and fills the one where it was. Forgetting the second half leaves a display's ghost
+ * punched through the floor grid for the rest of the session.
+ */
+function remaskMoved(d) {
+  remaskDisplay(d);
+  const floor = displays.find((o) => o.solid === false);
+  if (floor && floor !== d) remaskDisplay(floor);
+}
+
 function remaskDisplay(d) {
   const probe = { x: d.x, z: d.z, yaw: d.yaw, cols: d.g.cols, rows: d.g.rows, tilt: d.tilt ?? 0 };
   const others = roomObstacles(displays.filter((o) => o !== d));
@@ -227,7 +240,9 @@ function chairAt(event) {
 
 export function grabMovable(event) {
   const p = floorPoint(event);
-  const m = p ? (chairAt(event) ?? hoverTarget(event)?.disp) : null;
+  // You cannot pick up the floor. Everything else in the room is fair game (DISPLAYS.md rule 10).
+  const under = hoverTarget(event)?.disp;
+  const m = p ? (chairAt(event) ?? (under?.solid === false ? null : under)) : null;
   if (!m) { clearSelection(); return false; }   // a press on bare floor deselects and orbits
   mover.m = m;
   mover.from = movePose(m);
@@ -255,7 +270,7 @@ export function dropMovable() {
     // so this can add slots back but never revoke one.
     for (const d of displays) remaskDisplay(d);
   } else {
-    remaskDisplay(m);
+    remaskMoved(m);
     followDisplay(m);
   }
   mover.sel = m;
@@ -286,7 +301,7 @@ export function rotateMovable(step) {
   const ok = proposeMove(m, from.x, from.z, from.yaw + step);
   if (mover.m) return;
   if (ok) {
-    if (!isSeat(m)) remaskDisplay(m);
+    if (!isSeat(m)) remaskMoved(m);
   } else {
     moveApply(m, from.x, from.z, from.yaw);
     mover.ok = canPlaceAt(m, from);

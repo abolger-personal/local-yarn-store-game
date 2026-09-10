@@ -31,6 +31,16 @@ import { refreshAll } from '../goods/paint.js';
 import { addItem } from '../goods/stock.js';
 import { buildBlobs, routeLength } from './cast.js';
 
+// Ids have to be unique across days too — a regular is matched to the roster by id, so a new
+// customer reusing "npc0" would be mistaken for one.
+let nextNpcId = 0;
+
+// The shop's regulars, surviving a restart. CHARACTER-VISIT.md: an NPC who bought something or got
+// some crafting done comes back — and comes back as themselves, with their skill and their
+// half-finished projects. That has to outlive `world`, which restart() throws away, so it lives
+// here rather than on the world.
+let roster = [];
+
 // ---------------------------------------------------------------- the world
 export const room = {
   door:      { x: 0, z: HALF_D - 0.35 },
@@ -295,15 +305,7 @@ function spawnCast() {
   return npcs;
 }
 
-// The shop's regulars, surviving a restart. CHARACTER-VISIT.md: an NPC who bought something or got
-// some crafting done comes back — and comes back as themselves, with their skill and their
-// half-finished projects. That has to outlive `world`, which restart() throws away, so it lives
-// here rather than on the world.
-let roster = [];
 
-// Ids have to be unique across days too — a regular is matched to the roster by id, so a new
-// customer reusing "npc0" would be mistaken for one.
-let nextNpcId = 0;
 
 // The day cycle. `day` starts at 0 because the first restart() call is itself day one opening.
 

@@ -18,6 +18,11 @@ import { buildBlobs } from '../sim/cast.js';
 import { frameRoom } from './framing.js';
 
 // ---------------------------------------------------------------- gui
+
+// Into the rail, not auto-placed. lil-gui's default is fixed to the top-right corner, which is
+// exactly where the timer is — it was sitting on top of the controls it shares a corner with.
+const gui = new GUI({ title: 'store', container: document.getElementById('guiSlot') });
+
 function applyQuality(name) {
   const q = QUALITY[name] ?? QUALITY.high;
   S.quality = name;
@@ -27,10 +32,6 @@ function applyQuality(name) {
   restart();
   gui.controllersRecursive().forEach((c) => c.updateDisplay());
 }
-
-// Into the rail, not auto-placed. lil-gui's default is fixed to the top-right corner, which is
-// exactly where the timer is — it was sitting on top of the controls it shares a corner with.
-const gui = new GUI({ title: 'store', container: document.getElementById('guiSlot') });
 
 // Counts are dropdowns, not sliders: each value is an authored layout from a fixed pool, so the
 // legal values are discrete and the list makes that obvious.
@@ -165,7 +166,7 @@ const KEYS = {
 // Keys whose browser default would fight the shortcut: Tab moves focus, Space scrolls.
 const SWALLOW = new Set(['tab', ' ']);
 
-const setView = (v) => { S.view = v; setViewMode(castGroup, v); };
+function setView(v) { S.view = v; setViewMode(castGroup, v); }
 
 /** Typing in a panel field is typing, not a shortcut. */
 const isTyping = (t) => t instanceof HTMLElement

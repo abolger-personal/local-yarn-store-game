@@ -320,10 +320,10 @@ export function tickCast(dt) {
   updateBlobs();
 }
 
-const blendedValue = (rec, k) => {
+function blendedValue(rec, k) {
   const e = rec.pt * rec.pt * (3 - 2 * rec.pt);
   return rec.poseFrom[k] + (rec.poseTo[k] - rec.poseFrom[k]) * e;
-};
+}
 
 // ---------------------------------------------------------------- blob shadows
 // Same trade as crowd.html: one instanced draw for the whole cast instead of a second shadow pass.

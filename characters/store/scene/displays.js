@@ -40,13 +40,39 @@ const STAND_OFF = 0.65;      // how far in front of a display an NPC stands to r
 export const DISPLAY_SLOTS = [
   { id: 'shelf-n', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: SHELF_ROWS, shelves: 3, headroom: SHELF_HEADROOM, x: 0,    z: -HALF_D + 0.5, yaw: 0 },
   { id: 'table-a', kind: 'pile',  form: 'table',      cols: 5, rows: 5, shelves: 1, headroom: PILE_HEADROOM, x: 1.5,  z: -0.2,          yaw: 0 },
-  { id: 'floor-a', kind: 'pile',  form: 'floor',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: 0.55, z: 0.85,          yaw: 0 },
   { id: 'shelf-e', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: SHELF_ROWS, shelves: 3, headroom: SHELF_HEADROOM, x: HALF_W - 0.5, z: -1.1,  yaw: -Math.PI / 2 },
   { id: 'shelf-w', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: SHELF_ROWS, shelves: 3, headroom: SHELF_HEADROOM, x: -HALF_W + 0.5, z: -1.6, yaw: Math.PI / 2 },
-  { id: 'floor-b', kind: 'pile',  form: 'floor',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: -1.20, z: 1.55,         yaw: 0 },
   { id: 'table-b', kind: 'pile',  form: 'table',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: 1.45, z: 1.75,          yaw: 0 },
   { id: 'table-c', kind: 'pile',  form: 'table',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: -0.35, z: -1.75,        yaw: 0 },
 ];
+
+/**
+ * The shop floor, as a display.
+ *
+ * Deliberately NOT in DISPLAY_SLOTS: it is the room, not furniture. It cannot be added, removed,
+ * moved or turned, and it is always built LAST so that every other display — and the counter, the
+ * chairs and the doorway — masks a hole straight through it. What is left is exactly the floor you
+ * can actually stand a box on.
+ *
+ * `solid: false` is the whole of what makes that safe. Everything else in the room treats a
+ * display as an obstacle: the sim routes NPCs around one and blocks line of sight through one, and
+ * the placement test refuses to put furniture inside one. A room-sized obstacle would wall the
+ * shop off from itself. This is a surface you walk ON, so it is excluded from all three — see
+ * roomObstacles here, and `obstacles`/`canSee` in visit.js.
+ */
+// How close to a wall anything may stand: the panel is 0.08 thick and centred on the boundary, so
+// 0.04 of it is inside the room, plus 0.02 of slack. Named because the wall-shelf snap has to stand
+// a display off by AT LEAST this much — a snap that lands inside its own clearance makes the
+// display red against every wall in the shop, which is exactly the bug this constant prevents.
+export const WALL_INSET = 0.04 + 0.02;
+
+const FLOOR_COLS = Math.floor((ROOM.w - WALL_INSET * 2) / CELL);
+const FLOOR_ROWS = Math.floor((ROOM.d - WALL_INSET * 2) / CELL);
+export const ROOM_FLOOR = Object.freeze({
+  id: 'floor', kind: 'pile', form: 'floor', solid: false,
+  cols: FLOOR_COLS, rows: FLOOR_ROWS, shelves: 1, headroom: PILE_HEADROOM,
+  x: 0, z: 0, yaw: 0,
+});
 
 const displayGroup = new THREE.Group();
 
@@ -80,11 +106,6 @@ function slotCellWorld(slot, c, r) {
  * display may refuse a spot it would just barely have fitted, but never clips the counter. A real
  * OBB test is the upgrade if that ever feels tight.
  */
-// How close to a wall anything may stand: the panel is 0.08 thick and centred on the boundary, so
-// 0.04 of it is inside the room, plus 0.02 of slack. Named because the wall-shelf snap has to stand
-// a display off by AT LEAST this much — a snap that lands inside its own clearance makes the
-// display red against every wall in the shop, which is exactly the bug this constant prevents.
-export const WALL_INSET = 0.04 + 0.02;
 
 /** An axis-aligned box on the floor, clear of the room shell and of everything else solid in it. */
 export function boxIsClear(x, z, half, obstacles) {
@@ -112,7 +133,12 @@ export function roomObstacles(dispList, seatList = seats) {
   // slot already sits well clear of this, so it only ever bites on something the player moved.
   const out = [{ ...COUNTER, pad: 0.05 }, { x: 0, z: HALF_D - 0.45, w: ROOM.doorW + 0.4, d: 0.9, pad: 0 }];
   for (const s of seatList) out.push({ x: s.x, z: s.z, w: CHAIR_W, d: CHAIR_W, pad: 0.10 });
-  for (const d of dispList) out.push({ x: d.x, z: d.z, w: d.w, d: d.d, pad: 0.02 });
+  // A display you walk ON is not something to walk around — see ROOM_FLOOR. Without this the
+  // floor masks every other display out of existence, itself included.
+  for (const d of dispList) {
+    if (d.solid === false) continue;
+    out.push({ x: d.x, z: d.z, w: d.w, d: d.d, pad: 0.02 });
+  }
   return out;
 }
 
@@ -181,7 +207,7 @@ export const levelFrame = (d, shelf) => (d.levels?.[shelf]?.frame ?? d.frame);
 
 function makeDisplayFromSlot(slot, builtSoFar = []) {
   const d = {
-    id: slot.id, kind: slot.kind, form: slot.form,
+    id: slot.id, kind: slot.kind, form: slot.form, solid: slot.solid !== false,
     wallRow: slot.kind === 'shelf' ? 0 : -1,   // a table has no wall side
     g: makeDisplay(slot.cols, slot.rows, {
       shelves: slot.shelves, headroom: slot.headroom, cell: CELL,
@@ -216,6 +242,9 @@ export function buildDisplays(n) {
   // pointing at the old one. This is the price of shared state and it is a small one.
   displays.length = 0;
   for (const slot of DISPLAY_SLOTS.slice(0, n)) displays.push(makeDisplayFromSlot(slot, displays));
+  // Last, so it is masked against everything: the furniture keeps its cells and the floor loses
+  // the ones underneath. `displayCount` does not include it — the floor is always there.
+  displays.push(makeDisplayFromSlot(ROOM_FLOOR, displays));
   if (!byId(aim.active)) aim.active = displays[0]?.id ?? null;
   for (const d of displays) {
     d.group = new THREE.Group();

@@ -109,8 +109,10 @@ function dragDisplay(event) {
 }
 
 /** Has this press travelled far enough to be a drag rather than a tap? */
-const pastSlop = (event) => drag.index !== EMPTY && !drag.moved
-  && Math.hypot(event.clientX - drag.downX, event.clientY - drag.downY) > TAP_SLOP;
+function pastSlop(event) {
+  return drag.index !== EMPTY && !drag.moved
+    && Math.hypot(event.clientX - drag.downX, event.clientY - drag.downY) > TAP_SLOP;
+}
 
 /**
  * Follow the pointer onto whichever display and level it is over. Returns whether anything the

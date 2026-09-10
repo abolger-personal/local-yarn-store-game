@@ -246,7 +246,10 @@ function segmentHitsBox(a, b, box) {
 
 /** CHARACTER-VISIT.md: visible unless something intersects the line to the display's centroid. */
 export function visibleTo(world, from, display) {
-  return !world.displays.some((d) => d.id !== display.id && segmentHitsBox(from, display, d));
+  // `solid: false` is a display you walk ON rather than around — the shop floor. It blocks no
+  // sightline, or a room-wide grid would make everything in the shop invisible from everywhere.
+  return !world.displays.some((d) =>
+    d.id !== display.id && d.solid !== false && segmentHitsBox(from, display, d));
 }
 
 // ---------------------------------------------------------------- getting there
@@ -288,7 +291,10 @@ const grow = (b, pad) => ({ x: b.x, z: b.z, w: b.w + pad * 2, d: b.d + pad * 2 }
  * scene's furniture — it is told about it, the same way it is told where the door is.
  */
 export function obstacles(world) {
-  const out = world.displays.map((d) => ({ x: d.x, z: d.z, w: d.w, d: d.d }));
+  // Same exclusion as visibleTo: a floor grid is a surface, not something to route around.
+  const out = world.displays
+    .filter((d) => d.solid !== false)
+    .map((d) => ({ x: d.x, z: d.z, w: d.w, d: d.d }));
   for (const s of world.seats) out.push({ x: s.x, z: s.z, w: s.w ?? 0.34, d: s.d ?? 0.34 });
   for (const b of world.room.solids ?? []) out.push({ x: b.x, z: b.z, w: b.w, d: b.d });
   return out;

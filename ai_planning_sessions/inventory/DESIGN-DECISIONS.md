@@ -294,7 +294,26 @@ again.
 player's pick needs the same answer the NPC does, and `inventory/` must not depend on `characters/`.
 Re-exported from `visit.js`, so existing callers are unchanged.
 
+### Yarn is in the shop — 2026-09-09
+
+`characters/store.html` draws real yarn: the three shapes `catalog.js` sells, from the same
+`yarn-geometry.js` / `yarn-look.js` the bake-off used, with the same matcap, ink outline, ball band
+and strand hatching. `yarnFit` moved into `yarn-geometry.js` so both pages share the arithmetic
+that had the donut and the floating bugs in it. Full write-up in `YARN-ASSET-SPIKE.md` §17.
+
+Three things worth carrying forward from it:
+
+- **Section 3's "flat notions next to 3D yarn is a feature" now has a picture.** It is real in the
+  shop, not just in a demo, and it is the first time the two are side by side under one grade.
+- **A tilted shelf has far less usable height than its gap suggests** — 0.170 of 0.453, the rest
+  eaten by the ramp. That is what decides which yarn can go on a wall, and it is now one named
+  constant (`SHELF_CLEAR`) rather than a hand-typed headroom of 3.
+- **Section 4 (held notions) is half done.** An NPC carries the real ball out of the shop now,
+  sharing the shelf's geometry and cloning only the material. The rig side of section 4 — a notion
+  posed in the hand rather than a group tipped out of the fist — is still untouched.
+
 ### Not started
 
-Held notions on a character (section 4), and the 1000-item sameyness check — the tooling for the
-latter now exists (one button in the demo), but nobody has looked at it yet.
+Held notions on a character (section 4) as specified — an NPC carries real yarn now, but through
+the same tipped-group placeholder, not the rig work that section describes. And the 1000-item
+sameyness check: the tooling exists (one button in the demo), but nobody has looked at it yet.

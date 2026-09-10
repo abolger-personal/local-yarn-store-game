@@ -123,17 +123,30 @@ const lerp = (a, b, t) => a + (b - a) * t;
  * The anchors still bias the distribution — colours cluster near them, which is what keeps a
  * mid-spread palette feeling chosen — but nothing is unreachable any more.
  *
+ * `hue` overrides the roll outright, for a caller building a FIXED-SIZE indexed palette rather
+ * than colouring one instance. Rolling is right per item and wrong per index: sampling 48 hues
+ * from the anchors left gaps of up to 103 degrees across seeds — more than a quarter of the circle
+ * with no yarn anywhere in it. Walking the anchors in order barely helped (52), because the heavy
+ * tail comes from the jitter WITHIN each arc, not from which arc gets picked. A caller that owns a
+ * whole index can simply place the hues instead, and bound the gap by construction.
+ *
  * @param spread 0 = the original tight pastel; 1 = the full range a real shop carries.
+ * @param hue    degrees, placed rather than rolled; null rolls one from the anchors, as an item does.
  */
-export function yarnColor(rng = Math.random, target = new THREE.Color(), { spread = 1 } = {}) {
+export function yarnColor(rng = Math.random, target = new THREE.Color(),
+                          { spread = 1, hue = null } = {}) {
   const t = Math.min(1, Math.max(0, spread));
   const lMin = lerp(TIGHT.lMin, FULL.lMin, t), lMax = lerp(TIGHT.lMax, FULL.lMax, t);
   const cMin = lerp(TIGHT.cMin, FULL.cMin, t), cMax = lerp(TIGHT.cMax, FULL.cMax, t);
 
-  // 18 degrees of arc per anchor closes to a curated palette; 46 tiles the circle (8 x 45) with
-  // enough overlap that no hue is unreachable.
-  const arc = lerp(18, 46, t);
-  const h = YARN_ANCHORS[(rng() * YARN_ANCHORS.length) | 0] + (rng() - 0.5) * arc;
+  // 18 degrees of arc per anchor closes to a curated palette; the wide end has to TILE the circle.
+  //
+  // 46 was picked as "8 anchors x 45 degrees, with a little overlap" — which would be right if the
+  // anchors were evenly spaced. They are not: the gaps run 54, 26, 36, 54, 44, 36, 54, 56, so a
+  // 46-degree arc left four genuine holes, the widest 10 degrees of blue-purple that no yarn could
+  // ever be. The arc has to clear the LARGEST anchor gap, not the average one.
+  const arc = lerp(18, 58, t);
+  const h = hue ?? YARN_ANCHORS[(rng() * YARN_ANCHORS.length) | 0] + (rng() - 0.5) * arc;
   let l = lerp(lMin, lMax, rng());
   const c = lerp(cMin, cMax, rng());
 

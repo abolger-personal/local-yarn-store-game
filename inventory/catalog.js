@@ -73,6 +73,16 @@ export const yarnWeight = (name) => YARN_WEIGHTS.find((w) => w.name === name);
 export const YARN_SHAPES = Object.freeze(['ball', 'cone', 'skein']);
 
 /**
+ * How many distinct colours a yarn can be. Not a palette — this module stays pure data and knows
+ * nothing about hexes — just how wide the index is, so the renderer's palette and the sim's notion
+ * of "the same colour" cannot disagree about the count.
+ *
+ * YARN.md wants "an overwhelming variety". Twelve was a placeholder sized to a hand-written list,
+ * and it read as a curated set rather than a shop: no rainbow wall is possible out of twelve.
+ */
+export const YARN_COLOR_COUNT = 48;
+
+/**
  * PATTERNS.md: "units of yarn will map to their physical volume grid size: 1x1x1 yarn item = 1 unit
  * yarn. 3x3x3 yarn item = 9 units." Nine, not twenty-seven — so it is the FOOTPRINT that counts,
  * not the volume, and the 2.5D height is how tall the ball looks rather than how much wool is on it.
@@ -128,7 +138,7 @@ export function makeYarn(rng = Math.random, weightName = pickFrom(YARN_WEIGHT_NA
     shape: pickFrom(YARN_SHAPES, rng),
     // TODO(YARN.md): colour is one flat hue. The doc wants gradients, sparkle, fuzziness and ball
     // bands — all of which need art and a detail channel, not just another field here.
-    colorIndex: Math.floor(rng() * 12),
+    colorIndex: Math.floor(rng() * YARN_COLOR_COUNT),
     w: weight.size,
     h: weight.size,
     // YARN.md: "anywhere from 1x1x1 (thread, lace weight yarn) to 3x3x3 (super bulky housewares

@@ -32,6 +32,13 @@ export default [
     },
   },
   {
+    // Build/verification scripts run in node, not the browser. tools/linkcheck.mjs checks that
+    // every `import { x } from './y.js'` finds a real `export x` — something eslint cannot see,
+    // because it lints one file at a time and a missing export is a clean lint and a blank page.
+    files: ['tools/**/*.js', 'tools/**/*.mjs'],
+    languageOptions: { ecmaVersion: 2024, sourceType: 'module', globals: globals.node },
+  },
+  {
     ignores: ['node_modules/**', 'dist/**'],
   },
 ];

@@ -982,3 +982,140 @@ never lands quite as it was lifted, but repeated pick-ups must not erase an arra
 > `../DESIGN-DECISIONS.md` §5 specifies jitter *derived* from `hash(itemId, slotIndex)` so it is
 > stable across reloads and needs no storage. Still stored per item; noted at the definition,
 > worth doing when items get stable ids, and visually identical today.
+
+---
+
+## 17. Into `store.html` — 2026-09-09
+
+The spike's whole purpose. The shop now draws real yarn instead of a box with a printed silhouette
+on it, and the assets, the shading and the fit arithmetic all come from the same modules the demo
+uses, so the two pages cannot drift apart on what yarn looks like.
+
+What moved, and what deliberately did not:
+
+| | demo | shop |
+|---|---|---|
+| families | 6 (`ball cake skein cone mini booklet`) | the 3 the catalog sells |
+| footprint | from the GEOMETRY (`familyFootprint`, skein 2x1) | from `catalog.js` — a yarn's WEIGHT |
+| layer pitch | `cell/8`, fine | `BOX_H` 0.055, coarse and already tuned for notions |
+| colour | rolled per item | a fixed index the sim carries (`colorIndex`) |
+
+Both footprint answers are right and they are right for different reasons, which is why `yarnFit`
+now **takes the footprint as an argument** rather than deriving it. In the demo a skein needs two
+slots so it cannot be mistaken for a mini-skein — a legibility fact about the shape. In the shop a
+yarn's footprint is its weight, and `PATTERNS.md` reads units off it: a 1x1 lace ball is worth 1
+unit toward a pattern and a 3x3 super-bulky is worth 9. Forcing either to adopt the other's rule
+would have broken something real. There is no mini-skein in the shop, so nothing is confusable.
+
+### `yarnFit` is now shared
+
+Lifted out of the demo into `yarn-geometry.js` unchanged. Same lesson as `pick-place.js`: this is
+the function that had the donut bug and the floating bug in it, and a second copy is how one page
+gets the fix and the other keeps the bug.
+
+### Layers are derived here too, and that has furniture consequences
+
+The shop keeps `catalog.js`'s footprint but **not** its `layers`, which is weight-derived. Height
+has to follow the SHAPE or a flat skein reserves a ball's worth of space and holds up whatever
+stacks on it. Deriving it exposed the vertical clash §4 predicted, in the one place it actually
+bites — a **tilted** shelf:
+
+```
+shelf gap 0.453, of which 0.283 is the ramp itself
+usable clearance 0.170  =  3 layers        a pile takes 12
+```
+
+Only the air above the ramp can hold anything, and that is 0.17 units. So:
+
+```
+  shape/weight    layers   wall?  pile?        shape/weight    layers   wall?  pile?
+  ball/fingering    3       yes    yes         cone/worsted      8       -     yes
+  ball/dk           5        -     yes         cone/bulky       12       -     yes
+  ball/worsted      5        -     yes         skein/fingering   1       yes   yes
+  ball/bulky        8        -     yes         skein/dk          2       yes   yes
+  cone/fingering    4        -     yes         skein/worsted     2       yes   yes
+  cone/dk           8        -     yes         skein/bulky       3       yes   yes
+```
+
+**Left as it is, deliberately.** The wall takes fingering balls and skeins of every weight;
+everything rounder or bulkier falls through to a table or the floor, which is what `addItem`
+already does and is not a wrong outcome — big yarn in floor baskets is what a real shop looks
+like. But *a wall of worsted balls is the iconic yarn-shop image*, and that needs `SHELF_CLEAR`
+raised from 0.170 to about 0.280 (5 layers). The cost is the top shelf rising from 1.84 to 2.17
+units against a 2.6 wall, and "top shelf at roughly NPC head height" was a tuned decision — so it
+is one named constant with the numbers written beside it, not something to change unasked.
+
+`PILE_HEADROOM` did have to move, 10 -> 12: a super-bulky cone is 0.66 units and nothing in the
+room could hold it, so `fillStock` would re-roll it forever and the shop would come up quietly
+short. Asserted now rather than trusted.
+
+### Index === instance slot
+
+The demo keeps a slot-allocation pass (`restage`) because its meshes are packed. The shop does
+not: every yarn mesh is allocated at `CAPACITY` and indexed by the item's own index, exactly like
+the notion boxes. It costs a few mostly-empty matrix buffers and some zero-scale instances the
+rasteriser discards; it buys keeping `refresh(index)` a single number, which every pick, place and
+NPC purchase in that file already assumes. A second numbering scheme there would have been a bug
+farm for no measurable gain.
+
+Unused slots are written as an explicit degenerate matrix rather than left as the zero-filled
+buffer three.js allocates — an all-zero matrix has `w = 0` too, so it divides by zero in the
+perspective step instead of collapsing to a point.
+
+### Exposure: nothing to do, and the reason is worth writing down
+
+The shop grades through ACES at **0.40**, against the demo's 0.95. Measured, a pastel authored at
+73% arrives at 48% there — and the instinct from §16 says raise the exposure. Wrong here: the
+shop's notion cards are *unlit* too, so they take the same 0.40 and arrive at 52%. Yarn at 48%
+sits exactly in the room it is in. The §16 defect was the matcap midtone cutting albedo **before**
+the grade; a grade applied evenly to everything is a look, not a bug. Exposure left alone.
+
+### The palette, and a coverage measurement that finally measures coverage
+
+`colorIndex` was 12 wide and indexed 12 hand-written hexes — the artificial-restriction complaint
+from §13 in its most literal form. Now 48, addressing the OKLCH generator.
+
+Widening the count alone was not enough, and the numbers say why. Largest gap anywhere in the hue
+circle, worst of 8 seeds:
+
+```
+  48 colours, anchors rolled       103 degrees      more than a quarter of the circle, empty
+  48 colours, anchors walked in order  52
+  48 colours, hues PLACED on a jittered even grid   25
+```
+
+Walking the anchors barely helped, because the heavy tail comes from the jitter **within** each
+arc, not from which arc gets picked. A caller that owns a whole fixed index does not have to
+sample at all — it can place the hues and bound the gap by construction, which is what the shop
+does now (`yarnColor(..., { hue })`). Lightness and chroma still come from the generator, so the
+range and the `characterRange` carve-out are untouched.
+
+One real bug fell out of measuring it: the arc at full spread was 46 degrees, chosen as "8 anchors
+x 45, with a little overlap". That would be right if the anchors were evenly spaced. They are not
+— the gaps run 54, 26, 36, 54, 44, 36, 54, 56 — so four holes survived, the widest 10 degrees of
+blue-purple no yarn could ever be. The arc has to clear the **largest** anchor gap: now 58.
+
+### What an NPC walks out with
+
+Also real yarn now. Geometry is borrowed from the shelf's instanced meshes (building a fresh ball
+per sale would leak one per sale); the material is cloned, because a held ball needs its own colour
+while the shelf's comes from `instanceColor`. `syncCarried`'s teardown had to learn the difference:
+it disposes the clone and leaves the shared geometry alone. Disposing that would blank the shelf.
+
+### Guards
+
+`scratchpad/storeyarn.mjs` and `scratchpad/storesmoke.mjs`. Seven mutations caught between them.
+Three things they got wrong first, all the same shape of error — **a metric that does not contain
+the property it claims to check**:
+
+1. *Drawn height == reserved height* is a comparison of a value to itself, because any bug that
+   derives the vertical scale FROM the reservation satisfies it. Unclamping `settle` and setting
+   `ky` straight from `layers * pitch` both survived. The property with teeth is the **asymmetry**:
+   yarn may be squashed to meet the grid and never stretched to fill it, so `ky <= k`.
+2. That invariant then had to be swept across **pitches**. At the shop's 0.055 the clamp is dead
+   code — `ceil` never overshoots by enough to stretch anything — so both mutations stayed inert
+   and a shipped-pitch-only check passed while the invariant was gone. It goes live around 0.18.
+3. The hue-gap guard scored 39 on the shipped seed and 103 on the next one along. Measured over
+   eight seeds now. A coverage claim from a single sample is not a coverage claim.
+
+Not verified: **any of it visually.** No browser here.

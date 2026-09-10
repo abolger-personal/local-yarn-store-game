@@ -68,7 +68,7 @@ import {
 import { makePicker, placeItem, scatterYaw, settleYaw } from './pick-place.js';
 import {
   YARN_FAMILIES, TIERS, BANDS, TAILS, buildFamily, buildBand, buildTail, bandMatrix, tailMatrix,
-  familyFootprint, familyExtent, triangleCount, aspectDistance,
+  familyFootprint, familyExtent, triangleCount, aspectDistance, yarnFit as sharedYarnFit,
 } from './yarn-geometry.js';
 import { SHADING, makeMatcap, makePaperMatcap, makeToonRamp, yarnMaterial, bakeVertexAO, makeHull,
          yarnColor, applyHatching, addHatchScale } from './yarn-look.js';
@@ -432,47 +432,13 @@ const _p3 = new THREE.Vector3();
 const HATCH_FOR_BULK = [1.8, 1.0, 0.62];
 const hatchScaleOf = (item) => (S.perWeight ? HATCH_FOR_BULK[(item.bulk ?? 1) - 1] : 1);
 
-/**
- * Fit a yarn family into the slots its footprint gives it, WITHOUT wrecking its proportions.
- *
- * This replaces scaling x, y and z independently to fill the slot box, which had two consequences
- * that looked like separate bugs and were the same one:
- *
- *   - **Donuts.** A skein is 1.00 x 0.44 x 0.40 by design — a flat figure eight. Stretching y to
- *     fill a tall layer turned it into a fat ring. Every family was being distorted by a different
- *     arbitrary amount, because none of them fill the unit box equally.
- *   - **Floating.** The reverse of the same thing: a family whose unit height is 0.44 drew only
- *     44% of the height it had RESERVED, so whatever stacked on top sat on empty air.
- *
- * So: one uniform scale from the footprint, and then the LAYER COUNT is derived from the height
- * that produces — rather than the layer count being assumed and the shape stretched to meet it.
- * A flat skein therefore reserves fewer layers than a round ball of the same footprint, which is
- * both what fixes the float and what is physically true.
- *
- * The leftover half-layer is taken up by `settle`: a small vertical squash, clamped, so the item
- * meets its slot exactly. Clamped because unclamped is precisely the distortion being removed —
- * and a *little* squash is right anyway, since yarn sits under its own weight.
- */
-// How far an item may be squashed to meet the layer grid. Only ever a SQUASH, never a stretch:
-// drawn height must not exceed reserved height or the thing above it overlaps, which is the bug
-// this whole path exists to avoid. With a fine pitch the correction is a couple of percent.
-const SETTLE_MIN = 0.82;
-
-function yarnFit(family, bulk) {
-  const [uw, uh, ud] = familyExtent(family, S.tier);
-  const [fw, fd] = familyFootprint(family, bulk);
-  // One scale for both horizontal axes: whichever of width or depth runs out first.
-  const k = Math.min((fw * S.cell * FILL) / uw, (fd * S.cell * FILL) / ud);
-  const natural = k * uh;
-  // CEIL, not round: the reservation must be at least as tall as the thing in it. Rounding down
-  // and stretching the slot to fit is how a ball came to poke 15% out of the top of its own
-  // reservation and into whatever was stacked above.
-  const layers = Math.max(1, Math.ceil((natural * SETTLE_MIN) / S.boxHeight));
-  // Then settle DOWN into the reservation, so the top of the item is the top of its layers and the
-  // next item rests on it rather than on air. Capped at 1: never stretched.
-  const settle = Math.min(1, (layers * S.boxHeight) / natural);
-  return { k, ky: k * settle, layers, w: fw, h: fd };
-}
+// Fitting a family into its footprint lives in yarn-geometry.js — the shop needs the identical
+// arithmetic, and two copies of it is how the donut and the floating bugs would come back on one
+// page only. Here the footprint comes from the GEOMETRY (a skein is 2x1); in the shop it comes
+// from the catalog, where footprint means yarn weight.
+const yarnFit = (family, bulk) =>
+  sharedYarnFit(family, ...familyFootprint(family, bulk),
+                { cell: S.cell, boxHeight: S.boxHeight, fill: FILL, tier: S.tier });
 
 /** How many 2.5D layers an item occupies. Derived from its shape for yarn; a notion is flat. */
 const itemLayers = (item) => (item.kind === 'yarn' ? (item.layers ?? 1) : 1);

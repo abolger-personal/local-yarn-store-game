@@ -346,6 +346,53 @@ export function familyExtent(name, tier = 1) {
   return out;
 }
 
+/**
+ * How far an item may be squashed to meet the layer grid. Only ever a SQUASH, never a stretch:
+ * drawn height must not exceed reserved height or the thing above it overlaps, which is the bug
+ * this whole path exists to avoid. With a fine pitch the correction is a couple of percent.
+ */
+export const SETTLE_MIN = 0.82;
+
+/**
+ * Fit a yarn family into the slots its footprint gives it, WITHOUT wrecking its proportions.
+ *
+ * Lives here rather than in a page because both pages need it and the two must not drift — the
+ * same lesson `pick-place.js` came out of. It replaces scaling x, y and z independently to fill
+ * the slot box, which had two consequences that looked like separate bugs and were the same one:
+ *
+ *   - **Donuts.** A skein is 1.00 x 0.44 x 0.40 by design — a flat figure eight. Stretching y to
+ *     fill a tall layer turned it into a fat ring. Every family was distorted by a different
+ *     arbitrary amount, because none of them fill the unit box equally.
+ *   - **Floating.** The reverse of the same thing: a family whose unit height is 0.44 drew only
+ *     44% of the height it had RESERVED, so whatever stacked on top sat on empty air.
+ *
+ * So: one uniform scale from the footprint, and then the LAYER COUNT is derived from the height
+ * that produces — rather than the layer count being assumed and the shape stretched to meet it.
+ * A flat skein therefore reserves fewer layers than a round ball of the same footprint, which is
+ * both what fixes the float and what is physically true.
+ *
+ * The footprint is passed in rather than derived, because the two callers disagree about where a
+ * footprint comes from and both are right: the demo takes it from the geometry
+ * (`familyFootprint`, so a skein is 2x1 and cannot be mistaken for a mini-skein), while the shop
+ * takes it from `catalog.js`, where a yarn's footprint is its WEIGHT and decides how many units
+ * toward a pattern the ball is worth.
+ */
+export function yarnFit(family, footW, footD,
+                        { cell, boxHeight, fill = 0.9, tier = 1, settleMin = SETTLE_MIN } = {}) {
+  const [uw, uh, ud] = familyExtent(family, tier);
+  // One scale for both horizontal axes: whichever of width or depth runs out first.
+  const k = Math.min((footW * cell * fill) / uw, (footD * cell * fill) / ud);
+  const natural = k * uh;
+  // CEIL, not round: the reservation must be at least as tall as the thing in it. Rounding down
+  // and stretching the slot to fit is how a ball came to poke 15% out of the top of its own
+  // reservation and into whatever was stacked above.
+  const layers = Math.max(1, Math.ceil((natural * settleMin) / boxHeight));
+  // Then settle DOWN into the reservation, so the top of the item is the top of its layers and the
+  // next item rests on it rather than on air. Capped at 1: never stretched.
+  const settle = Math.min(1, (layers * boxHeight) / natural);
+  return { k, ky: k * settle, layers, w: footW, h: footD };
+}
+
 const _aspect = new Map();
 
 export function familyAspect(name, tier = 1) {

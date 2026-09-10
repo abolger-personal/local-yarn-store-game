@@ -137,14 +137,23 @@ function seedOne(npc, i, unseeded) {
  * DISPLAYS.md still gets exercised. The lid takes the SAME footprint as the item below, or it
  * would bridge onto neighbouring columns instead of sitting squarely on top and burying it.
  */
-function buryOne(npc, i, want) {
-  const hidden = displays[(i + 1) % displays.length];
-  const buried = addItem(hidden, 0, specFor(want, npc), { avoidWall: true, shape: [1, 1] });
-  if (buried < 0) return 0;
-  const it = items[buried];
-  const lid = addItem(hidden, 0, makeStockNotion(Math.random, 'darning-needle'),
-                      { c: it.c, r: it.r, shape: [it.w, it.h] });
-  return 1 + (lid >= 0 ? 1 : 0);
+function buryOne(npc, i, want, unburied) {
+  const spec = specFor(want, npc);
+  // Every display in turn, not just the next one. A 1x1 cone still reserves four layers and a
+  // wall shelf only clears three, so the one display this used to try can legitimately refuse —
+  // and a burial that silently does not happen is the dig-out branch quietly going untested.
+  for (let k = 0; k < displays.length; k++) {
+    const hidden = displays[(i + 1 + k) % displays.length];
+    const buried = addItem(hidden, 0, spec, { avoidWall: true, shape: [1, 1] });
+    if (buried < 0) continue;
+    const it = items[buried];
+    const lid = addItem(hidden, 0, makeStockNotion(Math.random, 'darning-needle'),
+                        { c: it.c, r: it.r, shape: [it.w, it.h] });
+    if (lid < 0) unburied.push(`${npc.name}'s ${want.kind} landed on ${hidden.id} with no lid`);
+    return 1 + (lid >= 0 ? 1 : 0);
+  }
+  unburied.push(`${npc.name}'s ${want.kind} fits under nothing in the room`);
+  return 0;
 }
 
 function seedWants(npcs) {
@@ -153,7 +162,7 @@ function seedWants(npcs) {
   npcs.forEach((npc, i) => {
     const { wants, placed } = seedOne(npc, i, unseeded);
     placedCount += placed;
-    if (wants.length) placedCount += buryOne(npc, i, wants[0]);
+    if (wants.length) placedCount += buryOne(npc, i, wants[0], unseeded);
   });
   console.assert(unseeded.length === 0, 'want seeding failed:', unseeded);
   return placedCount;

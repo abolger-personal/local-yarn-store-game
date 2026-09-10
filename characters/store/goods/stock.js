@@ -76,20 +76,23 @@ const INK = '#241e22';
  * cannot invent a yarn weight or a pattern that catalog.js would not have produced.
  */
 /**
- * How many 2.5D layers tall this item reserves.
- *
- * A forced `shape` is a deliberate 1x1 override (the burial seed), so it flattens the item's own
- * height too rather than leaving a tall thing on a small footprint.
+ * How many 2.5D layers tall this item reserves. Takes the RESOLVED footprint, forced or not.
  *
  * Yarn derives it from its SHAPE rather than taking catalog.js's `layers`, because the mesh is
  * what has to fit: a flat skein reserves fewer layers than a round ball on the same footprint.
  * Reserving what is drawn is the whole reason nothing stacks on air — see yarnFit. It also means
  * tall yarn simply fails over to a table or the floor when a wall shelf cannot take it, which is
  * the correct answer and the one SHELF_CLEAR governs.
+ *
+ * It must take the footprint the item ACTUALLY ends up with.
+ * A forced `shape` (the burial seed's 1x1 override) also flattened the reservation to one layer —
+ * but paintYarn does not read `item.layers`, it re-derives the height by calling yarnFit on
+ * `item.w`/`item.h`. So a buried cone reserved one layer and was drawn four tall, and the notion
+ * lid dropped on top of it landed at its midpoint. Non-yarn has no such split: a box IS whatever
+ * `item.layers` says, in the grid and on screen alike, so there is nothing to reconcile there.
  */
-function layersFor(spec, forcedShape) {
-  if (forcedShape) return 1;
-  if (spec.name === 'yarn') return yarnFit(spec.shape, spec.w, spec.h, YARN_FIT).layers;
+function layersFor(spec, w, h) {
+  if (spec.name === 'yarn') return yarnFit(spec.shape, w, h, YARN_FIT).layers;
   return spec.layers ?? 1;
 }
 
@@ -124,7 +127,7 @@ export function addItem(display, shelf, spec, { c, r, avoidWall = false, shape }
   const g = display.g;
   // Yarn and patterns bring their own footprint; a notion gets one of its packagings.
   const [w, h] = shape ?? (spec.w ? [spec.w, spec.h] : packageFor(spec.name));
-  const layers = layersFor(spec, shape);
+  const layers = layersFor(spec, w, h);
 
   for (const cell of cellOrder(display, { c, r, avoidWall })) {
     // footprint() returns null the moment any covered cell runs off the grid or hits a mask, and

@@ -541,7 +541,7 @@ function applyShading() {
   surface.visible = !solo;
   pegBacking.visible = !solo;
   displays.shelf.panels.forEach((p) => { p.visible = !solo; });
-  displays.peg.hooks && (displays.peg.hooks.visible = !solo);
+  if (displays.peg.hooks) displays.peg.hooks.visible = !solo;
   if (shadows) shadows.visible = !solo;
   paintActivePlane();
 }

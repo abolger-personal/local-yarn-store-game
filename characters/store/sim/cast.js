@@ -4,14 +4,15 @@
 
 import { cast } from '../core/state.js';
 import { cellRect } from '../../../inventory/notions.js';
-import { BANDS, TAILS, bandMatrix, familyExtent, tailMatrix } from '../../../inventory/yarn-geometry.js';
+import { BANDS, TAILS, bandMatrix, familyExtent, tailMatrix, yarnFit }
+  from '../../../inventory/yarn-geometry.js';
 import { POSES, POSE_KEYS, applyPose } from '../../npc.js';
 import { ACTION, STATE } from '../../visit.js';
 import * as THREE from 'three';
 import { BOX_H, CELL, S } from '../core/config.js';
 import { key, scene } from '../scene/stage.js';
 import { FILL, atlas, sizeAtlas } from '../goods/items.js';
-import { YARN, bandMesh, tailMesh, yarnMeshes } from '../goods/yarn.js';
+import { YARN, YARN_FIT, bandMesh, tailMesh, yarnMeshes } from '../goods/yarn.js';
 import { cellNameFor } from '../goods/stock.js';
 
 // ---------------------------------------------------------------- carried notions
@@ -31,8 +32,8 @@ let heldMat = null, heldBoxMat = null, heldSizeMat = null;
 const HELD_W = CELL * FILL, HELD_H = BOX_H;
 
 /** One face of the carried package: an atlas cell baked straight into the plane's UVs. */
-function heldLabel(atlasPack, material, key, w, h) {
-  const [u0, v0, du, dv] = cellRect(atlasPack.manifest, key);
+function heldLabel(atlasPack, material, cellName, w, h) {
+  const [u0, v0, du, dv] = cellRect(atlasPack.manifest, cellName);
   const geo = new THREE.PlaneGeometry(w, h);
   const uv = geo.attributes.uv;
   for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) * du, v0 + uv.getY(i) * dv);
@@ -66,9 +67,15 @@ function heldMaterials() {
  */
 function heldYarn(item, group) {
   const [, uh] = familyExtent(item.shape, YARN.tier);
+  // The SAME fit the shelf used, so a ball is the size it was when it was picked up. Sizing it to
+  // HELD_H instead squeezed every family into one 2.5D layer, which is only correct for a shape
+  // that is one layer tall: measured, that left held yarn at 7-85% of its shelf size depending on
+  // family and weight, and a customer walking off with a visibly smaller thing than they lifted.
+  // A notion box still shrinks to HELD_H, and should: one layer IS what it is on the shelf.
+  const fit = yarnFit(item.shape, item.w, item.h, YARN_FIT);
   const unit = new THREE.Group();                 // unit space, so the band's own matrix applies
-  unit.scale.setScalar(HELD_H / uh);              // sized to the fist, not to a slot
-  unit.position.y = -HELD_H / 2;                  // the family sits ON y=0; the fist wants centred
+  unit.scale.set(fit.k, fit.ky, fit.k);
+  unit.position.y = -(fit.ky * uh) / 2;           // the family sits ON y=0; the fist wants centred
   group.add(unit);
   const parts = [[yarnMeshes[item.shape], null, item.color]];
   if (BANDS[item.shape]) parts.push([bandMesh, bandMatrix(item.shape), YARN.bandColor]);
@@ -119,7 +126,7 @@ function heldBox(item, group) {
 }
 
 /** What an NPC carries out of the shop: a real ball, or a labelled box for everything else. */
-function makeHeldNotion(item) {
+export function makeHeldNotion(item) {
   heldMaterials();
   const group = new THREE.Group();
   if (item.name === 'yarn') heldYarn(item, group);

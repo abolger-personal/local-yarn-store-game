@@ -886,7 +886,9 @@ function groupByFamily(meshes, toJointSpace) {
 
 function mergedMesh({ parts, shadow, material }) {
   const geometry = parts.length === 1 ? parts[0] : mergeGeometries(parts, false);
-  if (parts.length > 1) parts.forEach((part) => part.dispose());
+  // `geo`, not `part`: the module exports a part() factory and shadowing it here reads as if
+  // this were disposing rig parts rather than the geometries that were just merged.
+  if (parts.length > 1) parts.forEach((geo) => geo.dispose());
   const mesh = new THREE.Mesh(geometry, material);
   mesh.castShadow = shadow;
   mesh.receiveShadow = shadow;

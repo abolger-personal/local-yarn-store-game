@@ -181,8 +181,12 @@ export const SHOP_RANGE = Object.freeze({
   toolSizes: Object.freeze([3.0, 4.0, 5.0, 6.0]),
 });
 
+// Both params default, mirroring makePattern/makeYarn/makeNotion above: the second one is
+// derived from the first rather than left bare. A bare `type` would force the one caller that
+// wants to name a notion to pass `Math.random` positionally just to reach past it, which is
+// exactly what buryOne was already doing.
 /** A pattern written for yarn this shop actually sells. */
-export const makeStockPattern = (rng = Math.random, type) => {
+export const makeStockPattern = (rng = Math.random, type = pickFrom(PATTERN_NAMES, rng)) => {
   const p = makePattern(rng, type);
   p.weight = pickFrom(SHOP_RANGE.weights, rng);
   p.materials = [pickFrom(SHOP_RANGE.materials, rng)];
@@ -198,7 +202,7 @@ export const makeStockYarn = (rng = Math.random) => {
 };
 
 /** A tool in a size the shop stocks; other notions unchanged. */
-export const makeStockNotion = (rng = Math.random, name) => {
+export const makeStockNotion = (rng = Math.random, name = pickFrom(NOTION_NAMES, rng)) => {
   const it = makeNotion(rng, name);
   if (it.size != null) it.size = pickFrom(SHOP_RANGE.toolSizes, rng);
   return it;

@@ -152,6 +152,7 @@ function seat(g) {
 }
 
 /** One family's geometry, in unit space, at one tessellation tier. */
+/** @param {string} name @param {number|string} [tier] index into TIERS, or its name */
 export function buildFamily(name, tier = 1) {
   const make = BUILDERS[name];
   if (!make) throw new Error(`unknown yarn family: ${name}`);
@@ -230,6 +231,7 @@ const familyHeight = (name) => {
 };
 
 /** An open-ended cylinder: the band is a wrapper, so it has no end caps to draw. */
+/** @param {number|string} [tier] */
 export const buildBand = (tier = 1) =>
   new THREE.CylinderGeometry(1, 1, 1, [10, 14, 18][typeof tier === 'string' ? tierIndex(tier) : tier],
                              1, true);
@@ -272,6 +274,7 @@ function tailCurve() {
   return new THREE.CatmullRomCurve3(pts, false);
 }
 
+/** @param {number|string} [tier] */
 export const buildTail = (tier = 1) => {
   const t = typeof tier === 'string' ? tierIndex(tier) : tier;
   return new THREE.TubeGeometry(tailCurve(), [8, 12, 16][t], 0.075, [3, 4, 5][t], false);
@@ -335,6 +338,7 @@ const _extent = new Map();
  * shape by a different arbitrary amount — which is exactly how a flat figure-eight skein becomes a
  * donut when the shelf gap goes up.
  */
+/** @param {string} name @param {number|string} [tier] */
 export function familyExtent(name, tier = 1) {
   const cacheKey = `${name}@${tier}`;
   if (_extent.has(cacheKey)) return _extent.get(cacheKey);
@@ -376,9 +380,15 @@ export const SETTLE_MIN = 0.82;
  * (`familyFootprint`, so a skein is 2x1 and cannot be mistaken for a mini-skein), while the shop
  * takes it from `catalog.js`, where a yarn's footprint is its WEIGHT and decides how many units
  * toward a pattern the ball is worth.
+ *
+ * @param {string} family
+ * @param {number} footW  footprint width in slots
+ * @param {number} footD  footprint depth in slots
+ * @param {{cell: number, boxHeight: number, fill?: number, tier?: number|string,
+ *          settleMin?: number}} grid
  */
 export function yarnFit(family, footW, footD,
-                        { cell, boxHeight, fill = 0.9, tier = 1, settleMin = SETTLE_MIN } = {}) {
+                        { cell, boxHeight, fill = 0.9, tier = 1, settleMin = SETTLE_MIN }) {
   const [uw, uh, ud] = familyExtent(family, tier);
   // One scale for both horizontal axes: whichever of width or depth runs out first.
   const k = Math.min((footW * cell * fill) / uw, (footD * cell * fill) / ud);
@@ -395,6 +405,7 @@ export function yarnFit(family, footW, footD,
 
 const _aspect = new Map();
 
+/** @param {string} name @param {number|string} [tier] */
 export function familyAspect(name, tier = 1) {
   // Memoised: this is a pure function of (family, tier), and the demo polls it for the overlay.
   // Rebuilding a geometry per call would also leak one per call, since nothing disposes them.
@@ -411,6 +422,7 @@ export function familyAspect(name, tier = 1) {
 }
 
 /** How far apart two families are in proportion. Bigger is more distinguishable. */
+/** @param {string} a @param {string} b @param {number|string} [tier] */
 export const aspectDistance = (a, b, tier = 1) => {
   const [p, q] = [familyAspect(a, tier), familyAspect(b, tier)];
   return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);

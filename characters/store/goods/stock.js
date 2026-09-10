@@ -97,6 +97,10 @@ function layersFor(spec, forcedShape) {
  * Every cell of a display, starting somewhere random so stock does not pile into one corner.
  * `avoidWall` drops the wall-facing row, which DISPLAYS.md says can never be noticed.
  */
+/**
+ * @param {any} display
+ * @param {{c?: number, r?: number, avoidWall?: boolean}} start
+ */
 function cellOrder(display, { c, r, avoidWall }) {
   const g = display.g;
   const cells = [];
@@ -109,6 +113,12 @@ function cellOrder(display, { c, r, avoidWall }) {
   return cells.slice(rnd(cells.length)).concat(cells);
 }
 
+/**
+ * @param {any} display
+ * @param {number} shelf
+ * @param {any} spec
+ * @param {{c?: number, r?: number, avoidWall?: boolean, shape?: number[]}} [where]
+ */
 export function addItem(display, shelf, spec, { c, r, avoidWall = false, shape } = {}) {
   if (items.length >= CAPACITY) return -1;   // the instanced buffers cannot grow past this
   const g = display.g;

@@ -1,0 +1,30 @@
+{
+  // Type-checks the plain JS with no build step and no TypeScript syntax: tsc reads the JSDoc
+  // that is already there and infers the rest. This is the class of bug that produced
+  // `YARN_COLOR_COUNT is not found`, `Cannot read properties of undefined (reading 'randomise')`
+  // and the `#rotator` null — a missing export, a wrong argument count, a typo'd property.
+  //
+  // `three` is a devDependency ONLY for its type definitions. At runtime it still comes from the
+  // CDN import map in the html; nothing bundles or imports it from node_modules.
+  "compilerOptions": {
+    "checkJs": true,
+    "allowJs": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    // "bundler" so `import ... from './x.js'` resolves the way the browser resolves it.
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // Off deliberately: this is untyped JS, and strict null checking on it is thousands of
+    // "possibly null" on DOM lookups that are all fine. The value here is wrong NAMES and wrong
+    // ARGUMENT COUNTS, which need none of it.
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    // Do not type-check the JS inside node_modules. three's addons are plain JS and full of
+    // errors under checkJs; the .d.ts beside them is what we actually want to read.
+    "maxNodeModuleJsDepth": 0
+  },
+  "include": ["characters/**/*.js", "inventory/**/*.js", "*.js"],
+  "exclude": ["node_modules", "**/*.test.mjs"]
+}

@@ -235,6 +235,12 @@ export function makeField(texture, capacity, opts = {}) {
 }
 
 /** Partial update: a drag only moves an instance, it does not restage its cell or colour. */
+/**
+ * @param {import('three').InstancedMesh} field
+ * @param {number} index
+ * @param {{matrix?: import('three').Matrix4, rect?: number[],
+ *          color?: import('three').Color}} update  only the parts given are written
+ */
 export function setInstance(field, index, { matrix, rect, color }) {
   if (matrix) {
     field.setMatrixAt(index, matrix);

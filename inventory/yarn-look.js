@@ -285,6 +285,7 @@ export function makeToonRamp(steps = 3) {
  * system is unaffected by the choice — which is what makes this an aesthetic decision rather than
  * an architectural one.
  */
+/** @param {string} mode @param {{matcap?: any, ramp?: any, color?: string}} [look] */
 export function yarnMaterial(mode, { matcap, ramp, color = '#ffffff' } = {}) {
   switch (mode) {
     case 'matcap':

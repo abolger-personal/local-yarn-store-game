@@ -99,6 +99,10 @@ export const STATE = Object.freeze({
 
 // ---------------------------------------------------------------- npc record
 
+/**
+ * @param {{id: string, name: string, species: string, target?: any, traits?: any,
+ *          prefs?: any, rng?: () => number}} seed  traits and prefs roll if not given
+ */
 export function makeNpc({ id, name, species, target, traits, prefs, rng = Math.random }) {
   const t = traits ?? randomTraits(rng);
   // "personal craft preferences completely unrelated to personality" — rolled from their own
@@ -1203,6 +1207,10 @@ function stepCloseout(npc, world) {
  * few fields over", because the interesting failure is the opposite of a crash: a customer who
  * quietly comes back a stranger, with their skill or their half-knitted sweater silently gone.
  * Anything NOT named here persists on purpose.
+ */
+/**
+ * @param {any} npc
+ * @param {{at?: {x: number, z: number}, rng?: () => number}} [opts]
  */
 export function rejoin(npc, { at, rng = Math.random } = {}) {
   npc.state = STATE.QUEUED;

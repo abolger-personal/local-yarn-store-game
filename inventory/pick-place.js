@@ -28,6 +28,7 @@ import { EMPTY, gridSize, topAt, columnAt, slotRect, footprint, fits, place, nea
   from './grid.js';
 
 /**
+ * @param {object} opts
  * @param opts.camera
  * @param opts.displays    () => iterable of displays, each { g, ... }
  * @param opts.items       () => the item array
@@ -248,6 +249,14 @@ export function settleYaw(item, rng = Math.random) {
  * through here rather than calling `place` directly.
  *
  * `target` is a slot from snapTo, or null to send it back where it already belongs.
+ */
+/**
+ * @param {any} item
+ * @param {number} index
+ * @param {any} target  a slot from snapTo, or null
+ * @param {any} home
+ * @param {number} homeShelf
+ * @param {{layers?: (item: any) => number, anySlot?: Function}} [opts]
  */
 export function placeItem(item, index, target, home, homeShelf, { layers = () => 1, anySlot } = {}) {
   const tall = layers(item);

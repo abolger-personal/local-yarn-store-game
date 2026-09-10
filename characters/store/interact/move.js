@@ -312,7 +312,8 @@ export function rotateMovable(step) {
 }
 
 // ---- the on-screen rotate handles
-const turnBtns = [...document.querySelectorAll('#furnBtns .turn')];
+const turnBtns = /** @type {HTMLButtonElement[]} */
+  ([...document.querySelectorAll('#furnBtns .turn')]);
 
 /** Park the handles over the selection. Projected every frame because the camera orbits freely and
  *  a handle left behind on screen points at the wrong thing. */

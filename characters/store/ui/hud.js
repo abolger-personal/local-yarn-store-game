@@ -119,11 +119,12 @@ const clockLabel = document.getElementById('clockLabel');
 
 export const autoBar = document.getElementById('autoBar');
 
-export const autoBox = document.getElementById('auto');
+export const autoBox = /** @type {HTMLInputElement} */ (document.getElementById('auto'));
 
-export const autoDayBox = document.getElementById('autoDay');
+export const autoDayBox =
+  /** @type {HTMLInputElement} */ (document.getElementById('autoDay'));
 
-const advanceBtn = document.getElementById('advance');
+const advanceBtn = /** @type {HTMLButtonElement} */ (document.getElementById('advance'));
 
 export function drawTimer() {
   if (!shop.world) return;

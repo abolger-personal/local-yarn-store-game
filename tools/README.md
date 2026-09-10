@@ -13,6 +13,21 @@ for it — eslint already parses every file:
 | `funclen.mjs` (long functions) | `max-lines-per-function` |
 | `fiximports.mjs`, `repoint.mjs` | one-offs for the module split; the split is done |
 | — (nothing caught it) | `no-use-before-define` — the TDZ that blanked the page |
+| — (nothing caught it) | `tsc -p jsconfig.json` — wrong names, wrong argument counts |
+
+`npm run typecheck` is TypeScript reading the plain JS (`checkJs`), no build step and no
+TypeScript syntax. It catches what a per-file linter structurally cannot: an import of a name the
+target does not export, a call with the wrong number of arguments, a `.checked` on something that
+is not an input. `three` is a devDependency for its type definitions ONLY — at runtime it still
+comes from the CDN import map in the html.
+
+Two things it does NOT catch, so do not trust it for them:
+
+- **Property typos on plain object literals.** In `.js` files TypeScript treats them as expandos,
+  so `fit.kk` on a `{k, ky, ...}` return reads as `any`. Typos against a *typed* API (three, the
+  DOM) are caught.
+- **`null` from a missed DOM lookup** — that needs `strictNullChecks`, which is 151 errors on this
+  codebase today, nearly all of them fine. `selectors.mjs` covers the shop's own lookups instead.
 
 What is left is project-specific, and no off-the-shelf rule knows about it:
 
@@ -23,5 +38,27 @@ What is left is project-specific, and no off-the-shelf rule knows about it:
   nothing and are referenced by nothing, so every other tool considers them dead code. Dropping
   them leaves no species registered and the shop fails to open.
 - **`modules.mjs`** — shared helper: every store module, wherever it lives in the folder tree.
+
+## Why not eslint-config-google / airbnb
+
+Both were checked and rejected, on facts rather than taste:
+
+- **`eslint-config-google`** — 0.14.0, last real release 2020, eslintrc-only. 79 rules, 34 of
+  them formatting rules that eslint 10 removed from core. Of the remainder most are already in
+  `js.configs.recommended`; what is genuinely new is about a dozen plain core rules, which are
+  now written out in `eslint.config.js` directly.
+- **`eslint-config-airbnb-base`** — 15.0.0, peer range stops at `eslint ^8`. Will not install here.
+- **Meta** publishes no general JS config: `eslint-config-fbjs` and `eslint-config-fb-strict` are
+  Flow + React + Babel on `eslint ^8`.
+- **`eslint-plugin-sonarjs`** — supports eslint 10, but its `ts-api-utils` breaks against the
+  TypeScript 7 this repo now uses for `npm run typecheck`. Not worth pinning TS backwards for.
+
+`eslint-plugin-unicorn` is in, but NOT its `recommended` preset: that reports 974 findings here
+and ~70% of them sit in four rules that are actively wrong for a geometry project —
+`no-zero-fractions` (rewrites `CELL = 0.20`), `single-line-block-comment-style` (reformats the
+comments that are this codebase's documentation), `no-null` (rewrites a sentinel used on purpose)
+and `prefer-math-trunc`, which would replace mulberry32's `| 0`. That `| 0` is a 32-bit **wrap**,
+not a truncation: with `Math.trunc` the generator's state grows past 2^53 and the sequence
+diverges after ~4.9 million draws. Presets are a starting point to measure, not to adopt.
 
 Run: `npm run lint` and `npm run check`.

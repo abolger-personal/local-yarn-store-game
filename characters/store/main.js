@@ -51,7 +51,9 @@ console.info('LYS build', BUILD);
  * the whole shop down with it.
  */
 function restoreFolds() {
-  for (const el of document.querySelectorAll('.fold')) {
+  const folds = /** @type {NodeListOf<HTMLDetailsElement>} */
+    (document.querySelectorAll('.fold'));
+  for (const el of folds) {
     try {
       const saved = localStorage.getItem(`lys.fold.${el.id}`);
       if (saved !== null) el.open = saved === '1';
@@ -73,6 +75,7 @@ function restoreFolds() {
  * feature and say so, not the rest of the shop.
  */
 function buildShop() {
+  /** @type {[string, () => void][]} */
   const steps = [
     ['stage', installStage], ['room', buildRoomShell], ['seating', installSeating],
     ['displays', installDisplays], ['placeholder art', installPlaceholderArt],

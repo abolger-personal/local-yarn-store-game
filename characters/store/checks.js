@@ -19,6 +19,7 @@ import { refresh, refreshAll } from './goods/paint.js';
 import { cellNameFor } from './goods/stock.js';
 import { movePose, YAW_STEP, applySeat, canPlaceAt, constrainPose, moveApply } from './interact/move.js';
 import { isUnder } from './ui/framing.js';
+import { makeHeldNotion } from './sim/cast.js';
 
 // ---------------------------------------------------------------- framing
 /**
@@ -121,7 +122,8 @@ function checkYarnHeights() {
 function checkStockable() {
   const tallest = Math.max(...displays.map((d) => d.g.headroom));
   const unstockable = YARN_SHAPES.flatMap((sh) => SHOP_RANGE.weights
-    .map((wn) => [sh, wn, yarnFit(sh, yarnWeight(wn).size, yarnWeight(wn).size, YARN_FIT).layers])
+    .map((wn) => /** @type {[string, string, number]} */
+      ([sh, wn, yarnFit(sh, yarnWeight(wn).size, yarnWeight(wn).size, YARN_FIT).layers]))
     .filter(([, , L]) => L > tallest));
   console.assert(unstockable.length === 0, 'yarn the shop can roll but nothing can hold:',
     unstockable.map(([sh, wn, L]) => `${sh}/${wn}=${L} layers > ${tallest}`));
@@ -302,9 +304,35 @@ function checkHeldIsHideable(fails) {
   return meshes;
 }
 
+/**
+ * A ball leaves the shop the size it was on the shelf.
+ *
+ * A notion box SHOULD shrink to one layer in the fist — that is what it is on the shelf too. Yarn
+ * should not: it is drawn at its own settled fit, and squashing every family into one layer made
+ * a super-bulky ball leave at a third of the width it was picked up at, which reads as the
+ * customer walking off with a different, smaller thing.
+ *
+ * Measured off the mesh that is actually built, not recomputed from the formula: the same
+ * arithmetic on both sides of an assertion compares a value to itself and passes forever.
+ */
+function checkHeldYarnSize(fails) {
+  for (const shape of YARN_SHAPES) {
+    const w = yarnWeight(SHOP_RANGE.weights[0]).size;
+    const held = makeHeldNotion({ name: 'yarn', shape, w, h: w, color: '#888' });
+    const unit = held.children[0];
+    const want = yarnFit(shape, w, w, YARN_FIT);
+    if (Math.abs(unit.scale.x - want.k) > 1e-9)
+      fails.push(`held ${shape} is ${unit.scale.x.toFixed(4)} wide, shelf draws it ${want.k.toFixed(4)}`);
+    // Same split as syncCarried's teardown: the cloned materials are this probe's, the geometry
+    // belongs to the shelf's instanced meshes and disposing it would blank every shelf.
+    held.traverse((n) => { if (n.userData.owned) n.material.dispose(); });
+  }
+}
+
 export function checkHeldItem() {
   const fails = [];
   checkNobodyStartsCarrying(fails);
+  checkHeldYarnSize(fails);
   const meshes = checkHeldIsHideable(fails);
   console.assert(fails.length === 0, 'held item:', fails);
   console.info(`held item: ${fails.length

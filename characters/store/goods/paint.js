@@ -10,6 +10,7 @@ import { layerY, BOX_H, CELL, S } from '../core/config.js';
 import { camera } from '../scene/stage.js';
 import { byId, levelFrame } from '../scene/displays.js';
 import {
+  CAPACITY,
   FILL,
   _boxMat,
   _col,
@@ -163,14 +164,26 @@ function paintInstance(display, index, p) {
   paintShadow(index, g);
 }
 
+/**
+ * Blank EVERY representation of one instance slot: the notion box and its labels, the yarn meshes,
+ * and the contact shadow.
+ *
+ * All three, always, because an index does not remember what it was last drawn as — slot 7 can be
+ * a ball today and a hook tomorrow — and blanking only the half you expect is how a ghost gets
+ * left behind.
+ */
+export function hideItem(index) {
+  hideBox(index);
+  hideYarn(index);
+  shadows.setMatrixAt(index, _hide);
+  shadows.instanceMatrix.needsUpdate = true;
+}
+
 /** Draw an item at rest in its slot — or nowhere at all, once an NPC has bought it. */
 export function refresh(index) {
   const item = items[index];
   if (item.gone) {
-    hideBox(index);
-    hideYarn(index);
-    shadows.setMatrixAt(index, _hide);
-    shadows.instanceMatrix.needsUpdate = true;
+    hideItem(index);
     return;
   }
   const disp = byId(item.display);
@@ -208,7 +221,23 @@ export function refreshFloating(disp, index, x, z) {
   });
 }
 
-export const refreshAll = () => items.forEach((_, i) => {
-  // A held item follows the pointer; it has no resting slot to be drawn in until it is dropped.
-  if (!items[i].held) refresh(i);
-});
+export const refreshAll = () => {
+  items.forEach((_, i) => {
+    // A held item follows the pointer; it has no resting slot to be drawn in until it is dropped.
+    if (!items[i].held) refresh(i);
+  });
+  // Then blank every slot ABOVE the stock that exists.
+  //
+  // An InstancedMesh keeps whatever matrix was last written to a slot, and `count` is not a
+  // reliable eraser here: sizeInstanceBuffers can shrink the notion meshes, but the YARN meshes
+  // are allocated and drawn at full CAPACITY (they have no per-frame count to lower — see
+  // yarnInstances), so a ball whose item no longer exists carries on being drawn exactly where
+  // it was. The symptom is stale yarn: the bench's "clear the shop" left every ball standing,
+  // and in the shop a day that puts out LESS stock than yesterday leaves yesterday's balls
+  // floating over the new arrangement.
+  //
+  // Unconditional rather than tracking a high-water mark: it is one matrix write per empty slot
+  // on a function that already redraws the whole shop, and a high-water mark is a second piece
+  // of state that can disagree with this one.
+  for (let i = items.length; i < CAPACITY; i++) hideItem(i);
+};

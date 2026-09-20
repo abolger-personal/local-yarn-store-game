@@ -201,6 +201,47 @@ when idles land — and they have now landed.
 - `npm run serve`, never `python3 -m http.server`. This branch adds a module and new exports,
   which is precisely the case `readme.md:13` warns renders a blank white page.
 
+## The interpolator bake-off: decided
+
+**Spring.** Decided 2026-09-20 in the lab, by eye and then by measurement.
+
+Smoothstep visibly twitches on every interrupt — its slope is zero at both ends, so an
+interrupted move throws its speed away and relaunches from a standstill. That was the whole
+premise of this work and it reads immediately on screen.
+
+Spring and hermite are indistinguishable by eye. What separates them:
+
+| a fresh move from rest | overshoot | settles |
+| --- | --- | --- |
+| spring, zeta 0.6 | **1.084** | 0.60s |
+| spring, zeta 1.0 | 1.000 | 0.65s |
+| hermite | 1.000 | 0.34s |
+| smoothstep | 1.000 | 0.34s |
+
+**Hermite is bit-identical to smoothstep on any move that is not interrupted** — measured max
+difference 0.000000 rad. Its start tangent is seeded from incoming velocity, which is zero at
+rest, leaving a cubic Hermite with both tangents zero, which *is* `t*t*(3-2t)`. And its end
+tangent is hard-zero, so it can never overshoot — which kills the `zeta` dial that carries
+Volatility vs Orderliness. Spring also keeps no interrupt bookkeeping at all (continuity is
+structural) and has no `blend` duration to stay in sync with.
+
+The one point for hermite: max |dv| at an interrupt is 0.48 against spring's 1.86. Looking at
+both, that 1.4 rad/s is not visible.
+
+**Note for whoever wires this up: the walk cannot decide this.** The walk and idle layers are
+added *downstream* of the interpolator, so with a pose held the engine spread is exactly
+0.0000 rad. Walking under spring and under hermite is bit-identical output.
+
+Hermite and smoothstep are **still in the code**, as lab-only comparison rows behind the two
+"also show" checkboxes, off by default. They are not deleted yet because tuning the spring is
+worth being able to sanity-check against. The deletion is still owed: three grep-able places,
+all named `mode`.
+
+`zeta` was re-spanned from [0.60, 1.50] to **[0.45, 1.00]** at the same time. Measured overshoot:
+0.45 → 19.6%, 0.55 → 11.6%, 0.65 → 5.7%, 0.75 → 2.0%, 0.85 → 0.2%, and everything from 0.85 up
+is indistinguishable. Two thirds of the old span sat in that dead zone, which is why the bounce
+read as flat across a cast.
+
 ## Bugs this work found and fixed, worth not reintroducing
 
 1. **Foot skate, twice — and the second time was my own "fix".** A phase is one CYCLE, which is

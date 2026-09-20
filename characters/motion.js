@@ -125,7 +125,15 @@ export const MOTION_DEFAULTS = Object.freeze({
 // REPLACE" applied to motion, and the self-check asserts it.
 export const BASE_MOTION_RANGES = Object.freeze({
   stiff:    [60, 240],
-  zeta:     [0.60, 1.50],
+  // Damping RATIO, not an absolute coefficient -- absolute damping means every stiffness
+  // increase silently under-damps the whole cast at once. Below 1 overshoots.
+  //
+  // Measured overshoot on a fresh move: 0.45 -> 19.6%, 0.55 -> 11.6%, 0.65 -> 5.7%,
+  // 0.75 -> 2.0%, 0.85 -> 0.2%, and everything from 0.85 up is indistinguishable. The old
+  // [0.60, 1.50] span spent two thirds of its travel in that dead zone, which is why the
+  // bounce read as flat across a cast. This span is live end to end: a volatile character
+  // wobbles visibly, an orderly one arrives dead clean.
+  zeta:     [0.45, 1.00],
   idleAmp:  [0.40, 1.60],
   idleRate: [0.75, 1.25],
   stride:   [1.40, 2.24],

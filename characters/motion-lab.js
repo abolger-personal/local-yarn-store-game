@@ -34,7 +34,20 @@ console.info('LYS build', BUILD);
 // Three rows, front to back. 'smoothstep' is the CURRENT behaviour, on screen as the control:
 // the whole question is whether the other two look better than what the game does today, and
 // that is not answerable without it in the same frame.
-const ENGINES = ['spring', 'hermite', 'smoothstep'];
+// SPRING IS THE CHOSEN ENGINE. Decided 2026-09-20 in this lab: smoothstep visibly twitches on
+// every interrupt (its slope is zero at both ends, so an interrupted move relaunches from a
+// standstill), and hermite, while smooth, is bit-identical to smoothstep on any move that is
+// NOT interrupted -- measured max difference 0.000000 rad from rest, because its start tangent
+// is seeded from incoming velocity and that is zero at rest, leaving a cubic Hermite with both
+// tangents zero, which IS t*t*(3-2t). Its end tangent is hard-zero, so it can never overshoot,
+// which kills the zeta dial that carries Volatility vs Orderliness.
+//
+// The other two are kept here as comparison rows, off by default, because the tuning that
+// follows is worth being able to sanity-check against. They are NOT kept in the game: the plan
+// deletes them from motion.js when cast.js is wired, at three grep-able places all named `mode`.
+const CHOSEN = 'spring';
+const ENGINES = [CHOSEN, 'hermite', 'smoothstep'];
+
 
 // What each pose is meant to read as. A motion cannot be judged without knowing what it was
 // aiming for -- "is that arrival wrong, or is browse just like that?" is unanswerable otherwise.
@@ -71,6 +84,9 @@ const S = {
   cutSlow: 0.2,            // time scale WHILE a scripted cut runs, so the eye can follow it
   loopCut: true,           // repeat the cut until told to stop -- one press is never enough
   chaos: false,
+  // Off: spring is chosen, so these are comparison rows you switch on to check something, not
+  // the normal view. Showing them by default triples the cast for no benefit while tuning.
+  compare: { hermite: false, smoothstep: false },
   dtScale: 1,
   // walk
   speed: 0.0,
@@ -87,6 +103,11 @@ const S = {
            armGain: 1, sway: 1, lean: 1 },
   ranges: structuredClone(BASE_MOTION_RANGES),
 };
+
+/** The rows actually on screen. Spring is never hideable -- it is the one being tuned. */
+function shownEngines() {
+  return ENGINES.filter((e) => e === CHOSEN || S.compare[e]);
+}
 
 // ---------------------------------------------------------------- scene
 
@@ -181,6 +202,7 @@ function buildCast() {
   ids.forEach((id, i) => addPair(id, i, ids.length));
   setViewMode(group, S.view);
   refreshRoster();
+  showPose();     // the banner names which engines are on screen, so it changes with the cast
 }
 
 
@@ -202,17 +224,23 @@ function addPair(id, slot, slots) {
   const walkDist = Math.random() * 0.4;
   const seed = Math.random();
 
-  ENGINES.forEach((engine, row) => {
-    const built = createCharacter({ ...params }, kit);
-    const lane = slot * (ENGINES.length + 0.7) + row;
-    const z = (lane - (slots * (ENGINES.length + 0.7) - 1.7) / 2) * 0.8;
-    built.root.position.set(0, 0, z);
-    group.add(built.root);
-    cast.push({
-      built, engine, traits, lane: z, walkDist,
-      motion: makeMotion(built.params, seed),
-      opts: coeffs(traits, kit, engine),
-    });
+  const shown = shownEngines();
+  shown.forEach((engine, row) => {
+    const lane = slot * (shown.length + 0.7) + row;
+    addOne(kit, params, engine, traits, seed, walkDist,
+      (lane - (slots * (shown.length + 0.7) - 1.7) / 2) * 0.8);
+  });
+}
+
+/** One built character in one lane, running one engine. */
+function addOne(kit, params, engine, traits, seed, walkDist, z) {
+  const built = createCharacter({ ...params }, kit);
+  built.root.position.set(0, 0, z);
+  group.add(built.root);
+  cast.push({
+    built, engine, traits, lane: z, walkDist,
+    motion: makeMotion(built.params, seed),
+    opts: coeffs(traits, kit, engine),
   });
 }
 
@@ -289,11 +317,15 @@ function showPose() {
   // 0.0227 across one clean pose change, 0.2670 across an interrupted one. So a walking cast
   // holding a pose shows three bit-identical rows, and that reads as a broken engine switch
   // when it is the system working correctly.
-  const tail = runStage === 'done'
-    ? '<span class="hint">the three rows differ ONLY across a pose change \u2014 press '
-      + '<kbd>Enter</kbd> to interrupt one. Walking and fidgeting are added after the '
-      + 'interpolator, the same way for all three.</span>'
-    : `<span class="stage">${RUN_STAGES[runStage] ?? ''}</span>`;
+  const tail = runStage !== 'done'
+    ? `<span class="stage">${RUN_STAGES[runStage] ?? ''}</span>`
+    : shownEngines().length > 1
+      ? '<span class="hint">the rows differ ONLY across a pose change \u2014 press '
+        + '<kbd>Enter</kbd> to interrupt one. Walking and fidgeting are added after the '
+        + 'interpolator, the same way for every row.</span>'
+      : '<span class="hint">spring \u2014 press <kbd>Enter</kbd> to interrupt a move. Switch on '
+        + 'hermite or smoothstep under \u201chow motion gets from A to B\u201d to compare '
+        + 'against it.</span>';
   const arrow = prev ? `${prev} \u2192 ` : '';
   poseEl.innerHTML = `<b>${arrow}${now}</b><span>${POSE_MEANS[now] ?? ''}</span>${tail}`;
 }
@@ -436,7 +468,7 @@ const COLOUR = { spring: '#2f7fd1', hermite: '#d1642f', smoothstep: '#8a8f98' };
 
 function sampleScope() {
   const W = scopeCanvas.width;
-  for (const engine of ENGINES) {
+  for (const engine of shownEngines()) {
     const a = cast.find((c) => c.engine === engine);
     if (!a) continue;
     const h = history.get(engine) ?? { v: [], d: [], mark: [] };
@@ -457,13 +489,13 @@ function drawScope() {
   ctx2d.beginPath(); ctx2d.moveTo(0, H / 2); ctx2d.lineTo(W, H / 2); ctx2d.stroke();
 
   // a vertical rule at each interrupt: the only place on the trace worth looking at
-  const marks = history.get(ENGINES[0])?.mark ?? [];
+  const marks = history.get(CHOSEN)?.mark ?? [];
   ctx2d.strokeStyle = 'rgba(0,0,0,.30)';
   ctx2d.beginPath();
   marks.forEach((m, i) => { if (m) { ctx2d.moveTo(i, 0); ctx2d.lineTo(i, H); } });
   ctx2d.stroke();
 
-  for (const engine of ENGINES) {
+  for (const engine of shownEngines()) {
     const h = history.get(engine);
     if (!h) continue;
     trace(h.v, COLOUR[engine], 1, 0.35);      // value: solid
@@ -529,7 +561,7 @@ function refreshRoster() {
 
 const readoutEl = document.getElementById('readout');
 setInterval(() => {
-  const parts = ENGINES.map((engine) => {
+  const parts = shownEngines().map((engine) => {
     const a = cast.find((c) => c.engine === engine);
     return a ? `${engine} ${(a.maxDv ?? 0).toFixed(2)}` : engine;
   });
@@ -603,6 +635,16 @@ knob(fRanges, { copy: exportRanges }, 'copy', 'copy these spans as code',
 fRanges.close();
 
 const fBake = gui.addFolder('how motion gets from A to B');
+knob(fBake, S.compare, 'hermite', 'also show: hermite',
+  'A second row per character running the velocity-carrying cubic instead of the spring. Smooth '
+  + 'across an interrupt, but identical to smoothstep on any move that is NOT interrupted, and '
+  + 'it can never overshoot — so the wobble dial does nothing on it. Off by default: spring is '
+  + 'the chosen engine.').onChange(buildCast);
+knob(fBake, S.compare, 'smoothstep', 'also show: smoothstep',
+  'A third row running what the game used before this work: zero slope at both ends, so an '
+  + 'interrupted move throws its speed away and restarts from a standstill. That is the twitch. '
+  + 'Kept only so you can see the problem again on demand.').onChange(buildCast);
+
 knob(fBake, { go: fireInterrupt }, 'go', '\u25b6 CUT OFF A MOVE (Enter)',
   'The whole point of this page. Starts a reach, then interrupts it partway with a browse. '
   + 'Watch whether each row glides into the new move or stops dead and restarts.');

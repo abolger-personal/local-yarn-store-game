@@ -23,7 +23,7 @@ import {
   BASE_PARAMS, BASE_MOTION_RANGES, MOTION_DEFAULTS, POSES, POSE_KEYS, BUILD, TONE_MAPPING,
   createCharacter, disposeCharacter, setViewMode, setGeometryDetail,
   getSpecies, speciesIds, makeMotion, resetMotion, integrate, compose, applyPose,
-  motionOf, walkPhase, walkLayer, walkGain, valueOf, velocityOf,
+  motionOf, factors, walkPhase, walkLayer, walkGain, valueOf, velocityOf,
 } from './npc.js';
 import { randomTraits } from './visit.js';
 import './owl.js';
@@ -525,13 +525,16 @@ function trace(series, colour, alpha, scale) {
 
 const rosterEl = document.getElementById('roster');
 
-// The seven assets motionOf actually reads, with the abbreviation each gets as a column
-// header. The other three Big-5 assets drive other systems and are left out rather than
-// shown as dead columns. Exact names: CHARACTER-ATTRIBUTES.md makes synonyms a violation.
+// The four Big-5 FACTORS that drive motion, each the mean of its two assets. Showing the
+// factors rather than the assets is the point: eight asset columns was more personality than
+// anyone can hold while tuning, and the coefficients do not read the assets individually
+// anyway. Agreeableness is left out rather than shown as a dead column -- it is the factor
+// about how you treat people, and it belongs to what an NPC does, not to how their body moves.
 const TRAIT_COLS = Object.freeze([
-  ['Ast', 'Assertiveness'], ['Wth', 'Withdrawal'], ['Vol', 'Volatility'],
-  ['Ord', 'Orderliness'], ['Ent', 'Enthusiasm'], ['Ind', 'Industriousness'],
-  ['Opn', 'Openness'],
+  ['E', 'Extraversion', 'Enthusiasm + Assertiveness'],
+  ['N', 'Neuroticism', 'Volatility + Withdrawal'],
+  ['C', 'Conscientiousness', 'Industriousness + Orderliness'],
+  ['O', 'Openness/Intellect', 'Openness + Intellect'],
 ]);
 
 /**
@@ -548,7 +551,10 @@ function rosterRow(a) {
   const second = coat && P[coat] !== P.bodyColor
     ? `<span class="chip" style="background:${P[coat]}"></span>` : '';
   const swatch = `<span class="chip" style="background:${P.bodyColor}"></span>${second}`;
-  const traits = TRAIT_COLS.map(([, full]) => `<td>${a.traits[full] ?? '–'}</td>`).join('');
+  const F = factors(a.traits);
+  // one decimal, because a factor is the mean of two 1-5 assets and lands on halves
+  const traits = TRAIT_COLS.map(([, full]) => `<td>${F[full.replace('/', '')].toFixed(1)}</td>`)
+    .join('');
   return `<tr><td>${swatch} ${a.built.species.label}</td>${traits}`
     + `<td class="co">${o.stiff.toFixed(0)}</td><td class="co">${o.zeta.toFixed(2)}</td>`
     + `<td class="co">${o.idleAmp.toFixed(2)}</td><td class="co">${o.stride.toFixed(2)}</td>`
@@ -572,7 +578,8 @@ function refreshRoster() {
     ? '<div class="shared">Same traits on every row, so anything that differs below is the '
       + 'species’ own MOTION_RANGES.</div>'
     : '';
-  const th = TRAIT_COLS.map(([ab, full]) => `<th title="${full}">${ab}</th>`).join('');
+  const th = TRAIT_COLS.map(([ab, full, from]) =>
+    `<th title="${full} — the mean of ${from}">${ab}</th>`).join('');
   rosterEl.innerHTML = `${head}<table><tr><th>species</th>${th}`
     + '<th class="co" title="how eagerly they move">stiff</th>'
     + '<th class="co" title="how much they wobble on arrival">zeta</th>'

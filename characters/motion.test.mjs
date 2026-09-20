@@ -522,10 +522,12 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
 // only 75% of its span against 100% for a single-trait one, and the middle 80% of a cast sits
 // in a band far narrower than that suggests.
 {
-  // An exhaustive sweep of the seven assets motionOf reads, rather than a random sample, so
-  // this can never fail intermittently. 5^7 is 78125 casts -- every personality there is.
-  const DRIVERS = ['Assertiveness', 'Withdrawal', 'Volatility', 'Orderliness', 'Enthusiasm',
-    'Industriousness', 'Openness'];
+  // An exhaustive sweep of the eight assets motionOf reads -- the two halves of each of the four
+  // factors that drive motion -- rather than a random sample, so this can never fail
+  // intermittently. 5^8 is 390625 casts: every personality there is, as far as motion can see.
+  // (Compassion and Politeness are absent because Agreeableness drives nothing here.)
+  const DRIVERS = ['Volatility', 'Withdrawal', 'Enthusiasm', 'Assertiveness',
+    'Industriousness', 'Orderliness', 'Openness', 'Intellect'];
   const vals = {};
   let N = 0;
   const walk = (i, traits) => {

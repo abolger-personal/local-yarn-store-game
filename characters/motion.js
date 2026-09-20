@@ -163,16 +163,15 @@ export const BASE_MOTION_RANGES = Object.freeze({
 // ---------------------------------------------------------------- traits -> coefficients
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
-const unit = (v) => (v - 1) / 4;                       // a trait asset, 1..5, onto 0..1
 const span = (range, u) => range[0] + (range[1] - range[0]) * clamp01(u);
 
 /**
- * Per-character motion coefficients, from the ten Big-5 assets.
+ * Per-character motion coefficients, from the five Big-5 FACTORS.
  *
- * CHARACTER-ATTRIBUTES.md is explicit that these exact names carry the spec and that synonyms are
- * a violation, so there is no "fidgetiness" or "tempo" knob here -- every input below is a named
- * asset. Four of the ten drive motion and six do not, which is fine: nothing says every asset has
- * to drive every system.
+ * The ten assets remain the stored, spec-named truth -- CHARACTER-ATTRIBUTES.md is explicit that
+ * those exact names carry the spec and that synonyms are a violation -- but motion reads the five
+ * factors derived from them, because twelve coefficients hanging off ten assets is more
+ * personality dials than anyone can hold while tuning. See factors().
  *
  * @param {Record<string, number>} traits the ten assets, 1-5 (visit.js randomTraits)
  * @param {Record<string, number[]>} [ranges] the species' spans
@@ -196,41 +195,88 @@ export function motionOf(traits, ranges = BASE_MOTION_RANGES) {
 // centre of the span and the dial reads as if it were not wired to anything. Measured p10..p90
 // occupancy: 75% for every two-trait coefficient against 100% for every single-trait one.
 //
-// Widening the deviation by 1.3 takes that to 98% while saturating exactly as many characters
-// at the ends as before -- 8% either way, and only the genuine extremes (a 5 against a 1). Past
-// that it gets worse fast: 1.6 reaches 100% occupancy but pins a QUARTER of the cast at a limit,
-// and 2.0 pins nearly half, which is a different way of having no spread.
+// `d` is the deviation from the middle of the span. Single-FACTOR coefficients do not come
+// through here at all: the quantile mapping above already makes those uniform, and they reach
+// 87% occupancy, which is simply what nine discrete levels give you. Only differences need it.
 //
-// `d` is the deviation from the middle of the span, so a single-trait coefficient never goes
-// through here -- those are already flat across 0..1.
-const SPREAD = 1.3;
+// Swept with the quantile factors in place: 1.3 leaves the worst difference dial at 68%, 1.6
+// reaches 83%, and 1.9 reaches 87% -- the same ceiling the single-factor dials have, so that is
+// where it stops being the limiting factor. Past 1.9 nothing improves and the pinning keeps
+// climbing (21% at 2.2, 28% at 3.0).
+const SPREAD = 1.9;
 const pair = (d) => clamp01(0.5 + SPREAD * d);
 
-/** Where this character sits, 0..1, on each coefficient's span. */
-function traitPositions(traits) {
+/**
+ * The five FACTORS, each the mean of its two assets, on the assets' own 1..5 scale.
+ *
+ * Motion is tied to these rather than to the ten assets. Twelve coefficients hanging off ten
+ * assets meant ten personality dials to reason about before you could predict how one character
+ * would move, and no way to hold "how extraverted is this one" in your head at all.
+ *
+ * The pairing is DeYoung's and it is the one visit.js already documents at its TRAITS list, so
+ * this invents nothing: the assets keep their exact spec names as the inputs, and the factors
+ * are only a reading of them. Note that the Openness/Intellect FACTOR shares a name with the
+ * Openness ASSET inside it -- that collision is DeYoung's, not ours, so the factor key spells
+ * out both halves.
+ */
+export function factors(t) {
   return {
-    // Assertive characters move like they meant it; withdrawn ones dawdle.
-    stiff: pair(0.5 * (unit(traits.Assertiveness) - unit(traits.Withdrawal))),
-    // Volatility is the Neuroticism asset that literally means reactivity, so it is the one that
-    // un-damps. Orderliness pulls back toward exactly-critical: an orderly character does not
-    // overshoot. Low u = low zeta = overshoot.
-    zeta: pair(-0.5 * (unit(traits.Volatility) - unit(traits.Orderliness))),
-    idleAmp: pair(0.5 * (unit(traits.Enthusiasm) - unit(traits.Withdrawal))),
-    idleRate: unit(traits.Volatility),
-    stride: unit(traits.Industriousness),
-    bounce: unit(traits.Enthusiasm),
-    headArc: unit(traits.Openness),
+    Neuroticism: (t.Volatility + t.Withdrawal) / 2,
+    Extraversion: (t.Enthusiasm + t.Assertiveness) / 2,
+    OpennessIntellect: (t.Openness + t.Intellect) / 2,
+    Agreeableness: (t.Compassion + t.Politeness) / 2,
+    Conscientiousness: (t.Industriousness + t.Orderliness) / 2,
+  };
+}
+
+// A factor is the MEAN of two independent 1..5 assets, so its nine possible values are not
+// equally likely: there are five ways to average 3 and only one to average 1. Feeding that mean
+// straight into a span would bunch a cast around the middle of every dial -- the same defect the
+// two-asset differences had, but now baked into every single coefficient as well.
+//
+// So a factor's position on a span is its QUANTILE, not its value: the share of the population
+// at or below it. That makes factor position uniform by construction, and needs no widening and
+// pins nobody at a limit. Indexed by the SUM of the two assets, 2..10.
+//
+// Measured alternative, for the record: leaving the mean raw and widening instead needs SPREAD
+// 1.9 to reach the same spread, and that pins one character in six at an end of every dial.
+const FACTOR_Q = Object.freeze([0, 0.0625, 0.1667, 0.3125, 0.5, 0.6875, 0.8333, 0.9375, 1]);
+const factorUnit = (a, b) => FACTOR_Q[a + b - 2];
+
+/**
+ * Where this character sits, 0..1, on each coefficient's span.
+ *
+ * Four of the five factors drive motion. Agreeableness does not, and that is not an oversight:
+ * it is the factor about how you treat people, and it belongs to what an NPC DOES -- visit.js
+ * already spends it -- rather than to how their body moves. Nothing says every factor has to
+ * drive every system.
+ */
+function traitPositions(t) {
+  const N = factorUnit(t.Volatility, t.Withdrawal);
+  const E = factorUnit(t.Enthusiasm, t.Assertiveness);
+  const C = factorUnit(t.Industriousness, t.Orderliness);
+  const O = factorUnit(t.Openness, t.Intellect);
+  return {
+    // Outgoing and settled moves like it meant it; anxious and withdrawn dawdles.
+    stiff: pair(0.5 * (E - N)),
+    // Neuroticism is reactivity, so it is what un-damps; Conscientiousness pulls back toward
+    // exactly critical. Low here means overshoot.
+    zeta: pair(0.5 * (C - N)),
+    idleAmp: pair(0.5 * (E - N)),
+    idleRate: N,
+    stride: C,
+    bounce: E,
+    headArc: O,
     // Arms swing when a character is outgoing and pin to the body when they are not.
-    armGain: pair(0.5 * (unit(traits.Enthusiasm) - unit(traits.Withdrawal))),
-    // An orderly character walks a tidy line; an excitable one rolls.
-    sway: pair(0.5 * (unit(traits.Enthusiasm) - unit(traits.Orderliness))),
-    // Leaning into the walk is purposefulness.
-    lean: pair(0.5 * (unit(traits.Assertiveness) + unit(traits.Industriousness)) - 0.5),
+    armGain: pair(0.5 * (E - N)),
+    // A conscientious character walks a tidy line; an excitable one rolls.
+    sway: pair(0.5 * (E - C)),
+    // Leaning into the walk is purposefulness: outgoing AND organised.
+    lean: pair(0.5 * (E + C) - 0.5),
     // The single most readable posture signal, and completely free of leg length: head up and
-    // open, or down and closed. SPIKE-FUN.md:353 asks for exactly this as "arms in, small,
-    // glancing at the door".
-    headCarry: pair(0.5 * (unit(traits.Withdrawal) - unit(traits.Assertiveness))),
-    armTuck: unit(traits.Withdrawal),
+    // open, or down and closed.
+    headCarry: pair(0.5 * (N - E)),
+    armTuck: N,
   };
 }
 

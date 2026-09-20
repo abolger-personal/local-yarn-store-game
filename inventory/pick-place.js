@@ -34,6 +34,9 @@ import { EMPTY, gridSize, topAt, columnAt, slotRect, footprint, fits, place, nea
  * @param opts.items       () => the item array
  * @param opts.levelFrame  (disp, shelf) => Matrix4, that level's frame in world space
  * @param opts.itemHeight  (disp, item) => its TOP surface, measured above its level's origin
+ * @param opts.itemTall    (disp, item) => how tall the item ITSELF is. Defaults to 0, which makes
+ *                         a pick behave as it did when everything was one layer: tested against
+ *                         its top face alone. Pass it and a tall thing is grabbable by its body.
  * @param opts.exposed     (disp, items, index) => may this item be lifted right now
  * @param opts.grabRadius  () => screen-space slack in CSS px
  * @param opts.snapCells   () => how far a drop reaches, in slots
@@ -41,6 +44,7 @@ import { EMPTY, gridSize, topAt, columnAt, slotRect, footprint, fits, place, nea
 export function makePicker(opts) {
   const {
     camera, displays, items, levelFrame, itemHeight,
+    itemTall = () => 0,
     exposed = () => true,
     grabRadius = () => 44,
     snapCells = () => 1.6,
@@ -84,10 +88,10 @@ export function makePicker(opts) {
     return { x: _localPt.x, z: _localPt.z, distSq };
   }
 
-  /** Where a slot's top face lands on screen, in CSS pixels, or null if it is behind the camera. */
-  function slotScreenPos(disp, shelf, item) {
+  /** Where a point on a slot's axis lands on screen, in CSS px, or null if behind the camera. */
+  function slotScreenPos(disp, shelf, item, height = itemHeight(disp, item)) {
     const rect = slotRect(disp.g, item.c, item.r, item.w, item.h);
-    _ndc.set(rect.x, itemHeight(disp, item), rect.z)
+    _ndc.set(rect.x, height, rect.z)
       .applyMatrix4(levelFrame(disp, shelf))
       .project(camera);
     if (_ndc.z > 1) return null;   // behind the camera projects to a mirrored point; reject it
@@ -95,11 +99,41 @@ export function makePicker(opts) {
   }
 
   /**
+   * Screen distance from the pointer to the item's VERTICAL AXIS — bottom of the thing to top of
+   * it — rather than to the single point on top of it.
+   *
+   * On a one-layer notion box, 15px tall on screen, the difference is nothing. On a super-bulky
+   * cone, 60px tall, measuring from the top face puts the whole lower half of the object outside a
+   * 22px grab radius: the player clicks the middle of something they can plainly see and nothing
+   * happens. The taller the item the harder it was to pick up, which is exactly backwards.
+   */
+  function axisDistance(disp, shelf, item, px, py) {
+    const top = slotScreenPos(disp, shelf, item);
+    if (!top) return null;
+    const base = slotScreenPos(disp, shelf, item, itemHeight(disp, item) - itemTall(disp, item));
+    if (!base) return Math.hypot(top.x - px, top.y - py);
+    const dx = base.x - top.x, dy = base.y - top.y;
+    const len2 = dx * dx + dy * dy;
+    // t clamped to [0,1]: past either end the nearest point IS that end, which is what keeps this
+    // a distance to the object rather than to the infinite line running through it.
+    const t = len2 < 1e-9 ? 0
+      : Math.min(1, Math.max(0, ((px - top.x) * dx + (py - top.y) * dy) / len2));
+    return Math.hypot(top.x + dx * t - px, top.y + dy * t - py);
+  }
+
+  /**
    * What the player clicked on, across EVERY display and EVERY shelf level.
    *
-   * Each occupied column is tested against ITS OWN top face, so there is no parallax to correct: a
+   * Each occupied column is tested against ITS OWN plane, so there is no parallax to correct: a
    * single cast at the shelf FLOOR while the player clicked a box TOP is off by over half a slot at
    * a diorama angle, which frequently landed outside the lattice altogether.
+   *
+   * That plane is the item's MIDDLE, not its top. A diorama angle turns a height difference into a
+   * horizontal offset — half the item's height over the tangent of the camera's elevation — and
+   * from the top face of a three-layer ball that offset is most of a slot, so a click on the front
+   * of the ball tested a column in front of the ball. Measuring from the middle halves the worst
+   * case and centres it, which is what makes a tall item grabbable over its whole body rather
+   * than only near its lid.
    *
    * FORGIVING. An exact hit wins outright; failing that, the nearest box within a SCREEN-SPACE
    * radius. Screen space, not world space, is the point — the tolerance has to mean the same thing
@@ -132,7 +166,7 @@ export function makePicker(opts) {
             // instead of the box. Removing the guard today changes nothing but the cost, which is
             // why no test can fail on it.)
             if (item.c !== c || item.r !== r) continue;
-            const hit = castLocal(disp, s, itemHeight(disp, item));
+            const hit = castLocal(disp, s, itemHeight(disp, item) - itemTall(disp, item) / 2);
             if (!hit) continue;
             const col = columnAt(disp.g, hit.x, hit.z);
             if (col && topAt(disp.g, s, col.c, col.r) === index) {
@@ -141,10 +175,8 @@ export function makePicker(opts) {
               continue;
             }
             if (exact) continue;                       // an exact hit always beats a near miss
-            const at = slotScreenPos(disp, s, item);
-            if (!at) continue;
-            const d = Math.hypot(at.x - px, at.y - py);
-            if (d > radius) continue;
+            const d = axisDistance(disp, s, item, px, py);
+            if (d === null || d > radius) continue;
             // Among near misses take the closest ON SCREEN, and only then the closest to the
             // camera, so two boxes overlapping in the picture resolve to the front one.
             if (!near || d < near.d - 1 || (Math.abs(d - near.d) <= 1 && hit.distSq < near.distSq)) {

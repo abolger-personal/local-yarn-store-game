@@ -23,6 +23,9 @@ export const DEFAULT_PARAMS = {
   name:          'Perpetua',
   footColor:     '#5d4a3c',
 
+  // A long neck bends further than a stubby one, but nothing like a bird's swivel.
+  headYawMax:    1.90,    // ~109 degrees
+
   shoulderOut:   1.00,    // arms ride on the fleece surface, not inside it
   shoulderLift:  0.34,
   clampArmOut:   true,    // llama arms are visible, so never let a pose bury the elbow

@@ -25,6 +25,12 @@ export const DEFAULT_PARAMS = {
   name:          'Hoot',
   footColor:     '#e0a53c',
 
+  // The swivel. A real owl clears about 270 degrees, and it is the single most recognisable
+  // thing an owl does -- so it is anatomy, set once here, and every system that turns a head
+  // gets it for free without knowing what an owl is. The neck takes its usual share, which is
+  // invisible on a cylinder and hidden under plumage anyway.
+  headYawMax:    4.60,    // ~264 degrees
+
   // species kit
   tuftSize:      0.049,
   tuftSpread:    0.694,

@@ -88,6 +88,10 @@ export const BASE_PARAMS = Object.freeze({
   armSwingAlt:   0.00,    // anti-symmetric arm swing: armSwing moves both arms together, so a
                           // walk's counter-swing needs a channel of its own
   headYaw:       0.00,    // positive turns to the character's LEFT
+  headYawMax:    1.40,    // HOW FAR this species can physically turn its head, radians (~80deg,
+                          // a mammal). Anatomy, not personality, so it lives with neckLength
+                          // rather than in the motion ranges -- an owl overrides it to ~260deg
+                          // and everything that turns a head is then correct for free.
   headPitch:     0.00,    // positive looks DOWN, matching spineBend's positive-forward
   headTilt:      0.00,    // positive takes the top of the head to the character's left
   blink:         0.00,    // 0 open, 1 shut. Not interpolated -- see motion.js
@@ -999,8 +1003,12 @@ function applyLimbs(joints, pose, out) {
 }
 
 /** Head rotation and blink. Split out of applyPose only to keep it under the line limit. */
-function applyHead(joints, pose) {
-  const yaw = pose.headYaw ?? 0, pitch = pose.headPitch ?? 0, tilt = pose.headTilt ?? 0;
+function applyHead(joints, pose, P) {
+  // Clamped to the species' anatomy, OUTPUT ONLY -- never written back into the interpolator,
+  // for the same reason clampArmOut is not: a clamp that feeds back ratchets.
+  const lim = P.headYawMax ?? 1.40;
+  const yaw = Math.max(-lim, Math.min(lim, pose.headYaw ?? 0));
+  const pitch = pose.headPitch ?? 0, tilt = pose.headTilt ?? 0;
   if (joints.neck) {
     joints.neck.rotation.set(pitch * NECK_SHARE, yaw * NECK_SHARE, -tilt * NECK_SHARE);
   }
@@ -1033,7 +1041,7 @@ export function applyPose(built, pose) {
   for (const { node, side, tilt } of joints.ear) {
     node.rotation.set(pose.earPerk ?? 0, 0, side * -(tilt + (pose.earSplay ?? 0)));
   }
-  applyHead(joints, pose);
+  applyHead(joints, pose, params);
   if (held && pose.holdItem !== undefined) held.visible = Boolean(pose.holdItem);
   groundCharacter(built, pose);
 }
@@ -1146,7 +1154,7 @@ export const BASE_GUI = Object.freeze({
     ['spineBend', -0.7, 1.2], ['spineRoll', -0.8, 0.8],
     ['earPerk', -1.2, 1.2], ['earSplay', -0.8, 1.2],
     ['armSwingAlt', -1.0, 1.0],
-    ['headYaw', -1.6, 1.6], ['headPitch', -0.9, 0.9], ['headTilt', -0.8, 0.8],
+    ['headYaw', -5.0, 5.0], ['headPitch', -0.9, 0.9], ['headTilt', -0.8, 0.8],
     ['blink', 0, 1],
     ['holdItem', 'bool'],
   ],
@@ -1155,6 +1163,7 @@ export const BASE_GUI = Object.freeze({
     ['upperArmLen', 0.03, 0.20], ['forearmLen', 0.03, 0.20],
     ['shoulderOut', 0.4, 1.6], ['shoulderLift', -0.2, 0.9],
     ['clampArmOut', 'bool'], ['armClearance', 0, 0.03],
+    ['headYawMax', 0.4, 5.0],
     ['heldColor', 'color'],
   ],
   'body material': [

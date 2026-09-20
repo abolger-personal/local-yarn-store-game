@@ -57,11 +57,18 @@ const S = {
   allSpecies: false,       // one character per species from IDENTICAL traits
   view: 'felted',
   // bake-off
-  interruptAfter: 0.15,    // seconds into a transition -- default BLEND is 0.35, so mid-flight
+  // A FRACTION of the move, not a wall-clock time. Absolute seconds made the duration knob
+  // change two things at once: how long a move takes AND how far through it the interrupt
+  // landed. Worse, at any duration shorter than the interrupt delay the move simply FINISHED
+  // first, so there was no interrupt to survive and the two duration-based engines printed
+  // identical numbers -- which reads as "the duration slider does nothing to smoothstep".
+  interruptAt: 0.45,       // 0..1 through the move
   chaos: false,
   dtScale: 1,
   // walk
   speed: 0.0,
+  lookOver: 0,             // -1..1 of the species' own headYawMax. An owl reaches ~264deg here
+                           // and a llama ~109, from one shared control and no per-species code.
   scopeChannel: 'armSwing',
   // tuning, copied so the lab never mutates a frozen export
   opts: { ...MOTION_DEFAULTS },
@@ -275,7 +282,10 @@ function fireInterrupt() {
   target = POSES.rest;
   setTarget(POSES.reach);
   pendingTarget = POSES.browse;
-  pendingInterrupt = S.interruptAfter;
+  // Scaled by the move duration, so changing that knob changes ONLY how fast the move is and
+  // never where the interrupt lands. The spring has no duration of its own, but all three rows
+  // run off one event stream and so must share one interrupt instant.
+  pendingInterrupt = S.interruptAt * S.opts.blend;
 }
 
 // ---------------------------------------------------------------- per-frame
@@ -292,6 +302,9 @@ function tickOne(a, dt) {
   a.maxDv = Math.max(a.maxDv ?? 0, Math.abs(after - before));
 
   const out = compose(scratch, a.motion, a.opts);
+  // Deliberate head turn, as a fraction of what this species can physically do. applyPose
+  // clamps to headYawMax, so asking for more than an animal has simply saturates.
+  if (S.lookOver !== 0) out.headYaw += S.lookOver * (a.built.params.headYawMax ?? 1.4);
 
   // walk: distance-driven, so the phase freezes when the character does
   const P = a.built.params;
@@ -497,8 +510,10 @@ const fBake = gui.addFolder('how motion gets from A to B');
 knob(fBake, { go: fireInterrupt }, 'go', '\u25b6 CUT OFF A MOVE (Enter)',
   'The whole point of this page. Starts a reach, then interrupts it partway with a browse. '
   + 'Watch whether each row glides into the new move or stops dead and restarts.');
-knob(fBake, S, 'interruptAfter', 'cut it off after', 'Seconds into the first move before the '
-  + 'interrupt lands. Moves take about 0.35s, so 0.15 cuts in halfway.', 0.02, 0.5);
+knob(fBake, S, 'interruptAt', 'cut it off how far in',
+  'Where the interrupt lands, as a fraction of the move: 0.5 is halfway. A fraction rather than '
+  + 'a time, so changing the duration below does not also change where the cut happens.',
+  0.05, 0.95);
 knob(fBake, { next: cyclePose }, 'next', 'next pose (P)',
   'Step through the poses one at a time, uninterrupted.');
 knob(fBake, S, 'chaos', 'never stop interrupting',
@@ -539,6 +554,11 @@ knob(fWalk, S.opts, 'armGain', 'arm swing',
   0, 1.5).onChange(retune);
 knob(fWalk, S.opts, 'lean', 'forward lean',
   'How far they lean into the walk while moving.', 0, 0.3).onChange(retune);
+
+knob(fWalk, S, 'lookOver', 'look over the shoulder',
+  'Turns every head as far as ITS OWN SPECIES can manage. An owl clears about 264 degrees, a '
+  + 'llama about 109 \u2014 set once in each kit as headYawMax, next to neckLength.',
+  -1, 1).onChange(() => { if (S.speed === 0) showPose(); });
 
 const fIdle = gui.addFolder('standing still');
 knob(fIdle, S.opts, 'idleAmount', 'how much they fidget',

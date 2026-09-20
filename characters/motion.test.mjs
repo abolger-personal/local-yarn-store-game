@@ -290,6 +290,32 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     'the walk drives no knee channel: npc.js kneeAmount already derives it from legSwing');
 }
 
+// --- head yaw is anatomy, and species differ in it enormously ---------------------------------
+//
+// headYawMax lives in the rig params next to neckLength, not in the motion ranges, because it is
+// a fact about the animal rather than about one individual's temperament. Anything that turns a
+// head asks for an angle and gets clamped to what that species actually has -- which is what
+// lets one shared look-at serve a 264-degree owl and a 109-degree llama with no per-species code.
+//
+// Asserted here on the pose side (the clamp itself lives in npc.js applyPose, which needs three):
+// headArc scales how much they IDLY glance and must stay modest, or every character spends the
+// day staring backwards.
+{
+  const o = opts();
+  const m = makeMotion(POSES.rest, 0.5);
+  const buf = out();
+  let hi = 0;
+  for (let i = 0; i < 3600; i++) {
+    integrate(m, POSES.rest, 1 / 60, { ...o, headArc: 2.2 });      // the owl's widest span
+    compose(buf, m, { ...o, headArc: 2.2 });
+    hi = Math.max(hi, Math.abs(buf.headYaw));
+  }
+  assert.ok(hi * 180 / Math.PI < 45,
+    `idle glancing must stay modest even at the widest headArc (got ${(hi * 180 / Math.PI).toFixed(0)}deg) `
+    + '-- the full swivel is for deliberate looks, not for standing around');
+  assert.ok(hi > 0.05, 'but they must still look around while idle');
+}
+
 // --- traits to coefficients, and the per-species span -----------------------------------------
 {
   const flat = Object.fromEntries(Object.keys(motionOf(t(3))).map((k) => [k, 0]));

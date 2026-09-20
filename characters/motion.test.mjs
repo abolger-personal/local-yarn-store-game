@@ -470,6 +470,18 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
       + 'BASE_MOTION_RANGES if it should vary per species');
   }
 
+  // Every span also needs a plain-English label, or its two generated rows render as
+  // "undefined — least" and "undefined — most". Adding a key to BASE_MOTION_RANGES and
+  // forgetting SPAN_HELP is a one-line omission with no other symptom.
+  const help = lab.slice(lab.indexOf('const SPAN_HELP'));
+  const labelled = new Set([...help.slice(0, help.indexOf('};')).matchAll(/^\s*(\w+):/gm)]
+    .map((m) => m[1]));
+  for (const k of spans) {
+    assert.ok(labelled.has(k),
+      `BASE_MOTION_RANGES.${k} has no SPAN_HELP entry in motion-lab.js, so its two slider rows `
+      + 'will both read "undefined"');
+  }
+
   // and the reverse: a knob naming a key that no longer exists is a slider wired to nothing
   const known = new Set([...Object.keys(MOTION_DEFAULTS), ...spans]);
   for (const k of wired) {

@@ -616,6 +616,13 @@ const SPAN_HELP = {
   stride: 'step length',
   bounce: 'walking bounce',
   headArc: 'how far they turn their head',
+  // The walking STYLE spans. These arrived with the personality-in-the-walk work and had no
+  // label here, so every one of them rendered as "undefined — least" / "undefined — most".
+  armGain: 'how much the arms swing',
+  sway: 'how far they roll side to side',
+  lean: 'how far they lean into a walk',
+  headCarry: 'how low they carry their head',
+  armTuck: 'how much they hold their arms in',
 };
 
 const fRanges = gui.addFolder('how much members of a species differ');

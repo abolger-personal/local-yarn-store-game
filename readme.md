@@ -30,8 +30,9 @@ If that value looks old, the browser is running cached code and nothing you chan
 | --- | --- |
 | `characters/species-checker.html` | Do two species read as different animals? Tuning surface, one character at a time. |
 | `characters/crowd.html` | Does the randomiser make a cast or a zoo? Performance instrumentation lives here. |
+| `characters/motion-lab.html` | Does motion survive being interrupted, and does personality read in how a character moves? See `characters/MOTION-TODO.md`. |
+| `characters/store.html` | The game. Visit loop, displays, the full sim. |
 | `inventory/stash-and-stuff.html` | Does the placement mechanic feel good? Notion look and drag behaviour. |
-| `characters/felted-owl.html` | Original single-owl tuner. Superseded by the species checker. |
 
 ## Layout
 

@@ -585,7 +585,9 @@ function refreshRoster() {
     + '<th class="co" title="how much they wobble on arrival">zeta</th>'
     + '<th class="co" title="how much they fidget">idle</th>'
     + '<th class="co" title="step length">stride</th>'
-    + `<th class="co" title="how far they turn their head">head</th></tr>${rows}</table>`;
+    + '<th class="co" title="how much they look around while idling — NOT how far they CAN '
+    + 'turn, which is headYawMax in the species kit: anatomy, not temperament">head</th>'
+    + `</tr>${rows}</table>`;
 }
 
 const readoutEl = document.getElementById('readout');
@@ -684,7 +686,7 @@ const SPAN_HELP = {
   idleRate: 'how fast they fidget',
   stride: 'step length',
   bounce: 'walking bounce',
-  headArc: 'how far they turn their head',
+  headArc: 'how much they look around',
   // The walking STYLE spans. These arrived with the personality-in-the-walk work and had no
   // label here, so every one of them rendered as "undefined — least" / "undefined — most".
   armGain: 'how much the arms swing',

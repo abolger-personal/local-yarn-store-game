@@ -839,7 +839,12 @@ export function createCharacter(P, species) {
   if (P.scarf) body.neck.add(buildScarf(P, addMaterial));
   if (!P.partShadows) disableShadowCasting(body.root);
   if (P.mergeMeshes !== false) mergeCharacter(ctx);
-  groundCharacter(ctx);
+  // Seed the pose through applyPose rather than leaving each build function to set its own
+  // joint from P. The build functions still do (buildArm sets P.armSwing, buildUpperBody sets
+  // P.spineBend), but they only know the channels that existed when they were written -- which
+  // is why a newly added channel silently did nothing in species-checker.html, whose sliders
+  // REBUILD rather than re-pose. One path for build and runtime, so the two cannot drift again.
+  applyPose(ctx, P);
   return ctx;
 }
 

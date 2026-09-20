@@ -68,6 +68,8 @@ const S = {
   // first, so there was no interrupt to survive and the two duration-based engines printed
   // identical numbers -- which reads as "the duration slider does nothing to smoothstep".
   interruptAt: 0.45,       // 0..1 through the move
+  cutSlow: 0.2,            // time scale WHILE a scripted cut runs, so the eye can follow it
+  loopCut: true,           // repeat the cut until told to stop -- one press is never enough
   chaos: false,
   dtScale: 1,
   // walk
@@ -240,10 +242,24 @@ const scratch = Object.fromEntries(
 
 let target = POSES.rest;
 let poseIndex = 0;
-let pendingInterrupt = 0;
-let pendingTarget = null;
+// The scripted run, as a stage machine: settle -> reach -> (cut) -> browse -> done.
+// It used to be a one-shot that began by SNAPPING every character to rest in a single frame,
+// which is a whole-screen flash an order of magnitude more visible than the 0.35s event it was
+// setting up -- it read as the page reloading. The snap is still here, for the determinism it
+// buys, but it now happens only once everyone has already ANIMATED back to rest, so it moves
+// nothing and you never see it.
+let runStage = 'done';
+let runTimer = 0;
 let markNextSample = false;   // drawn as a vertical rule on the scope
 const poseTrail = [];         // the last two target names, so the banner can read "reach -> browse"
+
+// What the banner says at each stage of a scripted cut. Without this the settle stage looks
+// like the page doing something random before the thing you asked for.
+const RUN_STAGES = {
+  settle: 'settling back to rest \u2014 so every run starts from the same place',
+  reach:  'reaching \u2026 about to be cut off partway',
+  cut:    'CUT \u2014 the reach was interrupted by a browse. Which row glided, and which stopped dead?',
+};
 const poseEl = document.getElementById('pose');
 
 /**
@@ -267,18 +283,21 @@ function setTarget(pose, reset = true) {
 function showPose() {
   const now = poseTrail.at(-1) ?? 'rest';
   const prev = poseTrail.length > 1 ? poseTrail.at(-2) : null;
-  poseEl.innerHTML = `<b>${prev ? `${prev} \u2192 ` : ''}${now}</b>`
-    + `<span>${POSE_MEANS[now] ?? ''}</span>`
-    // The trap this page is built around and did not warn about: the three engines interpolate
-    // the COMMANDED pose, and the walk and idle layers are added AFTERWARDS, identically for
-    // all three. Measured spread on armSwing between the engines: 0.0000 rad while the target
-    // is held, 0.0227 across one clean pose change, 0.2670 across an interrupted one. So a
-    // walking cast with a fixed pose shows three bit-identical rows, and it looks like the
-    // engine switch is broken when it is doing exactly what it should.
-    + '<span class="hint">the three rows differ ONLY across a pose change \u2014 press '
-    + '<kbd>Enter</kbd> to interrupt one. Walking and fidgeting are added after the '
-    + 'interpolator, the same way for all three.</span>';
+  // The trap this page is built around and did not warn about: the three engines interpolate the
+  // COMMANDED pose, and the walk and idle layers are added AFTERWARDS, identically for all
+  // three. Measured spread on armSwing between engines: 0.0000 rad while the target is held,
+  // 0.0227 across one clean pose change, 0.2670 across an interrupted one. So a walking cast
+  // holding a pose shows three bit-identical rows, and that reads as a broken engine switch
+  // when it is the system working correctly.
+  const tail = runStage === 'done'
+    ? '<span class="hint">the three rows differ ONLY across a pose change \u2014 press '
+      + '<kbd>Enter</kbd> to interrupt one. Walking and fidgeting are added after the '
+      + 'interpolator, the same way for all three.</span>'
+    : `<span class="stage">${RUN_STAGES[runStage] ?? ''}</span>`;
+  const arrow = prev ? `${prev} \u2192 ` : '';
+  poseEl.innerHTML = `<b>${arrow}${now}</b><span>${POSE_MEANS[now] ?? ''}</span>${tail}`;
 }
+
 
 function cyclePose() {
   poseIndex = (poseIndex + 1) % POSE_NAMES.length;
@@ -293,21 +312,52 @@ function cyclePose() {
  * one frame.
  */
 function fireInterrupt() {
-  // Snap everyone back to rest first. Firing twice in a row from wherever the last run happened
-  // to end measures nothing -- the second run starts already at the target and no channel moves,
-  // which reads as "0.00" and looks like the instrument is broken rather than the setup.
-  //
-  // `target` has to be reset alongside the per-character state: integrate() detects a retarget by
-  // object IDENTITY, so leaving it pointing at POSES.reach from the previous run means the setup
-  // pose below is not seen as a change at all and nothing ever starts moving.
-  for (const a of cast) resetMotion(a.motion, POSES.rest);
-  target = POSES.rest;
-  setTarget(POSES.reach);
-  pendingTarget = POSES.browse;
-  // Scaled by the move duration, so changing that knob changes ONLY how fast the move is and
-  // never where the interrupt lands. The spring has no duration of its own, but all three rows
-  // run off one event stream and so must share one interrupt instant.
-  pendingInterrupt = S.interruptAt * S.opts.blend;
+  runStage = 'settle';
+  runTimer = 0;
+}
+
+/** Everyone home and stopped, so a hard reset from here changes nothing you can see. */
+function atRest() {
+  return cast.every((a) => POSE_KEYS.every((k) => Math.abs(velocityOf(a.motion, k)) < 2e-3
+    && Math.abs(valueOf(a.motion, k) - (POSES.rest[k] ?? 0)) < 2e-3));
+}
+
+/**
+ * One frame of the scripted run.
+ *
+ * Deterministic and repeatable, which is the whole point: eyeballing an interrupt by clicking
+ * twice fast never lands on the same frame twice, and the comparison is about that one frame.
+ * Firing again from wherever the last run ended would measure nothing -- the second run would
+ * start already at the target, no channel would move, and the readout would say 0.00 and look
+ * like a broken instrument rather than a broken setup. Hence the settle stage.
+ */
+function stepRun(dt) {
+  runTimer += dt;
+  if (runStage === 'settle') {
+    // `target` must be reset alongside the per-character state: integrate() detects a retarget
+    // by object IDENTITY, so leaving it pointing at POSES.reach means the setup pose below is
+    // not seen as a change at all and nothing ever starts moving.
+    if (target !== POSES.rest) setTarget(POSES.rest);
+    if (!atRest() && runTimer < 3) return;          // timeout: a very low stiffness may crawl
+    for (const a of cast) resetMotion(a.motion, POSES.rest);
+    setTarget(POSES.reach);
+    runStage = 'reach';
+    runTimer = 0;
+  } else if (runStage === 'reach') {
+    // Scaled by the move duration, so that knob changes ONLY how fast the move is and never
+    // where the cut lands. The spring has no duration of its own, but all three rows run off
+    // one event stream and so must share one interrupt instant.
+    if (runTimer < S.interruptAt * S.opts.blend) return;
+    setTarget(POSES.browse, false);
+    runStage = 'cut';
+    runTimer = 0;
+    // Hold after the cut just long enough to see the arrival. This is SIMULATED time, so at
+    // cutSlow 0.2 a 1.5s hold is seven and a half real seconds of watching nothing happen --
+    // long enough that a looping cut feels broken rather than repetitive.
+  } else if (runTimer > Math.max(0.6, S.opts.blend * 2)) {
+    runStage = S.loopCut ? 'settle' : 'done';
+    runTimer = 0;
+  }
 }
 
 // ---------------------------------------------------------------- per-frame
@@ -353,12 +403,16 @@ function frame() {
   if (paused && !stepOnce) dt = 0;
   if (stepOnce) { dt = (1 / 60) * S.dtScale; stepOnce = false; }
 
-  if (pendingInterrupt > 0 && dt > 0) {
-    pendingInterrupt -= dt;
-    if (pendingInterrupt <= 0 && pendingTarget) {
-      setTarget(pendingTarget, false);
-      pendingTarget = null;
-    }
+  // Slowed only while a scripted run is in flight. Velocity continuity is a sub-100ms event:
+  // at real time there is nothing for an eye to catch, which is why pressing the button felt
+  // like it did nothing but flash. Walking speed is untouched when no run is going.
+  if (runStage !== 'done') {
+    // Settling is setup, not evidence: run it at real time so the loop does not spend most of
+    // its wall clock watching characters stand back up.
+    if (runStage !== 'settle') dt *= S.cutSlow;
+    const was = runStage;
+    stepRun(dt);
+    if (runStage !== was) showPose();
   }
   if (S.chaos && dt > 0 && Math.random() < dt * 4) cyclePose();
 
@@ -552,9 +606,17 @@ const fBake = gui.addFolder('how motion gets from A to B');
 knob(fBake, { go: fireInterrupt }, 'go', '\u25b6 CUT OFF A MOVE (Enter)',
   'The whole point of this page. Starts a reach, then interrupts it partway with a browse. '
   + 'Watch whether each row glides into the new move or stops dead and restarts.');
-knob(fBake, S, 'interruptAt', 'cut it off how far in',
-  'Where the interrupt lands, as a fraction of the move: 0.5 is halfway. A fraction rather than '
-  + 'a time, so changing the duration below does not also change where the cut happens.',
+knob(fBake, S, 'cutSlow', 'slow motion during the cut',
+  'Velocity continuity is a sub-100ms event, so at real time there is nothing for an eye to '
+  + 'catch. This slows time only while a cut is running — walking speed is untouched the '
+  + 'rest of the time. 0.1 is ten times slower than life.', 0.05, 1);
+knob(fBake, S, 'loopCut', 'keep repeating the cut',
+  'Runs the cut over and over, settling back to rest between each one, so you can watch the '
+  + 'same instant as many times as you need instead of pressing the button again.');
+knob(fBake, S, 'interruptAt', 'cut it off how far in (fraction)',
+  'Where the cut lands as a FRACTION of the move, not a time: 0.5 is halfway, 0.1 is almost '
+  + 'immediately. A fraction rather than seconds, so changing the move duration below does not '
+  + 'also move where the cut happens.',
   0.05, 0.95);
 knob(fBake, { next: cyclePose }, 'next', 'next pose (P)',
   'Step through the poses one at a time, uninterrupted.');

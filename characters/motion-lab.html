@@ -22,7 +22,10 @@
     background: #efefef; border: 1px solid #ddd; border-bottom-width: 2px;
     border-radius: 4px; padding: 0 4px; font-size: 11px; font-family: ui-monospace, monospace;
   }
-  #roster { right: 12px; bottom: 12px; font-size: 11px; max-height: 38vh; overflow: auto; }
+  /* clear of the lil-gui panel: at 13 columns the roster used to run underneath it and the
+     coefficients were simply not readable */
+  #roster { right: 262px; bottom: 12px; font-size: 11px; max-height: 38vh; overflow: auto;
+    max-width: calc(100vw - 290px); }
   #roster table { border-collapse: collapse; }
   #roster th, #roster td { padding: 1px 7px 1px 0; text-align: right; font-variant-numeric: tabular-nums; }
   #roster th:first-child, #roster td:first-child { text-align: left; }
@@ -41,6 +44,8 @@
   #pose b { display: block; font-size: 15px; color: #111; letter-spacing: .01em; }
   #pose span { display: block; font-size: 11px; color: #777; margin-top: 1px; }
   #pose span.hint { color: #9a6b2f; max-width: 460px; margin: 3px auto 0; line-height: 1.35; }
+  #pose span.stage { color: #1a6b3f; font-size: 12px; max-width: 460px; margin: 3px auto 0;
+    line-height: 1.35; font-weight: 500; }
   #scope { display: block; width: 360px; height: 110px; }
   #readout {
     margin-top: 4px; font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: #444;

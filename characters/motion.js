@@ -250,6 +250,7 @@ const MAX_DT = 1 / 30;
 // 1.089 / 1.089 / 1.089. Cost at the worst frame is ~12 substeps, on a frame already late.
 const MAX_H = 1 / 120;
 
+const FLICK_DUR = 0.34;   // an ear flick is quick; slower reads as a droop
 const BLINK_DUR = 0.12;
 const BREATH_W = TAU * 0.25;    // ~4s per breath at idleRate 1
 
@@ -286,6 +287,8 @@ export function makeMotion(pose, seed = Math.random()) {
     rateB: (1 - seed) * 0.07,
     idlePhase: seed * TAU,
     blinkT: 1 + seed * 4,
+    earT: 0.7 + seed * 5,             // offset from the blink so the two never sync up
+    earWay: seed < 0.5 ? -1 : 1,      // which ear leads this flick
     walkGain: 0,
   };
   readInto(m.cur, pose);
@@ -339,13 +342,32 @@ export function integrate(m, target, dt, opts) {
   else if (opts.mode === 'smoothstep') smoothstep(m, step, opts);
   else spring(m, step, opts);
 
-  // Idle clocks advance with the real dt, not the clamped one: a long frame really did take that
-  // long, and a breath that stalls during a hitch reads worse than one that jumps.
+  advanceClocks(m, dt, opts);
+  return m;
+}
+
+/**
+ * The three idle clocks: the breathing phase, the blink, and the ear flick.
+ *
+ * All advance with the REAL dt, not the clamped one -- a long frame really did take that long,
+ * and a breath that stalls through a hitch reads worse than one that jumps. They run at rates
+ * that are deliberately not multiples of each other: two twitch rhythms sharing a period read as
+ * one mechanism, and that is what makes an idle look like an animation instead of like life.
+ */
+function advanceClocks(m, dt, opts) {
   m.idlePhase += dt * BREATH_W * opts.idleRate;
   if (m.idlePhase > TAU * 1e6) m.idlePhase %= TAU;
+
   m.blinkT -= dt;
   if (m.blinkT < -BLINK_DUR) m.blinkT = 2 + Math.random() * 5;
-  return m;
+
+  // Flick rate follows how often they fidget, so one knob governs both -- but an ear is never
+  // fully stilled, for the same reason breathing is not.
+  m.earT -= dt * (0.45 + 0.55 * (opts.idleDuty ?? 1));
+  if (m.earT < -FLICK_DUR) {
+    m.earT = 1.4 + Math.random() * 6;
+    m.earWay = Math.random() < 0.5 ? -1 : 1;
+  }
 }
 
 function spring(m, dt, opts) {
@@ -437,6 +459,26 @@ export function compose(out, m, opts) {
  * gated by this -- an animal that stops breathing when it stops shifting its weight reads as
  * switched off rather than as still.
  */
+
+/**
+ * Ear flicks: the idle channel the rig has always had and nothing ever drove.
+ *
+ * A llama's ears and an owl's tufts sat dead through every idle, which on an animal whose ears
+ * are half its silhouette is the most obviously missing thing on screen.
+ *
+ * A flick is not a sway -- it is fast, asymmetric, and on its own clock -- so it rides a
+ * Poisson-ish timer like the blink rather than the idle sine. A sine here would read as ears
+ * flapping in a breeze. Both ears share one channel pair, so the asymmetry has to come from
+ * splay rather than a per-ear angle; that reads as one ear cocking, which is the right shape
+ * even though both are moving.
+ */
+function earFlick(out, m, a) {
+  if (m.earT >= 0) return;
+  const k = Math.sin((1 + m.earT / FLICK_DUR) * Math.PI);   // 0 -> 1 -> 0 across the flick
+  out.earPerk += a * 0.30 * k;
+  out.earSplay += a * 0.16 * k * m.earWay;
+}
+
 function dutyGate(p, duty, seed) {
   if (duty >= 1) return 1;
   const e = Math.sin(p * 0.37 + seed * 1.7);
@@ -463,11 +505,25 @@ function idleLayer(out, m, opts, a) {
   // never repeat, and a visible repeat is what makes an idle read as an animation, not as life.
   const w = Math.sin(p * (0.17 + m.rateA) + m.seed);
   out.spineRoll += g * 0.085 * w;
-  out.hipFlex += g * 0.020 * Math.sin(p * (0.17 + m.rateA) * 2 + m.seed);
+
+  // The hip part of the weight shift FADES OUT as the character folds up, and this is not a
+  // nicety. groundCharacter derives root Y from the lowest foot, whose sensitivity to hipFlex is
+  // sin(hip) -- which is ~0 standing (hip near 0) and ~1 seated (POSES.sit has hipFlex 1.45).
+  // So the identical 0.020 rad wobble is invisible on a standing character and a 100x larger
+  // whole-body bounce on a seated one. Measured over two simulated minutes: root travel 0.05mm
+  // standing against 5.20mm sitting, and still 4.38mm with the duty cycle at its lowest, which
+  // is why a sitting owl looked like it never stopped moving however far that knob came down.
+  //
+  // It is also just wrong: you do not shift your weight between your feet while sitting on them.
+  const upright = clamp01(1 - Math.abs(out.hipFlex) / 0.9);
+  out.hipFlex += g * upright * 0.020 * Math.sin(p * (0.17 + m.rateA) * 2 + m.seed);
   out.headTilt += g * 0.070 * opts.headArc * w;
   out.headYaw += g * 0.180 * opts.headArc * Math.sin(p * (0.11 + m.rateB) + m.seed * 2);
   out.headPitch += g * 0.055 * opts.headArc * Math.sin(p * (0.09 + m.rateB) + m.seed * 3);
+
+  earFlick(out, m, a);
 }
+
 
 /**
  * Stride phase, stride length and swing amplitude, from DISTANCE TRAVELLED rather than time.

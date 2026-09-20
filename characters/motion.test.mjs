@@ -448,6 +448,72 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     'the walk leaves kneeBend to the base pose and drives kneeSwing instead');
 }
 
+// --- the idle must not bounce a seated character --------------------------------------------
+//
+// groundCharacter derives root Y from the lowest foot, and that foot's sensitivity to hipFlex is
+// sin(hip): ~0 standing, ~1 folded up (POSES.sit authors hipFlex 1.45). So an idle term sized
+// for a standing character becomes a whole-body vertical bounce when seated -- measured 0.05mm
+// standing against 5.20mm sitting, and still 4.38mm with the duty cycle at its lowest, which is
+// what "the owls never stop moving when sitting" actually was.
+{
+  const L = 0.238, thigh = L * 0.55, shin = L * 0.45;
+  const lowest = (pose) => Math.min(...[-1, 1].map((side) => {
+    const hip = pose.legSwing * side - (pose.hipFlex ?? 0);
+    const knee = hip + Math.max(0, side * (pose.kneeSwing ?? 0));
+    return L - Math.cos(hip) * thigh - Math.cos(knee) * shin;
+  }));
+
+  const bob = (poseName) => {
+    const o = opts();
+    const m = makeMotion(POSES[poseName], 0.42);
+    resetMotion(m, POSES[poseName]);
+    const buf = {};
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < 60 * 90; i++) {
+      integrate(m, POSES[poseName], 1 / 60, o);
+      compose(buf, m, o);
+      const y = -lowest(buf);
+      lo = Math.min(lo, y); hi = Math.max(hi, y);
+    }
+    return hi - lo;
+  };
+
+  const standing = bob('rest');
+  assert.ok(bob('sit') <= standing + 1e-4,
+    `a seated character bobs ${(bob('sit') * 1000).toFixed(2)}mm against `
+    + `${(standing * 1000).toFixed(2)}mm standing -- the weight-shift idle has to fade out as `
+    + 'the legs fold, or grounding turns it into a whole-body bounce');
+}
+
+// --- ears are part of the idle ---------------------------------------------------------------
+//
+// earPerk and earSplay existed from the day the rig was built and nothing drove them, so a
+// llama's ears and an owl's tufts sat dead through every idle -- on an animal whose ears are
+// half its silhouette, the most visibly missing thing on screen.
+{
+  const o = opts();
+  const m = makeMotion(POSES.rest, 0.42);
+  resetMotion(m, POSES.rest);
+  const buf = {};
+  let flicks = 0, was = false, peak = 0, splay = 0;
+  for (let i = 0; i < 60 * 180; i++) {
+    integrate(m, POSES.rest, 1 / 60, o);
+    compose(buf, m, o);
+    const on = buf.earPerk > 0.01;
+    if (on && !was) flicks++;
+    was = on;
+    peak = Math.max(peak, buf.earPerk);
+    splay = Math.max(splay, Math.abs(buf.earSplay));
+  }
+  assert.ok(flicks / 3 > 2, `ears must flick while idling (got ${(flicks / 3).toFixed(1)}/min)`);
+  assert.ok(splay > 0.01, 'a flick must be asymmetric, or both ears move as one slab');
+  // headroom: BASE_GUI authors earPerk over -1.2..1.2 and POSES.delighted uses 0.38, so a flick
+  // landing on top of delight must still be an angle an ear can physically reach
+  assert.ok(peak + 0.38 < 1.2,
+    `a flick on top of POSES.delighted reaches ${(peak + 0.38).toFixed(2)} rad, past what the `
+    + 'rig authors for an ear');
+}
+
 // --- personality actually spreads the cast ---------------------------------------------------
 //
 // A dial wired to personality but bunched at the middle of its span is indistinguishable, on

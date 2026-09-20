@@ -830,7 +830,9 @@ knob(fIdle, S.scale, 'idleRate', 'how fast they fidget',
 knob(fIdle, S.opts, 'idleDuty', 'how often they fidget',
   'Duty cycle, separate from size. At 1 they sway continuously; lower and the sway comes in '
   + 'bursts with real stillness between them, which is how animals actually stand around. '
-  + 'Breathing never stops.', 0.15, 1).onChange(retune);
+  + 'Two things deliberately never stop: breathing, and the occasional ear flick — both slow '
+  + 'down here but neither switches off, because a character frozen absolutely solid reads as '
+  + 'a dropped frame rather than as stillness.', 0.15, 1).onChange(retune);
 
 /** Paste-ready for a kit file, so lab tuning lands in source without retyping. */
 function exportRanges() {

@@ -197,6 +197,22 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
   assert.equal(walkPhase(0, 0.2, short, o).skate, 0, 'no skate at a walkable speed');
   assert.ok(walkPhase(0, 4.0, short, o).skate > 0.5,
     'skate is reported, not hidden, once the geometric ceiling binds');
+
+  // THE FOOT-LOCK CONDITION, and the assertion that catches the bug this file shipped with:
+  // the foot's peak-to-peak fore-aft travel is 2*L*sin(swingAmp) and the body covers strideLen
+  // per cycle, so equal or the feet slide. Measured against the real rig at four leg lengths,
+  // where an earlier stride/4 put the true excursion at exactly 0.500x -- 50% skate, invisible
+  // to every other assertion here because none of them compared the foot to the ground.
+  for (const L of [short, tall, 0.13, 0.475]) {
+    for (const speed of [0.15, 0.4, 0.8]) {
+      const p = walkPhase(0, speed, L, o);
+      if (p.skate > 0) continue;                 // past the ceiling the shortfall is reported
+      const travel = 2 * L * Math.sin(p.swingAmp);
+      assert.ok(Math.abs(travel - p.strideLen) < 1e-9,
+        `foot travel ${travel.toFixed(4)} must equal stride ${p.strideLen.toFixed(4)} `
+        + `(L=${L}, speed=${speed}) or the planted foot slides`);
+    }
+  }
 }
 
 // --- the walk gate closes cleanly -------------------------------------------------------------

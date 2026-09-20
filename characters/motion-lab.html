@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYS — motion lab</title>
+<style>
+  :root { color-scheme: light; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; transition: filter 120ms linear; }
+  canvas.squint { filter: blur(6px); }
+  .panel {
+    position: fixed; z-index: 10;
+    background: rgba(255,255,255,.84); backdrop-filter: blur(6px);
+    border: 1px solid rgba(0,0,0,.08); border-radius: 10px;
+    padding: 9px 12px; font-size: 12px; line-height: 1.5; color: #333;
+  }
+  #hud { left: 12px; bottom: 12px; max-width: 360px; }
+  #hud b { color: #111; }
+  #hud kbd {
+    background: #efefef; border: 1px solid #ddd; border-bottom-width: 2px;
+    border-radius: 4px; padding: 0 4px; font-size: 11px; font-family: ui-monospace, monospace;
+  }
+  #roster { right: 12px; bottom: 12px; font-size: 11px; max-height: 38vh; overflow: auto; }
+  #roster table { border-collapse: collapse; }
+  #roster th, #roster td { padding: 1px 7px 1px 0; text-align: right; font-variant-numeric: tabular-nums; }
+  #roster th:first-child, #roster td:first-child { text-align: left; }
+  #roster th { color: #888; font-weight: 500; }
+  #roster .shared { color: #555; margin-bottom: 4px; max-width: 210px; line-height: 1.4; }
+  #scopeWrap { left: 12px; top: 12px; padding: 8px 10px 6px; }
+  #scope { display: block; width: 360px; height: 110px; }
+  #readout {
+    margin-top: 4px; font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: #444;
+  }
+  .legend { font-size: 10px; color: #777; margin-bottom: 3px; }
+  .legend i { font-style: normal; font-weight: 600; }
+  .sp { color: #2f7fd1; } .he { color: #d1642f; } .ss { color: #8a8f98; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div class="panel" id="scopeWrap">
+  <div class="legend">
+    selected channel · bold = value, faint = velocity · vertical rule = interrupt<br />
+    <i class="sp">spring</i> · <i class="he">hermite</i> · <i class="ss">smoothstep (today)</i>
+    — front to back
+  </div>
+  <canvas id="scope" width="360" height="110"></canvas>
+  <div id="readout"></div>
+</div>
+
+<div class="panel" id="hud">
+  <b>LYS motion lab</b> — does motion survive an interrupt, and how much should one member of a
+  species differ?<br />
+  Drag to orbit · scroll to zoom<br />
+  <kbd>Enter</kbd> interrupt &nbsp; <kbd>P</kbd> next pose &nbsp; <kbd>R</kbd> reroll traits<br />
+  <kbd>Space</kbd> pause &nbsp; <kbd>.</kbd> single frame &nbsp; <kbd>D</kbd> 150px &nbsp; <kbd>B</kbd> squint<br />
+  <kbd>1</kbd> felted &nbsp; <kbd>2</kbd> grey &nbsp; <kbd>3</kbd> silhouette
+</div>
+
+<div class="panel" id="roster"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<!-- Every line of logic lives in the module: eslint covers **/*.js and jsconfig includes
+     characters/**/*.js, but neither looks inside an inline <script>. -->
+<script type="module" src="./motion-lab.js"></script>
+</body>
+</html>

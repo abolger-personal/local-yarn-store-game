@@ -79,7 +79,11 @@ export const MOTION_DEFAULTS = Object.freeze({
   // makes this a per-character option rather than a module-level switch. When one wins, DELETE
   // the loser: the losing branch in integrate(), this key, and the one read of opts.mode. Three
   // places, all grep-able as `mode`. Do not build anything on it.
-  mode: /** @type {'spring' | 'hermite'} */ ('spring'),
+  //
+  // 'smoothstep' is the third: the behaviour this change REPLACES, kept selectable so the lab can
+  // show the defect rather than assert it. Without a baseline on screen there is nothing to judge
+  // the other two against. It goes when the winner is chosen.
+  mode: /** @type {'spring' | 'hermite' | 'smoothstep'} */ ('spring'),
 
   stiff: 150,     // spring: natural frequency is sqrt(stiff) rad/s
   zeta:  1.00,    // spring: damping RATIO, never an absolute coefficient -- absolute damping
@@ -91,7 +95,9 @@ export const MOTION_DEFAULTS = Object.freeze({
   idleAmp:  1,
   idleRate: 1,
 
-  stride:    1.60,   // stride length as a multiple of leg-chain length
+  stride:    1.05,   // stride length as a multiple of leg-chain length. The foot-lock condition
+                     // is sin(swingAmp) = stride/2, so stride is capped near 2*sinMax ~ 1.13
+                     // before the legs physically cannot reach far enough and skate begins.
   bounce:    0.05,   // NEGATIVE cancels the free bounce; see walkLayer
   armGain:   0.55,
   lean:      0.06,   // forward lean at full speed
@@ -110,7 +116,7 @@ export const BASE_MOTION_RANGES = Object.freeze({
   zeta:     [0.60, 1.50],
   idleAmp:  [0.40, 1.60],
   idleRate: [0.75, 1.25],
-  stride:   [1.40, 1.80],
+  stride:   [0.85, 1.12],
   bounce:   [0.00, 0.12],
   headArc:  [0.50, 1.50],
 });
@@ -260,6 +266,7 @@ export function integrate(m, target, dt, opts) {
   }
 
   if (opts.mode === 'hermite') hermite(m, step, opts);
+  else if (opts.mode === 'smoothstep') smoothstep(m, step, opts);
   else spring(m, step, opts);
 
   // Idle clocks advance with the real dt, not the clamped one: a long frame really did take that
@@ -307,6 +314,21 @@ function hermite(m, dt, opts) {
   }
 }
 
+// The OLD behaviour, for comparison only: Hermite with both tangents forced to zero. Position
+// is carried across an interrupt but velocity is not, because t*t*(3-2*t) has slope zero at
+// t = 0 -- so a channel travelling at 4 rad/s is stopped dead in a single frame and has to
+// accelerate again from rest. That is the hitch this whole module exists to remove.
+function smoothstep(m, dt, opts) {
+  m.t = Math.min(1, m.t + dt / opts.blend);
+  const e = m.t * m.t * (3 - 2 * m.t);
+  const de = (6 * m.t - 6 * m.t * m.t) / opts.blend;
+  const { cur, vel, from, to } = m;
+  for (let i = 0; i < cur.length; i++) {
+    cur[i] = from[i] + (to[i] - from[i]) * e;
+    vel[i] = (to[i] - from[i]) * de;
+  }
+}
+
 // ---------------------------------------------------------------- the additive layers
 
 /**
@@ -347,9 +369,10 @@ export function compose(out, m, opts) {
  * smoothstep so nobody moves at constant speed anyway. Distance-driven gives the ease-out free --
  * as speed approaches zero the phase freezes mid-stride with the feet planted.
  *
- * The amplitude is scale-INVARIANT and that is the point: each foot's excursion from centre is
- * strideLen/4, so sin(swingAmp) = (strideLen/4)/L = stride/4 and the L cancels. One knob, and
- * foot-lock holds at every leg length with no per-character tuning.
+ * The amplitude is scale-INVARIANT and that is the point: foot-lock needs the foot's peak-to-peak
+ * travel, 2*L*sin(swingAmp), to equal the strideLen the body covers, so sin(swingAmp) = stride/2
+ * and the L cancels. One knob, and the lock then holds at every leg length with no per-character
+ * tuning -- verified against the rig across the full 5x legHeight spread.
  *
  * `skate` is the residual once the geometric ceiling binds -- the honest report that the feet are
  * now sliding because the body is moving faster than legs that length can carry it. Real hardware
@@ -361,10 +384,15 @@ export function compose(out, m, opts) {
  */
 export function walkPhase(walkDist, speed, L, opts) {
   const natural = opts.stride * L;
-  const ceiling = 4 * L * opts.sinMax;
+  const ceiling = 2 * L * opts.sinMax;
   const needed = opts.cadenceMax > 0 ? (2 * speed) / opts.cadenceMax : natural;
   const strideLen = Math.min(ceiling, Math.max(natural, needed));
-  const swingAmp = Math.asin(Math.min(strideLen / (4 * L), opts.sinMax));
+  // THE FOOT-LOCK CONDITION. The foot's peak-to-peak fore-aft travel is 2*L*sin(swingAmp), and
+  // the body covers strideLen per cycle, so the two have to be equal or the feet slide. Measured
+  // against the real rig at four leg lengths, so this is the rig's behaviour and not a model of
+  // it: an earlier /(4*L) here -- from confusing excursion-from-centre with peak-to-peak -- put
+  // the true excursion at exactly 0.500x the stride, i.e. 50% skate, identically at every size.
+  const swingAmp = Math.asin(Math.min(strideLen / (2 * L), opts.sinMax));
   const skate = needed > ceiling ? (needed - ceiling) / needed : 0;
   const phase = strideLen > 0 ? (walkDist / strideLen) % 1 : 0;
   return { phase, strideLen, swingAmp, skate };

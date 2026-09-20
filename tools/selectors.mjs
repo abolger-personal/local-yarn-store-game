@@ -7,7 +7,11 @@
 import { readFileSync } from 'node:fs';
 import { storeFiles } from './modules.mjs';
 
-const html = readFileSync('characters/store.html', 'utf8');
+// Both pages, as one pool of ids. The store modules drive the shop AND the puzzle bench, and a
+// module cannot say which page it was loaded by — so this can no longer tell you an element is on
+// the WRONG page, only that it exists on neither, which is the failure that actually happened.
+const html = ['characters/store.html', 'characters/puzzle.html']
+  .map((f) => readFileSync(f, 'utf8')).join('\n');
 const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]));
 const classes = new Set([...html.matchAll(/class="([^"]+)"/g)].flatMap((m) => m[1].split(/\s+/)));
 
@@ -23,5 +27,5 @@ for (const f of storeFiles()) {
       if (part.startsWith('.') && !classes.has(part.slice(1))) miss(part, f);
     }
 }
-console.log(bad ? `${bad} selector(s) have no element` : 'every selector the JS uses exists in store.html');
+console.log(bad ? `${bad} selector(s) have no element` : 'every selector the JS uses exists in the markup');
 process.exit(bad ? 1 : 0);

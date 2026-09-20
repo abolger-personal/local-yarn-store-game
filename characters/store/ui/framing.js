@@ -22,11 +22,19 @@ export const isUnder = (node, ancestor) => {
  * the shop is a place you stand in, not a diagram you view.
  *
  * Zooming out to see the whole room is still one pinch away; getting back in is this button.
+ *
+ * `at` is what to stand in front of — anything with an x and a z, so a display can be passed
+ * straight in. It defaults to the middle of the shop, which is what the F key and the frame
+ * button mean. The bench (characters/puzzle.html) frames the ONE display its customer is
+ * shopping, and the shop will want the same call the first time it wants to draw the player's
+ * eye to a particular table.
+ *
+ * @param {{x: number, z: number}} [at]
  */
 const TARGET_SLOT_PX = 56;   // on-screen size of one slot; a diorama angle foreshortens it to ~34
 
-export function frameRoom() {
-  const center = new THREE.Vector3(0, 0, 0);
+export function frameRoom(at = { x: 0, z: 0 }) {
+  const center = new THREE.Vector3(at.x, 0, at.z);
   // Solve the perspective projection for distance: a slot of CELL*FILL world units should cover
   // TARGET_SLOT_PX of the viewport's height.
   const halfFov = THREE.MathUtils.degToRad(camera.fov) * 0.5;

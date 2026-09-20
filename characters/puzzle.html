@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LYS — puzzle bench</title>
+<style>
+  :root { color-scheme: light; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; touch-action: none; }
+
+  /* The UA's own `[hidden] { display: none }` loses to any rule that sets display — and
+     `label.row` below sets `display: flex`. Without this every field of the stock palette stayed
+     on screen whatever kind of thing was being built, so the form read as "fill in anything"
+     when only the fields for the chosen kind are used. */
+  [hidden] { display: none !important; }
+
+  .panel {
+    background: rgba(255,255,255,.90); backdrop-filter: blur(6px);
+    border: 1px solid rgba(0,0,0,.08); border-radius: 10px;
+    padding: 10px 12px; font-size: 12px; line-height: 1.5; color: #333;
+  }
+  .fold > summary {
+    cursor: pointer; user-select: none; list-style: none;
+    font: 700 10px ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .06em; text-transform: uppercase; opacity: .55;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .fold > summary::-webkit-details-marker { display: none; }
+  .fold > summary::before { content: '▸'; font-size: 11px; transition: transform 120ms ease; }
+  .fold[open] > summary::before { transform: rotate(90deg); }
+  .fold[open] > summary { margin-bottom: 6px; }
+
+  /* Two columns, both scrolling inside themselves: the bench is a form, and a form that pushes
+     its own buttons off the bottom of the screen is a form you cannot use. */
+  #left, #rail {
+    position: fixed; top: 10px; bottom: 10px; z-index: 10;
+    width: 300px; display: flex; flex-direction: column; gap: 8px;
+    pointer-events: none; overflow: hidden;
+  }
+  #left { left: 10px; }
+  #rail { right: 10px; width: 330px; }
+  #left > *, #rail > * { pointer-events: auto; }
+  #left > .panel, #rail > .panel { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+  label.row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+  label.row > span:first-child { flex: 0 0 74px; opacity: .6; }
+  select, input[type=number], input[type=text] {
+    flex: 1 1 auto; min-width: 0; font: inherit; font-size: 12px;
+    padding: 2px 4px; border: 1px solid #ccc; border-radius: 5px; background: #fff;
+  }
+  button {
+    font: 600 12px ui-sans-serif, system-ui, sans-serif; padding: 5px 9px;
+    border: 1px solid #c2703f; background: #c2703f; color: #fff;
+    border-radius: 7px; cursor: pointer;
+  }
+  button:hover { background: #ad6234; }
+  button.ghost { background: #fff; color: #7a5540; }
+  button.ghost:hover { background: #f6ece3; }
+  .btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+  .traits { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; }
+  .traits label.row > span:first-child { flex: 1 1 auto; font-size: 11px; }
+  .traits input { flex: 0 0 46px; }
+
+  .hint { border-top: 1px solid rgba(0,0,0,.09); padding: 6px 0 2px; }
+  .hint > .head {
+    display: flex; align-items: center; gap: 6px;
+    font: 700 10px ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .06em; text-transform: uppercase; opacity: .6;
+  }
+  .hint > .head input { flex: 0 0 auto; margin: 0; }
+  .hint .body { font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; color: #3b3b3b; }
+  .hint.secret .body { color: #b07a4a; }
+  .hint .redacted { color: #999; font-style: italic; }
+
+  .item { display: flex; gap: 6px; align-items: baseline; font: 11px/1.5 ui-monospace, Menlo, monospace; }
+  .item .dot { flex: 0 0 auto; }
+  .item .why { opacity: .6; }
+  .seen { color: #2f6b4a; }
+  .hidden { color: #a06a5a; }
+  .wanted { font-weight: 700; color: #1f5c8f; }
+  .k { opacity: .55; }
+  .held { font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; min-height: 30px; }
+  #log { font: 11px/1.5 ui-monospace, Menlo, monospace; color: #5a4f45; }
+  #log div { border-top: 1px dotted rgba(0,0,0,.12); padding: 3px 0; }
+  #log div:first-child { border-top: 0; }
+  h4 { margin: 8px 0 2px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; opacity: .55; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<!-- interact/input.js latches furniture mode onto this button. The bench has no furniture mode,
+     but the button has to exist or installInput throws and nothing gets a pointer at all. -->
+<button id="moveBtn" hidden></button>
+
+<div id="left">
+  <details class="panel fold" open>
+    <summary>stock — build one and put it somewhere</summary>
+    <div id="palette"></div>
+  </details>
+  <div class="panel">
+    <div id="held" class="held"></div>
+    <span class="k">left-click a box to pick it up, click again to set it down ·
+    right-drag orbits · <b>F</b> reframe · <b>G</b> grid</span>
+  </div>
+</div>
+
+<div id="rail">
+  <details class="panel fold" open>
+    <summary>the customer <span id="who" class="k"></span></summary>
+    <div id="npcPanel"></div>
+  </details>
+  <details class="panel fold" open>
+    <summary>what the shop knows about them</summary>
+    <div id="hints"></div>
+  </details>
+  <details class="panel fold" open>
+    <summary>what they can see from here</summary>
+    <div id="readout"></div>
+  </details>
+  <details class="panel fold" open>
+    <summary>what happened</summary>
+    <div id="log"></div>
+  </details>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module" src="./store/puzzle.js"></script>
+</body>
+</html>

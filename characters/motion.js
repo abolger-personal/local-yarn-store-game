@@ -191,30 +191,45 @@ export function motionOf(traits, ranges = BASE_MOTION_RANGES) {
   };
 }
 
+// A coefficient built from TWO traits lands on a triangular distribution, not a flat one: the
+// two middles cancel far more often than the ends line up, so a random cast bunches around the
+// centre of the span and the dial reads as if it were not wired to anything. Measured p10..p90
+// occupancy: 75% for every two-trait coefficient against 100% for every single-trait one.
+//
+// Widening the deviation by 1.3 takes that to 98% while saturating exactly as many characters
+// at the ends as before -- 8% either way, and only the genuine extremes (a 5 against a 1). Past
+// that it gets worse fast: 1.6 reaches 100% occupancy but pins a QUARTER of the cast at a limit,
+// and 2.0 pins nearly half, which is a different way of having no spread.
+//
+// `d` is the deviation from the middle of the span, so a single-trait coefficient never goes
+// through here -- those are already flat across 0..1.
+const SPREAD = 1.3;
+const pair = (d) => clamp01(0.5 + SPREAD * d);
+
 /** Where this character sits, 0..1, on each coefficient's span. */
 function traitPositions(traits) {
   return {
     // Assertive characters move like they meant it; withdrawn ones dawdle.
-    stiff: 0.5 + 0.5 * (unit(traits.Assertiveness) - unit(traits.Withdrawal)),
+    stiff: pair(0.5 * (unit(traits.Assertiveness) - unit(traits.Withdrawal))),
     // Volatility is the Neuroticism asset that literally means reactivity, so it is the one that
     // un-damps. Orderliness pulls back toward exactly-critical: an orderly character does not
     // overshoot. Low u = low zeta = overshoot.
-    zeta: 0.5 - 0.5 * (unit(traits.Volatility) - unit(traits.Orderliness)),
-    idleAmp: 0.5 + 0.5 * (unit(traits.Enthusiasm) - unit(traits.Withdrawal)),
+    zeta: pair(-0.5 * (unit(traits.Volatility) - unit(traits.Orderliness))),
+    idleAmp: pair(0.5 * (unit(traits.Enthusiasm) - unit(traits.Withdrawal))),
     idleRate: unit(traits.Volatility),
     stride: unit(traits.Industriousness),
     bounce: unit(traits.Enthusiasm),
     headArc: unit(traits.Openness),
     // Arms swing when a character is outgoing and pin to the body when they are not.
-    armGain: 0.5 + 0.5 * (unit(traits.Enthusiasm) - unit(traits.Withdrawal)),
+    armGain: pair(0.5 * (unit(traits.Enthusiasm) - unit(traits.Withdrawal))),
     // An orderly character walks a tidy line; an excitable one rolls.
-    sway: 0.5 + 0.5 * (unit(traits.Enthusiasm) - unit(traits.Orderliness)),
+    sway: pair(0.5 * (unit(traits.Enthusiasm) - unit(traits.Orderliness))),
     // Leaning into the walk is purposefulness.
-    lean: 0.5 * (unit(traits.Assertiveness) + unit(traits.Industriousness)),
+    lean: pair(0.5 * (unit(traits.Assertiveness) + unit(traits.Industriousness)) - 0.5),
     // The single most readable posture signal, and completely free of leg length: head up and
     // open, or down and closed. SPIKE-FUN.md:353 asks for exactly this as "arms in, small,
     // glancing at the door".
-    headCarry: 0.5 + 0.5 * (unit(traits.Withdrawal) - unit(traits.Assertiveness)),
+    headCarry: pair(0.5 * (unit(traits.Withdrawal) - unit(traits.Assertiveness))),
     armTuck: unit(traits.Withdrawal),
   };
 }

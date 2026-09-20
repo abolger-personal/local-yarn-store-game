@@ -448,6 +448,41 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     'the walk leaves kneeBend to the base pose and drives kneeSwing instead');
 }
 
+// --- personality actually spreads the cast ---------------------------------------------------
+//
+// A dial wired to personality but bunched at the middle of its span is indistinguishable, on
+// screen, from a dial wired to nothing -- which is exactly how it gets reported. A coefficient
+// built from TWO traits lands on a triangular distribution, so without widening it occupies
+// only 75% of its span against 100% for a single-trait one, and the middle 80% of a cast sits
+// in a band far narrower than that suggests.
+{
+  // An exhaustive sweep of the seven assets motionOf reads, rather than a random sample, so
+  // this can never fail intermittently. 5^7 is 78125 casts -- every personality there is.
+  const DRIVERS = ['Assertiveness', 'Withdrawal', 'Volatility', 'Orderliness', 'Enthusiasm',
+    'Industriousness', 'Openness'];
+  const vals = {};
+  let N = 0;
+  const walk = (i, traits) => {
+    if (i === DRIVERS.length) {
+      N++;
+      for (const [k, v] of Object.entries(motionOf(traits))) (vals[k] ??= []).push(v);
+      return;
+    }
+    for (let v = 1; v <= 5; v++) walk(i + 1, { ...traits, [DRIVERS[i]]: v });
+  };
+  walk(0, t(3));
+  for (const [k, list] of Object.entries(vals)) {
+    const [lo, hi] = BASE_MOTION_RANGES[k];
+    list.sort((a, b) => a - b);
+    const p10 = list[Math.floor(N * 0.1)], p90 = list[Math.floor(N * 0.9)];
+    const uses = (p90 - p10) / (hi - lo);
+    assert.ok(uses > 0.85,
+      `motionOf.${k} spreads a cast over only ${(uses * 100).toFixed(0)}% of its span `
+      + `[${lo}, ${hi}] — too bunched to read as personality on screen`);
+    assert.ok(p10 >= lo - 1e-9 && p90 <= hi + 1e-9, `motionOf.${k} escaped its span`);
+  }
+}
+
 // --- every knob has a control -----------------------------------------------------------------
 //
 // A tunable with no slider can only be changed by editing source, which means it never gets

@@ -815,9 +815,15 @@ knob(fWalk, S, 'lookOver', 'look over the shoulder',
   -1, 1).onChange(() => { if (S.speed === 0) showPose(); });
 
 const fIdle = gui.addFolder('standing still');
-knob(fIdle, S.opts, 'idleAmount', 'how much they fidget',
-  'Master dial for breathing, weight shifting and looking around. 0 freezes them solid \u2014 '
-  + 'which is what the game looks like today.', 0, 3).onChange(retune);
+// NOT the same knob as the "how much they fidget" span in the variation folder, and it used to
+// carry the same name -- so moving this one changed the whole cast together and made the
+// personality link look broken when it was simply a different control.
+knob(fIdle, S.opts, 'idleAmount', 'fidgeting, whole cast',
+  'Master dial over every character at once, on top of whatever their personality gives them. '
+  + '0 freezes them solid — which is what the game looks like today. How much any ONE of them '
+  + 'fidgets comes from Enthusiasm minus Withdrawal: see the roster\u2019s "idle" column, and '
+  + 'the "how much they fidget" pair under "how much members of a species differ".',
+  0, 3).onChange(retune);
 knob(fIdle, S.scale, 'idleRate', 'how fast they fidget',
   'Speeds up or slows down every idle rhythm \u2014 breathing, swaying, looking around. '
   + 'Scales the whole cast; personality still spreads them.', 0.25, 3).onChange(retune);

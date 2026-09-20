@@ -109,6 +109,8 @@ export const MOTION_DEFAULTS = Object.freeze({
   bounce:    0.05,   // NEGATIVE cancels the free bounce; see walkLayer
   armGain:   0.55,
   sway:      0.075,  // lateral body lean per step. The side-to-side half of a walk.
+  headCarry: 0,      // posture, not gait: applied standing AND walking
+  armTuck:   0,
   lean:      0.06,   // forward lean at full speed
   gateSpeed: 0.35,   // ground speed at which the walk layer reaches full weight
   cadenceMax: 3.4,   // steps/sec before stride stretches instead of cadence rising
@@ -128,6 +130,25 @@ export const BASE_MOTION_RANGES = Object.freeze({
   stride:   [0.85, 1.12],
   bounce:   [0.00, 0.12],
   headArc:  [0.50, 1.50],
+  // ---- walking STYLE. All of these are ANGLES, and that is the entire point.
+  //
+  // A style expressed as a LENGTH is welded to leg length: stride has to scale with the legs or
+  // the feet skate, so it can never carry personality on its own -- a stilt llama and a stumpy
+  // owl of identical temperament will always differ more than two opposite temperaments on the
+  // same legs. Angles have no such coupling. A 40-degree arm swing is a 40-degree arm swing on
+  // any body, so these read as character rather than as size.
+  //
+  // These were global constants, identical for every character in the game, which is why
+  // personality was invisible in the walk while leg length dominated it completely.
+  armGain:   [0.20, 1.10],   // how much the arms counter-swing
+  sway:      [0.02, 0.17],   // how far the body rolls over the planted foot
+  lean:      [0.00, 0.17],   // how far they lean into the walk
+  headCarry: [-0.24, 0.22],  // negative = head up and open, positive = head down and closed
+  // ponytail: armTuck is a CONSTANT elbow offset, so it also bends the arm of a character who
+  // is reaching for a shelf -- capped low enough that this reads as "holds themselves in"
+  // rather than as a broken reach. The real fix is posture that fades out while a pose needs a
+  // specific arm shape; do that if the knitting pose ever lands.
+  armTuck:   [0.00, 0.50],   // elbows bent, arms held in against the body
 });
 
 // ---------------------------------------------------------------- traits -> coefficients
@@ -148,7 +169,22 @@ const span = (range, u) => range[0] + (range[1] - range[0]) * clamp01(u);
  * @param {Record<string, number[]>} [ranges] the species' spans
  */
 export function motionOf(traits, ranges = BASE_MOTION_RANGES) {
-  const u = {
+  const u = traitPositions(traits);
+  // Written out rather than looped, so the coefficient object has a real shape for the type
+  // checker and for anything reading this to find out what a species can tune. The self-check
+  // asserts every BASE_MOTION_RANGES key still appears, so the two cannot drift apart.
+  const pick = (k) => span(ranges[k] ?? BASE_MOTION_RANGES[k], u[k]);
+  return {
+    stiff: pick('stiff'), zeta: pick('zeta'), idleAmp: pick('idleAmp'),
+    idleRate: pick('idleRate'), stride: pick('stride'), bounce: pick('bounce'),
+    headArc: pick('headArc'), armGain: pick('armGain'), sway: pick('sway'),
+    lean: pick('lean'), headCarry: pick('headCarry'), armTuck: pick('armTuck'),
+  };
+}
+
+/** Where this character sits, 0..1, on each coefficient's span. */
+function traitPositions(traits) {
+  return {
     // Assertive characters move like they meant it; withdrawn ones dawdle.
     stiff: 0.5 + 0.5 * (unit(traits.Assertiveness) - unit(traits.Withdrawal)),
     // Volatility is the Neuroticism asset that literally means reactivity, so it is the one that
@@ -160,15 +196,17 @@ export function motionOf(traits, ranges = BASE_MOTION_RANGES) {
     stride: unit(traits.Industriousness),
     bounce: unit(traits.Enthusiasm),
     headArc: unit(traits.Openness),
-  };
-  // Written out rather than looped, so the coefficient object has a real shape for the type
-  // checker and for anything reading this to find out what a species can tune. The self-check
-  // asserts every BASE_MOTION_RANGES key still appears, so the two cannot drift apart.
-  const pick = (k) => span(ranges[k] ?? BASE_MOTION_RANGES[k], u[k]);
-  return {
-    stiff: pick('stiff'), zeta: pick('zeta'), idleAmp: pick('idleAmp'),
-    idleRate: pick('idleRate'), stride: pick('stride'), bounce: pick('bounce'),
-    headArc: pick('headArc'),
+    // Arms swing when a character is outgoing and pin to the body when they are not.
+    armGain: 0.5 + 0.5 * (unit(traits.Enthusiasm) - unit(traits.Withdrawal)),
+    // An orderly character walks a tidy line; an excitable one rolls.
+    sway: 0.5 + 0.5 * (unit(traits.Enthusiasm) - unit(traits.Orderliness)),
+    // Leaning into the walk is purposefulness.
+    lean: 0.5 * (unit(traits.Assertiveness) + unit(traits.Industriousness)),
+    // The single most readable posture signal, and completely free of leg length: head up and
+    // open, or down and closed. SPIKE-FUN.md:353 asks for exactly this as "arms in, small,
+    // glancing at the door".
+    headCarry: 0.5 + 0.5 * (unit(traits.Withdrawal) - unit(traits.Assertiveness)),
+    armTuck: unit(traits.Withdrawal),
   };
 }
 
@@ -348,6 +386,14 @@ export function compose(out, m, opts) {
   for (let i = 0; i < POSE_KEYS.length; i++) out[POSE_KEYS[i]] = m.cur[i];
   out.holdItem = m.cur[HOLD] > 0.5;
   out.blink = 0;
+
+  // POSTURE: how this character carries itself, standing or walking. It sits ABOVE the idle
+  // early-out on purpose -- posture is carriage, not fidgeting, so a character with the idle
+  // layer turned all the way down is still withdrawn or still confident. Putting it below meant
+  // "idle amount 0" silently erased personality along with the movement. Pure angles, so it
+  // reads the same on a stumpy owl and a stilt llama.
+  out.headPitch += opts.headCarry ?? 0;
+  out.elbowBend += opts.armTuck ?? 0;
 
   const a = opts.idleAmount * opts.idleAmp;
   if (a <= 0) return out;

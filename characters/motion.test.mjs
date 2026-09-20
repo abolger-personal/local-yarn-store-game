@@ -231,6 +231,59 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     'breathing must NOT be gated by duty: a character that stops breathing reads as switched off');
 }
 
+// --- walking STYLE must belong to personality, not to leg length ------------------------------
+//
+// The complaint this exists to prevent: "leg length is clearly the dominant factor, so
+// personality-as-walking-style feels impossible". It was true and it was measurable -- two
+// opposite personalities on the same legs produced a byte-identical walk, because three of the
+// four style dials (armGain, sway, lean) were global constants and the fourth, stride, is a
+// LENGTH and therefore welded to the legs.
+//
+// The fix is that style is carried by ANGLES. An angle has no length in it, so it reads the same
+// on a stumpy owl and a stilt llama. Two properties, and the walk is only believable with both:
+{
+  const o = opts();
+  const T = (over) => ({ ...t(3), ...over });
+  const BOLD = T({ Enthusiasm: 5, Assertiveness: 5, Withdrawal: 1, Industriousness: 5, Orderliness: 1 });
+  const SHY = T({ Enthusiasm: 1, Assertiveness: 1, Withdrawal: 5, Industriousness: 1, Orderliness: 5 });
+  const STYLE = ['armSwingAlt', 'spineRoll', 'spineBend', 'headPitch', 'elbowBend'];
+
+  const signature = (traits, L) => {
+    const co = { ...o, ...motionOf(traits, BASE_MOTION_RANGES), idleAmount: 0 };
+    const m = makeMotion(POSES.rest, 0.5);
+    const buf = out();
+    const w0 = walkPhase(0, 0.35, L, co);
+    const peak = {};
+    for (let i = 0; i < 240; i++) {
+      integrate(m, POSES.rest, 1 / 60, co);
+      compose(buf, m, co);
+      walkLayer(buf, { ...w0, phase: i / 240 }, 1, co);
+      for (const k of STYLE) peak[k] = Math.max(peak[k] ?? 0, Math.abs(buf[k]));
+    }
+    return peak;
+  };
+
+  const SHORT = 0.085 + 0.045, TALL = 0.345 + 0.045;   // the full tier-1 legHeight spread
+
+  // 1. Same body, opposite temperaments -> the walks must genuinely differ.
+  const bold = signature(BOLD, SHORT), shy = signature(SHY, SHORT);
+  assert.ok(bold.armSwingAlt > shy.armSwingAlt * 3,
+    `personality must drive arm swing (bold ${bold.armSwingAlt.toFixed(2)} vs `
+    + `shy ${shy.armSwingAlt.toFixed(2)}) -- these were once identical`);
+  assert.ok(bold.spineRoll > shy.spineRoll * 3, 'and how much the body rolls');
+  assert.ok(bold.spineBend > shy.spineBend + 0.05, 'and how far they lean in');
+  assert.ok(shy.elbowBend > bold.elbowBend + 0.2, 'and how tightly the arms are held');
+
+  // 2. Same temperament, a 3x difference in leg length -> the STYLE must be identical. This is
+  //    the decoupling: the body decides stride and cadence, the personality decides everything
+  //    else, and the two no longer compete for the same visual channel.
+  const tall = signature(BOLD, TALL);
+  for (const k of STYLE) {
+    assert.ok(Math.abs(bold[k] - tall[k]) < 0.02,
+      `${k} must not change with leg length (${bold[k].toFixed(3)} vs ${tall[k].toFixed(3)})`);
+  }
+}
+
 // --- a global tuning knob must actually REACH the character -----------------------------------
 //
 // The lab merges its global settings with motionOf()'s per-personality values. motionOf spread
@@ -239,7 +292,8 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
 // that merge so the next coefficient added cannot quietly join the dead pile.
 {
   const traits = t(3);
-  const SCALED = ['stiff', 'zeta', 'stride', 'bounce', 'idleRate'];
+  const SCALED = ['stiff', 'zeta', 'stride', 'bounce', 'idleRate',
+                  'armGain', 'sway', 'lean'];
   const coeffsLike = (scale) => {
     const per = motionOf(traits, BASE_MOTION_RANGES);
     for (const k of SCALED) per[k] *= scale[k];
@@ -255,7 +309,7 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
   }
   // and the knobs that are NOT per-personality must survive the merge untouched
   const per = motionOf(traits, BASE_MOTION_RANGES);
-  for (const k of ['blend', 'sway', 'armGain', 'lean', 'idleAmount', 'idleDuty']) {
+  for (const k of ['blend', 'idleAmount', 'idleDuty', 'gateSpeed', 'sinMax']) {
     assert.equal(base[k], MOTION_DEFAULTS[k], `${k} must survive the motionOf merge`);
     assert.ok(!(k in per), `${k} must not be returned by motionOf, or its slider is clobbered`);
   }

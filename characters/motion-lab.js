@@ -76,7 +76,8 @@ const S = {
   // These cannot live in `opts`: coeffs() spreads motionOf() over it, so anything motionOf
   // returns silently overwrote the slider and five knobs did nothing at all. Scaling after the
   // merge keeps BOTH -- personality still spreads the cast, these shift the whole cast at once.
-  scale: { stiff: 1, zeta: 1, stride: 1, bounce: 1, idleRate: 1 },
+  scale: { stiff: 1, zeta: 1, stride: 1, bounce: 1, idleRate: 1,
+           armGain: 1, sway: 1, lean: 1 },
   ranges: structuredClone(BASE_MOTION_RANGES),
 };
 
@@ -552,17 +553,18 @@ knob(fWalk, S.scale, 'stride', 'step length',
   'How far each step reaches. Past about 1.13x leg length the legs physically cannot reach and '
   + 'the feet slide \u2014 the skate readout will say so. Scales the whole cast.',
   0.5, 1.5).onChange(retune);
-knob(fWalk, S.opts, 'sway', 'side-to-side sway',
-  'How far the body leans over the planted foot each step. 0 is a machine pacing; this is what '
-  + 'makes a walk look like it has weight.', 0, 0.25).onChange(retune);
+knob(fWalk, S.scale, 'sway', 'side-to-side sway',
+  'How far the body rolls over the planted foot each step. An excitable character rolls, an '
+  + 'orderly one walks a tidy line. Scales the whole cast.', 0, 3).onChange(retune);
 knob(fWalk, S.scale, 'bounce', 'up-and-down bounce',
   'Extra dip at each footfall, on top of the bob that comes free from the legs scissoring. '
   + 'Scales the whole cast.', 0, 3).onChange(retune);
-knob(fWalk, S.opts, 'armGain', 'arm swing',
-  'How much the arms counter-swing against the legs. 0 leaves the arms hanging dead.',
-  0, 1.5).onChange(retune);
-knob(fWalk, S.opts, 'lean', 'forward lean',
-  'How far they lean into the walk while moving.', 0, 0.3).onChange(retune);
+knob(fWalk, S.scale, 'armGain', 'arm swing',
+  'How much the arms counter-swing against the legs. Outgoing characters swing; withdrawn ones '
+  + 'pin their arms to their sides. Scales the whole cast.', 0, 2.5).onChange(retune);
+knob(fWalk, S.scale, 'lean', 'forward lean',
+  'How far they lean into the walk. Assertive, industrious characters lean in. Scales the '
+  + 'whole cast.', 0, 2.5).onChange(retune);
 
 knob(fWalk, S, 'lookOver', 'look over the shoulder',
   'Turns every head as far as ITS OWN SPECIES can manage. An owl clears about 264 degrees, a '

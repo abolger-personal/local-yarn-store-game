@@ -203,6 +203,7 @@ function buildCast() {
   setViewMode(group, S.view);
   refreshRoster();
   showPose();     // the banner names which engines are on screen, so it changes with the cast
+  syncEngineControls();
 }
 
 
@@ -464,7 +465,10 @@ const scopeCanvas = /** @type {HTMLCanvasElement} */ (document.getElementById('s
 const ctx2d = scopeCanvas.getContext('2d');
 const history = new Map();      // engine -> {v: number[], d: number[]}
 
-const COLOUR = { spring: '#2f7fd1', hermite: '#d1642f', smoothstep: '#8a8f98' };
+// One palette, used by both the scope traces and the slider labels, so a colour means the same
+// thing wherever it appears. Smoothstep is purple rather than grey specifically so that GREY can
+// mean "applies to every engine" and never be mistaken for an engine of its own.
+const COLOUR = { spring: '#2f7fd1', hermite: '#d1642f', smoothstep: '#7a4fd1' };
 
 function sampleScope() {
   const W = scopeCanvas.width;
@@ -530,11 +534,22 @@ const TRAIT_COLS = Object.freeze([
   ['Opn', 'Openness'],
 ]);
 
-/** One row: the traits that were rolled, then the coefficients they produced. */
+/**
+ * One row: who it is, the traits that were rolled, then the coefficients they produced.
+ *
+ * The swatch is that character's actual body colour, plus its coat colour where the kit has one
+ * (the owl's plumage, the llama's fleece), because at a glance the coat is what you actually
+ * pick a character out by. Numbers alone gave you no way to tell which row was which animal.
+ */
 function rosterRow(a) {
   const o = a.opts;
+  const P = a.built.params;
+  const coat = a.built.species.coatColorKey;
+  const second = coat && P[coat] !== P.bodyColor
+    ? `<span class="chip" style="background:${P[coat]}"></span>` : '';
+  const swatch = `<span class="chip" style="background:${P.bodyColor}"></span>${second}`;
   const traits = TRAIT_COLS.map(([, full]) => `<td>${a.traits[full] ?? '–'}</td>`).join('');
-  return `<tr><td>${a.built.species.label}</td>${traits}`
+  return `<tr><td>${swatch} ${a.built.species.label}</td>${traits}`
     + `<td class="co">${o.stiff.toFixed(0)}</td><td class="co">${o.zeta.toFixed(2)}</td>`
     + `<td class="co">${o.idleAmp.toFixed(2)}</td><td class="co">${o.stride.toFixed(2)}</td>`
     + `<td class="co">${o.headArc.toFixed(2)}</td></tr>`;
@@ -545,7 +560,14 @@ function refreshRoster() {
   // rather than only in the shared-traits banner. Reading "this one is stiffer" is useless
   // without the trait that made it so -- and with several of ONE species on screen the
   // traits are the only thing that differs between the rows at all.
-  const rows = cast.filter((a) => a.engine === 'spring').map(rosterRow).join('');
+  // Sorted along the lane axis so row order matches the order they physically stand in --
+  // descending, which is nearest-camera first as the scene loads. Unsorted, the table was in
+  // build order, which is only the same thing by accident. Orbit far enough and any convention
+  // inverts, which is what the colour chip is for: the chip identifies the row, the order just
+  // makes it quick to find.
+  const rows = cast.filter((a) => a.engine === CHOSEN)
+    .sort((x, y) => y.lane - x.lane)
+    .map(rosterRow).join('');
   const head = shared
     ? '<div class="shared">Same traits on every row, so anything that differs below is the '
       + 'species’ own MOTION_RANGES.</div>'
@@ -589,6 +611,41 @@ function knob(folder, obj, prop, label, help, ...rest) {
   return c;
 }
 
+// Which engines each control actually reaches. Measured from the source, not guessed: spring()
+// reads opts.stiff and opts.zeta and nothing else; hermite() and smoothstep() both read
+// opts.blend and nothing else; every other knob feeds the idle or walk layers, which are
+// downstream of the interpolator and identical for all three.
+//
+// So there are no hermite-only or smoothstep-only controls to colour, and there never will be
+// while `blend` is the only thing either of them reads -- that one is shared between the two
+// duration engines and belongs to neither. It gets both dots.
+const tagged = [];
+
+/**
+ * Mark a control as belonging to specific engines: colour its label, and hide it outright when
+ * none of its engines are on screen. Untagged controls apply to everything and stay grey.
+ */
+function forEngines(c, ...engines) {
+  const name = c.domElement.querySelector('.name');
+  if (name) {
+    if (engines.length === 1) name.style.color = COLOUR[engines[0]];
+    // A control shared by SOME engines but not all cannot have one honest colour, so it gets a
+    // dot per engine instead of a blended one nobody could decode.
+    const dots = engines.map((e) =>
+      `<span class="dot" style="background:${COLOUR[e]}"></span>`).join('');
+    name.insertAdjacentHTML('beforeend', ` ${dots}`);
+    name.title = `${name.title}\n\nOnly affects: ${engines.join(', ')}.`;
+  }
+  tagged.push({ c, engines });
+  return c;
+}
+
+/** Hide any control whose engines are all switched off. */
+function syncEngineControls() {
+  const shown = shownEngines();
+  for (const { c, engines } of tagged) c.show(engines.some((e) => shown.includes(e)));
+}
+
 const fCast = gui.addFolder('cast');
 knob(fCast, S, 'species', 'species', 'Which species to fill the lab with.', speciesIds())
   .onChange(buildCast);
@@ -608,6 +665,11 @@ knob(fCast, S, 'view', 'render as',
 // How much ONE member of a species differs from another. Each row is a RANGE, not a value:
 // personality decides where in the range a character lands, the species decides how wide the
 // range is. Narrow the gap and every member moves alike; widen it and they vary.
+// The only coefficients any engine reads directly: spring() takes opts.stiff and opts.zeta,
+// hermite() and smoothstep() take opts.blend. Everything else feeds the idle and walk layers,
+// which sit downstream of the interpolator.
+const SPRING_ONLY = new Set(['stiff', 'zeta']);
+
 const SPAN_HELP = {
   stiff: 'how eagerly they move',
   zeta: 'how much they wobble on arrival',
@@ -632,16 +694,27 @@ for (const k of Object.keys(BASE_MOTION_RANGES)) {
   const row = { min: S.ranges[k][0], max: S.ranges[k][1] };
   const help = `${SPAN_HELP[k]}. Narrow the gap and every member of the species moves alike; `
     + 'widen it and they vary. Where one character sits inside it is set by their personality.';
-  knob(fRanges, row, 'min', `${SPAN_HELP[k]} \u2014 least`, help, lo - pad, hi + pad)
+  const mn = knob(fRanges, row, 'min', `${SPAN_HELP[k]} \u2014 least`, help, lo - pad, hi + pad)
     .onChange((v) => { S.ranges[k][0] = v; retune(); });
-  knob(fRanges, row, 'max', `${SPAN_HELP[k]} \u2014 most`, help, lo - pad, hi + pad)
+  const mx = knob(fRanges, row, 'max', `${SPAN_HELP[k]} \u2014 most`, help, lo - pad, hi + pad)
     .onChange((v) => { S.ranges[k][1] = v; retune(); });
+  // stiff and zeta are read by spring() alone, so their spans are spring-only too -- the same
+  // fact as the global knobs of the same name, just applied per species.
+  if (SPRING_ONLY.has(k)) { forEngines(mn, 'spring'); forEngines(mx, 'spring'); }
 }
 knob(fRanges, { copy: exportRanges }, 'copy', 'copy these spans as code',
   'Puts a paste-ready MOTION_RANGES block on the clipboard, for owl.js or llama.js.');
 fRanges.close();
 
 const fBake = gui.addFolder('how motion gets from A to B');
+// What the colours on the labels mean. Without this the dots are decoration.
+fBake.domElement.querySelector('.children')?.insertAdjacentHTML('afterbegin',
+  '<div class="engine-key">label colour = which engine a control reaches:<br />'
+  + `<i style="color:${COLOUR.spring}">spring</i> · `
+  + `<i style="color:${COLOUR.hermite}">hermite</i> · `
+  + `<i style="color:${COLOUR.smoothstep}">smoothstep</i> · `
+  + 'grey = all of them. A control reaching some but not all gets one dot per engine.</div>');
+
 knob(fBake, S.compare, 'hermite', 'also show: hermite',
   'A second row per character running the velocity-carrying cubic instead of the spring. Smooth '
   + 'across an interrupt, but identical to smoothstep on any move that is NOT interrupted, and '
@@ -678,17 +751,20 @@ knob(fBake, { step: () => { stepOnce = true; } }, 'step', 'advance one frame (.)
 knob(fBake, S, 'scopeChannel', 'graph which joint',
   'Which joint angle the graph top-left plots. armSwing shows the most during a reach.',
   POSE_KEYS);
-knob(fBake, S.scale, 'stiff', 'how eagerly they move',
-  'Spring rows only. Higher = snaps to a new pose decisively; lower = dawdles into it. Scales '
-  + 'the whole cast at once; personality still spreads them apart (see the roster).',
-  0.15, 3).onChange(retune);
-knob(fBake, S.scale, 'zeta', 'wobble on arrival',
-  'Spring rows only. Below 1 the move overshoots and settles back \u2014 the cute bounce. '
-  + 'Above 1 it arrives sluggishly. Scales the whole cast; personality still spreads them.',
-  0.4, 2).onChange(retune);
-knob(fBake, S.opts, 'blend', 'move duration (s)',
-  'Hermite and smoothstep rows only: how long a move takes, start to finish.',
-  0.08, 1.2).onChange(retune);
+forEngines(knob(fBake, S.scale, 'stiff', 'how eagerly they move',
+  'Higher = snaps to a new pose decisively; lower = dawdles into it. Scales the whole cast at '
+  + 'once; personality still spreads them apart (see the roster).',
+  0.15, 3).onChange(retune), 'spring');
+forEngines(knob(fBake, S.scale, 'zeta', 'wobble on arrival',
+  'Below 1 the move overshoots and settles back \u2014 the cute bounce. Above 1 it arrives '
+  + 'sluggishly. Measured overshoot: 0.45 gives 19.6%, 0.65 gives 5.7%, and anything from 0.85 '
+  + 'up is indistinguishable. Scales the whole cast; personality still spreads them.',
+  0.4, 2).onChange(retune), 'spring');
+forEngines(knob(fBake, S.opts, 'blend', 'move duration (s)',
+  'How long a move takes, start to finish. The spring has no duration of its own \u2014 it '
+  + 'settles at a rate set by how eagerly they move and the wobble on arrival \u2014 so this '
+  + 'reaches the other two engines only, and disappears when neither is on screen.',
+  0.08, 1.2).onChange(retune), 'hermite', 'smoothstep');
 
 const fWalk = gui.addFolder('walking');
 knob(fWalk, S, 'speed', 'walking speed',

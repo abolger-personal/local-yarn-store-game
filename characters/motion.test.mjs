@@ -9,6 +9,7 @@
 // inside npc.js.
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   POSES, POSE_KEYS, MOTION_KEYS, MOTION_DEFAULTS, BASE_MOTION_RANGES,
   makeMotion, resetMotion, integrate, compose, valueOf, velocityOf,
@@ -445,6 +446,37 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
 
   assert.equal(on.kneeBend, 0,
     'the walk leaves kneeBend to the base pose and drives kneeSwing instead');
+}
+
+// --- every knob has a control -----------------------------------------------------------------
+//
+// A tunable with no slider can only be changed by editing source, which means it never gets
+// tuned and quietly becomes a constant. This has already bitten twice: five sliders that were
+// silently overwritten by the coefficient merge, and `kneeLift`, which shipped with no control
+// at all so the swing-leg knee could not be dialled to zero to see what it was doing.
+//
+// Static check: the lab's own source must mention every MOTION_DEFAULTS key, either as a knob()
+// call or as a BASE_MOTION_RANGES span (which generates its own min/max rows).
+{
+  const lab = readFileSync(new URL('./motion-lab.js', import.meta.url), 'utf8');
+  const wired = new Set([...lab.matchAll(/knob\([^,]+,\s*[^,]+,\s*'([^']+)'/g)].map((m) => m[1]));
+  const spans = new Set(Object.keys(BASE_MOTION_RANGES));
+
+  for (const k of Object.keys(MOTION_DEFAULTS)) {
+    // `mode` is the bake-off engine, chosen per row by the lab's layout rather than by a slider
+    if (k === 'mode') continue;
+    assert.ok(wired.has(k) || spans.has(k),
+      `MOTION_DEFAULTS.${k} has no control in motion-lab.js: add a knob() for it, or a span in `
+      + 'BASE_MOTION_RANGES if it should vary per species');
+  }
+
+  // and the reverse: a knob naming a key that no longer exists is a slider wired to nothing
+  const known = new Set([...Object.keys(MOTION_DEFAULTS), ...spans]);
+  for (const k of wired) {
+    if (!known.has(k) && /^(stiff|zeta|blend|idle|stride|bounce|knee|arm|sway|lean|head|gate|cadence|sin)/.test(k)) {
+      assert.ok(false, `motion-lab.js has a knob for '${k}', which is not a motion key any more`);
+    }
+  }
 }
 
 // --- head yaw is anatomy, and species differ in it enormously ---------------------------------

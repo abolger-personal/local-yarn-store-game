@@ -27,7 +27,12 @@
   #roster th, #roster td { padding: 1px 7px 1px 0; text-align: right; font-variant-numeric: tabular-nums; }
   #roster th:first-child, #roster td:first-child { text-align: left; }
   #roster th { color: #888; font-weight: 500; }
-  #roster .shared { color: #555; margin-bottom: 4px; max-width: 210px; line-height: 1.4; }
+  #roster .shared { color: #555; margin-bottom: 4px; max-width: 330px; line-height: 1.4; }
+  /* traits are the cause, the coefficients the effect: rule between the two halves so the
+     row reads as "these traits produced these numbers" and not as twelve loose figures */
+  #roster th.co, #roster td.co { color: #555; }
+  #roster th:nth-child(9), #roster td:nth-child(9) { border-left: 1px solid #ddd; padding-left: 7px; }
+  #roster th { cursor: help; }
   #scopeWrap { left: 12px; top: 12px; padding: 8px 10px 6px; }
   #pose {
     position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 11;
@@ -35,6 +40,7 @@
   }
   #pose b { display: block; font-size: 15px; color: #111; letter-spacing: .01em; }
   #pose span { display: block; font-size: 11px; color: #777; margin-top: 1px; }
+  #pose span.hint { color: #9a6b2f; max-width: 460px; margin: 3px auto 0; line-height: 1.35; }
   #scope { display: block; width: 360px; height: 110px; }
   #readout {
     margin-top: 4px; font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: #444;

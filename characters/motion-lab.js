@@ -268,7 +268,16 @@ function showPose() {
   const now = poseTrail.at(-1) ?? 'rest';
   const prev = poseTrail.length > 1 ? poseTrail.at(-2) : null;
   poseEl.innerHTML = `<b>${prev ? `${prev} \u2192 ` : ''}${now}</b>`
-    + `<span>${POSE_MEANS[now] ?? ''}</span>`;
+    + `<span>${POSE_MEANS[now] ?? ''}</span>`
+    // The trap this page is built around and did not warn about: the three engines interpolate
+    // the COMMANDED pose, and the walk and idle layers are added AFTERWARDS, identically for
+    // all three. Measured spread on armSwing between the engines: 0.0000 rad while the target
+    // is held, 0.0227 across one clean pose change, 0.2670 across an interrupted one. So a
+    // walking cast with a fixed pose shows three bit-identical rows, and it looks like the
+    // engine switch is broken when it is doing exactly what it should.
+    + '<span class="hint">the three rows differ ONLY across a pose change \u2014 press '
+    + '<kbd>Enter</kbd> to interrupt one. Walking and fidgeting are added after the '
+    + 'interpolator, the same way for all three.</span>';
 }
 
 function cyclePose() {
@@ -426,22 +435,42 @@ function trace(series, colour, alpha, scale) {
 
 const rosterEl = document.getElementById('roster');
 
+// The seven assets motionOf actually reads, with the abbreviation each gets as a column
+// header. The other three Big-5 assets drive other systems and are left out rather than
+// shown as dead columns. Exact names: CHARACTER-ATTRIBUTES.md makes synonyms a violation.
+const TRAIT_COLS = Object.freeze([
+  ['Ast', 'Assertiveness'], ['Wth', 'Withdrawal'], ['Vol', 'Volatility'],
+  ['Ord', 'Orderliness'], ['Ent', 'Enthusiasm'], ['Ind', 'Industriousness'],
+  ['Opn', 'Openness'],
+]);
+
+/** One row: the traits that were rolled, then the coefficients they produced. */
+function rosterRow(a) {
+  const o = a.opts;
+  const traits = TRAIT_COLS.map(([, full]) => `<td>${a.traits[full] ?? '–'}</td>`).join('');
+  return `<tr><td>${a.built.species.label}</td>${traits}`
+    + `<td class="co">${o.stiff.toFixed(0)}</td><td class="co">${o.zeta.toFixed(2)}</td>`
+    + `<td class="co">${o.idleAmp.toFixed(2)}</td><td class="co">${o.stride.toFixed(2)}</td>`
+    + `<td class="co">${o.headArc.toFixed(2)}</td></tr>`;
+}
+
 function refreshRoster() {
-  const rows = cast.filter((a) => a.engine === 'spring').map((a) => {
-    const o = a.opts;
-    return `<tr><td>${a.built.species.label}</td><td>${o.stiff.toFixed(0)}</td>`
-      + `<td>${o.zeta.toFixed(2)}</td><td>${o.idleAmp.toFixed(2)}</td>`
-      + `<td>${o.stride.toFixed(2)}</td><td>${o.headArc.toFixed(2)}</td></tr>`;
-  }).join('');
-  // With shared traits on screen, a difference between rows can only come from the species'
-  // own spans -- so the traits have to be visible or the comparison cannot be read.
+  // Traits are the CAUSE and the coefficients are the effect, so they belong on every row
+  // rather than only in the shared-traits banner. Reading "this one is stiffer" is useless
+  // without the trait that made it so -- and with several of ONE species on screen the
+  // traits are the only thing that differs between the rows at all.
+  const rows = cast.filter((a) => a.engine === 'spring').map(rosterRow).join('');
   const head = shared
-    ? `<div class="shared">same traits — Assertiveness ${shared.Assertiveness}, `
-      + `Withdrawal ${shared.Withdrawal}, Volatility ${shared.Volatility}, `
-      + `Enthusiasm ${shared.Enthusiasm}</div>`
+    ? '<div class="shared">Same traits on every row, so anything that differs below is the '
+      + 'species’ own MOTION_RANGES.</div>'
     : '';
-  rosterEl.innerHTML = `${head}<table><tr><th>species</th><th>stiff</th><th>zeta</th>`
-    + `<th>idle</th><th>stride</th><th>head</th></tr>${rows}</table>`;
+  const th = TRAIT_COLS.map(([ab, full]) => `<th title="${full}">${ab}</th>`).join('');
+  rosterEl.innerHTML = `${head}<table><tr><th>species</th>${th}`
+    + '<th class="co" title="how eagerly they move">stiff</th>'
+    + '<th class="co" title="how much they wobble on arrival">zeta</th>'
+    + '<th class="co" title="how much they fidget">idle</th>'
+    + '<th class="co" title="step length">stride</th>'
+    + `<th class="co" title="how far they turn their head">head</th></tr>${rows}</table>`;
 }
 
 const readoutEl = document.getElementById('readout');
@@ -555,9 +584,15 @@ knob(fWalk, S, 'speed', 'walking speed',
   'Drives them along the floor. 0 = standing still. Stride phase follows DISTANCE, so the feet '
   + 'stay planted at any speed and any leg length.', 0, 2.5);
 knob(fWalk, S.scale, 'stride', 'step length',
-  'How far each step reaches. Past about 1.13x leg length the legs physically cannot reach and '
-  + 'the feet slide \u2014 the skate readout will say so. Scales the whole cast.',
+  'How far each step reaches, as a multiple of leg length. Past about 2.26x the legs physically '
+  + 'cannot reach and the feet slide \u2014 the skate readout will say so. Scales the whole cast.',
   0.5, 1.5).onChange(retune);
+knob(fWalk, S.opts, 'kneeLift', 'knee lift',
+  'How much the swinging leg bends its knee to clear the floor. At 0 the legs are rigid sticks '
+  + 'and BOTH feet reach the ground at the same instant twice a step — that is the stomp '
+  + 'that reads as a limp, so drag it to 0 to see what this fixed. The knee only lifts the foot '
+  + 'while that leg is BEHIND the hip, so very high values buckle it rather than lifting more.',
+  0, 1.4).onChange(retune);
 knob(fWalk, S.scale, 'sway', 'side-to-side sway',
   'How far the body rolls over the planted foot each step. An excitable character rolls, an '
   + 'orderly one walks a tidy line. Scales the whole cast.', 0, 3).onChange(retune);
@@ -570,6 +605,22 @@ knob(fWalk, S.scale, 'armGain', 'arm swing',
 knob(fWalk, S.scale, 'lean', 'forward lean',
   'How far they lean into the walk. Assertive, industrious characters lean in. Scales the '
   + 'whole cast.', 0, 2.5).onChange(retune);
+
+// The three gait LIMITS. Not style -- these say what the rig is physically willing to do, and
+// they are the first things to reach for when a walk looks wrong rather than merely bland.
+knob(fWalk, S.opts, 'sinMax', 'biggest believable step',
+  'A ceiling on how far the legs will scissor, as a sine: 0.56 is sin(0.6 rad), about 34 '
+  + 'degrees. Step length is clamped to this no matter what the stride knob asks for, so past '
+  + 'it the body outruns the legs and the skate readout climbs instead of the step growing.',
+  0.15, 0.85).onChange(retune);
+knob(fWalk, S.opts, 'cadenceMax', 'fastest step rate',
+  'Steps per second before the legs stop moving faster and start reaching further instead. Low '
+  + 'values give a long striding walk, high values a quick scurry.', 0.5, 8).onChange(retune);
+knob(fWalk, S.opts, 'gateSpeed', 'speed to reach a full walk',
+  'How fast they must be moving before the walk is at full strength. Below it the cycle fades '
+  + 'out, which is what brings the feet together when they stop. Raise it and they creep into '
+  + 'and out of walking; lower it and the legs snap on the instant they move.',
+  0.05, 1.5).onChange(retune);
 
 knob(fWalk, S, 'lookOver', 'look over the shoulder',
   'Turns every head as far as ITS OWN SPECIES can manage. An owl clears about 264 degrees, a '

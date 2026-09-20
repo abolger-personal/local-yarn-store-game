@@ -612,11 +612,39 @@ function idleLayer(out, m, opts, a) {
  * @param {number} speed current ground speed
  * @param {number} L leg-chain length: legHeight + hipInset
  */
+/**
+ * The fastest this body can honestly walk: cadence at its cap, legs at full believable scissor.
+ *
+ * Above this the body outruns the legs and the feet slide -- which is allowed and is what
+ * `skate` reports, but it is a deliberate look ("hurrying"), not a setting to wander past by
+ * accident. It is almost entirely a function of LEG LENGTH, which is why a cast of mixed
+ * heights has no single safe speed: measured on owl legs, 0.40 units/s on the shortest and
+ * 1.46 on the longest.
+ */
+export function topSpeed(L, opts) {
+  return (opts.cadenceMax * 4 * L * opts.sinMax) / 2;
+}
+
 export function walkPhase(walkDist, speed, L, opts) {
   const natural = opts.stride * L;
   const ceiling = 4 * L * opts.sinMax;
   const needed = opts.cadenceMax > 0 ? (2 * speed) / opts.cadenceMax : natural;
-  const strideLen = Math.min(ceiling, Math.max(natural, needed));
+  // TWO stride lengths, and keeping them apart is the whole fix.
+  //
+  // `gaitLen` is what the CADENCE demands and is deliberately unbounded, because it is what the
+  // phase is divided by: cadence is 2*speed/gaitLen and gaitLen >= needed = 2*speed/cadenceMax,
+  // so cadence can never exceed cadenceMax. That makes the knob an actual cap.
+  //
+  // `reach` is how far the legs can physically swing, and it IS bounded by the geometry.
+  //
+  // These used to be one value clamped to the ceiling, which quietly made cadenceMax a wish
+  // rather than a limit: once the ceiling bound, the phase was divided by the ceiling and
+  // cadence ran away with speed. Measured on a short-legged owl at speed 2.5: 21.5 steps/s,
+  // i.e. 10.7 leg cycles per second, sampled at 60fps -- about 5.6 frames per cycle, which is
+  // close enough to Nyquist that the legs alias instead of animating. That is the "looks crazy",
+  // and it was worst on short legs, which is why one long-legged owl looked fine.
+  const gaitLen = Math.max(natural, needed);
+  const reach = Math.min(gaitLen, ceiling);
   // THE FOOT-LOCK CONDITION.
   //
   // A phase is one CYCLE -- legSwing runs a whole sine over it -- which is TWO steps, and each
@@ -630,10 +658,13 @@ export function walkPhase(walkDist, speed, L, opts) {
   // cycle of one leg instead of its stance half -- the same off-by-a-half, just on the other
   // side. Measured over the real stance window, planted-foot slip is 10.7% of stride at /(4*L)
   // and 55.7% at /(2*L).
-  const swingAmp = Math.asin(Math.min(strideLen / (4 * L), opts.sinMax));
-  const skate = needed > ceiling ? (needed - ceiling) / needed : 0;
-  const phase = strideLen > 0 ? (walkDist / strideLen) % 1 : 0;
-  return { phase, strideLen, swingAmp, skate };
+  const swingAmp = Math.asin(Math.min(reach / (4 * L), opts.sinMax));
+  // The honest report: how much of the body's travel the legs are NOT accounting for. A
+  // character who outruns their own legs skates, and skating reads far better than blurring --
+  // it looks like someone hurrying, where a blur looks like a broken rig.
+  const skate = gaitLen > reach ? (gaitLen - reach) / gaitLen : 0;
+  const phase = gaitLen > 0 ? (walkDist / gaitLen) % 1 : 0;
+  return { phase, strideLen: gaitLen, reach, swingAmp, skate, cadence: 2 * speed / gaitLen };
 }
 
 /**

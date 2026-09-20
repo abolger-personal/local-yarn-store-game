@@ -143,7 +143,7 @@ export const BASE_PARAMS = Object.freeze({
 // Positive armSwing takes the arm BACKWARD, so carrying wants a small negative value: the
 // upper arm stays near vertical and the elbow does the work.
 export { POSES, MOTION_KEYS, REST_POSE, MOTION_DEFAULTS, BASE_MOTION_RANGES,
-         motionOf, factors, walkPhase, walkLayer, walkGain, valueOf, velocityOf,
+         motionOf, factors, walkPhase, walkLayer, walkGain, topSpeed, valueOf, velocityOf,
          resetMotion } from './motion.js';
 export { makeMotion, integrate, compose, POSE_KEYS };
 

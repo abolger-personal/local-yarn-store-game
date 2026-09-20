@@ -387,6 +387,27 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     }
   }
 
+  // CADENCE IS A CAP, NOT A WISH. This is what the legs blurring at high speed actually was:
+  // phase was divided by a stride clamped to the geometric ceiling, so once that bound, cadence
+  // ran away linearly with speed. A short-legged owl at speed 2.5 hit 21.5 steps/s -- 10.7 leg
+  // cycles per second against a 60fps sampler, about 5.6 frames per cycle, close enough to
+  // Nyquist that the legs alias rather than animate.
+  //
+  // The body is allowed to outrun the legs; that is what `skate` reports. What is not allowed
+  // is the legs spinning to pretend otherwise.
+  for (const L of [0.103, 0.238, 0.448]) {
+    for (const speed of [0.2, 1, 2.5, 6, 20]) {
+      const p = walkPhase(0, speed, L, o);
+      const cadence = (2 * speed) / p.strideLen;
+      assert.ok(cadence <= o.cadenceMax + 1e-9,
+        `L=${L} speed=${speed}: ${cadence.toFixed(1)} steps/s exceeds the ${o.cadenceMax} cap `
+        + '-- at 60fps the legs alias instead of animating');
+      // and the legs must never scissor past what the geometry allows
+      assert.ok(p.swingAmp <= Math.asin(o.sinMax) + 1e-9, `L=${L} speed=${speed}: over-scissored`);
+      assert.ok(p.skate >= 0 && p.skate < 1, 'skate stays a reportable fraction');
+    }
+  }
+
   // The swing-leg knee, which is what stops both feet reaching the floor together. Two rigid
   // mirrored legs have their feet at identical heights twice a cycle, so the body stomps; the
   // knee is the only thing that breaks the tie. Measured on the rig: ground clearance went from

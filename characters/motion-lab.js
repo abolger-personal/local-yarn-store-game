@@ -23,7 +23,7 @@ import {
   BASE_PARAMS, BASE_MOTION_RANGES, MOTION_DEFAULTS, POSES, POSE_KEYS, BUILD, TONE_MAPPING,
   createCharacter, disposeCharacter, setViewMode, setGeometryDetail,
   getSpecies, speciesIds, makeMotion, resetMotion, integrate, compose, applyPose,
-  motionOf, factors, walkPhase, walkLayer, walkGain, valueOf, velocityOf,
+  motionOf, factors, walkPhase, walkLayer, walkGain, topSpeed, valueOf, velocityOf,
 } from './npc.js';
 import { randomTraits } from './visit.js';
 import './owl.js';
@@ -169,7 +169,7 @@ resize();
 
 /**
  * @typedef {{built: any, motion: any, opts: any, engine: string, traits: any,
- *   walkDist: number, lane: number, maxDv?: number, skate?: number}} Actor
+ *   walkDist: number, lane: number, maxDv?: number, skate?: number, top?: number}} Actor
  */
 /** @type {Actor[]} */
 let cast = [];
@@ -419,6 +419,7 @@ function tickOne(a, dt) {
   const gain = walkGain(a.motion, S.speed, dt, a.opts);
   walkLayer(out, w, gain, a.opts);
   a.skate = w.skate;
+  a.top = topSpeed(L, a.opts);
 
   applyPose(a.built, out);
 
@@ -596,9 +597,19 @@ setInterval(() => {
     const a = cast.find((c) => c.engine === engine);
     return a ? `${engine} ${(a.maxDv ?? 0).toFixed(2)}` : engine;
   });
-  const skate = cast[0]?.skate ?? 0;
-  readoutEl.textContent = `max |dv| at interrupt — ${parts.join('  ·  ')}`
-    + `   ·   skate ${(skate * 100).toFixed(0)}%`;
+  // Worst in the cast, not cast[0]. Skate is decided almost entirely by leg length, so with a
+  // mixed-height cast one character can be sliding badly while the first one reads fine.
+  const shown = cast.filter((c) => c.engine === CHOSEN);
+  const worst = Math.max(0, ...shown.map((c) => c.skate ?? 0));
+  const slowest = Math.min(Infinity, ...shown.map((c) => c.top ?? Infinity));
+  const sliding = worst > 0.25;
+  const warn = sliding ? ' — the feet are sliding' : '';
+  const top = Number.isFinite(slowest)
+    ? `<br />fastest honest walk for this cast: <b>${slowest.toFixed(2)}</b> (set by the shortest legs)`
+    : '';
+  readoutEl.innerHTML = `max |dv| at interrupt — ${parts.join('  ·  ')}`
+    + `   ·   <span class="${sliding ? 'bad' : ''}">worst skate `
+    + `${(worst * 100).toFixed(0)}%${warn}</span>${top}`;
 }, 120);
 
 // ---------------------------------------------------------------- gui

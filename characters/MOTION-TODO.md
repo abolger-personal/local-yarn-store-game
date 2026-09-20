@@ -274,6 +274,30 @@ nobody was using.
 degrees, llama 109, clamped in `applyPose`), `clampArmOut`. A new kit gets all of that by
 setting its own body params, with no motion tuning at all.
 
+## Speed has a ceiling, and it is set by leg length
+
+`topSpeed(L, opts)` in `motion.js` is the fastest a body can honestly walk: cadence at its cap,
+legs at full believable scissor. Measured on owl legs:
+
+| legHeight | top honest speed |
+| --- | --- |
+| 0.085 (stumpy) | **0.40** |
+| 0.215 | 0.89 |
+| 0.345 (leggy) | 1.39 |
+
+A mixed-height cast therefore has no single safe speed — the shortest legs set it. The lab prints
+it as *"fastest honest walk for this cast"* and turns the skate readout orange past 25%.
+
+Above the ceiling the body outruns the legs and the feet slide. That is allowed and is what
+`skate` reports; it reads as hurrying. What is NOT allowed is the legs spinning to pretend
+otherwise, which is what used to happen — see the bug list.
+
+**This is the pacing decision, now with a number on it.** `config.js` ships `S.travel = 1.4`,
+which is above the honest ceiling for every character shorter than about 0.35 legHeight. Either
+`S.travel` comes down to roughly 0.8, or `cadenceMax` goes up (3.4 steps/s is already brisk), or
+the cast is authored leggier. Coming down is the right call and this branch is what makes it
+affordable: longer rounds stop reading as statues once idles land.
+
 ## Bugs this work found and fixed, worth not reintroducing
 
 1. **Foot skate, twice — and the second time was my own "fix".** A phase is one CYCLE, which is

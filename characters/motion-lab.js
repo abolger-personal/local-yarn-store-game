@@ -35,6 +35,19 @@ console.info('LYS build', BUILD);
 // the whole question is whether the other two look better than what the game does today, and
 // that is not answerable without it in the same frame.
 const ENGINES = ['spring', 'hermite', 'smoothstep'];
+
+// What each pose is meant to read as. A motion cannot be judged without knowing what it was
+// aiming for -- "is that arrival wrong, or is browse just like that?" is unanswerable otherwise.
+const POSE_MEANS = {
+  rest: 'standing, arms down',
+  walk: 'mid-stride (static pose; the real walk is the walking folder)',
+  carry: 'holding something at the chest',
+  reach: 'arm out to a shelf',
+  browse: 'leaning in, looking at goods',
+  sit: 'seated, knees up',
+  delighted: 'arms up, ears perked \u2014 the buy reaction',
+  'walk+carry': 'mid-stride holding something',
+};
 const LANE = 2.4;                 // characters wrap at +/- this, so a walk has somewhere to go
 const POSE_NAMES = Object.keys(POSES);
 
@@ -163,7 +176,11 @@ function addPair(id, slot, slots) {
   const params = { ...BASE_PARAMS, ...kit.defaults };
   if (!S.allSpecies) kit.randomise?.(params);
   const traits = shared ?? randomTraits();
-  const walkDist = Math.random() * 0.4;   // shared, or the trio strides out of step
+  // Shared ACROSS the trio, varied across slots. The three rows of one slot must differ by the
+  // interpolator and nothing else, or the comparison is contaminated -- but two different slots
+  // should still look like two different characters, which is what the idle seed provides.
+  const walkDist = Math.random() * 0.4;
+  const seed = Math.random();
 
   ENGINES.forEach((engine, row) => {
     const built = createCharacter({ ...params }, kit);
@@ -173,7 +190,7 @@ function addPair(id, slot, slots) {
     group.add(built.root);
     cast.push({
       built, engine, traits, lane: z, walkDist,
-      motion: makeMotion(built.params, Math.random()),
+      motion: makeMotion(built.params, seed),
       opts: coeffs(traits, kit, engine),
     });
   });
@@ -206,6 +223,8 @@ let poseIndex = 0;
 let pendingInterrupt = 0;
 let pendingTarget = null;
 let markNextSample = false;   // drawn as a vertical rule on the scope
+const poseTrail = [];         // the last two target names, so the banner can read "reach -> browse"
+const poseEl = document.getElementById('pose');
 
 /**
  * `reset` clears the peak-velocity-step readout.
@@ -215,9 +234,21 @@ let markNextSample = false;   // drawn as a vertical rule on the scope
  * interrupt does not.
  */
 function setTarget(pose, reset = true) {
+  const name = POSE_NAMES.find((n) => POSES[n] === pose) ?? '?';
+  if (target !== pose) poseTrail.push(name);
+  while (poseTrail.length > 2) poseTrail.shift();
   target = pose;
   if (reset) for (const a of cast) a.maxDv = 0;
   markNextSample = true;
+  showPose();
+}
+
+/** The banner: what they are doing, and what it is supposed to look like. */
+function showPose() {
+  const now = poseTrail.at(-1) ?? 'rest';
+  const prev = poseTrail.length > 1 ? poseTrail.at(-2) : null;
+  poseEl.innerHTML = `<b>${prev ? `${prev} \u2192 ` : ''}${now}</b>`
+    + `<span>${POSE_MEANS[now] ?? ''}</span>`;
 }
 
 function cyclePose() {
@@ -402,46 +433,119 @@ setInterval(() => {
 
 const gui = new GUI({ title: 'motion lab' });
 
+/**
+ * Add a control with a readable name and a hover explanation.
+ *
+ * lil-gui shows only the property name, and the property names here are the maths ("zeta",
+ * "sinMax", "armGain") -- fine in the source, useless on a tuning surface where the whole job is
+ * deciding what to drag. Every knob says what it does and which way is which.
+ */
+function knob(folder, obj, prop, label, help, ...rest) {
+  const c = folder.add(obj, prop, ...rest).name(label);
+  c.domElement.title = help;
+  const name = c.domElement.querySelector('.name');
+  if (name) name.title = help;
+  return c;
+}
+
 const fCast = gui.addFolder('cast');
-fCast.add(S, 'species', speciesIds()).onChange(buildCast);
-fCast.add(S, 'count', 1, 8, 1).onChange(buildCast);
-fCast.add(S, 'allSpecies').name('one per species, same traits').onChange(buildCast);
-fCast.add({ reroll: buildCast }, 'reroll').name('reroll traits (R)');
-fCast.add(S, 'view', ['felted', 'grey', 'silhouette']).onChange((v) => setViewMode(group, v));
+knob(fCast, S, 'species', 'species', 'Which species to fill the lab with.', speciesIds())
+  .onChange(buildCast);
+knob(fCast, S, 'count', 'how many', 'Characters per row. Each gets its own random personality.',
+  1, 8, 1).onChange(buildCast);
+knob(fCast, S, 'allSpecies', 'compare species',
+  'One of every species, all given the SAME personality. Any difference you then see comes only '
+  + 'from that species\u2019 own variation spans.').onChange(buildCast);
+knob(fCast, { reroll: buildCast }, 'reroll', 'new personalities (R)',
+  'Roll fresh trait values for everyone. Watch the roster bottom-right change with them.');
+knob(fCast, S, 'view', 'render as',
+  'Silhouette is the honest test: if a motion does not read as a flat black shape, it will not '
+  + 'read at play distance either.', ['felted', 'grey', 'silhouette'])
+  .onChange((v) => setViewMode(group, v));
 
 // The per-species knob: drag a span and the row spreads or converges, live.
-const fRanges = gui.addFolder('species variation');
+// How much ONE member of a species differs from another. Each row is a RANGE, not a value:
+// personality decides where in the range a character lands, the species decides how wide the
+// range is. Narrow the gap and every member moves alike; widen it and they vary.
+const SPAN_HELP = {
+  stiff: 'how eagerly they move',
+  zeta: 'how much they wobble on arrival',
+  idleAmp: 'how much they fidget',
+  idleRate: 'how fast they fidget',
+  stride: 'step length',
+  bounce: 'walking bounce',
+  headArc: 'how far they turn their head',
+};
+
+const fRanges = gui.addFolder('how much members of a species differ');
 for (const k of Object.keys(BASE_MOTION_RANGES)) {
   const [lo, hi] = BASE_MOTION_RANGES[k];
   const pad = (hi - lo) * 1.5;
   const row = { min: S.ranges[k][0], max: S.ranges[k][1] };
-  fRanges.add(row, 'min', lo - pad, hi + pad).name(`${k} min`)
+  const help = `${SPAN_HELP[k]}. Narrow the gap and every member of the species moves alike; `
+    + 'widen it and they vary. Where one character sits inside it is set by their personality.';
+  knob(fRanges, row, 'min', `${SPAN_HELP[k]} \u2014 least`, help, lo - pad, hi + pad)
     .onChange((v) => { S.ranges[k][0] = v; retune(); });
-  fRanges.add(row, 'max', lo - pad, hi + pad).name(`${k} max`)
+  knob(fRanges, row, 'max', `${SPAN_HELP[k]} \u2014 most`, help, lo - pad, hi + pad)
     .onChange((v) => { S.ranges[k][1] = v; retune(); });
 }
-fRanges.add({ copy: exportRanges }, 'copy').name('copy MOTION_RANGES to clipboard');
+knob(fRanges, { copy: exportRanges }, 'copy', 'copy these spans as code',
+  'Puts a paste-ready MOTION_RANGES block on the clipboard, for owl.js or llama.js.');
 fRanges.close();
 
-const fBake = gui.addFolder('interpolator bake-off');
-fBake.add(S.opts, 'stiff', 20, 800).onChange(retune).name('stiff (spring)');
-fBake.add(S.opts, 'zeta', 0.3, 2).onChange(retune).name('zeta (spring)');
-fBake.add(S.opts, 'blend', 0.08, 1.2).onChange(retune).name('blend (hermite)');
-fBake.add(S, 'interruptAfter', 0.02, 0.5).name('interrupt after (s)');
-fBake.add({ go: fireInterrupt }, 'go').name('INTERRUPT (Enter)');
-fBake.add({ next: cyclePose }, 'next').name('next pose (P)');
-fBake.add(S, 'chaos').name('chaos — random interrupts');
-fBake.add(S, 'dtScale', 0.1, 2).name('dt scale');
-fBake.add({ step: () => { stepOnce = true; } }, 'step').name('single frame (.)');
-fBake.add(S, 'scopeChannel', POSE_KEYS).name('scope channel');
+const fBake = gui.addFolder('how motion gets from A to B');
+knob(fBake, { go: fireInterrupt }, 'go', '\u25b6 CUT OFF A MOVE (Enter)',
+  'The whole point of this page. Starts a reach, then interrupts it partway with a browse. '
+  + 'Watch whether each row glides into the new move or stops dead and restarts.');
+knob(fBake, S, 'interruptAfter', 'cut it off after', 'Seconds into the first move before the '
+  + 'interrupt lands. Moves take about 0.35s, so 0.15 cuts in halfway.', 0.02, 0.5);
+knob(fBake, { next: cyclePose }, 'next', 'next pose (P)',
+  'Step through the poses one at a time, uninterrupted.');
+knob(fBake, S, 'chaos', 'never stop interrupting',
+  'Fires random moves at random times forever. This is what shakes out blow-ups.');
+knob(fBake, S, 'dtScale', 'slow motion', 'Below 1 runs slower than real time, so you can watch '
+  + 'a single interrupt happen. Above 1 fast-forwards.', 0.1, 2);
+knob(fBake, { step: () => { stepOnce = true; } }, 'step', 'advance one frame (.)',
+  'Pause with Space, then tap this to step frame by frame through an interrupt.');
+knob(fBake, S, 'scopeChannel', 'graph which joint',
+  'Which joint angle the graph top-left plots. armSwing shows the most during a reach.',
+  POSE_KEYS);
+knob(fBake, S.opts, 'stiff', 'how eagerly they move',
+  'Spring rows only. Higher = snaps to a new pose decisively; lower = dawdles into it.',
+  20, 800).onChange(retune);
+knob(fBake, S.opts, 'zeta', 'wobble on arrival',
+  'Spring rows only. Below 1 the move overshoots and settles back \u2014 the cute bounce. '
+  + '1 arrives dead-on. Above 1 arrives sluggishly.', 0.3, 2).onChange(retune);
+knob(fBake, S.opts, 'blend', 'move duration (s)',
+  'Hermite and smoothstep rows only: how long a move takes, start to finish.',
+  0.08, 1.2).onChange(retune);
 
-const fWalk = gui.addFolder('walk');
-fWalk.add(S, 'speed', 0, 2.5).name('treadmill speed');
-fWalk.add(S.opts, 'stride', 1.0, 2.4).onChange(retune);
-fWalk.add(S.opts, 'bounce', -0.12, 0.2).onChange(retune);
-fWalk.add(S.opts, 'armGain', 0, 1.5).onChange(retune);
-fWalk.add(S.opts, 'lean', 0, 0.3).onChange(retune);
-fWalk.add(S.opts, 'idleAmount', 0, 2).onChange(retune).name('idle amount');
+const fWalk = gui.addFolder('walking');
+knob(fWalk, S, 'speed', 'walking speed',
+  'Drives them along the floor. 0 = standing still. Stride phase follows DISTANCE, so the feet '
+  + 'stay planted at any speed and any leg length.', 0, 2.5);
+knob(fWalk, S.opts, 'stride', 'step length',
+  'How far each step reaches, relative to leg length. Past about 1.13 the legs physically '
+  + 'cannot reach that far and the feet start to slide \u2014 the skate readout will say so.',
+  0.5, 1.4).onChange(retune);
+knob(fWalk, S.opts, 'sway', 'side-to-side sway',
+  'How far the body leans over the planted foot each step. 0 is a machine pacing; this is what '
+  + 'makes a walk look like it has weight.', 0, 0.25).onChange(retune);
+knob(fWalk, S.opts, 'bounce', 'up-and-down bounce',
+  'Extra dip at each footfall. NEGATIVE cancels the natural bob that comes free from the legs '
+  + 'scissoring \u2014 useful if it reads as a limp.', -0.12, 0.2).onChange(retune);
+knob(fWalk, S.opts, 'armGain', 'arm swing',
+  'How much the arms counter-swing against the legs. 0 leaves the arms hanging dead.',
+  0, 1.5).onChange(retune);
+knob(fWalk, S.opts, 'lean', 'forward lean',
+  'How far they lean into the walk while moving.', 0, 0.3).onChange(retune);
+
+const fIdle = gui.addFolder('standing still');
+knob(fIdle, S.opts, 'idleAmount', 'how much they fidget',
+  'Master dial for breathing, weight shifting and looking around. 0 freezes them solid \u2014 '
+  + 'which is what the game looks like today.', 0, 3).onChange(retune);
+knob(fIdle, S.opts, 'idleRate', 'how fast they fidget',
+  'Speeds up or slows down every idle rhythm at once.', 0.3, 2.5).onChange(retune);
 
 /** Paste-ready for a kit file, so lab tuning lands in source without retyping. */
 function exportRanges() {
@@ -458,6 +562,7 @@ function exportRanges() {
 addEventListener('keydown', (e) => {
   if (/input|textarea/i.test(/** @type {HTMLElement} */ (e.target)?.tagName ?? '')) return;
   const k = e.key.toLowerCase();
+  // (named `k`, not `key`: `key` is the scene's directional light)
   if (k === 'enter') fireInterrupt();
   else if (k === 'p') cyclePose();
   else if (k === 'r') buildCast();
@@ -473,3 +578,4 @@ addEventListener('keydown', (e) => {
 
 setGeometryDetail('high');
 buildCast();
+showPose();

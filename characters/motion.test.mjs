@@ -149,6 +149,56 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     'blink must not be interpolated: a 120ms snap through a 0.35s spring becomes a droop');
 }
 
+// --- MOTION_DEFAULTS alone is a COMPLETE coefficient set --------------------------------------
+//
+// Every coefficient the layers multiply by has to have a default. headArc lived only in
+// BASE_MOTION_RANGES, so a caller passing bare MOTION_DEFAULTS multiplied by undefined and put
+// NaN on all three head channels -- which does not look like a broken head, it culls the entire
+// character. The lab hid it because it always merges motionOf() on top.
+{
+  for (const k of Object.keys(BASE_MOTION_RANGES)) {
+    assert.ok(MOTION_DEFAULTS[k] !== undefined,
+      `MOTION_DEFAULTS is missing ${k}, so a caller not merging motionOf() gets NaN`);
+  }
+  const m = makeMotion(POSES.rest, 0.4);
+  const buf = out();
+  for (let i = 0; i < 600; i++) {
+    integrate(m, POSES.browse, 1 / 60, MOTION_DEFAULTS);
+    compose(buf, m, MOTION_DEFAULTS);
+    walkLayer(buf, walkPhase(i / 60, 0.5, 0.238, MOTION_DEFAULTS), 1, MOTION_DEFAULTS);
+    for (const k of POSE_KEYS) {
+      assert.ok(Number.isFinite(buf[k]), `${k} is finite using only MOTION_DEFAULTS (frame ${i})`);
+    }
+  }
+}
+
+// --- the idle layer actually moves, and moves SIDEWAYS -----------------------------------------
+//
+// Amplitudes that are technically nonzero but read as frozen are the failure this guards: the
+// first pass shipped a 0.9-degree weight shift on a fore-aft channel, which is invisible twice
+// over. spineRoll is the only lateral channel on the rig, so if it stays flat nothing on the
+// character can move side to side at all.
+{
+  const o = opts();
+  const range = (key, seed, amp) => {
+    const m = makeMotion(POSES.rest, seed);
+    const buf = out();
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < 3600; i++) {
+      integrate(m, POSES.rest, 1 / 60, { ...o, idleAmp: amp });
+      compose(buf, m, { ...o, idleAmp: amp });
+      lo = Math.min(lo, buf[key]); hi = Math.max(hi, buf[key]);
+    }
+    return (hi - lo) * 180 / Math.PI;
+  };
+
+  assert.ok(range('spineRoll', 0.5, 1) > 4,
+    'a standing character must sway several degrees side to side, not twitch imperceptibly');
+  assert.ok(range('headYaw', 0.5, 1) > 4, 'and look around');
+  assert.ok(range('spineRoll', 0.5, 1.6) > range('spineRoll', 0.5, 0.4) * 2,
+    'a fidgety character must sway visibly more than a still one, or the trait does nothing');
+}
+
 // --- holdItem crosses exactly once ------------------------------------------------------------
 {
   for (const mode of ['spring', 'hermite']) {

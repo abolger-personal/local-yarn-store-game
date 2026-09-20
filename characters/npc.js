@@ -80,6 +80,9 @@ export const BASE_PARAMS = Object.freeze({
   hipFlex:       0.00,    // both legs forward together. Positive = knees come UP, which is
                           // the opposite sign to legSwing, because flexion reads that way.
   spineBend:     0.00,    // forward lean at the waist; positive folds the chest toward +Z
+  spineRoll:     0.00,    // LATERAL lean at the waist; positive leans to the character's left.
+                          // Every other body channel rotates about X (fore-aft), so this is the
+                          // only way anything on the rig moves side to side.
   earPerk:       0.00,    // forward/back hinge at the ear base; the expression channel
   earSplay:      0.00,    // extra outward tilt, added to the species' resting tilt
   armSwingAlt:   0.00,    // anti-symmetric arm swing: armSwing moves both arms together, so a
@@ -1022,7 +1025,10 @@ export function applyPose(built, pose) {
   const { joints, held, params, bulge = 0 } = built;
   const out = clampArmOut(params, bulge, pose.armOut, pose.armSwing);
   applyLimbs(joints, pose, out);
-  if (joints.spine) joints.spine.rotation.x = pose.spineBend ?? 0;
+  // Roll lives on the SPINE, not the hips: lowestFoot derives grounding from hip and knee
+  // angles alone, so rolling the hips would lift one foot off the floor and sink the other with
+  // grounding none the wiser. Above the waist the legs are untouched and grounding stays exact.
+  if (joints.spine) joints.spine.rotation.set(pose.spineBend ?? 0, 0, -(pose.spineRoll ?? 0));
   // resting tilt belongs to the species, so the pose adds to it rather than replacing it
   for (const { node, side, tilt } of joints.ear) {
     node.rotation.set(pose.earPerk ?? 0, 0, side * -(tilt + (pose.earSplay ?? 0)));
@@ -1137,7 +1143,7 @@ export const BASE_GUI = Object.freeze({
   pose: [
     ['armSwing', -1.6, 1.6], ['armOut', -1.0, 3.0], ['elbowBend', -0.2, 2.4],
     ['legSwing', -1.0, 1.0], ['kneeBend', -0.4, 2.4], ['hipFlex', -0.6, 1.9],
-    ['spineBend', -0.7, 1.2],
+    ['spineBend', -0.7, 1.2], ['spineRoll', -0.8, 0.8],
     ['earPerk', -1.2, 1.2], ['earSplay', -0.8, 1.2],
     ['armSwingAlt', -1.0, 1.0],
     ['headYaw', -1.6, 1.6], ['headPitch', -0.9, 0.9], ['headTilt', -0.8, 0.8],

@@ -32,7 +32,7 @@
 // interpolator is what turns a blink into a droop.
 export const POSE_KEYS = [
   'armSwing', 'armSwingAlt', 'armOut', 'elbowBend', 'legSwing', 'kneeBend',
-  'hipFlex', 'spineBend', 'earPerk', 'earSplay',
+  'hipFlex', 'spineBend', 'spineRoll', 'earPerk', 'earSplay',
   'headYaw', 'headPitch', 'headTilt',
 ];
 
@@ -47,7 +47,7 @@ const TAU = Math.PI * 2;
 // is the anti-symmetric partner: positive is contralateral to positive legSwing.
 export const REST_POSE = Object.freeze({
   armSwing: 0, armSwingAlt: 0, armOut: 0, elbowBend: 0, legSwing: 0, kneeBend: 0,
-  hipFlex: 0, spineBend: 0, earPerk: 0, earSplay: 0,
+  hipFlex: 0, spineBend: 0, spineRoll: 0, earPerk: 0, earSplay: 0,
   headYaw: 0, headPitch: 0, headTilt: 0,
   holdItem: false, blink: 0,
 });
@@ -94,12 +94,16 @@ export const MOTION_DEFAULTS = Object.freeze({
                   // and the A/B switch for measuring what continuous motion actually costs)
   idleAmp:  1,
   idleRate: 1,
+  headArc:  1,    // MUST be here and not only in BASE_MOTION_RANGES: a caller using the defaults
+                  // alone would otherwise multiply by undefined, and NaN on a head channel
+                  // reaches the bounding sphere and culls the whole character.
 
   stride:    1.05,   // stride length as a multiple of leg-chain length. The foot-lock condition
                      // is sin(swingAmp) = stride/2, so stride is capped near 2*sinMax ~ 1.13
                      // before the legs physically cannot reach far enough and skate begins.
   bounce:    0.05,   // NEGATIVE cancels the free bounce; see walkLayer
   armGain:   0.55,
+  sway:      0.075,  // lateral body lean per step. The side-to-side half of a walk.
   lean:      0.06,   // forward lean at full speed
   gateSpeed: 0.35,   // ground speed at which the walk layer reaches full weight
   cadenceMax: 3.4,   // steps/sec before stride stretches instead of cadence rising
@@ -206,14 +210,13 @@ function readInto(arr, pose) {
 export function makeMotion(pose, seed = Math.random()) {
   const n = MOTION_KEYS.length;
   const m = {
-    cur: new Float64Array(n),
-    vel: new Float64Array(n),
-    from: new Float64Array(n),
-    fromVel: new Float64Array(n),
-    to: new Float64Array(n),
+    cur: new Float64Array(n), vel: new Float64Array(n),
+    from: new Float64Array(n), fromVel: new Float64Array(n), to: new Float64Array(n),
     target: null,      // identity only, for interrupt detection. NEVER read for values.
     t: 1,
     seed: seed * TAU,
+    rateA: seed * 0.10,               // per-character sub-rhythm rates: see idleLayer
+    rateB: (1 - seed) * 0.07,
     idlePhase: seed * TAU,
     blinkT: 1 + seed * 4,
     walkGain: 0,
@@ -344,21 +347,35 @@ export function compose(out, m, opts) {
   const a = opts.idleAmount * opts.idleAmp;
   if (a <= 0) return out;
 
-  const p = m.idlePhase;
-  // Breathing. The chest lifts and the arms follow it a little, because an arm that stays put
-  // while the ribcage moves reads as a detached limb.
-  out.spineBend -= a * 0.016 * Math.sin(p);
-  out.armOut += a * 0.009 * Math.sin(p);
-  // Weight shift, at an incommensurate rate so it never locks to the breath and the pair never
-  // repeats -- a visible loop is what makes an idle read as an animation rather than as life.
-  const w = Math.sin(p * 0.21 + m.seed);
-  out.hipFlex += a * 0.010 * w;
-  out.headTilt += a * 0.028 * opts.headArc * w;
-  out.headYaw += a * 0.090 * opts.headArc * Math.sin(p * 0.13 + m.seed * 2);
+  idleLayer(out, m, opts, a);
   // Blink rides its own timer, not the phase: blinks are Poisson-ish, and a blink on a sine is
   // metronomic in a way that reads as a machine.
   if (m.blinkT < 0) out.blink = Math.sin((1 + m.blinkT / BLINK_DUR) * Math.PI);
   return out;
+}
+
+/** Breathing, the lateral weight shift, and the wandering head. All additive, all stateless. */
+function idleLayer(out, m, opts, a) {
+  const p = m.idlePhase;
+  // Breathing. The chest lifts and the arms follow it a little, because an arm that stays put
+  // while the ribcage moves reads as a detached limb.
+  out.spineBend -= a * 0.045 * Math.sin(p);
+  out.armOut += a * 0.022 * Math.sin(p);
+
+  // WEIGHT SHIFT -- the side-to-side one, and the reason spineRoll exists. Everything else on
+  // the rig is fore-aft (spineBend, legSwing, hipFlex all rotate about X), so without a lateral
+  // channel an idle character can only ever bob forwards and backwards, which reads as breathing
+  // hard rather than as standing around.
+  //
+  // Each sub-rhythm gets a rate derived from the character's own seed (rateA/rateB, set in
+  // makeMotion), so no two characters run the same loop at an offset -- incommensurate rates
+  // never repeat, and a visible repeat is what makes an idle read as an animation, not as life.
+  const w = Math.sin(p * (0.17 + m.rateA) + m.seed);
+  out.spineRoll += a * 0.085 * w;
+  out.hipFlex += a * 0.020 * Math.sin(p * (0.17 + m.rateA) * 2 + m.seed);
+  out.headTilt += a * 0.070 * opts.headArc * w;
+  out.headYaw += a * 0.180 * opts.headArc * Math.sin(p * (0.11 + m.rateB) + m.seed * 2);
+  out.headPitch += a * 0.055 * opts.headArc * Math.sin(p * (0.09 + m.rateB) + m.seed * 3);
 }
 
 /**
@@ -422,6 +439,9 @@ export function walkLayer(out, w, gain, opts) {
   // crouch. If a deeper bob is ever wanted, it needs a real pelvis height channel, not more of this.
   out.hipFlex += gain * opts.bounce * (0.5 + 0.5 * Math.cos(2 * TAU * w.phase));
   out.spineBend += gain * opts.lean;
+  // Sway: the body leans over whichever foot is planted, once per step. Without it a walk reads
+  // as a machine pacing -- the legs alternate but the mass never commits to either side.
+  out.spineRoll += gain * opts.sway * Math.cos(TAU * w.phase);
   return out;
 }
 

@@ -194,6 +194,13 @@ export default [
     languageOptions: { ecmaVersion: 2024, sourceType: 'module', globals: globals.node },
   },
   {
+    // The self-checks run under bare `node` too. Without this they match no block that sets
+    // globals at all — the `**/*.js` block above does not cover .mjs — so every `console.log`
+    // in visit.test.mjs, wip.test.mjs and motion.test.mjs reported as no-undef.
+    files: ['**/*.test.mjs'],
+    languageOptions: { ecmaVersion: 2024, sourceType: 'module', globals: globals.node },
+  },
+  {
     ignores: ['node_modules/**', 'dist/**'],
   },
 ];

@@ -100,7 +100,7 @@ const S = {
   // returns silently overwrote the slider and five knobs did nothing at all. Scaling after the
   // merge keeps BOTH -- personality still spreads the cast, these shift the whole cast at once.
   scale: { stiff: 1, zeta: 1, stride: 1, bounce: 1, idleRate: 1,
-           armGain: 1, sway: 1, lean: 1 },
+           armGain: 1, sway: 1, lean: 1, headCarry: 1, armTuck: 1 },
   ranges: structuredClone(BASE_MOTION_RANGES),
 };
 
@@ -697,6 +697,10 @@ const SPAN_HELP = {
 };
 
 const fRanges = gui.addFolder('how much members of a species differ');
+fRanges.domElement.querySelector('.children')?.insertAdjacentHTML('afterbegin',
+  '<div class="engine-key">Walking STYLE is deliberately not here: arm swing, sway, lean, head '
+  + 'carriage and arms-held-in are the same spans for every species, so a walk reads the same '
+  + 'way whatever animal is doing it. Their global knobs are under “walking”.</div>');
 for (const k of Object.keys(BASE_MOTION_RANGES)) {
   const [lo, hi] = BASE_MOTION_RANGES[k];
   const pad = (hi - lo) * 1.5;
@@ -817,6 +821,17 @@ knob(fWalk, S.opts, 'gateSpeed', 'speed to reach a full walk',
   + 'out, which is what brings the feet together when they stop. Raise it and they creep into '
   + 'and out of walking; lower it and the legs snap on the instant they move.',
   0.05, 1.5).onChange(retune);
+
+// The two posture dials. They apply standing AND walking -- posture is carriage, not gait --
+// so they sit here with the rest of the body language rather than under "standing still".
+knob(fWalk, S.scale, 'headCarry', 'head carriage',
+  'How high or low they hold their head. Open and confident, or down and closed — the single '
+  + 'most readable posture signal there is, and completely free of leg length. Scales the whole '
+  + 'cast; personality still spreads them.', 0, 2.5).onChange(retune);
+knob(fWalk, S.scale, 'armTuck', 'arms held in',
+  'How much they keep their elbows bent and their arms against the body. Withdrawn characters '
+  + 'hold themselves in. Scales the whole cast; personality still spreads them.',
+  0, 2.5).onChange(retune);
 
 knob(fWalk, S, 'lookOver', 'look over the shoulder',
   'Turns every head as far as ITS OWN SPECIES can manage. An owl clears about 264 degrees, a '

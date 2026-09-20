@@ -139,16 +139,33 @@ export const BASE_MOTION_RANGES = Object.freeze({
   stride:   [1.40, 2.24],
   bounce:   [0.00, 0.12],
   headArc:  [0.50, 1.50],
-  // ---- walking STYLE. All of these are ANGLES, and that is the entire point.
-  //
-  // A style expressed as a LENGTH is welded to leg length: stride has to scale with the legs or
-  // the feet skate, so it can never carry personality on its own -- a stilt llama and a stumpy
-  // owl of identical temperament will always differ more than two opposite temperaments on the
-  // same legs. Angles have no such coupling. A 40-degree arm swing is a 40-degree arm swing on
-  // any body, so these read as character rather than as size.
-  //
-  // These were global constants, identical for every character in the game, which is why
-  // personality was invisible in the walk while leg length dominated it completely.
+});
+
+/**
+ * WALKING STYLE: personality only, identical for every species, NOT tunable per kit.
+ *
+ * All of these are ANGLES, and that is the whole reason they live apart from the table above.
+ *
+ * A style expressed as a LENGTH is welded to leg length -- stride has to scale with the legs or
+ * the feet skate -- so it can never carry personality on its own: a stilt llama and a stumpy owl
+ * of identical temperament will always differ more than two opposite temperaments on the same
+ * legs. Angles have no such coupling. A 40-degree arm swing is a 40-degree arm swing on any
+ * body, so these read as character rather than as size.
+ *
+ * Which is exactly why a species must NOT be able to touch them. The moment a kit narrows
+ * `sway`, "excitable characters roll when they walk" stops being true of the game and starts
+ * being true of one animal, and the reader of a walk has to know which species they are looking
+ * at before they can read the temperament. These five are the part of the vocabulary that is
+ * supposed to be universal.
+ *
+ * It is also the maintenance argument, with more kits coming: seven spans to consider per new
+ * species instead of twelve, and no way to accidentally flatten a style dial in a kit and spend
+ * an afternoon wondering why one species reads as having no personality.
+ *
+ * Measured before splitting: neither shipped kit overrode ANY of these -- between-species share
+ * of variance was 0% for all five -- so this removes a capability nobody used, not a tuning.
+ */
+export const STYLE_RANGES = Object.freeze({
   armGain:   [0.20, 1.10],   // how much the arms counter-swing
   sway:      [0.02, 0.17],   // how far the body rolls over the planted foot
   lean:      [0.00, 0.17],   // how far they lean into the walk
@@ -181,12 +198,15 @@ export function motionOf(traits, ranges = BASE_MOTION_RANGES) {
   // Written out rather than looped, so the coefficient object has a real shape for the type
   // checker and for anything reading this to find out what a species can tune. The self-check
   // asserts every BASE_MOTION_RANGES key still appears, so the two cannot drift apart.
+  // A species may narrow or widen anything in BASE_MOTION_RANGES. STYLE_RANGES is deliberately
+  // not consulted through `ranges` at all, so a kit cannot reach it even by passing the key.
   const pick = (k) => span(ranges[k] ?? BASE_MOTION_RANGES[k], u[k]);
+  const style = (k) => span(STYLE_RANGES[k], u[k]);
   return {
     stiff: pick('stiff'), zeta: pick('zeta'), idleAmp: pick('idleAmp'),
     idleRate: pick('idleRate'), stride: pick('stride'), bounce: pick('bounce'),
-    headArc: pick('headArc'), armGain: pick('armGain'), sway: pick('sway'),
-    lean: pick('lean'), headCarry: pick('headCarry'), armTuck: pick('armTuck'),
+    headArc: pick('headArc'), armGain: style('armGain'), sway: style('sway'),
+    lean: style('lean'), headCarry: style('headCarry'), armTuck: style('armTuck'),
   };
 }
 

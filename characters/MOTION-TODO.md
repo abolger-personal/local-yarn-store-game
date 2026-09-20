@@ -242,6 +242,38 @@ all named `mode`.
 is indistinguishable. Two thirds of the old span sat in that dead zone, which is why the bounce
 read as flat across a cast.
 
+## What a species kit may tune, and what it may not
+
+Two tables in `motion.js`, and the split is enforced by the self-check rather than by
+convention:
+
+**`BASE_MOTION_RANGES` — seven spans, per species.** `stiff`, `zeta`, `idleAmp`, `idleRate`,
+`stride`, `bounce`, `headArc`. A kit's `MOTION_RANGES` narrows or widens any of these; it may
+never invent a key. This is "owls are snappy, llamas are languid".
+
+**`STYLE_RANGES` — five spans, universal.** `armGain`, `sway`, `lean`, `headCarry`, `armTuck`.
+Identical for every species, and `motionOf` does not consult a kit's ranges for them at all, so
+passing them in a kit changes nothing.
+
+Why style is locked: these are the ANGLES, and angles are what can carry personality, because a
+40-degree arm swing is a 40-degree arm swing on any body while a length is welded to leg length.
+The moment a kit narrows `sway`, "excitable characters roll when they walk" stops being true of
+the game and becomes true of one animal — and reading a walk then requires knowing the species
+first. Five species in, that is the difference between one body-language vocabulary and five.
+
+It is also the maintenance argument: seven spans to consider per new kit instead of twelve, and
+no way to flatten a style dial by accident and spend an afternoon wondering why one species
+reads as having no personality.
+
+Measured before splitting: neither shipped kit overrode any of the five — between-species share
+of variance was 0% for all of them, and identical after the split — so this removed a capability
+nobody was using.
+
+**Not** in either table, because it is anatomy rather than temperament: `legHeight`/`hipInset`
+(stride is a multiple of leg length, so gait is scale-free automatically), `headYawMax` (owl 264
+degrees, llama 109, clamped in `applyPose`), `clampArmOut`. A new kit gets all of that by
+setting its own body params, with no motion tuning at all.
+
 ## Bugs this work found and fixed, worth not reintroducing
 
 1. **Foot skate, twice — and the second time was my own "fix".** A phase is one CYCLE, which is

@@ -11,7 +11,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  POSES, POSE_KEYS, MOTION_KEYS, MOTION_DEFAULTS, BASE_MOTION_RANGES,
+  POSES, POSE_KEYS, MOTION_KEYS, MOTION_DEFAULTS, BASE_MOTION_RANGES, STYLE_RANGES,
   makeMotion, resetMotion, integrate, compose, valueOf, velocityOf,
   motionOf, walkPhase, walkLayer, walkGain,
 } from './motion.js';
@@ -157,7 +157,7 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
 // NaN on all three head channels -- which does not look like a broken head, it culls the entire
 // character. The lab hid it because it always merges motionOf() on top.
 {
-  for (const k of Object.keys(BASE_MOTION_RANGES)) {
+  for (const k of Object.keys({ ...BASE_MOTION_RANGES, ...STYLE_RANGES })) {
     assert.ok(MOTION_DEFAULTS[k] !== undefined,
       `MOTION_DEFAULTS is missing ${k}, so a caller not merging motionOf() gets NaN`);
   }
@@ -514,6 +514,33 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     + 'rig authors for an ear');
 }
 
+// --- walking style is universal: a species CANNOT tune it --------------------------------------
+//
+// The style dials are angles, and that is why they carry personality: a 40-degree arm swing is
+// the same on any body, while a length is welded to leg length. The moment a kit could narrow
+// `sway`, "excitable characters roll when they walk" would stop being true of the game and
+// start being true of one animal -- and reading a walk would require knowing the species first.
+//
+// So this is enforced, not merely documented: passing style keys in a kit's ranges must change
+// nothing at all. Without it the split is a naming convention that the next kit quietly breaks.
+{
+  const traits = t(3, { Enthusiasm: 5, Assertiveness: 5, Withdrawal: 1, Volatility: 1 });
+  const base = motionOf(traits);
+  const sabotage = {
+    ...BASE_MOTION_RANGES,
+    ...Object.fromEntries(Object.keys(STYLE_RANGES).map((k) => [k, [0, 0]])),
+  };
+  const after = motionOf(traits, sabotage);
+  for (const k of Object.keys(STYLE_RANGES)) {
+    assert.equal(after[k], base[k],
+      `a kit flattened ${k} by passing it in MOTION_RANGES -- style must not be reachable `
+      + 'from a species kit, or one animal ends up with no walking personality');
+  }
+  // and the per-species dials must still be reachable, or the split broke the wrong half
+  assert.notEqual(motionOf(traits, { ...BASE_MOTION_RANGES, stiff: [10, 11] }).stiff, base.stiff,
+    'a kit must still be able to tune the per-species spans');
+}
+
 // --- personality actually spreads the cast ---------------------------------------------------
 //
 // A dial wired to personality but bunched at the middle of its span is indistinguishable, on
@@ -540,7 +567,7 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
   };
   walk(0, t(3));
   for (const [k, list] of Object.entries(vals)) {
-    const [lo, hi] = BASE_MOTION_RANGES[k];
+    const [lo, hi] = BASE_MOTION_RANGES[k] ?? STYLE_RANGES[k];
     list.sort((a, b) => a - b);
     const p10 = list[Math.floor(N * 0.1)], p90 = list[Math.floor(N * 0.9)];
     const uses = (p90 - p10) / (hi - lo);
@@ -563,6 +590,8 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
 {
   const lab = readFileSync(new URL('./motion-lab.js', import.meta.url), 'utf8');
   const wired = new Set([...lab.matchAll(/knob\([^,]+,\s*[^,]+,\s*'([^']+)'/g)].map((m) => m[1]));
+  // Only BASE_MOTION_RANGES generates the per-species min/max rows; STYLE_RANGES is not
+  // per-species and deliberately has no rows in that folder.
   const spans = new Set(Object.keys(BASE_MOTION_RANGES));
 
   for (const k of Object.keys(MOTION_DEFAULTS)) {
@@ -640,6 +669,9 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
   for (let v = 1; v <= 5; v++) {
     const c = motionOf(t(v));
     for (const [k, range] of Object.entries(BASE_MOTION_RANGES)) {
+      assert.ok(!(k in STYLE_RANGES),
+        `${k} is in both range tables -- a key belongs to exactly one, or which one wins `
+        + 'depends on lookup order');
       assert.ok(Number.isFinite(c[k]), `${k} is finite at trait ${v}`);
       assert.ok(c[k] >= range[0] - 1e-9 && c[k] <= range[1] + 1e-9,
         `${k}=${c[k]} stays inside its span at trait ${v}`);

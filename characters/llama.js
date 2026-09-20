@@ -11,7 +11,7 @@
 //      quadruped reference art, then stood upright.
 
 import {
-  BASE_PARAMS, BASE_RANDOM_RANGES, BASE_GUI, GEO,
+  BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
   addEars, addEyes, createCharacter, deriveCoatColor, touchingScallopSize,
   feltMaterial, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh,
 } from './npc.js';
@@ -285,11 +285,27 @@ export const LLAMA_GUI = Object.freeze({
 
 // ---------------------------------------------------------------- species
 
+// How much motion variation ONE llama gets. See owl.js for the shape and the reasoning.
+//
+// A llama is languid where the owl is snappy: slower idle, softer commitment, and a long neck
+// that carries a wide head arc without the head itself having to turn far. Because the neck
+// takes a fixed SHARE of a head turn, a llama's longer neck already sweeps further per radian
+// than an owl's -- so this span is wide but not as wide as the owl's, or it reads as rubbery.
+export const MOTION_RANGES = Object.freeze({
+  ...BASE_MOTION_RANGES,
+  stiff:    [55, 190],
+  idleRate: [0.60, 0.95],
+  idleAmp:  [0.50, 1.50],
+  headArc:  [0.90, 1.80],
+  bounce:   [0.02, 0.14],   // leggy, so the gait carries more vertical than a stumpy bird's
+});
+
 export const llama = registerSpecies({
   id: 'llama',
   label: 'Llama',
   defaults: DEFAULT_PARAMS,
   randomRanges: RANDOM_RANGES,
+  motionRanges: MOTION_RANGES,
   gui: { ...BASE_GUI, ...LLAMA_GUI },
   buildKit,
   coatBulge,

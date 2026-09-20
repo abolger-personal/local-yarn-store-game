@@ -5,7 +5,7 @@
 // since they bolt onto the shared upper arm rather than replacing the arm chain.
 
 import {
-  BASE_PARAMS, BASE_RANDOM_RANGES, BASE_GUI, GEO,
+  BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
   addConeEars, addEyes, createCharacter, deriveCoatColor,
   feltMaterial, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh,
 } from './npc.js';
@@ -235,6 +235,25 @@ export const OWL_GUI = Object.freeze({
   ],
 });
 
+// ---------------------------------------------------------------- motion
+
+// How much motion variation ONE owl gets. The trait values decide where in a span a character
+// lands; this decides how wide the span is. Spread from the base the same way RANDOM_RANGES is,
+// so a key that is not a base key simply has no effect -- "ADD or SCALE, never REPLACE" holds
+// without any validation code.
+//
+// An owl is a snappy bird: it commits to a movement fast and it holds still between movements,
+// which is the opposite of a llama. The head arc is the species tell -- an owl's swivel is the
+// one piece of motion nobody will mistake for anything else, so it gets the widest span here.
+export const MOTION_RANGES = Object.freeze({
+  ...BASE_MOTION_RANGES,
+  stiff:    [140, 300],
+  idleRate: [1.00, 1.60],
+  idleAmp:  [0.30, 1.10],
+  headArc:  [1.20, 2.20],
+  stride:   [1.30, 1.65],   // stumpier than a llama, so shorter steps for the same legs
+});
+
 // ---------------------------------------------------------------- species
 
 export const owl = registerSpecies({
@@ -242,6 +261,7 @@ export const owl = registerSpecies({
   label: 'Owl',
   defaults: DEFAULT_PARAMS,
   randomRanges: RANDOM_RANGES,
+  motionRanges: MOTION_RANGES,
   gui: { ...BASE_GUI, ...OWL_GUI },
   buildKit,
   coatBulge,

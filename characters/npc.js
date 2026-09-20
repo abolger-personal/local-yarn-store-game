@@ -10,10 +10,11 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { makeMotion, integrate, compose, POSE_KEYS } from './motion.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
-export const BUILD = '2026-09-07.1-held-item-unmerged';
+export const BUILD = '2026-09-19.1-motion-layer';
 
 // ---------------------------------------------------------------- species registry
 
@@ -81,6 +82,12 @@ export const BASE_PARAMS = Object.freeze({
   spineBend:     0.00,    // forward lean at the waist; positive folds the chest toward +Z
   earPerk:       0.00,    // forward/back hinge at the ear base; the expression channel
   earSplay:      0.00,    // extra outward tilt, added to the species' resting tilt
+  armSwingAlt:   0.00,    // anti-symmetric arm swing: armSwing moves both arms together, so a
+                          // walk's counter-swing needs a channel of its own
+  headYaw:       0.00,    // positive turns to the character's LEFT
+  headPitch:     0.00,    // positive looks DOWN, matching spineBend's positive-forward
+  headTilt:      0.00,    // positive takes the top of the head to the character's left
+  blink:         0.00,    // 0 open, 1 shut. Not interpolated -- see motion.js
   holdItem:      false,
   heldColor:     '#7a9e6b',
 
@@ -120,38 +127,17 @@ export const BASE_PARAMS = Object.freeze({
   toneMapping:   'ACES',
 });
 
+// Pose data and the maths that drives it moved to motion.js, which is pure: no three.js, so
+// characters/motion.test.mjs can drive the interpolator under bare node. Re-exported here so
+// every existing importer (cast.js, owl.js, the viewers) is untouched.
+//
 // armOut is the shoulder's outward rotation in radians: ~1.57 is straight out sideways,
 // ~3.0 is overhead. Positive kneeBend takes the heel backward, which is the natural knee.
 // Positive armSwing takes the arm BACKWARD, so carrying wants a small negative value: the
 // upper arm stays near vertical and the elbow does the work.
-const REST_POSE = {
-  armSwing: 0, armOut: 0, elbowBend: 0, legSwing: 0, kneeBend: 0,
-  hipFlex: 0, spineBend: 0, earPerk: 0, earSplay: 0, holdItem: false,
-};
-
-// Every pose carries every channel, even the ones it does not use. A pose missing a key makes
-// interpolation produce NaN, NaN reaches the bounding sphere, and the renderer culls the whole
-// character -- which looks like characters popping in and out rather than like a broken pose.
-const definePoses = (raw) => Object.freeze(Object.fromEntries(
-  Object.entries(raw).map(([name, pose]) => [name, Object.freeze({ ...REST_POSE, ...pose })])
-));
-
-export const POSES = definePoses({
-  rest:   { armOut: 0.16 },
-  walk:   { armSwing: 0.42, armOut: 0.14, elbowBend: 0.30, legSwing: 0.30, kneeBend: 1.50 },
-  carry:  { armSwing: -0.12, armOut: 0.02, elbowBend: 1.45, holdItem: true },
-  reach:  { armSwing: -1.15, armOut: 0.30, elbowBend: 0.35 },
-  browse: { armSwing: -0.45, armOut: 0.34, elbowBend: 0.85, spineBend: 0.14 },
-  // thighs forward to horizontal, shins dropped back to vertical: kneeBend has to match hipFlex
-  sit:    { armSwing: -0.10, armOut: 0.22, elbowBend: 0.75, kneeBend: 1.45, hipFlex: 1.45, spineBend: 0.10 },
-  delighted: { armSwing: -0.30, armOut: 2.55, elbowBend: 0.55, kneeBend: 0.10, earPerk: 0.38, earSplay: 0.22 },
-  'walk+carry': { armSwing: -0.10, armOut: 0.03, elbowBend: 1.40, legSwing: 0.30, kneeBend: 1.50, holdItem: true },
-});
-
-export const POSE_KEYS = [
-  'armSwing', 'armOut', 'elbowBend', 'legSwing', 'kneeBend',
-  'hipFlex', 'spineBend', 'earPerk', 'earSplay',
-];
+export { POSES, MOTION_KEYS, REST_POSE, MOTION_DEFAULTS, BASE_MOTION_RANGES,
+         motionOf, walkPhase, walkLayer, walkGain, valueOf, velocityOf } from './motion.js';
+export { makeMotion, integrate, compose, POSE_KEYS };
 
 // Two tiers, not one global percentage.
 // TIER 1 - silhouette carriers, roughly +/-50%. These let you tell one character from another
@@ -375,6 +361,21 @@ setGeometryDetail('high');
 
 export const getGeometryDetail = () => currentDetail;
 
+// the character faces +Z, which puts its right side at -X
+const sideName = (side) => (side < 0 ? 'right' : 'left');
+
+const named = (node, name) => {
+  node.name = name;
+  return node;
+};
+
+// Marks a node as articulated. Meshes beneath one move together and can be baked into a
+// single geometry; anything that rotates on its own has to stay a node of its own.
+const joint = (node, name) => {
+  node.userData.joint = true;
+  return named(node, name);
+};
+
 export function part(geometry, material, { pos = [0, 0, 0], scale = [1, 1, 1], rot = [0, 0, 0], shadow = true } = {}) {
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.set(...pos);
@@ -512,7 +513,14 @@ function buildEye(side, P, mat, { spread, lift, front, squash }) {
   return group;
 }
 
-/** Eyes on the head node. Placement is species business, construction is not. */
+/**
+ * Eyes on the head node. Placement is species business, construction is not.
+ *
+ * Each eye is an articulated node so a blink can squash it. Marking it joint() rather than
+ * noMerge is what keeps that cheap: joint() gives ONE merged mesh per eye on the shared,
+ * vertex-coloured eye material, where noMerge would leave the white and the pupil as two
+ * separate meshes on a per-character material.
+ */
 export function addEyes(ctx, P, opts = {}) {
   const placement = {
     spread: opts.spread ?? P.eyeSpread,
@@ -520,7 +528,11 @@ export function addEyes(ctx, P, opts = {}) {
     front: opts.front ?? P.eyeFront,
     squash: opts.squash ?? 1,
   };
-  for (const side of [-1, 1]) ctx.head.add(buildEye(side, P, ctx.mat, placement));
+  for (const side of [-1, 1]) {
+    const eye = joint(buildEye(side, P, ctx.mat, placement), `${sideName(side)}Eye`);
+    ctx.head.add(eye);
+    ctx.joints.eye.push({ node: eye });
+  }
 }
 
 /**
@@ -573,13 +585,20 @@ export function minArmOut(P, bulge = 0, armSwing = 0) {
   const cs = Math.cos(armSwing);
   const sn = Math.sin(armSwing);
 
+  // Interpolated between the bracketing samples rather than returned as the first failing
+  // sample. Returning the index made this a STAIRCASE in armSwing, which was invisible while
+  // armSwing only moved during a 0.35s blend and chatters visibly once a walk cycle swings the
+  // arm every frame. Only llamas notice -- they are the species with clampArmOut on.
+  let prev = 0;
   for (let i = 0; i <= 24; i++) {
     const t = (i / 24) * (Math.PI / 2);
     const down = Math.cos(t) * reach;
     const x = (x0 + Math.sin(t) * reach) / a;
     const y = (y0 - down * cs) / b;
     const z = (down * sn) / c;
-    if (x * x + y * y + z * z > 1) return t;
+    const d = x * x + y * y + z * z;                    // linear crossing of the d = 1 surface
+    if (d > 1) return i === 0 ? 0 : t - (Math.PI / 48) * ((d - 1) / (d - prev));
+    prev = d;
   }
   return Math.PI / 2;
 }
@@ -594,21 +613,6 @@ export const clampArmOut = (P, bulge, armOut, armSwing) => (P.clampArmOut
 // lowerArm, hand, upperLeg, lowerLeg, foot). Nothing here reads those names, but matching the
 // standard keeps a retargeting layer a mapping table rather than a rewrite, and it makes the
 // hierarchy legible to anything that expects a humanoid.
-
-// the character faces +Z, which puts its right side at -X
-const sideName = (side) => (side < 0 ? 'right' : 'left');
-
-const named = (node, name) => {
-  node.name = name;
-  return node;
-};
-
-// Marks a node as articulated. Meshes beneath one move together and can be baked into a
-// single geometry; anything that rotates on its own has to stay a node of its own.
-const joint = (node, name) => {
-  node.userData.joint = true;
-  return named(node, name);
-};
 
 function buildFoot(shinLen, mat, side) {
   const foot = named(new THREE.Group(), `${sideName(side)}Foot`);
@@ -739,8 +743,12 @@ function attachArms(chest, P, mat, joints, addMaterial, bulge) {
 // Length is real even when hidden: a multiplier on a near-zero neck stays near-zero, which is
 // what would make a long-necked species impossible to express.
 function buildNeck(P, mat) {
-  const neck = named(new THREE.Group(), 'neck');
+  const neck = joint(new THREE.Group(), 'neck');
   neck.position.y = P.torsoH - P.headOverlap;
+  // YXZ, not the default XYZ: XYZ applies pitch before yaw, which injects a parasitic roll into
+  // a head that is both turned and tilted down. Costs nothing -- Euler.set without an order
+  // argument keeps whatever order the node already has.
+  neck.rotation.order = 'YXZ';
   neck.add(part(GEO.cyl, mat.body, {
     scale: [P.neckThick, P.neckLength, P.neckThick],
     pos: [0, P.neckLength / 2, 0],
@@ -750,8 +758,9 @@ function buildNeck(P, mat) {
 
 // the node only - head geometry belongs to the species kit
 function buildHeadNode(P) {
-  const head = named(new THREE.Group(), 'head');
+  const head = joint(new THREE.Group(), 'head');
   head.position.y = P.neckLength + P.headRadius * 0.62;
+  head.rotation.order = 'YXZ';
   return head;
 }
 
@@ -816,12 +825,16 @@ export function createCharacter(P, species) {
   const mat = baseMaterials(P, addMaterial);
   const joints = {
     hips: null, spine: null, chest: null, neck: null, head: null,
-    upperArm: [], lowerArm: [], upperLeg: [], lowerLeg: [], foot: [], ear: [],
+    upperArm: [], lowerArm: [], upperLeg: [], lowerLeg: [], foot: [], ear: [], eye: [],
   };
   const bulge = Math.max(0, kit.coatBulge?.(P) ?? 0);
   const body = buildBody(P, mat, joints, addMaterial, bulge);
 
-  const ctx = { ...body, joints, materials, mat, addMaterial, params: P, species: kit, bulge };
+  // Seeded from the pose the rig was BUILT in, with zero velocity, so frame 1 has no error to
+  // correct and a spawning character cannot lurch. groundOffset is what the seat lift and the
+  // arrival tween write into, now that grounding owns root.y absolutely every frame.
+  const ctx = { ...body, joints, materials, mat, addMaterial, params: P, species: kit, bulge,
+                motion: makeMotion(P), groundOffset: 0 };
   kit.buildKit(ctx, P);
   if (P.scarf) body.neck.add(buildScarf(P, addMaterial));
   if (!P.partShadows) disableShadowCasting(body.root);
@@ -944,15 +957,29 @@ function lowestFoot(P, pose) {
  * correction it was making.
  */
 export function groundCharacter(built, pose = built.params) {
-  const y = FOOT_SOLE - lowestFoot(built.params, pose);
+  const y = (built.groundOffset ?? 0) + FOOT_SOLE - lowestFoot(built.params, pose);
   if (Number.isFinite(y)) built.root.position.y = y;
 }
 
-/** Re-poses an existing character without rebuilding it. */
-export function applyPose(built, pose) {
-  const { joints, held, params, bulge = 0 } = built;
-  const out = clampArmOut(params, bulge, pose.armOut, pose.armSwing);
-  for (const { node, side } of joints.upperArm) node.rotation.set(pose.armSwing, 0, side * out);
+// A look starts in the neck and finishes in the head. ONE ratio for every species, because
+// "kits may ADD or SCALE, never REPLACE" means a channel has to work without the kit knowing
+// about it -- and a longer neck then gets a wider arc for free, since the same fraction of
+// rotation on a longer lever carries the head further. Which is also what is physically true.
+const NECK_SHARE = 0.35;
+const HEAD_SHARE = 1 - NECK_SHARE;
+
+/**
+ * Arms and legs.
+ *
+ * armSwingAlt is subtracted PER SIDE, so positive armSwingAlt is contralateral to positive
+ * legSwing -- the direction a walk needs the arms to go. armSwing alone moves both arms
+ * together, which is why the walk could not be expressed without a second channel.
+ */
+function applyLimbs(joints, pose, out) {
+  const alt = pose.armSwingAlt ?? 0;
+  for (const { node, side } of joints.upperArm) {
+    node.rotation.set(pose.armSwing - side * alt, 0, side * out);
+  }
   for (const { node } of joints.lowerArm) node.rotation.x = -pose.elbowBend;
   for (const { node, side } of joints.upperLeg) {
     node.rotation.x = pose.legSwing * side - (pose.hipFlex ?? 0);
@@ -960,13 +987,61 @@ export function applyPose(built, pose) {
   for (const { node, side } of joints.lowerLeg) {
     node.rotation.x = kneeAmount(pose.kneeBend, pose.legSwing, side);
   }
+}
+
+/** Head rotation and blink. Split out of applyPose only to keep it under the line limit. */
+function applyHead(joints, pose) {
+  const yaw = pose.headYaw ?? 0, pitch = pose.headPitch ?? 0, tilt = pose.headTilt ?? 0;
+  if (joints.neck) {
+    joints.neck.rotation.set(pitch * NECK_SHARE, yaw * NECK_SHARE, -tilt * NECK_SHARE);
+  }
+  if (joints.head) {
+    joints.head.rotation.set(pitch * HEAD_SHARE, yaw * HEAD_SHARE, -tilt * HEAD_SHARE);
+  }
+  // ponytail: a blink is a y-squash of the whole eye about its centre, so it reads as a squint
+  // rather than a lid coming down. Upgrade path is a lid disc under the eye joint, if it ever
+  // matters at play distance -- at ~150px tall it does not.
+  const lid = 1 - (pose.blink ?? 0);
+  for (const { node } of joints.eye) node.scale.y = lid;
+}
+
+// One reused output object for the whole cast: applyPose consumes it synchronously, so one is
+// enough, and a fresh object per character per frame is real GC pressure at 40 characters.
+const _out = Object.seal(Object.fromEntries(
+  [...POSE_KEYS.map((k) => [k, 0]), ['holdItem', false], ['blink', 0]],
+));
+
+/** Re-poses an existing character without rebuilding it. */
+export function applyPose(built, pose) {
+  const { joints, held, params, bulge = 0 } = built;
+  const out = clampArmOut(params, bulge, pose.armOut, pose.armSwing);
+  applyLimbs(joints, pose, out);
   if (joints.spine) joints.spine.rotation.x = pose.spineBend ?? 0;
   // resting tilt belongs to the species, so the pose adds to it rather than replacing it
   for (const { node, side, tilt } of joints.ear) {
     node.rotation.set(pose.earPerk ?? 0, 0, side * -(tilt + (pose.earSplay ?? 0)));
   }
+  applyHead(joints, pose);
   if (held && pose.holdItem !== undefined) held.visible = Boolean(pose.holdItem);
   groundCharacter(built, pose);
+}
+
+/**
+ * Advances one character's motion by `dt` and applies it. The whole per-frame path.
+ *
+ * Lives here rather than in motion.js because it calls applyPose, and motion.js must stay
+ * free of three.js so the self-check can run under bare node.
+ *
+ * `add` is the walk layer, summed AFTER the interpolator and never fed back into it -- see the
+ * invariant at the top of motion.js. Grounding therefore sees the composed legs, which is why
+ * there is exactly one applyPose call and not one per layer.
+ */
+export function stepMotion(built, target, dt, opts, add) {
+  integrate(built.motion, target, dt, opts);
+  compose(_out, built.motion, opts);
+  if (add) add(_out);
+  applyPose(built, _out);
+  return _out;
 }
 
 /** Swaps every mesh to grey or flat black for the shape and silhouette checks. */
@@ -1058,6 +1133,9 @@ export const BASE_GUI = Object.freeze({
     ['legSwing', -1.0, 1.0], ['kneeBend', -0.4, 2.4], ['hipFlex', -0.6, 1.9],
     ['spineBend', -0.7, 1.2],
     ['earPerk', -1.2, 1.2], ['earSplay', -0.8, 1.2],
+    ['armSwingAlt', -1.0, 1.0],
+    ['headYaw', -1.6, 1.6], ['headPitch', -0.9, 0.9], ['headTilt', -0.8, 0.8],
+    ['blink', 0, 1],
     ['holdItem', 'bool'],
   ],
   rig: [

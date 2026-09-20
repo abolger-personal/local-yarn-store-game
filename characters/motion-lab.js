@@ -72,6 +72,11 @@ const S = {
   scopeChannel: 'armSwing',
   // tuning, copied so the lab never mutates a frozen export
   opts: { ...MOTION_DEFAULTS },
+  // MULTIPLIERS for the coefficients motionOf derives from personality, 1 = as authored.
+  // These cannot live in `opts`: coeffs() spreads motionOf() over it, so anything motionOf
+  // returns silently overwrote the slider and five knobs did nothing at all. Scaling after the
+  // merge keeps BOTH -- personality still spreads the cast, these shift the whole cast at once.
+  scale: { stiff: 1, zeta: 1, stride: 1, bounce: 1, idleRate: 1 },
   ranges: structuredClone(BASE_MOTION_RANGES),
 };
 
@@ -206,7 +211,9 @@ function addPair(id, slot, slots) {
 /** Species span + trait position + the lab's global knobs, merged in that order. */
 function coeffs(traits, kit, engine) {
   const ranges = S.allSpecies ? (kit.motionRanges ?? S.ranges) : S.ranges;
-  return { ...S.opts, ...motionOf(traits, ranges), mode: engine };
+  const per = motionOf(traits, ranges);
+  for (const k of Object.keys(S.scale)) per[k] *= S.scale[k];
+  return { ...S.opts, ...per, mode: engine };
 }
 
 /** Re-derives coefficients without rebuilding. Dragging a span must be felt immediately. */
@@ -525,12 +532,14 @@ knob(fBake, { step: () => { stepOnce = true; } }, 'step', 'advance one frame (.)
 knob(fBake, S, 'scopeChannel', 'graph which joint',
   'Which joint angle the graph top-left plots. armSwing shows the most during a reach.',
   POSE_KEYS);
-knob(fBake, S.opts, 'stiff', 'how eagerly they move',
-  'Spring rows only. Higher = snaps to a new pose decisively; lower = dawdles into it.',
-  20, 800).onChange(retune);
-knob(fBake, S.opts, 'zeta', 'wobble on arrival',
+knob(fBake, S.scale, 'stiff', 'how eagerly they move',
+  'Spring rows only. Higher = snaps to a new pose decisively; lower = dawdles into it. Scales '
+  + 'the whole cast at once; personality still spreads them apart (see the roster).',
+  0.15, 3).onChange(retune);
+knob(fBake, S.scale, 'zeta', 'wobble on arrival',
   'Spring rows only. Below 1 the move overshoots and settles back \u2014 the cute bounce. '
-  + '1 arrives dead-on. Above 1 arrives sluggishly.', 0.3, 2).onChange(retune);
+  + 'Above 1 it arrives sluggishly. Scales the whole cast; personality still spreads them.',
+  0.4, 2).onChange(retune);
 knob(fBake, S.opts, 'blend', 'move duration (s)',
   'Hermite and smoothstep rows only: how long a move takes, start to finish.',
   0.08, 1.2).onChange(retune);
@@ -539,16 +548,16 @@ const fWalk = gui.addFolder('walking');
 knob(fWalk, S, 'speed', 'walking speed',
   'Drives them along the floor. 0 = standing still. Stride phase follows DISTANCE, so the feet '
   + 'stay planted at any speed and any leg length.', 0, 2.5);
-knob(fWalk, S.opts, 'stride', 'step length',
-  'How far each step reaches, relative to leg length. Past about 1.13 the legs physically '
-  + 'cannot reach that far and the feet start to slide \u2014 the skate readout will say so.',
-  0.5, 1.4).onChange(retune);
+knob(fWalk, S.scale, 'stride', 'step length',
+  'How far each step reaches. Past about 1.13x leg length the legs physically cannot reach and '
+  + 'the feet slide \u2014 the skate readout will say so. Scales the whole cast.',
+  0.5, 1.5).onChange(retune);
 knob(fWalk, S.opts, 'sway', 'side-to-side sway',
   'How far the body leans over the planted foot each step. 0 is a machine pacing; this is what '
   + 'makes a walk look like it has weight.', 0, 0.25).onChange(retune);
-knob(fWalk, S.opts, 'bounce', 'up-and-down bounce',
-  'Extra dip at each footfall. NEGATIVE cancels the natural bob that comes free from the legs '
-  + 'scissoring \u2014 useful if it reads as a limp.', -0.12, 0.2).onChange(retune);
+knob(fWalk, S.scale, 'bounce', 'up-and-down bounce',
+  'Extra dip at each footfall, on top of the bob that comes free from the legs scissoring. '
+  + 'Scales the whole cast.', 0, 3).onChange(retune);
 knob(fWalk, S.opts, 'armGain', 'arm swing',
   'How much the arms counter-swing against the legs. 0 leaves the arms hanging dead.',
   0, 1.5).onChange(retune);
@@ -564,8 +573,13 @@ const fIdle = gui.addFolder('standing still');
 knob(fIdle, S.opts, 'idleAmount', 'how much they fidget',
   'Master dial for breathing, weight shifting and looking around. 0 freezes them solid \u2014 '
   + 'which is what the game looks like today.', 0, 3).onChange(retune);
-knob(fIdle, S.opts, 'idleRate', 'how fast they fidget',
-  'Speeds up or slows down every idle rhythm at once.', 0.3, 2.5).onChange(retune);
+knob(fIdle, S.scale, 'idleRate', 'how fast they fidget',
+  'Speeds up or slows down every idle rhythm \u2014 breathing, swaying, looking around. '
+  + 'Scales the whole cast; personality still spreads them.', 0.25, 3).onChange(retune);
+knob(fIdle, S.opts, 'idleDuty', 'how often they fidget',
+  'Duty cycle, separate from size. At 1 they sway continuously; lower and the sway comes in '
+  + 'bursts with real stillness between them, which is how animals actually stand around. '
+  + 'Breathing never stops.', 0.15, 1).onChange(retune);
 
 /** Paste-ready for a kit file, so lab tuning lands in source without retyping. */
 function exportRanges() {

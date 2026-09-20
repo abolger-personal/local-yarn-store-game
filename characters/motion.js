@@ -94,6 +94,11 @@ export const MOTION_DEFAULTS = Object.freeze({
                   // and the A/B switch for measuring what continuous motion actually costs)
   idleAmp:  1,
   idleRate: 1,
+  // HOW OFTEN they fidget, as distinct from how far. At 1 the sway runs continuously, which
+  // reads as permanent swaying rather than as standing around; below 1 it comes in bursts with
+  // real stillness between. Amplitude and duty cycle are genuinely different knobs, and
+  // conflating them is why a continuous idle looks restless rather than alive.
+  idleDuty: 0.65,
   headArc:  1,    // MUST be here and not only in BASE_MOTION_RANGES: a caller using the defaults
                   // alone would otherwise multiply by undefined, and NaN on a head channel
                   // reaches the bounding sphere and culls the whole character.
@@ -354,9 +359,24 @@ export function compose(out, m, opts) {
   return out;
 }
 
+/**
+ * Is this character mid-fidget right now?
+ *
+ * Returns 0 while holding still and ramps to 1 through a burst. Breathing is deliberately NOT
+ * gated by this -- an animal that stops breathing when it stops shifting its weight reads as
+ * switched off rather than as still.
+ */
+function dutyGate(p, duty, seed) {
+  if (duty >= 1) return 1;
+  const e = Math.sin(p * 0.37 + seed * 1.7);
+  const threshold = 1 - 2 * duty;          // duty 0.5 -> half the time, 0.15 -> rarely
+  return Math.max(0, Math.min(1, (e - threshold) / 0.35));
+}
+
 /** Breathing, the lateral weight shift, and the wandering head. All additive, all stateless. */
 function idleLayer(out, m, opts, a) {
   const p = m.idlePhase;
+  const g = a * dutyGate(p, opts.idleDuty ?? 1, m.seed);
   // Breathing. The chest lifts and the arms follow it a little, because an arm that stays put
   // while the ribcage moves reads as a detached limb.
   out.spineBend -= a * 0.045 * Math.sin(p);
@@ -371,11 +391,11 @@ function idleLayer(out, m, opts, a) {
   // makeMotion), so no two characters run the same loop at an offset -- incommensurate rates
   // never repeat, and a visible repeat is what makes an idle read as an animation, not as life.
   const w = Math.sin(p * (0.17 + m.rateA) + m.seed);
-  out.spineRoll += a * 0.085 * w;
-  out.hipFlex += a * 0.020 * Math.sin(p * (0.17 + m.rateA) * 2 + m.seed);
-  out.headTilt += a * 0.070 * opts.headArc * w;
-  out.headYaw += a * 0.180 * opts.headArc * Math.sin(p * (0.11 + m.rateB) + m.seed * 2);
-  out.headPitch += a * 0.055 * opts.headArc * Math.sin(p * (0.09 + m.rateB) + m.seed * 3);
+  out.spineRoll += g * 0.085 * w;
+  out.hipFlex += g * 0.020 * Math.sin(p * (0.17 + m.rateA) * 2 + m.seed);
+  out.headTilt += g * 0.070 * opts.headArc * w;
+  out.headYaw += g * 0.180 * opts.headArc * Math.sin(p * (0.11 + m.rateB) + m.seed * 2);
+  out.headPitch += g * 0.055 * opts.headArc * Math.sin(p * (0.09 + m.rateB) + m.seed * 3);
 }
 
 /**

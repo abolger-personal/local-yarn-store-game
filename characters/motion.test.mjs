@@ -199,6 +199,68 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     'a fidgety character must sway visibly more than a still one, or the trait does nothing');
 }
 
+// --- amplitude and duty cycle are SEPARATE knobs ----------------------------------------------
+//
+// "How much they fidget" and "how often they fidget" are different questions, and a single
+// amplitude dial answers only the first: at full duty the sway never stops, which reads as
+// permanent swaying rather than as an animal standing around. Breathing must survive the gate,
+// or a still character reads as switched off rather than as still.
+{
+  const o = opts();
+  const sample = (duty) => {
+    const m = makeMotion(POSES.rest, 0.4);
+    const buf = out();
+    let stillFrames = 0, peakSway = 0, peakBreath = 0;
+    for (let i = 0; i < 7200; i++) {           // two minutes
+      integrate(m, POSES.rest, 1 / 60, { ...o, idleDuty: duty });
+      compose(buf, m, { ...o, idleDuty: duty });
+      if (Math.abs(buf.spineRoll) < 0.004) stillFrames++;
+      peakSway = Math.max(peakSway, Math.abs(buf.spineRoll));
+      peakBreath = Math.max(peakBreath, Math.abs(buf.spineBend));
+    }
+    return { stillPct: 100 * stillFrames / 7200, peakSway, peakBreath };
+  };
+
+  const low = sample(0.25), high = sample(1);
+  assert.ok(low.stillPct > high.stillPct + 15,
+    'a low duty cycle must produce real stillness between fidgets '
+    + `(${low.stillPct.toFixed(0)}% still vs ${high.stillPct.toFixed(0)}% at full duty)`);
+  assert.ok(low.peakSway > 0.03,
+    'but when they do fidget it must still be full size -- duty is not a volume knob');
+  assert.ok(low.peakBreath > 0.02,
+    'breathing must NOT be gated by duty: a character that stops breathing reads as switched off');
+}
+
+// --- a global tuning knob must actually REACH the character -----------------------------------
+//
+// The lab merges its global settings with motionOf()'s per-personality values. motionOf spread
+// last, so every key it returns silently overwrote the slider -- five knobs looked wired, moved
+// a number, and did nothing at all. Scaling after the merge keeps both. This pins the shape of
+// that merge so the next coefficient added cannot quietly join the dead pile.
+{
+  const traits = t(3);
+  const SCALED = ['stiff', 'zeta', 'stride', 'bounce', 'idleRate'];
+  const coeffsLike = (scale) => {
+    const per = motionOf(traits, BASE_MOTION_RANGES);
+    for (const k of SCALED) per[k] *= scale[k];
+    return { ...MOTION_DEFAULTS, ...per };
+  };
+  const neutral = Object.fromEntries(SCALED.map((k) => [k, 1]));
+  const base = coeffsLike(neutral);
+
+  for (const k of SCALED) {
+    const bumped = coeffsLike({ ...neutral, [k]: 2 });
+    assert.ok(Math.abs(bumped[k] - base[k] * 2) < 1e-9,
+      `a global "${k}" knob must reach the character and scale it`);
+  }
+  // and the knobs that are NOT per-personality must survive the merge untouched
+  const per = motionOf(traits, BASE_MOTION_RANGES);
+  for (const k of ['blend', 'sway', 'armGain', 'lean', 'idleAmount', 'idleDuty']) {
+    assert.equal(base[k], MOTION_DEFAULTS[k], `${k} must survive the motionOf merge`);
+    assert.ok(!(k in per), `${k} must not be returned by motionOf, or its slider is clobbered`);
+  }
+}
+
 // --- holdItem crosses exactly once ------------------------------------------------------------
 {
   for (const mode of ['spring', 'hermite']) {

@@ -14,7 +14,7 @@ import { makeMotion, integrate, compose, POSE_KEYS } from './motion.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
-export const BUILD = '2026-09-19.1-motion-layer';
+export const BUILD = '2026-09-20.1-walk-cycle';
 
 // ---------------------------------------------------------------- species registry
 
@@ -659,6 +659,12 @@ function limbSegment(node, material, radius, length, cap = true) {
 const kneeAmount = (kneeBend, legSwing, side) =>
   kneeBend * (1 - 0.85 * Math.max(0, Math.tanh(legSwing * side * 4)));
 
+// The walk layer's swing-leg knee lift, rectified onto one side. walkLayer emits a single
+// cosine; each leg takes the half of it that is positive for that side, so the swing leg flexes
+// and the stance leg stays dead straight. Both lowestFoot and applyPose must use it or the
+// character is grounded on a leg length it is not actually standing on.
+const swingKnee = (pose, side) => Math.max(0, side * (pose.kneeSwing ?? 0));
+
 function buildLeg(side, P, mat, joints) {
   const total = P.legHeight + P.hipInset;
   const [thigh, shin] = [total * 0.55, total * 0.45];
@@ -955,7 +961,7 @@ function lowestFoot(P, pose) {
 
   for (const side of [-1, 1]) {
     const hip = pose.legSwing * side - (pose.hipFlex ?? 0);
-    const knee = hip + kneeAmount(pose.kneeBend, pose.legSwing, side);
+    const knee = hip + kneeAmount(pose.kneeBend, pose.legSwing, side) + swingKnee(pose, side);
     const y = total - Math.cos(hip) * thigh - Math.cos(knee) * shin;
     if (y < lowest) lowest = y;
   }
@@ -998,7 +1004,7 @@ function applyLimbs(joints, pose, out) {
     node.rotation.x = pose.legSwing * side - (pose.hipFlex ?? 0);
   }
   for (const { node, side } of joints.lowerLeg) {
-    node.rotation.x = kneeAmount(pose.kneeBend, pose.legSwing, side);
+    node.rotation.x = kneeAmount(pose.kneeBend, pose.legSwing, side) + swingKnee(pose, side);
   }
 }
 

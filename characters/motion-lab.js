@@ -40,13 +40,18 @@ const ENGINES = ['spring', 'hermite', 'smoothstep'];
 // aiming for -- "is that arrival wrong, or is browse just like that?" is unanswerable otherwise.
 const POSE_MEANS = {
   rest: 'standing, arms down',
-  walk: 'mid-stride (static pose; the real walk is the walking folder)',
+  // These two are NOT the walk. They are single frozen frames, hand-authored back when nothing
+  // moved -- a snapshot of one instant of a stride, held forever. The actual walk is a layer
+  // added on top of whichever pose is selected, driven by distance travelled, and you turn it
+  // on with the `walking` slider folder (or the treadmill). Pick `rest` and push the treadmill
+  // up: that is the real gait. Both of these get deleted once the cycle is wired into the game.
+  walk: 'a frozen snapshot of one stride frame -- NOT the walk cycle. Pick rest + treadmill for that.',
   carry: 'holding something at the chest',
   reach: 'arm out to a shelf',
   browse: 'leaning in, looking at goods',
   sit: 'seated, knees up',
   delighted: 'arms up, ears perked \u2014 the buy reaction',
-  'walk+carry': 'mid-stride holding something',
+  'walk+carry': 'the same frozen snapshot, holding something -- also not the walk cycle',
 };
 const LANE = 2.4;                 // characters wrap at +/- this, so a walk has somewhere to go
 const POSE_NAMES = Object.keys(POSES);
@@ -226,7 +231,7 @@ function retune() {
 }
 
 const scratch = Object.fromEntries(
-  [...POSE_KEYS.map((k) => [k, 0]), ['holdItem', false], ['blink', 0]],
+  [...POSE_KEYS.map((k) => [k, 0]), ['holdItem', false], ['blink', 0], ['kneeSwing', 0]],
 );
 
 // ---------------------------------------------------------------- the pose event stream

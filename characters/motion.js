@@ -103,10 +103,11 @@ export const MOTION_DEFAULTS = Object.freeze({
                   // alone would otherwise multiply by undefined, and NaN on a head channel
                   // reaches the bounding sphere and culls the whole character.
 
-  stride:    1.05,   // stride length as a multiple of leg-chain length. The foot-lock condition
+  stride:    1.80,   // stride length as a multiple of leg-chain length. The foot-lock condition
                      // is sin(swingAmp) = stride/2, so stride is capped near 2*sinMax ~ 1.13
                      // before the legs physically cannot reach far enough and skate begins.
   bounce:    0.05,   // NEGATIVE cancels the free bounce; see walkLayer
+  kneeLift:  0.55,   // swing-leg knee flexion. Without it the legs are sticks and both feet stomp.
   armGain:   0.55,
   sway:      0.075,  // lateral body lean per step. The side-to-side half of a walk.
   headCarry: 0,      // posture, not gait: applied standing AND walking
@@ -127,7 +128,7 @@ export const BASE_MOTION_RANGES = Object.freeze({
   zeta:     [0.60, 1.50],
   idleAmp:  [0.40, 1.60],
   idleRate: [0.75, 1.25],
-  stride:   [0.85, 1.12],
+  stride:   [1.40, 2.24],
   bounce:   [0.00, 0.12],
   headArc:  [0.50, 1.50],
   // ---- walking STYLE. All of these are ANGLES, and that is the entire point.
@@ -386,6 +387,7 @@ export function compose(out, m, opts) {
   for (let i = 0; i < POSE_KEYS.length; i++) out[POSE_KEYS[i]] = m.cur[i];
   out.holdItem = m.cur[HOLD] > 0.5;
   out.blink = 0;
+  out.kneeSwing = 0;
 
   // POSTURE: how this character carries itself, standing or walking. It sits ABOVE the idle
   // early-out on purpose -- posture is carriage, not fidgeting, so a character with the idle
@@ -467,15 +469,23 @@ function idleLayer(out, m, opts, a) {
  */
 export function walkPhase(walkDist, speed, L, opts) {
   const natural = opts.stride * L;
-  const ceiling = 2 * L * opts.sinMax;
+  const ceiling = 4 * L * opts.sinMax;
   const needed = opts.cadenceMax > 0 ? (2 * speed) / opts.cadenceMax : natural;
   const strideLen = Math.min(ceiling, Math.max(natural, needed));
-  // THE FOOT-LOCK CONDITION. The foot's peak-to-peak fore-aft travel is 2*L*sin(swingAmp), and
-  // the body covers strideLen per cycle, so the two have to be equal or the feet slide. Measured
-  // against the real rig at four leg lengths, so this is the rig's behaviour and not a model of
-  // it: an earlier /(4*L) here -- from confusing excursion-from-centre with peak-to-peak -- put
-  // the true excursion at exactly 0.500x the stride, i.e. 50% skate, identically at every size.
-  const swingAmp = Math.asin(Math.min(strideLen / (2 * L), opts.sinMax));
+  // THE FOOT-LOCK CONDITION.
+  //
+  // A phase is one CYCLE -- legSwing runs a whole sine over it -- which is TWO steps, and each
+  // leg is planted for exactly half of it. So while one foot is down the body advances
+  // strideLen/2, not strideLen, and that is the distance that foot has to cover backwards
+  // relative to the body. Its peak-to-peak fore-aft travel is 2*L*sin(swingAmp), so
+  //
+  //     2*L*sin(swingAmp) = strideLen/2   ->   sin(swingAmp) = strideLen / (4*L)
+  //
+  // A previous pass changed this to /(2*L) on the strength of a probe that measured a whole
+  // cycle of one leg instead of its stance half -- the same off-by-a-half, just on the other
+  // side. Measured over the real stance window, planted-foot slip is 10.7% of stride at /(4*L)
+  // and 55.7% at /(2*L).
+  const swingAmp = Math.asin(Math.min(strideLen / (4 * L), opts.sinMax));
   const skate = needed > ceiling ? (needed - ceiling) / needed : 0;
   const phase = strideLen > 0 ? (walkDist / strideLen) % 1 : 0;
   return { phase, strideLen, swingAmp, skate };
@@ -498,15 +508,61 @@ export function walkLayer(out, w, gain, opts) {
   if (gain <= 0) return out;
   const s = Math.sin(TAU * w.phase);
   out.legSwing += gain * w.swingAmp * s;
-  out.armSwingAlt -= gain * opts.armGain * w.swingAmp * s;
-  // Peaks at phase 0 and 0.5, i.e. at footfall, deepening the natural dip. A NEGATIVE bounce
-  // cancels it instead, which is the knob you want if the free bob reads as a limp.
+  // Counter-swing. applyPose does `armSwing - side * armSwingAlt`, so side +1's arm goes BACK
+  // (rotation.x positive) when armSwingAlt is positive -- which is exactly when side +1's leg is
+  // going back too. Opposite of a walk. This was `-=`, i.e. the arms swung WITH the legs.
+  out.armSwingAlt += gain * opts.armGain * w.swingAmp * s;
+  // THE SWING-LEG KNEE. Without this the legs are rigid sticks: measured swing-foot ground
+  // clearance was 5mm on a 1.0-tall character, and because two rigid legs are exact mirrors
+  // BOTH feet reach the floor at the same instant, twice a cycle. That is the stomp that reads
+  // as a limp -- there is no stance phase at all, both feet plant and lift together.
+  //
+  // applyPose rectifies this per side (`max(0, side * kneeSwing)`), so one leg gets a positive
+  // pulse over its swing half and the other gets the same pulse half a cycle later, each leg
+  // dead straight through its whole stance. (kneeAmount cannot do this job -- it sees position,
+  // not direction, and a leg at legSwing 0 is mid-swing going one way and mid-stance the other.)
+  //
+  // WHICH HALF IS SWING, since every phase below depends on it and getting it backwards is
+  // invisible in a still frame. A limb hangs along -Y, so rotating it by +rotation.x puts its
+  // far end at -Z; the character faces +Z (POSES.browse leans in with spineBend +0.14, and the
+  // spine points up, so the same sign tips the head to +Z). Positive legSwing*side therefore
+  // puts that foot BEHIND. Side +1's hip angle is swingAmp*sin(TAU*p), so its foot sits at
+  // -L*sin(angle), which travels backwards relative to a body moving +Z exactly while
+  // cos(TAU*p) > 0. So side +1 is in STANCE around phase 0 and mid-SWING at phase 0.5, and the
+  // lift needs -cos, not +cos.
+  //
+  // ponytail: KNOWN CEILING. applyPose drives both legs from one scalar as `legSwing * side`,
+  // so the two legs are exact MIRRORS -- at every phase their hip angles are equal and
+  // opposite, so with equal knees their feet sit at exactly the same height and grounding has
+  // no reason to prefer either. Only the knee breaks the tie, and a backward-bending knee only
+  // RAISES the foot while the leg is behind the hip: flexing a leg that is already forward just
+  // brings the shin back toward vertical and puts the foot down. So the lift works over the
+  // back half of the swing and does nothing over the front half. Swept over amplitude x phase,
+  // the best a one-harmonic lift reaches is 3 contact swaps per cycle instead of 2 -- one extra
+  // flicker near footstrike, where the feet are genuinely tied anyway.
+  //
+  // The upgrade path, when the gait needs to be better than "reads right at diorama distance":
+  // a per-leg shape f(p) with the other leg at f(p + 0.5) is exactly representable on the
+  // channels that already exist, because `hip = legSwing * side - hipFlex` is `a + b * side`
+  // with a = -hipFlex and b = legSwing. Set legSwing = (f(p) - f(p+0.5))/2 and
+  // hipFlex = -(f(p) + f(p+0.5))/2 and ANY stance/swing asymmetry becomes authorable -- a real
+  // 60/40 split, a fast swing, a slow stance. The knee needs the same treatment, which means
+  // replacing the rectifier in applyPose with a linear `kneeSwing + side * kneeSwingAlt` pair.
+  // Do that only if the flicker actually reads on screen; it is a redesign, not a tweak.
+  out.kneeSwing = -gain * opts.kneeLift * Math.cos(TAU * w.phase);
+  // Footfall is MAX SCISSOR -- phase 0.25 and 0.75 -- not phase 0. Phase 0 is the passing pose,
+  // where the legs cross and the hips are at their highest. Measured root height over a cycle:
+  // -0.0003 at phase 0, -0.0416 at phase 0.25. This term had a +cos here, so it was adding its
+  // crouch at the top of the bob and cancelling the free one; that flattening is half of why the
+  // walk read as wrong. -cos puts it at the bottom, deepening the dip as intended, and a
+  // NEGATIVE bounce now cancels instead.
   // ponytail: hipFlex also rotates both thighs forward, so past ~0.12 the character walks in a
   // crouch. If a deeper bob is ever wanted, it needs a real pelvis height channel, not more of this.
-  out.hipFlex += gain * opts.bounce * (0.5 + 0.5 * Math.cos(2 * TAU * w.phase));
+  out.hipFlex += gain * opts.bounce * (0.5 - 0.5 * Math.cos(2 * TAU * w.phase));
   out.spineBend += gain * opts.lean;
-  // Sway: the body leans over whichever foot is planted, once per step. Without it a walk reads
-  // as a machine pacing -- the legs alternate but the mass never commits to either side.
+  // Sway: the mass leans OVER the planted foot, once per cycle. Side +1 is planted around phase
+  // 0 and sits at +X, and applyPose negates spineRoll into rotation.z so that positive tips the
+  // head toward +X -- so +cos is right, and in phase with the knee lift's stance half.
   out.spineRoll += gain * opts.sway * Math.cos(TAU * w.phase);
   return out;
 }

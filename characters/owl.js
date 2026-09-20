@@ -257,7 +257,7 @@ export const MOTION_RANGES = Object.freeze({
   idleRate: [1.00, 1.60],
   idleAmp:  [0.30, 1.10],
   headArc:  [1.20, 2.20],
-  stride:   [0.80, 1.05],   // stumpier than a llama, so shorter steps for the same legs
+  stride:   [1.30, 1.90],   // stumpier than a llama, so shorter steps for the same legs
 });
 
 // ---------------------------------------------------------------- species

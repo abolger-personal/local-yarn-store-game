@@ -104,7 +104,12 @@ call.** Open the lab, press Enter, and pick. Then delete the loser: three grep-a
 named `mode` — the branch in `integrate()`, the key in `MOTION_DEFAULTS`, and the one read of
 `opts.mode`. Delete `smoothstep` too; it exists only as the control.
 
-**2. Pacing. The cast moves roughly 3-4x faster than their legs can carry.** Peak ground speed
+**2. Pacing. The cast moves faster than their legs can carry — though less than it looked.**
+With the foot-lock condition corrected the geometric ceiling doubled, so honest top speed is now
+about 0.92 units/s rather than half that. The gap is real but smaller; re-measure the skate
+meter before changing `S.travel`, because the number below was taken under the old condition.
+
+**Original note, taken under the broken `/2` foot-lock:** Peak ground speed
 is about 2.1 units/s on a ~1.0-tall character at `S.travel = 1.4`, which at default proportions
 is ~11 steps/second. The walk cycle cannot hide this — a distance-locked stride reports it
 instead, and the lab's skate meter reads **24% at a speed of 0.55**. Clamping cadence does not
@@ -198,10 +203,16 @@ when idles land — and they have now landed.
 
 ## Bugs this work found and fixed, worth not reintroducing
 
-1. **50% foot skate.** The foot-lock condition is that peak-to-peak foot travel, `2·L·sin(θ)`,
-   equals the stride the body covers. The code used `asin(stride/4)` — confusing
-   excursion-from-centre with peak-to-peak — putting true travel at exactly 0.500x stride,
-   identically at every leg length.
+1. **Foot skate, twice — and the second time was my own "fix".** A phase is one CYCLE, which is
+   TWO steps, and each leg is planted for exactly half of it. So while one foot is down the body
+   advances `strideLen/2`, and that is the distance the foot must cover backwards relative to
+   the body: `2·L·sin(θ) = strideLen/2`, i.e. `asin(stride/4)`. An earlier pass changed this to
+   `asin(stride/2)` on the strength of a probe that watched one leg for a whole cycle instead of
+   its stance half — the same off-by-a-half, just on the other side — and halved `stride` to
+   0.85–1.12 to hide the result. Measured on the real stance window, slip is **10.7% of stride**
+   at `/4` and **55.7%** at `/2`. Restored, and `stride` is back to 1.40–2.24.
+   **The lesson: measure a foot over its STANCE, never over a cycle.** A cycle-long window
+   averages the two legs together and every wrong answer looks symmetric.
 2. **`headArc` had no default.** It lived only in `BASE_MOTION_RANGES`, so a caller using
    `MOTION_DEFAULTS` alone multiplied by `undefined` and put NaN on all three head channels.
    NaN reaches the bounding sphere and culls the *entire character* — it does not look like a
@@ -219,3 +230,73 @@ when idles land — and they have now landed.
 
 Every one of these was found by measuring rather than by reading, and each has an assertion that
 was verified to fail when the fix is reverted.
+
+
+## The walk cycle: what was wrong, and the ceiling that is left
+
+Fixed 2026-09-20, all four measured on the rig rather than argued:
+
+1. **No knee at all.** `walkLayer` drove `legSwing` and nothing else, on the plan's reasoning
+   that `kneeAmount` would derive the knee from `legSwing`. It does not: `POSES.rest` has
+   `kneeBend: 0`, so `kneeAmount` returned 0 identically and the legs were rigid sticks. Measured
+   swing-foot ground clearance: **5mm on a 1.0-tall character**. Worse, two rigid legs driven by
+   `legSwing * side` are exact MIRRORS, so both feet reached the floor at the same instant twice
+   a cycle — there was no stance phase at all, both feet planting and lifting together. That is
+   the stomp that reads as a limp. New `kneeSwing` channel, rectified per side in `applyPose`;
+   clearance is now **9% of leg length**.
+2. **Bounce was half a cycle out of phase.** Footfall is max scissor — phase 0.25 and 0.75 — not
+   phase 0, which is the passing pose where the hips are HIGHEST. Measured root height: -0.0003
+   at phase 0, -0.0416 at phase 0.25. The term used `+cos`, so it added its crouch at the top of
+   the bob and cancelled the free one.
+3. **The arms swung WITH the legs.** `applyPose` computes `armSwing - side * armSwingAlt`, so a
+   positive `armSwingAlt` sends side +1's arm back — exactly when side +1's leg goes back too.
+   The layer used `-=`. Counter-swing is the single biggest readability cue in a walk and it was
+   inverted.
+4. **The foot-lock divisor.** See the bugs list above.
+
+**Which half of the cycle is stance**, since everything above depends on it and it is invisible
+in a still frame: a limb hangs along -Y, so `+rotation.x` puts its far end at -Z, and the
+character faces +Z (`POSES.browse` leans in with `spineBend: +0.14`, and the spine points up, so
+the same sign tips the head to +Z; `POSES.reach` puts the arm forward with `armSwing: -1.15`).
+So positive `legSwing * side` puts that foot BEHIND. Side +1's foot travels backwards relative
+to a body moving +Z exactly while `cos(TAU * phase) > 0`, so **side +1 is in stance around phase
+0 and mid-swing at phase 0.5.**
+
+### Known ceiling: the legs are exact mirrors
+
+`applyPose` drives both legs from one scalar as `legSwing * side`, so at every phase their hip
+angles are equal and opposite. With equal knees their feet sit at exactly the same height and
+grounding has no reason to prefer either. Only the knee breaks the tie — and a backward-bending
+knee only RAISES the foot while the leg is behind the hip, because flexing a leg that is already
+forward just brings the shin back toward vertical and puts the foot down. So the lift works over
+the back half of the swing and does nothing over the front half.
+
+Swept over amplitude x phase, the best a one-harmonic lift reaches is **3 ground-contact swaps
+per cycle instead of 2** — one extra flicker near footstrike, where the feet are genuinely tied
+anyway. Whether that reads on screen is an eyes call.
+
+**The upgrade path, if it does read.** A per-leg shape `f(p)` with the other leg at `f(p + 0.5)`
+is exactly representable on channels that already exist, because `hip = legSwing * side -
+hipFlex` is `a + b*side` with `a = -hipFlex` and `b = legSwing`. Set
+
+    legSwing = (f(p) - f(p + 0.5)) / 2
+    hipFlex  = -(f(p) + f(p + 0.5)) / 2
+
+and any stance/swing asymmetry becomes authorable — a real 60/40 split, a fast swing, a slow
+stance. The knee needs the same treatment, which means replacing the `max(0, side * kneeSwing)`
+rectifier in `applyPose` with a linear `kneeSwing + side * kneeSwingAlt` pair. It is a redesign
+of `walkLayer`, not a tweak, so do it only against a visible problem.
+
+### Still to do here
+
+- `kneeLift` is a single global constant, not a per-species span. It is an ANGLE, so it belongs
+  in `BASE_MOTION_RANGES` with the other style dials (high-stepping vs shuffling is exactly the
+  kind of thing one llama should differ from another on). Left out only because basic walking
+  came first.
+- `POSES.walk` and `POSES['walk+carry']` are frozen single frames from before the cycle existed,
+  and the lab now says so in its pose banner. They are still in the list; the plan deletes them
+  when `cast.js` is wired.
+- `kneeAmount`'s `max(0, tanh(...))` is a half-wave rectifier, so knee response is asymmetric in
+  `legSwing` — with a biased `legSwing` (which `POSES.walk` has) it produces a discontinuous
+  6cm vertical pop. Harmless while the walk runs from `rest`, which has `kneeBend: 0`; it dies
+  with those two poses.

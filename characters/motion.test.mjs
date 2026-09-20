@@ -364,20 +364,50 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
   assert.ok(walkPhase(0, 4.0, short, o).skate > 0.5,
     'skate is reported, not hidden, once the geometric ceiling binds');
 
-  // THE FOOT-LOCK CONDITION, and the assertion that catches the bug this file shipped with:
-  // the foot's peak-to-peak fore-aft travel is 2*L*sin(swingAmp) and the body covers strideLen
-  // per cycle, so equal or the feet slide. Measured against the real rig at four leg lengths,
-  // where an earlier stride/4 put the true excursion at exactly 0.500x -- 50% skate, invisible
-  // to every other assertion here because none of them compared the foot to the ground.
+  // THE FOOT-LOCK CONDITION. A phase is one CYCLE -- legSwing runs a whole sine over it -- which
+  // is TWO steps, and each leg is planted for exactly half of it. So while one foot is down the
+  // body advances strideLen/2, and THAT is the distance that foot has to cover backwards
+  // relative to the body. Its peak-to-peak fore-aft travel is 2*L*sin(swingAmp), so
+  //
+  //     2*L*sin(swingAmp) = strideLen/2
+  //
+  // This assertion previously demanded the full strideLen, which is the same off-by-a-half the
+  // code had: a probe that watched one leg for a whole cycle instead of its stance half. Slip
+  // measured on the real stance window is 10.7% of stride under this condition and 55.7% under
+  // the other, so the two are not a matter of taste.
   for (const L of [short, tall, 0.13, 0.475]) {
     for (const speed of [0.15, 0.4, 0.8]) {
       const p = walkPhase(0, speed, L, o);
       if (p.skate > 0) continue;                 // past the ceiling the shortfall is reported
       const travel = 2 * L * Math.sin(p.swingAmp);
-      assert.ok(Math.abs(travel - p.strideLen) < 1e-9,
-        `foot travel ${travel.toFixed(4)} must equal stride ${p.strideLen.toFixed(4)} `
+      assert.ok(Math.abs(travel - p.strideLen / 2) < 1e-9,
+        `foot travel ${travel.toFixed(4)} must equal half the stride ${(p.strideLen / 2).toFixed(4)} `
         + `(L=${L}, speed=${speed}) or the planted foot slides`);
     }
+  }
+
+  // The swing-leg knee, which is what stops both feet reaching the floor together. Two rigid
+  // mirrored legs have their feet at identical heights twice a cycle, so the body stomps; the
+  // knee is the only thing that breaks the tie. Measured on the rig: ground clearance went from
+  // 5mm to 9% of leg length when this was added.
+  for (const L of [short, tall]) {
+    const thigh = L * 0.55, shin = L * 0.45;
+    const footY = (pose, side) => {
+      const hip = pose.legSwing * side - (pose.hipFlex ?? 0);
+      const knee = hip + Math.max(0, side * (pose.kneeSwing ?? 0));
+      return L - Math.cos(hip) * thigh - Math.cos(knee) * shin;
+    };
+    const at = (phase) => {
+      const p = walkPhase(phase * walkPhase(0, 0.4, L, o).strideLen, 0.4, L, o);
+      const out = { legSwing: 0, hipFlex: 0, kneeBend: 0, armSwing: 0, armSwingAlt: 0, spineBend: 0, spineRoll: 0 };
+      walkLayer(out, p, 1, o);
+      return out;
+    };
+    // side +1 is planted around phase 0 and mid-swing at 0.5, so at 0.5 its foot must be UP
+    assert.ok(footY(at(0.5), 1) - footY(at(0.5), -1) > 0.02 * L,
+      `L=${L}: the swinging foot must clear the planted one at mid-swing`);
+    // and its knee must be straight through its own stance, or grounding sits on a short leg
+    assert.ok(Math.max(0, 1 * at(0).kneeSwing) < 1e-9, `L=${L}: stance knee must be straight`);
   }
 }
 
@@ -401,9 +431,20 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
   const on = out();
   walkLayer(on, walkPhase(0.25 * w.strideLen, 0.5, 0.238, o), 1, o);
   assert.ok(on.legSwing > 0.05, 'the legs swing');
-  assert.ok(on.armSwingAlt < 0, 'the arms counter-swing');
+
+  // Counter-swing, stated the way applyPose actually computes it rather than as a sign on one
+  // channel -- the previous version pinned `armSwingAlt < 0`, which is the BROKEN direction, so
+  // it locked the bug in. Arms and legs both hang along -Y, so the same rotation.x sends both to
+  // the same side of the body; a walk needs the same-side pair pointing opposite ways.
+  for (const side of [-1, 1]) {
+    const arm = on.armSwing - side * on.armSwingAlt;
+    const leg = on.legSwing * side;
+    assert.ok(arm * leg < 0,
+      `side ${side}: arm ${arm.toFixed(3)} and leg ${leg.toFixed(3)} must swing opposite ways`);
+  }
+
   assert.equal(on.kneeBend, 0,
-    'the walk drives no knee channel: npc.js kneeAmount already derives it from legSwing');
+    'the walk leaves kneeBend to the base pose and drives kneeSwing instead');
 }
 
 // --- head yaw is anatomy, and species differ in it enormously ---------------------------------

@@ -447,6 +447,26 @@ const FIDGET_W = TAU * 0.30;    // ~3.3s per shift at idleRate 1, ~1.1s at 3
 /** Breathing answers to idleRate, but only partly -- see FIDGET_W. */
 const breathRate = (r) => 0.65 + 0.35 * r;
 
+/**
+ * ...and breath DEPTH answers to idleAmp only partly, for exactly the same reason.
+ *
+ * Breathing is not a fidget. Everyone breathes, at roughly the same depth, whatever their
+ * temperament -- a calm animal breathes SLOWER, not shallower, and `breathRate` already says so.
+ * Scaling depth by the raw fidget amplitude made a placid owl (idleAmp 0.30 on the owl's own
+ * span) breathe 1.55 degrees peak to peak, which is a statue.
+ *
+ * That went unnoticed while the head was also multiplied by idleAmp -- body and head were quiet
+ * together, so the character read as calm rather than as broken. Two later changes moved the
+ * head off it and left the chest behind: decoupling headArc from idleAmp (right in itself: E was
+ * driving the head twice) made the head 1.4x to 3.3x bigger, and the fidget-clock speed-up made
+ * it ~3x faster. Measured on a calm owl afterwards: 35 degrees of head yaw against 1.6 of chest,
+ * a 23:1 ratio, which is a head coming off a still body -- and the shape of the report.
+ *
+ * Same curve as breathRate and for the same reason, so the two stay legible side by side: the
+ * quietest breather is still 65% of the liveliest, never a tenth of it.
+ */
+const breathDepth = (amp) => 0.65 + 0.35 * amp;
+
 /** @typedef {ReturnType<typeof makeMotion>} Motion */
 /** @typedef {typeof MOTION_DEFAULTS & ReturnType<typeof motionOf>} MotionOpts */
 
@@ -710,8 +730,13 @@ function idleLayer(out, m, opts, a) {
   const g = a * dutyGate(p, opts.idleDuty ?? 1, m.seed);
   // Breathing. The chest lifts and the arms follow it a little, because an arm that stays put
   // while the ribcage moves reads as a detached limb.
-  out.spineBend -= a * 0.045 * Math.sin(p);
-  out.armOut += a * 0.022 * Math.sin(p);
+  //
+  // NOT scaled by `a`: that carries idleAmp, and breath depth is not fidget amplitude. See
+  // breathDepth. idleAmount still gates it, because that is the master dial and the answer to
+  // "reduce motion" -- a character whose idle is switched off entirely holds still.
+  const breath = (opts.idleAmount ?? 1) * breathDepth(opts.idleAmp ?? 1);
+  out.spineBend -= breath * 0.045 * Math.sin(p);
+  out.armOut += breath * 0.022 * Math.sin(p);
 
   // WEIGHT SHIFT -- the side-to-side one, and the reason spineRoll exists. Everything else on
   // the rig is fore-aft (spineBend, legSwing, hipFlex all rotate about X), so without a lateral
@@ -774,7 +799,7 @@ function idleLayer(out, m, opts, a) {
   // joint already exists and applyPose already writes it every frame.
   out.neckCurve = look * 0.075 * Math.sin(q * m.rateB * 0.62 + m.seed * 5);
 
-  headLook(out, m, look, q, w);
+  headLook(out, m, look, q, w, g * still);
   earFlick(out, m, a);
 }
 
@@ -784,8 +809,20 @@ function idleLayer(out, m, opts, a) {
  * alarmed rather than interested. Still incommensurate with the body rhythm, so no visible
  * repeat.
  */
-function headLook(out, m, look, q, w) {
-  out.headTilt += look * 0.070 * w;
+function headLook(out, m, look, q, w, lean) {
+  // THE TILT IS NOT LOOKING AROUND, and scaling it as though it were is the other half of the
+  // head-coming-off report. It rides `w` -- the BODY's weight-shift wave -- so it is postural
+  // follow-through, the body's roll continuing up the spine, not a glance. Curiosity already
+  // has its own sideways tilt in `headCock`, held rather than oscillating.
+  //
+  // Driven by `look` it took its amplitude from headArc while the thing it follows took a
+  // separate one from idleAmp, so the two drifted apart: measured on a calm owl, 13.6 degrees
+  // of head tilt against 2.9 of body roll, IN PHASE on the same wave. A head swinging nearly
+  // five times as far as the shoulders it sits on does not read as calm, it reads as loose.
+  //
+  // `lean` is that same g * still the weight shift uses, so the head now tracks the body it is
+  // attached to at any fidget amount and fades out with it when they start walking.
+  out.headTilt += lean * 0.070 * w;
   out.headYaw += look * 0.180 * Math.sin(q * m.rateB + m.seed * 2);
   out.headPitch += look * 0.055 * Math.sin(q * m.rateB * 0.8 + m.seed * 3);
 }

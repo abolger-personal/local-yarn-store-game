@@ -232,6 +232,60 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     'breathing must NOT be gated by duty: a character that stops breathing reads as switched off');
 }
 
+// --- the head must not outrun the body it is attached to --------------------------------------
+//
+// "The owls look like their heads are going to come off when they fidget because the bodies are
+// perfectly still." Two separate couplings had come apart, both leaving the chest behind:
+//
+//   1. BREATH DEPTH was scaled by idleAmp -- the FIDGET amplitude. Breathing is not a fidget;
+//      a calm animal breathes slower, not shallower, which is what breathRate already says. On
+//      the owl's own span (idleAmp 0.30 at the low end) a placid owl breathed 1.55 degrees peak
+//      to peak, which is a statue. It went unnoticed while the head was ALSO multiplied by
+//      idleAmp -- they were quiet together, so it read as calm rather than as broken -- and
+//      surfaced the moment headArc was correctly decoupled from idleAmp.
+//   2. HEAD TILT rides `w`, the BODY's weight-shift wave, but took its amplitude from headArc
+//      while the body took its own from idleAmp. In phase, on one wave, at 4.7x the amplitude:
+//      a head swinging five times as far as the shoulders under it.
+//
+// Both pinned as RATIOS rather than absolute sizes, because absolute amplitudes are a tuning
+// choice and this is about the channels staying attached to each other.
+{
+  const body = (over) => {
+    const o = opts(over);
+    const m = makeMotion(POSES.rest, 0.4);
+    const buf = out();
+    const peak = { spineBend: 0, spineRoll: 0, headTilt: 0 };
+    for (let i = 0; i < 7200; i++) {           // two minutes
+      integrate(m, POSES.rest, 1 / 60, o);
+      compose(buf, m, o);
+      for (const k of Object.keys(peak)) peak[k] = Math.max(peak[k], Math.abs(buf[k]));
+    }
+    return peak;
+  };
+
+  // The owl's own low end, which is where the report came from.
+  const calm = body({ idleAmp: 0.30, headArc: 1.70 });
+  const lively = body({ idleAmp: 1.10, headArc: 2.20 });
+
+  assert.ok(calm.spineBend > lively.spineBend * 0.6,
+    `a calm character must still visibly breathe (${calm.spineBend.toFixed(3)} rad against `
+    + `${lively.spineBend.toFixed(3)} for a lively one) -- breath depth is not fidget amplitude, `
+    + 'and a chest that goes quiet with the fidget dial reads as a statue with a moving head');
+
+  // and the head tilt must stay proportional to the roll it is following, at BOTH ends of the
+  // fidget span -- the bug was a ratio that changed with idleAmp, not one that was merely large.
+  for (const [name, p] of [['calm', calm], ['lively', lively]]) {
+    const ratio = p.headTilt / p.spineRoll;
+    assert.ok(ratio < 1.5,
+      `${name}: the head tilts ${ratio.toFixed(1)}x as far as the body rolls, on the SAME wave `
+      + '-- a head outswinging its own shoulders reads as detached, not as alert');
+  }
+  const drift = Math.abs(calm.headTilt / calm.spineRoll - lively.headTilt / lively.spineRoll);
+  assert.ok(drift < 0.1,
+    `head-to-body tilt ratio must not change with the fidget dial (drifted ${drift.toFixed(2)}) `
+    + '-- that is the two channels taking their amplitude from different places again');
+}
+
 // --- walking STYLE must belong to personality, not to leg length ------------------------------
 //
 // The complaint this exists to prevent: "leg length is clearly the dominant factor, so

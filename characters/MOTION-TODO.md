@@ -455,6 +455,50 @@ union across kits. Zero stays reachable on every channel: no wobble, no bounce, 
 all legitimate settings, and a span whose pad crosses zero stops **at** zero rather than at its
 own low end.
 
+## The head must stay attached to the body
+
+> "We've broken breathing somehow in idle mode — the owls look like their heads are going to
+> come off when they fidget because the bodies are perfectly still."
+
+Two separate couplings had come apart, both leaving the chest behind, and neither was visible
+until the other change exposed it.
+
+**1. Breath depth was scaled by `idleAmp` — the *fidget* amplitude.** Breathing is not a fidget.
+Everyone breathes, at roughly the same depth; a calm animal breathes *slower*, not shallower,
+which is exactly what `breathRate = 0.65 + 0.35·idleRate` already says. On the owl's own span
+(`idleAmp` bottoms at 0.30) a placid owl breathed **1.55° peak to peak**, which is a statue.
+
+This was invisible for as long as the head was *also* multiplied by `idleAmp` — body and head
+went quiet together, so the character read as calm rather than as broken. Decoupling `headArc`
+from `idleAmp` (`0998bd7`, correct in itself: E was driving the head twice) made the head 1.4×
+to 3.3× bigger, and the fidget-clock speed-up made it ~3× faster. Neither touched the chest.
+
+`breathDepth(amp) = 0.65 + 0.35·amp`, the same curve as `breathRate` so the two read together:
+the quietest breather is still 65% of the liveliest, never a tenth. `idleAmount` still gates it,
+because that is the master dial and the reduce-motion answer.
+
+**2. `headTilt` rides `w` — the *body's* weight-shift wave — but took its amplitude from
+`headArc` while the body took its own from `idleAmp`.** In phase, on one wave, at wildly
+different sizes:
+
+| | body roll | head tilt | ratio |
+| --- | --- | --- | --- |
+| calm owl | 2.9° | 13.6° | **4.7×** |
+| lively owl | 10.7° | 17.6° | 1.6× |
+
+A head swinging nearly five times as far as the shoulders it sits on does not read as alert, it
+reads as loose — and the ratio *changing with the fidget dial* is what made it worst on exactly
+the calm characters the report named. The tilt is postural follow-through, not a glance;
+curiosity already has its own sideways tilt in `headCock`, held rather than oscillating. It now
+takes the same `g · still` the weight shift uses, so the ratio is a constant 0.8 across the span
+and fades out with the body when they walk.
+
+After both: calm owl breathes 3.9° (was 1.55°), tilts 2.4° against 2.9° of roll. Yaw is
+unchanged at 35° — looking around is a separate intent and is supposed to be the big one.
+
+Pinned as **ratios**, not absolute sizes: the amplitudes are a tuning choice, but the channels
+staying attached to each other is not.
+
 ## The idle fades where the walk already does the job
 
 Standing fidget and walking gait were running at once on the same joints, at incommensurate

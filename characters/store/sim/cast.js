@@ -6,7 +6,8 @@ import { cast } from '../core/state.js';
 import { cellRect } from '../../../inventory/notions.js';
 import { BANDS, TAILS, bandMatrix, familyExtent, tailMatrix, yarnFit }
   from '../../../inventory/yarn-geometry.js';
-import { POSES, stepMotion, valueOf, walkPhase, walkLayer, walkGain } from '../../npc.js';
+import { POSES, phaseStep, stepMotion, valueOf, walkPhase, walkLayer, walkGain }
+  from '../../npc.js';
 import { ACTION, STATE } from '../../visit.js';
 import * as THREE from 'three';
 import { BOX_H, CELL, S } from '../core/config.js';
@@ -334,10 +335,11 @@ function stepWalk(rec, n, dt) {
     if (at.total > 0.05) rec.built.root.rotation.y = at.facing;
   }
 
-  const moved = Math.hypot(p.x - wasX, p.z - wasZ);
-  rec.walkDist += moved;
+  // Handed to stepGait, which turns it into a fraction of a stride. Distance is NOT
+  // accumulated here any more -- see phaseStep for why a running total was the bug.
+  rec.moved = Math.hypot(p.x - wasX, p.z - wasZ);
   // dt is clamped to 0.1 upstream (main.js), so this cannot divide by something tiny.
-  rec.speed = dt > 0 ? moved / dt : 0;
+  rec.speed = dt > 0 ? rec.moved / dt : 0;
 }
 
 /**
@@ -404,7 +406,11 @@ function stepGait(rec, out, dt) {
   // way the old code did: without this an NPC who buys mid-move hops and strides at once.
   const speed = rec.celebrate > 0 ? 0 : rec.speed;
   const gain = walkGain(rec.built.motion, speed, dt, rec.opts);
-  if (gain > 0) walkLayer(out, walkPhase(rec.walkDist, speed, L, rec.opts), gain, rec.opts);
+  if (gain > 0) walkLayer(out, walkPhase(rec.phase, speed, L, rec.opts), gain, rec.opts);
+  // Advanced AFTER the layer reads it, so a frame's pose matches the distance already covered.
+  // Accumulated rather than divided out of total distance -- see phaseStep, and note this is
+  // the code path where that mattered: the store's speed changes every frame.
+  rec.phase = (rec.phase + phaseStep(rec.moved, speed, L, rec.opts)) % 1;
 }
 
 function tickOne(rec, dt) {

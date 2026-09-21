@@ -875,10 +875,25 @@ export function topSpeed(L, opts) {
   return (opts.cadenceMax * 4 * L * opts.sinMax) / 2;
 }
 
-export function walkPhase(walkDist, speed, L, opts) {
+/** Wrap any real number into [0, 1). Negative phases happen when a character backs up. */
+const wrap01 = (x) => ((x % 1) + 1) % 1;
+
+/**
+ * The stride length the CADENCE demands, deliberately unbounded -- see walkPhase. Split out so
+ * phaseStep can divide by the same number walkPhase reports.
+ */
+export function strideFor(speed, L, opts) {
   const natural = opts.stride * L;
-  const ceiling = 4 * L * opts.sinMax;
   const needed = opts.cadenceMax > 0 ? (2 * speed) / opts.cadenceMax : natural;
+  return Math.max(natural, needed);
+}
+
+/**
+ * The gait at a given point in the cycle. `at` is the accumulated PHASE (0..1), not a distance:
+ * advance it with phaseStep.
+ */
+export function walkPhase(at, speed, L, opts) {
+  const ceiling = 4 * L * opts.sinMax;
   // TWO stride lengths, and keeping them apart is the whole fix.
   //
   // `gaitLen` is what the CADENCE demands and is deliberately unbounded, because it is what the
@@ -893,7 +908,7 @@ export function walkPhase(walkDist, speed, L, opts) {
   // i.e. 10.7 leg cycles per second, sampled at 60fps -- about 5.6 frames per cycle, which is
   // close enough to Nyquist that the legs alias instead of animating. That is the "looks crazy",
   // and it was worst on short legs, which is why one long-legged owl looked fine.
-  const gaitLen = Math.max(natural, needed);
+  const gaitLen = strideFor(speed, L, opts);
   const reach = Math.min(gaitLen, ceiling);
   // THE FOOT-LOCK CONDITION.
   //
@@ -913,8 +928,41 @@ export function walkPhase(walkDist, speed, L, opts) {
   // character who outruns their own legs skates, and skating reads far better than blurring --
   // it looks like someone hurrying, where a blur looks like a broken rig.
   const skate = gaitLen > reach ? (gaitLen - reach) / gaitLen : 0;
-  const phase = gaitLen > 0 ? (walkDist / gaitLen) % 1 : 0;
-  return { phase, strideLen: gaitLen, reach, swingAmp, skate, cadence: 2 * speed / gaitLen };
+  return { phase: wrap01(at), strideLen: gaitLen, reach, swingAmp, skate,
+           cadence: 2 * speed / gaitLen };
+}
+
+/**
+ * How far the gait advances this frame, as a fraction of a cycle. Add it to the running phase.
+ *
+ * THE PHASE IS ACCUMULATED, NOT DIVIDED, and that is not a refactor -- dividing was wrong.
+ *
+ * It used to be `walkDist / gaitLen`, total distance ever walked over the current stride length.
+ * That is only stable if gaitLen is constant, and gaitLen is a function of SPEED: it stretches
+ * to `2 * speed / cadenceMax` so that cadence can never exceed the cap. So every time a
+ * character slowed down the divisor shrank underneath a numerator that only ever grows, and the
+ * phase leapt.
+ *
+ * Measured on an owl easing through one 2-unit move, which should be 5.3 leg cycles:
+ *
+ *     walkDist at start   worst phase jump per frame   cycles actually run
+ *              0                  46.8%                       5.2
+ *             10                  47.7%                      14.4
+ *            200                  49.5%                      18.8
+ *
+ * Half a cycle in a single frame, getting worse the longer that character had been in the shop.
+ * That is legs spinning, and it appears exactly when a walk ENDS, because that is when the
+ * deceleration is sharpest.
+ *
+ * The motion lab could never have shown it: its speed is a slider, so gaitLen never moved.
+ * Nothing was wrong with the distance-driven idea -- a stride is still tied to ground covered,
+ * the feet still stay planted at any speed and any leg length -- only with doing the division
+ * once at the end instead of integrating it. Accumulating confines a change in stride length to
+ * the step it happens on, which is what makes deceleration smooth rather than a jump.
+ */
+export function phaseStep(moved, speed, L, opts) {
+  const gaitLen = strideFor(speed, L, opts);
+  return gaitLen > 0 ? moved / gaitLen : 0;
 }
 
 /**

@@ -23,7 +23,8 @@ import {
   BASE_PARAMS, BASE_MOTION_RANGES, MOTION_DEFAULTS, POSES, POSE_KEYS, BUILD, TONE_MAPPING,
   createCharacter, disposeCharacter, setViewMode, setGeometryDetail,
   getSpecies, speciesIds, makeMotion, resetMotion, integrate, compose, applyPose,
-  motionOf, factors, walkPhase, walkLayer, walkGain, topSpeed, valueOf, velocityOf, spanBounds,
+  motionOf, factors, walkPhase, phaseStep, walkLayer, walkGain, topSpeed, valueOf, velocityOf,
+  spanBounds,
 } from './npc.js';
 import { randomTraits } from './visit.js';
 import './owl.js';
@@ -174,7 +175,7 @@ resize();
 
 /**
  * @typedef {{built: any, motion: any, opts: any, engine: string, traits: any,
- *   walkDist: number, lane: number, maxDv?: number, skate?: number, top?: number,
+ *   walkDist: number, phase: number, lane: number, maxDv?: number, skate?: number, top?: number,
  *   label?: string, odd?: string}} Actor
  */
 /** @type {Actor[]} */
@@ -323,7 +324,7 @@ function addOne(kit, params, engine, traits, seed, walkDist, z, label, odd) {
   built.root.position.set(0, 0, z);
   group.add(built.root);
   cast.push({
-    built, engine, traits, lane: z, walkDist, label, odd,
+    built, engine, traits, lane: z, walkDist, phase: walkDist, label, odd,
     motion: makeMotion(built.params, seed),
     opts: coeffs(traits, kit, engine),
   });
@@ -504,8 +505,14 @@ function tickOne(a, dt) {
   // walk: distance-driven, so the phase freezes when the character does
   const P = a.built.params;
   const L = P.legHeight + P.hipInset;
-  a.walkDist += S.speed * dt;
-  const w = walkPhase(a.walkDist, S.speed, L, a.opts);
+  // walkDist stays, but ONLY for the lane position below. The gait phase is accumulated
+  // separately: dividing a distance total by a speed-dependent stride length is what made legs
+  // spin on deceleration. The lab never showed it because its speed is a slider and so the
+  // divisor never moved -- see phaseStep in motion.js.
+  const moved = S.speed * dt;
+  a.walkDist += moved;
+  const w = walkPhase(a.phase, S.speed, L, a.opts);
+  a.phase = (a.phase + phaseStep(moved, S.speed, L, a.opts)) % 1;
   const gain = walkGain(a.motion, S.speed, dt, a.opts);
   walkLayer(out, w, gain, a.opts);
   a.skate = w.skate;

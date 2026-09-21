@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import {
   POSES, POSE_KEYS, MOTION_KEYS, MOTION_DEFAULTS, BASE_MOTION_RANGES, STYLE_RANGES,
   makeMotion, resetMotion, integrate, compose, valueOf, velocityOf,
-  motionOf, walkPhase, walkLayer, walkGain, spanBounds,
+  motionOf, walkPhase, phaseStep, walkLayer, walkGain, spanBounds,
 } from './motion.js';
 
 const opts = (over = {}) => ({ ...MOTION_DEFAULTS, ...over });
@@ -166,7 +166,7 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
   for (let i = 0; i < 600; i++) {
     integrate(m, POSES.browse, 1 / 60, MOTION_DEFAULTS);
     compose(buf, m, MOTION_DEFAULTS);
-    walkLayer(buf, walkPhase(i / 60, 0.5, 0.238, MOTION_DEFAULTS), 1, MOTION_DEFAULTS);
+    walkLayer(buf, walkPhase((i / 60) % 1, 0.5, 0.238, MOTION_DEFAULTS), 1, MOTION_DEFAULTS);
     for (const k of POSE_KEYS) {
       assert.ok(Number.isFinite(buf[k]), `${k} is finite using only MOTION_DEFAULTS (frame ${i})`);
     }
@@ -496,19 +496,63 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     'swing amplitude is scale-invariant: the leg length cancels out of asin(stride/4)');
   assert.ok(b.strideLen > a.strideLen * 2, 'a longer leg takes a proportionally longer stride');
 
-  // one full stride returns to the same phase, at any leg length
+  // one full stride's worth of GROUND advances the phase exactly once round, at any leg length
   for (const L of [short, tall]) {
     const w = walkPhase(0, 0.2, L, o);
-    for (const d of [0, 0.37, 1.9]) {
-      assert.ok(Math.abs(walkPhase(d, 0.2, L, o).phase - walkPhase(d + w.strideLen, 0.2, L, o).phase) < 1e-9,
-        `phase repeats every stride at L=${L}`);
-    }
+    assert.ok(Math.abs(phaseStep(w.strideLen, 0.2, L, o) - 1) < 1e-12,
+      `one stride is one cycle at L=${L}`);
+    assert.ok(Math.abs(phaseStep(w.strideLen / 4, 0.2, L, o) - 0.25) < 1e-12,
+      `and a quarter of it is a quarter cycle at L=${L}`);
   }
 
   // steps x strideLen === distance, which is what "the feet do not skate" means numerically
   const w = walkPhase(0, 0.2, short, o);
   const dist = 2.0;
   assert.ok(Math.abs((dist / w.strideLen) * w.strideLen - dist) < 1e-12, 'distance reconciles');
+
+  // --- THE PHASE MUST NOT SPIN WHEN A CHARACTER SLOWS DOWN ------------------------------------
+  //
+  // Reported as "the weird leg cycling all the characters have when slowing down", and it was
+  // not skate. The phase used to be walkDist / strideLen -- a running distance total over a
+  // stride length that is itself a function of SPEED, since it stretches to 2*speed/cadenceMax
+  // to hold the cadence cap. So every deceleration shrank the divisor under a numerator that
+  // only grows, and the phase leapt: measured up to 46.8% of a cycle in ONE frame, and worse the
+  // longer that character had been walking -- 18.8 leg cycles over a move that should be 5.3.
+  //
+  // The lab could never have shown it: its speed is a slider, so the divisor never moved.
+  //
+  // Simulated here as a real move -- ease in, ease out -- which is exactly when it bit, because
+  // the end of a move is where the deceleration is sharpest.
+  {
+    const L = short;
+    const len = 2.0, dur = 1.4, dt = 1 / 60;
+    const ease = (x) => x * x * (3 - 2 * x);
+    // start well into a long shift, which is where the old formula was worst
+    for (const startPhase of [0, 0.37]) {
+      let phase = startPhase, prev = null, worst = 0, cycles = 0;
+      for (let i = 0; i <= dur / dt; i++) {
+        const tNow = Math.min(1, (i * dt) / dur);
+        const moved = len * (ease(tNow) - ease(Math.max(0, tNow - dt / dur)));
+        const speed = moved / dt;
+        if (prev !== null) {
+          let d = phase - prev;
+          d -= Math.round(d);                      // shortest way round the circle
+          worst = Math.max(worst, Math.abs(d));
+          cycles += Math.abs(d);
+        }
+        prev = phase;
+        phase = (phase + phaseStep(moved, speed, L, o)) % 1;
+      }
+      assert.ok(worst < 0.2,
+        `the gait must not jump (worst ${(100 * worst).toFixed(1)}% of a cycle in one frame) -- `
+        + 'a phase that leaps on deceleration is legs spinning, not a walk');
+      // and the move must be the right LENGTH: the ground covered decides the step count.
+      const honest = len / walkPhase(0, 0.2, L, o).strideLen;
+      assert.ok(cycles < honest * 1.6,
+        `a ${len}-unit move must be about ${honest.toFixed(1)} cycles, not ${cycles.toFixed(1)} `
+        + '-- extra cycles are the phase spinning, and they scale with how far they have walked');
+    }
+  }
 
   // and the honest report when the body outruns the legs
   assert.equal(walkPhase(0, 0.2, short, o).skate, 0, 'no skate at a walkable speed');
@@ -547,12 +591,11 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
   {
     const marching = { ...o, kneeLift: 1.4 };
     const T = 0.238, thigh = T * 0.55;
-    const S = walkPhase(0, 0.5, T, marching).strideLen;
     let kneeFrontAtPeak = 0, peakFlex = 0;
     for (let i = 0; i < 400; i++) {
       const buf = { legSwing: 0, hipFlex: 0, kneeBend: 0, armSwing: 0, armSwingAlt: 0,
         spineBend: 0, spineRoll: 0, kneeSwing: 0 };
-      walkLayer(buf, walkPhase((i / 400) * S, 0.5, T, marching), 1, marching);
+      walkLayer(buf, walkPhase(i / 400, 0.5, T, marching), 1, marching);
       const flex = Math.max(0, buf.kneeSwing);
       if (flex > peakFlex) {
         peakFlex = flex;
@@ -599,7 +642,7 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
       return L - Math.cos(hip) * thigh - Math.cos(knee) * shin;
     };
     const at = (phase) => {
-      const p = walkPhase(phase * walkPhase(0, 0.4, L, o).strideLen, 0.4, L, o);
+      const p = walkPhase(phase, 0.4, L, o);
       const out = { legSwing: 0, hipFlex: 0, kneeBend: 0, armSwing: 0, armSwingAlt: 0, spineBend: 0, spineRoll: 0 };
       walkLayer(out, p, 1, o);
       return out;
@@ -624,13 +667,13 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
   assert.equal(m.walkGain, 0, 'walk gain reaches EXACTLY zero when stopped, not merely near it');
 
   const base = out(), walked = out();
-  const w = walkPhase(1.3, 0, 0.238, o);
+  const w = walkPhase(0.3, 0, 0.238, o);
   walkLayer(walked, w, 0, o);
   assert.deepEqual(walked, base, 'at zero gain the walk layer contributes nothing at all');
 
   // and it does contribute when open, anti-symmetrically in the arms
   const on = out();
-  walkLayer(on, walkPhase(0.25 * w.strideLen, 0.5, 0.238, o), 1, o);
+  walkLayer(on, walkPhase(0.25, 0.5, 0.238, o), 1, o);
   assert.ok(on.legSwing > 0.05, 'the legs swing');
 
   // Counter-swing, stated the way applyPose actually computes it rather than as a sign on one

@@ -293,14 +293,16 @@ const castRecord = (npc, built, color) => ({
   // each span is, the traits pick where in it this individual lands.
   opts: { ...MOTION_DEFAULTS, ...motionOf(npc.traits, built.species?.motionRanges) },
 
-  // Distance walked, ever, in world units. Drives the stride phase, which is why it is distance
-  // and not time: the feet then stay planted at any speed and any leg length.
+  // Where in the stride they are, 0..1. ACCUMULATED per frame from distance covered — never
+  // derived from a running distance total, which is what made legs spin on deceleration (see
+  // phaseStep in motion.js).
   //
   // SEEDED RANDOM, and that one word is the difference between a cast and a chorus line. Every
   // NPC starting at zero means every NPC plants the same foot on the same frame — the queue
   // walks in in lockstep, which is exactly the tell crowd.html records about pose cycling. A
   // random start is a random point in the gait, and it costs nothing.
-  walkDist: Math.random() * 2,
+  phase: Math.random(),
+  moved: 0,
   speed: 0,
 });
 

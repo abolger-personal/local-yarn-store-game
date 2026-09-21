@@ -254,7 +254,7 @@ export const OWL_GUI = Object.freeze({
 export const MOTION_RANGES = Object.freeze({
   ...BASE_MOTION_RANGES,
   stiff:    [140, 300],
-  idleRate: [1.00, 1.60],
+  idleRate: [1.20, 3.00],   // a bird is twitchy: the top of the range, and never fully still
   idleAmp:  [0.30, 1.10],
   headArc:  [1.20, 2.20],
   stride:   [1.30, 1.90],   // stumpier than a llama, so shorter steps for the same legs

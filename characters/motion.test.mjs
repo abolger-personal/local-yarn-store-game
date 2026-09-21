@@ -535,6 +535,50 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     + 'rig authors for an ear');
 }
 
+// --- fidgeting and breathing are separate tempos ----------------------------------------------
+//
+// A keyed-up character taps and jiggles several times faster than a placid one, but one
+// BREATHING three times faster is panting -- distress, or having just run somewhere, not nerves.
+// So idleRate drives the fidget clock fully and the breath clock only partly.
+//
+// The measurement that forced this: the weight shift used to run at 0.17x the breath frequency,
+// so a cycle took 18.2s on a calm owl and 11.4s on the most volatile one. A drift, not a
+// fidget, and no widening of idleRate could have fixed it.
+{
+  const period = (rate, key) => {
+    const o = { ...opts(), idleRate: rate, idleDuty: 1 };
+    const m = makeMotion(POSES.rest, 0.42);
+    resetMotion(m, POSES.rest);
+    const buf = {};
+    let crossings = 0, prev = null;
+    const SECS = 120;
+    for (let i = 0; i < 60 * SECS; i++) {
+      integrate(m, POSES.rest, 1 / 60, o);
+      compose(buf, m, o);
+      // count zero crossings of the channel's deviation from its settled value
+      const v = buf[key] - (key === 'spineBend' ? -0 : 0);
+      if (prev !== null && Math.sign(v) !== Math.sign(prev) && Math.abs(v) > 1e-6) crossings++;
+      prev = v;
+    }
+    return crossings > 1 ? (2 * SECS) / crossings : Infinity;
+  };
+
+  const slowFidget = period(0.6, 'spineRoll');
+  const fastFidget = period(3.0, 'spineRoll');
+  assert.ok(fastFidget < slowFidget / 3,
+    `a volatile character must fidget far faster: got ${fastFidget.toFixed(1)}s against `
+    + `${slowFidget.toFixed(1)}s, which is not a difference anyone reads on screen`);
+  assert.ok(fastFidget < 2,
+    `the fastest fidget is ${fastFidget.toFixed(1)}s per cycle -- that is a drift, not a fidget`);
+
+  // ...and breathing must NOT race with it
+  const slowBreath = period(0.6, 'spineBend');
+  const fastBreath = period(3.0, 'spineBend');
+  assert.ok(fastBreath > slowBreath / 2.2,
+    `breathing sped up ${(slowBreath / fastBreath).toFixed(1)}x with the fidget rate -- that is `
+    + 'panting, which reads as distress rather than as nervous energy');
+}
+
 // --- walking style is universal: a species CANNOT tune it --------------------------------------
 //
 // The style dials are angles, and that is why they carry personality: a 40-degree arm swing is

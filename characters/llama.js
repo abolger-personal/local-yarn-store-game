@@ -297,7 +297,7 @@ export const LLAMA_GUI = Object.freeze({
 export const MOTION_RANGES = Object.freeze({
   ...BASE_MOTION_RANGES,
   stiff:    [55, 190],
-  idleRate: [0.60, 0.95],
+  idleRate: [0.60, 1.60],   // languid: a llama takes its time even when it is worked up
   idleAmp:  [0.50, 1.50],
   headArc:  [0.90, 1.80],
   bounce:   [0.02, 0.14],   // leggy, so the gait carries more vertical than a stumpy bird's

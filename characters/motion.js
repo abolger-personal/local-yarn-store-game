@@ -111,6 +111,7 @@ export const MOTION_DEFAULTS = Object.freeze({
   armGain:   0.55,
   sway:      0.075,  // lateral body lean per step. The side-to-side half of a walk.
   headCarry: 0,      // posture, not gait: applied standing AND walking
+  headCock:  0,      // sideways head tilt held while curious; sign is per-character
   armTuck:   0,
   lean:      0.06,   // forward lean at full speed
   gateSpeed: 0.35,   // ground speed at which the walk layer reaches full weight
@@ -135,7 +136,11 @@ export const BASE_MOTION_RANGES = Object.freeze({
   // wobbles visibly, an orderly one arrives dead clean.
   zeta:     [0.45, 1.00],
   idleAmp:  [0.40, 1.60],
-  idleRate: [0.75, 1.25],
+  // How fast they fidget, from Neuroticism. Wide on purpose: at the old [0.75, 1.25] the most
+  // volatile character in the game was 1.67x the calmest, which is not a difference anyone
+  // reads. Across this span a jittery character shifts about every 1.1s against 5.5s for a
+  // placid one, which is the difference between tapping along to a beat and standing still.
+  idleRate: [0.60, 3.00],
   stride:   [1.40, 2.24],
   bounce:   [0.00, 0.12],
   headArc:  [0.50, 1.50],
@@ -170,6 +175,15 @@ export const STYLE_RANGES = Object.freeze({
   sway:      [0.02, 0.17],   // how far the body rolls over the planted foot
   lean:      [0.00, 0.17],   // how far they lean into the walk
   headCarry: [-0.24, 0.22],  // negative = head up and open, positive = head down and closed
+  // The head COCK: a sideways tilt held while curious. Deliberately a different axis from
+  // headCarry, so confidence (pitch, up/down) and curiosity (roll, sideways) cannot be mistaken
+  // for one another -- which is exactly what happened when pitch was the only head posture
+  // there was and a confident character read as an interested one.
+  //
+  // Signed by the individual rather than always the same way: a whole cast cocking their heads
+  // to the left reads as a rigging error. The sign comes from the idle seed, so it is stable
+  // for a character -- a head that changed which way it cocked would read as a twitch.
+  headCock:  [0.00, 0.20],   // ~11 degrees at the top, which is a clear cock and not a lean
   // ponytail: armTuck is a CONSTANT elbow offset, so it also bends the arm of a character who
   // is reaching for a shelf -- capped low enough that this reads as "holds themselves in"
   // rather than as a broken reach. The real fix is posture that fades out while a pose needs a
@@ -206,7 +220,8 @@ export function motionOf(traits, ranges = BASE_MOTION_RANGES) {
     stiff: pick('stiff'), zeta: pick('zeta'), idleAmp: pick('idleAmp'),
     idleRate: pick('idleRate'), stride: pick('stride'), bounce: pick('bounce'),
     headArc: pick('headArc'), armGain: style('armGain'), sway: style('sway'),
-    lean: style('lean'), headCarry: style('headCarry'), armTuck: style('armTuck'),
+    lean: style('lean'), headCarry: style('headCarry'), headCock: style('headCock'),
+    armTuck: style('armTuck'),
   };
 }
 
@@ -263,6 +278,16 @@ export function factors(t) {
 const FACTOR_Q = Object.freeze([0, 0.0625, 0.1667, 0.3125, 0.5, 0.6875, 0.8333, 0.9375, 1]);
 const factorUnit = (a, b) => FACTOR_Q[a + b - 2];
 
+/** The four motion-driving factors as quantile positions, 0..1. Agreeableness drives none. */
+function factorUnits(t) {
+  return {
+    N: factorUnit(t.Volatility, t.Withdrawal),
+    E: factorUnit(t.Enthusiasm, t.Assertiveness),
+    C: factorUnit(t.Industriousness, t.Orderliness),
+    O: factorUnit(t.Openness, t.Intellect),
+  };
+}
+
 /**
  * Where this character sits, 0..1, on each coefficient's span.
  *
@@ -272,10 +297,7 @@ const factorUnit = (a, b) => FACTOR_Q[a + b - 2];
  * drive every system.
  */
 function traitPositions(t) {
-  const N = factorUnit(t.Volatility, t.Withdrawal);
-  const E = factorUnit(t.Enthusiasm, t.Assertiveness);
-  const C = factorUnit(t.Industriousness, t.Orderliness);
-  const O = factorUnit(t.Openness, t.Intellect);
+  const { N, E, C, O } = factorUnits(t);
   return {
     // Outgoing and settled moves like it meant it; anxious and withdrawn dawdles.
     stiff: pair(0.5 * (E - N)),
@@ -296,6 +318,9 @@ function traitPositions(t) {
     // The single most readable posture signal, and completely free of leg length: head up and
     // open, or down and closed.
     headCarry: pair(0.5 * (N - E)),
+    // Curiosity, and Openness alone: the same factor that decides how much they look around,
+    // so a curious character reads as curious standing still as well as while moving.
+    headCock: O,
     armTuck: N,
   };
 }
@@ -319,6 +344,20 @@ const MAX_H = 1 / 120;
 const FLICK_DUR = 0.34;   // an ear flick is quick; slower reads as a droop
 const BLINK_DUR = 0.12;
 const BREATH_W = TAU * 0.25;    // ~4s per breath at idleRate 1
+
+// THE FIDGET CLOCK, separate from the breath clock, and the reason is that they must not scale
+// together. A keyed-up character taps, shifts and jiggles several times faster than a placid
+// one -- but a character breathing three times faster is PANTING, which reads as distress or as
+// having just run somewhere, not as nervous energy.
+//
+// Measured before splitting: the weight shift ran at 0.17x the breath frequency, so one cycle
+// took 18.2s on a calm owl and 11.4s on the most volatile one. That is a slow drift, not a
+// fidget, and no widening of idleRate could have fixed it -- at the old 1.6x span the fastest
+// character in the game still took eleven seconds to shift their weight once.
+const FIDGET_W = TAU * 0.30;    // ~3.3s per shift at idleRate 1, ~1.1s at 3
+
+/** Breathing answers to idleRate, but only partly -- see FIDGET_W. */
+const breathRate = (r) => 0.65 + 0.35 * r;
 
 /** @typedef {ReturnType<typeof makeMotion>} Motion */
 /** @typedef {typeof MOTION_DEFAULTS & ReturnType<typeof motionOf>} MotionOpts */
@@ -349,12 +388,16 @@ export function makeMotion(pose, seed = Math.random()) {
     target: null,      // identity only, for interrupt detection. NEVER read for values.
     t: 1,
     seed: seed * TAU,
-    rateA: seed * 0.10,               // per-character sub-rhythm rates: see idleLayer
-    rateB: (1 - seed) * 0.07,
+    fidgetPhase: seed * TAU,          // its own clock: see FIDGET_W
+    rateA: 0.85 + seed * 0.30,        // per-character sub-rhythm rates: see idleLayer
+    rateB: 0.38 + (1 - seed) * 0.22,
     idlePhase: seed * TAU,
     blinkT: 1 + seed * 4,
     earT: 0.7 + seed * 5,             // offset from the blink so the two never sync up
     earWay: seed < 0.5 ? -1 : 1,      // which ear leads this flick
+    // Which way this character cocks their head. Fixed for life: a head that changed sides
+    // would read as a twitch rather than as a way of holding yourself.
+    cockWay: seed < 0.5 ? -1 : 1,
     walkGain: 0,
   };
   readInto(m.cur, pose);
@@ -421,8 +464,10 @@ export function integrate(m, target, dt, opts) {
  * one mechanism, and that is what makes an idle look like an animation instead of like life.
  */
 function advanceClocks(m, dt, opts) {
-  m.idlePhase += dt * BREATH_W * opts.idleRate;
+  m.idlePhase += dt * BREATH_W * breathRate(opts.idleRate);
   if (m.idlePhase > TAU * 1e6) m.idlePhase %= TAU;
+  m.fidgetPhase += dt * FIDGET_W * opts.idleRate;
+  if (m.fidgetPhase > TAU * 1e6) m.fidgetPhase %= TAU;
 
   m.blinkT -= dt;
   if (m.blinkT < -BLINK_DUR) m.blinkT = 2 + Math.random() * 5;
@@ -506,6 +551,9 @@ export function compose(out, m, opts) {
   // "idle amount 0" silently erased personality along with the movement. Pure angles, so it
   // reads the same on a stumpy owl and a stilt llama.
   out.headPitch += opts.headCarry ?? 0;
+  // The cock is POSTURE, not a fidget, so it sits up here with headCarry and survives the idle
+  // being turned down -- a curious character is curious whether or not they are moving.
+  out.headTilt += (opts.headCock ?? 0) * m.cockWay;
   out.elbowBend += opts.armTuck ?? 0;
 
   const a = opts.idleAmount * opts.idleAmp;
@@ -569,7 +617,8 @@ function idleLayer(out, m, opts, a) {
   // Each sub-rhythm gets a rate derived from the character's own seed (rateA/rateB, set in
   // makeMotion), so no two characters run the same loop at an offset -- incommensurate rates
   // never repeat, and a visible repeat is what makes an idle read as an animation, not as life.
-  const w = Math.sin(p * (0.17 + m.rateA) + m.seed);
+  const q = m.fidgetPhase;
+  const w = Math.sin(q * m.rateA + m.seed);
   out.spineRoll += g * 0.085 * w;
 
   // The hip part of the weight shift FADES OUT as the character folds up, and this is not a
@@ -582,12 +631,31 @@ function idleLayer(out, m, opts, a) {
   //
   // It is also just wrong: you do not shift your weight between your feet while sitting on them.
   const upright = clamp01(1 - Math.abs(out.hipFlex) / 0.9);
-  out.hipFlex += g * upright * 0.020 * Math.sin(p * (0.17 + m.rateA) * 2 + m.seed);
-  out.headTilt += g * 0.070 * opts.headArc * w;
-  out.headYaw += g * 0.180 * opts.headArc * Math.sin(p * (0.11 + m.rateB) + m.seed * 2);
-  out.headPitch += g * 0.055 * opts.headArc * Math.sin(p * (0.09 + m.rateB) + m.seed * 3);
-
+  out.hipFlex += g * upright * 0.020 * Math.sin(q * m.rateA * 2 + m.seed);
+  // LOOKING AROUND IS CURIOSITY, and it gets its own amount rather than riding the general
+  // fidget amplitude. These used to be multiplied -- `g` already carries idleAmp -- which let
+  // Extraversion drive head movement harder than Openness did: measured on the owl's own spans,
+  // idleAmp varies 3.67x across a cast while headArc varies only 1.83x, so two thirds of the
+  // "curious" cue was extraversion wearing Openness's name.
+  //
+  // idleAmount still gates it, because that is the master dial and the reduce-motion answer,
+  // and the duty cycle still applies, because a character who has gone still should not carry
+  // on scanning the room. idleAmp does not.
+  const look = (opts.idleAmount ?? 1) * opts.headArc * dutyGate(p, opts.idleDuty ?? 1, m.seed);
+  headLook(out, m, look, q, w);
   earFlick(out, m, a);
+}
+
+/**
+ * Glancing round the room: runs at a FRACTION of the fidget clock, because looking about is a
+ * slower beat than jiggling on the spot and a head whipping around at tapping speed reads as
+ * alarmed rather than interested. Still incommensurate with the body rhythm, so no visible
+ * repeat.
+ */
+function headLook(out, m, look, q, w) {
+  out.headTilt += look * 0.070 * w;
+  out.headYaw += look * 0.180 * Math.sin(q * m.rateB + m.seed * 2);
+  out.headPitch += look * 0.055 * Math.sin(q * m.rateB * 0.8 + m.seed * 3);
 }
 
 

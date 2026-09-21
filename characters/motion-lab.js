@@ -83,7 +83,10 @@ const S = {
   // identical numbers -- which reads as "the duration slider does nothing to smoothstep".
   interruptAt: 0.45,       // 0..1 through the move
   cutSlow: 0.2,            // time scale WHILE a scripted cut runs, so the eye can follow it
-  loopCut: true,           // repeat the cut until told to stop -- one press is never enough
+  // OFF by default. The button says "CUT OFF A MOVE", singular, so that is what one press has
+  // to do -- a control that quietly does something forever is a lying affordance, however
+  // convenient the loop is once you know it is there.
+  loopCut: false,
   chaos: false,
   // Off: spring is chosen, so these are comparison rows you switch on to check something, not
   // the normal view. Showing them by default triples the cast for no benefit while tuning.
@@ -847,8 +850,9 @@ knob(fBake, S, 'cutSlow', 'slow motion during the cut',
   + 'catch. This slows time only while a cut is running — walking speed is untouched the '
   + 'rest of the time. 0.1 is ten times slower than life.', 0.05, 1);
 knob(fBake, S, 'loopCut', 'keep repeating the cut',
-  'Runs the cut over and over, settling back to rest between each one, so you can watch the '
-  + 'same instant as many times as you need instead of pressing the button again.');
+  'Off: one press of Enter runs ONE cut and stops. On: it settles back to rest and runs the '
+  + 'same cut again, over and over, so you can watch a single instant as many times as you '
+  + 'need without reaching for the keyboard.');
 knob(fBake, S, 'interruptAt', 'cut it off how far in (fraction)',
   'Where the cut lands as a FRACTION of the move, not a time: 0.5 is halfway, 0.1 is almost '
   + 'immediately. A fraction rather than seconds, so changing the move duration below does not '
@@ -989,21 +993,43 @@ function exportRanges() {
 
 // ---------------------------------------------------------------- keys
 
+// Keyboard shortcuts, as a table rather than an if-chain so the handler can tell whether it
+// consumed the key -- which is what decides whether to preventDefault. See below.
+const SHORTCUTS = {
+  enter: () => fireInterrupt(),
+  p: () => cyclePose(),
+  r: () => buildCast(),
+  '.': () => { stepOnce = true; },
+  ' ': () => { paused = !paused; },
+  b: () => renderer.domElement.classList.toggle('squint'),
+  d: () => camera.position.copy(HOME).multiplyScalar(2.1),   // ~150px tall
+  f: () => camera.position.copy(HOME),
+  1: () => setViewMode(group, 'felted'),
+  2: () => setViewMode(group, 'grey'),
+  3: () => setViewMode(group, 'silhouette'),
+};
+
 addEventListener('keydown', (e) => {
   if (/input|textarea/i.test(/** @type {HTMLElement} */ (e.target)?.tagName ?? '')) return;
   const k = e.key.toLowerCase();
   // (named `k`, not `key`: `key` is the scene's directional light)
-  if (k === 'enter') fireInterrupt();
-  else if (k === 'p') cyclePose();
-  else if (k === 'r') buildCast();
-  else if (k === '.') stepOnce = true;
-  else if (k === ' ') { paused = !paused; e.preventDefault(); }
-  else if (k === 'b') renderer.domElement.classList.toggle('squint');
-  else if (k === 'd') camera.position.copy(HOME).multiplyScalar(2.1);   // ~150px tall
-  else if (k === 'f') camera.position.copy(HOME);
-  else if (k === '1') setViewMode(group, 'felted');
-  else if (k === '2') setViewMode(group, 'grey');
-  else if (k === '3') setViewMode(group, 'silhouette');
+
+  const act = SHORTCUTS[k];
+  if (!act) return;
+  act();
+
+  // A lil-gui row is a real <button>, and a focused button activates on Enter and Space. After
+  // clicking ANY button with the mouse it keeps focus, so every later Enter ran the shortcut
+  // AND re-clicked that button -- click "next pose" once and Enter stepped the pose from then
+  // on, which is exactly what "Enter turns on a pose loop" looked like from the outside.
+  //
+  // preventDefault is what actually stops it. Blurring first was tried and measured: the button
+  // still received its click, because the activation is the keydown's DEFAULT ACTION and is
+  // aimed at whatever had focus when the key went down. The blur stays anyway, so the next key
+  // is clean too.
+  e.preventDefault();
+  const focused = /** @type {HTMLElement} */ (document.activeElement);
+  if (focused && focused !== document.body && focused.closest?.('.lil-gui')) focused.blur();
 });
 
 setGeometryDetail('high');

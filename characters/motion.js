@@ -110,6 +110,7 @@ export const MOTION_DEFAULTS = Object.freeze({
   kneeLift:  0.55,   // swing-leg knee flexion. Without it the legs are sticks and both feet stomp.
   armGain:   0.55,
   sway:      0.075,  // lateral body lean per step. The side-to-side half of a walk.
+  attend:    0,      // lean in, paying attention; crossfades with `lean` once walking
   headCarry: 0,      // posture, not gait: applied standing AND walking
   headCock:  0,      // sideways head tilt held while curious; sign is per-character
   armTuck:   0,
@@ -184,6 +185,16 @@ export const STYLE_RANGES = Object.freeze({
   // to the left reads as a rigging error. The sign comes from the idle seed, so it is stable
   // for a character -- a head that changed which way it cocked would read as a twitch.
   headCock:  [0.00, 0.20],   // ~11 degrees at the top, which is a clear cock and not a lean
+  // LEANING IN. Conscientiousness reached nothing at all while a character stood still -- it
+  // moved zeta, stride, sway and lean, every one of which is walk-or-arrival -- so a diligent
+  // character and a careless one were identical until they set off. This is the standing tell:
+  // torso forward, paying attention. Negative at the bottom, which is a slight lean back and
+  // reads as not especially bothered.
+  //
+  // It CROSSFADES with the walking lean rather than adding to it -- see walkLayer. Both are the
+  // torso going forward, and two of them stacking would put a purposeful, focused character at
+  // 20 degrees off vertical, which reads as falling rather than as intent.
+  attend:    [-0.05, 0.18],  // ~10 degrees forward at the top; POSES.browse leans 0.14 to look
   // ponytail: armTuck is a CONSTANT elbow offset, so it also bends the arm of a character who
   // is reaching for a shelf -- capped low enough that this reads as "holds themselves in"
   // rather than as a broken reach. The real fix is posture that fades out while a pose needs a
@@ -221,7 +232,7 @@ export function motionOf(traits, ranges = BASE_MOTION_RANGES) {
     idleRate: pick('idleRate'), stride: pick('stride'), bounce: pick('bounce'),
     headArc: pick('headArc'), armGain: style('armGain'), sway: style('sway'),
     lean: style('lean'), headCarry: style('headCarry'), headCock: style('headCock'),
-    armTuck: style('armTuck'),
+    attend: style('attend'), armTuck: style('armTuck'),
   };
 }
 
@@ -321,6 +332,8 @@ function traitPositions(t) {
     // Curiosity, and Openness alone: the same factor that decides how much they look around,
     // so a curious character reads as curious standing still as well as while moving.
     headCock: O,
+    // Focus, and Conscientiousness alone. The one thing C does that is visible standing still.
+    attend: C,
     armTuck: N,
   };
 }
@@ -380,6 +393,30 @@ function readInto(arr, pose) {
  *   velocity by construction and there is nothing to lurch from
  * @param {number} [seed] 0..1, so a crowd does not breathe in unison
  */
+/**
+ * Everything about a character's idle that is decided once and never changes: the clocks, their
+ * per-character rates, and the two fixed handednesses.
+ *
+ * The rates are deliberately incommensurate -- no two are multiples of each other -- because
+ * rhythms that share a period read as one mechanism, and a visible repeat is what makes an idle
+ * look like an animation rather than like life.
+ */
+function rhythms(seed) {
+  return {
+    seed: seed * TAU,
+    idlePhase: seed * TAU,            // breathing
+    fidgetPhase: seed * TAU,          // its own clock, and a faster one: see FIDGET_W
+    rateA: 0.85 + seed * 0.30,        // per-character sub-rhythm rates: see idleLayer
+    rateB: 0.38 + (1 - seed) * 0.22,
+    blinkT: 1 + seed * 4,
+    earT: 0.7 + seed * 5,             // offset from the blink so the two never sync up
+    earWay: seed < 0.5 ? -1 : 1,      // which ear leads a flick
+    // Which way this character cocks their head. Fixed for life: a head that changed sides
+    // would read as a twitch rather than as a way of holding yourself.
+    cockWay: seed < 0.5 ? -1 : 1,
+  };
+}
+
 export function makeMotion(pose, seed = Math.random()) {
   const n = MOTION_KEYS.length;
   const m = {
@@ -387,18 +424,8 @@ export function makeMotion(pose, seed = Math.random()) {
     from: new Float64Array(n), fromVel: new Float64Array(n), to: new Float64Array(n),
     target: null,      // identity only, for interrupt detection. NEVER read for values.
     t: 1,
-    seed: seed * TAU,
-    fidgetPhase: seed * TAU,          // its own clock: see FIDGET_W
-    rateA: 0.85 + seed * 0.30,        // per-character sub-rhythm rates: see idleLayer
-    rateB: 0.38 + (1 - seed) * 0.22,
-    idlePhase: seed * TAU,
-    blinkT: 1 + seed * 4,
-    earT: 0.7 + seed * 5,             // offset from the blink so the two never sync up
-    earWay: seed < 0.5 ? -1 : 1,      // which ear leads this flick
-    // Which way this character cocks their head. Fixed for life: a head that changed sides
-    // would read as a twitch rather than as a way of holding yourself.
-    cockWay: seed < 0.5 ? -1 : 1,
     walkGain: 0,
+    ...rhythms(seed),
   };
   readInto(m.cur, pose);
   m.to.set(m.cur);
@@ -544,6 +571,7 @@ export function compose(out, m, opts) {
   out.holdItem = m.cur[HOLD] > 0.5;
   out.blink = 0;
   out.kneeSwing = 0;
+  out.neckCurve = 0;
 
   // POSTURE: how this character carries itself, standing or walking. It sits ABOVE the idle
   // early-out on purpose -- posture is carriage, not fidgeting, so a character with the idle
@@ -554,6 +582,7 @@ export function compose(out, m, opts) {
   // The cock is POSTURE, not a fidget, so it sits up here with headCarry and survives the idle
   // being turned down -- a curious character is curious whether or not they are moving.
   out.headTilt += (opts.headCock ?? 0) * m.cockWay;
+  out.spineBend += opts.attend ?? 0;
   out.elbowBend += opts.armTuck ?? 0;
 
   const a = opts.idleAmount * opts.idleAmp;
@@ -642,6 +671,14 @@ function idleLayer(out, m, opts, a) {
   // and the duty cycle still applies, because a character who has gone still should not carry
   // on scanning the room. idleAmp does not.
   const look = (opts.idleAmount ?? 1) * opts.headArc * dutyGate(p, opts.idleDuty ?? 1, m.seed);
+  // THE NECK'S OWN RHYTHM. Long-necked animals never hold the neck rigid -- it settles and
+  // rises continuously, on a slower beat than the head's glancing. Its own rate again, so it
+  // does not lock to the breath or the fidget and turn the whole idle into one mechanism.
+  //
+  // Free in the terms that matter: no new node, no new material, no new draw call. The neck
+  // joint already exists and applyPose already writes it every frame.
+  out.neckCurve = look * 0.075 * Math.sin(q * m.rateB * 0.62 + m.seed * 5);
+
   headLook(out, m, look, q, w);
   earFlick(out, m, a);
 }
@@ -803,7 +840,11 @@ export function walkLayer(out, w, gain, opts) {
   // ponytail: hipFlex also rotates both thighs forward, so past ~0.12 the character walks in a
   // crouch. If a deeper bob is ever wanted, it needs a real pelvis height channel, not more of this.
   out.hipFlex += gain * opts.bounce * (0.5 - 0.5 * Math.cos(2 * TAU * w.phase));
-  out.spineBend += gain * opts.lean;
+  // CROSSFADE, not a sum. `attend` is already in `out` from compose, and both it and `lean`
+  // are the torso going forward: a focused, purposeful character would otherwise reach 20
+  // degrees off vertical, which reads as falling. So walking trades one for the other -- at
+  // rest the lean is attention, at full stride it is gait, and in between it is a blend.
+  out.spineBend += gain * (opts.lean - (opts.attend ?? 0));
   // Sway: the mass leans OVER the planted foot, once per cycle. Side +1 is planted around phase
   // 0 and sits at +X, and applyPose negates spineRoll into rotation.z so that positive tips the
   // head toward +X -- so +cos is right, and in phase with the knee lift's stance half.

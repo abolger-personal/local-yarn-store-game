@@ -101,7 +101,8 @@ const S = {
   // returns silently overwrote the slider and five knobs did nothing at all. Scaling after the
   // merge keeps BOTH -- personality still spreads the cast, these shift the whole cast at once.
   scale: { stiff: 1, zeta: 1, stride: 1, bounce: 1, idleRate: 1,
-           armGain: 1, sway: 1, lean: 1, headCarry: 1, headCock: 1, armTuck: 1 },
+           armGain: 1, sway: 1, lean: 1, headCarry: 1, headCock: 1, attend: 1,
+           armTuck: 1 },
   ranges: structuredClone(BASE_MOTION_RANGES),
 };
 
@@ -337,7 +338,8 @@ function retune() {
 }
 
 const scratch = Object.fromEntries(
-  [...POSE_KEYS.map((k) => [k, 0]), ['holdItem', false], ['blink', 0], ['kneeSwing', 0]],
+  [...POSE_KEYS.map((k) => [k, 0]), ['holdItem', false], ['blink', 0], ['kneeSwing', 0],
+    ['neckCurve', 0]],
 );
 
 // ---------------------------------------------------------------- the pose event stream
@@ -926,6 +928,11 @@ knob(fWalk, S.scale, 'headCarry', 'head carriage',
   'How high or low they hold their head. Open and confident, or down and closed — the single '
   + 'most readable posture signal there is, and completely free of leg length. Scales the whole '
   + 'cast; personality still spreads them.', 0, 2.5).onChange(retune);
+knob(fWalk, S.scale, 'attend', 'leans in, paying attention',
+  'Torso forward while STANDING — the focused, intent posture. Conscientiousness drives it, and '
+  + 'it is the only thing C does that you can see before a character sets off walking. It '
+  + 'crossfades with forward lean rather than adding to it: at rest the lean is attention, at '
+  + 'full stride it is gait.', 0, 2.5).onChange(retune);
 knob(fWalk, S.scale, 'headCock', 'head cocked to one side',
   'A sideways head tilt held while curious — the head-cock a bird or a dog does at something '
   + 'interesting. Openness drives it, and which SIDE each character cocks to is fixed for life, '

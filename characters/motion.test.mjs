@@ -535,6 +535,90 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     + 'rig authors for an ear');
 }
 
+// --- a long neck is not a broom handle --------------------------------------------------------
+//
+// The neck joint has always existed and has always been written; what it lacked was any motion
+// of its OWN. It only ever took a fixed 0.35 share of wherever the head was looking, so it moved
+// as a rigid extension of the head and a llama read as having a pole for a neck.
+//
+// npc.js owns the share (it needs the species' neckLength), so what is pinned here is the part
+// motion.js is responsible for: the neck's independent rhythm.
+{
+  const o = opts();
+  const m = makeMotion(POSES.rest, 0.42);
+  resetMotion(m, POSES.rest);
+  const buf = {};
+  let peak = 0, crossings = 0, prev = null;
+  const SECS = 180;
+  for (let i = 0; i < 60 * SECS; i++) {
+    integrate(m, POSES.rest, 1 / 60, o);
+    compose(buf, m, o);
+    peak = Math.max(peak, Math.abs(buf.neckCurve));
+    if (prev !== null && Math.sign(buf.neckCurve) !== Math.sign(prev)) crossings++;
+    prev = buf.neckCurve;
+  }
+  assert.ok(peak > 0.01, 'the neck must move on its own, not only as a share of the head');
+  // slower than the head's glancing, or a long neck whipping about reads as alarm
+  const neckPeriod = (2 * SECS) / Math.max(1, crossings);
+  assert.ok(neckPeriod > 3,
+    `the neck settles every ${neckPeriod.toFixed(1)}s -- that is a whip, not a long neck easing`);
+
+  // and it must stop when the character is told to stop, like every other idle
+  const off = { ...o, idleAmount: 0 };
+  const still = makeMotion(POSES.rest, 0.42);
+  resetMotion(still, POSES.rest);
+  integrate(still, POSES.rest, 1 / 60, off);
+  compose(buf, still, off);
+  assert.equal(buf.neckCurve, 0, 'neck motion must answer the master idle dial');
+}
+
+// --- Conscientiousness reaches a standing character -------------------------------------------
+//
+// It used to move zeta, stride, sway and lean, and every one of those is walk-or-arrival: a
+// diligent character and a careless one were identical until they set off. `attend` is the
+// standing tell.
+{
+  const o = opts();
+  const still = (C) => {
+    const t = { Volatility: 3, Withdrawal: 3, Enthusiasm: 3, Assertiveness: 3, Openness: 3,
+      Intellect: 3, Compassion: 3, Politeness: 3, Industriousness: C, Orderliness: C };
+    const co = { ...o, ...motionOf(t) };
+    const m = makeMotion(POSES.rest, 0.42);
+    resetMotion(m, POSES.rest);
+    const buf = {};
+    integrate(m, POSES.rest, 1 / 60, co);
+    compose(buf, m, co);
+    return { spineBend: buf.spineBend, co };
+  };
+  assert.ok(still(5).spineBend - still(1).spineBend > 0.1,
+    'a conscientious character must lean in while STANDING, or C is invisible until they walk');
+
+  // THE CROSSFADE. `attend` and `lean` are both the torso going forward. Summed, a focused and
+  // purposeful character reaches about 20 degrees off vertical, which reads as falling rather
+  // than as intent -- so walking must trade one for the other, not add them.
+  let worst = 0;
+  for (const C of [1, 3, 5]) {
+    for (const E of [1, 3, 5]) {
+      const t = { Volatility: 3, Withdrawal: 3, Enthusiasm: E, Assertiveness: E, Openness: 3,
+        Intellect: 3, Compassion: 3, Politeness: 3, Industriousness: C, Orderliness: C };
+      const co = { ...o, ...motionOf(t), idleAmount: 0 };
+      for (const gain of [0, 0.25, 0.5, 0.75, 1]) {
+        const m = makeMotion(POSES.rest, 0.42);
+        resetMotion(m, POSES.rest);
+        const buf = {};
+        integrate(m, POSES.rest, 1 / 60, co);
+        compose(buf, m, co);
+        walkLayer(buf, walkPhase(0, 0.5, 0.238, co), gain, co);
+        worst = Math.max(worst, Math.abs(buf.spineBend));
+      }
+    }
+  }
+  // POSES.browse leans 0.14 as a deliberate look-at-the-goods; twice that is falling over
+  assert.ok(worst < 0.28,
+    `forward lean reaches ${worst.toFixed(3)} rad (${(worst * 180 / Math.PI).toFixed(0)} deg) `
+    + 'across personality and walk gain -- attention lean and gait lean must crossfade, not sum');
+}
+
 // --- fidgeting and breathing are separate tempos ----------------------------------------------
 //
 // A keyed-up character taps and jiggles several times faster than a placid one, but one

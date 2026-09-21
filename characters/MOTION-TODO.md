@@ -330,6 +330,37 @@ What the corners produce, on the shared spans:
 Every dial reaches both ends of its span across the eight, which is the check that the trait
 mapping is actually wired.
 
+## What each factor is worth, and where
+
+| factor | standing | walking |
+| --- | --- | --- |
+| **E** Extraversion | fidget amount, head carried up | bounce, arm swing, sway, lean |
+| **N** Neuroticism | fidget RATE, head carried down, arms tucked in | (via the above) |
+| **C** Conscientiousness | **leans in, attending** | stride length, tidy line, lean |
+| **O** Openness/Intellect | **head cocked**, looks around | — |
+| **A** Agreeableness | nothing, on purpose — it is about how you treat people, and `visit.js` spends it |
+
+Conscientiousness used to be **invisible standing still**: it moved `zeta`, `stride`, `sway` and
+`lean`, and every one of those is walk-or-arrival. `attend` is its standing tell, and it
+**crossfades** with the walking `lean` rather than adding — both are the torso going forward, and
+summed they put a focused, purposeful character 20 degrees off vertical, which reads as falling.
+
+## The neck
+
+`neckShare` is DERIVED from `neckLength` rather than being a flat 0.35. Measured over four
+simulated minutes of idling, the flat share had it backwards: the owl's 0.10 stub rotated 7.9
+degrees in yaw while the llama's 0.38 neck rotated 6.5 — the long, obviously flexible neck was
+the stiffer of the two. Now 12.9 against 7.5, and the head travels twice as far on the llama.
+
+`neckCurve` gives the neck a rhythm of its own on top of its share of the look, because a neck
+that only ever moves as a rigid extension of the head reads as a broom handle. The head
+counter-rotates by the same amount, so a character glancing at a shelf still ends up looking at
+the shelf.
+
+**Both are free in the terms that matter.** Measured before and after: 44 nodes, 18 meshes, 5
+materials, 18 geometries, unchanged for both species. The neck joint already existed and was
+already written every frame — what it lacked was anything interesting to be told.
+
 ## Bugs this work found and fixed, worth not reintroducing
 
 1. **Foot skate, twice — and the second time was my own "fix".** A phase is one CYCLE, which is

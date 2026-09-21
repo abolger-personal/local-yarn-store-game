@@ -980,12 +980,25 @@ export function groundCharacter(built, pose = built.params) {
   if (Number.isFinite(y)) built.root.position.y = y;
 }
 
-// A look starts in the neck and finishes in the head. ONE ratio for every species, because
-// "kits may ADD or SCALE, never REPLACE" means a channel has to work without the kit knowing
-// about it -- and a longer neck then gets a wider arc for free, since the same fraction of
-// rotation on a longer lever carries the head further. Which is also what is physically true.
-const NECK_SHARE = 0.35;
-const HEAD_SHARE = 1 - NECK_SHARE;
+/**
+ * A look starts in the neck and finishes in the head. How much starts there is DERIVED from the
+ * neck's own length, not a constant -- still no kit knowledge, so "kits may ADD or SCALE, never
+ * REPLACE" holds, and a new species gets the right answer by setting `neckLength` alone.
+ *
+ * It was a flat 0.35, and the result was backwards. Measured over four simulated minutes of
+ * idling: the owl's 0.10 stub rotated 7.9 degrees in yaw and the llama's 0.38 neck rotated 6.5.
+ * The long, obviously flexible neck was the STIFFER of the two, because both took the same
+ * fraction of an arc the owl happens to author wider. A long neck should do most of the turning
+ * -- that is what it is for, and it is what a llama or a goose actually does.
+ *
+ * Total is always 1, so the head still ends up pointing where it was asked to look; only the
+ * split between the two joints changes. Zero new nodes: both joints already exist and are
+ * already written every frame.
+ */
+function neckShare(P) {
+  const len = P.neckLength ?? 0.1;
+  return Math.max(0.20, Math.min(0.72, 0.20 + 1.3 * len));
+}
 
 /**
  * Arms and legs.
@@ -1015,11 +1028,18 @@ function applyHead(joints, pose, P) {
   const lim = P.headYawMax ?? 1.40;
   const yaw = Math.max(-lim, Math.min(lim, pose.headYaw ?? 0));
   const pitch = pose.headPitch ?? 0, tilt = pose.headTilt ?? 0;
+  const neck = neckShare(P);
+  const head = 1 - neck;
+  // The neck's own motion, on top of its share of the look. A long neck that only ever moves as
+  // a rigid extension of the head reads as a broom handle; this is the soft S-curve at the
+  // base. It is a NECK-only channel -- the head counter-rotates by the same amount, so a
+  // character glancing at a shelf still ends up looking at the shelf.
+  const curve = pose.neckCurve ?? 0;
   if (joints.neck) {
-    joints.neck.rotation.set(pitch * NECK_SHARE, yaw * NECK_SHARE, -tilt * NECK_SHARE);
+    joints.neck.rotation.set(pitch * neck + curve, yaw * neck, -tilt * neck);
   }
   if (joints.head) {
-    joints.head.rotation.set(pitch * HEAD_SHARE, yaw * HEAD_SHARE, -tilt * HEAD_SHARE);
+    joints.head.rotation.set(pitch * head - curve, yaw * head, -tilt * head);
   }
   // ponytail: a blink is a y-squash of the whole eye about its centre, so it reads as a squint
   // rather than a lid coming down. Upgrade path is a lid disc under the eye joint, if it ever

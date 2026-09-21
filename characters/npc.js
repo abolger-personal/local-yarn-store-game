@@ -144,6 +144,7 @@ export const BASE_PARAMS = Object.freeze({
 // upper arm stays near vertical and the elbow does the work.
 export { POSES, MOTION_KEYS, REST_POSE, MOTION_DEFAULTS, BASE_MOTION_RANGES,
          motionOf, factors, walkPhase, walkLayer, walkGain, topSpeed, valueOf, velocityOf,
+         spanBounds,
          resetMotion } from './motion.js';
 export { makeMotion, integrate, compose, POSE_KEYS };
 

@@ -23,7 +23,7 @@ import {
   BASE_PARAMS, BASE_MOTION_RANGES, MOTION_DEFAULTS, POSES, POSE_KEYS, BUILD, TONE_MAPPING,
   createCharacter, disposeCharacter, setViewMode, setGeometryDetail,
   getSpecies, speciesIds, makeMotion, resetMotion, integrate, compose, applyPose,
-  motionOf, factors, walkPhase, walkLayer, walkGain, topSpeed, valueOf, velocityOf,
+  motionOf, factors, walkPhase, walkLayer, walkGain, topSpeed, valueOf, velocityOf, spanBounds,
 } from './npc.js';
 import { randomTraits } from './visit.js';
 import './owl.js';
@@ -822,14 +822,17 @@ fRanges.domElement.querySelector('.children')?.insertAdjacentHTML('afterbegin',
 // authors a knee lift of 1.00 where the base tops out at 0.78, so bounds derived from the base
 // alone would have made the kit's own value undialable. Widened from the union across all
 // registered kits, so a new species with a bolder span widens the sliders by existing.
-function spanBounds(k) {
+//
+// The union is all this does; the PADDING rule lives in motion.js next to the table it pads,
+// because which channels are allowed below zero is a fact about the channels and not about
+// this panel -- and because it is then reachable from the self-check.
+function sliderBounds(k) {
   let lo = BASE_MOTION_RANGES[k][0], hi = BASE_MOTION_RANGES[k][1];
   for (const id of speciesIds()) {
     const r = getSpecies(id)?.motionRanges?.[k];
     if (r) { lo = Math.min(lo, r[0]); hi = Math.max(hi, r[1]); }
   }
-  const pad = (hi - lo) * 1.5;
-  return [lo - pad, hi + pad];
+  return spanBounds(k, lo, hi);
 }
 
 /** The two controllers per span, so switching species can push the new numbers into them. */
@@ -845,7 +848,7 @@ function refreshSpans() {
 }
 
 for (const k of Object.keys(BASE_MOTION_RANGES)) {
-  const [lo, hi] = spanBounds(k);
+  const [lo, hi] = sliderBounds(k);
   const row = { min: S.ranges[k][0], max: S.ranges[k][1] };
   const help = `${SPAN_HELP[k]}. Narrow the gap and every member of the species moves alike; `
     + 'widen it and they vary. Where one character sits inside it is set by their personality.';

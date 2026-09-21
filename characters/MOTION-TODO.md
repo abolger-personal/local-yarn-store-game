@@ -433,6 +433,28 @@ the clipboard is what the kit actually ships. The slider BOUNDS come from the un
 registered kits rather than from the base alone, or a kit authoring a bolder span than the
 default would have its own value undialable — which is exactly what had happened to `kneeLift`.
 
+**And then the padding that fixed that created its own bug.** Padding 1.5× either side put the
+floor of **all eight** span sliders below zero, on channels that are amounts. Reported as *"why
+can I drop how much they fidget to negative? Isn't that an amplitude?"* — and it is worse than a
+confusing label:
+
+| below zero | what happens |
+| --- | --- |
+| `stiff` | `spring()` takes `sqrt(stiff)` → damping is **NaN** → NaN reaches the bounding sphere → the renderer culls the character. The "popping in and out" failure, reachable by dragging a slider. |
+| `zeta` | negative damping **injects** energy. Measured at −0.5: 3× past the target after one second, still climbing. |
+| the amounts | a negative amplitude is the same wobble phase-flipped; a negative rate is the same clock backwards. Indistinguishable on screen from the positive twin, so half the slider travel is a decoy. |
+
+`bounce` is the **one real exception** — negative cancels the free bob that comes from the legs
+scissoring, which is documented in `walkLayer` and is a genuine setting. That is why this is a
+`SIGNED_SPANS` list rather than a blanket clamp.
+
+The padding rule now lives in `motion.js` as `spanBounds(k, lo, hi)`, next to the table it pads,
+because *which channels may go negative* is a fact about the channels rather than about the
+panel — and because the self-check can then reach it. The lab's `sliderBounds` does only the
+union across kits. Zero stays reachable on every channel: no wobble, no bounce, no knee lift are
+all legitimate settings, and a span whose pad crosses zero stops **at** zero rather than at its
+own low end.
+
 ## The idle fades where the walk already does the job
 
 Standing fidget and walking gait were running at once on the same joints, at incommensurate

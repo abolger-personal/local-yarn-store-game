@@ -177,6 +177,39 @@ export const BASE_MOTION_RANGES = Object.freeze({
 });
 
 /**
+ * How far past a shipped span the lab lets you drag, and where it refuses to go.
+ *
+ * The padding is the point of the control: a span you can only narrow is not a tuning tool, and
+ * a kit authoring a bolder value than the base (the llama's knee lift is 1.70 against a base
+ * 0.78) has to stay dialable. But padding blindly put the floor of EVERY one of these eight
+ * sliders below zero, and almost none of them mean anything down there:
+ *
+ *   stiff  < 0   spring() takes sqrt(stiff), so the damping goes NaN, and NaN on a joint
+ *                reaches the bounding sphere and culls the whole character -- the
+ *                "characters popping in and out" failure npc.js warns about, from a slider.
+ *   zeta   < 0   negative damping is energy INJECTION. Measured at zeta -0.5: 3x past the
+ *                target after one second and still growing. It diverges.
+ *   the rest     amounts. A negative amplitude is the same wobble phase-flipped, a negative
+ *                rate is the same clock running backwards, and neither is distinguishable on
+ *                screen from its positive twin -- so half the slider is a decoy.
+ *
+ * `bounce` is the exception and the reason this is a list rather than a blanket clamp: the free
+ * bob comes from the legs scissoring, so a NEGATIVE bounce cancels it. That is documented in
+ * walkLayer and it is a real setting.
+ *
+ * Zero itself is allowed and is the honest bottom of each: no wobble, no bounce, no knee lift.
+ * `stiff: 0` freezes the commanded pose (the idle and walk layers keep running, since they are
+ * downstream), which reads as a character who has stopped taking direction -- useless, but
+ * legible, and finite.
+ */
+const SIGNED_SPANS = new Set(['bounce']);
+
+export function spanBounds(k, lo, hi) {
+  const pad = (hi - lo) * 1.5;
+  return [SIGNED_SPANS.has(k) ? lo - pad : Math.max(0, lo - pad), hi + pad];
+}
+
+/**
  * WALKING STYLE: personality only, identical for every species, NOT tunable per kit.
  *
  * All of these are ANGLES, and that is the whole reason they live apart from the table above.

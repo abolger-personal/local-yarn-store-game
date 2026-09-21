@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import {
   POSES, POSE_KEYS, MOTION_KEYS, MOTION_DEFAULTS, BASE_MOTION_RANGES, STYLE_RANGES,
   makeMotion, resetMotion, integrate, compose, valueOf, velocityOf,
-  motionOf, walkPhase, walkLayer, walkGain,
+  motionOf, walkPhase, walkLayer, walkGain, spanBounds,
 } from './motion.js';
 
 const opts = (over = {}) => ({ ...MOTION_DEFAULTS, ...over });
@@ -910,6 +910,52 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
       assert.ok(false, `motion-lab.js has a knob for '${k}', which is not a motion key any more`);
     }
   }
+}
+
+// --- no span slider may reach a value that is not a setting -----------------------------------
+//
+// The span sliders are padded 1.5x either side, which is the point of them: a span you can only
+// narrow is not a tuning tool, and a kit authoring a bolder value than the base has to stay
+// dialable. But padding blindly put the floor of ALL EIGHT of these sliders below zero, and
+// almost none of them mean anything down there. Reported as "why can I drag how much they
+// fidget negative -- isn't that an amplitude?", and it is worse than a confusing label:
+//
+//   stiff < 0   spring() takes sqrt(stiff), so damping is NaN, NaN reaches the bounding sphere
+//               and the renderer culls the character. The "popping in and out" failure, from a
+//               slider drag.
+//   zeta  < 0   negative damping INJECTS energy. Measured at -0.5: 3x past target after 1s and
+//               still climbing.
+//   amounts     a negative amplitude is the same motion phase-flipped and a negative rate is
+//               the same clock backwards -- indistinguishable on screen from the positive twin,
+//               so half the slider travel is a decoy.
+//
+// bounce is the one real exception (negative cancels the free bob from the legs scissoring),
+// which is why this is a list and not a blanket clamp.
+{
+  for (const k of Object.keys(BASE_MOTION_RANGES)) {
+    const [lo, hi] = BASE_MOTION_RANGES[k];
+    const [floor, ceil] = spanBounds(k, lo, hi);
+    assert.ok(ceil > hi, `${k}'s slider must reach ABOVE the shipped span, or a kit that authors `
+      + 'a bolder value than the base cannot be dialled to it');
+    if (k === 'bounce') {
+      assert.ok(floor < 0, 'bounce must still go negative -- that is how the free bob from the '
+        + 'legs scissoring gets cancelled, and it is a documented setting');
+      continue;
+    }
+    assert.ok(floor >= 0,
+      `${k}'s span slider floor is ${floor.toFixed(2)}: it is an amount, and below zero it is `
+      + 'either meaningless (a flipped phase, a backwards clock) or unstable (NaN damping, '
+      + 'injected energy). Add it to SIGNED_SPANS only if negative is a real setting');
+  }
+
+  // And the padding must not have been thrown away to achieve that: zero is a legitimate floor,
+  // but a slider clamped to the shipped span itself would be a span you can only narrow.
+  const [floor] = spanBounds('kneeLift', 0.35, 1.70);
+  assert.ok(floor === 0, `a span whose pad crosses zero must stop AT zero, not at its own low `
+    + `end (got ${floor}) -- no knee lift at all is a real setting`);
+  const [stiffFloor] = spanBounds('stiff', 100, 120);
+  assert.ok(stiffFloor > 0 && stiffFloor < 100,
+    `a span whose pad does NOT cross zero must keep its padding (got ${stiffFloor})`);
 }
 
 // --- head yaw is anatomy, and species differ in it enormously ---------------------------------

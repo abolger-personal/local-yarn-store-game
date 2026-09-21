@@ -17,6 +17,8 @@ import {
   pick,
   setViewMode,
   speciesIds,
+  MOTION_DEFAULTS,
+  motionOf,
 } from '../../npc.js';
 import { STATE, advanceRound, makeNpc, makeWorld, rejoin } from '../../visit.js';
 import { satisfies, wantsOf } from '../../wip.js';
@@ -29,7 +31,7 @@ import { buildDisplays } from '../scene/displays.js';
 import { boxes, edgeTop, fieldTop, shadows, sideEdge, sideField, sizeSide, sizeTop } from '../goods/items.js';
 import { refreshAll } from '../goods/paint.js';
 import { addItem } from '../goods/stock.js';
-import { buildBlobs, routeLength } from './cast.js';
+import { buildBlobs, liftNow, routeLength } from './cast.js';
 
 // Ids have to be unique across days too — a regular is matched to the roster by id, so a new
 // customer reusing "npc0" would be mistaken for one.
@@ -278,11 +280,28 @@ function queueOutside(npc, i) {
 /** The render-side record: everything tickCast needs that the sim does not know about. */
 const castRecord = (npc, built, color) => ({
   npc, built, color,
-  poseFrom: { ...POSES.rest }, poseTo: POSES.rest, pt: 1,
+  // poseFrom/poseTo/pt are gone: the interpolator carries its own position AND velocity in
+  // built.motion, which is what makes an interrupted move continue smoothly instead of
+  // relaunching from a standstill. The pose target is held inside it, by identity.
   moveT: 1, travelled: 0, fromX: npc.x, fromY: 0, fromZ: npc.z, toY: 0,
   wait: 0, dur: S.travel,
   carriedName: null, carriedMesh: null,
   celebrate: 0, hop: 0, route: [{ x: npc.x, z: npc.z }, { x: npc.x, z: npc.z }],
+
+  // How this character moves, from who they are. Computed once: traits survive rejoin(), so a
+  // regular walks like themselves tomorrow with nothing persisted. The species owns how WIDE
+  // each span is, the traits pick where in it this individual lands.
+  opts: { ...MOTION_DEFAULTS, ...motionOf(npc.traits, built.species?.motionRanges) },
+
+  // Distance walked, ever, in world units. Drives the stride phase, which is why it is distance
+  // and not time: the feet then stay planted at any speed and any leg length.
+  //
+  // SEEDED RANDOM, and that one word is the difference between a cast and a chorus line. Every
+  // NPC starting at zero means every NPC plants the same foot on the same frame — the queue
+  // walks in in lockstep, which is exactly the tell crowd.html records about pose cycling. A
+  // random start is a random point in the gait, and it costs nothing.
+  walkDist: Math.random() * 2,
+  speed: 0,
 });
 
 /**
@@ -379,7 +398,9 @@ function retarget(rec) {
   rec.moveT = 0;
   rec.fromX = rec.built.root.position.x;
   rec.fromZ = rec.built.root.position.z;
-  rec.fromY = rec.built.root.position.y;
+  // NOT root.position.y -- that is the grounded height (lift + foot solve), so reading it back
+  // would fold the leg geometry into the seat lift. liftNow is the tween's own value.
+  rec.fromY = liftNow(rec);
   // The sim's route, rooted where the NPC is drawn and ending at the LIVE destination. The last
   // point is rewritten every frame (see walkRoute) so a display moved out from under someone
   // still drags them along, as it did when this was a straight line.

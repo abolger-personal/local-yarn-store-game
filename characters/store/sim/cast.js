@@ -6,7 +6,7 @@ import { cast } from '../core/state.js';
 import { cellRect } from '../../../inventory/notions.js';
 import { BANDS, TAILS, bandMatrix, familyExtent, tailMatrix, yarnFit }
   from '../../../inventory/yarn-geometry.js';
-import { POSES, POSE_KEYS, applyPose } from '../../npc.js';
+import { POSES, stepMotion, valueOf, walkPhase, walkLayer, walkGain } from '../../npc.js';
 import { ACTION, STATE } from '../../visit.js';
 import * as THREE from 'three';
 import { BOX_H, CELL, S } from '../core/config.js';
@@ -228,61 +228,150 @@ function walkRoute(rec, n, e) {
   return at ? { ...at, total } : { x: n.x, z: n.z, facing: n.facing, total };
 }
 
-// TODO: there is no walk cycle. Movement follows the round's route holding the static `walk` pose.
-// P1-SPIKE-PLAN.md step E owns the real one. The route itself comes from findPath() in visit.js —
-// a visibility graph over the furniture, which is what stopped NPCs walking through tables.
-const blended = {};
+/**
+ * ROOT Y HAS EXACTLY ONE WRITER, and it is groundCharacter (inside applyPose).
+ *
+ * It used to have three, in a sequence that only worked by accident. stepWalk wrote an absolute
+ * y for the seat lift, applyPose then overwrote it from the feet, stepHop added the hop on top,
+ * and the next frame opened by subtracting the hop back off. The undo existed because applyPose
+ * stopped running once a pose blend settled, so "add an offset in place" was correct half the
+ * time and launched a standing NPC through the ceiling the other half.
+ *
+ * Continuous motion removes the premise: applyPose now runs every frame for every character, so
+ * anything written to y outside it is erased within one frame. `built.groundOffset` is the seam
+ * that already existed for this — grounding adds it before placing the feet — so the seat lift
+ * and the hop both become contributions to it, recomputed from scratch each frame. Nothing to
+ * undo, no captured baseline, and a stationary NPC cannot drift.
+ */
+/**
+ * ...and a SEATED character is the exception grounding cannot express, because their weight is
+ * not on their feet.
+ *
+ * groundCharacter places every character by its lowest foot. POSES.sit folds the legs up, so a
+ * seated character's feet dangle — measured 75mm above where a standing pose puts them — and
+ * grounding faithfully drops the whole body by that much to put the dangling feet on the floor.
+ * They sink into the chair.
+ *
+ * This did not show before because applyPose stopped running once a pose blend settled, so the
+ * seat tween's own y write survived and a seated NPC sat at exactly S.seatLift. That is the
+ * value that was eyeballed against this chair, so it is the value to reproduce.
+ *
+ * Cancelling the grounding term is what reproduces it, and cancelling beats retuning S.seatLift
+ * by 75mm: the term depends on LEG LENGTH, which varies 3.7x across the cast, so one constant
+ * would seat a stilt llama and a stumpy owl at visibly different heights on the same chair.
+ *
+ * The term is read back from last frame rather than recomputed -- root.y is groundOffset plus
+ * exactly that term, so the subtraction recovers it -- which needs no new npc.js export and is
+ * not a feedback loop: the term depends on the pose, never on the offset. One frame stale, and
+ * invisible at any frame rate.
+ *
+ * HOW FAR the handover has got is read off the LEGS, not off the seat tween, and that matters
+ * because they run on different clocks. The tween takes rec.dur (~1.4s); the pose is a spring
+ * that folds the legs in about a third of that, and poseFor commands `sit` from the moment an
+ * NPC sets off for a chair, not on arrival. Driving the handover off the tween meant the legs
+ * had already folded — and grounding had already dropped the body to chase the dangling feet —
+ * while the lift was barely off zero. Measured: a 117mm dip through the floor, for about a
+ * second, every time anyone sat down.
+ *
+ * hipFlex is the fold, so it is the honest progress bar: it is the channel POSES.sit uses to
+ * bring the thighs up, no other pose commands it, and it is read from the interpolator's
+ * COMMANDED value, which is exactly what grounding is reacting to. The two now move together
+ * and the dip is arithmetic rather than timing.
+ */
+function seatedness(rec) {
+  return Math.min(1, Math.max(0, valueOf(rec.built.motion, 'hipFlex') / POSES.sit.hipFlex));
+}
 
-const BLEND = 0.35;
+function groundOffsetFor(rec) {
+  const lift = liftNow(rec);
+  const grounded = rec.built.root.position.y - (rec.built.groundOffset ?? 0);
+  return lift - seatedness(rec) * grounded + rec.hop;
+}
 
 /**
- * Advance one NPC along this round's route.
+ * How far off the floor the seat tween currently has this character.
+ *
+ * Exported because `retarget` has to restart the tween from wherever it actually got to, and it
+ * can no longer read that off `root.position.y`: that is the GROUNDED height now — lift plus the
+ * foot solve — so reading it back would feed the leg geometry into the seat lift and every
+ * retarget would sink or raise the whole cast by however bent their knees happened to be.
+ */
+export function liftNow(rec) {
+  const e = rec.moveT * rec.moveT * (3 - 2 * rec.moveT);
+  return rec.fromY + (rec.toY - rec.fromY) * e;
+}
+
+/**
+ * Advance one NPC along this round's route, and measure how fast they are actually moving.
  *
  * Holds at the round's start position until this NPC's own stagger elapses. No position write is
  * needed while waiting: the root is already sitting at `from`, where last round left it.
+ *
+ * SPEED IS MEASURED, NOT DERIVED, and that is the whole reason the gait survives contact with
+ * this function. The route is traversed by an eased fraction of arc length, so ground speed
+ * varies continuously through every move — nobody sets off at full pace. Differentiating the
+ * root's own position covers that for free, and keeps covering it through things no formula
+ * would survive: walkRoute rewrites the final point every frame when a display is dragged out
+ * from under someone, retarget restarts the tween mid-stride, and separation nudges NPCs
+ * sideways. All of it is movement, and all of it reaches the legs by being movement.
+ *
+ * rec.travelled is NOT this. Despite the name it is the route's total LENGTH.
  */
 function stepWalk(rec, n, dt) {
-  if (rec.wait > 0) { rec.wait -= dt; return; }
-  if (rec.moveT >= 1) return;
-  rec.moveT = Math.min(1, rec.moveT + dt / (rec.dur ?? S.travel));
-  const e = rec.moveT * rec.moveT * (3 - 2 * rec.moveT);
-  const at = walkRoute(rec, n, e);
-  rec.built.root.position.set(at.x, rec.fromY + (rec.toY - rec.fromY) * e, at.z);
-  rec.travelled = at.total;
-  // Facing comes from the LEG being walked, not from the start-to-end line: rounding a table
-  // means turning, and an NPC who keeps facing their final destination crabs sideways.
-  if (at.total > 0.05) rec.built.root.rotation.y = at.facing;
+  const p = rec.built.root.position;
+  const wasX = p.x, wasZ = p.z;
+
+  if (rec.wait > 0) rec.wait -= dt;
+  else if (rec.moveT < 1) {
+    rec.moveT = Math.min(1, rec.moveT + dt / (rec.dur ?? S.travel));
+    const e = rec.moveT * rec.moveT * (3 - 2 * rec.moveT);
+    const at = walkRoute(rec, n, e);
+    p.x = at.x;
+    p.z = at.z;
+    rec.travelled = at.total;
+    // Facing comes from the LEG being walked, not from the start-to-end line: rounding a table
+    // means turning, and an NPC who keeps facing their final destination crabs sideways.
+    if (at.total > 0.05) rec.built.root.rotation.y = at.facing;
+  }
+
+  const moved = Math.hypot(p.x - wasX, p.z - wasZ);
+  rec.walkDist += moved;
+  // dt is clamped to 0.1 upstream (main.js), so this cannot divide by something tiny.
+  rec.speed = dt > 0 ? moved / dt : 0;
 }
 
 /**
  * Which pose this NPC should be in.
  *
- * Delight outranks everything, including the walk: an NPC who buys as they turn away should stop
- * and cheer, and a customer gliding out mid-cheer is the tell that this is a placeholder. And
- * still WAITING is not moving — without that test they walk on the spot before setting off.
+ * Delight outranks everything: an NPC who buys as they turn away should stop and cheer, and a
+ * customer gliding out mid-cheer is the tell that this is a placeholder.
+ *
+ * There is no `moving` branch any more, and that is the point of the walk cycle. It used to
+ * return POSES.walk or POSES['walk+carry'] — single frozen frames of a stride, held for the
+ * length of the move — guarded by a test for "actually going somewhere" (not still waiting, not
+ * arrived, route long enough to bother) that existed only to stop characters striding on the
+ * spot. The gait is now an additive layer gated on measured speed, so a character who is not
+ * moving contributes exactly zero of it and the guard has nothing left to guard.
  */
 function wantedPose(rec, n) {
-  const celebrating = rec.celebrate > 0;
-  const moving = !celebrating && rec.wait <= 0 && rec.moveT < 1 && rec.travelled > 0.05;
-  if (celebrating) return POSES.delighted;
-  if (moving) return n.carrying ? POSES['walk+carry'] : POSES.walk;
-  return poseFor(n);
-}
-
-/** Cross-fade toward `want`, starting from wherever the current blend actually is. */
-function stepPose(rec, want, dt) {
-  if (want !== rec.poseTo) {
-    for (const k of POSE_KEYS) rec.poseFrom[k] = blendedValue(rec, k);
-    rec.poseFrom.holdItem = rec.poseTo.holdItem;
-    rec.poseTo = want;
-    rec.pt = 0;
+  if (rec.celebrate > 0) return POSES.delighted;
+  // YOU DO NOT SIT DOWN WHILE STILL WALKING THERE.
+  //
+  // poseFor answers WALK_TO_SEAT with POSES.sit — "they arrive and sit down in the same round",
+  // which was reasonable when a walk was a static pose gliding along a route: the legs were not
+  // doing anything either way, so adopting the seated shape early cost nothing and saved needing
+  // an arrival state.
+  //
+  // With a real gait it means striding with the thighs folded at 83 degrees. The legs are then
+  // both folded and scissoring, so the lowest foot — which is what grounding places the body by
+  // — swung 90mm PER FRAME, and the body dropped 111mm through the floor chasing it. That looked
+  // like a grounding bug and was not one: grounding was faithfully following an impossible pose.
+  //
+  // moveT reaching 1 is arrival, and cast.js is the half of this that knows it.
+  if (n.action?.type === ACTION.WALK_TO_SEAT && rec.moveT < 1) {
+    return n.carrying ? POSES.carry : POSES.rest;
   }
-  if (rec.pt >= 1) return;
-  rec.pt = Math.min(1, rec.pt + dt / BLEND);
-  const e = rec.pt * rec.pt * (3 - 2 * rec.pt);
-  for (const k of POSE_KEYS) blended[k] = rec.poseFrom[k] + (rec.poseTo[k] - rec.poseFrom[k]) * e;
-  blended.holdItem = rec.pt > 0.5 ? rec.poseTo.holdItem : rec.poseFrom.holdItem;
-  applyPose(rec.built, blended);
+  return poseFor(n);
 }
 
 /**
@@ -290,46 +379,57 @@ function stepPose(rec, want, dt) {
  *
  * abs(sin) touches down between hops instead of floating; the (1 - t) taper lands them softly on
  * the last one rather than cutting the bounce off mid-air.
+ *
+ * Writes rec.hop only — groundOffsetFor folds it into the single y write. See above.
  */
 function stepHop(rec, dt) {
-  if (rec.celebrate <= 0) return;
+  if (rec.celebrate <= 0) { rec.hop = 0; return; }
   rec.celebrate = Math.max(0, rec.celebrate - dt);
   const t = 1 - rec.celebrate / CELEBRATE_S;
   rec.hop = Math.abs(Math.sin(t * Math.PI * CELEBRATE_HOPS)) * HOP_H * (1 - t);
-  rec.built.root.position.y += rec.hop;
+}
+
+/**
+ * The gait, summed on top of the interpolated pose and never fed back into it.
+ *
+ * Phase follows DISTANCE, not time, so the feet stay planted at any speed and any leg length:
+ * as a character eases to a halt the phase freezes mid-stride rather than the legs carrying on
+ * scissoring while the body glides. walkGain then closes them over a couple of tenths, which is
+ * the "bring your feet together" beat for free.
+ */
+function stepGait(rec, out, dt) {
+  const P = rec.built.params;
+  const L = P.legHeight + P.hipInset;
+  // Delight outranks the walk, and an additive layer cannot express that by swapping poses the
+  // way the old code did: without this an NPC who buys mid-move hops and strides at once.
+  const speed = rec.celebrate > 0 ? 0 : rec.speed;
+  const gain = walkGain(rec.built.motion, speed, dt, rec.opts);
+  if (gain > 0) walkLayer(out, walkPhase(rec.walkDist, speed, L, rec.opts), gain, rec.opts);
 }
 
 function tickOne(rec, dt) {
   const n = rec.npc;
-  // Undo last frame's hop before anything else reads or writes y. Both the walk tween and
-  // applyPose (via groundCharacter) rewrite y while they are running and neither is running once
-  // an NPC has settled — so adding an offset in place would be correct half the time and would
-  // launch a stationary NPC through the ceiling the other half. Removing it first composes with
-  // both, and needs no captured baseline.
-  if (rec.hop) { rec.built.root.position.y -= rec.hop; rec.hop = 0; }
   // The buy lands in syncCarried, so read it BEFORE choosing this frame's pose or the celebration
   // starts a frame late — visible at 60fps on a beat this short.
   syncCarried(rec);
   stepWalk(rec, n, dt);
-  stepPose(rec, wantedPose(rec, n), dt);
+  stepHop(rec, dt);
+  // Every contribution to root height is known before applyPose runs, because applyPose is the
+  // only thing that writes it.
+  rec.built.groundOffset = groundOffsetFor(rec);
+  stepMotion(rec.built, wantedPose(rec, n), dt, rec.opts, (out) => stepGait(rec, out, dt));
   // The rig's placeholder skein is never correct in this game: a customer is either carrying the
   // real package or carrying nothing at all. So it is forced off every frame, unconditionally,
   // rather than only when a real notion has replaced it — applyPose turns it back on for any pose
-  // with holdItem set (carry, walk+carry), and relying on the pose to keep it off is what left
-  // every NPC holding one. It belongs to crowd.html's pose demo, not here.
+  // with holdItem set (carry), and relying on the pose to keep it off is what left every NPC
+  // holding one. It belongs to crowd.html's pose demo, not here.
   if (rec.built.held) rec.built.held.visible = false;
-  stepHop(rec, dt);
   rec.built.root.visible = n.state !== STATE.GONE;
 }
 
 export function tickCast(dt) {
   for (const rec of cast) tickOne(rec, dt);
   updateBlobs();
-}
-
-function blendedValue(rec, k) {
-  const e = rec.pt * rec.pt * (3 - 2 * rec.pt);
-  return rec.poseFrom[k] + (rec.poseTo[k] - rec.poseFrom[k]) * e;
 }
 
 // ---------------------------------------------------------------- blob shadows

@@ -31,7 +31,7 @@ import { buildDisplays } from '../scene/displays.js';
 import { boxes, edgeTop, fieldTop, shadows, sideEdge, sideField, sizeSide, sizeTop } from '../goods/items.js';
 import { refreshAll } from '../goods/paint.js';
 import { addItem } from '../goods/stock.js';
-import { buildBlobs, rollCheer, routeLength } from './cast.js';
+import { STAND_TIME, buildBlobs, measureSeatDrop, rollCheer, routeLength } from './cast.js';
 
 // Ids have to be unique across days too — a regular is matched to the roster by id, so a new
 // customer reusing "npc0" would be mistaken for one.
@@ -288,7 +288,7 @@ const castRecord = (npc, built, color) => ({
   // baseX/baseZ are the ROUTE position; the root is this plus the seat shift (cast.js), so
   // settling onto a cushion is not mistaken for ground covered.
   moveT: 1, travelled: 0, fromX: npc.x, fromZ: npc.z,
-  baseX: npc.x, baseZ: npc.z, faceTo: npc.facing ?? 0, seatRef: null,
+  baseX: npc.x, baseZ: npc.z, faceTo: npc.facing ?? 0, seatRef: null, seatCal: false,
   wait: 0, dur: S.travel,
   carriedName: null, carriedMesh: null,
   // Their own reaction to good news: a pause, then a duration, hop count and height of their
@@ -328,6 +328,9 @@ function spawnOne(returning, i) {
   queueOutside(npc, i);
   built.root.position.set(npc.x, 0, npc.z);
   castGroup.add(built.root);
+  // Where this body's backside is in the sit pose, measured once: it is not a fixed distance
+  // below the hips on any two characters. See measureSeatDrop.
+  built.seatDrop = measureSeatDrop(built);
   applyPose(built, POSES.rest);
   cast.push(castRecord(npc, built, P.bodyColor));
   return npc;
@@ -432,7 +435,10 @@ function retarget(rec, slot = 0, total = 1) {
   //
   // One slot per NPC, shuffled, with a jittered position inside it. Gaps are then jitter/n by
   // construction and nobody can land on top of anyone.
-  rec.wait = ((slot + Math.random()) / Math.max(1, total)) * S.travelJitter;
+  rec.wait = ((slot + Math.random()) / Math.max(1, total)) * S.travelJitter
+    // Getting out of a chair takes a moment, and the walk must not start underneath it --
+    // the route would drag them off the seat while they were still folded into it.
+    + (rec.seatRef ? STAND_TIME : 0);
   rec.dur = Math.max(S.travel * (1 + (Math.random() * 2 - 1) * S.paceJitter), 0.05);
 }
 

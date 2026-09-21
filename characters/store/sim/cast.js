@@ -6,7 +6,7 @@ import { cast, seats } from '../core/state.js';
 import { cellRect } from '../../../inventory/notions.js';
 import { BANDS, TAILS, bandMatrix, familyExtent, tailMatrix, yarnFit }
   from '../../../inventory/yarn-geometry.js';
-import { POSES, phaseStep, stepMotion, valueOf, walkPhase, walkLayer, walkGain }
+import { POSES, applyPose, phaseStep, stepMotion, valueOf, walkPhase, walkLayer, walkGain }
   from '../../npc.js';
 import { ACTION, STATE } from '../../visit.js';
 import * as THREE from 'three';
@@ -350,7 +350,7 @@ function seatedness(rec) {
  * of the thigh lying on it, rather than an eyeballed height for the whole rig.
  */
 function seatedRootY(rec) {
-  return SEAT_H + S.seatLift - rec.built.params.legHeight;
+  return SEAT_H + (rec.built.seatDrop ?? 0) - S.seatLift;
 }
 
 function groundOffsetFor(rec) {
@@ -378,8 +378,13 @@ function groundOffsetFor(rec) {
 function stepWalk(rec, n, dt) {
   const wasX = rec.baseX, wasZ = rec.baseZ;
 
-  if (rec.wait > 0) rec.wait -= dt;
-  else if (rec.moveT < 1) {
+  if (rec.wait > 0) {
+    rec.wait -= dt;
+    // The walk starts from wherever getting up left them, not from the cushion they were on.
+    // walkRoute only ever rewrites the LAST point, so the first one is pinned at retarget --
+    // and for someone still standing up that is a spot they are in the middle of leaving.
+    if (rec.route[0]) { rec.route[0].x = rec.baseX; rec.route[0].z = rec.baseZ; }
+  } else if (rec.moveT < 1) {
     rec.moveT = Math.min(1, rec.moveT + dt / (rec.dur ?? S.travel));
     const e = rec.moveT * rec.moveT * (3 - 2 * rec.moveT);
     const at = walkRoute(rec, n, e);
@@ -402,11 +407,87 @@ function stepWalk(rec, n, dt) {
   rec.speed = dt > 0 ? rec.moved / dt : 0;
 }
 
+const _seatBox = new THREE.Box3();
+
+/**
+ * How far BELOW the root this character's backside is, in the sit pose. Measured once per body.
+ *
+ * Placing a seated character by the hip JOINT was still wrong, just less obviously: the distance
+ * from that joint down to the bottom of the body is not a constant. It depends on torso size,
+ * on hipInset, and on whatever the species hangs off its middle -- a llama's fleece reaches
+ * lower than an owl's. Measured across six seated bodies at a fixed hip height, the backside
+ * landed anywhere from 42mm INSIDE the cushion to 33mm above it, which is the floating that was
+ * reported. No single offset fixes that, because the thing being offset is not the same distance
+ * on any two characters.
+ *
+ * So measure the part that actually touches. Once, at spawn, in the pose it will be sitting in:
+ * geometry does not change, and chasing it per frame would only make the idle's breathing push
+ * the character through the chair.
+ *
+ * The legs are excluded because they hang far below the seat and are not what rests on it, and
+ * the arms because they swing past it. Everything under `spine` minus the arm subtrees is the
+ * torso, the head and whatever the kit bolted to them.
+ */
+export function measureSeatDrop(built) {
+  const skip = new Set(built.joints.upperArm.map((a) => a.node));
+  applyPose(built, POSES.sit);
+  built.root.updateMatrixWorld(true);
+  let lowest = Infinity;
+  const visit = (n) => {
+    if (skip.has(n)) return;
+    if (n.isMesh) lowest = Math.min(lowest, _seatBox.setFromObject(n).min.y);
+    n.children.forEach(visit);
+  };
+  visit(built.joints.spine);
+  const drop = Number.isFinite(lowest) ? built.root.position.y - lowest : 0;
+  applyPose(built, POSES.rest);
+  return drop;
+}
+
+/**
+ * Correct seatDrop against where the body ACTUALLY ends up, once, the first time this character
+ * is fully seated.
+ *
+ * measureSeatDrop poses the rig in a bare POSES.sit, but what the character is really wearing by
+ * then is that pose plus the idle layer plus whatever posture their personality carries -- and
+ * the difference is not small: measured 53mm of sink against the 10mm that was asked for. Rather
+ * than model the discrepancy, read it off the thing itself and cancel it. Once: chasing it every
+ * frame would let the breathing push the body through the chair.
+ */
+function calibrateSeat(rec, sat) {
+  if (rec.seatCal || sat < 0.99) return;
+  rec.seatCal = true;
+  const b = rec.built;
+  b.root.updateMatrixWorld(true);
+  const skip = new Set(b.joints.upperArm.map((a) => a.node));
+  let lowest = Infinity;
+  const visit = (n) => {
+    if (skip.has(n)) return;
+    if (n.isMesh) lowest = Math.min(lowest, _seatBox.setFromObject(n).min.y);
+    n.children.forEach(visit);
+  };
+  visit(b.joints.spine);
+  if (Number.isFinite(lowest)) b.seatDrop -= lowest - (SEAT_H - S.seatLift);
+}
+
 /** Shortest way round: blending 350 degrees toward 10 must not go the long way about. */
 const angleLerp = (from, to, t) => from + Math.atan2(Math.sin(to - from), Math.cos(to - from)) * t;
 
 /** How far back on the cushion the hips settle, as a fraction of the chair's depth. */
 const SIT_BACK = 0.26;
+
+/**
+ * Where a character STANDS relative to the chair, as a fraction of its depth: clear of the front
+ * edge, which is where your feet go when you get up. 0.62 of 0.34 is ~210mm forward of centre
+ * against a 170mm half-depth, so they end up just outside the box rather than inside it.
+ */
+const STAND_OUT = 0.62;
+
+/** Seconds allowed for getting up, before the round's walk is allowed to start. */
+export const STAND_TIME = 0.5;
+
+/** Radians of forward lean at the midpoint of sitting down or getting up. */
+const SIT_LEAN = 0.30;
 
 /**
  * Put the character where a seated body actually goes -- which is not the middle of the chair,
@@ -445,11 +526,37 @@ function placeSeated(rec) {
   const seat = rec.seatRef;
   const face = seat ? angleLerp(rec.faceTo, seat.facing, sat) : rec.faceTo;
   root.rotation.y = face;
+  root.position.x = rec.baseX;
+  root.position.z = rec.baseZ;
   // Backwards along the way they are facing: seated, the hips are at the back of the cushion;
   // standing, they are back at the centroid and clear to walk.
-  const back = seat ? sat * SIT_BACK * CHAIR_W : 0;
-  root.position.x = rec.baseX - Math.sin(face) * back;
-  root.position.z = rec.baseZ - Math.cos(face) * back;
+  // GETTING UP IS A STEP FORWARD, not a lift straight up out of the middle of the cushion.
+  //
+  // This is what was actually being complained about. Sitting at the centroid means standing at
+  // the centroid, and the centroid is INSIDE the chair -- so the legs unfolded straight down
+  // through the box and the feet ended up in it. You do not stand up like that: you lean
+  // forward, take your weight onto your feet in front of the seat, and rise.
+  //
+  // So the along-facing offset runs from BEHIND centre when seated to WELL IN FRONT of the
+  // front edge when standing, on the same `seatedness` the fold uses. Sitting down is the same
+  // move backwards, which is also right.
+  //
+  // It moves the BASE rather than being a display offset on top of it, and that is deliberate:
+  // base is what the gait measures its speed from, so stepping off the chair drives the legs and
+  // reads as a step. A display offset would have slid them off the seat with their feet still.
+  // The route wins only once they have actually GIVEN UP the chair. A customer who stays
+  // seated for another round still gets retargeted -- the sim aims them at the seat they are
+  // already in -- and letting that route run dragged them forward off the back of the cushion
+  // to the centroid while still sitting. Measured: -0.088 creeping to -0.002 over two seconds,
+  // for a character who never stood up.
+  if (!seat) return;
+  if (rec.npc.seat === null && rec.wait <= 0 && rec.moveT < 1) return;
+  calibrateSeat(rec, sat);
+  const along = (STAND_OUT - (STAND_OUT + SIT_BACK) * sat) * CHAIR_W;
+  rec.baseX = seat.x + Math.sin(face) * along;
+  rec.baseZ = seat.z + Math.cos(face) * along;
+  root.position.x = rec.baseX;
+  root.position.z = rec.baseZ;
 }
 
 /**
@@ -525,6 +632,12 @@ function stepGait(rec, out, dt) {
   const speed = rec.celebrate > 0 ? 0 : rec.speed;
   const gain = walkGain(rec.built.motion, speed, dt, rec.opts);
   if (gain > 0) walkLayer(out, walkPhase(rec.phase, speed, L, rec.opts), gain, rec.opts);
+  // THE LEAN. You cannot stand up without putting your head over your feet first, and you cannot
+  // sit down without it either -- the torso goes forward, the hips go back. Peaks halfway
+  // through the fold and is zero at both ends, so it costs nothing when seated or standing and
+  // needs no state of its own.
+  const sat = seatedness(rec);
+  out.spineBend += SIT_LEAN * 4 * sat * (1 - sat);
   // Advanced AFTER the layer reads it, so a frame's pose matches the distance already covered.
   // Accumulated rather than divided out of total distance -- see phaseStep, and note this is
   // the code path where that mattered: the store's speed changes every frame.

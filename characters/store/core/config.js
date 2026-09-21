@@ -119,14 +119,17 @@ export const S = {
   // autoSeconds, or a round ends before the walk it started does. 1.6 + 1.4*1.25 = 3.35.
   travelJitter: 1.6,
   paceJitter:  0.25,    // +/- fraction on each NPC's own travel time, so arrivals stagger too
-  // How far a seated NPC's HIP JOINT rides above the cushion — roughly the radius of the thigh
-  // lying on it. Small, and no longer per-seat-height guesswork: cast.js places the pelvis at
-  // SEAT_H and the rest follows from the character's own leg length, so one value is right for a
-  // stilt llama and a stumpy owl on the same chair.
+  // How far a seated NPC's backside SINKS into the cushion. Small and soft-bodied: the rest of
+  // the placement is measured, not guessed. cast.js measures where each body's bottom actually
+  // is in the sit pose (measureSeatDrop) and puts that on the cushion, which is the only thing
+  // that works across a cast whose leg lengths vary 3.7x and whose species hang different
+  // amounts of fleece off their middles.
   //
-  // It used to be 0.16, the height the whole RIG was raised by — but the rig's origin is at the
-  // feet, so that sat them on the cushion with the hips 90mm above it.
-  seatLift:    0.04,
+  // It has been three different quantities in three days, so: 0.16 was how far the whole RIG
+  // was raised (origin at the feet, so it sat them on the cushion); 0.04 was the gap from the
+  // hip JOINT to the cushion (better, but that distance is not the same on any two bodies).
+  // This is the last one, because it is the only one that is a choice rather than a measurement.
+  seatLift:    0.01,
   // The halo and the drop ghost are deliberately ONE colour: the thing in your hand and the
   // slot it is going into are two halves of the same statement, and colouring them separately
   // made the player match them up themselves. Same green, so the eye pairs them for free.

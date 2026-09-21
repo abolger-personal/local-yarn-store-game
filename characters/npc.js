@@ -855,7 +855,10 @@ export function createCharacter(P, species) {
   // precisely the lurch the line above promises there will not be. Params double as a pose in
   // species-checker, which is what made this look right.
   const ctx = { ...body, joints, materials, mat, addMaterial, params: P, species: kit, bulge,
-                motion: makeMotion(POSES.rest), groundOffset: 0 };
+                // How far below the root this body's backside sits in the sit pose. Filled in by
+                // whoever seats characters (the store measures it once at spawn); 0 means the
+                // root itself, which is what a viewer with no chairs wants.
+                motion: makeMotion(POSES.rest), groundOffset: 0, seatDrop: 0 };
   kit.buildKit(ctx, P);
   if (P.scarf) body.neck.add(buildScarf(P, addMaterial));
   if (!P.partShadows) disableShadowCasting(body.root);

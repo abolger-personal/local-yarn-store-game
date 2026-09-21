@@ -980,6 +980,11 @@ knob(fWalk, S.scale, 'headCarry', 'head carriage',
   'How high or low they hold their head. Open and confident, or down and closed — the single '
   + 'most readable posture signal there is, and completely free of leg length. Scales the whole '
   + 'cast; personality still spreads them.', 0, 2.5).onChange(retune);
+knob(fWalk, S.opts, 'marchRatio', 'march vs butt-kick',
+  'Where the knee lift goes. At 0 only the shin folds, so the heel kicks back and more knee '
+  + 'lift just kicks harder — that is a butt-kicker. Turn it up and the THIGH comes forward '
+  + 'with the bend, so the knee rises in front of the body: a march. Around 0.5 reads as '
+  + 'picking your feet up smartly.', 0, 1).onChange(retune);
 knob(fWalk, S.scale, 'attend', 'leans in, paying attention',
   'Torso forward while STANDING — the focused, intent posture. Conscientiousness drives it, and '
   + 'it is the only thing C does that you can see before a character sets off walking. It '

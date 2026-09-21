@@ -414,6 +414,35 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     }
   }
 
+  // A MARCH, NOT A BUTT KICK. The same knee bend reads as either depending on where the thigh
+  // is when it happens -- and the knee flexion peaks at mid-swing, where the plain sine puts
+  // the hip at exactly zero, thigh straight down. So a bare knee lift could only ever send the
+  // heel backwards, and more of it bought a harder kick rather than a march.
+  //
+  // Fixed by giving the thigh a per-leg, swing-only lift, which the rig can express because
+  // `legSwing * side - hipFlex` is `a + b * side`. This pins the outcome, not the arithmetic.
+  {
+    const marching = { ...o, kneeLift: 1.4 };
+    const T = 0.238, thigh = T * 0.55;
+    const S = walkPhase(0, 0.5, T, marching).strideLen;
+    let kneeFrontAtPeak = 0, peakFlex = 0;
+    for (let i = 0; i < 400; i++) {
+      const buf = { legSwing: 0, hipFlex: 0, kneeBend: 0, armSwing: 0, armSwingAlt: 0,
+        spineBend: 0, spineRoll: 0, kneeSwing: 0 };
+      walkLayer(buf, walkPhase((i / 400) * S, 0.5, T, marching), 1, marching);
+      const flex = Math.max(0, buf.kneeSwing);
+      if (flex > peakFlex) {
+        peakFlex = flex;
+        // +rotation.x puts a limb's end at -Z and the character faces +Z, so negate for "front"
+        kneeFrontAtPeak = -Math.sin(buf.legSwing - buf.hipFlex) * thigh;
+      }
+    }
+    assert.ok(peakFlex > 0.1, 'the knee must actually flex');
+    assert.ok(kneeFrontAtPeak > 0.01,
+      `at peak knee flexion the knee sits ${kneeFrontAtPeak.toFixed(4)} from the hip -- it has `
+      + 'to be IN FRONT, or the gait reads as a butt kick however high the lift goes');
+  }
+
   // CADENCE IS A CAP, NOT A WISH. This is what the legs blurring at high speed actually was:
   // phase was divided by a stride clamped to the geometric ceiling, so once that bound, cadence
   // ran away linearly with speed. A short-legged owl at speed 2.5 hit 21.5 steps/s -- 10.7 leg
@@ -560,6 +589,31 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
   assert.ok(peak + 0.38 < 1.2,
     `a flick on top of POSES.delighted reaches ${(peak + 0.38).toFixed(2)} rad, past what the `
     + 'rig authors for an ear');
+}
+
+// --- arms do not hang dead straight -----------------------------------------------------------
+//
+// POSES.rest authored elbowBend 0, and the only thing bending an arm was armTuck. The moment
+// armTuck stopped being a personality trait, every character's arms locked out straight --
+// which read as a doll, and made the arm swing look broken because a rigid stick pivoting at
+// the shoulder shows far less motion than an articulated arm does.
+//
+// A resting bend belongs to the POSE, where no personality decision can take it away.
+{
+  const o = opts();
+  const m = makeMotion(POSES.rest, 0.42);
+  resetMotion(m, POSES.rest);
+  const buf = {};
+  integrate(m, POSES.rest, 1 / 60, o);
+  compose(buf, m, o);
+  assert.ok(buf.elbowBend > 0.1,
+    `a resting arm must keep some bend (got ${buf.elbowBend.toFixed(3)}) -- dead straight reads `
+    + 'as a doll, and it cannot depend on a personality channel to supply it');
+  for (const name of Object.keys(POSES)) {
+    assert.ok((POSES[name].elbowBend ?? 0) > 0.1,
+      `POSES.${name} authors elbowBend ${(POSES[name].elbowBend ?? 0).toFixed(2)} -- every pose `
+      + 'needs some, or it locks the arm straight');
+  }
 }
 
 // --- a long neck is not a broom handle --------------------------------------------------------

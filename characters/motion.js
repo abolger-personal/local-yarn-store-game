@@ -60,7 +60,11 @@ const definePoses = (raw) => Object.freeze(Object.fromEntries(
 ));
 
 export const POSES = definePoses({
-  rest:   { armOut: 0.16 },
+  // elbowBend is NOT zero here, and that is anatomy rather than taste: an arm hanging dead
+  // straight reads as a doll. It was zero, and the only thing bending it was armTuck -- so the
+  // moment armTuck stopped being a personality trait, every character's arms locked out
+  // straight. A resting bend belongs to the POSE, where no personality decision can remove it.
+  rest:   { armOut: 0.16, elbowBend: 0.22 },
   walk:   { armSwing: 0.42, armOut: 0.14, elbowBend: 0.30, legSwing: 0.30, kneeBend: 1.50 },
   carry:  { armSwing: -0.12, armOut: 0.02, elbowBend: 1.45, holdItem: true },
   reach:  { armSwing: -1.15, armOut: 0.30, elbowBend: 0.35 },
@@ -108,6 +112,11 @@ export const MOTION_DEFAULTS = Object.freeze({
                      // before the legs physically cannot reach far enough and skate begins.
   bounce:    0.05,   // NEGATIVE cancels the free bounce; see walkLayer
   kneeLift:  0.55,   // swing-leg knee flexion; per-species, see BASE_MOTION_RANGES
+  // How much of the lift goes to the THIGH rather than the shin. 0 is a pure butt kick, which
+  // is what this was before it existed; around 0.5 reads as a march. It is a ratio of kneeLift
+  // rather than its own amount so that "pick your feet up" stays one control -- two would drift
+  // apart and give a character a high knee with a dangling shin, or the reverse.
+  marchRatio: 0.55,
   armGain:   0.55,
   sway:      0.075,  // lateral body lean per step. The side-to-side half of a walk.
   attend:    0,      // lean in, paying attention; crossfades with `lean` once walking
@@ -804,10 +813,40 @@ export function walkPhase(walkDist, speed, L, opts) {
 export function walkLayer(out, w, gain, opts) {
   if (gain <= 0) return out;
   const s = Math.sin(TAU * w.phase);
-  out.legSwing += gain * w.swingAmp * s;
+
+  // THE HIP, PER LEG -- and this is the rig upgrade the ceiling note said would be needed.
+  //
+  // A march and a butt kick are the same knee bend in different places: knee up in FRONT of the
+  // hip, or heel up behind it. The knee flexion peaks at mid-swing, and at mid-swing the hip
+  // angle is exactly zero -- thigh straight down -- so bending the knee there sent the heel
+  // backwards and nothing else. More knee lift bought a harder butt kick, never a march.
+  //
+  // A march needs the thigh to come FORWARD while the knee bends, which is a per-leg hip lift,
+  // and the rig appears not to have one: applyPose computes `legSwing * side - hipFlex`, so
+  // legSwing is antisymmetric and hipFlex hits both legs.
+  //
+  // But `a + b * side` can express ANY per-leg pair. Given a shape f(p) for one leg, the other
+  // being f(p + 0.5):
+  //
+  //     legSwing = (f(p) - f(p + 0.5)) / 2
+  //     hipFlex  = -(f(p) + f(p + 0.5)) / 2
+  //
+  // and the two recombine to exactly f(p) and f(p + 0.5). The hipFlex term looks like it should
+  // disturb the stance leg -- it is applied to both -- and the legSwing term cancels it there
+  // precisely. That is what makes a rectified, swing-only hip lift possible at all.
+  const lift = opts.kneeLift * (opts.marchRatio ?? 0);
+  const hipOf = (ph) => w.swingAmp * Math.sin(TAU * ph)
+    // Negative is forward. max(0, -cos) is 1 at mid-swing and 0 outside the swing half, so the
+    // stance leg never sees this and the planted foot is untouched.
+    - lift * Math.max(0, -Math.cos(TAU * ph));
+  const near = hipOf(w.phase), far = hipOf(w.phase + 0.5);
+  out.legSwing += gain * (near - far) * 0.5;
+  out.hipFlex -= gain * (near + far) * 0.5;
   // Counter-swing. applyPose does `armSwing - side * armSwingAlt`, so side +1's arm goes BACK
   // (rotation.x positive) when armSwingAlt is positive -- which is exactly when side +1's leg is
   // going back too. Opposite of a walk. This was `-=`, i.e. the arms swung WITH the legs.
+  // The arms keep the plain sine: they counter-swing the LEGS' travel, and a marching thigh is
+  // a lift rather than a longer stride, so folding it in here would just overswing the arms.
   out.armSwingAlt += gain * opts.armGain * w.swingAmp * s;
   // THE SWING-LEG KNEE. Without this the legs are rigid sticks: measured swing-foot ground
   // clearance was 5mm on a 1.0-tall character, and because two rigid legs are exact mirrors

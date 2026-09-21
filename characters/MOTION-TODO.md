@@ -472,6 +472,32 @@ So positive `legSwing * side` puts that foot BEHIND. Side +1's foot travels back
 to a body moving +Z exactly while `cos(TAU * phase) > 0`, so **side +1 is in stance around phase
 0 and mid-swing at phase 0.5.**
 
+### The mirrored-leg ceiling: LIFTED
+
+The note below described the limitation and its upgrade path. The upgrade landed when a raised
+knee lift produced a **butt kick instead of a march**: knee flexion peaks at mid-swing, and at
+mid-swing the plain sine puts the hip at exactly 0.000 — thigh straight down — so bending the
+knee there could only send the heel backwards. More lift bought a harder kick, never a march.
+
+A march needs the thigh FORWARD while the knee bends, which is a per-leg hip lift, and
+`legSwing * side - hipFlex` looks like it cannot express one. It can, because that is
+`a + b · side`: given a shape `f(p)` for one leg with the other at `f(p + 0.5)`,
+
+    legSwing = (f(p) - f(p + 0.5)) / 2
+    hipFlex  = -(f(p) + f(p + 0.5)) / 2
+
+recombines to exactly `f(p)` and `f(p + 0.5)`. The `hipFlex` term looks like it should disturb
+the stance leg — it is applied to both — and the `legSwing` term cancels it there precisely.
+Measured: stance slip unchanged at 11.4% of stride before and after.
+
+`marchRatio` is how much of the lift goes to the thigh rather than the shin: 0 is a pure butt
+kick, ~0.5 reads as a march. It is a RATIO of `kneeLift` rather than its own amount so "pick
+your feet up" stays one control — two would drift apart and give a high knee with a dangling
+shin.
+
+Still true of the knee itself: it is one rectified harmonic, so the flicker near footstrike
+described below remains.
+
 ### Known ceiling: the legs are exact mirrors
 
 `applyPose` drives both legs from one scalar as `legSwing * side`, so at every phase their hip

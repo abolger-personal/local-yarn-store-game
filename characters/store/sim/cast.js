@@ -2,7 +2,7 @@
 //
 // Extracted from the single 3,200-line module that used to live inline in store.html.
 
-import { cast } from '../core/state.js';
+import { cast, seats } from '../core/state.js';
 import { cellRect } from '../../../inventory/notions.js';
 import { BANDS, TAILS, bandMatrix, familyExtent, tailMatrix, yarnFit }
   from '../../../inventory/yarn-geometry.js';
@@ -12,6 +12,7 @@ import { ACTION, STATE } from '../../visit.js';
 import * as THREE from 'three';
 import { BOX_H, CELL, S, SEAT_H } from '../core/config.js';
 import { key, scene } from '../scene/stage.js';
+import { CHAIR_W } from '../scene/seating.js';
 import { FILL, atlas, sizeAtlas } from '../goods/items.js';
 import { YARN, YARN_FIT, bandMesh, tailMesh, yarnMeshes } from '../goods/yarn.js';
 import { cellNameFor } from '../goods/stock.js';
@@ -375,27 +376,80 @@ function groundOffsetFor(rec) {
  * rec.travelled is NOT this. Despite the name it is the route's total LENGTH.
  */
 function stepWalk(rec, n, dt) {
-  const p = rec.built.root.position;
-  const wasX = p.x, wasZ = p.z;
+  const wasX = rec.baseX, wasZ = rec.baseZ;
 
   if (rec.wait > 0) rec.wait -= dt;
   else if (rec.moveT < 1) {
     rec.moveT = Math.min(1, rec.moveT + dt / (rec.dur ?? S.travel));
     const e = rec.moveT * rec.moveT * (3 - 2 * rec.moveT);
     const at = walkRoute(rec, n, e);
-    p.x = at.x;
-    p.z = at.z;
+    // BASE coordinates, not the root's. The root is the base plus the seat shift below, and
+    // feeding that back in would make settling onto a cushion read as ground covered -- the
+    // legs would take a stride while sitting down. The route lives in base space; the shift is
+    // a display offset on top of it.
+    rec.baseX = at.x;
+    rec.baseZ = at.z;
     rec.travelled = at.total;
     // Facing comes from the LEG being walked, not from the start-to-end line: rounding a table
     // means turning, and an NPC who keeps facing their final destination crabs sideways.
-    if (at.total > 0.05) rec.built.root.rotation.y = at.facing;
+    if (at.total > 0.05) rec.faceTo = at.facing;
   }
 
   // Handed to stepGait, which turns it into a fraction of a stride. Distance is NOT
   // accumulated here any more -- see phaseStep for why a running total was the bug.
-  rec.moved = Math.hypot(p.x - wasX, p.z - wasZ);
+  rec.moved = Math.hypot(rec.baseX - wasX, rec.baseZ - wasZ);
   // dt is clamped to 0.1 upstream (main.js), so this cannot divide by something tiny.
   rec.speed = dt > 0 ? rec.moved / dt : 0;
+}
+
+/** Shortest way round: blending 350 degrees toward 10 must not go the long way about. */
+const angleLerp = (from, to, t) => from + Math.atan2(Math.sin(to - from), Math.cos(to - from)) * t;
+
+/** How far back on the cushion the hips settle, as a fraction of the chair's depth. */
+const SIT_BACK = 0.26;
+
+/**
+ * Put the character where a seated body actually goes -- which is not the middle of the chair,
+ * and not facing wherever they happened to walk in from.
+ *
+ * TWO THINGS WERE WRONG, and only the second one was reported.
+ *
+ * 1. FACING. root.rotation.y had exactly one writer, inside the walk, so a seated character kept
+ *    whichever way the last leg of their route pointed. The sim does set npc.facing from the
+ *    seat, but nothing carried it to the rig. Measured across five seated customers: 76 to 164
+ *    degrees off the chair they were sitting on -- one of them essentially backwards.
+ *
+ * 2. POSITION. They sat at the exact centroid, so standing up was a vertical rise out of the
+ *    middle of the cushion. You do not stand up like that; you come forward off the seat, and
+ *    you sit back onto it.
+ *
+ * Both ride `seatedness`, so they are the same motion as the fold rather than a separate tween,
+ * and both are ZERO at zero seatedness -- which is what makes walking away continuous. There is
+ * no moment where a shift has to be cancelled, because a character who is not sitting has no
+ * shift. The base position stays the chair centroid throughout, so the route that carries them
+ * off still starts from the chair.
+ */
+function placeSeated(rec) {
+  const root = rec.built.root;
+  const sat = seatedness(rec);
+  // THE SEAT OUTLIVES THE ASSIGNMENT, by exactly as long as the legs stay folded.
+  //
+  // npc.seat clears the instant the sim gives the chair up, but the character is still most of
+  // the way into the sit pose at that moment -- measured at 96% folded. Dropping the seat there
+  // snapped the shift off in one frame: an 88mm teleport, larger than a whole frame of walking
+  // at top speed, which is a character jumping out of a chair rather than standing up out of it.
+  //
+  // Held until seatedness actually reaches zero, so the shift and the turn unwind with the legs.
+  if (rec.npc.seat !== null) rec.seatRef = seats.find((s) => s.id === rec.npc.seat) ?? null;
+  else if (sat <= 0) rec.seatRef = null;
+  const seat = rec.seatRef;
+  const face = seat ? angleLerp(rec.faceTo, seat.facing, sat) : rec.faceTo;
+  root.rotation.y = face;
+  // Backwards along the way they are facing: seated, the hips are at the back of the cushion;
+  // standing, they are back at the centroid and clear to walk.
+  const back = seat ? sat * SIT_BACK * CHAIR_W : 0;
+  root.position.x = rec.baseX - Math.sin(face) * back;
+  root.position.z = rec.baseZ - Math.cos(face) * back;
 }
 
 /**
@@ -486,6 +540,7 @@ function tickOne(rec, dt) {
   stepHop(rec, dt);
   // Every contribution to root height is known before applyPose runs, because applyPose is the
   // only thing that writes it.
+  placeSeated(rec);
   rec.built.groundOffset = groundOffsetFor(rec);
   stepMotion(rec.built, wantedPose(rec, n), dt, rec.opts, (out) => stepGait(rec, out, dt));
   // The rig's placeholder skein is never correct in this game: a customer is either carrying the

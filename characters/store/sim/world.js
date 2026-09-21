@@ -285,7 +285,10 @@ const castRecord = (npc, built, color) => ({
   // relaunching from a standstill. The pose target is held inside it, by identity.
   // fromY/toY are gone with the seat tween: height now rides the sit pose itself, so there
   // is nothing to interpolate. See groundOffsetFor in cast.js.
+  // baseX/baseZ are the ROUTE position; the root is this plus the seat shift (cast.js), so
+  // settling onto a cushion is not mistaken for ground covered.
   moveT: 1, travelled: 0, fromX: npc.x, fromZ: npc.z,
+  baseX: npc.x, baseZ: npc.z, faceTo: npc.facing ?? 0, seatRef: null,
   wait: 0, dur: S.travel,
   carriedName: null, carriedMesh: null,
   // Their own reaction to good news: a pause, then a duration, hop count and height of their
@@ -403,8 +406,10 @@ export function restart({ keepRegulars = true } = {}) {
 function retarget(rec, slot = 0, total = 1) {
   const n = rec.npc;
   rec.moveT = 0;
-  rec.fromX = rec.built.root.position.x;
-  rec.fromZ = rec.built.root.position.z;
+  // The BASE, not the drawn root: a character still rising off a chair is drawn behind their
+  // base, and starting the route there would walk them out of the seat shift as well.
+  rec.fromX = rec.baseX;
+  rec.fromZ = rec.baseZ;
   // The sim's route, rooted where the NPC is drawn and ending at the LIVE destination. The last
   // point is rewritten every frame (see walkRoute) so a display moved out from under someone
   // still drags them along, as it did when this was a straight line.

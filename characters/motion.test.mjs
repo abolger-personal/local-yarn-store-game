@@ -310,6 +310,20 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     `a faster cadence must damp the sway (hurrying ${bold.spineRoll.toFixed(3)} vs `
     + `strolling ${strolling.spineRoll.toFixed(3)}) -- otherwise the torso rolls the same `
     + 'amount in half the time, which reads as a vibration rather than a swagger');
+
+  // ...and the other side of that cap, which is the half that was wrong. A rate limit set too
+  // low stops being a limit on hurrying and becomes the ceiling on sway FULL STOP: at 0.70 the
+  // boldest character asked for 9.7 degrees and got 3.8 at any brisk pace, so the top of the
+  // span was unreachable and widening it would have changed nothing on screen. That failure is
+  // invisible from either number alone -- the span looks generous, the cap looks physical --
+  // and it presents as "the sway slider does nothing", which is the report that found it.
+  //
+  // So: a STROLLING character must actually be delivered most of what the span authors.
+  const asked = Math.abs(motionOf(BOLD, BASE_MOTION_RANGES).sway);
+  assert.ok(strolling.spineRoll > asked * 0.9,
+    `the rate cap must not be the ceiling on an ordinary walk (asked ${asked.toFixed(3)} rad, `
+    + `delivered ${strolling.spineRoll.toFixed(3)} strolling) -- a cap that binds at every `
+    + 'speed makes the whole sway span undialable, not just a hurried one');
 }
 
 // --- a global tuning knob must actually REACH the character -----------------------------------

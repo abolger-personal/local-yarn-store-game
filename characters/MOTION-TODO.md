@@ -385,6 +385,28 @@ why the sway looked wrong at speed and looked right the moment the step rate cam
 `swayRateMax` caps the rate rather than scaling by cadence, so a character who already sways
 gently is untouched and only someone asking for more roll than they have time for gets damped.
 
+**And then the cap was set too low, which is a different bug wearing the same clothes.** At
+`swayRateMax = 0.70` the cap was the binding constraint at *every* walking speed rather than only
+fast ones. The boldest character in the cast asks for 9.7°:
+
+| ground speed | cadence | cap | delivered |
+| --- | --- | --- | --- |
+| 0.30 (stroll) | 1.4 /s | ×0.93 | 9.0° |
+| 0.50 (walk) | 2.4 /s | ×0.56 | 5.4° |
+| 0.80+ | 3.4 /s | ×0.39 | **3.8°** |
+
+So the top of the `sway` span was unreachable above about 1.4 steps/s, and *widening the span
+would have delivered nothing* — the cap simply scaled it back to 0.70 rad/s again. This is
+invisible from either number alone: the span looks generous, the cap looks physical, and the
+symptom is "the sway slider does nothing", which is the report that found it.
+
+Now `swayRateMax = 1.25` (72 deg/s) and `sway` tops out at `0.26` (15°). The cap still bites —
+×0.65 at a normal walk, ×0.45 at full cadence — so hurrying still damps the roll; it just is not
+also the ceiling on a stroll. Delivered roughly doubles everywhere: 14.9° / 9.7° / 6.7°.
+
+The self-check pins **both directions**: faster cadence must roll less, *and* a strolling
+character must be delivered ≥90% of what the span authors.
+
 This has a consequence worth knowing: **style is leg-length-independent at matched CADENCE, not
 at matched ground speed.** A short-legged character at a given speed steps faster, so the cap
 binds sooner on them. That is a physical constraint applying to everyone identically, not a

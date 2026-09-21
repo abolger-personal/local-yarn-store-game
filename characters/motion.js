@@ -128,7 +128,19 @@ export const MOTION_DEFAULTS = Object.freeze({
   // the lab: against a top honest walk near 1.2 this means the legs ease in over most of the
   // range rather than snapping to a full stride the instant a character moves.
   gateSpeed: 0.86,
-  swayRateMax: 0.70,  // rad/s: the fastest the torso will roll, ~40 deg/s. See walkLayer.
+  // rad/s: the fastest the torso will roll, ~72 deg/s. See walkLayer.
+  //
+  // Raised from 0.70 once the idle weight shift stopped fighting the sway on the same joint.
+  // At 0.70 this cap was the binding constraint at EVERY walking speed, not just fast ones:
+  // the boldest character asked for 9.7 degrees and was delivered 9.0 at a stroll, 5.4 at a
+  // normal walk and 3.8 at anything from a brisk walk up -- so widening the sway span alone
+  // would have bought exactly nothing above about 1.4 steps/s. The cap, not the span, was the
+  // ceiling anyone tuning sway was actually hitting.
+  //
+  // 1.25 keeps the cap doing its job -- it still bites at x0.65 at a normal walk and x0.45 at
+  // full cadence, so hurrying still damps the roll -- while leaving a stroller's swagger
+  // untouched, which is the walk the cap was strangling.
+  swayRateMax: 1.25,
   cadenceMax: 3.4,   // steps/sec before stride stretches instead of cadence rising
   sinMax:    0.5646, // sin(0.6 rad): the most scissor that still reads as walking
 });
@@ -190,7 +202,12 @@ export const BASE_MOTION_RANGES = Object.freeze({
  */
 export const STYLE_RANGES = Object.freeze({
   armGain:   [0.20, 1.10],   // how much the arms counter-swing
-  sway:      [0.02, 0.17],   // how far the body rolls over the planted foot
+  // How far the body rolls over the planted foot. The top was 0.17 while the idle weight shift
+  // was rolling the same joint underneath it -- the two beating against each other read as a
+  // bobble-head, and the only sway that looked clean was a small one. With that gone, the roll
+  // is the only thing on the axis and can be a real swagger: 15 degrees at the top, which is
+  // big for a person and right for a stylised animal seen across a room.
+  sway:      [0.02, 0.26],
   lean:      [0.00, 0.17],   // how far they lean into the walk
   headCarry: [-0.24, 0.22],  // negative = head up and open, positive = head down and closed
   // The head COCK: a sideways tilt held while curious. Deliberately a different axis from

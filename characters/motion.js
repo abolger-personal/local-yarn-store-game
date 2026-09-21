@@ -501,8 +501,13 @@ function rhythms(seed) {
     seed: seed * TAU,
     idlePhase: seed * TAU,            // breathing
     fidgetPhase: seed * TAU,          // its own clock, and a faster one: see FIDGET_W
-    rateA: 0.85 + seed * 0.30,        // per-character sub-rhythm rates: see idleLayer
-    rateB: 0.38 + (1 - seed) * 0.22,
+    // Per-character sub-rhythm rates: see idleLayer. WIDE, because these set how long each
+    // character holds a weight shift, and at the old 0.85..1.10 that was a 24% spread -- every
+    // character rolling with the same 4s period, which reads as one shared wave however offset
+    // their phases are. Incommensurate rates are what stop an idle looping visibly, and rates
+    // this close are very nearly commensurate.
+    rateA: 0.55 + seed * 1.05,        // 2.9x, so periods genuinely differ rather than beat
+    rateB: 0.30 + (1 - seed) * 0.55,
     blinkT: 1 + seed * 4,
     earT: 0.7 + seed * 5,             // offset from the blink so the two never sync up
     earWay: seed < 0.5 ? -1 : 1,      // which ear leads a flick
@@ -588,7 +593,18 @@ export function integrate(m, target, dt, opts) {
 function advanceClocks(m, dt, opts) {
   m.idlePhase += dt * BREATH_W * breathRate(opts.idleRate);
   if (m.idlePhase > TAU * 1e6) m.idlePhase %= TAU;
-  m.fidgetPhase += dt * FIDGET_W * opts.idleRate;
+  // THE GATE STOPS THE CLOCK; it does not fade the lean out.
+  //
+  // Scaling the weight shift's AMPLITUDE by the duty gate dragged every character smoothly back
+  // through upright and out again on a ~10s cycle -- a slow envelope on a slow sine, which is a
+  // swell, and the measured roll then spent 51% of its time in the middle third of its range.
+  // That envelope was most of the "seasick on an invisible boat".
+  //
+  // It is also not what a body does. When you stop shifting about you do not glide back to
+  // centre; you stay standing on whichever foot you were already on. Freezing the clock says
+  // exactly that, and it is the same line of code.
+  m.fidgetPhase += dt * FIDGET_W * opts.idleRate
+    * dutyGate(m.idlePhase, opts.idleDuty ?? 1, m.seed);
   if (m.fidgetPhase > TAU * 1e6) m.fidgetPhase %= TAU;
 
   m.blinkT -= dt;
@@ -760,7 +776,25 @@ function idleLayer(out, m, opts, a) {
   // makeMotion), so no two characters run the same loop at an offset -- incommensurate rates
   // never repeat, and a visible repeat is what makes an idle read as an animation, not as life.
   const q = m.fidgetPhase;
-  const w = Math.sin(q * m.rateA + m.seed);
+  // DWELL, and this is what stops a cast reading as "seasick on an invisible boat".
+  //
+  // A weight shift is not a sine. You stand on one foot, stay there a while, then move your
+  // weight across and stay on the other. A sine never stays anywhere: it is always mid-crossing,
+  // and a body whose lateral lean is a continuous smooth sinusoid is doing exactly what a boat
+  // does. Measured on a standing owl, the roll spent 55% of its time inside the middle third of
+  // its range and only 24% out near an extreme -- worse than a raw sine, because the duty gate
+  // fades it in and out THROUGH zero as well.
+  //
+  // tanh flattens the crests and steepens the crossing without changing the period or the
+  // amplitude, so it is the same shift arriving decisively instead of drifting. It is not a
+  // square wave: the transitions stay smooth, which is what keeps it a shift of weight rather
+  // than a flinch.
+  //
+  // This is NOT a synchronisation problem, which is worth recording because it looked like one.
+  // Measured pairwise correlation of spine roll across a cast of eight standing for a minute:
+  // mean |r| = 0.05, i.e. independent. They were never moving together; they were each moving
+  // in a way that reads as a wave.
+  const w = Math.tanh(2.2 * Math.sin(q * m.rateA + m.seed)) / Math.tanh(2.2);
 
   // THE WEIGHT SHIFT FADES OUT AS THEY WALK, and it is not a nicety.
   //
@@ -773,7 +807,9 @@ function idleLayer(out, m, opts, a) {
   // `still` is one frame stale -- compose runs before walkGain each tick -- which is invisible
   // at any frame rate and much simpler than reordering the pipeline for it.
   const still = 1 - (m.walkGain ?? 0);
-  out.spineRoll += g * still * 0.085 * w;
+  // `a`, not `g`: the duty gate now holds the POSE by stopping the clock (see advanceClocks)
+  // rather than shrinking the lean, so gating here as well would fade it out twice.
+  out.spineRoll += a * still * 0.085 * w;
 
   // The hip part of the weight shift FADES OUT as the character folds up, and this is not a
   // nicety. groundCharacter derives root Y from the lowest foot, whose sensitivity to hipFlex is
@@ -785,7 +821,7 @@ function idleLayer(out, m, opts, a) {
   //
   // It is also just wrong: you do not shift your weight between your feet while sitting on them.
   const upright = clamp01(1 - Math.abs(out.hipFlex) / 0.9);
-  out.hipFlex += g * upright * still * 0.020 * Math.sin(q * m.rateA * 2 + m.seed);
+  out.hipFlex += a * upright * still * 0.020 * Math.sin(q * m.rateA * 2 + m.seed);
   // LOOKING AROUND IS CURIOSITY, and it gets its own amount rather than riding the general
   // fidget amplitude. These used to be multiplied -- `g` already carries idleAmp -- which let
   // Extraversion drive head movement harder than Openness did: measured on the owl's own spans,

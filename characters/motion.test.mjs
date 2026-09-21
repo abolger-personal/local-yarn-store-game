@@ -211,11 +211,17 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
   const sample = (duty) => {
     const m = makeMotion(POSES.rest, 0.4);
     const buf = out();
-    let stillFrames = 0, peakSway = 0, peakBreath = 0;
+    let stillFrames = 0, peakSway = 0, peakBreath = 0, prev = null;
     for (let i = 0; i < 7200; i++) {           // two minutes
       integrate(m, POSES.rest, 1 / 60, { ...o, idleDuty: duty });
       compose(buf, m, { ...o, idleDuty: duty });
-      if (Math.abs(buf.spineRoll) < 0.004) stillFrames++;
+      // STILL MEANS NOT MOVING, not "near upright", and the difference is the whole model.
+      // The duty gate stops the fidget CLOCK, so a gated character holds whichever foot they
+      // were already standing on -- which is what a body does, and what stopped the cast washing
+      // back through centre every cycle like a swell. Measuring |spineRoll| would now call a
+      // character standing perfectly still on one foot "fidgeting".
+      if (prev !== null && Math.abs(buf.spineRoll - prev) < 1e-4) stillFrames++;
+      prev = buf.spineRoll;
       peakSway = Math.max(peakSway, Math.abs(buf.spineRoll));
       peakBreath = Math.max(peakBreath, Math.abs(buf.spineBend));
     }
@@ -285,6 +291,69 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
       + 'switch and the A/B for measuring what continuous motion costs');
   }
   assert.equal(off.blinks, 0, 'idleAmount 0 stops the blinking too -- no idle means no idle');
+}
+
+// --- a weight shift holds, it does not wash ----------------------------------------------------
+//
+// "It looks like all my NPCs are seasick on an invisible boat, rocking to the same boat wave."
+//
+// It was NOT a synchronisation problem, and checking that first is what found the real one:
+// pairwise correlation of spine roll across a cast of eight standing for a minute came out at
+// mean |r| = 0.05, i.e. independent. They were never moving together.
+//
+// They were each moving like a wave. A weight shift is a hold, not a sinusoid: you stand on one
+// foot, stay, then move across and stay. A sine is never anywhere -- always mid-crossing -- and
+// the measured roll spent 55% of its time inside the middle third of its range against only 24%
+// out near an extreme. Continuous smooth lateral lean is what a boat does.
+{
+  const o = opts();
+  const m = makeMotion(POSES.rest, 0.4);
+  const buf = out();
+  const trace = [];
+  for (let i = 0; i < 7200; i++) {           // two minutes
+    integrate(m, POSES.rest, 1 / 60, o);
+    compose(buf, m, o);
+    trace.push(buf.spineRoll);
+  }
+  const amp = Math.max(...trace.map(Math.abs));
+  const frac = (test) => trace.filter(test).length / trace.length;
+  const middle = frac((v) => Math.abs(v) < amp * 0.33);
+  const ends = frac((v) => Math.abs(v) > amp * 0.75);
+
+  // A raw sine sits at 21% middle / 33% ends. Anything that washes through the centre MORE than
+  // a sine does is a wave, not a shift.
+  assert.ok(ends > middle,
+    `a weight shift must spend longer held on a foot (${(100 * ends).toFixed(0)}%) than crossing `
+    + `between them (${(100 * middle).toFixed(0)}%) -- a lean that is always mid-crossing is a `
+    + 'boat, and reads as one');
+  // 0.55 rather than 0.35, so this pins BOTH halves of the fix rather than only the louder one.
+  // Measured on a standing owl: the original sine-with-a-faded-amplitude gave 24% held; stopping
+  // the clock instead of fading the amplitude took it to 43%; flattening the crests with tanh on
+  // top took it to 73%. A threshold of 0.35 would have been satisfied by the clock gate alone
+  // and would have let the waveform quietly go back to a sine.
+  assert.ok(ends > 0.55,
+    `and genuinely dwell at the extremes (${(100 * ends).toFixed(0)}%; a pure sine manages 46%, `
+    + 'and a sine whose amplitude is faded in and out manages 24%)');
+  // ...without becoming a flinch: it must still take real time to cross.
+  assert.ok(middle > 0.08,
+    `but the crossing must stay smooth (${(100 * middle).toFixed(0)}% mid) -- a square wave is a `
+    + 'twitch, not a shift of weight');
+}
+
+// --- characters must not share a rhythm --------------------------------------------------------
+//
+// The other half of the boat report. Phases are seeded per character, so nobody starts together
+// -- but if every character's sub-rhythm runs at nearly the same RATE, they all roll with the
+// same period and the eye reads one shared wave regardless of offset. rateA was 0.85..1.10, a
+// 24% spread, which is very nearly commensurate.
+{
+  const rates = [];
+  for (let i = 0; i < 200; i++) rates.push(makeMotion(POSES.rest, i / 200).rateA);
+  const lo = Math.min(...rates), hi = Math.max(...rates);
+  assert.ok(hi / lo > 2,
+    `idle sub-rhythms must differ by more than 2x across a cast (got ${(hi / lo).toFixed(2)}x, `
+    + `${lo.toFixed(2)}..${hi.toFixed(2)}) -- close rates beat against each other instead of `
+    + 'being independent, which is what makes a crowd look like one wave');
 }
 
 // --- the head must not outrun the body it is attached to --------------------------------------

@@ -106,10 +106,18 @@ export const S = {
   // that says nothing about real seconds — and at the old 30s the cast walked for ~1.5s and then
   // stood frozen for 28. This is just over the longest a staggered walk can take
   // (travelJitter + travel * (1 + paceJitter)), so a round ends about when the motion does.
-  autoSeconds: 3,
+  autoSeconds: 4,
   dayGap: 0,            // seconds the shop sits empty between closing and the next day's queue
   travel:      1.4,     // seconds of animation per round of movement
-  travelJitter: 0.5,    // max random delay before an NPC sets off, so departures stagger
+  // The window departures are spread across. Raised from 0.5 because it is shared between the
+  // WHOLE cast: retarget now hands each NPC their own slot inside it (see world.js) rather than
+  // drawing uniformly, which stops them clustering — but eight customers sharing 0.5s is a 62ms
+  // gap however evenly it is divided, and 62ms apart is simultaneous to the eye. At 1.6 the gap
+  // is ~200ms, which reads as people noticing at different moments rather than answering a bell.
+  //
+  // Bounded by the round: travelJitter + travel * (1 + paceJitter) should fit inside
+  // autoSeconds, or a round ends before the walk it started does. 1.6 + 1.4*1.25 = 3.35.
+  travelJitter: 1.6,
   paceJitter:  0.25,    // +/- fraction on each NPC's own travel time, so arrivals stagger too
   // How far a seated NPC rises so they rest ON the chair rather than through it. The rig grounds
   // every pose to feet-at-zero, so this cannot be derived — it needs eyeballing per seat height.

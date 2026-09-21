@@ -84,20 +84,9 @@ function pacingRows() {
   gui.add(S, 'travel', 0.2, 4, 0.1).name('travel anim (s)');
   gui.add(S, 'travelJitter', 0, 2, 0.05).name('start stagger (s)');
   gui.add(S, 'paceJitter', 0, 0.6, 0.05).name('pace variation (±)');
-  gui.add(S, 'seatLift', 0, 0.35, 0.005).name('seated height').onChange(liftSeated);
-}
-
-/** Re-seat everyone at the new height. Only the seated: standing NPCs are grounded at zero. */
-function liftSeated() {
-  for (const rec of cast) {
-    if (rec.npc.seat === null) continue;
-    // BOTH ends of the tween, and no root.position.y write. Grounding owns y and rewrites it
-    // every frame from the seat lift plus the foot solve, so a direct write here would survive
-    // for exactly one frame; setting fromY as well is what makes the slider land immediately
-    // rather than easing in over the rest of whatever move is in flight.
-    rec.fromY = S.seatLift;
-    rec.toY = S.seatLift;
-  }
+  // No onChange: the seat height is read live every frame by groundOffsetFor, so the slider
+  // moves everyone already seated without a re-seat pass.
+  gui.add(S, 'seatLift', 0, 0.35, 0.005).name('seated height');
 }
 
 function perfRows() {

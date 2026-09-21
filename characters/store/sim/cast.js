@@ -283,23 +283,26 @@ function seatedness(rec) {
   return Math.min(1, Math.max(0, valueOf(rec.built.motion, 'hipFlex') / POSES.sit.hipFlex));
 }
 
-function groundOffsetFor(rec) {
-  const lift = liftNow(rec);
-  const grounded = rec.built.root.position.y - (rec.built.groundOffset ?? 0);
-  return lift - seatedness(rec) * grounded + rec.hop;
-}
-
 /**
- * How far off the floor the seat tween currently has this character.
+ * THE LIFT RIDES THE LEGS TOO, and that is the rest of the same idea.
  *
- * Exported because `retarget` has to restart the tween from wherever it actually got to, and it
- * can no longer read that off `root.position.y`: that is the GROUNDED height now — lift plus the
- * foot solve — so reading it back would feed the leg geometry into the seat lift and every
- * retarget would sink or raise the whole cast by however bent their knees happened to be.
+ * The height used to tween on moveT — it arrived when the WALK finished — while the sit pose
+ * only began once moveT hit 1. So a character reached the chair already raised to seat height
+ * but still standing, hung there in the air, and dropped into the chair a round later when they
+ * finally folded. Reported as "floating over seats, then teleporting down".
+ *
+ * Both halves now come off `seatedness`, so rising and folding are the same motion and there is
+ * no window where one has happened and the other has not. There is no tween left to run: the
+ * spring that bends the hips IS the timing, which is also why standing up is smooth for free
+ * rather than needing its own easing.
+ *
+ * S.seatLift is read live rather than captured, so the GUI slider moves everyone at once with no
+ * re-seat pass.
  */
-export function liftNow(rec) {
-  const e = rec.moveT * rec.moveT * (3 - 2 * rec.moveT);
-  return rec.fromY + (rec.toY - rec.fromY) * e;
+function groundOffsetFor(rec) {
+  const sat = seatedness(rec);
+  const grounded = rec.built.root.position.y - (rec.built.groundOffset ?? 0);
+  return sat * (S.seatLift - grounded) + rec.hop;
 }
 
 /**

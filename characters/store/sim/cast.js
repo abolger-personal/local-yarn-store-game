@@ -377,6 +377,7 @@ function groundOffsetFor(rec) {
  */
 function stepWalk(rec, n, dt) {
   const wasX = rec.baseX, wasZ = rec.baseZ;
+  let routed = false;
 
   if (rec.wait > 0) {
     rec.wait -= dt;
@@ -395,14 +396,29 @@ function stepWalk(rec, n, dt) {
     rec.baseX = at.x;
     rec.baseZ = at.z;
     rec.travelled = at.total;
+    routed = true;
     // Facing comes from the LEG being walked, not from the start-to-end line: rounding a table
     // means turning, and an NPC who keeps facing their final destination crabs sideways.
     if (at.total > 0.05) rec.faceTo = at.facing;
   }
 
-  // Handed to stepGait, which turns it into a fraction of a stride. Distance is NOT
-  // accumulated here any more -- see phaseStep for why a running total was the bug.
-  rec.moved = Math.hypot(rec.baseX - wasX, rec.baseZ - wasZ);
+  // ONLY THE ROUTE COUNTS AS WALKING.
+  //
+  // This used to be every change in position, which sounded principled -- "all of it is
+  // movement, and all of it reaches the legs by being movement" -- and was wrong the moment
+  // something other than the route started moving the base. Getting out of a chair does: it
+  // slides the body forward off the cushion, and reading that as ground covered opened the walk
+  // gate on a character whose feet were planted. Measured on a stand-up: one frame at 13.8
+  // units/s as the base handed over between route and chair, which pinned walkGain at 1, after
+  // which the legs sat open at phase 0.86 and closed over the next second. That is the "weird
+  // little cycle" -- a stride that never went anywhere, triggered by a number that was never a
+  // speed.
+  //
+  // Standing up is not a stride anyway. The body rises and travels forward over feet that stay
+  // where they are; the step comes after. Everything the old measurement was meant to catch --
+  // a display dragged out from under someone, a retarget mid-stride, separation nudges -- comes
+  // through walkRoute, so it is all still inside this branch.
+  rec.moved = routed ? Math.hypot(rec.baseX - wasX, rec.baseZ - wasZ) : 0;
   // dt is clamped to 0.1 upstream (main.js), so this cannot divide by something tiny.
   rec.speed = dt > 0 ? rec.moved / dt : 0;
 }
@@ -561,13 +577,23 @@ function placeSeated(rec) {
   // It moves the BASE rather than being a display offset on top of it, and that is deliberate:
   // base is what the gait measures its speed from, so stepping off the chair drives the legs and
   // reads as a step. A display offset would have slid them off the seat with their feet still.
-  // The route wins only once they have actually GIVEN UP the chair. A customer who stays
-  // seated for another round still gets retargeted -- the sim aims them at the seat they are
-  // already in -- and letting that route run dragged them forward off the back of the cushion
-  // to the centroid while still sitting. Measured: -0.088 creeping to -0.002 over two seconds,
-  // for a character who never stood up.
+  // THE CHAIR PLACES THEM UNLESS THEY ARE ACTUALLY GOING SOMEWHERE, and "still holds the chair"
+  // is not the same question.
+  //
+  // A customer who stays seated for another round still gets retargeted -- the sim aims them at
+  // the seat they are already in -- so letting any running route win dragged them forward off
+  // the back of the cushion. But gating on whether they still HOLD the seat was worse: someone
+  // who keeps the chair while walking off to look at something had the route and the chair
+  // writing the base on alternate lines of the same frame, each undoing the other. That reads as
+  // a speed of 64 units/s, which pinned the walk gate open and is the rest of the "weird little
+  // cycle".
+  //
+  // The honest test is the route's own length. A round that keeps someone in their chair has
+  // nowhere to walk to, so it is a few millimetres long; a round that sends them across the shop
+  // is not. Under the threshold the chair decides where they are, over it the route does, and
+  // nothing writes the base twice.
   if (!seat) return;
-  if (rec.npc.seat === null && rec.wait <= 0 && rec.moveT < 1) return;
+  if (rec.wait <= 0 && rec.moveT < 1 && rec.travelled > 0.15) return;
   calibrateSeat(rec, sat);
   const stand = CHAIR_W / 2 + STAND_CLEAR;
   const along = stand + (sitAlong(rec.built.params) - stand) * sat;

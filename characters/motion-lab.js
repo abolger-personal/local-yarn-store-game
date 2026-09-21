@@ -72,6 +72,7 @@ const POSE_NAMES = Object.keys(POSES);
 const S = {
   species: speciesIds()[0],
   count: 2,
+  extremes: false,         // the 8 corner personalities instead of random ones
   allSpecies: false,       // one character per species from IDENTICAL traits
   view: 'felted',
   // bake-off
@@ -169,7 +170,8 @@ resize();
 
 /**
  * @typedef {{built: any, motion: any, opts: any, engine: string, traits: any,
- *   walkDist: number, lane: number, maxDv?: number, skate?: number, top?: number}} Actor
+ *   walkDist: number, lane: number, maxDv?: number, skate?: number, top?: number,
+ *   label?: string, odd?: string}} Actor
  */
 /** @type {Actor[]} */
 let cast = [];
@@ -184,6 +186,61 @@ function clearCast() {
 /** The trait set every species shares while `allSpecies` is on. */
 let shared = null;
 
+/** The eight corner rows while `extremes` is on, else null. @type {Corner[] | null} */
+let matrix = null;
+
+// THE EXTREMES MATRIX. Random casts are the wrong instrument for learning the range of the
+// system: eight random personalities cluster near the middle of every dial and you end up
+// comparing near-duplicates. This walks the corners instead.
+//
+// Four factors drive motion, so "three at 5 and one at 1" has exactly four members -- one per
+// choice of which factor is low -- and "three at 1 and one at 5" has four more. Eight, which is
+// the whole cast, and each factor appears low twice and high twice across it. That is a
+// near-orthogonal design: read DOWN a column to see one factor's effect with the others held
+// at an extreme, and the difference is attributable rather than confounded.
+const FACTOR_ORDER = ['E', 'N', 'C', 'O'];
+
+/**
+ * The eight corner personalities.
+ *
+ * @typedef {{E: number, N: number, C: number, O: number, label: string, odd: string}} Corner
+ * @returns {Corner[]}
+ */
+function extremesMatrix() {
+  const rows = [];
+  for (const [base, odd] of [[5, 1], [1, 5]]) {
+    for (const k of FACTOR_ORDER) {
+      const v = (x) => (x === k ? odd : base);
+      rows.push({
+        E: v('E'), N: v('N'), C: v('C'), O: v('O'),
+        // CASE IS THE VALUE: upper = 5, lower = 1. So "ENCo" is high on everything but
+        // Openness and "encO" is low on everything but Openness. Marking merely which factor
+        // was the odd one out gave both of those the same label, which is the one thing the
+        // label exists to tell apart.
+        label: FACTOR_ORDER.map((x) => (v(x) === 5 ? x : x.toLowerCase())).join(''),
+        odd: k,
+      });
+    }
+  }
+  return rows;
+}
+
+/**
+ * A corner row as the ten spec-named assets: both halves of a factor take the same value.
+ * @param {Corner} row
+ */
+function traitsOf(row) {
+  return {
+    Enthusiasm: row.E, Assertiveness: row.E,
+    Volatility: row.N, Withdrawal: row.N,
+    Industriousness: row.C, Orderliness: row.C,
+    Openness: row.O, Intellect: row.O,
+    // Agreeableness drives no motion, so it is pinned mid rather than varied -- varying it
+    // would suggest it does something here.
+    Compassion: 3, Politeness: 3,
+  };
+}
+
 /**
  * Builds one TRIO per slot: identical params, identical traits, one engine each.
  *
@@ -192,13 +249,15 @@ let shared = null;
  */
 function buildCast() {
   clearCast();
-  const ids = S.allSpecies ? speciesIds() : Array.from({ length: S.count }, () => S.species);
+  const n = S.extremes ? 8 : S.count;
+  const ids = S.allSpecies ? speciesIds() : Array.from({ length: n }, () => S.species);
   // "one per species, SAME traits" means one trait roll shared by every species -- that is the
   // whole comparison, temperament held constant so any difference left is the species' own
   // MOTION_RANGES. Rolling per slot instead made each species a different character and there
   // was nothing to compare. Rerolling then replaces the shared set, which is what makes the
   // button do something visible in this mode.
   shared = S.allSpecies ? randomTraits() : null;
+  matrix = S.extremes && !S.allSpecies ? extremesMatrix() : null;
   ids.forEach((id, i) => addPair(id, i, ids.length));
   setViewMode(group, S.view);
   refreshRoster();
@@ -217,29 +276,45 @@ function buildCast() {
 function addPair(id, slot, slots) {
   const kit = getSpecies(id);
   const params = { ...BASE_PARAMS, ...kit.defaults };
-  if (!S.allSpecies) kit.randomise?.(params);
-  const traits = shared ?? randomTraits();
+  // In matrix mode every body is IDENTICAL -- no randomise() -- because leg length dominates a
+  // walk far more than temperament does, and the point here is to see what temperament alone
+  // is worth. Randomised bodies would put a stilt llama next to a stumpy one and the motion
+  // difference would be unreadable underneath.
+  if (!S.allSpecies && !matrix) kit.randomise?.(params);
+  const corner = matrix?.[slot];
+  // ...except COLOUR, which is the one thing that cannot affect motion. Eight identical grey
+  // owls are a correct experiment and a useless one: the roster chips all match and there is no
+  // way to say which critter on screen is which row. A hue per corner fixes that and changes
+  // nothing that moves.
+  if (corner) {
+    const hue = (slot / 8) * 360;
+    params.bodyColor = `hsl(${hue.toFixed(0)}, 42%, 62%)`;
+    if (kit.coatColorKey) params[kit.coatColorKey] = `hsl(${hue.toFixed(0)}, 38%, 52%)`;
+  }
+  const traits = corner ? traitsOf(corner) : (shared ?? randomTraits());
   // Shared ACROSS the trio, varied across slots. The three rows of one slot must differ by the
   // interpolator and nothing else, or the comparison is contaminated -- but two different slots
   // should still look like two different characters, which is what the idle seed provides.
-  const walkDist = Math.random() * 0.4;
-  const seed = Math.random();
+  // Matrix mode also fixes the idle seed and the stride phase, for the same reason: they are
+  // deliberate noise, and noise is exactly what you do not want while reading a comparison.
+  const walkDist = matrix ? (slot / slots) * 0.4 : Math.random() * 0.4;
+  const seed = matrix ? (slot + 0.5) / slots : Math.random();
 
   const shown = shownEngines();
   shown.forEach((engine, row) => {
     const lane = slot * (shown.length + 0.7) + row;
     addOne(kit, params, engine, traits, seed, walkDist,
-      (lane - (slots * (shown.length + 0.7) - 1.7) / 2) * 0.8);
+      (lane - (slots * (shown.length + 0.7) - 1.7) / 2) * 0.8, corner?.label, corner?.odd);
   });
 }
 
 /** One built character in one lane, running one engine. */
-function addOne(kit, params, engine, traits, seed, walkDist, z) {
+function addOne(kit, params, engine, traits, seed, walkDist, z, label, odd) {
   const built = createCharacter({ ...params }, kit);
   built.root.position.set(0, 0, z);
   group.add(built.root);
   cast.push({
-    built, engine, traits, lane: z, walkDist,
+    built, engine, traits, lane: z, walkDist, label, odd,
     motion: makeMotion(built.params, seed),
     opts: coeffs(traits, kit, engine),
   });
@@ -553,10 +628,14 @@ function rosterRow(a) {
     ? `<span class="chip" style="background:${P[coat]}"></span>` : '';
   const swatch = `<span class="chip" style="background:${P.bodyColor}"></span>${second}`;
   const F = factors(a.traits);
-  // one decimal, because a factor is the mean of two 1-5 assets and lands on halves
-  const traits = TRAIT_COLS.map(([, full]) => `<td>${F[full.replace('/', '')].toFixed(1)}</td>`)
-    .join('');
-  return `<tr><td>${swatch} ${a.built.species.label}</td>${traits}`
+  // In matrix mode the odd-one-out factor is the whole point of the row, so mark its cell --
+  // eight rows of near-identical digits are unreadable otherwise.
+  const traits = TRAIT_COLS.map(([ab, full]) => {
+    const v = F[full.replace('/', '')].toFixed(1);
+    return a.odd === ab ? `<td class="odd">${v}</td>` : `<td>${v}</td>`;
+  }).join('');
+  const who = a.label ? `<span class="corner">${a.label}</span>` : a.built.species.label;
+  return `<tr><td>${swatch} ${who}</td>${traits}`
     + `<td class="co">${o.stiff.toFixed(0)}</td><td class="co">${o.zeta.toFixed(2)}</td>`
     + `<td class="co">${o.idleAmp.toFixed(2)}</td><td class="co">${o.stride.toFixed(2)}</td>`
     + `<td class="co">${o.headArc.toFixed(2)}</td></tr>`;
@@ -671,6 +750,14 @@ knob(fCast, S, 'species', 'species', 'Which species to fill the lab with.', spec
   .onChange(buildCast);
 knob(fCast, S, 'count', 'how many', 'Characters per row. Each gets its own random personality.',
   1, 8, 1).onChange(buildCast);
+knob(fCast, S, 'extremes', 'extremes, not random',
+  'Replaces the random cast with the EIGHT corner personalities: four with three factors at 5 '
+  + 'and one at 1, four with three at 1 and one at 5. Every factor is low twice and high twice '
+  + 'across the row, so reading down a roster column shows what that one factor is worth. '
+  + 'Bodies, idle seeds and stride phase are all held identical in this mode — leg length '
+  + 'dominates a walk far more than temperament does, so randomised bodies would bury exactly '
+  + 'the thing you are trying to see. Forces the cast to 8.').onChange(buildCast);
+
 knob(fCast, S, 'allSpecies', 'compare species',
   'One of every species, all given the SAME personality. Any difference you then see comes only '
   + 'from that species\u2019 own variation spans.').onChange(buildCast);

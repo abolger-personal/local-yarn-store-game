@@ -298,6 +298,38 @@ which is above the honest ceiling for every character shorter than about 0.35 le
 the cast is authored leggier. Coming down is the right call and this branch is what makes it
 affordable: longer rounds stop reading as statues once idles land.
 
+## Reading the motion range: the extremes matrix
+
+`extremes, not random` in the lab replaces the random cast with the eight CORNER personalities.
+Random casts are the wrong instrument for learning what the system can do — eight random
+personalities cluster near the middle of every dial and you end up comparing near-duplicates.
+
+Four factors drive motion, so "three at 5 and one at 1" has exactly four members and "three at 1
+and one at 5" has four more. Eight, which is the whole cast, and each factor appears low twice
+and high twice across it. Read DOWN a roster column and that factor's effect is attributable
+rather than confounded.
+
+Labels encode the values: **upper = 5, lower = 1**. `ENCo` is high on everything but Openness;
+`encO` is low on everything but Openness. The odd-one-out cell is marked in the roster.
+
+Everything that is not personality is held identical — body params, idle seed, stride phase —
+because leg length dominates a walk far more than temperament does, and randomised bodies bury
+exactly the thing the mode exists to show. The one exception is COLOUR, which cannot affect
+motion: each corner gets its own hue, because eight identical grey owls is a correct experiment
+and a useless one.
+
+What the corners produce, on the shared spans:
+
+| label | E | N | C | O | stiff | zeta | idle | stride | head |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `Enco` | 5 | 1 | 1 | 1 | **240** | 0.73 | **1.60** | 1.40 | 0.50 |
+| `eNco` | 1 | 5 | 1 | 1 | **60** | **0.45** | **0.40** | 1.40 | 0.50 |
+| `enCo` | 1 | 1 | 5 | 1 | 150 | **1.00** | 1.00 | **2.24** | 0.50 |
+| `encO` | 1 | 1 | 1 | 5 | 150 | 0.73 | 1.00 | 1.40 | **1.50** |
+
+Every dial reaches both ends of its span across the eight, which is the check that the trait
+mapping is actually wired.
+
 ## Bugs this work found and fixed, worth not reintroducing
 
 1. **Foot skate, twice — and the second time was my own "fix".** A phase is one CYCLE, which is

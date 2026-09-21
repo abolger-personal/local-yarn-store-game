@@ -361,6 +361,42 @@ the shelf.
 materials, 18 geometries, unchanged for both species. The neck joint already existed and was
 already written every frame — what it lacked was anything interesting to be told.
 
+## Two constraints the walk was missing
+
+**Head stabilisation.** The neck is a child of the spine, so every degree the torso rolls is a
+degree the neck rolls, multiplied by how far up the head sits. Measured while walking: the
+llama's head swung **112mm side to side per step, 11% of its own height**. Nothing about the neck
+was wrong — it was faithfully riding a torso doing exactly what it was told.
+
+Real long-necked animals do the opposite. A walking chicken, crane or camelid holds its head
+almost fixed while the body sways underneath, and `neckStabilise` now does that, scaled by neck
+length. Llama 112mm → **44mm**, and the llama is now steadier than the owl (4.3% of height
+against 8.4%), which is the right way round.
+
+**Roll only, deliberately.** Pitch carries posture — `attend`, and `POSES.browse` leaning in to
+look at the goods — and a neck that cancelled pitch would undo the gesture those exist to make.
+Roll has no posture on it.
+
+**The sway rate cap.** Sway is an AMPLITUDE and says nothing about how fast the torso gets there:
+peak roll rate is `amp · TAU · cadence / 2`, so the same 8 degrees of lean is 26 deg/s at a
+stroll and **87 deg/s at a scurry**. The first is a swagger, the second is a vibration — which is
+why the sway looked wrong at speed and looked right the moment the step rate came down.
+
+`swayRateMax` caps the rate rather than scaling by cadence, so a character who already sways
+gently is untouched and only someone asking for more roll than they have time for gets damped.
+
+This has a consequence worth knowing: **style is leg-length-independent at matched CADENCE, not
+at matched ground speed.** A short-legged character at a given speed steps faster, so the cap
+binds sooner on them. That is a physical constraint applying to everyone identically, not a
+style difference, and the self-check compares at matched cadence for exactly that reason.
+
+## armTuck is an emotion, not a trait
+
+Holding your arms in against your body reads as tense — a state you are in now, not a way you
+are — and wired to Neuroticism it made every anxious character permanently braced. `motionOf`
+pins it at zero; the channel, its span and its knob remain for an emotional layer to drive.
+It is the one coefficient exempt from the span-occupancy check, by name and with the reason.
+
 ## Bugs this work found and fixed, worth not reintroducing
 
 1. **Foot skate, twice — and the second time was my own "fix".** A phase is one CYCLE, which is

@@ -107,7 +107,7 @@ export const MOTION_DEFAULTS = Object.freeze({
                      // is sin(swingAmp) = stride/2, so stride is capped near 2*sinMax ~ 1.13
                      // before the legs physically cannot reach far enough and skate begins.
   bounce:    0.05,   // NEGATIVE cancels the free bounce; see walkLayer
-  kneeLift:  0.55,   // swing-leg knee flexion. Without it the legs are sticks and both feet stomp.
+  kneeLift:  0.55,   // swing-leg knee flexion; per-species, see BASE_MOTION_RANGES
   armGain:   0.55,
   sway:      0.075,  // lateral body lean per step. The side-to-side half of a walk.
   attend:    0,      // lean in, paying attention; crossfades with `lean` once walking
@@ -115,7 +115,11 @@ export const MOTION_DEFAULTS = Object.freeze({
   headCock:  0,      // sideways head tilt held while curious; sign is per-character
   armTuck:   0,
   lean:      0.06,   // forward lean at full speed
-  gateSpeed: 0.35,   // ground speed at which the walk layer reaches full weight
+  // Ground speed at which the walk layer reaches full weight. Raised from 0.35 after tuning in
+  // the lab: against a top honest walk near 1.2 this means the legs ease in over most of the
+  // range rather than snapping to a full stride the instant a character moves.
+  gateSpeed: 0.86,
+  swayRateMax: 0.70,  // rad/s: the fastest the torso will roll, ~40 deg/s. See walkLayer.
   cadenceMax: 3.4,   // steps/sec before stride stretches instead of cadence rising
   sinMax:    0.5646, // sin(0.6 rad): the most scissor that still reads as walking
 });
@@ -144,6 +148,10 @@ export const BASE_MOTION_RANGES = Object.freeze({
   idleRate: [0.60, 3.00],
   stride:   [1.40, 2.24],
   bounce:   [0.00, 0.12],
+  // How high the swinging leg picks its foot up. Per-species because it is leg mechanics, not
+  // style: a leggy animal placing its feet and a stumpy one scuttling are different gaits, not
+  // different moods. Was a single global constant, which MOTION-TODO already owed.
+  kneeLift: [0.35, 0.78],
   headArc:  [0.50, 1.50],
 });
 
@@ -230,6 +238,7 @@ export function motionOf(traits, ranges = BASE_MOTION_RANGES) {
   return {
     stiff: pick('stiff'), zeta: pick('zeta'), idleAmp: pick('idleAmp'),
     idleRate: pick('idleRate'), stride: pick('stride'), bounce: pick('bounce'),
+    kneeLift: pick('kneeLift'),
     headArc: pick('headArc'), armGain: style('armGain'), sway: style('sway'),
     lean: style('lean'), headCarry: style('headCarry'), headCock: style('headCock'),
     attend: style('attend'), armTuck: style('armTuck'),
@@ -319,6 +328,8 @@ function traitPositions(t) {
     idleRate: N,
     stride: C,
     bounce: E,
+    // A diligent character picks their feet up; a careless one scuffs along.
+    kneeLift: C,
     headArc: O,
     // Arms swing when a character is outgoing and pin to the body when they are not.
     armGain: pair(0.5 * (E - N)),
@@ -334,7 +345,12 @@ function traitPositions(t) {
     headCock: O,
     // Focus, and Conscientiousness alone. The one thing C does that is visible standing still.
     attend: C,
-    armTuck: N,
+    // armTuck is NOT here on purpose. Holding your arms in against your body reads as tense --
+    // as a state you are in right now, not as a way you are -- and wired to Neuroticism it made
+    // every anxious character permanently braced, which is both wrong and tiring to look at.
+    // The channel and its knob stay, for an emotional layer to drive when there is one.
+    // Personality leaves it at zero.
+    armTuck: 0,
   };
 }
 
@@ -848,7 +864,22 @@ export function walkLayer(out, w, gain, opts) {
   // Sway: the mass leans OVER the planted foot, once per cycle. Side +1 is planted around phase
   // 0 and sits at +X, and applyPose negates spineRoll into rotation.z so that positive tips the
   // head toward +X -- so +cos is right, and in phase with the knee lift's stance half.
-  out.spineRoll += gain * opts.sway * Math.cos(TAU * w.phase);
+  //
+  // THE RATE CAP, and it is what stops a swagger turning into a shudder. Sway is an amplitude,
+  // and an amplitude says nothing about how FAST the torso gets there: peak roll RATE is
+  // amp * TAU * cadence / 2, so the same 8 degrees of lean is 26 deg/s at a stroll and 87 at a
+  // scurry. The first is a swagger and the second is a vibration, which is why the sway looked
+  // wrong at speed and looked right the moment the step rate came down.
+  //
+  // It is also true of bodies. Rolling a torso side to side is moving real mass, and a fast
+  // walker has visibly LESS lateral sway than a slow one, not the same amount faster.
+  //
+  // Capping the rate rather than scaling by cadence directly means a character who already
+  // sways gently is untouched -- the cap only binds on someone asking for more roll than they
+  // have time for.
+  const rate = Math.abs(opts.sway) * TAU * w.cadence * 0.5;
+  const swayCap = rate > opts.swayRateMax ? opts.swayRateMax / rate : 1;
+  out.spineRoll += gain * opts.sway * swayCap * Math.cos(TAU * w.phase);
   return out;
 }
 

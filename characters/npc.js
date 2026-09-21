@@ -1001,6 +1001,31 @@ function neckShare(P) {
 }
 
 /**
+ * HEAD STABILISATION, and it is why a llama neck read as a physics error.
+ *
+ * The neck is a child of the spine, so every degree the torso rolls is a degree the neck rolls,
+ * multiplied by how far up the head sits. Measured while walking at the authored sway: the
+ * llama's head swung 112mm side to side per step, 11% of its own height. Nothing about the neck
+ * was wrong -- it was faithfully riding a torso that was doing exactly what it was told.
+ *
+ * Real long-necked animals do the opposite of that. A walking chicken, crane or camelid holds
+ * its head almost fixed in space while the body sways underneath: the neck counter-rotates. It
+ * is the single most recognisable thing about how they move, and it is free here because the
+ * joint is already being written.
+ *
+ * Scaled by neck length, so a stub barely does it and a llama mostly does -- which is both what
+ * is true and what the lever arm allows.
+ *
+ * ROLL ONLY, deliberately. Pitch carries posture -- `attend` leans a focused character in, and
+ * POSES.browse leans in to look at the goods -- and a neck that cancelled pitch would undo the
+ * very gesture those exist to make. Roll has no posture on it: it is sway and weight shift,
+ * both purely oscillating, which is exactly what a stabiliser should cancel.
+ */
+function neckStabilise(P) {
+  return Math.min(0.75, 1.6 * (P.neckLength ?? 0.1));
+}
+
+/**
  * Arms and legs.
  *
  * armSwingAlt is subtracted PER SIDE, so positive armSwingAlt is contralateral to positive
@@ -1035,8 +1060,11 @@ function applyHead(joints, pose, P) {
   // base. It is a NECK-only channel -- the head counter-rotates by the same amount, so a
   // character glancing at a shelf still ends up looking at the shelf.
   const curve = pose.neckCurve ?? 0;
+  // The neck is a CHILD of the spine, so a local +roll here cancels that fraction of the
+  // parent's -roll and the head stays put while the body sways under it.
+  const steady = (pose.spineRoll ?? 0) * neckStabilise(P);
   if (joints.neck) {
-    joints.neck.rotation.set(pitch * neck + curve, yaw * neck, -tilt * neck);
+    joints.neck.rotation.set(pitch * neck + curve, yaw * neck, -tilt * neck + steady);
   }
   if (joints.head) {
     joints.head.rotation.set(pitch * head - curve, yaw * head, -tilt * head);

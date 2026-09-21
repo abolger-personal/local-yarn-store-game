@@ -101,7 +101,7 @@ const S = {
   // returns silently overwrote the slider and five knobs did nothing at all. Scaling after the
   // merge keeps BOTH -- personality still spreads the cast, these shift the whole cast at once.
   scale: { stiff: 1, zeta: 1, stride: 1, bounce: 1, idleRate: 1,
-           armGain: 1, sway: 1, lean: 1, headCarry: 1, headCock: 1, attend: 1,
+           armGain: 1, sway: 1, lean: 1, headCarry: 1, headCock: 1, attend: 1, kneeLift: 1,
            armTuck: 1 },
   ranges: structuredClone(BASE_MOTION_RANGES),
 };
@@ -786,6 +786,7 @@ const SPAN_HELP = {
   idleRate: 'how fast they fidget',
   stride: 'step length',
   bounce: 'walking bounce',
+  kneeLift: 'how high they pick their feet up',
   headArc: 'how much they look around',
   // The walking STYLE spans. These arrived with the personality-in-the-walk work and had no
   // label here, so every one of them rendered as "undefined — least" / "undefined — most".
@@ -887,12 +888,12 @@ knob(fWalk, S.scale, 'stride', 'step length',
   'How far each step reaches, as a multiple of leg length. Past about 2.26x the legs physically '
   + 'cannot reach and the feet slide \u2014 the skate readout will say so. Scales the whole cast.',
   0.5, 1.5).onChange(retune);
-knob(fWalk, S.opts, 'kneeLift', 'knee lift',
+knob(fWalk, S.scale, 'kneeLift', 'knee lift',
   'How much the swinging leg bends its knee to clear the floor. At 0 the legs are rigid sticks '
   + 'and BOTH feet reach the ground at the same instant twice a step — that is the stomp '
   + 'that reads as a limp, so drag it to 0 to see what this fixed. The knee only lifts the foot '
   + 'while that leg is BEHIND the hip, so very high values buckle it rather than lifting more.',
-  0, 1.4).onChange(retune);
+  0, 2.5).onChange(retune);
 knob(fWalk, S.scale, 'sway', 'side-to-side sway',
   'How far the body rolls over the planted foot each step. An excitable character rolls, an '
   + 'orderly one walks a tidy line. Scales the whole cast.', 0, 3).onChange(retune);
@@ -913,6 +914,13 @@ knob(fWalk, S.opts, 'sinMax', 'biggest believable step',
   + 'degrees. Step length is clamped to this no matter what the stride knob asks for, so past '
   + 'it the body outruns the legs and the skate readout climbs instead of the step growing.',
   0.15, 0.85).onChange(retune);
+knob(fWalk, S.opts, 'swayRateMax', 'fastest the body will roll',
+  'A speed limit on the side-to-side sway, in radians per second. Sway is an AMPLITUDE, which '
+  + 'says nothing about how fast the torso gets there — the same 8 degrees of lean is 26 deg/s '
+  + 'at a stroll and 87 at a scurry, and the second one reads as a vibration rather than a '
+  + 'swagger. This caps the rate, so a character who already sways gently is untouched and only '
+  + 'someone asking for more roll than they have time for gets damped. Turn it all the way up '
+  + 'to see the shudder it prevents.', 0.15, 3).onChange(retune);
 knob(fWalk, S.opts, 'cadenceMax', 'fastest step rate',
   'Steps per second before the legs stop moving faster and start reaching further instead. Low '
   + 'values give a long striding walk, high values a quick scurry.', 0.5, 8).onChange(retune);

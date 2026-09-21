@@ -300,7 +300,12 @@ export const MOTION_RANGES = Object.freeze({
   idleRate: [0.60, 1.60],   // languid: a llama takes its time even when it is worked up
   idleAmp:  [0.50, 1.50],
   headArc:  [0.90, 1.80],
-  bounce:   [0.02, 0.14],   // leggy, so the gait carries more vertical than a stumpy bird's
+  // Tuned in the motion lab. A llama is a tall, deliberate animal: long steps, high knees, and
+  // almost no vertical -- the bounce that reads as bird-like bobbing on an owl reads as a limp
+  // on something this leggy.
+  bounce:   [0.00, 0.02],
+  stride:   [1.78, 2.20],   // long steps; 2.26x leg is the geometric ceiling, so this is near it
+  kneeLift: [0.55, 1.00],   // picks its feet up, where a bird scuttles
 });
 
 export const llama = registerSpecies({

@@ -249,11 +249,11 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
   const SHY = T({ Enthusiasm: 1, Assertiveness: 1, Withdrawal: 5, Industriousness: 1, Orderliness: 5 });
   const STYLE = ['armSwingAlt', 'spineRoll', 'spineBend', 'headPitch', 'elbowBend'];
 
-  const signature = (traits, L) => {
+  const signature = (traits, L, speed = 0.35) => {
     const co = { ...o, ...motionOf(traits, BASE_MOTION_RANGES), idleAmount: 0 };
     const m = makeMotion(POSES.rest, 0.5);
     const buf = out();
-    const w0 = walkPhase(0, 0.35, L, co);
+    const w0 = walkPhase(0, speed, L, co);
     const peak = {};
     for (let i = 0; i < 240; i++) {
       integrate(m, POSES.rest, 1 / 60, co);
@@ -273,16 +273,43 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     + `shy ${shy.armSwingAlt.toFixed(2)}) -- these were once identical`);
   assert.ok(bold.spineRoll > shy.spineRoll * 3, 'and how much the body rolls');
   assert.ok(bold.spineBend > shy.spineBend + 0.05, 'and how far they lean in');
-  assert.ok(shy.elbowBend > bold.elbowBend + 0.2, 'and how tightly the arms are held');
+  // armTuck used to be asserted here, as Neuroticism holding the arms in. It is no longer a
+  // personality signal at all: holding your arms against your body reads as tense, which is a
+  // STATE you are in rather than a way you are, and wired to a trait it made every anxious
+  // character permanently braced. The channel and its knob remain for an emotional layer.
+  assert.equal(bold.elbowBend, shy.elbowBend,
+    'armTuck must not vary with personality -- it is an emotion channel now');
+  // Head carriage carries what armTuck used to: open and up against closed and down. Compared
+  // on the coefficient rather than on `signature`, which takes absolute values -- head-up and
+  // head-down are equal in magnitude and opposite in sign, so |peak| cannot tell them apart.
+  const carry = (t) => motionOf(t, BASE_MOTION_RANGES).headCarry;
+  assert.ok(carry(SHY) > carry(BOLD) + 0.1,
+    `and how they carry their head (shy ${carry(SHY).toFixed(2)} vs bold ${carry(BOLD).toFixed(2)}) `
+    + '-- positive is down and closed, negative is up and open');
 
   // 2. Same temperament, a 3x difference in leg length -> the STYLE must be identical. This is
   //    the decoupling: the body decides stride and cadence, the personality decides everything
   //    else, and the two no longer compete for the same visual channel.
-  const tall = signature(BOLD, TALL);
+  //
+  //    AT MATCHED CADENCE, and that qualifier is not a weakening. Sway is rate-capped -- rolling
+  //    a torso is moving real mass, so there is a limit to how fast it can be done and a
+  //    character stepping quickly gets less roll per step than one strolling. That is a
+  //    physical constraint and it applies to everyone identically; it simply binds sooner on
+  //    whoever is stepping faster. Comparing two leg lengths at the same GROUND SPEED compares
+  //    two different cadences, so it would be measuring the cap, not the style.
+  const tall = signature(BOLD, TALL, 0.35 * (TALL / SHORT));
   for (const k of STYLE) {
     assert.ok(Math.abs(bold[k] - tall[k]) < 0.02,
       `${k} must not change with leg length (${bold[k].toFixed(3)} vs ${tall[k].toFixed(3)})`);
   }
+
+  // And the cap itself: the same character stepping faster must roll LESS per step, or a
+  // swagger turns into a shudder as soon as they hurry.
+  const strolling = signature(BOLD, SHORT, 0.12);
+  assert.ok(bold.spineRoll < strolling.spineRoll - 0.01,
+    `a faster cadence must damp the sway (hurrying ${bold.spineRoll.toFixed(3)} vs `
+    + `strolling ${strolling.spineRoll.toFixed(3)}) -- otherwise the torso rolls the same `
+    + 'amount in half the time, which reads as a vibration rather than a swagger');
 }
 
 // --- a global tuning knob must actually REACH the character -----------------------------------
@@ -716,6 +743,11 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
   };
   walk(0, t(3));
   for (const [k, list] of Object.entries(vals)) {
+    // armTuck is deliberately NOT personality-driven: arms held in against the body reads as
+    // tense, which is a state rather than a trait, and wired to Neuroticism it made every
+    // anxious character permanently braced. Its span stays so an emotional layer has somewhere
+    // to move along, and motionOf pins it at zero until there is one.
+    if (k === 'armTuck') continue;
     const [lo, hi] = BASE_MOTION_RANGES[k] ?? STYLE_RANGES[k];
     list.sort((a, b) => a - b);
     const p10 = list[Math.floor(N * 0.1)], p90 = list[Math.floor(N * 0.9)];

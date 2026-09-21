@@ -232,6 +232,61 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     'breathing must NOT be gated by duty: a character that stops breathing reads as switched off');
 }
 
+// --- a character who does not fidget is still alive --------------------------------------------
+//
+// "Owls are not breathing once I set the fidget dial to 0." The idle layer early-outed on
+// `idleAmount * idleAmp <= 0`, so the two dials were interchangeable at their bottom end -- and
+// they are not the same dial at all:
+//
+//   idleAmount = 0   run NO idle. The reduce-motion answer, and the A/B switch for measuring
+//                    what continuous motion costs. Returning early is correct and is what makes
+//                    that measurement honest.
+//   idleAmp    = 0   this character does not fidget. A TEMPERAMENT, not an off switch.
+//
+// So dropping the fidget dial to zero also stopped the breathing and the blinking, and a
+// perfectly still character became a corpse. It surfaced right after breath depth was moved off
+// idleAmp, because that fix worked everywhere except at exactly zero, where this line meant
+// breathDepth never ran at all.
+{
+  const sample = (over) => {
+    const o = opts(over);
+    const m = makeMotion(POSES.rest, 0.4);
+    const buf = out();
+    const peak = {};
+    let blinks = 0, was = false;
+    for (let i = 0; i < 7200; i++) {           // two minutes
+      integrate(m, POSES.rest, 1 / 60, o);
+      compose(buf, m, o);
+      for (const k of POSE_KEYS) {
+        peak[k] = Math.max(peak[k] ?? 0, Math.abs(buf[k] - (POSES.rest[k] ?? 0)));
+      }
+      const b = (buf.blink ?? 0) > 0.5;
+      if (b && !was) blinks++;
+      was = b;
+    }
+    return { peak, blinks };
+  };
+
+  const still = sample({ idleAmp: 0 });
+  assert.ok(still.peak.spineBend > 0.02,
+    `a character who does not fidget must still BREATHE (chest moved ${still.peak.spineBend
+      .toFixed(4)} rad) -- idleAmp 0 is a temperament, not a pulse check`);
+  assert.ok(still.blinks > 10,
+    `and still blink (${still.blinks} in two minutes) -- a blink is not a fidget either`);
+  // ...and genuinely not fidget, or the dial does nothing at its own extreme.
+  assert.equal(still.peak.spineRoll, 0, 'but the weight shift must be gone at idleAmp 0');
+  assert.equal(still.peak.earPerk, 0, 'and the ears must stop flicking');
+
+  // The master dial keeps meaning what it says, or the reduce-motion answer and the perf A/B
+  // both stop being true.
+  const off = sample({ idleAmount: 0 });
+  for (const k of POSE_KEYS) {
+    assert.equal(off.peak[k], 0, `idleAmount 0 must freeze ${k} solid: it is the reduce-motion `
+      + 'switch and the A/B for measuring what continuous motion costs');
+  }
+  assert.equal(off.blinks, 0, 'idleAmount 0 stops the blinking too -- no idle means no idle');
+}
+
 // --- the head must not outrun the body it is attached to --------------------------------------
 //
 // "The owls look like their heads are going to come off when they fidget because the bodies are

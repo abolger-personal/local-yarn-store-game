@@ -680,8 +680,21 @@ export function compose(out, m, opts) {
   out.spineBend += opts.attend ?? 0;
   out.elbowBend += opts.armTuck ?? 0;
 
+  // THE EARLY-OUT IS ON THE MASTER DIAL ONLY, and the difference between the two is the whole
+  // point of having two. `idleAmount` is "run no idle at all" -- the reduce-motion answer, and
+  // the A/B switch for measuring what continuous motion costs -- so returning here is correct
+  // and is what makes that measurement honest.
+  //
+  // `idleAmp` is "this character does not fidget", which is a temperament, not an off switch.
+  // Gating the layer on their product meant dropping the fidget dial to zero also stopped the
+  // breathing and the blinking, so a perfectly still character became a corpse. Reported right
+  // after breath depth was moved off idleAmp: the fix worked everywhere except at exactly zero,
+  // because this line never let breathDepth run at all.
+  //
+  // Below, every fidget term carries `a` (or `g`, which is `a` gated), so they all reach zero on
+  // their own. Breathing and blinking do not, which is the intent.
+  if (opts.idleAmount <= 0) return out;
   const a = opts.idleAmount * opts.idleAmp;
-  if (a <= 0) return out;
 
   idleLayer(out, m, opts, a);
   // Blink rides its own timer, not the phase: blinks are Poisson-ish, and a blink on a sine is

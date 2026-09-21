@@ -499,6 +499,34 @@ unchanged at 35° — looking around is a separate intent and is supposed to be 
 Pinned as **ratios**, not absolute sizes: the amplitudes are a tuning choice, but the channels
 staying attached to each other is not.
 
+### …and at exactly zero it stopped breathing anyway
+
+> "Owls are not breathing once I set the fidget dial to 0."
+
+`compose` early-outed on `idleAmount * idleAmp <= 0`, which made the two dials interchangeable
+at their bottom end. They are not the same dial:
+
+| | means |
+| --- | --- |
+| `idleAmount = 0` | **run no idle at all.** The reduce-motion answer and the A/B switch for measuring what continuous motion costs. Returning early is correct, and is what makes that measurement honest. |
+| `idleAmp = 0` | **this character does not fidget.** A temperament, not an off switch. |
+
+So the breath-depth fix above worked everywhere *except* at exactly zero, because that line meant
+`breathDepth` never ran. The early-out is now on the master dial alone; every fidget term already
+carries `a` (or `g`, which is `a` gated), so they reach zero on their own. Breathing and blinking
+do not, which is the intent.
+
+| | breath | roll | ears | blinks/2min |
+| --- | --- | --- | --- | --- |
+| `idleAmp 0` | **1.68°** | 0 | 0 | 25 |
+| normal | 2.58° | 4.87° | 17.2° | 27 |
+| `idleAmount 0` | 0 | 0 | 0 | 0 |
+
+Head **yaw stays at 10.3° with the fidget dial at zero**, and that is deliberate: looking around
+is `headArc` from Openness, decoupled from `idleAmp` on purpose so Extraversion stopped driving
+the head twice. A character who holds still but watches the room is the intended reading. If that
+ever wants its own off switch it is a separate dial, not a re-coupling.
+
 ## The idle fades where the walk already does the job
 
 Standing fidget and walking gait were running at once on the same joints, at incommensurate

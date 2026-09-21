@@ -305,7 +305,12 @@ export const MOTION_RANGES = Object.freeze({
   // on something this leggy.
   bounce:   [0.00, 0.02],
   stride:   [1.78, 2.20],   // long steps; 2.26x leg is the geometric ceiling, so this is near it
-  kneeLift: [0.55, 1.00],   // picks its feet up, where a bird scuttles
+  // Picks its feet up, where a bird scuttles. Measured swing-foot clearance across this
+  // span: 13% of leg length at the bottom and 53% at the top, with the shin reaching 101
+  // degrees. Clearance keeps climbing past that and nothing self-intersects until about
+  // 2.20, so the ceiling here is taste rather than geometry -- a llama placing its feet,
+  // not a dressage horse.
+  kneeLift: [0.70, 1.70],
 });
 
 export const llama = registerSpecies({

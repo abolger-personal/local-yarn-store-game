@@ -106,7 +106,7 @@ const S = {
   scale: { stiff: 1, zeta: 1, stride: 1, bounce: 1, idleRate: 1,
            armGain: 1, sway: 1, lean: 1, headCarry: 1, headCock: 1, attend: 1, kneeLift: 1,
            armTuck: 1 },
-  ranges: structuredClone(BASE_MOTION_RANGES),
+  ranges: spansOf(speciesIds()[0]),
 };
 
 /** The rows actually on screen. Spring is never hideable -- it is the one being tuned. */
@@ -179,6 +179,11 @@ resize();
  */
 /** @type {Actor[]} */
 let cast = [];
+/** A species' own spans, as an editable copy. Falls back to the shared defaults. */
+function spansOf(id) {
+  return structuredClone(getSpecies(id)?.motionRanges ?? BASE_MOTION_RANGES);
+}
+
 const group = new THREE.Group();
 scene.add(group);
 
@@ -326,6 +331,11 @@ function addOne(kit, params, engine, traits, seed, walkDist, z, label, odd) {
 
 /** Species span + trait position + the lab's global knobs, merged in that order. */
 function coeffs(traits, kit, engine) {
+  // S.ranges is the SELECTED species' spans, seeded from its kit and then editable here. It
+  // used to be seeded from BASE_MOTION_RANGES and never reseeded, so picking "llama" showed a
+  // cast built from the base spans while the game would have used the llama's -- a maxed-out
+  // llama read stiff 235 here against 187 in the game, and knee lift capped at the base 0.78
+  // when the kit authors 1.00. Every number in this folder was about a species nobody ships.
   const ranges = S.allSpecies ? (kit.motionRanges ?? S.ranges) : S.ranges;
   const per = motionOf(traits, ranges);
   for (const k of Object.keys(S.scale)) per[k] *= S.scale[k];
@@ -751,8 +761,11 @@ function syncEngineControls() {
 }
 
 const fCast = gui.addFolder('cast');
-knob(fCast, S, 'species', 'species', 'Which species to fill the lab with.', speciesIds())
-  .onChange(buildCast);
+knob(fCast, S, 'species', 'species',
+  'Which species to fill the lab with. Switching also loads THAT species\u2019 own spans into '
+  + '\u201chow much members of a species differ\u201d, so the numbers you see and edit are the '
+  + 'ones the kit actually ships.', speciesIds())
+  .onChange((id) => { S.ranges = spansOf(id); refreshSpans(); buildCast(); });
 knob(fCast, S, 'count', 'how many', 'Characters per row. Each gets its own random personality.',
   1, 8, 1).onChange(buildCast);
 knob(fCast, S, 'extremes', 'extremes, not random',
@@ -805,22 +818,49 @@ fRanges.domElement.querySelector('.children')?.insertAdjacentHTML('afterbegin',
   '<div class="engine-key">Walking STYLE is deliberately not here: arm swing, sway, lean, head '
   + 'carriage and arms-held-in are the same spans for every species, so a walk reads the same '
   + 'way whatever animal is doing it. Their global knobs are under “walking”.</div>');
-for (const k of Object.keys(BASE_MOTION_RANGES)) {
-  const [lo, hi] = BASE_MOTION_RANGES[k];
+// The slider bounds have to cover EVERY species, not just the shared defaults: the llama
+// authors a knee lift of 1.00 where the base tops out at 0.78, so bounds derived from the base
+// alone would have made the kit's own value undialable. Widened from the union across all
+// registered kits, so a new species with a bolder span widens the sliders by existing.
+function spanBounds(k) {
+  let lo = BASE_MOTION_RANGES[k][0], hi = BASE_MOTION_RANGES[k][1];
+  for (const id of speciesIds()) {
+    const r = getSpecies(id)?.motionRanges?.[k];
+    if (r) { lo = Math.min(lo, r[0]); hi = Math.max(hi, r[1]); }
+  }
   const pad = (hi - lo) * 1.5;
+  return [lo - pad, hi + pad];
+}
+
+/** The two controllers per span, so switching species can push the new numbers into them. */
+const spanRows = [];
+
+function refreshSpans() {
+  for (const { k, row, mn, mx } of spanRows) {
+    row.min = S.ranges[k][0];
+    row.max = S.ranges[k][1];
+    mn.updateDisplay();
+    mx.updateDisplay();
+  }
+}
+
+for (const k of Object.keys(BASE_MOTION_RANGES)) {
+  const [lo, hi] = spanBounds(k);
   const row = { min: S.ranges[k][0], max: S.ranges[k][1] };
   const help = `${SPAN_HELP[k]}. Narrow the gap and every member of the species moves alike; `
     + 'widen it and they vary. Where one character sits inside it is set by their personality.';
-  const mn = knob(fRanges, row, 'min', `${SPAN_HELP[k]} \u2014 least`, help, lo - pad, hi + pad)
+  const mn = knob(fRanges, row, 'min', `${SPAN_HELP[k]} \u2014 least`, help, lo, hi)
     .onChange((v) => { S.ranges[k][0] = v; retune(); });
-  const mx = knob(fRanges, row, 'max', `${SPAN_HELP[k]} \u2014 most`, help, lo - pad, hi + pad)
+  const mx = knob(fRanges, row, 'max', `${SPAN_HELP[k]} \u2014 most`, help, lo, hi)
     .onChange((v) => { S.ranges[k][1] = v; retune(); });
+  spanRows.push({ k, row, mn, mx });
   // stiff and zeta are read by spring() alone, so their spans are spring-only too -- the same
   // fact as the global knobs of the same name, just applied per species.
   if (SPRING_ONLY.has(k)) { forEngines(mn, 'spring'); forEngines(mx, 'spring'); }
 }
 knob(fRanges, { copy: exportRanges }, 'copy', 'copy these spans as code',
-  'Puts a paste-ready MOTION_RANGES block on the clipboard, for owl.js or llama.js.');
+  'Puts a paste-ready MOTION_RANGES block on the clipboard, for the kit file of whichever '
+  + 'species is currently selected.');
 fRanges.close();
 
 const fBake = gui.addFolder('how motion gets from A to B');

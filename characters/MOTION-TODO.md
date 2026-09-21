@@ -397,6 +397,20 @@ are — and wired to Neuroticism it made every anxious character permanently bra
 pins it at zero; the channel, its span and its knob remain for an emotional layer to drive.
 It is the one coefficient exempt from the span-occupancy check, by name and with the reason.
 
+## The lab was tuning a species that does not ship
+
+Found while raising the llama's knee lift: `S.ranges` was seeded from `BASE_MOTION_RANGES` once
+at load and never reseeded, and `coeffs` used it for everything except "compare species". So
+picking *llama* built a cast from the SHARED defaults, not the llama's own spans. A maxed-out
+llama read `stiff 235` in the lab against `187` in the game, and knee lift capped at the base
+0.78 where the kit authors 1.00 — every number in the variation folder was about an animal
+nobody ships.
+
+Switching species now loads that kit's spans into the folder, so what you see, edit and copy to
+the clipboard is what the kit actually ships. The slider BOUNDS come from the union across all
+registered kits rather than from the base alone, or a kit authoring a bolder span than the
+default would have its own value undialable — which is exactly what had happened to `kneeLift`.
+
 ## Bugs this work found and fixed, worth not reintroducing
 
 1. **Foot skate, twice — and the second time was my own "fix".** A phase is one CYCLE, which is

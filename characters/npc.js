@@ -666,9 +666,15 @@ const kneeAmount = (kneeBend, legSwing, side) =>
 // character is grounded on a leg length it is not actually standing on.
 const swingKnee = (pose, side) => Math.max(0, side * (pose.kneeSwing ?? 0));
 
+// The 55/45 split of the leg chain. Three things need it -- building the leg, grounding the
+// character, and placing a seated one on a chair -- so it is written down once rather than
+// three times, which is how the first two came to hold the same magic number separately.
+export const femurOf = (P) => (P.legHeight + P.hipInset) * 0.55;
+
+export const tibiaOf = (P) => (P.legHeight + P.hipInset) * 0.45;
+
 function buildLeg(side, P, mat, joints) {
-  const total = P.legHeight + P.hipInset;
-  const [thigh, shin] = [total * 0.55, total * 0.45];
+  const [thigh, shin] = [femurOf(P), tibiaOf(P)];
   const upperLeg = joint(new THREE.Group(), `${sideName(side)}UpperLeg`);
   upperLeg.position.set(side * P.legSpread, P.hipInset, 0);
   upperLeg.rotation.x = P.legSwing * side - P.hipFlex;
@@ -965,8 +971,8 @@ const FOOT_SOLE = 0.012;
 // Only hip and knee rotation affect it, and both are known -- so this needs no matrices.
 function lowestFoot(P, pose) {
   const total = P.legHeight + P.hipInset;
-  const thigh = total * 0.55;
-  const shin = total * 0.45;
+  const thigh = femurOf(P);
+  const shin = tibiaOf(P);
   let lowest = Infinity;
 
   for (const side of [-1, 1]) {

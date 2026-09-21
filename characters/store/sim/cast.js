@@ -6,8 +6,8 @@ import { cast, seats } from '../core/state.js';
 import { cellRect } from '../../../inventory/notions.js';
 import { BANDS, TAILS, bandMatrix, familyExtent, tailMatrix, yarnFit }
   from '../../../inventory/yarn-geometry.js';
-import { POSES, applyPose, phaseStep, stepMotion, valueOf, walkPhase, walkLayer, walkGain }
-  from '../../npc.js';
+import { POSES, applyPose, femurOf, phaseStep, stepMotion, valueOf, walkPhase, walkLayer,
+  walkGain } from '../../npc.js';
 import { ACTION, STATE } from '../../visit.js';
 import * as THREE from 'three';
 import { BOX_H, CELL, S, SEAT_H } from '../core/config.js';
@@ -473,15 +473,32 @@ function calibrateSeat(rec, sat) {
 /** Shortest way round: blending 350 degrees toward 10 must not go the long way about. */
 const angleLerp = (from, to, t) => from + Math.atan2(Math.sin(to - from), Math.cos(to - from)) * t;
 
-/** How far back on the cushion the hips settle, as a fraction of the chair's depth. */
-const SIT_BACK = 0.26;
+/**
+ * How far in front of the chair's front edge a standing character's feet end up.
+ */
+const STAND_CLEAR = 0.06;
 
 /**
- * Where a character STANDS relative to the chair, as a fraction of its depth: clear of the front
- * edge, which is where your feet go when you get up. 0.62 of 0.34 is ~210mm forward of centre
- * against a 170mm half-depth, so they end up just outside the box rather than inside it.
+ * Where along the chair a seated character's HIPS go, measured from its centre.
+ *
+ * FROM THE FEMUR, not from a fraction of the chair. When you sit, your thighs lie along the
+ * cushion: your knees are at the front edge and your hips are one thigh-length behind them. So
+ * the offset is half the chair's depth minus the femur, and it falls out of the body rather than
+ * being tuned.
+ *
+ * It was a flat 26% of the chair's depth for everyone, which is the same mistake as every other
+ * constant in this file has turned out to be: this cast's leg lengths vary 3.7x, so a llama's
+ * thigh is longer than the whole seat while a stumpy owl's is half of it. The constant sat the
+ * llama with its knees hanging in mid-air and the owl perched on the back edge; the femur seats
+ * both of them with their knees over the front edge, which is what sitting looks like.
+ *
+ * Clamped at the back edge, because a thigh longer than the seat is a real case -- the leggiest
+ * llamas have one -- and the answer there is to perch on the back of the cushion rather than to
+ * hover off the end of it.
  */
-const STAND_OUT = 0.62;
+function sitAlong(P) {
+  return Math.max(-CHAIR_W * 0.45, CHAIR_W / 2 - femurOf(P));
+}
 
 /** Seconds allowed for getting up, before the round's walk is allowed to start. */
 export const STAND_TIME = 0.5;
@@ -552,7 +569,8 @@ function placeSeated(rec) {
   if (!seat) return;
   if (rec.npc.seat === null && rec.wait <= 0 && rec.moveT < 1) return;
   calibrateSeat(rec, sat);
-  const along = (STAND_OUT - (STAND_OUT + SIT_BACK) * sat) * CHAIR_W;
+  const stand = CHAIR_W / 2 + STAND_CLEAR;
+  const along = stand + (sitAlong(rec.built.params) - stand) * sat;
   rec.baseX = seat.x + Math.sin(face) * along;
   rec.baseZ = seat.z + Math.cos(face) * along;
   root.position.x = rec.baseX;

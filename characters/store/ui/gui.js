@@ -124,10 +124,13 @@ function lookRows() {
 }
 
 function cameraRows() {
-  gui.add({ f: frameRoom }, 'f').name('frame room  (F)');
+  gui.add({ f: () => frameRoom() }, 'f').name('frame room  (F)');
   gui.add(S, 'lockCamera').name('lock camera  (L)').onChange(setCameraLock);
   // The same call as the key and the GUI row, so the three can never drift apart.
-  document.getElementById('frameBtn').addEventListener('click', frameRoom);
+  // Wrapped, not passed by reference: frameRoom takes a place to stand in front of, and an
+  // event listener would hand it the MouseEvent — which has an `x` but no `z`, so the camera
+  // would be positioned at NaN and the shop would vanish.
+  document.getElementById('frameBtn').addEventListener('click', () => frameRoom());
   lockBtn.addEventListener('click', () => setCameraLock(!S.lockCamera));
 }
 

@@ -333,7 +333,7 @@ function stockTheShop(npcs) {
 }
 
 /** Point every instanced mesh at the stock that now exists. */
-function sizeInstanceBuffers() {
+export function sizeInstanceBuffers() {
   for (const m of [fieldTop, edgeTop, shadows, boxes, sizeTop]) m.count = items.length;
   for (const m of [sideField, sideEdge, sizeSide]) m.count = items.length * 4;
 }

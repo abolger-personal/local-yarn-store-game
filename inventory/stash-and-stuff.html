@@ -925,6 +925,7 @@ const picker = makePicker({
   levelFrame: (disp, shelf) => _levelFrame.copy(disp.frame)
     .multiply(_levelOffset.makeTranslation(0, shelf * S.shelfGap, 0)),
   itemHeight: (_disp, item) => item.layer * S.boxHeight + itemTall(item),
+  itemTall: (_disp, item) => itemTall(item),
   exposed: fullyExposed,
   grabRadius: () => S.grabRadius,
   snapCells: () => S.snapCells,

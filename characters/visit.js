@@ -1106,7 +1106,7 @@ function guestbookTags(npc) {
   return tags;
 }
 
-function signGuestbook(world, npc) {
+export function signGuestbook(world, npc) {
   // "The item in the PHOTO should be the most recently finished object, and the NPC should be
   // pictured in/with it even if they are not currently wearing it." Signing is 3rd-to-last and the
   // Drop Off 2nd-to-last, so anything being lent is still in their hands here — they are

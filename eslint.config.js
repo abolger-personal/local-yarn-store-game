@@ -188,6 +188,12 @@ export default [
     },
   },
   {
+    // The node-run self-checks (`node inventory/grid.test.mjs`). Same rules as the modules they
+    // test, but they run in node: `console` is a global there, not a browser affordance.
+    files: ['**/*.test.mjs'],
+    languageOptions: { ecmaVersion: 2024, sourceType: 'module', globals: globals.node },
+  },
+  {
     // Build/verification scripts run in node, not the browser. What is left in tools/ is only
     // what no off-the-shelf rule knows about — see tools/README.md.
     files: ['tools/**/*.js', 'tools/**/*.mjs'],

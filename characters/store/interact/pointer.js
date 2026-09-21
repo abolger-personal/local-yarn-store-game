@@ -26,6 +26,7 @@ export const picker = makePicker({
   // A level's frame already carries its height AND its tilt, so an item's height is purely its
   // own stack position — which is why layerY needs no shelf index.
   itemHeight: (_disp, item) => layerY(item.layer) + BOX_H * (item.layers ?? 1),
+  itemTall: (_disp, item) => BOX_H * (item.layers ?? 1),
   exposed: (disp, all, index) => fullyExposed(disp, all, index),
   grabRadius: () => S.grabRadius,
   snapCells: () => S.snapCells,

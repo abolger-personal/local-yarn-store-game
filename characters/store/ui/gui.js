@@ -86,7 +86,7 @@ function pacingRows() {
   gui.add(S, 'paceJitter', 0, 0.6, 0.05).name('pace variation (±)');
   // No onChange: the seat height is read live every frame by groundOffsetFor, so the slider
   // moves everyone already seated without a re-seat pass.
-  gui.add(S, 'seatLift', 0, 0.35, 0.005).name('seated height');
+  gui.add(S, 'seatLift', 0, 0.15, 0.005).name('hip clearance on seat');
 }
 
 function perfRows() {

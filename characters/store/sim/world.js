@@ -31,7 +31,7 @@ import { buildDisplays } from '../scene/displays.js';
 import { boxes, edgeTop, fieldTop, shadows, sideEdge, sideField, sizeSide, sizeTop } from '../goods/items.js';
 import { refreshAll } from '../goods/paint.js';
 import { addItem } from '../goods/stock.js';
-import { buildBlobs, routeLength } from './cast.js';
+import { buildBlobs, rollCheer, routeLength } from './cast.js';
 
 // Ids have to be unique across days too — a regular is matched to the roster by id, so a new
 // customer reusing "npc0" would be mistaken for one.
@@ -288,7 +288,10 @@ const castRecord = (npc, built, color) => ({
   moveT: 1, travelled: 0, fromX: npc.x, fromZ: npc.z,
   wait: 0, dur: S.travel,
   carriedName: null, carriedMesh: null,
-  celebrate: 0, hop: 0, route: [{ x: npc.x, z: npc.z }, { x: npc.x, z: npc.z }],
+  // Their own reaction to good news: a pause, then a duration, hop count and height of their
+  // own. The BUY is lockstep -- advanceRound resolves every customer in one call -- so
+  // without this the whole shop cheers on the same frame with the same three hops.
+  celebrate: 0, cheerIn: 0, cheer: rollCheer(), hop: 0, route: [{ x: npc.x, z: npc.z }, { x: npc.x, z: npc.z }],
 
   // How this character moves, from who they are. Computed once: traits survive rejoin(), so a
   // regular walks like themselves tomorrow with nothing persisted. The species owns how WIDE

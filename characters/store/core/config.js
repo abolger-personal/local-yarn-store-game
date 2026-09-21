@@ -119,9 +119,14 @@ export const S = {
   // autoSeconds, or a round ends before the walk it started does. 1.6 + 1.4*1.25 = 3.35.
   travelJitter: 1.6,
   paceJitter:  0.25,    // +/- fraction on each NPC's own travel time, so arrivals stagger too
-  // How far a seated NPC rises so they rest ON the chair rather than through it. The rig grounds
-  // every pose to feet-at-zero, so this cannot be derived — it needs eyeballing per seat height.
-  seatLift:    0.16,
+  // How far a seated NPC's HIP JOINT rides above the cushion — roughly the radius of the thigh
+  // lying on it. Small, and no longer per-seat-height guesswork: cast.js places the pelvis at
+  // SEAT_H and the rest follows from the character's own leg length, so one value is right for a
+  // stilt llama and a stumpy owl on the same chair.
+  //
+  // It used to be 0.16, the height the whole RIG was raised by — but the rig's origin is at the
+  // feet, so that sat them on the cushion with the hips 90mm above it.
+  seatLift:    0.04,
   // The halo and the drop ghost are deliberately ONE colour: the thing in your hand and the
   // slot it is going into are two halves of the same statement, and colouring them separately
   // made the player match them up themselves. Same green, so the eye pairs them for free.

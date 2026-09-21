@@ -10,7 +10,7 @@ import { POSES, phaseStep, stepMotion, valueOf, walkPhase, walkLayer, walkGain }
   from '../../npc.js';
 import { ACTION, STATE } from '../../visit.js';
 import * as THREE from 'three';
-import { BOX_H, CELL, S } from '../core/config.js';
+import { BOX_H, CELL, S, SEAT_H } from '../core/config.js';
 import { key, scene } from '../scene/stage.js';
 import { FILL, atlas, sizeAtlas } from '../goods/items.js';
 import { YARN, YARN_FIT, bandMesh, tailMesh, yarnMeshes } from '../goods/yarn.js';
@@ -146,6 +146,23 @@ const CELEBRATE_HOPS = 3;
 
 const HOP_H = 0.10;
 
+/**
+ * One character's own version of the celebration, rolled once at spawn.
+ *
+ * Exported so world.js can put it on the record; the numbers live here because this is the file
+ * that reads them, and the constants above are the middle of each range.
+ */
+export function rollCheer(rnd = Math.random) {
+  return {
+    // Long enough to break the unison, short enough that nobody looks slow on the uptake.
+    delay: rnd() * 0.55,
+    dur: CELEBRATE_S * (0.8 + rnd() * 0.45),
+    // A whole number, or the taper cuts the last hop off mid-air instead of landing it.
+    hops: CELEBRATE_HOPS + (rnd() < 0.5 ? -1 : 1) * (rnd() < 0.5 ? 0 : 1),
+    height: HOP_H * (0.75 + rnd() * 0.55),
+  };
+}
+
 /** Show what an NPC bought, in their hand, from the round they pick it up. */
 function syncCarried(rec) {
   const carried = rec.npc.carrying ?? null;
@@ -155,7 +172,22 @@ function syncCarried(rec) {
   if (rec.carriedName === want) return;
   // null -> something is the moment of the buy, and the only place in the render layer that knows
   // it happened. Not on the way back: putting an item down is not worth a dance.
-  if (!rec.carriedName && want) rec.celebrate = CELEBRATE_S;
+  // THE BUY IS LOCKSTEP; THE CHEER MUST NOT BE.
+  //
+  // advanceRound resolves every customer in one call, so everyone who buys this round buys on
+  // the same frame -- and the celebration had no per-character variation whatever: the same
+  // 1.6s, the same three hops, the same height. A whole shop punching the air in perfect unison.
+  //
+  // `cheer` is the character's own take on it, rolled once at spawn (world.js): a pause before
+  // it lands, then a duration, hop count and height of their own. The pause is the important
+  // one -- people react to their own good news at their own speed, and a shop where two
+  // customers cheer a beat apart reads as two people rather than one cue.
+  //
+  // ponytail: rolled at random rather than derived from personality. Enthusiasm ought to decide
+  // how fast someone lights up, and motionOf already has the factor -- but that is a motion
+  // channel with its own span, not a number to smuggle in here, so it waits for the emotion
+  // layer armTuck is also parked for.
+  if (!rec.carriedName && want) rec.cheerIn = rec.cheer.delay;
   rec.carriedName = want;
   if (rec.carriedMesh) {
     rec.carriedMesh.removeFromParent();
@@ -299,10 +331,31 @@ function seatedness(rec) {
  * S.seatLift is read live rather than captured, so the GUI slider moves everyone at once with no
  * re-seat pass.
  */
+/**
+ * Where the ROOT has to be for this character's backside to be on the chair.
+ *
+ * The thing that rests on a seat is the pelvis, and the rig's origin is at the FEET -- the hips
+ * joint is a direct child of root at local y = legHeight. So placing the root at seat height put
+ * the feet on the cushion and left the hips floating 90mm above it: measured on a seated owl,
+ * chair surface 0.220, feet 0.254, hips 0.310.
+ *
+ * Targeting the hip joint instead makes this correct PER CHARACTER for free, which a constant
+ * never could: legHeight varies 3.7x across the cast, so the same chair needs a leggy llama's
+ * root well below the floor line and a stumpy owl's well above it. Their feet then land where
+ * their legs actually reach -- on the floor for the tall one, dangling for the short one --
+ * which is the same fact about the same chair seen from two bodies.
+ *
+ * S.seatLift is now the gap between the hip JOINT and the cushion, which is roughly the radius
+ * of the thigh lying on it, rather than an eyeballed height for the whole rig.
+ */
+function seatedRootY(rec) {
+  return SEAT_H + S.seatLift - rec.built.params.legHeight;
+}
+
 function groundOffsetFor(rec) {
   const sat = seatedness(rec);
   const grounded = rec.built.root.position.y - (rec.built.groundOffset ?? 0);
-  return sat * (S.seatLift - grounded) + rec.hop;
+  return sat * (seatedRootY(rec) - grounded) + rec.hop;
 }
 
 /**
@@ -388,10 +441,18 @@ function wantedPose(rec, n) {
  * Writes rec.hop only — groundOffsetFor folds it into the single y write. See above.
  */
 function stepHop(rec, dt) {
+  // The beat between realising and reacting. Runs before the pose changes too, because
+  // wantedPose reads rec.celebrate -- so a character keeps browsing until their own cue lands.
+  if (rec.cheerIn > 0) {
+    rec.cheerIn -= dt;
+    if (rec.cheerIn <= 0) rec.celebrate = rec.cheer.dur;
+    rec.hop = 0;
+    return;
+  }
   if (rec.celebrate <= 0) { rec.hop = 0; return; }
   rec.celebrate = Math.max(0, rec.celebrate - dt);
-  const t = 1 - rec.celebrate / CELEBRATE_S;
-  rec.hop = Math.abs(Math.sin(t * Math.PI * CELEBRATE_HOPS)) * HOP_H * (1 - t);
+  const t = 1 - rec.celebrate / rec.cheer.dur;
+  rec.hop = Math.abs(Math.sin(t * Math.PI * rec.cheer.hops)) * rec.cheer.height * (1 - t);
 }
 
 /**

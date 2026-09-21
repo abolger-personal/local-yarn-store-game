@@ -411,6 +411,32 @@ the clipboard is what the kit actually ships. The slider BOUNDS come from the un
 registered kits rather than from the base alone, or a kit authoring a bolder span than the
 default would have its own value undialable — which is exactly what had happened to `kneeLift`.
 
+## The idle fades where the walk already does the job
+
+Standing fidget and walking gait were running at once on the same joints, at incommensurate
+frequencies. Measured on a lively owl:
+
+| | amplitude | period |
+| --- | --- | --- |
+| walk sway (`spineRoll`) | ±0.166 rad | 0.6 s |
+| idle weight shift (`spineRoll`) | ±0.092 rad | 1.6 s |
+
+The idle was **55% of the walk's amplitude on the same axis**, beating against it — a
+bobble-head, and unreachable from the sway slider because the sway slider was not what was doing
+it.
+
+**The weight shift now fades to zero with `walkGain`.** Shifting your weight foot to foot *is*
+what walking is; the two are the same physical act and only one of them should be running. While
+walking, `sway` is the only thing rolling the spine, which is what the slider name promises.
+
+**The head scan only fades part way**, to 40%. Looking around is a separate intent the walk does
+not cover, so it should quieten rather than stop — someone on the move mostly watches where they
+are going, but curiosity does not switch off because your feet moved. Owl head yaw ±23° standing
+→ ±9° walking.
+
+`still` is one frame stale, because `compose` runs before `walkGain` each tick. Invisible at any
+frame rate, and much simpler than reordering the pipeline for it.
+
 ## Bugs this work found and fixed, worth not reintroducing
 
 1. **Foot skate, twice — and the second time was my own "fix".** A phase is one CYCLE, which is

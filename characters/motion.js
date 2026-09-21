@@ -673,7 +673,19 @@ function idleLayer(out, m, opts, a) {
   // never repeat, and a visible repeat is what makes an idle read as an animation, not as life.
   const q = m.fidgetPhase;
   const w = Math.sin(q * m.rateA + m.seed);
-  out.spineRoll += g * 0.085 * w;
+
+  // THE WEIGHT SHIFT FADES OUT AS THEY WALK, and it is not a nicety.
+  //
+  // Shifting your weight from foot to foot IS what walking is -- the standing fidget and the
+  // walk's sway are the same physical act, and running both at once puts two independent
+  // oscillators on the SAME joint at incommensurate frequencies. Measured on a lively owl:
+  // sway +/-0.166 rad once per 0.6s stride, weight shift +/-0.092 rad on a 1.6s fidget clock,
+  // so the idle was 55% of the walk's amplitude and beating against it. That is the bobble-head.
+  //
+  // `still` is one frame stale -- compose runs before walkGain each tick -- which is invisible
+  // at any frame rate and much simpler than reordering the pipeline for it.
+  const still = 1 - (m.walkGain ?? 0);
+  out.spineRoll += g * still * 0.085 * w;
 
   // The hip part of the weight shift FADES OUT as the character folds up, and this is not a
   // nicety. groundCharacter derives root Y from the lowest foot, whose sensitivity to hipFlex is
@@ -685,7 +697,7 @@ function idleLayer(out, m, opts, a) {
   //
   // It is also just wrong: you do not shift your weight between your feet while sitting on them.
   const upright = clamp01(1 - Math.abs(out.hipFlex) / 0.9);
-  out.hipFlex += g * upright * 0.020 * Math.sin(q * m.rateA * 2 + m.seed);
+  out.hipFlex += g * upright * still * 0.020 * Math.sin(q * m.rateA * 2 + m.seed);
   // LOOKING AROUND IS CURIOSITY, and it gets its own amount rather than riding the general
   // fidget amplitude. These used to be multiplied -- `g` already carries idleAmp -- which let
   // Extraversion drive head movement harder than Openness did: measured on the owl's own spans,
@@ -695,7 +707,15 @@ function idleLayer(out, m, opts, a) {
   // idleAmount still gates it, because that is the master dial and the reduce-motion answer,
   // and the duty cycle still applies, because a character who has gone still should not carry
   // on scanning the room. idleAmp does not.
-  const look = (opts.idleAmount ?? 1) * opts.headArc * dutyGate(p, opts.idleDuty ?? 1, m.seed);
+  // The head scans LESS while walking, and keeps doing it rather than stopping: someone on the
+  // move is mostly watching where they are going, and glancing around is still what curiosity
+  // looks like. Measured on a curious owl before this: +/-23 degrees of yaw on a 1.6s clock
+  // while the body strode on a 0.6s one, which is most of the remaining bobble.
+  //
+  // Unlike the weight shift this only fades PART way -- the weight shift is the walk doing the
+  // same job twice, whereas looking around is a separate intent the walk does not cover.
+  const look = (opts.idleAmount ?? 1) * opts.headArc * (0.40 + 0.60 * still)
+    * dutyGate(p, opts.idleDuty ?? 1, m.seed);
   // THE NECK'S OWN RHYTHM. Long-necked animals never hold the neck rigid -- it settles and
   // rises continuously, on a slower beat than the head's glancing. Its own rate again, so it
   // does not lock to the breath or the fidget and turn the whole idle into one mechanism.

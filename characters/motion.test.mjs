@@ -525,6 +525,46 @@ const run = (m, target, o, frames, dt = 1 / 60) => {
     'the walk leaves kneeBend to the base pose and drives kneeSwing instead');
 }
 
+// --- the standing fidget must not run on top of the walk --------------------------------------
+//
+// Shifting your weight foot to foot IS what walking is, so the standing fidget and the walk's
+// sway are the same physical act. Running both put two independent oscillators on the SAME
+// joint at incommensurate frequencies -- measured on a lively owl, sway +/-0.166 rad once per
+// 0.6s stride against a weight shift of +/-0.092 rad on a 1.6s clock, the idle at 55% of the
+// walk and beating against it. That is a bobble-head, and no amount of tuning the sway slider
+// could reach it, because the sway slider was not what was doing it.
+{
+  const o = { ...opts(), idleDuty: 1 };
+  const swing = (gain) => {
+    const m = makeMotion(POSES.rest, 0.42);
+    resetMotion(m, POSES.rest);
+    m.walkGain = gain;
+    const buf = {};
+    let lo = Infinity, hi = -Infinity, headLo = Infinity, headHi = -Infinity;
+    for (let i = 0; i < 60 * 90; i++) {
+      integrate(m, POSES.rest, 1 / 60, o);
+      m.walkGain = gain;            // held, so this measures the idle alone
+      compose(buf, m, o);
+      lo = Math.min(lo, buf.spineRoll); hi = Math.max(hi, buf.spineRoll);
+      headLo = Math.min(headLo, buf.headYaw); headHi = Math.max(headHi, buf.headYaw);
+    }
+    return { roll: hi - lo, head: headHi - headLo };
+  };
+
+  const standing = swing(0), walking = swing(1);
+  assert.ok(walking.roll < standing.roll * 0.05,
+    `the standing weight shift must stop while walking (${walking.roll.toFixed(3)} against `
+    + `${standing.roll.toFixed(3)}) -- the walk's own sway is already doing that job`);
+  assert.ok(standing.roll > 0.05, 'and it must still be there while standing');
+
+  // the head keeps scanning, just less: it is a separate intent, not a duplicated one
+  assert.ok(walking.head < standing.head * 0.75,
+    'a walking character should scan less than a standing one');
+  assert.ok(walking.head > standing.head * 0.2,
+    `but must not stop looking around (${walking.head.toFixed(3)} against `
+    + `${standing.head.toFixed(3)}) -- curiosity does not switch off because your feet moved`);
+}
+
 // --- the idle must not bounce a seated character --------------------------------------------
 //
 // groundCharacter derives root Y from the lowest foot, and that foot's sensitivity to hipFlex is

@@ -10,7 +10,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeMotion, integrate, compose, POSE_KEYS } from './motion.js';
+import { makeMotion, integrate, compose, POSE_KEYS, POSES } from './motion.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
@@ -848,8 +848,14 @@ export function createCharacter(P, species) {
   // Seeded from the pose the rig was BUILT in, with zero velocity, so frame 1 has no error to
   // correct and a spawning character cannot lurch. groundOffset is what the seat lift and the
   // arrival tween write into, now that grounding owns root.y absolutely every frame.
+  //
+  // POSES.rest, not P. Params are not a pose: they carry armOut (0.16, which matches by
+  // coincidence) but no elbowBend, so seeding from them started every character with dead
+  // straight arms and sprang them to the 0.22 resting bend over the first third of a second --
+  // precisely the lurch the line above promises there will not be. Params double as a pose in
+  // species-checker, which is what made this look right.
   const ctx = { ...body, joints, materials, mat, addMaterial, params: P, species: kit, bulge,
-                motion: makeMotion(P), groundOffset: 0 };
+                motion: makeMotion(POSES.rest), groundOffset: 0 };
   kit.buildKit(ctx, P);
   if (P.scarf) body.neck.add(buildScarf(P, addMaterial));
   if (!P.partShadows) disableShadowCasting(body.root);
@@ -1079,8 +1085,19 @@ function applyHead(joints, pose, P) {
 
 // One reused output object for the whole cast: applyPose consumes it synchronously, so one is
 // enough, and a fresh object per character per frame is real GC pressure at 40 characters.
+//
+// kneeSwing and neckCurve are NOT in POSE_KEYS -- they are derived by the layers rather than
+// interpolated -- so they have to be listed by hand, and the seal is what makes forgetting them
+// loud instead of silent. They were forgotten: compose() threw
+// "Cannot add property kneeSwing, object is not extensible" on its first call, which means
+// stepMotion has never once executed. Nothing called it, so nothing noticed.
+//
+// The seal earns its keep here rather than merely documenting: unsealed, the missing keys would
+// have been added at runtime and the only symptom would have been a march that never marched
+// and a neck that never curved, on a rig where both look plausible.
 const _out = Object.seal(Object.fromEntries(
-  [...POSE_KEYS.map((k) => [k, 0]), ['holdItem', false], ['blink', 0]],
+  [...POSE_KEYS.map((k) => [k, 0]),
+    ['holdItem', false], ['blink', 0], ['kneeSwing', 0], ['neckCurve', 0]],
 ));
 
 /** Re-poses an existing character without rebuilding it. */

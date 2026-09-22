@@ -341,7 +341,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     // reported as inert -- which happened twice while writing this.
     const seen = {
       footLift: 0, footStride: 0, frozenStride: 0, armGapY: 0, armGapX: 0, armGapZ: 0,
-      armPair: 0, shift: 0, counter: 0, swung: 0,
+      armPair: 0, shift: 0, counter: 0, swung: 0, groundedBack: 0,
       roll: 0, twist: 0, turn: 0, travel: 0, rise: 0, rootY: { min: Infinity, max: -Infinity },
     };
     let phase = 0;
@@ -359,6 +359,17 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       seen.footStride = Math.max(seen.footStride, Math.abs(lFoot.z - rFoot.z));
       // Only while the walk layer is OFF -- what the legs look like during a held beat.
       if (d.walk === 0) seen.frozenStride = Math.max(seen.frozenStride, Math.abs(lFoot.z - rFoot.z));
+      // A STEP-BEHIND: a foot reaching back with BOTH feet still on the floor. The levelness test
+      // is what makes this different from every other beat in a step dance -- those all lift a leg,
+      // and a lifted leg swung back would pass a reach-only check while looking nothing like it.
+      //
+      // COUNTED, not maxed. A max is satisfied by a single frame in transit, so a step-behind whose
+      // knee bends -- which lifts the back foot off and turns it into another leg raise -- still
+      // passed, because the pose passes through level on its way to wrong. What has to be true is
+      // that the shape HOLDS for a beat.
+      if (Math.abs(lFoot.y - rFoot.y) < 0.02 && -Math.min(lFoot.z, rFoot.z) > 0.10) {
+        seen.groundedBack += 1;
+      }
       seen.roll = Math.max(seen.roll, Math.abs(valueOf(built.motion, 'spineRoll')));
       seen.armGapY = Math.max(seen.armGapY, Math.abs(lHand.y - rHand.y));
       seen.armGapX = Math.max(seen.armGapX, Math.abs(Math.abs(lHand.x) - Math.abs(rHand.x)));
@@ -411,6 +422,17 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     // front of the planted one against a high knee's 0.152. Below 0.20 the dance is all knees.
     assert.ok(rd.footStride > 0.20,
       `${id}: ...and at least one real kick -- furthest reach ${rd.footStride.toFixed(3)}`);
+    // AND A STEP-BEHIND. The rig has no lateral rotation at the hip, so a step that crosses behind
+    // the other foot is out of reach -- but swinging the leg STRAIGHT back with the foot still down
+    // is the fore-aft half of it, and that this rig can do.
+    //
+    // What this pins is that a held step-behind EXISTS, not the knee value that makes it cleanest.
+    // Bending the knee is a visible downgrade (the back foot hovers 0.027 and the dance loses 0.012
+    // of bounce) but not a different move, and a threshold tight enough to fail it would be tuned
+    // to one species' leg length rather than to anything true.
+    assert.ok(rd.groundedBack > 15,
+      `${id}: ...and a step-behind that HOLDS -- only ${rd.groundedBack} frames of 180 had a foot `
+      + 'reaching back with both feet on the floor');
 
     // The floss, against the wikiHow breakdown. The first version had the arms swinging fore-and-aft
     // like a march and nothing whatever at the hips -- reported as "total lack of hip motion and

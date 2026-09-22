@@ -174,6 +174,25 @@ export const DANCE_POSES = definePoses({
   // feet come off the ground as a pair -- the beat where the whole body leaves the floor. The lift
   // itself is the step's `hop` arc; this is only what the legs do while airborne.
   'rd-hop': { armOut: 0.12, elbowBend: 0.06, legSwing: 0, hipFlex: 0.34, kneeBend: 0.82, headPitch: -0.05 },
+  // THE STEP-BEHIND: one foot swung back and STILL ON THE FLOOR, which is a different thing from
+  // every other beat here -- those lift a leg, this one plants both.
+  //
+  // It works because hipFlex is what breaks the legs' symmetry: at hipFlex 0 the two legs rotate
+  // about their own hips by equal and opposite angles, so both feet rise by exactly the same
+  // amount and grounding sets the body down on both. Measured on both species, straight-kneed:
+  // legSwing 0.72 puts the back foot 0.15 behind with both feet level to within a thousandth.
+  //
+  // kneeBend stays at zero, for two measured reasons rather than one. kneeAmount bends the trailing
+  // leg harder than the leading one, so a bent knee lifts the back foot off the floor: 0.041 as a
+  // static pose, though only 0.027 in the dance as it actually runs, because the spring does not
+  // fully arrive inside a 0.17s beat. And the straight-legged splay squats deeper, which is worth
+  // more than it sounds -- it takes the body's height swing from 0.097 to 0.109. Straight legs are
+  // also simply what the dance looks like.
+  //
+  // The splay lowers the hips ~0.06 on its own, which feeds the bounce for free: the body sinks
+  // into the step and the next hop throws it back up.
+  'rd-behind-l': { armOut: 0.10, elbowBend: 0.06, legSwing: 0.72, hipFlex: 0, kneeBend: 0, headPitch: -0.05 },
+  'rd-behind-r': { armOut: 0.10, elbowBend: 0.06, legSwing: -0.72, hipFlex: 0, kneeBend: 0, headPitch: -0.05 },
 
   // -- floss. Built from the wikiHow breakdown rather than from memory, because the first attempt
   // had the arms swinging fore-and-aft like a march and nothing at all happening at the hips.
@@ -279,13 +298,21 @@ export const DANCES = defineDances({
     //
     // The hop is on the airborne beat itself and arcs back to zero within it, which is what lets a
     // LOOPING dance use it at all. A sustained `rise` here would snap to the floor at the wrap.
+    // Two mirrored halves of five: KICK, hop, STEP-BEHIND, high knee, hop. Ten beats is a long loop
+    // for a dance, and deliberately so -- a four-beat cycle at this tempo reads as a twitch, and
+    // the whole point of a step dance is that the feet are doing something you cannot quite follow.
+    //
+    // The step-behind is the only beat with both feet on the floor, and it is what the dance was
+    // missing: without it every beat is a lift, which is a drill rather than a dance.
     steps: [
       { pose: 'rd-kick-l', hold: 0.19 },
       { pose: 'rd-hop', hold: 0.15, hop: 0.055 },
+      { pose: 'rd-behind-l', hold: 0.17 },
       { pose: 'rd-right', hold: 0.16 },
       { pose: 'rd-hop', hold: 0.15, hop: 0.045 },
       { pose: 'rd-kick-r', hold: 0.19 },
       { pose: 'rd-hop', hold: 0.15, hop: 0.055 },
+      { pose: 'rd-behind-r', hold: 0.17 },
       { pose: 'rd-left', hold: 0.16 },
       { pose: 'rd-hop', hold: 0.15, hop: 0.045 },
     ],

@@ -17,6 +17,7 @@
 // so this costs one small file.
 
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
 import {
   POSES, POSE_KEYS, MOTION_DEFAULTS, BASE_PARAMS, createCharacter, stepMotion, applyPose,
   valueOf, walkPhase, walkLayer, speciesIds, getSpecies, resetMotion,
@@ -26,6 +27,26 @@ import './llama.js';
 
 const build = (id) => createCharacter(
   { ...BASE_PARAMS, ...getSpecies(id).defaults, mergeMeshes: false }, id);
+
+/**
+ * World position of the farthest descendant of a joint -- the hand at the end of an arm, the foot
+ * at the end of a leg. Angles alone cannot answer "is one arm higher than the other", because the
+ * two shoulders sit at mirrored offsets and a mirrored rotation about a mirrored origin lands
+ * somewhere different. So these assertions measure where the limb actually ENDS UP.
+ */
+function tipOf(built, node) {
+  built.root.updateMatrixWorld(true);
+  const origin = new THREE.Vector3().setFromMatrixPosition(node.matrixWorld);
+  let best = origin, far = -1;
+  node.traverse((c) => {
+    const p = new THREE.Vector3().setFromMatrixPosition(c.matrixWorld);
+    const d = p.distanceTo(origin);
+    if (d > far) { far = d; best = p; }
+  });
+  return best;
+}
+const limb = (built, part, side) => built.joints[part].find((j) => j.side === side).node;
+const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
 
 // --- stepMotion runs at all --------------------------------------------------------------------
 //
@@ -202,6 +223,97 @@ const build = (id) => createCharacter(
   assert.ok(moved > 60,
     `the idle layer moved the pose on only ${moved} of 120 frames -- with idleAmount 1 a standing `
     + 'character must visibly breathe, or the "+ idle" switch is toggling nothing');
+}
+
+// --- armOutAlt breaks the arms' mirror ----------------------------------------------------------
+//
+// applyLimbs writes `rotation.z = side * armOut`, which is mirrored BY CONSTRUCTION: measured
+// across armOut, armSwing and armSwingAlt, the two hands never differed laterally by more than
+// 0.00, so a ballet port de bras -- one arm up, one out -- was simply unreachable. armOutAlt is
+// the anti-symmetric partner, exactly as armSwingAlt is for armSwing.
+{
+  for (const id of speciesIds()) {
+    const built = build(id);
+
+    // First the baseline this exists to break: the symmetric channels must STAY symmetric.
+    for (const p of [{ armOut: 1.2 }, { armSwing: -1.0 }, { armOut: 2.55, armSwingAlt: 0.9 }]) {
+      pose(built, p);
+      const l = tipOf(built, limb(built, 'upperArm', 1));
+      const r = tipOf(built, limb(built, 'upperArm', -1));
+      assert.ok(Math.abs(Math.abs(l.x) - Math.abs(r.x)) < 1e-9,
+        `${id}: ${JSON.stringify(p)} must leave the arms laterally mirrored`);
+    }
+
+    // ...and armOutAlt must not.
+    pose(built, { armOut: 1.2, armOutAlt: 0.9 });
+    const l = tipOf(built, limb(built, 'upperArm', 1));
+    const r = tipOf(built, limb(built, 'upperArm', -1));
+    assert.ok(l.y - r.y > 0.02,
+      `${id}: positive armOutAlt must raise the LEFT hand above the right -- got ${(l.y - r.y).toFixed(4)}`);
+    assert.ok(Math.abs(l.x) - Math.abs(r.x) > 0.01,
+      `${id}: and carry it further out -- the two arms must stop being mirror images`);
+  }
+}
+
+// --- spineTwist turns the chest, and only the chest ---------------------------------------------
+//
+// The spine's Y rotation slot was unused -- set(bend, 0, -roll) -- so the torso could bend and lean
+// but never turn. Shoulders against hips is the whole read of a floss. The legs hang off the ROOT,
+// not the spine, so a twist must leave them exactly where they were: if it moved them the character
+// would screw themselves into the floor and grounding would chase it.
+{
+  const built = build(speciesIds()[0]);
+  pose(built, {});
+  const footBefore = tipOf(built, limb(built, 'upperLeg', 1)).clone();
+  const yBefore = built.root.position.y;
+
+  pose(built, { spineTwist: 0.8 });
+  // applyPose writes LOCAL rotations; nothing has rebuilt the world matrices yet.
+  built.root.updateMatrixWorld(true);
+  const spineYaw = new THREE.Euler().setFromRotationMatrix(built.joints.spine.matrixWorld).y;
+  assert.ok(Math.abs(spineYaw - 0.8) < 1e-6,
+    `spineTwist must reach the spine's world yaw -- got ${spineYaw.toFixed(4)}`);
+
+  const footAfter = tipOf(built, limb(built, 'upperLeg', 1));
+  assert.ok(footAfter.distanceTo(footBefore) < 1e-9, 'a twist at the waist must not move the legs');
+  assert.ok(Math.abs(built.root.position.y - yBefore) < 1e-9, 'nor change the grounding height');
+}
+
+// --- standing on one leg ------------------------------------------------------------------------
+//
+// legSwing is anti-symmetric (legSwing * side) and hipFlex is symmetric, so hipFlex = -legSwing
+// cancels one leg and doubles the other. That is the ONLY way this rig can stand on one leg, and
+// three of the five dances are built on it -- so it is worth pinning rather than rediscovering.
+//
+// What has to hold is not the lift but the PLANT: the standing foot stays on the floor and the body
+// does not bob, whatever the free leg is doing. Grounding places the body by its LOWEST foot, so if
+// this stopped holding, a dance would pump the whole character up and down.
+{
+  for (const id of speciesIds()) {
+    const built = build(id);
+    let planted = null, rootY = null;
+    for (const k of [0.6, 0.9, 1.2]) {
+      // free leg BEHIND (an attitude) and then IN FRONT (a riverdance knee)
+      for (const sign of [1, -1]) {
+        pose(built, { legSwing: sign * k, hipFlex: -sign * k, kneeBend: 1.2 });
+        const l = tipOf(built, limb(built, 'lowerLeg', 1));
+        const r = tipOf(built, limb(built, 'lowerLeg', -1));
+        const [low, high] = l.y <= r.y ? [l, r] : [r, l];
+        assert.ok(high.y - low.y > 0.05,
+          `${id}: legSwing ${sign * k} must lift a leg clear -- got ${(high.y - low.y).toFixed(3)}`);
+        if (sign !== 1) continue;
+        // the same leg stays planted through one direction, so it must not wander
+        if (planted !== null) {
+          assert.ok(Math.abs(low.y - planted) < 2e-3,
+            `${id}: the planted foot left the floor at legSwing ${k}`);
+          assert.ok(Math.abs(built.root.position.y - rootY) < 1e-3,
+            `${id}: the body bobbed at legSwing ${k} -- grounding must follow the STANDING leg`);
+        }
+        planted = low.y;
+        rootY = built.root.position.y;
+      }
+    }
+  }
 }
 
 console.log('npc.js rig self-check: all assertions passed');

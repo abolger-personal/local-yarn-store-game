@@ -31,8 +31,8 @@
 // a ~120ms snap the idle layer writes straight into the output, and pushing it through an
 // interpolator is what turns a blink into a droop.
 export const POSE_KEYS = [
-  'armSwing', 'armSwingAlt', 'armOut', 'elbowBend', 'legSwing', 'kneeBend',
-  'hipFlex', 'spineBend', 'spineRoll', 'earPerk', 'earSplay',
+  'armSwing', 'armSwingAlt', 'armOut', 'armOutAlt', 'elbowBend', 'legSwing', 'kneeBend',
+  'hipFlex', 'spineBend', 'spineRoll', 'spineTwist', 'earPerk', 'earSplay',
   'headYaw', 'headPitch', 'headTilt',
 ];
 
@@ -46,8 +46,8 @@ const TAU = Math.PI * 2;
 // channel at all -- and counter-swing is the single biggest readability cue in a walk. armSwingAlt
 // is the anti-symmetric partner: positive is contralateral to positive legSwing.
 export const REST_POSE = Object.freeze({
-  armSwing: 0, armSwingAlt: 0, armOut: 0, elbowBend: 0, legSwing: 0, kneeBend: 0,
-  hipFlex: 0, spineBend: 0, spineRoll: 0, earPerk: 0, earSplay: 0,
+  armSwing: 0, armSwingAlt: 0, armOut: 0, armOutAlt: 0, elbowBend: 0, legSwing: 0, kneeBend: 0,
+  hipFlex: 0, spineBend: 0, spineRoll: 0, spineTwist: 0, earPerk: 0, earSplay: 0,
   headYaw: 0, headPitch: 0, headTilt: 0,
   holdItem: false, blink: 0,
 });

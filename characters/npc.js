@@ -87,6 +87,19 @@ export const BASE_PARAMS = Object.freeze({
   earSplay:      0.00,    // extra outward tilt, added to the species' resting tilt
   armSwingAlt:   0.00,    // anti-symmetric arm swing: armSwing moves both arms together, so a
                           // walk's counter-swing needs a channel of its own
+  armOutAlt:     0.00,    // anti-symmetric arm ELEVATION -- armOut raises both arms by the same
+                          // angle and is mirrored by construction, so the rig could not put one
+                          // arm up and the other out. Measured: across armOut, armSwing and
+                          // armSwingAlt the two hands never differed laterally by more than 0.00.
+                          // Positive raises the character's LEFT arm and lowers the right. It is
+                          // clamped PER SIDE, so an asymmetric line still cannot drive an arm
+                          // through the body. A ballet port de bras needs this and nothing else
+                          // on the rig provides it.
+  spineTwist:    0.00,    // axial twist at the waist; positive turns the chest to the character's
+                          // LEFT while the hips stay put. The spine's Y rotation slot was
+                          // literally unused -- set(bend, 0, -roll) -- so the torso could bend and
+                          // lean but never turn. Shoulders-against-hips is the whole read of a
+                          // floss, and half of what makes a strut swagger rather than march.
   headYaw:       0.00,    // positive turns to the character's LEFT
   headYawMax:    1.40,    // HOW FAR this species can physically turn its head, radians (~80deg,
                           // a mammal). Anatomy, not personality, so it lives with neckLength
@@ -1051,7 +1064,7 @@ function neckStabilise(P) {
 function applyLimbs(joints, pose, out) {
   const alt = pose.armSwingAlt ?? 0;
   for (const { node, side } of joints.upperArm) {
-    node.rotation.set(pose.armSwing - side * alt, 0, side * out);
+    node.rotation.set(pose.armSwing - side * alt, 0, side * out[side > 0 ? 0 : 1]);
   }
   for (const { node } of joints.lowerArm) node.rotation.x = -pose.elbowBend;
   for (const { node, side } of joints.upperLeg) {
@@ -1112,12 +1125,21 @@ const _out = Object.seal(Object.fromEntries(
 /** Re-poses an existing character without rebuilding it. */
 export function applyPose(built, pose) {
   const { joints, held, params, bulge = 0 } = built;
-  const out = clampArmOut(params, bulge, pose.armOut, pose.armSwing);
+  // Per side, because armOutAlt raises one arm and drops the other: one clamp for both would
+  // either let the low arm through the body or lift it back to symmetry, and both look like bugs.
+  // [left, right] -- the loop in applyLimbs indexes it by side.
+  const alt = pose.armOutAlt ?? 0;
+  const out = [
+    clampArmOut(params, bulge, pose.armOut + alt, pose.armSwing),
+    clampArmOut(params, bulge, pose.armOut - alt, pose.armSwing),
+  ];
   applyLimbs(joints, pose, out);
   // Roll lives on the SPINE, not the hips: lowestFoot derives grounding from hip and knee
   // angles alone, so rolling the hips would lift one foot off the floor and sink the other with
   // grounding none the wiser. Above the waist the legs are untouched and grounding stays exact.
-  if (joints.spine) joints.spine.rotation.set(pose.spineBend ?? 0, 0, -(pose.spineRoll ?? 0));
+  if (joints.spine) {
+    joints.spine.rotation.set(pose.spineBend ?? 0, pose.spineTwist ?? 0, -(pose.spineRoll ?? 0));
+  }
   // resting tilt belongs to the species, so the pose adds to it rather than replacing it
   for (const { node, side, tilt } of joints.ear) {
     node.rotation.set(pose.earPerk ?? 0, 0, side * -(tilt + (pose.earSplay ?? 0)));
@@ -1234,7 +1256,7 @@ export const BASE_GUI = Object.freeze({
     ['legSwing', -1.0, 1.0], ['kneeBend', -0.4, 2.4], ['hipFlex', -0.6, 1.9],
     ['spineBend', -0.7, 1.2], ['spineRoll', -0.8, 0.8],
     ['earPerk', -1.2, 1.2], ['earSplay', -0.8, 1.2],
-    ['armSwingAlt', -1.0, 1.0],
+    ['armSwingAlt', -1.0, 1.0], ['armOutAlt', -1.5, 1.5], ['spineTwist', -1.2, 1.2],
     ['headYaw', -5.0, 5.0], ['headPitch', -0.9, 0.9], ['headTilt', -0.8, 0.8],
     ['blink', 0, 1],
     ['holdItem', 'bool'],

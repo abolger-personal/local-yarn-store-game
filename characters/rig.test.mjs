@@ -164,4 +164,44 @@ const build = (id) => createCharacter(
     'taking the rig back from the engine must leave it where the static path puts it');
 }
 
+// --- the layers are switches, and "pose alone" is the static pose -------------------------------
+//
+// The species checker now offers the stack as checkboxes -- pose, + idle, + walk -- which is only
+// honest if turning a layer off is SUBTRACTION rather than a different code path. The existing
+// handover block above asserts the COMMANDED pose (cur[]) holds; this asserts the composed OUTPUT,
+// which is what actually reaches the joints and is where a layer that leaks would show up.
+//
+// Both directions, because the off-assertion alone passes vacuously if the idle layer breaks:
+// with the switch off the output must BE the pose, and with it on it must not.
+{
+  const built = build(speciesIds()[0]);
+  const off = { ...MOTION_DEFAULTS, idleAmount: 0 };
+
+  // Settle, so the spring is sitting on the target and any difference left is a layer's doing.
+  resetMotion(built.motion, POSES.browse);
+  for (let i = 0; i < 120; i++) stepMotion(built, POSES.browse, 1 / 60, off);
+
+  const bare = stepMotion(built, POSES.browse, 1 / 60, off);
+  for (const k of POSE_KEYS) {
+    assert.equal(bare[k], POSES.browse[k],
+      `${k}: with every layer off the composed output must equal the pose exactly -- the lab `
+      + 'shows this as "pose alone", and it has to match what the static rig draws');
+  }
+  // The channels the layers own, rather than share, must be untouched too.
+  for (const k of ['blink', 'kneeSwing', 'neckCurve']) {
+    assert.equal(bare[k], 0, `${k} must be 0 with no layer running`);
+  }
+
+  // ...and the switch has to actually do something, or the assertion above means nothing.
+  const on = { ...MOTION_DEFAULTS };
+  let moved = 0;
+  for (let i = 0; i < 120; i++) {
+    const out = stepMotion(built, POSES.browse, 1 / 60, on);
+    if (POSE_KEYS.some((k) => Math.abs(out[k] - POSES.browse[k]) > 1e-4)) moved++;
+  }
+  assert.ok(moved > 60,
+    `the idle layer moved the pose on only ${moved} of 120 frames -- with idleAmount 1 a standing `
+    + 'character must visibly breathe, or the "+ idle" switch is toggling nothing');
+}
+
 console.log('npc.js rig self-check: all assertions passed');

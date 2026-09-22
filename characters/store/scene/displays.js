@@ -47,7 +47,7 @@ export const DISPLAY_SLOTS = [
 ];
 
 /**
- * The shop floor, as a display.
+ * The shop floor, as a row of PILES.
  *
  * Deliberately NOT in DISPLAY_SLOTS: it is the room, not furniture. It cannot be added, removed,
  * moved or turned, and it is always built LAST so that every other display — and the counter, the
@@ -59,6 +59,15 @@ export const DISPLAY_SLOTS = [
  * the placement test refuses to put furniture inside one. A room-sized obstacle would wall the
  * shop off from itself. This is a surface you walk ON, so it is excluded from all three — see
  * roomObstacles here, and `obstacles`/`canSee` in visit.js.
+ *
+ * CUT INTO TILES, because one room-sized display is one destination. An NPC decides what to walk
+ * to per display — attractiveness, visibility, the standing spot — so a single floor grid meant
+ * "there is yarn on the floor SOMEWHERE" and sent the whole cast to the same spot in the middle of
+ * the room. A tile is a pile: it is judged on the stock that is actually in it, it is seen from
+ * where it actually is, and it is stood beside where it actually is.
+ *
+ * The whole floor stays usable — the tiles tile it, edge tiles take the remainder. What is given
+ * up is a footprint straddling a tile boundary, which now has to fit inside one tile.
  */
 // How close to a wall anything may stand: the panel is 0.08 thick and centred on the boundary, so
 // 0.04 of it is inside the room, plus 0.02 of slack. Named because the wall-shelf snap has to stand
@@ -68,11 +77,54 @@ export const WALL_INSET = 0.04 + 0.02;
 
 const FLOOR_COLS = Math.floor((ROOM.w - WALL_INSET * 2) / CELL);
 const FLOOR_ROWS = Math.floor((ROOM.d - WALL_INSET * 2) / CELL);
+
 export const ROOM_FLOOR = Object.freeze({
   id: 'floor', kind: 'pile', form: 'floor', solid: false,
   cols: FLOOR_COLS, rows: FLOOR_ROWS, shelves: 1, headroom: PILE_HEADROOM,
   x: 0, z: 0, yaw: 0,
 });
+
+/**
+ * Cells per side of one floor pile. 4 is 0.8 units — about the size of a real heap of yarn, and
+ * far enough apart that two customers browsing neighbouring piles are not standing in each other.
+ * The ONE number to change: 3 makes more, smaller piles; 8 makes a handful of big zones.
+ */
+const FLOOR_TILE = 4;
+
+/** The floor, as slot specs. The remainder goes to the edge tiles rather than off the grid. */
+function floorTiles() {
+  const out = [];
+  const x0 = -(FLOOR_COLS * CELL) / 2, z0 = -(FLOOR_ROWS * CELL) / 2;
+  for (let r = 0; r < FLOOR_ROWS; r += FLOOR_TILE)
+    for (let c = 0; c < FLOOR_COLS; c += FLOOR_TILE) {
+      const cols = Math.min(FLOOR_TILE, FLOOR_COLS - c);
+      const rows = Math.min(FLOOR_TILE, FLOOR_ROWS - r);
+      out.push({ ...ROOM_FLOOR, id: `floor-${c}-${r}`, cols, rows,
+                 x: x0 + (c + cols / 2) * CELL, z: z0 + (r + rows / 2) * CELL });
+    }
+  return out;
+}
+
+// A shoulder. Matches visit.js's BODY_RADIUS, which is the sim's and cannot be imported here
+// without the scene depending on the simulation.
+const STAND_HALF = 0.12;
+
+/**
+ * Where an NPC stands to browse a floor pile.
+ *
+ * Furniture has a front, and STAND_OFF puts them in front of it. A heap on the ground has no
+ * front, so take the first side that is clear of the walls and of everything else in the room.
+ * null means it is hemmed in on all four sides, which is not a pile — it is the patch of floor
+ * under a table, and buildDisplays drops it.
+ */
+function standBeside(d, obstacles) {
+  const reach = Math.max(d.w, d.d) / 2 + STAND_OFF;
+  for (const [sx, sz] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+    const x = d.x + sx * reach, z = d.z + sz * reach;
+    if (boxIsClear(x, z, STAND_HALF, obstacles)) return { x, z };
+  }
+  return null;
+}
 
 const displayGroup = new THREE.Group();
 
@@ -232,6 +284,22 @@ function makeDisplayFromSlot(slot, builtSoFar = []) {
  * replaced, so a drag holding an index into the old ones cannot survive. Doing it in here meant
  * this module importing the interaction layer, which is the edge that kept the graph circular.
  */
+/**
+ * The floor, last, so its tiles are masked against everything: the furniture keeps its cells and
+ * the floor loses the ones underneath. `displayCount` does not include these — the floor is always
+ * there. Tiles do not mask each other, because roomObstacles skips anything `solid: false`.
+ */
+function buildFloor() {
+  for (const slot of floorTiles()) {
+    const d = makeDisplayFromSlot(slot, displays);
+    d.standAt = standBeside(d, roomObstacles(displays));
+    // A tile with no cell left, or with nowhere to stand beside it, is not a pile — it is the
+    // floor under a table. Dropping it keeps the display list a list of PLACES, which is what
+    // every NPC decision iterates over.
+    if (d.standAt && d.g.usable.includes(1)) displays.push(d);
+  }
+}
+
 export function buildDisplays(n) {
   mover.m = null;
   mover.sel = null;
@@ -242,9 +310,7 @@ export function buildDisplays(n) {
   // pointing at the old one. This is the price of shared state and it is a small one.
   displays.length = 0;
   for (const slot of DISPLAY_SLOTS.slice(0, n)) displays.push(makeDisplayFromSlot(slot, displays));
-  // Last, so it is masked against everything: the furniture keeps its cells and the floor loses
-  // the ones underneath. `displayCount` does not include it — the floor is always there.
-  displays.push(makeDisplayFromSlot(ROOM_FLOOR, displays));
+  buildFloor();
   if (!byId(aim.active)) aim.active = displays[0]?.id ?? null;
   for (const d of displays) {
     d.group = new THREE.Group();

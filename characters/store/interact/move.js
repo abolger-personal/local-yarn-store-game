@@ -180,11 +180,13 @@ export function proposeMove(m, x, z, yaw) {
  * The floor is masked against every other display, so anything that moves opens a hole where it
  * has gone and fills the one where it was. Forgetting the second half leaves a display's ghost
  * punched through the floor grid for the rest of the session.
+ *
+ * Every floor tile, not "the floor": a shelf dragged across the room lands on one tile and leaves
+ * another, and remasking only one of them is the ghost this exists to prevent.
  */
 function remaskMoved(d) {
   remaskDisplay(d);
-  const floor = displays.find((o) => o.solid === false);
-  if (floor && floor !== d) remaskDisplay(floor);
+  for (const o of displays) if (o.solid === false && o !== d) remaskDisplay(o);
 }
 
 function remaskDisplay(d) {

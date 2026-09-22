@@ -9,10 +9,10 @@ import { familyExtent, yarnFit } from '../../inventory/yarn-geometry.js';
 import { createCharacter, disposeCharacter, getSpecies, speciesIds } from '../npc.js';
 import { labelOf, seatById } from '../visit.js';
 import * as THREE from 'three';
-import { BOX_H } from './core/config.js';
+import { BOX_H, CELL } from './core/config.js';
 import { camera, controls } from './scene/stage.js';
 import { COUNTER, HALF_D, HALF_W, cullWalls, walls } from './scene/room.js';
-import { applyTransform } from './scene/displays.js';
+import { ROOM_FLOOR, applyTransform } from './scene/displays.js';
 import { atlas, boxes } from './goods/items.js';
 import { YARN, YARN_FIT, yarnMeshes } from './goods/yarn.js';
 import { refresh, refreshAll } from './goods/paint.js';
@@ -163,6 +163,53 @@ export function checkSlotMasking() {
 }
 
 /**
+ * Self-check: the floor tiles still tile the floor.
+ *
+ * The floor is cut into piles so that an NPC deciding where to walk has somewhere specific to walk
+ * to, and the cut is pure arithmetic on the tile size. So the way it breaks is an off-by-one: a
+ * seam of floor no tile owns, or an overlap where two tiles claim the same cell and an item
+ * dropped onto one is found by the other. Neither raises anything — both just read as "that patch
+ * of floor behaves oddly", which is the kind of bug nobody ever tracks down.
+ *
+ * Every tile cell must therefore land on the ONE floor lattice ROOM_FLOOR describes, and no cell
+ * may be claimed twice. The tile count is asserted too: one tile IS the old room-sized floor, and
+ * that is the regression this whole split exists to prevent.
+ */
+/** Which cell of the one floor lattice a tile's own cell sits on, in whole cells from a corner. */
+function floorCellAt(d, c, r) {
+  const x0 = -(ROOM_FLOOR.cols * CELL) / 2, z0 = -(ROOM_FLOOR.rows * CELL) / 2;
+  return {
+    fx: (d.x + (c + 0.5) * CELL - (d.g.cols * CELL) / 2 - x0) / CELL - 0.5,
+    fz: (d.z + (r + 0.5) * CELL - (d.g.rows * CELL) / 2 - z0) / CELL - 0.5,
+  };
+}
+
+function claimFloorCell(d, c, r, claimed, fails) {
+  const { fx, fz } = floorCellAt(d, c, r);
+  const ix = Math.round(fx), iz = Math.round(fz);
+  const key = `${ix},${iz}`;
+  if (Math.abs(fx - ix) > 1e-6 || Math.abs(fz - iz) > 1e-6)
+    fails.push(`${d.id} cell ${c},${r} sits off the floor lattice`);
+  else if (ix < 0 || iz < 0 || ix >= ROOM_FLOOR.cols || iz >= ROOM_FLOOR.rows)
+    fails.push(`${d.id} cell ${c},${r} sits outside the floor`);
+  if (claimed.has(key)) fails.push(`${d.id} and ${claimed.get(key)} both claim floor cell ${key}`);
+  claimed.set(key, d.id);
+}
+
+export function checkFloorTiling() {
+  const fails = [];
+  const tiles = displays.filter((d) => d.form === 'floor');
+  const claimed = new Map();
+  for (const d of tiles)
+    for (let r = 0; r < d.g.rows; r++)
+      for (let c = 0; c < d.g.cols; c++) claimFloorCell(d, c, r, claimed, fails);
+  if (tiles.length < 2) fails.push(`the floor is ${tiles.length} pile(s) — it is not cut up at all`);
+  console.assert(fails.length === 0, 'floor tiling:', fails.slice(0, 8));
+  console.info(`floor tiling: ${tiles.length} piles holding ${claimed.size} of `
+    + `${ROOM_FLOOR.cols * ROOM_FLOOR.rows} floor cells`);
+}
+
+/**
  * Self-check: DISPLAYS.md rule 10. Everything the player can move can be moved and turned, stock
  * comes with it, and the per-type restrictions hold. Runs against the live layout and restores
  * every pose afterwards.
@@ -252,7 +299,9 @@ export function checkDisplayMoves() {
   const fails = [];
   const saved = [...displays, ...seats].map((m) => ({ m, ...movePose(m) }));
   const shelf = displays.find((d) => d.form === 'wall-shelf');
-  const pile = displays.find((d) => d.kind === 'pile');
+  // `solid !== false` as well as 'pile': the floor tiles are piles too, and at displayCount 1
+  // there is no table, so this would otherwise pick a floor tile and start dragging the floor.
+  const pile = displays.find((d) => d.kind === 'pile' && d.solid !== false);
   const chair = seats[0];
 
   if (shelf) { checkShelfSnap(shelf, fails); checkShelfPlaceable(shelf, fails); }

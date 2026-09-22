@@ -35,7 +35,7 @@ import { tickCast } from './sim/cast.js';
 import { drawDebug, drawTimer, installHud, autoBar, autoBox, autoDayBox, updatePerf } from './ui/hud.js';
 import { frameRoom } from './ui/framing.js';
 import { buildGui } from './ui/gui.js';
-import { checkWallCulling, checkItemSizes, checkSlotMasking, checkDisplayMoves, checkHeldItem } from './checks.js';
+import { checkWallCulling, checkItemSizes, checkSlotMasking, checkFloorTiling, checkDisplayMoves, checkHeldItem } from './checks.js';
 
 const ATLAS_URL = '../../ai_planning_sessions/inventory/illustrations/build';
 
@@ -95,6 +95,7 @@ function runChecks() {
   checkWallCulling();
   checkItemSizes();
   checkSlotMasking();
+  checkFloorTiling();
   checkDisplayMoves();
   checkHeldItem();
 }

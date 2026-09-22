@@ -83,12 +83,28 @@ function randomStock() {
  * and stacking is what gives DISPLAYS.md's "buried inventory cannot be noticed" rule something to
  * do at all.
  */
+/**
+ * Where stock goes, as a round-robin of PLACES rather than of displays.
+ *
+ * The floor is cut into tiles (see displays.js) but it is still one place to put things. Entering
+ * every tile in the rota separately would hand the floor forty turns against the furniture's six
+ * and quietly relocate the whole shop's stock onto the ground — so the floor takes one turn, and
+ * a random tile takes it. Each entry is a group of interchangeable spots; `pick` chooses inside it.
+ */
+function stockSpots() {
+  const tiles = displays.filter((d) => d.solid === false);
+  const spots = displays.filter((d) => d.solid !== false).map((d) => [d]);
+  if (tiles.length) spots.push(tiles);
+  return spots;
+}
+
 function fillStock(n) {
   if (n <= 0 || !displays.length) return 0;
   let placed = 0, tries = 0;
-  // Round-robin across displays so a small shop is not all piled on one table.
+  const spots = stockSpots();
+  // Round-robin across places so a small shop is not all piled on one table.
   for (let i = 0; placed < n && tries < n * 8; i++, tries++) {
-    const d = displays[i % displays.length];
+    const d = pick(spots[i % spots.length]);
     if (d.kind === 'shelf') {
       if (addItem(d, rnd(d.g.shelves), randomStock()) >= 0) placed++;
       continue;
@@ -123,9 +139,10 @@ function fillStock(n) {
  */
 function seedOne(npc, i, unseeded) {
   const wants = wantsOf(npc);
+  const spots = stockSpots();
   let placed = 0;
   wants.forEach((want, k) => {
-    const open = displays[(i + k) % displays.length];
+    const open = pick(spots[(i + k) % spots.length]);
     const spec = specFor(want, npc);
     console.assert(satisfies(spec, want), 'seeded item does not satisfy its own want', spec, want);
     if (addItem(open, 0, spec, { avoidWall: true }) >= 0) placed++;

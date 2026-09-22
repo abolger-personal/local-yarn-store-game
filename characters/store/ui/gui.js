@@ -127,10 +127,14 @@ function cameraRows() {
   lockBtn.addEventListener('click', () => setCameraLock(!S.lockCamera));
 }
 
-/** Cycle which display the player is arranging — for the ones the pointer struggles to hit. */
+/** Cycle which display the player is arranging — for the ones the pointer struggles to hit.
+ *  Floor tiles are skipped: they are the easiest thing in the room to point AT, and there are
+ *  dozens of them, so including them would turn one keypress into forty. */
 function cycleDisplay() {
-  const i = displays.findIndex((d) => d.id === aim.active);
-  aim.active = displays[(i + 1) % displays.length].id;
+  const arrangeable = displays.filter((d) => d.solid !== false);
+  if (!arrangeable.length) return;
+  const i = arrangeable.findIndex((d) => d.id === aim.active);
+  aim.active = arrangeable[(i + 1) % arrangeable.length].id;
   paintActivePlane();
   updateHeldReadout();
 }

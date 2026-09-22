@@ -1297,6 +1297,10 @@ function t(all, over = {}) {
       assert.equal(e.turn, 0, `${name} loops, so it may not turn the root`);
       assert.equal(e.travel, 0, `${name} loops, so it may not travel`);
     }
+    // turn and travel only. `rise` and `shift` may end a cycle anywhere they like, because the
+    // wrap lerps from the LAST step's extras rather than from nothing -- see stepDance. That is
+    // what lets the floss alternate its hips: without it, a shift of +0.038/-0.038 would snap to
+    // zero on every wrap.
   }
 }
 
@@ -1344,7 +1348,7 @@ function t(all, over = {}) {
     let prev = stepDance(perf, 0);
     for (let i = 0; i < 1200; i++) {
       const now = stepDance(perf, 1 / 120);
-      for (const k of ['turn', 'rise', 'travel']) {
+      for (const k of ['turn', 'rise', 'travel', 'shift']) {
         assert.ok(Math.abs(now[k] - prev[k]) < 0.25,
           `${name}: ${k} jumped ${(now[k] - prev[k]).toFixed(3)} in one frame at step ${perf.i}`);
       }
@@ -1383,6 +1387,39 @@ function t(all, over = {}) {
   const firstFreeze = samples.findIndex((s) => s.walk === 0);
   assert.ok(samples.slice(firstFreeze).some((s) => s.walk > 0),
     'the walk must come back after a freeze -- `walk` falls back to the dance, it does not carry');
+}
+
+// --- a looping dance is continuous THROUGH the wrap ---------------------------------------------
+//
+// The blanket continuity check above uses a threshold loose enough for a pirouette's turn (0.075
+// per frame at 1/120), which is far too loose to catch a hip snapping across the body: the floss
+// alternates shift +0.038 / -0.038, so a broken wrap jumps 0.076 and sails straight through.
+//
+// This is the assertion for the wrap itself. Before stepDance learned that step 0's predecessor is
+// the LAST step once a dance has looped, the first lap was continuous and every lap after it
+// snapped -- which is the kind of thing that reads as "the dance twitches every second or so".
+{
+  for (const name of DANCE_NAMES) {
+    if (!DANCES[name].loop) continue;
+    const perf = makeDance(name);
+    let prev = stepDance(perf, 0);
+    let prevStep = perf.i;
+    let wraps = 0, worst = 0, worstKey = null;
+    for (let i = 0; i < 2400; i++) {
+      const now = stepDance(perf, 1 / 240);
+      if (perf.i === 0 && prevStep !== 0) wraps += 1;
+      for (const k of ['turn', 'rise', 'travel', 'shift']) {
+        const jump = Math.abs(now[k] - prev[k]);
+        if (jump > worst) { worst = jump; worstKey = k; }
+      }
+      prev = now;
+      prevStep = perf.i;
+    }
+    assert.ok(wraps >= 2, `${name} loops but only wrapped ${wraps} times -- the probe is too short`);
+    // At 1/240 nothing legitimate moves more than a few thousandths of a unit in a frame.
+    assert.ok(worst < 0.01,
+      `${name}: ${worstKey} jumped ${worst.toFixed(4)} across ${wraps} loop wraps`);
+  }
 }
 
 // A pirouette has to come back round to where it started, or a shop full of dancers slowly rotates.

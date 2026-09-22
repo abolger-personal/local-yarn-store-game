@@ -501,8 +501,9 @@ function stepDanceFor(id, character, slot, dt) {
     else { slot.perf = null; state.dance = 'none'; restoreSpring(slot); buildGui(); }
   }
   // The slot's own placement, plus what the dance asks for. Travel is along +Z because that is
-  // the direction a character faces; the two slots keep their own X so they stay side by side.
-  character.root.position.x = slotX(id);
+  // the direction a character faces, and shift is across it; the two slots keep their own X so
+  // they stay side by side.
+  character.root.position.x = slotX(id) + d.shift;
   character.root.position.z = d.travel;
   character.root.rotation.y = d.turn;
   slot.rise = d.rise;

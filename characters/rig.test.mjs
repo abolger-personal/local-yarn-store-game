@@ -341,6 +341,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     // reported as inert -- which happened twice while writing this.
     const seen = {
       footLift: 0, footStride: 0, frozenStride: 0, armGapY: 0, armGapX: 0, armGapZ: 0,
+      armPair: 0, shift: 0, counter: 0, swung: 0,
       roll: 0, twist: 0, turn: 0, travel: 0, rise: 0, rootY: { min: Infinity, max: -Infinity },
     };
     let phase = 0;
@@ -362,6 +363,17 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       seen.armGapY = Math.max(seen.armGapY, Math.abs(lHand.y - rHand.y));
       seen.armGapX = Math.max(seen.armGapX, Math.abs(Math.abs(lHand.x) - Math.abs(rHand.x)));
       seen.armGapZ = Math.max(seen.armGapZ, Math.abs(lHand.z - rHand.z));
+      // Where the PAIR of hands sits relative to the body, not which side each one is on. Both
+      // hands can travel right while the left is still left of centre -- that IS the floss, and
+      // comparing each hand's absolute side reports it as not happening.
+      const pair = (lHand.x + rHand.x) / 2 - d.shift;
+      seen.armPair = Math.max(seen.armPair, Math.abs(pair));
+      seen.shift = Math.max(seen.shift, Math.abs(d.shift));
+      // Hips one way, shoulders the other, counted only on frames where the hips are actually out.
+      if (Math.abs(d.shift) > 0.02) {
+        seen.swung += 1;
+        if (Math.sign(d.shift) !== Math.sign(valueOf(built.motion, 'spineRoll'))) seen.counter += 1;
+      }
       seen.twist = Math.max(seen.twist, Math.abs(valueOf(built.motion, 'spineTwist')));
       seen.turn = Math.max(seen.turn, Math.abs(d.turn));
       seen.travel = Math.max(seen.travel, Math.abs(d.travel));
@@ -388,10 +400,35 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       `${id}: a riverdance is all in the feet -- got ${rd.footLift.toFixed(3)} of lift`);
     assert.ok(rd.twist < 1e-6 && rd.armGapY < 1e-6,
       `${id}: ...with a stiff upper body -- twist ${rd.twist.toFixed(3)}, arms ${rd.armGapY.toFixed(3)}`);
+    // IT MUST LEAVE THE GROUND. The first version alternated a high knee with a beat where both
+    // feet were planted and the body did not move, which is the definition of a march -- reported
+    // as "isn't bouncing, it reads as a march". The hop is what fixes that, so it is what is
+    // asserted: a body that never rises is the regression.
+    assert.ok(rd.rise > 0.03,
+      `${id}: a riverdance has to leave the floor -- peak rise ${rd.rise.toFixed(3)}`);
+    // AND IT MUST KICK. A kick and a high knee are the same leg isolation with opposite knees, so
+    // they are told apart by REACH, not by lift: measured, a kick puts the free foot 0.239 in
+    // front of the planted one against a high knee's 0.152. Below 0.20 the dance is all knees.
+    assert.ok(rd.footStride > 0.20,
+      `${id}: ...and at least one real kick -- furthest reach ${rd.footStride.toFixed(3)}`);
 
+    // The floss, against the wikiHow breakdown. The first version had the arms swinging fore-and-aft
+    // like a march and nothing whatever at the hips -- reported as "total lack of hip motion and
+    // coordinated arm motion" -- so all three halves of it are pinned.
     const floss = perform(build(id), 'floss');
     assert.ok(floss.twist > 0.2,
       `${id}: a floss is shoulders against hips -- got ${floss.twist.toFixed(3)} of twist`);
+    assert.ok(floss.armPair > 0.10,
+      `${id}: ...arms travelling as a PAIR to one side -- centroid only ${floss.armPair.toFixed(3)} off centre`);
+    assert.ok(floss.armGapZ > 0.10,
+      `${id}: ...with one of them in front of the body and one behind (${floss.armGapZ.toFixed(3)})`);
+    assert.ok(floss.shift > 0.02,
+      `${id}: ...and the HIPS actually moving -- got ${floss.shift.toFixed(3)}`);
+    // The counter-motion is the joke of the dance: hips one way, shoulders the other. Having them
+    // agree is not a smaller version of the floss, it is a different move -- and it is what was on
+    // screen, countering on 6 frames out of 247.
+    assert.ok(floss.counter > floss.swung * 0.9,
+      `${id}: ...opposite each other -- hips countered the lean on only ${floss.counter}/${floss.swung} frames`);
 
     const att = perform(build(id), 'attitude');
     assert.ok(att.footLift > 0.08, `${id}: an attitude lifts the working leg behind`);

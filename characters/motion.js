@@ -98,7 +98,20 @@ export const POSES = definePoses({
 
 /**
  * What a dance asks of the root, which no pose channel can express: `turn` (radians about Y),
- * `rise` (metres up, for a relevé or a hop) and `travel` (metres forward along facing).
+ * `rise` (metres up, a SUSTAINED lift like a relevé), `travel` (metres forward along facing) and
+ * `shift` (metres sideways -- the HIPS).
+ *
+ * ponytail: `shift` moves the whole root, so the feet slide with the hips instead of staying
+ * planted. Real hip sway is the pelvis moving over planted feet, which needs lateral rotation at
+ * the hip joint -- a channel this rig does not have, and one that grounding could not follow,
+ * because lowestFoot derives height from hip and knee angles about X alone. At 0.035 units the
+ * slide is a few pixels at the distance the shop draws these. Upgrade is hip abduction plus a
+ * grounding that understands it, which is a bigger change than every dance put together.
+ *
+ * A `hop` is the fourth, and it is deliberately not one of these: it is a transient ARC within its
+ * own step, up and back down to zero, rather than a position that is held. That difference is what
+ * lets a LOOPING dance hop -- a sustained rise at the end of a cycle would snap back to zero at the
+ * wrap, because the first step lerps from nothing. A hop has nowhere to snap back from.
  *
  * Returned as DATA and never written to the root, exactly as `built.groundOffset` already works --
  * because the root belongs to whoever placed the character. In the shop that is cast.js, which
@@ -109,9 +122,14 @@ export const POSES = definePoses({
  * unwind to where it started. Resolved once here, at module load, so the per-frame path is a lerp.
  */
 const resolveExtras = (steps) => {
-  let cur = { turn: 0, rise: 0, travel: 0 };
+  let cur = { turn: 0, rise: 0, travel: 0, shift: 0 };
   return steps.map((s) => {
-    cur = { turn: s.turn ?? cur.turn, rise: s.rise ?? cur.rise, travel: s.travel ?? cur.travel };
+    cur = {
+      turn: s.turn ?? cur.turn,
+      rise: s.rise ?? cur.rise,
+      travel: s.travel ?? cur.travel,
+      shift: s.shift ?? cur.shift,
+    };
     return Object.freeze(cur);
   });
 };
@@ -126,7 +144,7 @@ const resolveExtras = (steps) => {
  * is doing, which is what the Uptown Funk beat needs: step, freeze, step, freeze.
  */
 const resolveWalk = (steps, dance) => Object.freeze(steps.map((s) => s.walk ?? dance ?? 0));
-const NO_EXTRAS = Object.freeze({ turn: 0, rise: 0, travel: 0 });
+const NO_EXTRAS = Object.freeze({ turn: 0, rise: 0, travel: 0, shift: 0 });
 
 const defineDances = (raw) => Object.freeze(Object.fromEntries(
   Object.entries(raw).map(([name, d]) => [name, Object.freeze({
@@ -146,12 +164,45 @@ export const DANCE_POSES = definePoses({
   // the FRONT leg lifting.
   'rd-left':  { armOut: 0.10, elbowBend: 0.06, legSwing: -0.95, hipFlex: 0.95, kneeBend: 1.90, headPitch: -0.05 },
   'rd-right': { armOut: 0.10, elbowBend: 0.06, legSwing: 0.95, hipFlex: 0.95, kneeBend: 1.90, headPitch: -0.05 },
-  'rd-plant': { armOut: 0.10, elbowBend: 0.06, legSwing: 0, hipFlex: 0.06, kneeBend: 0.18, headPitch: -0.05 },
+  // THE KICK. A high knee and a kick are the same leg isolation with opposite knees: the knee comes
+  // up and the shin stays tucked (kneeBend 1.90) for a march, or the leg extends and the shin comes
+  // THROUGH (kneeBend 0.15) for a kick. Without one of these the dance is all knees, which reads as
+  // marching on the spot however fast the feet go.
+  'rd-kick-l': { armOut: 0.10, elbowBend: 0.06, legSwing: -0.80, hipFlex: 0.80, kneeBend: 0.15, headPitch: -0.05 },
+  'rd-kick-r': { armOut: 0.10, elbowBend: 0.06, legSwing: 0.80, hipFlex: 0.80, kneeBend: 0.15, headPitch: -0.05 },
+  // THE HOP, replacing the old both-feet-down plant. Both legs together and slightly tucked, so the
+  // feet come off the ground as a pair -- the beat where the whole body leaves the floor. The lift
+  // itself is the step's `hop` arc; this is only what the legs do while airborne.
+  'rd-hop': { armOut: 0.12, elbowBend: 0.06, legSwing: 0, hipFlex: 0.34, kneeBend: 0.82, headPitch: -0.05 },
 
-  // -- floss: arms swing as a unit past the hips while the shoulders twist AGAINST them. The
-  // counter-twist is the whole read, and it is what spineTwist was added for.
-  'floss-l': { armSwingAlt: 0.85, armOut: 0.14, elbowBend: 0.05, spineTwist: -0.45, spineRoll: 0.12, hipFlex: 0.08 },
-  'floss-r': { armSwingAlt: -0.85, armOut: 0.14, elbowBend: 0.05, spineTwist: 0.45, spineRoll: -0.12, hipFlex: 0.08 },
+  // -- floss. Built from the wikiHow breakdown rather than from memory, because the first attempt
+  // had the arms swinging fore-and-aft like a march and nothing at all happening at the hips.
+  //
+  // What the reference actually shows:
+  //   * the arms stay STRAIGHT (elbowBend ~0) and travel as a PAIR to one side of the body -- one
+  //     arm reaching away, the other crossing in front of the belly. That pairing is armOutAlt:
+  //     one shoulder abducts while the other adducts. Without it both arms mirror and the whole
+  //     dance disappears, which is exactly what was on screen.
+  //   * one of the pair passes IN FRONT of the torso and the other BEHIND it -- armSwingAlt.
+  //   * the HIPS swing the opposite way to the arms. Arms left, hips right. That counter-motion is
+  //     the joke of the dance; without it a character is just waving.
+  //
+  // So each side is: arms to one side (armOutAlt), one front one back (armSwingAlt), hips shifted
+  // the OTHER way (the step's `shift`), and the chest twisted to follow the arms while the spine
+  // leans back over the hips.
+  // Named for where the ARMS are, because that is the half you actually look at. armOutAlt positive
+  // sends BOTH arms to the character's left: the left shoulder abducts to 1.35 while the right
+  // adducts to -0.75, which is the right arm crossing the belly. The spine leans WITH the arms and
+  // the hips go the other way (the step's `shift`) -- that is the counter-motion, and having the
+  // lean and the hips agree instead was the bug: measured, they countered on 6 frames out of 247.
+  'floss-l': {
+    armOutAlt: 1.05, armSwingAlt: -0.55, armOut: 0.30, elbowBend: 0.04,
+    spineTwist: 0.30, spineRoll: 0.26, hipFlex: 0.10, headYaw: 0.12,
+  },
+  'floss-r': {
+    armOutAlt: -1.05, armSwingAlt: 0.55, armOut: 0.30, elbowBend: 0.04,
+    spineTwist: -0.30, spineRoll: -0.26, hipFlex: 0.10, headYaw: -0.12,
+  },
 
   // -- attitude: standing leg planted, working leg lifted BEHIND with a bent knee, and the arms in
   // an asymmetric line -- one high, one out -- which is what armOutAlt exists for.
@@ -218,14 +269,35 @@ export const DANCE_POSES = definePoses({
 export const DANCES = defineDances({
   riverdance: {
     stiff: 520, zeta: 0.80, loop: true, walk: 0,
+    // kick -- HOP -- knee -- HOP, then the same on the other foot. Eight beats, so the dance takes
+    // a full bar to come back round and does not read as a two-frame flip.
+    //
+    // The old version alternated a high knee with a both-feet-down plant, and that plant was the
+    // problem: a beat where both feet are on the floor and the body does not move is a MARCH. The
+    // hop replaces it, so every second beat now leaves the ground -- which is where the bounce in
+    // an Irish step dance actually comes from.
+    //
+    // The hop is on the airborne beat itself and arcs back to zero within it, which is what lets a
+    // LOOPING dance use it at all. A sustained `rise` here would snap to the floor at the wrap.
     steps: [
-      { pose: 'rd-left', hold: 0.17 }, { pose: 'rd-plant', hold: 0.11 },
-      { pose: 'rd-right', hold: 0.17 }, { pose: 'rd-plant', hold: 0.11 },
+      { pose: 'rd-kick-l', hold: 0.19 },
+      { pose: 'rd-hop', hold: 0.15, hop: 0.055 },
+      { pose: 'rd-right', hold: 0.16 },
+      { pose: 'rd-hop', hold: 0.15, hop: 0.045 },
+      { pose: 'rd-kick-r', hold: 0.19 },
+      { pose: 'rd-hop', hold: 0.15, hop: 0.055 },
+      { pose: 'rd-left', hold: 0.16 },
+      { pose: 'rd-hop', hold: 0.15, hop: 0.045 },
     ],
   },
   floss: {
     stiff: 380, zeta: 0.75, loop: true, walk: 0,
-    steps: [{ pose: 'floss-l', hold: 0.24 }, { pose: 'floss-r', hold: 0.24 }],
+    // `shift` is OPPOSITE the arms on each beat -- arms left, hips right. Two beats only: the
+    // floss has no pause in it, and the spring carries the arms through the middle on its own.
+    steps: [
+      { pose: 'floss-l', hold: 0.23, shift: -0.038 },
+      { pose: 'floss-r', hold: 0.23, shift: 0.038 },
+    ],
   },
   attitude: {
     stiff: 190, zeta: 1.00, loop: false, walk: 0,
@@ -270,7 +342,7 @@ export const DANCES = defineDances({
 export const DANCE_NAMES = Object.freeze(Object.keys(DANCES));
 
 /** Per-performance state. Cheap and disposable: one per character per dance. */
-export const makeDance = (name) => ({ name, i: 0, t: 0, done: false });
+export const makeDance = (name) => ({ name, i: 0, t: 0, done: false, looped: false });
 
 // Named `sCurve`, not `smoothstep`: smoothstep in this file is one of the three INTERPOLATORS, a
 // three-argument (m, dt, opts) thing, and two functions a screen apart with the same name and
@@ -292,7 +364,7 @@ function advanceDance(d, dance, dt) {
   while (!d.done && d.t >= steps[d.i].hold) {
     d.t -= steps[d.i].hold;
     if (d.i + 1 < steps.length) d.i += 1;
-    else if (dance.loop) d.i = 0;
+    else if (dance.loop) { d.i = 0; d.looped = true; }
     else { d.done = true; d.t = 0; }
   }
 }
@@ -302,16 +374,29 @@ export function stepDance(d, dt) {
   const { steps, extras, walkAt } = dance;
   advanceDance(d, dance, dt);
   const step = steps[d.i];
+  const raw = d.done ? 1 : Math.min(1, d.t / step.hold);
   // Eased within the step, so the root does not change speed abruptly at a key pose. The pose
   // itself is NOT eased here -- the spring is doing that, which is the whole design.
-  const u = d.done ? 1 : sCurve(Math.min(1, d.t / step.hold));
-  const from = d.i === 0 ? NO_EXTRAS : extras[d.i - 1];
+  const u = sCurve(raw);
+  // At step 0 the previous step is the LAST one once the dance has wrapped, and nothing at all on
+  // the first pass. Getting this wrong is invisible until an extra alternates: a loop whose shift
+  // goes +0.035 / -0.035 would snap from -0.035 to 0 on every wrap, because the first step lerped
+  // from nothing. It cost nothing while every looping dance had all-zero extras.
+  const from = d.i === 0 ? (d.looped ? extras[extras.length - 1] : NO_EXTRAS) : extras[d.i - 1];
   const to = extras[d.i];
+  // The hop rides the RAW progress, not the eased one: sin of an already-eased t flattens the top
+  // into a hover. A half sine from the linear progress is the ballistic shape -- fastest leaving
+  // the ground and landing, slowest at the apex -- and it is zero at both ends by construction, so
+  // it needs no continuity handling at a step boundary or at a loop wrap.
+  const hop = (step.hop ?? 0) * Math.sin(Math.PI * raw);
   return {
     pose: DANCE_POSES[step.pose],
     turn: mix(from.turn, to.turn, u),
-    rise: mix(from.rise, to.rise, u),
+    // Summed, so a consumer only ever adds one number to the root -- a dance can hold a relevé and
+    // hop off it at the same time without the lab or cast.js knowing there are two ideas here.
+    rise: mix(from.rise, to.rise, u) + hop,
     travel: mix(from.travel, to.travel, u),
+    shift: mix(from.shift, to.shift, u),
     walk: walkAt[d.i],
     done: d.done,
   };

@@ -44,7 +44,7 @@
   <kbd>Tab</kbd> switch slot &nbsp; <kbd>R</kbd> randomise &nbsp; <kbd>Shift R</kbd> both<br />
   <kbd>1</kbd> felted &nbsp; <kbd>2</kbd> grey &nbsp; <kbd>3</kbd> silhouette<br />
   <kbd>F</kbd> frame &nbsp; <kbd>D</kbd> 150px test &nbsp; <kbd>B</kbd> squint<br />
-  <kbd>P</kbd> cycle pose &nbsp; <kbd>E</kbd> export slot<br />
+  <kbd>P</kbd> next pose &nbsp; <kbd>M</kbd> motion on/off &nbsp; <kbd>E</kbd> export slot<br />
   <span style="opacity:.7">both slots auto-save to this browser</span>
 </div>
 
@@ -63,10 +63,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
-  TONE_MAPPING, POSES, GEO_DETAIL, BUILD,
+  TONE_MAPPING, POSES, GEO_DETAIL, BUILD, MOTION_DEFAULTS,
   createCharacter, applyPose, setViewMode, disposeCharacter,
   setGeometryDetail, getSpecies, speciesList, slugify, shareRandomParams,
+  stepMotion, resetMotion, motionOf, walkPhase, walkLayer, walkGain, phaseStep,
 } from './npc.js';
+// Motion coefficients are derived from personality, and personality lives in the sim. Only the
+// trait roll is wanted here -- the same import motion-lab.js makes, for the same reason.
+import { randomTraits } from './visit.js';
 
 console.info('LYS build', BUILD);
 
@@ -86,6 +90,15 @@ const state = {
   toneMapping: 'ACES',
   spacing: 0.62,
   linkShared: true,
+  // MOTION. Off by default, and that default is the point: with `play` off this page is exactly
+  // what it was -- the rig sliders ARE the pose, nothing writes a joint behind your back, and the
+  // loop has no dt. With it on, the engine owns every joint and the pose folder is disabled for
+  // the duration. The two contracts are never live at the same time, which is the only way a
+  // slider you are dragging cannot be stomped 60 times a second.
+  play: false,
+  speed: 0,       // walk IN PLACE: the gait phase advances, the root never moves
+  cycle: false,   // auto-advance through POSES so the whole set can be watched hands-off
+  hold: 2.5,      // seconds per pose while cycling
   slots: {
     A: { speciesId: 'owl', params: null },
     B: { speciesId: 'llama', params: null },
@@ -172,6 +185,18 @@ function buildSlot(id) {
   scene.add(character.root);
   built[id] = character;
   slot.height = measureHeight(character.root);
+  // Kept ACROSS a rebuild, cleared only by randomise and by a species change: nudging a
+  // proportion slider under `play` rebuilds the mesh, and rerolling temperament or restarting
+  // the stride on every nudge would make the very thing you are judging jump.
+  slot.opts ??= {
+    ...MOTION_DEFAULTS,
+    ...motionOf(randomTraits(), getSpecies(slot.speciesId).motionRanges),
+  };
+  // Not zero: two characters starting at phase 0 march in lockstep, which is the chorus line
+  // crowd.html already learned to avoid.
+  slot.phase ??= Math.random();
+  // Start the engine where the static rig already is, so a rebuild mid-play does not re-blend.
+  if (state.play) resetMotion(character.motion, POSES[state.pose]);
 }
 
 function buildAll() {
@@ -244,6 +269,7 @@ function save() {
     active: state.active, view: state.view, pose: state.pose, detail: state.detail,
     exposure: state.exposure, toneMapping: state.toneMapping, spacing: state.spacing,
     linkShared: state.linkShared,
+    play: state.play, speed: state.speed, cycle: state.cycle, hold: state.hold,
     slots: Object.fromEntries(SLOTS.map((id) => [id, {
       speciesId: state.slots[id].speciesId,
       params: state.slots[id].params,
@@ -270,6 +296,10 @@ function load() {
     if (!raw) return;
     const saved = JSON.parse(raw);
     Object.assign(state, saved, { slots: state.slots });
+    // A pose name that no longer exists used to cost one wrong-looking frame; under `play` it is
+    // handed to the interpolator sixty times a second, where an undefined target is a crash and
+    // a blank page. Renaming a pose is exactly the kind of thing this branch has been doing.
+    if (!(state.pose in POSES)) state.pose = 'rest';
     for (const id of SLOTS) restoreSlot(id, saved.slots?.[id]);
   } catch { /* corrupt save, fall back to defaults */ }
 }
@@ -287,6 +317,7 @@ function rebuildActive() {
 function randomiseSlot(id) {
   const slot = state.slots[id];
   getSpecies(slot.speciesId).randomise(slot.params);
+  slot.opts = null;   // temperament is part of "a different individual", so it rerolls too
   buildSlot(id);
   updatePlates();
   refreshGui();
@@ -297,7 +328,10 @@ function randomiseSlot(id) {
 // two species randomise identically. Whatever still differs is the species kit's doing.
 function randomiseBoth() {
   const [a, b] = SLOTS.map((id) => state.slots[id]);
-  SLOTS.forEach((id) => getSpecies(state.slots[id].speciesId).randomise(state.slots[id].params));
+  SLOTS.forEach((id) => {
+    getSpecies(state.slots[id].speciesId).randomise(state.slots[id].params);
+    state.slots[id].opts = null;
+  });
   if (state.linkShared) {
     shareRandomParams(a.params, b.params, getSpecies(a.speciesId), getSpecies(b.speciesId));
   }
@@ -316,13 +350,48 @@ function setSpecies(id, speciesId) {
 
 // A preset writes into each slot's params, so the rig sliders show what is actually applied.
 // Re-applying it on every rebuild instead would silently stomp any manual joint edit.
+//
+// Under `play` it does NOT write params: the engine is the only writer of a joint then, and a
+// pose is a TARGET it blends toward rather than a value to assign. Writing both would put two
+// authors on every channel, and the sliders would fight the interpolator every frame.
 function setPose(name) {
   state.pose = name;
+  if (state.play) { save(); return; }
   for (const id of SLOTS) {
     Object.assign(state.slots[id].params, POSES[name]);
     if (built[id]) applyPose(built[id], POSES[name]);
   }
   refreshGui();
+  save();
+}
+
+const POSE_NAMES = Object.keys(POSES);
+
+// Seconds the current pose has been held, for the auto-cycle. Declared here rather than beside
+// the frame loop so setPlay can zero it without reaching forward past its own declaration.
+let cycleT = 0;
+
+function nextPose() {
+  setPose(POSE_NAMES[(POSE_NAMES.indexOf(state.pose) + 1) % POSE_NAMES.length]);
+}
+
+/**
+ * Hand the rig over to the motion engine, or take it back.
+ *
+ * Taking it back re-applies the current pose cleanly, so params and the rig agree again -- left
+ * alone the character would keep whatever half-blended joints the last frame happened to leave,
+ * and every slider would then be lying about the pose on screen.
+ *
+ * Handing it over snaps to the pose preset, which discards any manual joint edit. That is the
+ * honest reading of "the engine owns the pose now": there is nowhere for a hand-authored joint
+ * to live once something is writing all of them every frame.
+ */
+function setPlay(on) {
+  state.play = on;
+  cycleT = 0;
+  if (on) SLOTS.forEach((id) => built[id] && resetMotion(built[id].motion, POSES[state.pose]));
+  else setPose(state.pose);
+  buildGui();   // the pose folder is enabled in one state and disabled in the other
   save();
 }
 
@@ -345,6 +414,36 @@ function exportActive() {
   URL.revokeObjectURL(url);
 }
 
+// ---------------------------------------------------------------- motion
+//
+// Walk IN PLACE. The store drives the gait phase from ground actually covered; here the ground is
+// imaginary, so `speed` is a dial and the distance moved in a frame is speed * dt. Everything
+// downstream is the shop's own code, unchanged: the phase still ACCUMULATES rather than being a
+// running total divided by a speed-dependent stride, which is the bug that made legs spin on
+// deceleration. The root is never moved, so the feet skate by construction -- skate is measured
+// in the motion lab; this page is for judging the SHAPE of a stride against another species.
+const clock = new THREE.Clock();
+
+function stepSlot(id, dt) {
+  const character = built[id];
+  const slot = state.slots[id];
+  if (!character) return;
+  const L = character.params.legHeight + character.params.hipInset;
+  const w = walkPhase(slot.phase, state.speed, L, slot.opts);
+  const gain = walkGain(character.motion, state.speed, dt, slot.opts);
+  slot.phase = (slot.phase + phaseStep(state.speed * dt, state.speed, L, slot.opts)) % 1;
+  // POSES[name] is a frozen singleton, so passing it by name is what lets integrate() detect an
+  // interrupt by identity -- and a pose change mid-blend then carries its velocity across.
+  stepMotion(character, POSES[state.pose], dt, slot.opts,
+    (out) => walkLayer(out, w, gain, slot.opts));
+}
+
+function stepAll(dt) {
+  cycleT += dt;
+  if (state.cycle && cycleT >= state.hold) { cycleT = 0; nextPose(); }
+  for (const id of SLOTS) stepSlot(id, dt);
+}
+
 // ---------------------------------------------------------------- gui
 let gui = null;
 
@@ -362,6 +461,10 @@ function addSlotFolders(species, params, onChange) {
   for (const [title, entries] of Object.entries(species.gui)) {
     const folder = gui.addFolder(title);
     entries.forEach((entry) => addControl(folder, params, entry, onChange));
+    // Only the POSE folder. Proportions and rig are built into the mesh rather than written per
+    // frame, so they stay live under `play` -- which is half the point of animating here at all:
+    // drag a leg length and watch the stride change under it.
+    if (state.play && title === 'pose') folder.controllers.forEach((c) => c.disable());
     folder.close();
   }
 }
@@ -378,9 +481,20 @@ function addTopControls(species) {
   gui.add({ f: exportActive }, 'f').name('export slot  (E)');
 }
 
+function addMotionFolder() {
+  const folder = gui.addFolder('motion');
+  folder.add(state, 'play').name('animate  (M)').onChange(setPlay);
+  folder.add(state, 'speed', 0, 1.5, 0.01).name('walk in place').onChange(save);
+  folder.add(state, 'cycle').name('auto-cycle poses').onChange(save);
+  folder.add(state, 'hold', 0.5, 6, 0.1).name('seconds per pose').onChange(save);
+}
+
 function addSceneFolder() {
   const folder = gui.addFolder('scene');
-  folder.add(state, 'pose', Object.keys(POSES)).onChange(setPose);
+  // Under `play` this is the TARGET handed to the interpolator rather than a value assigned to
+  // the rig. `walk` and `walk+carry` are frozen snapshots of ONE stride frame, not the cycle --
+  // for the cycle pick `rest` and push `walk in place`.
+  folder.add(state, 'pose', POSE_NAMES).onChange(setPose);
   folder.add(state, 'view', ['felted', 'grey', 'silhouette']).onChange(setView);
   folder.add(state, 'detail', Object.keys(GEO_DETAIL)).name('geometry detail')
     .onChange((v) => { setGeometryDetail(v); buildAll(); save(); });
@@ -399,6 +513,7 @@ function buildGui() {
   const slot = activeSlot();
   const species = getSpecies(slot.speciesId);
   addTopControls(species);
+  addMotionFolder();
   addSceneFolder();
   addSlotFolders(species, slot.params, rebuildActive);
   gui.onFinishChange(save);
@@ -415,10 +530,8 @@ const KEY_ACTIONS = {
   1: () => setView('felted'),
   2: () => setView('grey'),
   3: () => setView('silhouette'),
-  p: () => {
-    const names = Object.keys(POSES);
-    setPose(names[(names.indexOf(state.pose) + 1) % names.length]);
-  },
+  p: () => nextPose(),
+  m: () => setPlay(!state.play),
 };
 
 const isFormField = (el) =>
@@ -451,6 +564,11 @@ buildGui();
 frameAll();
 
 renderer.setAnimationLoop(() => {
+  // Capped exactly as the game caps it (store/main.js): a backgrounded tab hands back one
+  // enormous frame, and a spring integrated over it diverges to NaN -- which reaches the bounding
+  // sphere and culls the whole character, presenting as "they popped out of existence".
+  const dt = Math.min(clock.getDelta(), 0.1);
+  if (state.play) stepAll(dt);
   controls.update();
   renderer.render(scene, camera);
   SLOTS.forEach(positionPlate);

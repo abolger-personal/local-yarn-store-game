@@ -19,7 +19,7 @@
 import assert from 'node:assert/strict';
 import {
   POSES, POSE_KEYS, MOTION_DEFAULTS, BASE_PARAMS, createCharacter, stepMotion, applyPose,
-  valueOf, walkPhase, walkLayer, speciesIds, getSpecies,
+  valueOf, walkPhase, walkLayer, speciesIds, getSpecies, resetMotion,
 } from './npc.js';
 import './owl.js';
 import './llama.js';
@@ -118,6 +118,50 @@ const build = (id) => createCharacter(
   applyPose(built, POSES.rest);
   assert.ok(Math.abs(built.root.position.y - floor) < 1e-9,
     'clearing groundOffset must put them back on the floor');
+}
+
+// --- handing the rig to the engine and taking it back is lossless ------------------------------
+//
+// The species checker has two mutually exclusive contracts: with `play` off its sliders ARE the
+// pose, with it on the engine writes every joint. Toggling has to land back exactly where the
+// static page would have put the character, or every slider is quietly lying about what is on
+// screen -- and a rig left mid-blend reads as a posing bug rather than as a handover bug.
+//
+// Idle off is the honest comparison: idle is SUPPOSED to move things, so leaving it on would
+// make this untestable rather than strict. Measured: with idle on, root y differs by 4.0e-5.
+{
+  const built = build(speciesIds()[0]);
+  const o = { ...MOTION_DEFAULTS, idleAmount: 0 };
+
+  applyPose(built, POSES.browse);
+  const staticY = built.root.position.y;
+
+  // Hand over. The FIRST frame is where a botched handover lives: seeded at the pose the rig is
+  // already in, the spring has zero error to correct and nothing may move at all. Two seconds
+  // later it has settled either way and the same assertion proves nothing -- measured, 1.1e-8
+  // with the seeding and 1.1e-8 without it, so only frame one discriminates.
+  resetMotion(built.motion, POSES.browse);
+  stepMotion(built, POSES.browse, 1 / 60, o);
+  for (const k of POSE_KEYS) {
+    assert.equal(valueOf(built.motion, k), POSES.browse[k],
+      `${k} moved on the handover frame -- seeding the engine from the pose the rig is already `
+      + 'in must leave it nothing to do, or toggling the checker into play lurches');
+  }
+
+  // and it must HOLD the pose rather than drift off it
+  for (let i = 0; i < 120; i++) stepMotion(built, POSES.browse, 1 / 60, o);
+  for (const k of POSE_KEYS) {
+    assert.ok(Math.abs(valueOf(built.motion, k) - POSES.browse[k]) < 1e-6,
+      `${k} drifted off its target under the engine -- with idle off the layer must contribute `
+      + 'exactly nothing, so a standing character is bit-identical to the base pose');
+  }
+  assert.ok(Math.abs(built.root.position.y - staticY) < 1e-9,
+    'and grounding must put them at the height the static page did');
+
+  // Take it back: applyPose straight from the preset is what the checker does on play-off.
+  applyPose(built, POSES.browse);
+  assert.ok(Math.abs(built.root.position.y - staticY) < 1e-9,
+    'taking the rig back from the engine must leave it where the static path puts it');
 }
 
 console.log('npc.js rig self-check: all assertions passed');

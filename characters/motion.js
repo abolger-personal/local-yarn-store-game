@@ -115,6 +115,17 @@ const resolveExtras = (steps) => {
     return Object.freeze(cur);
   });
 };
+
+/**
+ * The walk speed for each step: the step's own, else the dance's.
+ *
+ * NOT carried forward like the other extras, and the difference is deliberate. turn/rise/travel are
+ * POSITIONS -- where the root has got to -- so holding the last one is what stops a dance unwinding.
+ * `walk` is a RATE, and a rate that carries forward means one `walk: 0` freeze silently stops the
+ * walk for the rest of the dance. Falling back to the dance's own value makes each step say what it
+ * is doing, which is what the Uptown Funk beat needs: step, freeze, step, freeze.
+ */
+const resolveWalk = (steps, dance) => Object.freeze(steps.map((s) => s.walk ?? dance ?? 0));
 const NO_EXTRAS = Object.freeze({ turn: 0, rise: 0, travel: 0 });
 
 const defineDances = (raw) => Object.freeze(Object.fromEntries(
@@ -122,6 +133,7 @@ const defineDances = (raw) => Object.freeze(Object.fromEntries(
     ...d,
     steps: Object.freeze(d.steps.map((s) => Object.freeze({ ...s }))),
     extras: Object.freeze(resolveExtras(d.steps)),
+    walkAt: resolveWalk(d.steps, d.walk),
   })]),
 ));
 
@@ -160,11 +172,38 @@ export const DANCE_POSES = definePoses({
   },
   'pir-open':  { armOut: 0.90, armOutAlt: 0.35, elbowBend: 0.50, armSwing: -0.30, hipFlex: 0.18, kneeBend: 0.45, earPerk: 0.30 },
 
-  // -- uptown funk: a STRUT. The legs are deliberately left at zero, because this dance runs the
-  // walk layer underneath it (`walk` below) -- the layers are additive, so the swagger is a torso
-  // and arm pose sitting on top of the ordinary walk cycle rather than a second leg animation.
-  'uf-a': { spineTwist: 0.35, spineRoll: -0.10, armSwingAlt: 0.55, armOut: 0.28, elbowBend: 0.55, headYaw: -0.25, earPerk: 0.20 },
-  'uf-b': { spineTwist: -0.35, spineRoll: 0.10, armSwingAlt: -0.55, armOut: 0.28, elbowBend: 0.55, headYaw: 0.25, earPerk: 0.20 },
+  // -- uptown funk: STEP, FREEZE MID-STEP, SNAP, step, freeze, snap on the other side.
+  //
+  // The pause is the dance. A continuous strut is just a walk with a lean on it; what makes this
+  // read as Uptown Funk is stopping dead mid-stride and hitting a pose on the beat. So the step
+  // poses and the FREEZE poses are different: the freezes carry the big lateral lean and the arm
+  // snap, and they run with the walk layer switched off (`walk: 0` on those steps) so the legs
+  // hold wherever the stride left them instead of walking through the beat.
+  //
+  // The legs are left at zero in all four because the walk layer drives them during the step --
+  // the layers are additive, so this is a real walk cycle with a torso pose over it.
+  'uf-step-l': { spineTwist: 0.22, spineRoll: -0.20, armSwingAlt: 0.40, armOut: 0.30, elbowBend: 0.60, headYaw: -0.15, earPerk: 0.20 },
+  'uf-step-r': { spineTwist: -0.22, spineRoll: 0.20, armSwingAlt: -0.40, armOut: 0.30, elbowBend: 0.60, headYaw: 0.15, earPerk: 0.20 },
+  // The snap. Everything bigger and to one side: the lean nearly triples, the arms point across
+  // the body, the head turns to follow the point, ears up. spineRoll is the side-to-side, and it
+  // is the channel doing most of the work at this beat.
+  //
+  // legSwing and kneeBend are HERE, on the freeze, and that is the whole difference between
+  // "freeze mid-step" and "stop and stand still". The walk layer is not running during a snap
+  // (walk: 0), so with no leg content the character brought their feet neatly together on every
+  // beat -- measured 0.000 stride separation at the end of each freeze, which is a dancer coming
+  // to attention rather than one caught mid-stride. Positive legSwing takes the LEFT leg back, so
+  // each snap catches the leg on its own side FORWARD, matching the lean.
+  'uf-snap-l': {
+    spineTwist: 0.52, spineRoll: -0.58, armSwingAlt: 0.95, armOutAlt: -0.55,
+    armOut: 0.62, elbowBend: 0.95, headYaw: -0.45, headTilt: -0.22, earPerk: 0.45, earSplay: 0.18,
+    legSwing: -0.40, kneeBend: 0.60,
+  },
+  'uf-snap-r': {
+    spineTwist: -0.52, spineRoll: 0.58, armSwingAlt: -0.95, armOutAlt: 0.55,
+    armOut: 0.62, elbowBend: 0.95, headYaw: 0.45, headTilt: 0.22, earPerk: 0.45, earSplay: 0.18,
+    legSwing: 0.40, kneeBend: 0.60,
+  },
 });
 
 /**
@@ -205,12 +244,25 @@ export const DANCES = defineDances({
     ],
   },
   'uptown-funk': {
-    stiff: 210, zeta: 0.85, loop: false, walk: 0.75,
+    // Stiffer and lighter than the other travelling dances: a SNAP has to arrive, and a little
+    // overshoot (zeta below 1) is what makes it land like a hit rather than a glide.
+    stiff: 340, zeta: 0.70, loop: false, walk: 0.85,
+    // step -- FREEZE and snap -- step -- FREEZE and snap on the other side.
+    //
+    // `walk: 0` on a freeze is the whole trick: the walk layer stops being run, so the legs hold
+    // wherever the stride left them -- caught mid-step -- instead of strolling through the beat.
+    // travel repeats on the freeze, which is what makes the character stop MOVING too: the extras
+    // lerp toward a target equal to where they already are.
+    //
+    // A step is short and a freeze is long. That ratio IS the groove -- even holds read as a
+    // march. The last freeze gets an extra beat to land on.
     steps: [
-      { pose: 'uf-a', hold: 0.33, travel: 0.40 },
-      { pose: 'uf-b', hold: 0.33, travel: 0.80 },
-      { pose: 'uf-a', hold: 0.33, travel: 1.20 },
-      { pose: 'uf-b', hold: 0.33, travel: 1.60 },
+      { pose: 'uf-step-l', hold: 0.26, travel: 0.42 },
+      { pose: 'uf-snap-l', hold: 0.40, travel: 0.42, walk: 0 },
+      { pose: 'uf-step-r', hold: 0.26, travel: 0.84 },
+      { pose: 'uf-snap-r', hold: 0.40, travel: 0.84, walk: 0 },
+      { pose: 'uf-step-l', hold: 0.26, travel: 1.26 },
+      { pose: 'uf-snap-l', hold: 0.52, travel: 1.26, walk: 0 },
     ],
   },
 });
@@ -247,7 +299,7 @@ function advanceDance(d, dance, dt) {
 
 export function stepDance(d, dt) {
   const dance = DANCES[d.name];
-  const { steps, extras } = dance;
+  const { steps, extras, walkAt } = dance;
   advanceDance(d, dance, dt);
   const step = steps[d.i];
   // Eased within the step, so the root does not change speed abruptly at a key pose. The pose
@@ -260,7 +312,7 @@ export function stepDance(d, dt) {
     turn: mix(from.turn, to.turn, u),
     rise: mix(from.rise, to.rise, u),
     travel: mix(from.travel, to.travel, u),
-    walk: dance.walk,
+    walk: walkAt[d.i],
     done: d.done,
   };
 }

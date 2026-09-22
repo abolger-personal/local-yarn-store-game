@@ -340,8 +340,8 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     // separates them vertically. Collapsing those into "did it move" is how a working dance gets
     // reported as inert -- which happened twice while writing this.
     const seen = {
-      footLift: 0, footStride: 0, armGapY: 0, armGapX: 0, armGapZ: 0, twist: 0,
-      turn: 0, travel: 0, rise: 0, rootY: { min: Infinity, max: -Infinity },
+      footLift: 0, footStride: 0, frozenStride: 0, armGapY: 0, armGapX: 0, armGapZ: 0,
+      roll: 0, twist: 0, turn: 0, travel: 0, rise: 0, rootY: { min: Infinity, max: -Infinity },
     };
     let phase = 0;
     const L = built.params.legHeight + built.params.hipInset;
@@ -356,6 +356,9 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       const rHand = tipOf(built, limb(built, 'upperArm', -1));
       seen.footLift = Math.max(seen.footLift, Math.abs(lFoot.y - rFoot.y));
       seen.footStride = Math.max(seen.footStride, Math.abs(lFoot.z - rFoot.z));
+      // Only while the walk layer is OFF -- what the legs look like during a held beat.
+      if (d.walk === 0) seen.frozenStride = Math.max(seen.frozenStride, Math.abs(lFoot.z - rFoot.z));
+      seen.roll = Math.max(seen.roll, Math.abs(valueOf(built.motion, 'spineRoll')));
       seen.armGapY = Math.max(seen.armGapY, Math.abs(lHand.y - rHand.y));
       seen.armGapX = Math.max(seen.armGapX, Math.abs(Math.abs(lHand.x) - Math.abs(rHand.x)));
       seen.armGapZ = Math.max(seen.armGapZ, Math.abs(lHand.z - rHand.z));
@@ -402,11 +405,21 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     const uf = perform(build(id), 'uptown-funk');
     assert.ok(uf.travel > 1.0, `${id}: the strut travels -- got ${uf.travel.toFixed(2)}`);
     assert.ok(uf.twist > 0.15, `${id}: ...with some swagger in the shoulders`);
+    // Side to side, which is a different channel from the twist and was the thing most missing:
+    // the first pass leaned 5.7 degrees, which is a polite sway rather than a strut.
+    assert.ok(uf.roll > 0.40,
+      `${id}: ...and a real lateral lean -- got ${(uf.roll * 57.3).toFixed(1)} degrees`);
     // Fore-aft, not vertical: this one is a WALK with swagger on top, and a walking character's
     // feet separate along the stride. The layers are additive, so this is the assertion that the
     // strut is the walk cycle plus a torso pose rather than a second leg animation.
     assert.ok(uf.footStride > 0.10,
       `${id}: ...and the walk layer running underneath it -- stride ${uf.footStride.toFixed(3)}`);
+    // FREEZE MID-STEP, not freeze standing. The walk layer is switched off during a snap, so
+    // without leg content in those poses the character tidily brings their feet together on every
+    // beat -- measured 0.000 stride separation, a dancer coming to attention. The pause is the
+    // whole dance, so what it looks like is worth an assertion of its own.
+    assert.ok(uf.frozenStride > 0.06,
+      `${id}: a snap must catch the legs mid-stride -- got ${uf.frozenStride.toFixed(3)} apart`);
   }
 }
 

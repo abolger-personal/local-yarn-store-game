@@ -20,6 +20,11 @@
   }
   .plate.active { border-color: #c2703f; box-shadow: 0 0 0 2px rgba(194,112,63,.22); }
   .plate small { display: block; opacity: .6; font-size: 11px; }
+  /* Far enough away that the label no longer fits between the two characters: keep the name, drop
+     the measurements. See plateRoom() -- the distance test is for judging the silhouette, and a
+     label lying across it defeats the button. */
+  .plate.compact { font-size: 11px; padding: 3px 9px; }
+  .plate.compact small { display: none; }
 
   #hud {
     position: fixed; left: 12px; bottom: 12px; z-index: 10;
@@ -257,11 +262,31 @@ function frameAll(targetPx = 0) {
 // ---------------------------------------------------------------- nameplates
 const plates = { A: document.getElementById('plateA'), B: document.getElementById('plateB') };
 const projected = new THREE.Vector3();
+/** Each plate's width with its metadata showing. See positionPlate for why it is not read live. */
+const fullPlateWidth = { A: 0, B: 0 };
+
+/**
+ * How many screen pixels there are between the two characters right now.
+ *
+ * A plate is a FIXED pixel size while the characters shrink with the zoom, so at the 150px distance
+ * test a 220px label lies straight across its neighbour's feet -- measured 219px and 225px wide
+ * against a 93px gap, overlapping each other by 104px. That button exists to judge the silhouette,
+ * so a label covering it defeats the whole point of pressing it.
+ */
+function plateRoom() {
+  const a = projected.set(slotX('A'), 0, 0).project(camera).x;
+  const b = projected.set(slotX('B'), 0, 0).project(camera).x;
+  return Math.abs(a - b) * 0.5 * innerWidth;
+}
 
 function positionPlate(id) {
   const el = plates[id];
   const character = built[id];
   if (!character) return;
+  // Compared against the width measured with the metadata SHOWING (updatePlates), never against
+  // the live width: compacting makes the plate narrower, which would make it fit, which would
+  // un-compact it -- a flicker every frame at exactly the distance this is meant to fix.
+  el.classList.toggle('compact', plateRoom() < (fullPlateWidth[id] ?? 0));
   projected.set(slotX(id), 0, 0).project(camera);
   el.style.left = `${(projected.x * 0.5 + 0.5) * innerWidth}px`;
   el.style.top = `${(-projected.y * 0.5 + 0.5) * innerHeight + 8}px`;
@@ -275,6 +300,11 @@ function updatePlates() {
       `${slot.params?.name ?? ''}<small>${slot.speciesId} · height ${height} · torso ` +
       `${slot.params?.torsoW.toFixed(2)}×${slot.params?.torsoH.toFixed(2)}</small>`;
     plates[id].classList.toggle('active', id === state.active);
+    // Measured HERE, with the metadata showing, because this is the only place the content
+    // changes -- a rename or a species swap. positionPlate then has a stable number to compare
+    // the gap against, which is what keeps compacting from oscillating. See positionPlate.
+    plates[id].classList.remove('compact');
+    fullPlateWidth[id] = plates[id].offsetWidth;
   }
 }
 

@@ -1353,6 +1353,38 @@ function t(all, over = {}) {
   }
 }
 
+// --- the strut's pause beat ---------------------------------------------------------------------
+//
+// "step, freeze mid step and pause a beat to snap, then take next step, freeze mid step and pause a
+// beat to snap on the other side." The freeze is the dance -- a continuous strut is just a walk
+// with a lean on it -- so it is worth pinning that the walk actually STOPS and the character
+// actually stops MOVING, which are two separate things.
+{
+  const perf = makeDance('uptown-funk');
+  const samples = [];
+  for (let i = 0; i < 400; i++) samples.push(stepDance(perf, 1 / 120));
+  const moving = samples.filter((s) => s.walk > 0);
+  const frozen = samples.filter((s) => s.walk === 0);
+  assert.ok(moving.length > 20, 'the strut must spend real time stepping');
+  assert.ok(frozen.length > 20, 'and real time frozen mid-step -- that pause IS the dance');
+
+  // Frozen means frozen: travel must not advance while the walk is off, or the character glides
+  // through the beat with their legs held still, which is worse than not pausing at all.
+  let crept = 0;
+  for (let i = 1; i < samples.length; i++) {
+    if (samples[i].walk === 0 && samples[i - 1].walk === 0) {
+      crept = Math.max(crept, Math.abs(samples[i].travel - samples[i - 1].travel));
+    }
+  }
+  assert.ok(crept < 1e-9, `the character crept ${crept.toFixed(5)} during a freeze`);
+
+  // A rate must not carry forward the way a position does: one `walk: 0` freeze must not switch
+  // the walk off for the rest of the dance. This is the bug resolveWalk exists to prevent.
+  const firstFreeze = samples.findIndex((s) => s.walk === 0);
+  assert.ok(samples.slice(firstFreeze).some((s) => s.walk > 0),
+    'the walk must come back after a freeze -- `walk` falls back to the dance, it does not carry');
+}
+
 // A pirouette has to come back round to where it started, or a shop full of dancers slowly rotates.
 {
   const perf = makeDance('pirouette');

@@ -356,11 +356,16 @@ function setSpecies(id, speciesId) {
 // authors on every channel, and the sliders would fight the interpolator every frame.
 function setPose(name) {
   state.pose = name;
-  if (state.play) { save(); return; }
-  for (const id of SLOTS) {
-    Object.assign(state.slots[id].params, POSES[name]);
-    if (built[id]) applyPose(built[id], POSES[name]);
+  if (!state.play) {
+    for (const id of SLOTS) {
+      Object.assign(state.slots[id].params, POSES[name]);
+      if (built[id]) applyPose(built[id], POSES[name]);
+    }
   }
+  // Outside the branch. Under `play` nothing is written to params, but the dropdown still has to
+  // show which pose is being targeted -- skipping it left the auto-cycle advancing invisibly:
+  // measured, the rig walked through delighted -> walk+carry -> rest -> walk while the readout
+  // said `delighted` for the whole run.
   refreshGui();
   save();
 }

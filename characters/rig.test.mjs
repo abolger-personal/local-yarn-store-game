@@ -21,6 +21,7 @@ import * as THREE from 'three';
 import {
   POSES, POSE_KEYS, MOTION_DEFAULTS, BASE_PARAMS, createCharacter, stepMotion, applyPose,
   valueOf, walkPhase, walkLayer, speciesIds, getSpecies, resetMotion,
+  DANCES, DANCE_NAMES, makeDance, stepDance,
 } from './npc.js';
 import './owl.js';
 import './llama.js';
@@ -313,6 +314,99 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
         rootY = built.root.position.y;
       }
     }
+  }
+}
+
+// --- the dances actually move the rig -----------------------------------------------------------
+//
+// motion.test.mjs proves the dance DATA is well-formed and that the runner walks it. Neither says
+// anything about what reaches a character: a dance whose every key pose was accidentally authored
+// at rest would pass every assertion there and be an invisible celebration here.
+//
+// So this runs a performance exactly as the lab page does -- stepDance for the target, stepMotion
+// to drive the rig -- and asserts the thing each dance is FOR. The rig is the same one the shop
+// builds, so if these hold, the shop's dances are real.
+{
+  /** Run a whole performance and collect the extremes of everything worth judging. */
+  function perform(built, name, seconds = 3) {
+    const o = { ...MOTION_DEFAULTS, idleAmount: 0, stiff: DANCES[name].stiff, zeta: DANCES[name].zeta };
+    const perf = makeDance(name);
+    // footLift and footStride are DIFFERENT AXES and the distinction is the whole point: a high
+    // knee separates the feet vertically, a stride separates them fore-aft. Measured on the owl at
+    // the strut's own speed: the walk layer gives 0.221 fore-aft but only 0.012 vertical, so
+    // asserting "the feet move" on y alone says a walking character is standing still.
+    // Every measurement here is per AXIS, because the channels are: armOutAlt raises an arm (y),
+    // armSwingAlt swings it fore-aft (z), a stride separates the feet fore-aft and a high knee
+    // separates them vertically. Collapsing those into "did it move" is how a working dance gets
+    // reported as inert -- which happened twice while writing this.
+    const seen = {
+      footLift: 0, footStride: 0, armGapY: 0, armGapX: 0, armGapZ: 0, twist: 0,
+      turn: 0, travel: 0, rise: 0, rootY: { min: Infinity, max: -Infinity },
+    };
+    let phase = 0;
+    const L = built.params.legHeight + built.params.hipInset;
+    for (let i = 0; i < seconds * 60; i++) {
+      const d = stepDance(perf, 1 / 60);
+      const w = walkPhase(phase, d.walk, L, o);
+      phase = (phase + (d.walk > 0 ? (d.walk / 60) / w.strideLen : 0)) % 1;
+      stepMotion(built, d.pose, 1 / 60, o, d.walk > 0 ? (out) => walkLayer(out, w, 1, o) : null);
+      const lFoot = tipOf(built, limb(built, 'lowerLeg', 1));
+      const rFoot = tipOf(built, limb(built, 'lowerLeg', -1));
+      const lHand = tipOf(built, limb(built, 'upperArm', 1));
+      const rHand = tipOf(built, limb(built, 'upperArm', -1));
+      seen.footLift = Math.max(seen.footLift, Math.abs(lFoot.y - rFoot.y));
+      seen.footStride = Math.max(seen.footStride, Math.abs(lFoot.z - rFoot.z));
+      seen.armGapY = Math.max(seen.armGapY, Math.abs(lHand.y - rHand.y));
+      seen.armGapX = Math.max(seen.armGapX, Math.abs(Math.abs(lHand.x) - Math.abs(rHand.x)));
+      seen.armGapZ = Math.max(seen.armGapZ, Math.abs(lHand.z - rHand.z));
+      seen.twist = Math.max(seen.twist, Math.abs(valueOf(built.motion, 'spineTwist')));
+      seen.turn = Math.max(seen.turn, Math.abs(d.turn));
+      seen.travel = Math.max(seen.travel, Math.abs(d.travel));
+      seen.rise = Math.max(seen.rise, Math.abs(d.rise));
+      seen.rootY.min = Math.min(seen.rootY.min, built.root.position.y);
+      seen.rootY.max = Math.max(seen.rootY.max, built.root.position.y);
+    }
+    return seen;
+  }
+
+  for (const id of speciesIds()) {
+    // Every dance must move SOMETHING, on every species -- the blanket check, so a newly added
+    // dance cannot be silently inert.
+    for (const name of DANCE_NAMES) {
+      const s = perform(build(id), name);
+      const moved = s.footLift + s.footStride + s.armGapY + s.armGapZ + s.twist + s.turn
+        + s.travel + (s.rootY.max - s.rootY.min);
+      assert.ok(moved > 0.05, `${id}/${name}: the dance barely moves the rig (${moved.toFixed(3)})`);
+    }
+
+    // ...and then what each one is actually for.
+    const rd = perform(build(id), 'riverdance');
+    assert.ok(rd.footLift > 0.08,
+      `${id}: a riverdance is all in the feet -- got ${rd.footLift.toFixed(3)} of lift`);
+    assert.ok(rd.twist < 1e-6 && rd.armGapY < 1e-6,
+      `${id}: ...with a stiff upper body -- twist ${rd.twist.toFixed(3)}, arms ${rd.armGapY.toFixed(3)}`);
+
+    const floss = perform(build(id), 'floss');
+    assert.ok(floss.twist > 0.2,
+      `${id}: a floss is shoulders against hips -- got ${floss.twist.toFixed(3)} of twist`);
+
+    const att = perform(build(id), 'attitude');
+    assert.ok(att.footLift > 0.08, `${id}: an attitude lifts the working leg behind`);
+    assert.ok(att.armGapY > 0.02 || att.armGapX > 0.01,
+      `${id}: ...with an asymmetric port de bras -- the arms must stop being mirror images`);
+
+    const pir = perform(build(id), 'pirouette');
+    assert.ok(Math.abs(pir.turn - Math.PI * 2) < 1e-6, `${id}: a pirouette turns a full circle`);
+    assert.ok(pir.rise > 0.01, `${id}: ...rising onto the standing leg as it goes`);
+
+    const uf = perform(build(id), 'uptown-funk');
+    assert.ok(uf.travel > 1.0, `${id}: the strut travels -- got ${uf.travel.toFixed(2)}`);
+    assert.ok(uf.twist > 0.15, `${id}: ...with some swagger in the shoulders`);
+    // Fore-aft, not vertical: this one is a WALK with swagger on top, and a walking character's
+    // feet separate along the stride. The layers are additive, so this is the assertion that the
+    // strut is the walk cycle plus a torso pose rather than a second leg animation.
+    assert.ok(uf.footStride > 0.10,
+      `${id}: ...and the walk layer running underneath it -- stride ${uf.footStride.toFixed(3)}`);
   }
 }
 

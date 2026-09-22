@@ -158,6 +158,7 @@ export const BASE_PARAMS = Object.freeze({
 export { POSES, MOTION_KEYS, REST_POSE, MOTION_DEFAULTS, BASE_MOTION_RANGES,
          motionOf, factors, walkPhase, walkLayer, walkGain, topSpeed, valueOf, velocityOf,
          phaseStep, spanBounds, strideFor,
+         DANCES, DANCE_POSES, DANCE_NAMES, makeDance, stepDance,
          resetMotion } from './motion.js';
 export { makeMotion, integrate, compose, POSE_KEYS };
 

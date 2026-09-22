@@ -14,6 +14,7 @@ import {
   POSES, POSE_KEYS, MOTION_KEYS, MOTION_DEFAULTS, BASE_MOTION_RANGES, STYLE_RANGES,
   makeMotion, resetMotion, integrate, compose, valueOf, velocityOf,
   motionOf, walkPhase, phaseStep, walkLayer, walkGain, spanBounds,
+  DANCES, DANCE_POSES, DANCE_NAMES, makeDance, stepDance,
 } from './motion.js';
 
 const opts = (over = {}) => ({ ...MOTION_DEFAULTS, ...over });
@@ -1264,6 +1265,103 @@ function t(all, over = {}) {
   resetMotion(m, POSES.rest);
   assert.equal(velocityOf(m, 'armOut'), 0, 'reset zeroes velocity');
   assert.equal(valueOf(m, 'armOut'), POSES.rest.armOut, 'reset snaps to the pose');
+}
+
+// --- the dances are well-formed data ------------------------------------------------------------
+//
+// Dances are authored by hand, in bulk, and the ways they break are all silent. A pose key with a
+// typo resolves to undefined and every channel becomes NaN -- which reaches the bounding sphere and
+// culls the whole character, so it presents as a customer blinking out of existence rather than as
+// a bad dance. A zero hold spins the advance loop forever and freezes the page.
+{
+  assert.ok(DANCE_NAMES.length >= 5, 'DANCES.md asks for five dances');
+
+  for (const [name, pose] of Object.entries(DANCE_POSES)) {
+    for (const k of POSE_KEYS) {
+      assert.equal(typeof pose[k], 'number', `dance pose ${name} is missing ${k}`);
+      assert.ok(Number.isFinite(pose[k]), `dance pose ${name}.${k} is not finite`);
+    }
+  }
+
+  for (const name of DANCE_NAMES) {
+    const d = DANCES[name];
+    assert.ok(d.steps.length > 0, `${name} has no steps`);
+    for (const s of d.steps) {
+      assert.ok(s.pose in DANCE_POSES, `${name} names a pose that does not exist: ${s.pose}`);
+      assert.ok(s.hold > 0, `${name} has a step with hold ${s.hold} -- the advance loop needs > 0`);
+    }
+    // A looping dance that moves the root would unwind its turn and teleport back to its start
+    // every cycle, because the extras are absolute offsets from where the dance began.
+    if (!d.loop) continue;
+    for (const e of d.extras) {
+      assert.equal(e.turn, 0, `${name} loops, so it may not turn the root`);
+      assert.equal(e.travel, 0, `${name} loops, so it may not travel`);
+    }
+  }
+}
+
+// --- the runner ---------------------------------------------------------------------------------
+//
+// The identity assertion is the one that matters: integrate() spots an interrupt by comparing the
+// target by REFERENCE, so stepDance must hand back the frozen singleton. Returning a copy would
+// re-fire the interrupt every frame and the spring would never arrive anywhere -- which on screen
+// is a character twitching in place, with nothing in the data wrong.
+{
+  const d = makeDance('riverdance');
+  const a = stepDance(d, 0).pose;
+  const b = stepDance(d, 1 / 60).pose;
+  assert.equal(a, b, 'the same step must hand back the SAME pose object, not an equal one');
+  assert.equal(a, DANCE_POSES[DANCES.riverdance.steps[0].pose], 'and it must be the frozen singleton');
+}
+
+// A non-looping dance ends, after exactly the sum of its holds; a looping one never does.
+{
+  for (const name of DANCE_NAMES) {
+    const d = DANCES[name];
+    const total = d.steps.reduce((s, x) => s + x.hold, 0);
+    const perf = makeDance(name);
+    let elapsed = 0, endedAt = null;
+    for (let i = 0; i < 4000; i++) {
+      const r = stepDance(perf, 1 / 120);
+      elapsed += 1 / 120;
+      if (r.done && endedAt === null) endedAt = elapsed;
+    }
+    if (d.loop) {
+      assert.equal(endedAt, null, `${name} loops and must never report done`);
+    } else {
+      assert.ok(endedAt !== null, `${name} does not loop and must finish`);
+      assert.ok(Math.abs(endedAt - total) < 0.05,
+        `${name} ran ${endedAt?.toFixed(2)}s against ${total.toFixed(2)}s of holds`);
+    }
+  }
+}
+
+// The root extras must not jump. They are applied straight to position and rotation, so a
+// discontinuity here is a visible snap -- the character teleports a few centimetres mid-dance.
+{
+  for (const name of DANCE_NAMES) {
+    const perf = makeDance(name);
+    let prev = stepDance(perf, 0);
+    for (let i = 0; i < 1200; i++) {
+      const now = stepDance(perf, 1 / 120);
+      for (const k of ['turn', 'rise', 'travel']) {
+        assert.ok(Math.abs(now[k] - prev[k]) < 0.25,
+          `${name}: ${k} jumped ${(now[k] - prev[k]).toFixed(3)} in one frame at step ${perf.i}`);
+      }
+      prev = now;
+    }
+  }
+}
+
+// A pirouette has to come back round to where it started, or a shop full of dancers slowly rotates.
+{
+  const perf = makeDance('pirouette');
+  let last = null;
+  for (let i = 0; i < 1000; i++) last = stepDance(perf, 1 / 120);
+  assert.ok(last.done, 'the pirouette should have finished by now');
+  assert.ok(Math.abs(last.turn % (Math.PI * 2)) < 1e-9,
+    `a pirouette must end on a whole turn -- ended ${last.turn.toFixed(4)} rad off`);
+  assert.equal(last.rise, 0, 'and back down off the releve');
 }
 
 console.log('motion.js self-check: all assertions passed');

@@ -75,6 +75,196 @@ export const POSES = definePoses({
   'walk+carry': { armSwing: -0.10, armOut: 0.03, elbowBend: 1.40, legSwing: 0.30, kneeBend: 1.50, holdItem: true },
 });
 
+// ---------------------------------------------------------------- dances
+//
+// The five in ai_planning_sessions/characters/DANCES.md, as key poses on a clock.
+//
+// A dance is DATA, not code, and that is only possible because of how integrate() already works:
+// it detects a target change by object IDENTITY and carries the channel's velocity across it. So
+// handing it a new frozen pose every so often makes the spring do all the in-betweening, with no
+// keyframe system, no curves, and no interpolator of our own. Velocity continuity is exactly what
+// stops a keyframed dance reading as a robot stepping between statues.
+//
+// Three things about this rig shape every pose below, all measured rather than assumed:
+//
+//  1. STANDING ON ONE LEG is `hipFlex = -legSwing`. legSwing is anti-symmetric (legSwing * side)
+//     and hipFlex is symmetric, so equal and opposite cancels one leg and doubles the other.
+//     hipFlex POSITIVE with legSwing negative lifts the left leg IN FRONT; hipFlex negative with
+//     legSwing positive lifts it BEHIND. Nothing else here can do it, and rig.test.mjs pins it.
+//  2. THE ARMS were mirrored by construction until armOutAlt: `rotation.z = side * armOut`. Any
+//     asymmetric line -- a port de bras, a floss -- needs armOutAlt or armSwingAlt.
+//  3. THE BODY does not turn. applyPose never writes root.rotation.y, so a pirouette's turn is a
+//     ROOT EXTRA (below) rather than a pose channel.
+
+/**
+ * What a dance asks of the root, which no pose channel can express: `turn` (radians about Y),
+ * `rise` (metres up, for a relevé or a hop) and `travel` (metres forward along facing).
+ *
+ * Returned as DATA and never written to the root, exactly as `built.groundOffset` already works --
+ * because the root belongs to whoever placed the character. In the shop that is cast.js, which
+ * owns facing and position; in the lab it is the page. Both add these on top of their own.
+ *
+ * A step that omits one CARRIES THE PREVIOUS VALUE FORWARD rather than falling back to zero: a
+ * pirouette sets turn to 2pi as it spins and every later step should hold the new facing, not
+ * unwind to where it started. Resolved once here, at module load, so the per-frame path is a lerp.
+ */
+const resolveExtras = (steps) => {
+  let cur = { turn: 0, rise: 0, travel: 0 };
+  return steps.map((s) => {
+    cur = { turn: s.turn ?? cur.turn, rise: s.rise ?? cur.rise, travel: s.travel ?? cur.travel };
+    return Object.freeze(cur);
+  });
+};
+const NO_EXTRAS = Object.freeze({ turn: 0, rise: 0, travel: 0 });
+
+const defineDances = (raw) => Object.freeze(Object.fromEntries(
+  Object.entries(raw).map(([name, d]) => [name, Object.freeze({
+    ...d,
+    steps: Object.freeze(d.steps.map((s) => Object.freeze({ ...s }))),
+    extras: Object.freeze(resolveExtras(d.steps)),
+  })]),
+));
+
+// The key poses. Built through definePoses like POSES, so every one carries every channel and a
+// forgotten key cannot produce the NaN that culls a whole character.
+export const DANCE_POSES = definePoses({
+  // -- riverdance: "stiff upper body and straight arms, all in feet". The arms are pinned in and
+  // straight, the spine does NOTHING, and every bit of movement is a knee. hipFlex stays positive
+  // throughout and legSwing flips sign, which swaps which leg is up without changing that it is
+  // the FRONT leg lifting.
+  'rd-left':  { armOut: 0.10, elbowBend: 0.06, legSwing: -0.95, hipFlex: 0.95, kneeBend: 1.90, headPitch: -0.05 },
+  'rd-right': { armOut: 0.10, elbowBend: 0.06, legSwing: 0.95, hipFlex: 0.95, kneeBend: 1.90, headPitch: -0.05 },
+  'rd-plant': { armOut: 0.10, elbowBend: 0.06, legSwing: 0, hipFlex: 0.06, kneeBend: 0.18, headPitch: -0.05 },
+
+  // -- floss: arms swing as a unit past the hips while the shoulders twist AGAINST them. The
+  // counter-twist is the whole read, and it is what spineTwist was added for.
+  'floss-l': { armSwingAlt: 0.85, armOut: 0.14, elbowBend: 0.05, spineTwist: -0.45, spineRoll: 0.12, hipFlex: 0.08 },
+  'floss-r': { armSwingAlt: -0.85, armOut: 0.14, elbowBend: 0.05, spineTwist: 0.45, spineRoll: -0.12, hipFlex: 0.08 },
+
+  // -- attitude: standing leg planted, working leg lifted BEHIND with a bent knee, and the arms in
+  // an asymmetric line -- one high, one out -- which is what armOutAlt exists for.
+  'att-prep': { armOut: 0.55, elbowBend: 0.50, hipFlex: 0.30, kneeBend: 0.75 },
+  'att-hold': {
+    armOut: 1.00, armOutAlt: 1.10, elbowBend: 0.45, armSwing: -0.20,
+    legSwing: 0.95, hipFlex: -0.95, kneeBend: 1.25,
+    spineBend: 0.12, headTilt: 0.15, headPitch: -0.08, earPerk: 0.25,
+  },
+
+  // -- pirouette: plie to load, passe with the arms rounded in first while the ROOT turns, then
+  // open out of it. There are no ankles on this rig, so the releve is a root `rise` rather than a
+  // foot articulation -- a stylised nod at a piqué, which is the honest ceiling here.
+  'pir-plie':  { armOut: 0.70, elbowBend: 0.90, armSwing: -0.25, hipFlex: 0.35, kneeBend: 0.90 },
+  'pir-turn':  {
+    armOut: 0.30, elbowBend: 1.25, armSwing: -0.55,
+    legSwing: -0.70, hipFlex: 0.70, kneeBend: 2.30, earPerk: 0.20,
+  },
+  'pir-open':  { armOut: 0.90, armOutAlt: 0.35, elbowBend: 0.50, armSwing: -0.30, hipFlex: 0.18, kneeBend: 0.45, earPerk: 0.30 },
+
+  // -- uptown funk: a STRUT. The legs are deliberately left at zero, because this dance runs the
+  // walk layer underneath it (`walk` below) -- the layers are additive, so the swagger is a torso
+  // and arm pose sitting on top of the ordinary walk cycle rather than a second leg animation.
+  'uf-a': { spineTwist: 0.35, spineRoll: -0.10, armSwingAlt: 0.55, armOut: 0.28, elbowBend: 0.55, headYaw: -0.25, earPerk: 0.20 },
+  'uf-b': { spineTwist: -0.35, spineRoll: 0.10, armSwingAlt: -0.55, armOut: 0.28, elbowBend: 0.55, headYaw: 0.25, earPerk: 0.20 },
+});
+
+/**
+ * `stiff`/`zeta` per dance because a dance wants a snappier spring than a browse blend: the default
+ * 150 settles in about a third of a second, which is slower than a riverdance step.
+ *
+ * `walk` is the speed to run the WALK LAYER at underneath the dance, not a property of the poses.
+ *
+ * `loop` dances must declare no root extras -- wrapping the index back to 0 would unwind the turn
+ * and snap the travel back to the origin, which reads as a teleport. motion.test.mjs asserts it.
+ */
+export const DANCES = defineDances({
+  riverdance: {
+    stiff: 520, zeta: 0.80, loop: true, walk: 0,
+    steps: [
+      { pose: 'rd-left', hold: 0.17 }, { pose: 'rd-plant', hold: 0.11 },
+      { pose: 'rd-right', hold: 0.17 }, { pose: 'rd-plant', hold: 0.11 },
+    ],
+  },
+  floss: {
+    stiff: 380, zeta: 0.75, loop: true, walk: 0,
+    steps: [{ pose: 'floss-l', hold: 0.24 }, { pose: 'floss-r', hold: 0.24 }],
+  },
+  attitude: {
+    stiff: 190, zeta: 1.00, loop: false, walk: 0,
+    steps: [
+      { pose: 'att-prep', hold: 0.35 },
+      { pose: 'att-hold', hold: 1.40, rise: 0.02 },
+      { pose: 'att-prep', hold: 0.45, rise: 0 },
+    ],
+  },
+  pirouette: {
+    stiff: 260, zeta: 0.95, loop: false, walk: 0,
+    steps: [
+      { pose: 'pir-plie', hold: 0.34 },
+      { pose: 'pir-turn', hold: 0.70, turn: TAU, rise: 0.035 },
+      { pose: 'pir-open', hold: 0.55, rise: 0 },
+    ],
+  },
+  'uptown-funk': {
+    stiff: 210, zeta: 0.85, loop: false, walk: 0.75,
+    steps: [
+      { pose: 'uf-a', hold: 0.33, travel: 0.40 },
+      { pose: 'uf-b', hold: 0.33, travel: 0.80 },
+      { pose: 'uf-a', hold: 0.33, travel: 1.20 },
+      { pose: 'uf-b', hold: 0.33, travel: 1.60 },
+    ],
+  },
+});
+
+export const DANCE_NAMES = Object.freeze(Object.keys(DANCES));
+
+/** Per-performance state. Cheap and disposable: one per character per dance. */
+export const makeDance = (name) => ({ name, i: 0, t: 0, done: false });
+
+// Named `sCurve`, not `smoothstep`: smoothstep in this file is one of the three INTERPOLATORS, a
+// three-argument (m, dt, opts) thing, and two functions a screen apart with the same name and
+// different signatures is how a five-minute bug gets made.
+const sCurve = (t) => t * t * (3 - 2 * t);
+const mix = (a, b, t) => a + (b - a) * t;
+
+/**
+ * Advance one performance and report what to drive the character with this frame.
+ *
+ * Returns the step's POSE OBJECT itself, not a copy -- integrate() compares targets by identity to
+ * spot an interrupt, so handing it the frozen singleton is what makes the blend carry velocity.
+ * A copy would re-fire the interrupt every frame and the spring would never get anywhere.
+ */
+/** Consume elapsed time, stepping the index on. A `while`, so one long frame can cross two steps. */
+function advanceDance(d, dance, dt) {
+  const { steps } = dance;
+  d.t += dt;
+  while (!d.done && d.t >= steps[d.i].hold) {
+    d.t -= steps[d.i].hold;
+    if (d.i + 1 < steps.length) d.i += 1;
+    else if (dance.loop) d.i = 0;
+    else { d.done = true; d.t = 0; }
+  }
+}
+
+export function stepDance(d, dt) {
+  const dance = DANCES[d.name];
+  const { steps, extras } = dance;
+  advanceDance(d, dance, dt);
+  const step = steps[d.i];
+  // Eased within the step, so the root does not change speed abruptly at a key pose. The pose
+  // itself is NOT eased here -- the spring is doing that, which is the whole design.
+  const u = d.done ? 1 : sCurve(Math.min(1, d.t / step.hold));
+  const from = d.i === 0 ? NO_EXTRAS : extras[d.i - 1];
+  const to = extras[d.i];
+  return {
+    pose: DANCE_POSES[step.pose],
+    turn: mix(from.turn, to.turn, u),
+    rise: mix(from.rise, to.rise, u),
+    travel: mix(from.travel, to.travel, u),
+    walk: dance.walk,
+    done: d.done,
+  };
+}
+
 // ---------------------------------------------------------------- tuning
 
 export const MOTION_DEFAULTS = Object.freeze({

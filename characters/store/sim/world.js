@@ -158,11 +158,14 @@ function seedOne(npc, i, unseeded) {
  */
 function buryOne(npc, i, want, unburied) {
   const spec = specFor(want, npc);
-  // Every display in turn, not just the next one. A 1x1 cone still reserves four layers and a
-  // wall shelf only clears three, so the one display this used to try can legitimately refuse —
-  // and a burial that silently does not happen is the dig-out branch quietly going untested.
-  for (let k = 0; k < displays.length; k++) {
-    const hidden = displays[(i + 1 + k) % displays.length];
+  const spots = stockSpots();
+  // Every PLACE in turn, not just the next one. A 1x1 cone still reserves four layers and a wall
+  // shelf only clears three, so the one display this used to try can legitimately refuse — and a
+  // burial that silently does not happen is the dig-out branch quietly going untested. One random
+  // tile stands in for the floor rather than all of them: a tile is sixteen cells twelve layers
+  // deep, so unlike a shelf it has no realistic way to say no.
+  for (let k = 0; k < spots.length; k++) {
+    const hidden = pick(spots[(i + 1 + k) % spots.length]);
     const buried = addItem(hidden, 0, spec, { avoidWall: true, shape: [1, 1] });
     if (buried < 0) continue;
     const it = items[buried];

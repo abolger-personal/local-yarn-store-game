@@ -25,7 +25,7 @@ import {
 } from './npc.js';
 import './owl.js';
 import './llama.js';
-import './lion.js';
+import { MANE_PRESETS } from './lion.js';
 
 const build = (id) => createCharacter(
   { ...BASE_PARAMS, ...getSpecies(id).defaults, mergeMeshes: false }, id);
@@ -544,19 +544,29 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       + 'that is a hood, not a mane');
   }
 
-  // Stand-off. Not "does any curl poke out of the skull": the domes sit PROUD along their
-  // normals, so tips clear a head half-width even at spread 0.80 and that test never fires.
-  // What matters is how thick the halo reads. Calibrated BELOW the shipped floor so it catches
-  // a mane collapsing onto the skull rather than firing on a tuning pass -- clearance over head
-  // half-width measures 0.29 at the 1.02 span floor, 0.39 at the default, 0.50 at the ceiling.
+  // Stand-off. Not "does any curl poke out of the skull": the scallops sit PROUD along their
+  // normals, so tips clear a head half-width even at absurd settings and that test never fires.
+  // What matters is how thick the halo reads.
+  //
+  // Crossed with the presets, because each one carries its own maneProud and the worst corner is
+  // a preset against the span floor, not the span floor alone -- measured 0.21x at spread 0.80
+  // with preset 5's proud of 1.60, where the floor on its own gives 0.35x. The default is 0.47x.
+  // Threshold sits below that worst corner so it catches a mane collapsing onto the skull rather
+  // than firing on a tuning pass.
   for (const maneSpread of [kit.defaults.maneSpread, ...kit.randomRanges.maneSpread]) {
-    const P = { ...kit.defaults, maneSpread };
-    const headHalf = P.headRadius * 1.04;
-    const { maxR } = inspect(P);
-    assert.ok(maxR - headHalf > headHalf * 0.20,
-      `lion: mane must stand off the skull, not cling to it -- clearance `
-      + `${(maxR - headHalf).toFixed(4)} is ${((maxR - headHalf) / headHalf).toFixed(2)}x `
-      + `head half-width at spread ${maneSpread}`);
+    for (const preset of [{}, ...MANE_PRESETS]) {
+      const P = { ...kit.defaults, ...preset, maneSpread };
+      const headHalf = P.headRadius * 1.04;
+      const { maxR, overEye } = inspect(P);
+      assert.ok(maxR - headHalf > headHalf * 0.15,
+        `lion: mane must stand off the skull, not cling to it -- clearance `
+        + `${(maxR - headHalf).toFixed(4)} is ${((maxR - headHalf) / headHalf).toFixed(2)}x `
+        + `head half-width at spread ${maneSpread}, proud ${P.maneProud}`);
+      // spread moves the spikes forward as well as outward, so the eyes are its business too
+      assert.equal(overEye, 0,
+        `lion: mane must not reach in front of the eyes at spread ${maneSpread}, `
+        + `proud ${P.maneProud}`);
+    }
   }
 
   // The snout has to leave the head at EVERY corner of the four spans that feed it, not just at
@@ -589,9 +599,12 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   }
 
   // teeth: the assertions above must be able to fail. Both of these were real bugs on screen.
-  assert.ok(inspect({ ...kit.defaults, maneFaceGap: 1.80 }).overEye > 0,
-    'lion: gap 1.80 is meant to cover the eyes -- if it no longer does, the mane or the eye '
-    + 'placement moved and the 2.20 span floor needs re-measuring');
+  // A gap of ZERO, not a number near the shipped floor. The first version of this pinned 1.80
+  // and went stale the moment the spikes let the bases pull in to spread 0.88 -- a tuned number
+  // measures the tuning, where "a mane with no face gap is a hood" stays true by construction.
+  assert.ok(inspect({ ...kit.defaults, maneFaceGap: 0 }).overEye > 0,
+    'lion: a mane with no face gap is a hood and must cover the eyes -- if it does not, the eye '
+    + 'check is measuring nothing');
   assert.ok(protrusion({ ...kit.defaults, muzzleStart: 0.24 }) < 0,
     'lion: a 0.24 muzzle start is meant to bury the snout -- that was the shipped bug');
 }

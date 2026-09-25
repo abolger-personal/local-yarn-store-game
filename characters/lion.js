@@ -82,18 +82,26 @@ export const DEFAULT_PARAMS = {
   maneTouch:     1.10,    // above 1.0 the curls overlap, which is what closes the mass
   maneSize:      0.230,   // manual override, only used when maneAutoSize is off
   maneFlat:      0.38,
-  maneProud:     0.92,
+  // Faceted spikes, not domes. A dome has no direction, so a mane built from them reads as
+  // wool however the counts are tuned -- which is the owl's and the llama's whole point and
+  // exactly wrong here. 0 falls back to the dome; 3 is a sharp triangular spike, 4 a pyramid,
+  // and by 6 it is rounding off again.
+  maneSides:     4,
+  // a spike wants to be LONGER than it is wide; a dome at 0.92 is a bump
+  maneProud:     1.85,
   maneTop:       0.10,    // near the crown
   maneBottom:    0.97,    // hangs well below head centre, onto the shoulders
   maneStagger:   true,
   // Radians of +Z left open. The parameter that makes it a mane rather than a hood -- and it has
-  // to be bigger than it looks, because skipFront culls dome CENTRES while each dome still has a
-  // radius, so the curls flanking the gap spill across it. Measured on the default head: at 1.70
-  // the mane reaches z 0.1951 against a muzzle tip at 0.1607 and buries the face; 2.10 is the
-  // first value that clears it. 2.50 lands in the same quantisation bucket (perRow 11 = 0.571 rad
-  // steps) and holds the mane 43 degrees off-axis, which still frames the cheeks.
+  // to be bigger than it looks, because skipFront culls scallop CENTRES while each scallop still
+  // has a base radius, so the ones flanking the gap spill across it. It also quantises by
+  // manePerRow: at 11 the steps are 0.571 rad, so a range of values collapses to one shell.
+  // Measured with the spikes in: the eyes are covered with no gap at all and clear from 1.5 up,
+  // so 2.50 sits well clear and still brings the mane around the cheeks.
   maneFaceGap:   2.50,
-  maneSpread:    1.10,    // shell radius as a multiple of head radius
+  // BELOW 1 deliberately -- this places the spike BASES, which belong inside the skull so the
+  // mane grows out of the head instead of hovering around it. Reach is maneProud's job.
+  maneSpread:    0.88,
   maneTall:      1.06,    // Y scale relative to the spread, so the halo can hang oval
   maneDrop:      0.16,    // shell centre below head centre, as a fraction of head radius
   manePush:     -0.10,    // shell centre behind head centre, so it frames rather than wraps
@@ -102,13 +110,13 @@ export const DEFAULT_PARAMS = {
 // Fewer, larger curls than the llama's fleece: a mane is coarse. Size is derived from the counts
 // so a preset only chooses how many curls there are and how far they stand proud.
 export const MANE_PRESETS = Object.freeze([
-  { maneRows: 3, manePerRow: 9,  maneProud: 0.86, maneFlat: 0.34, maneStagger: true,  maneTop: 0.14, maneBottom: 0.94, maneSpread: 1.02 },
-  { maneRows: 3, manePerRow: 11, maneProud: 0.94, maneFlat: 0.36, maneStagger: true,  maneTop: 0.12, maneBottom: 0.95, maneSpread: 1.05 },
-  { maneRows: 4, manePerRow: 11, maneProud: 0.92, maneFlat: 0.38, maneStagger: true,  maneTop: 0.10, maneBottom: 0.97, maneSpread: 1.08 },
-  { maneRows: 4, manePerRow: 13, maneProud: 0.88, maneFlat: 0.40, maneStagger: true,  maneTop: 0.10, maneBottom: 0.97, maneSpread: 1.11 },
-  { maneRows: 5, manePerRow: 13, maneProud: 1.00, maneFlat: 0.40, maneStagger: true,  maneTop: 0.08, maneBottom: 0.98, maneSpread: 1.14 },
-  { maneRows: 5, manePerRow: 15, maneProud: 0.82, maneFlat: 0.42, maneStagger: false, maneTop: 0.08, maneBottom: 0.98, maneSpread: 1.17 },
-  { maneRows: 6, manePerRow: 15, maneProud: 0.96, maneFlat: 0.44, maneStagger: true,  maneTop: 0.06, maneBottom: 0.99, maneSpread: 1.20 },
+  { maneRows: 3, manePerRow: 9,  maneProud: 1.70, maneFlat: 0.34, maneStagger: true,  maneTop: 0.14, maneBottom: 0.94, maneSpread: 0.80 },
+  { maneRows: 3, manePerRow: 11, maneProud: 1.95, maneFlat: 0.36, maneStagger: true,  maneTop: 0.12, maneBottom: 0.95, maneSpread: 0.83 },
+  { maneRows: 4, manePerRow: 11, maneProud: 1.85, maneFlat: 0.38, maneStagger: true,  maneTop: 0.10, maneBottom: 0.97, maneSpread: 0.86 },
+  { maneRows: 4, manePerRow: 13, maneProud: 1.75, maneFlat: 0.40, maneStagger: true,  maneTop: 0.10, maneBottom: 0.97, maneSpread: 0.88 },
+  { maneRows: 5, manePerRow: 13, maneProud: 2.10, maneFlat: 0.40, maneStagger: true,  maneTop: 0.08, maneBottom: 0.98, maneSpread: 0.91 },
+  { maneRows: 5, manePerRow: 15, maneProud: 1.60, maneFlat: 0.42, maneStagger: false, maneTop: 0.08, maneBottom: 0.98, maneSpread: 0.94 },
+  { maneRows: 6, manePerRow: 15, maneProud: 2.00, maneFlat: 0.44, maneStagger: true,  maneTop: 0.06, maneBottom: 0.99, maneSpread: 0.97 },
 ]);
 
 export function applyManePreset(P, index) {
@@ -140,7 +148,7 @@ export const RANDOM_RANGES = Object.freeze({
   earTilt:      [0.160, 0.440],
   earPoint:     [0.30, 0.85],
   maneTouch:    [1.040, 1.200],
-  maneSpread:   [1.020, 1.200],
+  maneSpread:   [0.800, 0.980],
   // floor is 2.20, not taste: below about 2.10 the curls flanking the gap close over the muzzle.
   // rig.test walks this span and asserts the face stays clear at both ends.
   maneFaceGap:  [2.200, 3.100],
@@ -165,6 +173,7 @@ const maneShell = (P) => {
     rows: P.maneRows, perRow: P.manePerRow,
     top: P.maneTop, bottom: P.maneBottom,
     skipFront: P.maneFaceGap,
+    sides: P.maneSides,
   };
   return {
     ...shape, size: curlSize(P, shape),
@@ -221,11 +230,11 @@ function addNose(ctx, P) {
  * Offset back and down inside the head node rather than centred, so it frames the face instead
  * of wrapping it.
  *
- * maneSpread scales the shell past headRadius, but note it is NOT the point at which the mane
- * disappears: each dome sits proud along its own normal, so the curl tips reach well outside the
- * shell radius. Measured against a head half-width of 0.1851, the curls still clear the skull at
- * spread 0.80. What spread actually buys is how far the halo stands off -- 0.0499 of clearance at
- * 1.00, 0.0890 at the 1.18 randomisation floor, 0.1238 at the default. rig.test pins the floor.
+ * maneSpread is now BELOW 1, which looks wrong and is not: it positions the spike BASES, and the
+ * bases belong inside the skull so the mane grows out of the head rather than hovering around it.
+ * Reach comes from maneProud instead. Measured stand-off, as a multiple of head half-width: 0.35
+ * at the 0.80 span floor, 0.47 at the default, 0.63 at the ceiling, and 0.21 at the worst corner
+ * once the presets' own maneProud is crossed in. rig.test pins that corner.
  */
 function addMane(ctx, P) {
   if (!P.mane) return;
@@ -299,9 +308,10 @@ export const LION_GUI = Object.freeze({
     ['manePreset', 0, MANE_PRESETS.length - 1, 1],
     ['maneFaceGap', 0, 3.2], ['maneSpread', 1.0, 1.9], ['maneTall', 0.7, 1.4],
     ['maneDrop', -0.2, 0.6], ['manePush', -0.6, 0.3],
+    ['maneSides', 0, 8, 1],
     ['maneRows', 1, 8, 1], ['manePerRow', 3, 20, 1],
     ['maneAutoSize', 'bool'], ['maneTouch', 0.8, 1.6], ['maneSize', 0.08, 0.55],
-    ['maneProud', 0.1, 1.4], ['maneFlat', 0, 1.2],
+    ['maneProud', 0.1, 3.0], ['maneFlat', 0, 1.2],
     ['maneTop', 0, 1], ['maneBottom', 0, 1], ['maneStagger', 'bool'],
   ],
 });

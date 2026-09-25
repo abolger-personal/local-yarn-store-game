@@ -14,7 +14,7 @@ import { makeMotion, integrate, compose, POSE_KEYS, POSES } from './motion.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
-export const BUILD = '2026-09-24.1-lion';
+export const BUILD = '2026-09-24.2-mane-spikes';
 
 // ---------------------------------------------------------------- species registry
 
@@ -422,7 +422,19 @@ const normaliseShell = (o) => ({
   rows: Math.max(1, Math.round(o.rows)),
   perRow: Math.max(3, Math.round(o.perRow)),
   skipFront: o.skipFront ?? 0,
+  sides: o.sides ? Math.max(3, Math.round(o.sides)) : 0,
 });
+
+/**
+ * The scallop primitive. 0 sides is the dome -- soft, and what plumage and fleece want. Three or
+ * more is a faceted spike, which is what fur wants: a mane built from domes reads as wool no
+ * matter how the counts are tuned, because a dome has no direction.
+ *
+ * Built to the same unit convention as GEO.dome -- base at y=0, tip at y=1 -- so scallopMatrix
+ * places and scales it identically and `proud` goes on meaning length.
+ */
+const spikeGeometry = (sides) =>
+  new THREE.ConeGeometry(1, 1, sides).translate(0, 0.5, 0);
 
 // +Z is the face direction, which sits at theta = PI/2
 const inFaceGap = (theta, gap) => {
@@ -464,9 +476,13 @@ function makeScallopShell(opts) {
   const shell = normaliseShell(opts);
   const angles = scallopAngles(shell);
   if (!angles.length) return null;
-  const domes = angles.map((a) => GEO.dome.clone().applyMatrix4(scallopMatrix(a, shell)));
-  const merged = mergeGeometries(domes, false);
-  domes.forEach((g) => g.dispose());
+  // one spike per shell, cloned per scallop and disposed here -- the MERGED result is what the
+  // cache holds, so this never runs twice for the same settings
+  const unit = shell.sides ? spikeGeometry(shell.sides) : GEO.dome;
+  const scallops = angles.map((a) => unit.clone().applyMatrix4(scallopMatrix(a, shell)));
+  const merged = mergeGeometries(scallops, false);
+  scallops.forEach((g) => g.dispose());
+  if (shell.sides) unit.dispose();   // GEO.dome is shared and must outlive this
   return merged;
 }
 

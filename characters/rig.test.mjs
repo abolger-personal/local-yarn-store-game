@@ -25,6 +25,7 @@ import {
 } from './npc.js';
 import './owl.js';
 import './llama.js';
+import './lion.js';
 
 const build = (id) => createCharacter(
   { ...BASE_PARAMS, ...getSpecies(id).defaults, mergeMeshes: false }, id);
@@ -480,6 +481,86 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     assert.ok(uf.frozenStride > 0.06,
       `${id}: a snap must catch the legs mid-stride -- got ${uf.frozenStride.toFixed(3)} apart`);
   }
+}
+
+// --- the lion's mane frames the face ------------------------------------------------------------
+//
+// A mane is a halo around a BARE face; if it closes over the muzzle it is a hood, and the
+// character loses the only feature that carries expression. `skipFront` culls dome CENTRES, but
+// each dome still has a radius, so the curls flanking the gap spill across it -- which is why the
+// authored gap has to be much wider than the opening you actually want. The first default here
+// (1.70) buried the muzzle and looked entirely reasonable in the source.
+//
+// Measured in HEAD-LOCAL space and banded to the face, because the crown domes wrap over the top
+// where the XZ angle is meaningless -- an unbanded "closest vertex to +Z" reads 0.003 rad no
+// matter how wide the gap is, and so reports a buried face as a clear one.
+{
+  const kit = getSpecies('lion');
+
+  const maneOf = (P) => {
+    const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, 'lion');
+    built.root.updateMatrixWorld(true);
+    let mane = null;
+    built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
+    return mane;
+  };
+
+  const reach = (P) => {
+    const mane = maneOf(P);
+    assert.ok(mane, 'the mane shell must exist -- scallopGeometry returns null when every dome '
+      + 'falls inside the face gap, which presents as a lion with no mane at all');
+    const lo = -P.headRadius * P.muzzleDrop - P.muzzleWidth;
+    const hi = P.headRadius * P.eyeLift + P.eyeRadius;
+    const pos = mane.geometry.attributes.position;
+    const v = new THREE.Vector3();
+    let frontZ = -Infinity, maxR = 0;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(mane.matrix);
+      maxR = Math.max(maxR, Math.hypot(v.x, v.z));
+      if (v.y >= lo && v.y <= hi) frontZ = Math.max(frontZ, v.z);
+    }
+    return { frontZ, maxR };
+  };
+
+  const muzzleTip = (P) => P.headRadius * 0.24 + P.muzzleLength;
+
+  // Both ends of the randomisation span, not just the default: the span is what ships, and its
+  // floor was wrong too. 2.20 is the floor because 2.10 is the first clear value and the gap
+  // quantises by manePerRow.
+  for (const maneFaceGap of [kit.defaults.maneFaceGap, 2.20, 3.10]) {
+    const P = { ...kit.defaults, maneFaceGap };
+    const { frontZ, maxR } = reach(P);
+    const tip = muzzleTip(P);
+    assert.ok(frontZ < tip,
+      `lion: mane must not close over the muzzle at gap ${maneFaceGap} -- `
+      + `mane reaches z ${frontZ.toFixed(4)}, muzzle tip is ${tip.toFixed(4)}`);
+
+    // Stand-off, not mere visibility. "Does any curl poke out of the skull" is almost
+    // un-failable: the domes sit PROUD along their normals, so the tips clear a head half-width
+    // of 0.1851 even at spread 0.80. The number that matters is how thick the halo reads, and
+    // it is calibrated to the shipped span rather than to an eyeballed perceptual threshold --
+    // clearance over head half-width measures 0.27 at spread 1.00, 0.48 at the 1.18
+    // randomisation floor, 0.67 at the default. 0.40 sits between the floor and failure.
+    const headHalf = P.headRadius * 1.04;
+    assert.ok(maxR - headHalf > headHalf * 0.40,
+      `lion: mane must stand off the skull, not cling to it -- clearance `
+      + `${(maxR - headHalf).toFixed(4)} is ${((maxR - headHalf) / headHalf).toFixed(2)}x `
+      + `head half-width ${headHalf.toFixed(4)}`);
+  }
+
+  // the bottom of the randomisation span has to pass too, not just the default
+  {
+    const P = { ...kit.defaults, maneSpread: 1.18 };
+    const headHalf = P.headRadius * 1.04;
+    assert.ok(reach(P).maxR - headHalf > headHalf * 0.40,
+      'lion: the maneSpread randomisation floor must still read as a halo');
+  }
+
+  // and the regression that started all this
+  const bad = { ...kit.defaults, maneFaceGap: 1.70 };
+  assert.ok(reach(bad).frontZ > muzzleTip(bad),
+    'lion: the 1.70 gap is meant to FAIL -- if it now clears the muzzle then skipFront or the '
+    + 'curl sizing changed, and the floor on maneFaceGap needs re-measuring');
 }
 
 console.log('npc.js rig self-check: all assertions passed');

@@ -29,6 +29,7 @@ import {
 import { randomTraits } from './visit.js';
 import './owl.js';
 import './llama.js';
+import './lion.js';
 
 console.info('LYS build', BUILD);
 

@@ -483,17 +483,20 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   }
 }
 
-// --- the lion's mane frames the face ------------------------------------------------------------
+// --- the lion's mane frames the face, and its snout leaves the skull ----------------------------
 //
-// A mane is a halo around a BARE face; if it closes over the muzzle it is a hood, and the
-// character loses the only feature that carries expression. `skipFront` culls dome CENTRES, but
-// each dome still has a radius, so the curls flanking the gap spill across it -- which is why the
-// authored gap has to be much wider than the opening you actually want. The first default here
-// (1.70) buried the muzzle and looked entirely reasonable in the source.
+// Both of these shipped wrong and both looked reasonable in the source.
 //
-// Measured in HEAD-LOCAL space and banded to the face, because the crown domes wrap over the top
-// where the XZ angle is meaningless -- an unbanded "closest vertex to +Z" reads 0.003 rad no
-// matter how wide the gap is, and so reports a buried face as a clear one.
+// The snout: a cat's muzzle is SHORT, so on a broad head a short length starting where the
+// llama's starts never emerges at all -- the tip landed at z 0.1607 inside a skull 0.1687 deep.
+// The llama survives a 0.30 start because its head is small next to its muzzle (1.92x); the lion
+// is 0.66x, so muzzleStart carries it instead of length.
+//
+// The mane: "does it cover the muzzle" was the wrong landmark. Once the snout protrudes properly
+// it out-reaches the mane at EVERY face gap -- even a gap of 0, a full hood, leaves the nose
+// poking through -- so that assertion could never fail again. A hood buries the EYES long before
+// the nose, and that is what separates a mane from a balaclava. Measured: 275 mane vertices sit
+// in front of an eye at gap 0, 26 at 1.8, and 0 from 2.0 up.
 {
   const kit = getSpecies('lion');
 
@@ -502,65 +505,95 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     built.root.updateMatrixWorld(true);
     let mane = null;
     built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
+    assert.ok(mane, 'the mane shell must exist -- scallopGeometry returns null when every dome '
+      + 'falls inside the face gap, which presents as a lion with no mane at all');
     return mane;
   };
 
-  const reach = (P) => {
+  // vertices sitting in front of an eye, and the widest radius the curls reach
+  const inspect = (P) => {
     const mane = maneOf(P);
-    assert.ok(mane, 'the mane shell must exist -- scallopGeometry returns null when every dome '
-      + 'falls inside the face gap, which presents as a lion with no mane at all');
-    const lo = -P.headRadius * P.muzzleDrop - P.muzzleWidth;
-    const hi = P.headRadius * P.eyeLift + P.eyeRadius;
+    const ex = P.headRadius * P.eyeSpread;
+    const ey = P.headRadius * P.eyeLift;
+    const ez = P.headRadius * P.eyeFront;
+    const win = P.eyeRadius * 1.5;
     const pos = mane.geometry.attributes.position;
     const v = new THREE.Vector3();
-    let frontZ = -Infinity, maxR = 0;
+    let overEye = 0, maxR = 0;
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i).applyMatrix4(mane.matrix);
       maxR = Math.max(maxR, Math.hypot(v.x, v.z));
-      if (v.y >= lo && v.y <= hi) frontZ = Math.max(frontZ, v.z);
+      if (Math.abs(Math.abs(v.x) - ex) <= win && Math.abs(v.y - ey) <= win && v.z > ez) overEye++;
     }
-    return { frontZ, maxR };
+    return { overEye, maxR };
   };
 
-  const muzzleTip = (P) => P.headRadius * 0.24 + P.muzzleLength;
+  // head is an ellipsoid [r*1.04, r*0.94, r]; how deep in Z at the muzzle's height?
+  const skinZ = (P) => {
+    const k = 1 - ((-P.headRadius * P.muzzleDrop) / (P.headRadius * 0.94)) ** 2;
+    return k > 0 ? P.headRadius * Math.sqrt(k) : 0;
+  };
+  const protrusion = (P) => P.headRadius * P.muzzleStart + P.muzzleLength - skinZ(P);
 
-  // Both ends of the randomisation span, not just the default: the span is what ships, and its
-  // floor was wrong too. 2.20 is the floor because 2.10 is the first clear value and the gap
-  // quantises by manePerRow.
-  for (const maneFaceGap of [kit.defaults.maneFaceGap, 2.20, 3.10]) {
+  // The default and BOTH ends of the shipped span. The span is what randomisation actually
+  // draws from, and it was the span -- not the default -- that produced the bad ones on screen.
+  for (const maneFaceGap of [kit.defaults.maneFaceGap, ...kit.randomRanges.maneFaceGap]) {
     const P = { ...kit.defaults, maneFaceGap };
-    const { frontZ, maxR } = reach(P);
-    const tip = muzzleTip(P);
-    assert.ok(frontZ < tip,
-      `lion: mane must not close over the muzzle at gap ${maneFaceGap} -- `
-      + `mane reaches z ${frontZ.toFixed(4)}, muzzle tip is ${tip.toFixed(4)}`);
+    assert.equal(inspect(P).overEye, 0,
+      `lion: mane must not hang in front of the eyes at gap ${maneFaceGap} -- `
+      + 'that is a hood, not a mane');
+  }
 
-    // Stand-off, not mere visibility. "Does any curl poke out of the skull" is almost
-    // un-failable: the domes sit PROUD along their normals, so the tips clear a head half-width
-    // of 0.1851 even at spread 0.80. The number that matters is how thick the halo reads, and
-    // it is calibrated to the shipped span rather than to an eyeballed perceptual threshold --
-    // clearance over head half-width measures 0.27 at spread 1.00, 0.48 at the 1.18
-    // randomisation floor, 0.67 at the default. 0.40 sits between the floor and failure.
+  // Stand-off. Not "does any curl poke out of the skull": the domes sit PROUD along their
+  // normals, so tips clear a head half-width even at spread 0.80 and that test never fires.
+  // What matters is how thick the halo reads. Calibrated BELOW the shipped floor so it catches
+  // a mane collapsing onto the skull rather than firing on a tuning pass -- clearance over head
+  // half-width measures 0.29 at the 1.02 span floor, 0.39 at the default, 0.50 at the ceiling.
+  for (const maneSpread of [kit.defaults.maneSpread, ...kit.randomRanges.maneSpread]) {
+    const P = { ...kit.defaults, maneSpread };
     const headHalf = P.headRadius * 1.04;
-    assert.ok(maxR - headHalf > headHalf * 0.40,
+    const { maxR } = inspect(P);
+    assert.ok(maxR - headHalf > headHalf * 0.20,
       `lion: mane must stand off the skull, not cling to it -- clearance `
       + `${(maxR - headHalf).toFixed(4)} is ${((maxR - headHalf) / headHalf).toFixed(2)}x `
-      + `head half-width ${headHalf.toFixed(4)}`);
+      + `head half-width at spread ${maneSpread}`);
   }
 
-  // the bottom of the randomisation span has to pass too, not just the default
+  // The snout has to leave the head at EVERY corner of the four spans that feed it, not just at
+  // the default -- randomisation draws them independently, so the corners do occur. Worst corner
+  // measures 0.0203 of protrusion; the default manages 0.0520.
   {
-    const P = { ...kit.defaults, maneSpread: 1.18 };
-    const headHalf = P.headRadius * 1.04;
-    assert.ok(reach(P).maxR - headHalf > headHalf * 0.40,
-      'lion: the maneSpread randomisation floor must still read as a halo');
+    // the DEFAULT first. The corner scan below walks randomRanges, so on its own it says nothing
+    // about the shipped default -- and a bad default is exactly what went out.
+    assert.ok(protrusion(kit.defaults) > 0.012,
+      `lion: the default snout must clear the skull -- protrudes `
+      + `${protrusion(kit.defaults).toFixed(4)}`);
+
+    const R = kit.randomRanges;
+    let worst = Infinity, at = null;
+    for (const muzzleStart of R.muzzleStart) {
+      for (const muzzleLength of R.muzzleLength) {
+        for (const headRadius of R.headRadius) {
+          for (const muzzleDrop of R.muzzleDrop) {
+            const P = { ...kit.defaults, muzzleStart, muzzleLength, headRadius, muzzleDrop };
+            const out = protrusion(P);
+            if (out < worst) { worst = out; at = P; }
+          }
+        }
+      }
+    }
+    assert.ok(worst > 0.012,
+      `lion: the snout must clear the skull at every corner of its spans -- worst is `
+      + `${worst.toFixed(4)} at start ${at.muzzleStart} length ${at.muzzleLength} `
+      + `headRadius ${at.headRadius} drop ${at.muzzleDrop}`);
   }
 
-  // and the regression that started all this
-  const bad = { ...kit.defaults, maneFaceGap: 1.70 };
-  assert.ok(reach(bad).frontZ > muzzleTip(bad),
-    'lion: the 1.70 gap is meant to FAIL -- if it now clears the muzzle then skipFront or the '
-    + 'curl sizing changed, and the floor on maneFaceGap needs re-measuring');
+  // teeth: the assertions above must be able to fail. Both of these were real bugs on screen.
+  assert.ok(inspect({ ...kit.defaults, maneFaceGap: 1.80 }).overEye > 0,
+    'lion: gap 1.80 is meant to cover the eyes -- if it no longer does, the mane or the eye '
+    + 'placement moved and the 2.20 span floor needs re-measuring');
+  assert.ok(protrusion({ ...kit.defaults, muzzleStart: 0.24 }) < 0,
+    'lion: a 0.24 muzzle start is meant to bury the snout -- that was the shipped bug');
 }
 
 console.log('npc.js rig self-check: all assertions passed');

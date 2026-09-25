@@ -51,7 +51,14 @@ export const DEFAULT_PARAMS = {
   // species kit -- snout. Short and BROAD where the llama's is long and blunt. It tapers, which
   // is the whole difference: GEO.taper narrows to LIMB_TAPER (0.78) along its length, and the
   // nose pad then steps in again, so base to tip reads much narrower than 0.78 alone.
-  muzzleLength:  0.118,
+  // muzzleStart is the one that bites. A cat's snout is SHORT, so a short length on a broad head
+  // buries it: at the llama's 0.30 start with length 0.118 the tip lands at z 0.1607 against a
+  // head that is 0.1687 deep at that height, and the whole snout sits inside the skull. The llama
+  // gets away with 0.30 because its head is small (0.112) next to a 0.215 muzzle -- 1.92x. Here
+  // the ratio is 0.66x, so the snout has to START near the surface instead of being lengthened
+  // into a camelid one. At 0.65 it protrudes 0.0520 and still reads short.
+  muzzleStart:   0.65,    // where the taper begins, as a fraction of head radius
+  muzzleLength:  0.105,
   muzzleWidth:   0.104,   // X half-width at the skull end -- wider than it is deep, like a cat
   muzzleDepth:   0.082,   // Z half-depth at the skull end
   muzzleDrop:    0.300,   // below head centre, as a fraction of head radius
@@ -86,7 +93,7 @@ export const DEFAULT_PARAMS = {
   // first value that clears it. 2.50 lands in the same quantisation bucket (perRow 11 = 0.571 rad
   // steps) and holds the mane 43 degrees off-axis, which still frames the cheeks.
   maneFaceGap:   2.50,
-  maneSpread:    1.34,    // shell radius as a multiple of head radius
+  maneSpread:    1.10,    // shell radius as a multiple of head radius
   maneTall:      1.06,    // Y scale relative to the spread, so the halo can hang oval
   maneDrop:      0.16,    // shell centre below head centre, as a fraction of head radius
   manePush:     -0.10,    // shell centre behind head centre, so it frames rather than wraps
@@ -95,13 +102,13 @@ export const DEFAULT_PARAMS = {
 // Fewer, larger curls than the llama's fleece: a mane is coarse. Size is derived from the counts
 // so a preset only chooses how many curls there are and how far they stand proud.
 export const MANE_PRESETS = Object.freeze([
-  { maneRows: 3, manePerRow: 9,  maneProud: 0.86, maneFlat: 0.34, maneStagger: true,  maneTop: 0.14, maneBottom: 0.94, maneSpread: 1.22 },
-  { maneRows: 3, manePerRow: 11, maneProud: 0.94, maneFlat: 0.36, maneStagger: true,  maneTop: 0.12, maneBottom: 0.95, maneSpread: 1.28 },
-  { maneRows: 4, manePerRow: 11, maneProud: 0.92, maneFlat: 0.38, maneStagger: true,  maneTop: 0.10, maneBottom: 0.97, maneSpread: 1.34 },
-  { maneRows: 4, manePerRow: 13, maneProud: 0.88, maneFlat: 0.40, maneStagger: true,  maneTop: 0.10, maneBottom: 0.97, maneSpread: 1.40 },
-  { maneRows: 5, manePerRow: 13, maneProud: 1.00, maneFlat: 0.40, maneStagger: true,  maneTop: 0.08, maneBottom: 0.98, maneSpread: 1.46 },
-  { maneRows: 5, manePerRow: 15, maneProud: 0.82, maneFlat: 0.42, maneStagger: false, maneTop: 0.08, maneBottom: 0.98, maneSpread: 1.52 },
-  { maneRows: 6, manePerRow: 15, maneProud: 0.96, maneFlat: 0.44, maneStagger: true,  maneTop: 0.06, maneBottom: 0.99, maneSpread: 1.58 },
+  { maneRows: 3, manePerRow: 9,  maneProud: 0.86, maneFlat: 0.34, maneStagger: true,  maneTop: 0.14, maneBottom: 0.94, maneSpread: 1.02 },
+  { maneRows: 3, manePerRow: 11, maneProud: 0.94, maneFlat: 0.36, maneStagger: true,  maneTop: 0.12, maneBottom: 0.95, maneSpread: 1.05 },
+  { maneRows: 4, manePerRow: 11, maneProud: 0.92, maneFlat: 0.38, maneStagger: true,  maneTop: 0.10, maneBottom: 0.97, maneSpread: 1.08 },
+  { maneRows: 4, manePerRow: 13, maneProud: 0.88, maneFlat: 0.40, maneStagger: true,  maneTop: 0.10, maneBottom: 0.97, maneSpread: 1.11 },
+  { maneRows: 5, manePerRow: 13, maneProud: 1.00, maneFlat: 0.40, maneStagger: true,  maneTop: 0.08, maneBottom: 0.98, maneSpread: 1.14 },
+  { maneRows: 5, manePerRow: 15, maneProud: 0.82, maneFlat: 0.42, maneStagger: false, maneTop: 0.08, maneBottom: 0.98, maneSpread: 1.17 },
+  { maneRows: 6, manePerRow: 15, maneProud: 0.96, maneFlat: 0.44, maneStagger: true,  maneTop: 0.06, maneBottom: 0.99, maneSpread: 1.20 },
 ]);
 
 export function applyManePreset(P, index) {
@@ -119,6 +126,9 @@ export const RANDOM_RANGES = Object.freeze({
   headOverlap:  [0.050, 0.098],
   neckLength:   [0.085, 0.140],
   legHeight:    [0.150, 0.250],   // stocky; a lion is not a leggy animal
+  // floor is geometry, not taste: below about 0.60 the shortest muzzle on the widest head
+  // never leaves the skull. rig.test walks the worst corner of these four spans together.
+  muzzleStart:  [0.620, 0.800],
   muzzleLength: [0.090, 0.155],
   muzzleWidth:  [0.086, 0.126],
   muzzleDepth:  [0.068, 0.098],
@@ -130,7 +140,7 @@ export const RANDOM_RANGES = Object.freeze({
   earTilt:      [0.160, 0.440],
   earPoint:     [0.30, 0.85],
   maneTouch:    [1.040, 1.200],
-  maneSpread:   [1.180, 1.620],
+  maneSpread:   [1.020, 1.200],
   // floor is 2.20, not taste: below about 2.10 the curls flanking the gap close over the muzzle.
   // rig.test walks this span and asserts the face stays clear at both ends.
   maneFaceGap:  [2.200, 3.100],
@@ -181,7 +191,7 @@ function addHead(ctx, P) {
  */
 function addMuzzle(ctx, P) {
   const y = -P.headRadius * P.muzzleDrop;
-  const start = P.headRadius * 0.24;
+  const start = P.headRadius * P.muzzleStart;
   const { muzzleLength: len, muzzleWidth: w, muzzleDepth: d } = P;
 
   ctx.head.add(part(GEO.taper, ctx.mat.muzzle, {
@@ -196,7 +206,7 @@ function addMuzzle(ctx, P) {
 function addNose(ctx, P) {
   const y = -P.headRadius * P.muzzleDrop;
   const tipW = P.muzzleWidth * 0.78;
-  const z = P.headRadius * 0.24 + P.muzzleLength;
+  const z = P.headRadius * P.muzzleStart + P.muzzleLength;
   const r = tipW * P.noseSize;
 
   ctx.head.add(part(GEO.sphere, ctx.mat.nose, {
@@ -277,7 +287,8 @@ export function randomParams(overrides = {}) {
 
 export const LION_GUI = Object.freeze({
   'snout & ears': [
-    ['muzzleLength', 0.04, 0.24], ['muzzleWidth', 0.04, 0.18], ['muzzleDepth', 0.03, 0.14],
+    ['muzzleStart', 0.2, 1.0], ['muzzleLength', 0.04, 0.24],
+    ['muzzleWidth', 0.04, 0.18], ['muzzleDepth', 0.03, 0.14],
     ['muzzleDrop', 0, 0.8], ['muzzleColor', 'color'], ['noseColor', 'color'],
     ['noseSize', 0.2, 1.0],
     ['earLength', 0.03, 0.20], ['earWidth', 0.010, 0.08], ['earFlatten', 0.15, 1.0],

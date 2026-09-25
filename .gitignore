@@ -1,5 +1,5 @@
 .DS_Store
 ai_planning_sessions/.DS_Store
 node_modules/
-
+.claude/worktrees/
 

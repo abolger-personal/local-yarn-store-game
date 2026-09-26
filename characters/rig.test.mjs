@@ -1222,4 +1222,68 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   }
 }
 
+// --- the spikes grow out of the skull, and the mane's bottom edge lies against it ---------------
+//
+// Found in the checker: the underfur hugged the head, the bottom spikes did not. Every spike
+// pointed along its seating ray, out of the SHELL's centre -- which sits forward of and below the
+// head's -- so the lower rows pointed 12-16 degrees further out than the skull and flared like a
+// collar. Now each points along the skull's normal, then maneHug folds the last rows down and back
+// against it.
+//
+// Read off the built geometry: each spike is one ConeGeometry block in the merged buffer, in
+// maneBases order, and vertex 0 of a block is its apex -- so its true axis is apex minus base.
+{
+  const kit = getSpecies('lion');
+  const D = { ...BASE_PARAMS, ...kit.defaults };
+  const HEAD = [1.04, 0.94, 1.00];
+  // lean off the skull normal per spike, in degrees, with each spike's row as 0 (first) .. 1 (last)
+  const leans = (P) => {
+    const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, 'lion');
+    built.root.updateMatrixWorld(true);
+    let mane = null;
+    built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
+    const per = new THREE.ConeGeometry(1, 1, P.maneSides).attributes.position.count;
+    const pos = mane.geometry.attributes.position;
+    return maneBases(P).map((unit, i) => {
+      const base = unit.clone().applyMatrix4(mane.matrix);
+      const tip = new THREE.Vector3().fromBufferAttribute(pos, i * per).applyMatrix4(mane.matrix);
+      const n = new THREE.Vector3(base.x / HEAD[0] ** 2, base.y / HEAD[1] ** 2, base.z / HEAD[2] ** 2);
+      // the row from the base's own angle in the shell's unit space -- NOT its height, which varies
+      // along a row once bases are seated on a skull the shell is not centred on
+      const phi = Math.acos(unit.y / unit.length()) / Math.PI;
+      const row = P.maneBottom > P.maneTop ? (phi - P.maneTop) / (P.maneBottom - P.maneTop) : 0;
+      return { row, lean: THREE.MathUtils.radToDeg(tip.sub(base).angleTo(n.normalize())) };
+    });
+  };
+
+  // 1. At maneHug 0 every spike stands straight out of the skull. Walks maneTall's randomiser ends,
+  //    because a tall shell scales the mesh unevenly and a normal does not survive that unless it
+  //    is carried through by the inverse transpose -- measured 10.1 degrees off at maneTall 1.2 without it.
+  for (const maneTall of [D.maneTall, ...kit.randomRanges.maneTall]) {
+    for (const maneBottom of [D.maneBottom, 1.0]) {
+      const worst = Math.max(...leans({ ...D, maneHug: 0, maneTall, maneBottom }).map((s) => s.lean));
+      assert.ok(worst < 0.5,
+        `lion: at maneHug 0 every spike must grow straight out of the skull -- one leans `
+        + `${worst.toFixed(1)} degrees off it at maneTall ${maneTall}, maneBottom ${maneBottom}`);
+    }
+  }
+
+  // 2. The fold. The last row lies maneHug * 90 degrees off the normal whatever maneBottom is --
+  //    ramping by height instead left a short mane's last row at 24 degrees where a long one's
+  //    lay flat -- and the upper half of the rows is untouched, so the halo round the face and
+  //    the crown keep the look they were tuned to.
+  for (const maneBottom of [D.maneBottom, 0.8, 1.0]) {
+    const spikes = leans({ ...D, maneBottom });
+    const last = spikes.filter((s) => s.row > 1 - 1e-9).map((s) => s.lean);
+    const want = D.maneHug * 90;
+    assert.ok(last.length && last.every((l) => Math.abs(l - want) < 1),
+      `lion: the mane's last row must fold ${want.toFixed(0)} degrees against the skull at `
+      + `maneBottom ${maneBottom} -- got ${last.map((l) => l.toFixed(1)).join(', ')}`);
+    const upper = Math.max(...spikes.filter((s) => s.row <= 0.5).map((s) => s.lean));
+    assert.ok(upper < 0.5,
+      `lion: maneHug must leave the upper half of the mane alone -- a spike there leans `
+      + `${upper.toFixed(1)} degrees at maneBottom ${maneBottom}`);
+  }
+}
+
 console.log('npc.js rig self-check: all assertions passed');

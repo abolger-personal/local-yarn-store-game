@@ -14,7 +14,7 @@ import { makeMotion, integrate, compose, POSE_KEYS, POSES } from './motion.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
-export const BUILD = '2026-09-26.3-mane-underfur';
+export const BUILD = '2026-09-26.4-mane-hugs';
 
 // ---------------------------------------------------------------- species registry
 
@@ -504,8 +504,46 @@ export const scallopBases = (opts) => {
   return scallopAngles(shell).map((a) => scallopBase(a, shell).position);
 };
 
+// the way hair falls, for inside.sweep: down, and somewhat back (characters face +Z)
+const FLOW = new THREE.Vector3(0, -1, -0.5).normalize();
+
+/**
+ * Which way a seated scallop points: out of the part's own surface, then folded toward it.
+ *
+ * Not along the seating ray. That ray starts at the shell's centre, which sits wherever the
+ * species put it -- the lion's is forward of and below its head's -- so from there the lower rows
+ * pointed 12-16 degrees further OUT than the skull, and flared like a collar while everything
+ * under them followed the head down.
+ *
+ * `inside.sweep` then folds a scallop from the normal toward FLOW, by that many radians on the
+ * shell's LAST row, ramped linearly from nothing at its middle row. By row, not by how far down
+ * the part a scallop sits: it is the shell's bottom edge that lies against the part, wherever
+ * `bottom` puts that edge -- ramping by height left a short mane's last row folded by 24 degrees
+ * where the same setting laid a long one's flat. The upper half, and so a crown, is untouched.
+ *
+ * `inside.scale` is the non-uniform scale the mesh gets AFTER this (the lion's maneTall). A normal
+ * does not survive a non-uniform scale, so it is carried there by the inverse transpose, bent in
+ * that space, and brought back -- or a tall mane's spikes lean off it, 10.1 degrees at maneTall 1.2.
+ */
+function scallopFacing(position, row, { centre: c, axes: a, scale = [1, 1, 1], sweep = 0 }) {
+  const n = new THREE.Vector3(
+    (position.x - c[0]) / a[0] ** 2 / scale[0],
+    (position.y - c[1]) / a[1] ** 2 / scale[1],
+    (position.z - c[2]) / a[2] ** 2 / scale[2],
+  ).normalize();
+  const fold = sweep * Math.max(0, row * 2 - 1);
+  const along = FLOW.clone().addScaledVector(n, -FLOW.dot(n));
+  if (fold > 0 && along.lengthSq() > 1e-6) {
+    n.multiplyScalar(Math.cos(fold)).addScaledVector(along.normalize(), Math.sin(fold));
+  }
+  return new THREE.Vector3(n.x / scale[0], n.y / scale[1], n.z / scale[2]).normalize();
+}
+
 function scallopMatrix(angle, shell) {
-  const { normal, position } = scallopBase(angle, shell);
+  const { normal: ray, position } = scallopBase(angle, shell);
+  // 0 on the first row, 1 on the last
+  const row = shell.bottom > shell.top ? (angle.phi / Math.PI - shell.top) / (shell.bottom - shell.top) : 0;
+  const normal = shell.inside ? scallopFacing(position, row, shell.inside) : ray;
   // A base seated on a part is no longer at the unit distance its size was worked out for --
   // touchingScallopSize spaces scallops by ANGLE, so one sitting further out needs to be bigger
   // by the same ratio to keep touching its neighbours. Without this the rows at the back of a

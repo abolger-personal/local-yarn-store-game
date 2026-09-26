@@ -145,6 +145,10 @@ export const DEFAULT_PARAMS = {
   // No maneSpread or maneFlat: every spike base sits on the skull now (see skullInShell), so
   // there is nothing left for a base radius or a sink depth to set. Reach is maneProud's job.
   maneTall:      0.981,   // Y scale of the shell, so the rows fan out oval rather than round
+  // How flat the mane's bottom edge lies against the skull: 0 stands every spike straight out of
+  // it, 1 lays the last row flat along it, flowing down and back. Ramps from nothing at the middle
+  // row, so the crown and the halo round the face are untouched, wherever maneBottom ends it.
+  maneHug:       0.60,
   maneDrop:      0.111,   // shell centre below head centre, as a fraction of head radius
   manePush:      0.185,   // shell centre in FRONT of head centre, bringing the halo to the cheeks
 };
@@ -255,6 +259,8 @@ const curlSize = (P, shape) => (P.maneAutoSize
 const skullInShell = (P) => ({
   centre: [0, P.maneDrop / P.maneTall, -P.manePush],
   axes: [HEAD_SHAPE[0] * MANE_SEAT, HEAD_SHAPE[1] * MANE_SEAT / P.maneTall, HEAD_SHAPE[2] * MANE_SEAT],
+  scale: [1, P.maneTall, 1],              // what addMane scales the mesh by, so spikes face true
+  sweep: P.maneHug * Math.PI * 0.5,       // maneHug 1 lays the last row flat along the skull
 });
 
 const maneShell = (P) => {
@@ -509,7 +515,7 @@ export const LION_GUI = Object.freeze({
   mane: [
     ['mane', 'bool'], ['maneColor', 'color'],
     ['manePreset', 0, MANE_PRESETS.length - 1, 1],
-    ['maneFaceGap', 0, 4.2], ['maneTall', 0.7, 1.4],
+    ['maneFaceGap', 0, 4.2], ['maneTall', 0.7, 1.4], ['maneHug', 0, 1],
     // floored at 0: a negative drop grows the mane from above the skull's centre, which bunches
     // every row up round the crown
     ['maneDrop', 0, 0.6], ['manePush', -0.6, 0.3],

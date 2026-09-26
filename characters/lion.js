@@ -39,6 +39,10 @@ const SNOUT_GAP = Object.freeze([0.00, 0.45]);
 // below this the taper is a stub inside the skull and only the cap and nose show
 const MIN_MUZZLE = 0.030;
 
+// How far the nose pad stands out of the round cap, as a fraction of the pad's own depth.
+// Fixed, so muzzleRound cannot swallow the nose -- see noseAt.
+const NOSE_PROUD = 0.30;
+
 // ---------------------------------------------------------------- params
 
 export const DEFAULT_PARAMS = {
@@ -72,7 +76,7 @@ export const DEFAULT_PARAMS = {
   // the ratio is 0.66x, so the snout has to START near the surface instead of being lengthened
   // into a camelid one. At 0.65 it protrudes 0.0520 and still reads short.
   muzzleStart:   0.65,    // where the taper begins, as a fraction of head radius
-  muzzleLength:  0.067,
+  muzzleLength:  0.056,
   muzzleWidth:   0.104,   // X half-width at the skull end -- wider than it is deep, like a cat
   muzzleDepth:   0.082,   // HEIGHT at the skull end, not depth -- see addMuzzle on the axes
   muzzleRound:   0.85,    // 0 = the bare flat disc and its rim, 1 = a hemisphere on the end
@@ -252,9 +256,14 @@ function addMuzzle(ctx, P) {
 function noseAt(P) {
   const tipW = P.muzzleWidth * TIP;
   const r = tipW * P.noseSize;
-  // rides on the FRONT of the round cap, not on the flat disc the cap replaced
-  const centre = P.headRadius * P.muzzleStart + P.muzzleLength + tipW * P.muzzleRound * 0.62;
-  return { r, centre, back: centre - r * 0.90, depth: r * 1.80 };
+  const depth = r * 1.80;
+  // Measured from the CAP FRONT, not from a fixed fraction along the muzzle. Offsetting by
+  // tipW * muzzleRound * 0.62 let the cap swell past the nose as muzzleRound rose: the pad stood
+  // 25% of its own depth proud at round 0.62 and 3% at 1.15, a 7.5x swing that turns the nose
+  // into a dark smudge and leaves the snout reading as bare muzzle.
+  const capFront = P.headRadius * P.muzzleStart + P.muzzleLength + tipW * P.muzzleRound;
+  const front = capFront + NOSE_PROUD * depth;
+  return { r, centre: front - r * 0.90, back: front - depth, depth, front };
 }
 
 /** Where the muzzle leaves the skull, at the muzzle's own height. The head is [r*1.04, r*.94, r]. */
@@ -365,7 +374,9 @@ function solveSnout(P) {
   const gap = SNOUT_GAP[0] + Math.random() * (SNOUT_GAP[1] - SNOUT_GAP[0]);
   const tipW = P.muzzleWidth * TIP;
   const r = tipW * P.noseSize;
-  const front = headSkinZ(P) + gap * (r * 1.80) + r * 0.90 - tipW * P.muzzleRound * 0.62;
+  // noseBack = capFront - (1 - NOSE_PROUD) * depth, and capFront carries the full cap now
+  const depth = r * 1.80;
+  const front = headSkinZ(P) + gap * depth + (1 - NOSE_PROUD) * depth - tipW * P.muzzleRound;
   P.muzzleLength = front - P.headRadius * P.muzzleStart;
   if (P.muzzleLength >= MIN_MUZZLE) return;
   P.muzzleLength = MIN_MUZZLE;

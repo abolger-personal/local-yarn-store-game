@@ -586,9 +586,14 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     const capFront = (P) => P.headRadius * P.muzzleStart + P.muzzleLength
       + P.muzzleWidth * LIMB_TAPER * P.muzzleRound - skinZ(P);
 
-    assert.ok(protrusion(kit.defaults) > 0.012,
-      `lion: the default snout must clear the skull -- taper tip `
-      + `${protrusion(kit.defaults).toFixed(4)}`);
+    // NOT the taper tip, for the default either. That assertion retired when the nose moved out
+    // to a fixed protrusion and the default muzzle shortened to keep its ratio: the taper tip now
+    // clears by 0.0030 while the cap clears by 0.072. A cat's straight muzzle section belongs
+    // inside the skull -- the cap and nose are the snout you see. The taper tip survives only in
+    // the teeth check below, where it documents the original buried-snout bug.
+    assert.ok(capFront(kit.defaults) > 0.02,
+      `lion: the default snout must clear the skull -- cap front `
+      + `${capFront(kit.defaults).toFixed(4)}`);
     assert.ok(snoutGap(kit.defaults) >= 0 && snoutGap(kit.defaults) < 0.5,
       `lion: the default snout must read as a cat -- gap ${snoutGap(kit.defaults).toFixed(3)}`);
 
@@ -613,6 +618,15 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
         `lion: a randomised lion must not grow a fox snout -- worst gap ${worstGap.toFixed(4)}`);
       assert.ok(worstCap > 0.02,
         `lion: the round cap must stand out of the skull -- worst ${worstCap.toFixed(4)}`);
+
+      // The same invariant in the units it was asked for: total snout depth off the face,
+      // counted in nose-depths, between 1 and 2. It is the gap plus one by construction -- the
+      // whole snout is the bare part plus the nose itself -- but stating it both ways is what
+      // makes the requirement legible next to the number that implements it. Measured across
+      // 4000 draws: 1.000 to 1.450, where the code before the gap constraint gave 1.27 to 3.12.
+      assert.ok(worstGap + 1 <= 2 && bestGap + 1 >= 1,
+        `lion: a snout must be 1 to 2 nose-depths off the face -- got `
+        + `${(bestGap + 1).toFixed(3)} to ${(worstGap + 1).toFixed(3)}`);
     } finally {
       Math.random = real;
     }

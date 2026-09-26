@@ -14,7 +14,7 @@ import { makeMotion, integrate, compose, POSE_KEYS, POSES } from './motion.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
-export const BUILD = '2026-09-24.2-mane-spikes';
+export const BUILD = '2026-09-25.1-snout-ears';
 
 // ---------------------------------------------------------------- species registry
 
@@ -596,7 +596,14 @@ export function addEars(ctx, P, opts) {
     ear.rotation.set(P.earPerk ?? 0, 0, side * -(tilt + (P.earSplay ?? 0)));
     ear.add(part(geometry, material ?? ctx.mat.body, { pos: [0, length * 0.35, 0], scale }));
     ctx.head.add(ear);
-    ctx.joints.ear.push({ node: ear, side, tilt });
+    // the shape is recorded, not just the node: a species adding to the ear (a cat's point, say)
+    // has to size itself from the ear's ACTUAL half-width where it joins, and the midY/halfH
+    // constants that answer that live here. Copying them into a species kit is how you get a tip
+    // that ignores earWidth.
+    ctx.joints.ear.push({
+      node: ear, side, tilt, leaf, flatten,
+      size, length, midY: length * 0.35, halfH: length * 0.5,
+    });
   }
 }
 

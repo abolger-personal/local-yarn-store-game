@@ -609,4 +609,71 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     'lion: a 0.24 muzzle start is meant to bury the snout -- that was the shipped bug');
 }
 
+// --- the lion's ear point is part of the ear, not stuck on it -----------------------------------
+//
+// The point is a cone added to the leaf the shared addEars() builds. Sized from a constant it
+// reads as a tuft: the first version used earWidth * 0.92 at a height where the leaf is already
+// at its FULL earWidth, so the leaf bulged out around the cone base and only 0.045 * earLength of
+// apex cleared the top. "The triangles don't widen when the ear widens" is exactly that -- 0.92
+// of the leaf's MAXIMUM, not 1.0 of its width where they actually meet.
+//
+// So the assertion is tangency: the cone's base radius must equal the leaf's own half-width at
+// the junction height, which makes it track earWidth and earFlatten for free. That is why
+// addEars now records size/midY/halfH on the joint instead of the species re-deriving them.
+{
+  const kit = getSpecies('lion');
+
+  const measure = (P) => {
+    const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, 'lion');
+    built.root.updateMatrixWorld(true);
+    const ear = built.joints.ear[0];
+    const span = (mesh) => {
+      const pos = mesh.geometry.attributes.position;
+      const v = new THREE.Vector3();
+      let maxX = 0, minY = Infinity, maxY = -Infinity;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrix);
+        maxX = Math.max(maxX, Math.abs(v.x));
+        minY = Math.min(minY, v.y);
+        maxY = Math.max(maxY, v.y);
+      }
+      return { maxX, minY, maxY };
+    };
+    const meshes = ear.node.children.filter((c) => c.isMesh).map(span);
+    assert.equal(meshes.length, 2, 'lion: an ear is a leaf plus a point');
+    // the point is whichever reaches higher; order is an implementation detail
+    const [leaf, tip] = meshes[0].maxY > meshes[1].maxY ? [meshes[1], meshes[0]] : meshes;
+    // the leaf is an ellipsoid: its half-width at the tip's base height
+    const t = (tip.minY - ear.midY) / ear.halfH;
+    const leafAtJoin = ear.size * Math.sqrt(Math.max(0, 1 - t * t));
+    return { leaf, tip, leafAtJoin, past: tip.maxY - leaf.maxY, length: ear.length };
+  };
+
+  const R = kit.randomRanges;
+  for (const earWidth of [kit.defaults.earWidth, ...R.earWidth]) {
+    for (const earFlatten of [kit.defaults.earFlatten, ...R.earFlatten]) {
+      const m = measure({ ...kit.defaults, earWidth, earFlatten });
+      assert.ok(Math.abs(m.tip.maxX / m.leafAtJoin - 1) < 0.02,
+        `lion: the ear point must be as wide as the ear where it joins -- `
+        + `${m.tip.maxX.toFixed(4)} against ${m.leafAtJoin.toFixed(4)} `
+        + `at earWidth ${earWidth}, flatten ${earFlatten}`);
+    }
+  }
+
+  // and it has to actually clear the leaf, or there is no point to see
+  for (const earPoint of [kit.defaults.earPoint, ...R.earPoint]) {
+    const m = measure({ ...kit.defaults, earPoint });
+    assert.ok(m.past > m.length * 0.10,
+      `lion: the point must clear the leaf -- only ${m.past.toFixed(4)} at earPoint ${earPoint}`);
+  }
+
+  // teeth: the constant that caused this must fail the tangency check
+  {
+    const m = measure(kit.defaults);
+    assert.ok(Math.abs((m.leafAtJoin * 0.92) / m.leafAtJoin - 1) > 0.02,
+      'lion: a 0.92 constant is meant to fail tangency -- if 0.02 no longer catches it the '
+      + 'tolerance is too loose to measure anything');
+  }
+}
+
 console.log('npc.js rig self-check: all assertions passed');

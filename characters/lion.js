@@ -22,8 +22,13 @@
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
   addEars, addEyes, createCharacter, deriveCoatColor, touchingScallopSize,
-  feltMaterial, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh,
+  feltMaterial, LIMB_TAPER, part, randomiseBase, registerSpecies, scallopGeometry,
+  scallopMesh,
 } from './npc.js';
+
+// GEO.taper's narrow end, as a fraction of its wide end. Baked into the shared geometry, so
+// the cap has to be sized from the same number or it will not sit flush.
+const TIP = LIMB_TAPER;
 
 // ---------------------------------------------------------------- params
 
@@ -60,7 +65,8 @@ export const DEFAULT_PARAMS = {
   muzzleStart:   0.65,    // where the taper begins, as a fraction of head radius
   muzzleLength:  0.105,
   muzzleWidth:   0.104,   // X half-width at the skull end -- wider than it is deep, like a cat
-  muzzleDepth:   0.082,   // Z half-depth at the skull end
+  muzzleDepth:   0.082,   // HEIGHT at the skull end, not depth -- see addMuzzle on the axes
+  muzzleRound:   0.85,    // 0 = the bare flat disc and its rim, 1 = a hemisphere on the end
   muzzleDrop:    0.300,   // below head centre, as a fraction of head radius
   muzzleColor:   '#e8d9bd',
   noseColor:     '#241a1c',
@@ -70,7 +76,10 @@ export const DEFAULT_PARAMS = {
   earFlatten:    0.40,
   earSpread:     0.520,
   earTilt:       0.300,
-  earPoint:      0.55,    // 0 = the llama's rounded leaf, 1 = a spike. Scales the tip cone.
+  // How far the point reaches PAST the leaf top, as a fraction of earLength. 0 leaves the
+  // llama's rounded leaf. Its width is not set here -- it is taken from the ear's own half-width
+  // at the junction, so the point widens with earWidth and earFlatten on its own.
+  earPoint:      0.30,
 
   // mane
   mane:          true,
@@ -140,13 +149,14 @@ export const RANDOM_RANGES = Object.freeze({
   muzzleLength: [0.090, 0.155],
   muzzleWidth:  [0.086, 0.126],
   muzzleDepth:  [0.068, 0.098],
+  muzzleRound:  [0.620, 1.150],
   muzzleDrop:   [0.220, 0.380],
   earLength:    [0.066, 0.118],
   earWidth:     [0.030, 0.052],
   earFlatten:   [0.28, 0.56],
   earSpread:    [0.440, 0.600],
   earTilt:      [0.160, 0.440],
-  earPoint:     [0.30, 0.85],
+  earPoint:     [0.150, 0.550],
   maneTouch:    [1.040, 1.200],
   maneSpread:   [0.800, 0.980],
   // floor is 2.20, not taste: below about 2.10 the curls flanking the gap close over the muzzle.
@@ -197,6 +207,15 @@ function addHead(ctx, P) {
  * -PI/2 about X puts the NARROW end forward: broad at the skull, narrowing to the nose. The
  * llama's snout is the opposite shape deliberately -- a blunt tube reads camelid, a taper reads
  * cat -- so this does not share that code.
+ *
+ * MIND THE AXES. That same -PI/2 sends local +Z to world +Y, so the scale triple is
+ * [width, length, HEIGHT] -- muzzleDepth sizes the snout vertically, not front to back. Front to
+ * back is muzzleLength alone.
+ *
+ * The taper's narrow end is a flat disc meeting the wall at a hard circular rim, which is what
+ * reads as machined. muzzleRound caps it with a sphere sized to that exact end ellipse, so the
+ * two are tangent and the rim disappears: 0 leaves the bare disc, 1 is a hemisphere on the end,
+ * and past that it swells toward an egg.
  */
 function addMuzzle(ctx, P) {
   const y = -P.headRadius * P.muzzleDrop;
@@ -208,14 +227,20 @@ function addMuzzle(ctx, P) {
     scale: [w, len, d],
     rot: [-Math.PI * 0.5, 0, 0],
   }));
+  if (P.muzzleRound <= 0) return;
+  ctx.head.add(part(GEO.sphere, ctx.mat.muzzle, {
+    pos: [0, y, start + len],
+    scale: [w * TIP, d * TIP, w * TIP * P.muzzleRound],
+  }));
 }
 
 // The nose pad steps in again from the taper's narrow end, which is what stops the snout reading
 // as a cone with a ball stuck on it. Sits slightly proud so the muzzle curve cannot swallow it.
 function addNose(ctx, P) {
   const y = -P.headRadius * P.muzzleDrop;
-  const tipW = P.muzzleWidth * 0.78;
-  const z = P.headRadius * P.muzzleStart + P.muzzleLength;
+  const tipW = P.muzzleWidth * TIP;
+  // rides on the FRONT of the round cap, not on the flat disc the cap replaced
+  const z = P.headRadius * P.muzzleStart + P.muzzleLength + tipW * P.muzzleRound * 0.62;
   const r = tipW * P.noseSize;
 
   ctx.head.add(part(GEO.sphere, ctx.mat.nose, {
@@ -249,12 +274,21 @@ function addMane(ctx, P) {
 
 // A cat ear is a leaf with a point on it. The leaf alone is the llama's rounded ear, so the tip
 // cone is what earPoint buys -- at 0 it is not added at all and the ear is a llama's.
+// Where the point meets the leaf, as a fraction of the leaf's upper half. The leaf is an
+// ellipsoid, so its half-width there is a real number rather than a guess -- and taking it from
+// the ear instead of from a constant is the whole fix.
+const JOIN = 0.5;
+
 function addEarTips(ctx, P) {
   if (P.earPoint <= 0) return;
-  for (const { node } of ctx.joints.ear) {
-    node.add(part(GEO.cone, ctx.mat.body, {
-      pos: [0, P.earLength * 0.62, 0],
-      scale: [P.earWidth * 0.92, P.earLength * P.earPoint, P.earWidth * P.earFlatten * 0.92],
+  for (const ear of ctx.joints.ear) {
+    const { size, length, midY, halfH, flatten } = ear;
+    const k = Math.sqrt(1 - JOIN * JOIN);        // leaf half-width at the junction, 0.866
+    const base = midY + halfH * JOIN;
+    const h = halfH * (1 - JOIN) + length * P.earPoint;   // junction -> leaf top -> the point
+    ear.node.add(part(GEO.cone, ctx.mat.body, {
+      pos: [0, base + h / 2, 0],
+      scale: [size * k, h, size * flatten * k],
     }));
   }
 }
@@ -298,10 +332,11 @@ export const LION_GUI = Object.freeze({
   'snout & ears': [
     ['muzzleStart', 0.2, 1.0], ['muzzleLength', 0.04, 0.24],
     ['muzzleWidth', 0.04, 0.18], ['muzzleDepth', 0.03, 0.14],
+    ['muzzleRound', 0, 1.8],
     ['muzzleDrop', 0, 0.8], ['muzzleColor', 'color'], ['noseColor', 'color'],
     ['noseSize', 0.2, 1.0],
     ['earLength', 0.03, 0.20], ['earWidth', 0.010, 0.08], ['earFlatten', 0.15, 1.0],
-    ['earSpread', 0.1, 0.9], ['earTilt', -0.6, 0.9], ['earPoint', 0, 1.2],
+    ['earSpread', 0.1, 0.9], ['earTilt', -0.6, 0.9], ['earPoint', 0, 0.9],
   ],
   mane: [
     ['mane', 'bool'], ['maneColor', 'color'],

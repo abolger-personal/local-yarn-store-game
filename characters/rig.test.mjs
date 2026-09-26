@@ -1345,4 +1345,73 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     `lion: the maneProud slider must run ${MIN} to 3 -- it runs ${entry[1]} to ${entry[2]}`);
 }
 
+// --- a crowd of lions varies in build, and none of it breaks ---------------------------------------
+//
+// Seen in the checker: not enough variation in pupils, leg and arm length, or body size. Measured
+// as a typical big lion over a typical small one (90th over 10th percentile) across a seeded crowd,
+// before and after: body 1.25x -> 1.61x, arms 1.19x -> 1.53x, legs 1.50x -> 2.02x, pupils 1.50x ->
+// 1.83x. Body and arms were flat because each axis was drawn on its own, so a lion was only big
+// when all three landed high together; varyBody draws each as one thing.
+{
+  const kit = getSpecies('lion');
+  const D = { ...BASE_PARAMS, ...kit.defaults };
+  const real = Math.random;
+  let seed = 11;
+  Math.random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const lions = [];
+  try {
+    for (let i = 0; i < 1500; i++) lions.push(kit.randomise(structuredClone(D)));
+  } finally {
+    Math.random = real;
+  }
+  const spread = (f) => {
+    const v = lions.map(f).sort((a, b) => a - b);
+    return v[Math.floor(0.9 * (v.length - 1))] / v[Math.floor(0.1 * (v.length - 1))];
+  };
+  const want = {
+    body: [(P) => Math.cbrt(P.torsoW * P.torsoH * P.torsoD), 1.5],
+    arms: [(P) => P.upperArmLen + P.forearmLen, 1.45],
+    legs: [(P) => P.legHeight, 1.9],
+    pupils: [(P) => P.eyeRadius * P.pupilScale, 1.7],
+  };
+  for (const [name, [f, min]] of Object.entries(want)) {
+    const got = spread(f);
+    assert.ok(got >= min,
+      `lion: a crowd needs ${min}x between a typical big and small lion in ${name}, got ${got.toFixed(2)}x`);
+  }
+
+  // One author per value: varyBody owns these, so the range table must not also draw them.
+  for (const key of ['torsoW', 'torsoH', 'torsoD', 'upperArmLen', 'forearmLen']) {
+    assert.ok(!(key in kit.randomRanges),
+      `lion: ${key} is drawn by varyBody, so randomRanges must not draw it too -- one draw would be thrown away`);
+  }
+
+  // Hands clear the floor. Long arms on short legs and a short torso put the knuckles on it --
+  // 0.002 clear at an arm / (legs + torso) of 0.85 -- so varyBody caps that ratio at 0.70. Every
+  // lion in the crowd respects the cap, and the worst corner of it, built, clears the floor.
+  for (const P of lions) {
+    const ratio = (P.upperArmLen + P.forearmLen) / (P.legHeight + P.torsoH);
+    assert.ok(ratio <= 0.70 + 0.01, `lion: arm ratio ${ratio.toFixed(3)} is over the 0.70 cap`);
+  }
+  const torsoH = D.torsoH * 0.72 * 0.92;                       // shortest torso varyBody draws
+  const legHeight = kit.randomRanges.legHeight[0];
+  const armTotal = 0.70 * (legHeight + torsoH);
+  const split = D.upperArmLen / (D.upperArmLen + D.forearmLen);
+  const worst = createCharacter({ ...D, legHeight, torsoH, upperArmLen: armTotal * split,
+    forearmLen: armTotal * (1 - split), mergeMeshes: false }, 'lion');
+  worst.root.updateMatrixWorld(true);
+  const low = (n) => new THREE.Box3().setFromObject(n).min.y;
+  const clear = Math.min(...worst.joints.upperArm.map((a) => low(a.node)))
+    - Math.min(...worst.joints.upperLeg.map((l) => low(l.node)));
+  assert.ok(clear > 0.02, `lion: at the arm cap's worst corner the hands clear the floor by only ${clear.toFixed(4)}`);
+
+  // Pupils leave a ring of white. eyeSeat guarantees the white stands out of the skull by at least
+  // 0.25 of its depth, which leaves a cap of white 0.66 of the eye's radius wide; the pupilScale
+  // ceiling has to sit inside that, or the eye reads as a bare black bead. Measured worst: 0.081.
+  const cap = Math.sqrt(1 - (1 - 0.25) ** 2);
+  const ring = cap - kit.randomRanges.pupilScale[1];
+  assert.ok(ring >= 0.05,
+    `lion: the largest random pupil leaves only ${ring.toFixed(3)} of the eye's radius of white showing`);
+}
+
 console.log('npc.js rig self-check: all assertions passed');

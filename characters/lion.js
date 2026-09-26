@@ -197,12 +197,22 @@ export function applyManePreset(P, index) {
 
 // maneFaceGap and the presets' maneBottom are the tier 1 carriers here, the way neckLength is for the llama:
 // a lion in a huge dark halo and one with a thin fringe read as different animals at 150px.
+// Drawn as one thing each by varyBody, not per value -- so they are left out of the range table,
+// or randomiseBase would draw them and varyBody throw the draw away: two authors for one value.
+const DRAWN_AS_ONE = new Set(['torsoW', 'torsoH', 'torsoD', 'upperArmLen', 'forearmLen']);
+
 export const RANDOM_RANGES = Object.freeze({
-  ...BASE_RANDOM_RANGES,
+  ...Object.fromEntries(Object.entries(BASE_RANDOM_RANGES).filter(([k]) => !DRAWN_AS_ONE.has(k))),
   headRadius:   [0.158, 0.198],
   headOverlap:  [0.050, 0.098],
   neckLength:   [0.085, 0.140],
-  legHeight:    [0.150, 0.250],   // stocky; a lion is not a leggy animal
+  // Still stocky -- the llama reaches 0.43 -- but 0.150-0.250 gave a crowd only 1.50x between a
+  // typical long- and short-legged lion, which read as one leg length. This gives ~2x.
+  legHeight:    [0.120, 0.300],
+  // Pupil as a fraction of the eye. The ceiling is the eye white, not taste: eyeSeat leaves a cap of
+  // white about 0.66 of the eye's radius showing, so a pupil much past 0.6 covers it and the eye
+  // reads as a bare black bead again. The shared 0.38-0.56 gave 1.50x; with eyeRadius this is ~2x.
+  pupilScale:   [0.280, 0.580],
   // floor is geometry, not taste: below about 0.60 the shortest muzzle on the widest head
   // never leaves the skull. rig.test walks the worst corner of these four spans together.
   muzzleStart:  [0.620, 0.800],
@@ -544,8 +554,32 @@ export function deriveManeColor(bodyHex) {
   return hsl(hue, sat, l);
 }
 
+// Body and arm size, each varied as ONE draw with a little per-axis jitter for shape. Drawn per
+// value, a torso is only big when all three axes land high together, so a crowd averaged out to
+// mid-size: measured, 1.25x between a typical big and small lion, and 1.19x for arm length, where
+// each axis alone promised +/-26% and +/-16%.
+const BODY_SIZE = [0.72, 1.30];
+const ARM_SIZE = [0.75, 1.30];
+
+// Longest arm as a fraction of legs plus torso, which is what sets how high the hands hang. Drawn
+// freely, long arms on short legs and a short torso put the knuckles on the floor -- measured
+// 0.002 clear at a ratio of 0.85. The default is 0.45 (0.21 clear); the old per-value ranges
+// topped out near 0.69; at 0.70 the worst hand still clears the floor by ~0.03.
+const MAX_ARM_RATIO = 0.70;
+const round3 = (n) => Math.round(n * 1000) / 1000;
+
+function varyBody(P) {
+  const body = rand(...BODY_SIZE);
+  for (const k of ['torsoW', 'torsoH', 'torsoD']) P[k] = round3(DEFAULT_PARAMS[k] * body * rand(0.92, 1.08));
+  const arm = rand(...ARM_SIZE);
+  for (const k of ['upperArmLen', 'forearmLen']) P[k] = DEFAULT_PARAMS[k] * arm * rand(0.95, 1.05);
+  const over = (P.upperArmLen + P.forearmLen) / ((P.legHeight + P.torsoH) * MAX_ARM_RATIO);
+  for (const k of ['upperArmLen', 'forearmLen']) P[k] = round3(P[k] / Math.max(1, over));
+}
+
 export function randomiseInto(P) {
   randomiseBase(P, RANDOM_RANGES);
+  varyBody(P);
   solveSnout(P);
   applyManePreset(P, Math.floor(Math.random() * MANE_PRESETS.length));
   // a whole number of faces: 3 is a sharp triangle, and 0 falls back to the dome that read as wool

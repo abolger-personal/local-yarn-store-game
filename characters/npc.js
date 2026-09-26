@@ -14,7 +14,7 @@ import { makeMotion, integrate, compose, POSE_KEYS, POSES } from './motion.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
-export const BUILD = '2026-09-26.6-mane-proud-floor';
+export const BUILD = '2026-09-26.7-lion-build-variety';
 
 // ---------------------------------------------------------------- species registry
 
@@ -1409,7 +1409,12 @@ export function applyRanges(P, ranges) {
   return P;
 }
 
-/** Shared randomised identity. Species add their own on top. */
+/**
+ * Shared randomised identity. Species add their own on top.
+ * @param {Record<string, any>} P
+ * @param {Record<string, number[]>} [ranges] any subset of the range table -- a species may leave
+ *   keys out that it draws itself, as the lion does for its body and arm size
+ */
 export function randomiseBase(P, ranges = BASE_RANDOM_RANGES) {
   applyRanges(P, ranges);
   P.bodyColor = randomFur();

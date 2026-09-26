@@ -553,15 +553,10 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   // normals, so tips clear a head half-width even at absurd settings and that test never fires.
   // What matters is how thick the halo reads.
   //
-  // Crossed with the presets, because each one carries its own maneSpread paired with its own
-  // SOLVED maneProud, and the worst corner is a preset against a randomised extreme rather than
-  // either alone. The crossed axis used to be randomRanges.maneSpread; that span is gone, because
-  // applyManePreset runs after randomiseBase and overwrote it on every roll -- the test was
-  // walking a span no character could ever have.
-  //
-  // maneTouch is what replaces it: it scales the derived curl size, so its floor is the corner
-  // where the same maneProud reaches least far. Measured worst across all of it: 0.213x head
-  // half-width. Threshold sits below that so this catches a mane collapsing onto the skull rather
+  // Crossed with the presets, because each one carries its own SOLVED maneProud, and the worst
+  // corner is a preset against a randomised extreme rather than either alone. maneTouch is that
+  // extreme: it scales the derived curl size, so its floor is where the same maneProud reaches
+  // least far. Measured worst across all of it: 0.202x head half-width. Threshold sits below that so this catches a mane collapsing onto the skull rather
   // than firing on a tuning pass.
   for (const maneTouch of [kit.defaults.maneTouch, ...kit.randomRanges.maneTouch]) {
     for (const preset of [{}, ...MANE_PRESETS]) {
@@ -571,11 +566,11 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       assert.ok(maxR - headHalf > headHalf * 0.15,
         `lion: mane must stand off the skull, not cling to it -- clearance `
         + `${(maxR - headHalf).toFixed(4)} is ${((maxR - headHalf) / headHalf).toFixed(2)}x `
-        + `head half-width at touch ${maneTouch}, spread ${P.maneSpread}, proud ${P.maneProud}`);
+        + `head half-width at touch ${maneTouch}, proud ${P.maneProud}`);
       // spread moves the spikes forward as well as outward, so the eyes are its business too
       assert.equal(overEye, 0,
         `lion: mane must not reach in front of the eyes at touch ${maneTouch}, `
-        + `spread ${P.maneSpread}, proud ${P.maneProud}`);
+        + `proud ${P.maneProud}`);
     }
   }
 
@@ -992,19 +987,18 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     }
   }
   const where = (P) => `${KEYS.map((k) => `${k}=${P[k]}`).join(' ')} rows=${P.maneRows} `
-    + `bottom=${P.maneBottom} spread=${P.maneSpread}`;
+    + `bottom=${P.maneBottom} proud=${P.maneProud}`;
 
-  // 1. Wrapped. Every spike base on or inside the skull, whatever maneBottom is set to. The bases
-  //    sit on the shell's own oval, and two things used to throw them off the head: maneTall
-  //    stretching the oval up past the crown (1.21 of the skull's radius at the worst corner, so
-  //    the top ring floated), and maneBottom running the rows down past the jaw, where the oval
-  //    is out in the air. skullInShell hands npc.js the skull, and any base outside it is pulled
-  //    back along its own direction onto it -- so this walks the SLIDER's ends, 0.5 and 1.0, not
-  //    only the presets, because "regardless of the slider" is the requirement.
+  // 1. Seated. Every spike base sits ON the skull, at MANE_SEAT of its radius, whatever maneBottom
+  //    is set to -- exactly, in both directions. Off the shell's own oval, bases went wrong both
+  //    ways: out past the skull where maneTall stretched it over the crown (1.21, the top ring
+  //    floated) or maneBottom ran the rows past the jaw; and buried where manePush put the back
+  //    of the shell inside the skull (0.815), so only narrowing tips showed and the back of the
+  //    head read bare. Walks the SLIDER's ends, 0.5 and 1.0, because "regardless of the slider"
+  //    is the requirement.
   //
   //    Measured off the BUILT mesh's own matrix, applied to the same bases the geometry is built
-  //    from, so dropping the skull from maneShell or the pull-in from npc.js both fail here.
-  //    0.95 is MANE_SEAT; worst measured 0.9500.
+  //    from, so dropping the skull from maneShell or either direction of the seat in npc.js fails.
   const HEAD = [1.04, 0.94, 1.00];
   for (const P of corners) {
     for (const maneBottom of [P.maneBottom, 0.5, 1.0]) {
@@ -1017,9 +1011,9 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       for (const b of maneBases(Q)) {
         const v = b.clone().applyMatrix4(mane.matrix).divideScalar(Q.headRadius);
         const out = Math.hypot(v.x / HEAD[0], v.y / HEAD[1], v.z / HEAD[2]);
-        assert.ok(out <= 0.95 + 1e-9,
-          `lion: every spike base must wrap the skull, not hang off it -- one sits at `
-          + `${out.toFixed(3)} of the skull's radius at ${where(Q)}`);
+        assert.ok(Math.abs(out - 0.95) < 1e-6,
+          `lion: every spike base must sit on the skull, neither hanging off it nor buried in it `
+          + `-- one sits at ${out.toFixed(3)} of the skull's radius at ${where(Q)}`);
       }
     }
   }
@@ -1049,8 +1043,8 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   }
 
   // 2. No bald patch. maneTop moves the top row off the crown; how far it may go before bare head
-  //    shows through the middle depends on the curl size (both counts, and maneTouch), on maneFlat
-  //    and on where manePush and the seated drop put the shell -- which is why this is measured
+  //    shows through the middle depends on the curl size (both counts, and maneTouch)
+  //    and on where manePush and maneDrop put the shell -- which is why this is measured
   //    rather than bounded by a constant. Negative is covered. Worst across all corners: -0.116.
   for (const P of corners) {
     const gap = maneCrownGap(P);
@@ -1079,6 +1073,104 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   assert.ok(dropEntry && dropEntry[1] >= 0,
     `lion: the maneDrop slider starts at ${dropEntry?.[1]} -- a mane never sits ABOVE the skull `
     + 'it grows from, and the skull pull-in can only crush those rows flat onto the crown');
+}
+
+// --- from behind, the mane covers the back of the head -----------------------------------------
+//
+// Found by orbiting round in the checker: the back of the head showed through the mane. Two
+// causes, both measured here by looking from directly behind and casting parallel rays at the
+// skull -- a skull point is covered if the ray meets the mane first.
+//
+//   * Buried bases. manePush puts the shell's centre in front of the head's, so the back of the
+//     shell sat inside the skull and only the narrowing tips of the spikes poked through. Cover
+//     where the mane had rows: 53-72% on the default, 19% on the longest preset.
+//   * Spikes too small for where they sit. Seated on the skull, the back rows are further from
+//     the shell centre than the unit distance their size was worked out for, so they spread
+//     apart. Seating alone took the longest preset to 66%; growing each spike by its distance
+//     took it to 100%.
+//
+// Scored only over the height the mane actually reaches, because below maneBottom the skull is
+// meant to show -- that is a length choice, not a gap.
+{
+  const kit = getSpecies('lion');
+  const D = { ...BASE_PARAMS, ...kit.defaults };
+  const HEAD = [1.04, 0.94, 1.00];
+
+  const backCover = (P) => {
+    const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, 'lion');
+    built.root.updateMatrixWorld(true);
+    let mane = null;
+    built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
+    const head = built.joints.head;
+    const toLocal = head.matrixWorld.clone().invert();
+    const r = P.headRadius;
+    // lowest reach of the mane, head-local radii: below this the skull is supposed to be bare
+    let lowest = Infinity;
+    for (const b of maneBases(P)) lowest = Math.min(lowest, b.clone().applyMatrix4(mane.matrix).y / r);
+    const ray = new THREE.Raycaster();
+    let n = 0, covered = 0;
+    for (let i = 0; i <= 40; i++) {
+      for (let j = 0; j <= 40; j++) {
+        const x = (-1 + i / 20) * HEAD[0];
+        const y = (-1 + j / 20) * HEAD[1];
+        const k = 1 - (x / HEAD[0]) ** 2 - (y / HEAD[1]) ** 2;
+        if (k <= 0 || y < lowest) continue;
+        const from = new THREE.Vector3(x * r, y * r, -5 * r).applyMatrix4(head.matrixWorld);
+        const to = new THREE.Vector3(x * r, y * r, 0).applyMatrix4(head.matrixWorld);
+        ray.set(from, to.sub(from).normalize());
+        const hit = ray.intersectObject(mane, false)[0];
+        n++;
+        if (hit && hit.point.clone().applyMatrix4(toLocal).z / r < -HEAD[2] * Math.sqrt(k)) covered++;
+      }
+    }
+    return covered / n;
+  };
+
+  // Measured at the default maneTouch: default 97%, presets 0-3 92-99%. 0.90 catches either
+  // cause coming back.
+  //
+  // NOT YET: presets 4-6 measure 76%, 82% and 87%, and every preset loses ~10 points at the
+  // maneTouch floor (1.04). Few rows over a long mane leave bands between rows, and the size
+  // maths assumes round bases where a five-sided spike's flat edges only reach 81% as far. How
+  // to fill those is a look decision still open; add them here once it is made.
+  for (const [label, preset] of [['default', {}], ...MANE_PRESETS.slice(0, 4).map((p, i) => [`preset ${i}`, p])]) {
+    const cover = backCover({ ...D, ...preset });
+    assert.ok(cover >= 0.90,
+      `lion: from behind, the mane must cover the back of the head -- ${label} covers `
+      + `${Math.round(cover * 100)}% of the skull within its own reach`);
+  }
+}
+
+// --- maneCrownGap agrees with what a ray actually sees ------------------------------------------
+//
+// The corner scan above asserts the gap is <= 0, and that cannot notice the formula OVERSTATING
+// the cover -- the dangerous direction, where a bald patch reports as covered. Doubling its reach
+// passed every other assertion in this file. So sweep maneTop across the edge and cast a ray
+// straight down at the crown: the formula must call covered exactly where the ray meets mane
+// before skull. Measured on the default: both flip between maneTop 0.14 and 0.16.
+{
+  const kit = getSpecies('lion');
+  const D = { ...BASE_PARAMS, ...kit.defaults };
+  const crownCovered = (P) => {
+    const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, 'lion');
+    built.root.updateMatrixWorld(true);
+    let mane = null;
+    built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
+    const head = built.joints.head;
+    const r = P.headRadius;
+    const from = new THREE.Vector3(0, 5 * r, 0).applyMatrix4(head.matrixWorld);
+    const to = new THREE.Vector3(0, 0, 0).applyMatrix4(head.matrixWorld);
+    const hit = new THREE.Raycaster(from, to.sub(from).normalize()).intersectObject(mane, false)[0];
+    return Boolean(hit)
+      && hit.point.clone().applyMatrix4(head.matrixWorld.clone().invert()).y / r > 0.94;
+  };
+  for (let i = 0; i <= 15; i++) {
+    const P = { ...D, maneTop: i * 0.02 };
+    const saysCovered = maneCrownGap(P) <= 0;
+    assert.equal(saysCovered, crownCovered(P),
+      `lion: maneCrownGap says the crown is ${saysCovered ? 'covered' : 'bare'} at maneTop `
+      + `${P.maneTop.toFixed(2)} but a ray straight down says otherwise`);
+  }
 }
 
 console.log('npc.js rig self-check: all assertions passed');

@@ -120,7 +120,6 @@ export const DEFAULT_PARAMS = {
   maneAutoSize:  true,
   maneTouch:     1.155,   // above 1.0 the curls overlap, which is what closes the mass
   maneSize:      0.230,   // manual override, only used when maneAutoSize is off
-  maneFlat:      0.00,
   // Faceted spikes, not domes. A dome has no direction, so a mane built from them reads as
   // wool however the counts are tuned -- which is the owl's and the llama's whole point and
   // exactly wrong here. 0 falls back to the dome; 3 is a sharp triangular spike, 4 a pyramid,
@@ -138,10 +137,9 @@ export const DEFAULT_PARAMS = {
   // Measured with the spikes in: the eyes are covered with no gap at all and clear from 1.5 up,
   // so 2.50 sits well clear and still brings the mane around the cheeks.
   maneFaceGap:   3.20,
-  // BELOW 1 deliberately -- this places the spike BASES, which belong inside the skull so the
-  // mane grows out of the head instead of hovering around it. Reach is maneProud's job.
-  maneSpread:    1.00,
-  maneTall:      0.981,   // Y scale relative to the spread, so the halo can hang oval
+  // No maneSpread or maneFlat: every spike base sits on the skull now (see skullInShell), so
+  // there is nothing left for a base radius or a sink depth to set. Reach is maneProud's job.
+  maneTall:      0.981,   // Y scale of the shell, so the rows fan out oval rather than round
   maneDrop:      0.111,   // shell centre below head centre, as a fraction of head radius
   manePush:      0.185,   // shell centre in FRONT of head centre, bringing the halo to the cheeks
 };
@@ -160,17 +158,19 @@ export const DEFAULT_PARAMS = {
  * target stand-off. Picking proud by hand does not survive a change to the counts or to
  * maneBottom, because both move the derived curl size underneath it.
  *
- * Measured, worst randomised corner of each (the maneTouch floor): stand-off 0.28x to 0.40x head
- * half-width, no curl in front of an eye, and the crown covered by 0.11 to 0.24 rad.
+ * Re-solved when the bases moved onto the skull: spikes at the back of a forward-pushed mane now
+ * sit further out and grow to match, so the same proud reaches further than it did. Measured
+ * worst across every preset and randomiser corner: stand-off 0.20x head half-width, no curl in
+ * front of an eye, crown covered by at least 0.09 rad.
  */
 export const MANE_PRESETS = Object.freeze([
-  { maneRows: 8, manePerRow: 11, maneProud: 1.524, maneFlat: 0.00, maneStagger: false, maneTop: 0.00, maneBottom: 0.58, maneSpread: 1.00 },
-  { maneRows: 8, manePerRow: 13, maneProud: 2.081, maneFlat: 0.08, maneStagger: true,  maneTop: 0.02, maneBottom: 0.63, maneSpread: 0.98 },
-  { maneRows: 7, manePerRow: 11, maneProud: 1.865, maneFlat: 0.14, maneStagger: false, maneTop: 0.04, maneBottom: 0.70, maneSpread: 0.96 },
-  { maneRows: 7, manePerRow: 13, maneProud: 2.513, maneFlat: 0.20, maneStagger: true,  maneTop: 0.06, maneBottom: 0.78, maneSpread: 0.94 },
-  { maneRows: 6, manePerRow: 13, maneProud: 2.583, maneFlat: 0.28, maneStagger: true,  maneTop: 0.08, maneBottom: 0.86, maneSpread: 0.90 },
-  { maneRows: 6, manePerRow: 15, maneProud: 2.967, maneFlat: 0.34, maneStagger: false, maneTop: 0.10, maneBottom: 0.92, maneSpread: 0.86 },
-  { maneRows: 5, manePerRow: 15, maneProud: 2.408, maneFlat: 0.40, maneStagger: true,  maneTop: 0.12, maneBottom: 0.97, maneSpread: 0.82 },
+  { maneRows: 8, manePerRow: 11, maneProud: 1.524, maneStagger: false, maneTop: 0.00, maneBottom: 0.58 },
+  { maneRows: 8, manePerRow: 13, maneProud: 1.740, maneStagger: true,  maneTop: 0.02, maneBottom: 0.63 },
+  { maneRows: 7, manePerRow: 11, maneProud: 1.291, maneStagger: false, maneTop: 0.04, maneBottom: 0.70 },
+  { maneRows: 7, manePerRow: 13, maneProud: 1.885, maneStagger: true,  maneTop: 0.06, maneBottom: 0.78 },
+  { maneRows: 6, manePerRow: 13, maneProud: 1.617, maneStagger: true,  maneTop: 0.08, maneBottom: 0.86 },
+  { maneRows: 6, manePerRow: 15, maneProud: 1.501, maneStagger: false, maneTop: 0.10, maneBottom: 0.92 },
+  { maneRows: 5, manePerRow: 15, maneProud: 1.140, maneStagger: true,  maneTop: 0.12, maneBottom: 0.97 },
 ]);
 
 export function applyManePreset(P, index) {
@@ -180,7 +180,7 @@ export function applyManePreset(P, index) {
   return P;
 }
 
-// maneSpread and maneFaceGap are the tier 1 carriers here, the way neckLength is for the llama:
+// maneFaceGap and the presets' maneBottom are the tier 1 carriers here, the way neckLength is for the llama:
 // a lion in a huge dark halo and one with a thin fringe read as different animals at 150px.
 export const RANDOM_RANGES = Object.freeze({
   ...BASE_RANDOM_RANGES,
@@ -204,11 +204,6 @@ export const RANDOM_RANGES = Object.freeze({
   earTilt:      [0.160, 0.440],
   earPoint:     [0.150, 0.550],
   maneTouch:    [1.040, 1.200],
-  // maneSpread is NOT here. It was, and it did nothing: applyManePreset runs AFTER randomiseBase
-  // and overwrites it, so the span was drawn and thrown away on every roll. A preset pairs its
-  // spread with its own solved maneProud, which is the pairing that keeps the stand-off, so the
-  // preset is the right owner and the span was the dead one.
-  //
   // Face gap floor is geometry, not taste, and it is set by the WORST preset rather than by the
   // default. The gap quantises by manePerRow -- at 13 columns the steps are 0.483 rad -- so the
   // column flanking the gap either clears the eye or sits right over it with nothing in between.
@@ -248,18 +243,14 @@ const curlSize = (P, shape) => (P.maneAutoSize
  * The shell is scaled [spread, spread*tall, spread] and moved by (0, -drop, push) inside the head,
  * so in its unit space the skull is still an axis-aligned ellipsoid: offset and squashed.
  *
- * ponytail: this puts drop, push, spread and tall into the geometry cache key, so randomised lions
+ * ponytail: this puts drop, push and tall into the geometry cache key, so randomised lions
  * stop sharing a mane geometry (~0.5-1.5k verts each). Upgrade if a crowd ever shows the cost:
- * quantise these four, or do the pull-in in the vertex shader.
+ * quantise these three, or do the seating in the vertex shader.
  */
-const skullInShell = (P) => {
-  const across = P.maneSpread, up = P.maneSpread * P.maneTall;
-  return {
-    centre: [0, P.maneDrop / up, -P.manePush / across],
-    axes: [HEAD_SHAPE[0] * MANE_SEAT / across, HEAD_SHAPE[1] * MANE_SEAT / up,
-      HEAD_SHAPE[2] * MANE_SEAT / across],
-  };
-};
+const skullInShell = (P) => ({
+  centre: [0, P.maneDrop / P.maneTall, -P.manePush],
+  axes: [HEAD_SHAPE[0] * MANE_SEAT, HEAD_SHAPE[1] * MANE_SEAT / P.maneTall, HEAD_SHAPE[2] * MANE_SEAT],
+});
 
 const maneShell = (P) => {
   const shape = {
@@ -270,7 +261,7 @@ const maneShell = (P) => {
   };
   return {
     ...shape, size: curlSize(P, shape),
-    flat: P.maneFlat, proud: P.maneProud, stagger: P.maneStagger,
+    flat: 0, proud: P.maneProud, stagger: P.maneStagger,
     inside: skullInShell(P),
   };
 };
@@ -280,8 +271,8 @@ const maneShell = (P) => {
  * the head; positive is bare head ringed by mane, which reads as a bald patch.
  *
  * This is why maneTop has no fixed maximum. How far down the mane may start depends on how WIDE
- * a scallop is (touchingScallopSize, so both counts and maneTouch), how far it is sunk into the
- * shell (maneFlat), and where the shell sits relative to the skull -- manePush especially, since
+ * a scallop is (touchingScallopSize, so both counts and maneTouch), and where the shell sits
+ * relative to the skull -- manePush especially, since
  * pushing the shell forward moves the crown off the shell's own pole and eats the margin from one
  * side. A constant could only ever be right for one combination of those.
  *
@@ -289,10 +280,9 @@ const maneShell = (P) => {
  */
 export function maneCrownGap(P) {
   const shell = maneShell(P);
-  // Assumes each base sits at its full shell distance. The skull pull-in only ever moves a base
-  // CLOSER to the shell centre, along its own direction, where the same disc covers a wider arc
-  // -- so this can understate the cover, never overstate it. A safe bound, not an exact one.
-  const reach = Math.atan2(shell.size, 1 - shell.size * shell.flat);
+  // Exact, not a bound: each base sits on the skull at some distance d along its own direction,
+  // and npc.js grows the spike by that same d, so its disc always spans atan(size) of arc.
+  const reach = Math.atan(shell.size);
   // the crown, seen from the shell's centre, mapped back into the shell's own unit space
   const y = (HEAD_SHAPE[1] + P.maneDrop) / P.maneTall;
   const z = -P.manePush;
@@ -403,15 +393,13 @@ function addNose(ctx, P) {
  * Offset back and down inside the head node rather than centred, so it frames the face instead
  * of wrapping it.
  *
- * maneSpread is now BELOW 1, which looks wrong and is not: it positions the spike BASES, and the
- * bases belong inside the skull so the mane grows out of the head rather than hovering around it.
- * Reach comes from maneProud instead. Measured stand-off, as a multiple of head half-width: 0.35
- * at the 0.80 span floor, 0.47 at the default, 0.63 at the ceiling, and 0.21 at the worst corner
- * once the presets' own maneProud is crossed in. rig.test pins that corner.
+ * Every spike base sits on the skull (skullInShell), so the shell is scaled only by the head
+ * radius and maneTall; how far the halo stands off comes from maneProud alone. rig.test pins the
+ * worst stand-off corner.
  */
 function addMane(ctx, P) {
   if (!P.mane) return;
-  const radius = P.headRadius * P.maneSpread;
+  const radius = P.headRadius;
   const shell = scallopMesh(scallopGeometry(maneShell(P)), ctx.mat.mane,
     [radius, radius * P.maneTall, radius]);
   if (!shell) return;
@@ -514,16 +502,14 @@ export const LION_GUI = Object.freeze({
   mane: [
     ['mane', 'bool'], ['maneColor', 'color'],
     ['manePreset', 0, MANE_PRESETS.length - 1, 1],
-    // maneSpread's slider used to start at 1.0 while every shipped value was below it, so the
-    // control could not express the character it was tuning -- 1.0 was a floor, not a choice.
-    ['maneFaceGap', 0, 4.2], ['maneSpread', 0.6, 1.4], ['maneTall', 0.7, 1.4],
-    // floored at 0: a negative drop lifts the shell above the skull it grows from. The skull
-    // pull-in now stops that floating, but it does it by crushing the top rows flat onto the crown
+    ['maneFaceGap', 0, 4.2], ['maneTall', 0.7, 1.4],
+    // floored at 0: a negative drop grows the mane from above the skull's centre, which bunches
+    // every row up round the crown
     ['maneDrop', 0, 0.6], ['manePush', -0.6, 0.3],
     ['maneSides', 0, 8, 1],
     ['maneRows', MIN_MANE_ROWS, 10, 1], ['manePerRow', 3, 20, 1],
     ['maneAutoSize', 'bool'], ['maneTouch', 0.8, 1.6], ['maneSize', 0.08, 0.55],
-    ['maneProud', 0.1, 3.0], ['maneFlat', 0, 1.2],
+    ['maneProud', 0.1, 3.0],
     // maneTop keeps its bald-patch end reachable on purpose -- unlike maneRows there IS a lion
     // under part of it, and where the edge falls depends on the counts. See maneCrownGap.
     ['maneTop', 0, 0.4], ['maneBottom', MIN_MANE_BOTTOM, 1], ['maneStagger', 'bool'],

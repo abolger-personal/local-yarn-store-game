@@ -14,7 +14,7 @@ import { makeMotion, integrate, compose, POSE_KEYS, POSES } from './motion.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
-export const BUILD = '2026-09-26.1-mane-wraps-skull';
+export const BUILD = '2026-09-26.2-mane-sits-on-skull';
 
 // ---------------------------------------------------------------- species registry
 
@@ -468,9 +468,12 @@ export function scallopAngles({ rows, perRow, top, bottom, stagger, skipFront })
  * however far `flat` sinks it.
  *
  * `inside` is an axis-aligned ellipsoid in the shell's own unit space -- the body part the shell
- * is laid over. A base that would land outside it is pulled back along its normal onto its
- * surface, so the shell WRAPS that part instead of hanging off it wherever the rows run past it.
- * Only ever pulls in: bases already inside keep their distance.
+ * is laid over -- and with it every base sits ON that surface, along its own normal. Both ways:
+ * a base that would hang out past the part is pulled in, so the shell wraps round underneath
+ * instead of floating off it; and a base that would be buried is pushed out, because a buried
+ * spike shows only its narrowing tip and the tips do not meet. Measured on the lion before the
+ * push-out: the back of the skull was 53-72% covered where the mane had rows, and 19% on the
+ * longest preset, all of it gaps between tips.
  */
 function baseDistance(normal, sunk, inside) {
   if (!inside) return sunk;
@@ -482,7 +485,7 @@ function baseDistance(normal, sunk, inside) {
   const k = c[0] ** 2 + c[1] ** 2 + c[2] ** 2 - 1;
   // a shell centred OUTSIDE the part has no one surface to wrap, so leave it alone
   if (k >= 0) return sunk;
-  return Math.min(sunk, (-b + Math.sqrt(b * b - 4 * a * k)) / (2 * a));
+  return (-b + Math.sqrt(b * b - 4 * a * k)) / (2 * a);
 }
 
 /** Where one scallop's base sits in the shell's unit space, and which way it faces. */
@@ -503,7 +506,13 @@ export const scallopBases = (opts) => {
 
 function scallopMatrix(angle, shell) {
   const { normal, position } = scallopBase(angle, shell);
-  const { size, proud } = shell;
+  // A base seated on a part is no longer at the unit distance its size was worked out for --
+  // touchingScallopSize spaces scallops by ANGLE, so one sitting further out needs to be bigger
+  // by the same ratio to keep touching its neighbours. Without this the rows at the back of a
+  // forward-pushed mane spread apart: 19% cover on the lion's longest preset became 66%, and
+  // this took it to 100%. No `inside`, no change -- owl and llama shells are untouched.
+  const size = shell.inside ? shell.size * position.length() : shell.size;
+  const { proud } = shell;
   const rotation = new THREE.Quaternion().setFromUnitVectors(UP, normal);
   return new THREE.Matrix4().compose(position, rotation, new THREE.Vector3(size, size * proud, size));
 }

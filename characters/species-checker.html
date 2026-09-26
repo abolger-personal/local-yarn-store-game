@@ -601,10 +601,32 @@ function addControl(folder, params, entry, onChange) {
   else folder.add(params, key, a, b, step ?? 0.001).onChange(onChange);
 }
 
+/**
+ * A preset slider is not a parameter -- it is a BUNDLE of the other sliders in its folder. So it
+ * has to write them into params and then refresh their displays, or the character changes shape
+ * while every slider under it still reads the old number.
+ *
+ * `presetKey` and `onPresetChange` are the species' own declaration of which slider that is. All
+ * three species have declared them from the start and nothing ever read them, so every preset
+ * slider was inert: it set an integer that no builder looks at. The presets themselves only ever
+ * took effect through randomise, which picks one at random.
+ */
+function presetHandler(species, params, onChange) {
+  return () => {
+    species.onPresetChange(params, params[species.presetKey]);
+    onChange();
+    // updateDisplay, not buildGui: the user is mid-drag on one of these controllers and
+    // destroying the panel underneath them loses the drag.
+    gui.controllersRecursive().forEach((c) => c.updateDisplay());
+  };
+}
+
 function addSlotFolders(species, params, onChange) {
+  const isPreset = (key) => key === species.presetKey && species.onPresetChange;
   for (const [title, entries] of Object.entries(species.gui)) {
     const folder = gui.addFolder(title);
-    entries.forEach((entry) => addControl(folder, params, entry, onChange));
+    entries.forEach((entry) => addControl(folder, params, entry,
+      isPreset(entry[0]) ? presetHandler(species, params, onChange) : onChange));
     // Only the POSE folder. Proportions and rig are built into the mesh rather than written per
     // frame, so they stay live under `play` -- which is half the point of animating here at all:
     // drag a leg length and watch the stride change under it.

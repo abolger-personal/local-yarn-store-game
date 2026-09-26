@@ -745,4 +745,49 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   }
 }
 
+// --- a declared preset hook actually does something ---------------------------------------------
+//
+// Every species declares `presetKey` and `onPresetChange`, and until now NOTHING read them -- so
+// each species' preset slider set an integer no builder looks at, and the presets only ever
+// reached the character through randomise. The checker wires them now, which makes the
+// declaration load-bearing, so it is worth one assertion that the contract holds.
+//
+// The failure this guards is silent in exactly the same way: a presetKey naming a param that does
+// not exist, or a preset table whose entries write nothing, leaves a slider that moves and does
+// nothing rather than throwing.
+{
+  for (const id of speciesIds()) {
+    const kit = getSpecies(id);
+    if (!kit.presetKey && !kit.onPresetChange) continue;      // a species may have no presets
+    assert.ok(kit.presetKey && kit.onPresetChange,
+      `${id}: presetKey and onPresetChange are one contract -- declaring half of it gives a `
+      + 'slider that silently does nothing');
+    assert.ok(kit.presetKey in kit.defaults,
+      `${id}: presetKey "${kit.presetKey}" must be a real param, or the slider never appears`);
+
+    // walking the presets must actually move other params, and must land back where it started
+    const P = structuredClone(kit.defaults);
+    const seen = new Set();
+    for (let i = 0; i < 12; i++) {
+      kit.onPresetChange(P, i);
+      assert.equal(P[kit.presetKey], i, `${id}: onPresetChange must record which preset is live`);
+      const others = Object.entries(P)
+        .filter(([k, v]) => k !== kit.presetKey && v !== kit.defaults[k])
+        .map(([k]) => k);
+      seen.add(others.join(','));
+    }
+    assert.ok(seen.size > 1,
+      `${id}: the presets must differ from each other -- every one of them wrote the same params`);
+
+    // out-of-range indices wrap rather than throwing: the slider's max is a list length that
+    // changes whenever a preset is added
+    for (const i of [-3, 999]) {
+      kit.onPresetChange(P, i);
+      for (const [k, v] of Object.entries(P)) {
+        assert.ok(!Number.isNaN(v), `${id}: preset index ${i} left ${k} NaN`);
+      }
+    }
+  }
+}
+
 console.log('npc.js rig self-check: all assertions passed');

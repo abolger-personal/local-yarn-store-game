@@ -30,6 +30,15 @@ import {
 // the cap has to be sized from the same number or it will not sit flush.
 const TIP = LIMB_TAPER;
 
+// Bare snout between the skull and the back of the nose, over the nose's own depth. At 0 the
+// nose meets the face exactly; past about 0.5 there is enough naked muzzle to read as a fox or
+// a rodent rather than a cat. muzzleLength is solved from a draw in this band rather than
+// drawn itself -- see solveSnout.
+const SNOUT_GAP = Object.freeze([0.00, 0.45]);
+
+// below this the taper is a stub inside the skull and only the cap and nose show
+const MIN_MUZZLE = 0.030;
+
 // ---------------------------------------------------------------- params
 
 export const DEFAULT_PARAMS = {
@@ -63,7 +72,7 @@ export const DEFAULT_PARAMS = {
   // the ratio is 0.66x, so the snout has to START near the surface instead of being lengthened
   // into a camelid one. At 0.65 it protrudes 0.0520 and still reads short.
   muzzleStart:   0.65,    // where the taper begins, as a fraction of head radius
-  muzzleLength:  0.105,
+  muzzleLength:  0.067,
   muzzleWidth:   0.104,   // X half-width at the skull end -- wider than it is deep, like a cat
   muzzleDepth:   0.082,   // HEIGHT at the skull end, not depth -- see addMuzzle on the axes
   muzzleRound:   0.85,    // 0 = the bare flat disc and its rim, 1 = a hemisphere on the end
@@ -146,7 +155,8 @@ export const RANDOM_RANGES = Object.freeze({
   // floor is geometry, not taste: below about 0.60 the shortest muzzle on the widest head
   // never leaves the skull. rig.test walks the worst corner of these four spans together.
   muzzleStart:  [0.620, 0.800],
-  muzzleLength: [0.090, 0.155],
+  // muzzleLength is NOT here on purpose: solveSnout derives it from the drawn snout gap, and
+  // two authors for one param is how the ratio drifted in the first place.
   muzzleWidth:  [0.086, 0.126],
   muzzleDepth:  [0.068, 0.098],
   muzzleRound:  [0.620, 1.150],
@@ -234,17 +244,43 @@ function addMuzzle(ctx, P) {
   }));
 }
 
+/**
+ * Where the nose pad sits, in head-local space. Shared with the randomiser rather than inlined,
+ * because the ratio it constrains is defined by these exact numbers -- a randomiser working from
+ * its own copy of them would drift the moment the nose moved.
+ */
+function noseAt(P) {
+  const tipW = P.muzzleWidth * TIP;
+  const r = tipW * P.noseSize;
+  // rides on the FRONT of the round cap, not on the flat disc the cap replaced
+  const centre = P.headRadius * P.muzzleStart + P.muzzleLength + tipW * P.muzzleRound * 0.62;
+  return { r, centre, back: centre - r * 0.90, depth: r * 1.80 };
+}
+
+/** Where the muzzle leaves the skull, at the muzzle's own height. The head is [r*1.04, r*.94, r]. */
+function headSkinZ(P) {
+  const k = 1 - ((-P.headRadius * P.muzzleDrop) / (P.headRadius * 0.94)) ** 2;
+  return k > 0 ? P.headRadius * Math.sqrt(k) : 0;
+}
+
+/**
+ * Bare snout between the skull and the back of the nose, as a fraction of the nose's own depth.
+ * This one ratio is what separates a lion from a fox: at 0 the nose meets the face, and by about
+ * 0.5 there is enough naked muzzle showing to read as a snout rather than a cat's flat face.
+ */
+export const snoutGap = (P) => {
+  const nose = noseAt(P);
+  return (nose.back - headSkinZ(P)) / nose.depth;
+};
+
 // The nose pad steps in again from the taper's narrow end, which is what stops the snout reading
 // as a cone with a ball stuck on it. Sits slightly proud so the muzzle curve cannot swallow it.
 function addNose(ctx, P) {
   const y = -P.headRadius * P.muzzleDrop;
-  const tipW = P.muzzleWidth * TIP;
-  // rides on the FRONT of the round cap, not on the flat disc the cap replaced
-  const z = P.headRadius * P.muzzleStart + P.muzzleLength + tipW * P.muzzleRound * 0.62;
-  const r = tipW * P.noseSize;
+  const { r, centre } = noseAt(P);
 
   ctx.head.add(part(GEO.sphere, ctx.mat.nose, {
-    pos: [0, y + r * 0.30, z],
+    pos: [0, y + r * 0.30, centre],
     scale: [r * 1.25, r * 0.85, r * 0.90],
   }));
 }
@@ -314,8 +350,31 @@ function buildKit(ctx, P) {
 // ---------------------------------------------------------------- randomisation
 
 /** Applies randomised lion identity onto a params object, in place. */
+/**
+ * muzzleLength is SOLVED, not drawn, so the snout gap lands where it was asked to.
+ *
+ * Drawing headRadius, muzzleStart, muzzleWidth, muzzleRound and muzzleDrop independently and then
+ * drawing a length too puts the ratio anywhere: measured over 4000 draws it spanned 0.27 to 2.12
+ * and sat outside the lion band 98.7% of the time. The ratio is the read, so the ratio is what
+ * gets drawn, and the one parameter with no other job absorbs it.
+ *
+ * If that leaves a degenerate stub of a taper, muzzleStart gives way instead and the length pins
+ * at the floor -- the ratio stays exact either way, which is the whole point.
+ */
+function solveSnout(P) {
+  const gap = SNOUT_GAP[0] + Math.random() * (SNOUT_GAP[1] - SNOUT_GAP[0]);
+  const tipW = P.muzzleWidth * TIP;
+  const r = tipW * P.noseSize;
+  const front = headSkinZ(P) + gap * (r * 1.80) + r * 0.90 - tipW * P.muzzleRound * 0.62;
+  P.muzzleLength = front - P.headRadius * P.muzzleStart;
+  if (P.muzzleLength >= MIN_MUZZLE) return;
+  P.muzzleLength = MIN_MUZZLE;
+  P.muzzleStart = (front - MIN_MUZZLE) / P.headRadius;
+}
+
 export function randomiseInto(P) {
   randomiseBase(P, RANDOM_RANGES);
+  solveSnout(P);
   applyManePreset(P, Math.floor(Math.random() * MANE_PRESETS.length));
   P.maneColor = deriveCoatColor(P.bodyColor);
   return P;

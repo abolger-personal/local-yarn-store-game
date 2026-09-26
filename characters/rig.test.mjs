@@ -21,11 +21,11 @@ import * as THREE from 'three';
 import {
   POSES, POSE_KEYS, MOTION_DEFAULTS, BASE_PARAMS, createCharacter, stepMotion, applyPose,
   valueOf, walkPhase, walkLayer, speciesIds, getSpecies, resetMotion,
-  DANCES, DANCE_NAMES, makeDance, stepDance,
+  DANCES, DANCE_NAMES, makeDance, stepDance, LIMB_TAPER,
 } from './npc.js';
 import './owl.js';
 import './llama.js';
-import { MANE_PRESETS } from './lion.js';
+import { MANE_PRESETS, snoutGap } from './lion.js';
 
 const build = (id) => createCharacter(
   { ...BASE_PARAMS, ...getSpecies(id).defaults, mergeMeshes: false }, id);
@@ -569,33 +569,53 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     }
   }
 
-  // The snout has to leave the head at EVERY corner of the four spans that feed it, not just at
-  // the default -- randomisation draws them independently, so the corners do occur. Worst corner
-  // measures 0.0203 of protrusion; the default manages 0.0520.
+  // The snout has to leave the head, and it has to keep the one ratio that makes it a cat.
+  //
+  // The ratio is bare snout between the skull and the back of the nose, over the nose's own
+  // depth: 0 puts the nose against the face, and past ~0.5 there is enough naked muzzle to read
+  // as a fox. Drawn independently it landed outside that band 98.7% of 4000 draws and reached
+  // 2.12 -- and the shipped DEFAULT sat at 0.748, so this caught the character, not just the
+  // randomiser. muzzleLength is solved from a drawn gap now, which is why no randomRanges corner
+  // scan can reach it and this walks the real randomiser instead, under a seeded PRNG.
+  //
+  // Note which landmark is asserted. With the gap solved the TAPER's straight section tucks
+  // inside the skull on about a fifth of draws (worst -0.0223), and that is fine -- it is a
+  // flat-faced cat, and the round cap and nose still stand out (worst +0.0493 and +0.0629). The
+  // taper tip is only the right landmark for the default, where it documents the original bug.
   {
-    // the DEFAULT first. The corner scan below walks randomRanges, so on its own it says nothing
-    // about the shipped default -- and a bad default is exactly what went out.
-    assert.ok(protrusion(kit.defaults) > 0.012,
-      `lion: the default snout must clear the skull -- protrudes `
-      + `${protrusion(kit.defaults).toFixed(4)}`);
+    const capFront = (P) => P.headRadius * P.muzzleStart + P.muzzleLength
+      + P.muzzleWidth * LIMB_TAPER * P.muzzleRound - skinZ(P);
 
-    const R = kit.randomRanges;
-    let worst = Infinity, at = null;
-    for (const muzzleStart of R.muzzleStart) {
-      for (const muzzleLength of R.muzzleLength) {
-        for (const headRadius of R.headRadius) {
-          for (const muzzleDrop of R.muzzleDrop) {
-            const P = { ...kit.defaults, muzzleStart, muzzleLength, headRadius, muzzleDrop };
-            const out = protrusion(P);
-            if (out < worst) { worst = out; at = P; }
-          }
-        }
+    assert.ok(protrusion(kit.defaults) > 0.012,
+      `lion: the default snout must clear the skull -- taper tip `
+      + `${protrusion(kit.defaults).toFixed(4)}`);
+    assert.ok(snoutGap(kit.defaults) >= 0 && snoutGap(kit.defaults) < 0.5,
+      `lion: the default snout must read as a cat -- gap ${snoutGap(kit.defaults).toFixed(3)}`);
+
+    const real = Math.random;
+    let seed = 0x2545f491;
+    Math.random = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    };
+    try {
+      let worstCap = Infinity, worstGap = -Infinity, bestGap = Infinity;
+      for (let n = 0; n < 600; n++) {
+        const P = kit.randomise(structuredClone(kit.defaults));
+        worstCap = Math.min(worstCap, capFront(P));
+        worstGap = Math.max(worstGap, snoutGap(P));
+        bestGap = Math.min(bestGap, snoutGap(P));
+        assert.ok(P.muzzleLength > 0, `lion: solveSnout produced muzzleLength ${P.muzzleLength}`);
       }
+      assert.ok(bestGap >= 0,
+        `lion: the nose must never sink behind the face -- got ${bestGap.toFixed(4)}`);
+      assert.ok(worstGap < 0.5,
+        `lion: a randomised lion must not grow a fox snout -- worst gap ${worstGap.toFixed(4)}`);
+      assert.ok(worstCap > 0.02,
+        `lion: the round cap must stand out of the skull -- worst ${worstCap.toFixed(4)}`);
+    } finally {
+      Math.random = real;
     }
-    assert.ok(worst > 0.012,
-      `lion: the snout must clear the skull at every corner of its spans -- worst is `
-      + `${worst.toFixed(4)} at start ${at.muzzleStart} length ${at.muzzleLength} `
-      + `headRadius ${at.headRadius} drop ${at.muzzleDrop}`);
   }
 
   // teeth: the assertions above must be able to fail. Both of these were real bugs on screen.
@@ -606,7 +626,10 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     'lion: a mane with no face gap is a hood and must cover the eyes -- if it does not, the eye '
     + 'check is measuring nothing');
   assert.ok(protrusion({ ...kit.defaults, muzzleStart: 0.24 }) < 0,
-    'lion: a 0.24 muzzle start is meant to bury the snout -- that was the shipped bug');
+    'lion: a 0.24 muzzle start is meant to bury the snout -- that was the first shipped bug');
+  assert.ok(snoutGap({ ...kit.defaults, muzzleLength: 0.105 }) > 0.5,
+    'lion: muzzleLength 0.105 is meant to read as a fox -- it was the shipped default, and if it '
+    + 'now passes the band then the nose or the head moved and the band needs re-measuring');
 }
 
 // --- the lion's ear point is part of the ear, not stuck on it -----------------------------------

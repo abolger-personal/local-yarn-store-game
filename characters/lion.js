@@ -43,6 +43,12 @@ const MIN_MUZZLE = 0.030;
 // Fixed, so muzzleRound cannot swallow the nose -- see noseAt.
 const NOSE_PROUD = 0.30;
 
+// Rows of scallops down the mane. Below five it stops reading as a mane at all --
+// a handful of long spikes is a wolf's ruff or a hedgehog, whatever the other
+// settings say. The floor is on the slider as well as the presets: there is no
+// lion anywhere under it, so leaving it reachable is just a trap.
+const MIN_MANE_ROWS = 5;
+
 // ---------------------------------------------------------------- params
 
 export const DEFAULT_PARAMS = {
@@ -98,7 +104,7 @@ export const DEFAULT_PARAMS = {
   mane:          true,
   maneColor:     '#8a5a2b',
   manePreset:    2,
-  maneRows:      4,
+  maneRows:      5,    // MIN_MANE_ROWS -- fewer reads as a wolf or a hedgehog
   manePerRow:    11,
   maneAutoSize:  true,
   maneTouch:     1.10,    // above 1.0 the curls overlap, which is what closes the mass
@@ -132,13 +138,13 @@ export const DEFAULT_PARAMS = {
 // Fewer, larger curls than the llama's fleece: a mane is coarse. Size is derived from the counts
 // so a preset only chooses how many curls there are and how far they stand proud.
 export const MANE_PRESETS = Object.freeze([
-  { maneRows: 3, manePerRow: 9,  maneProud: 1.70, maneFlat: 0.34, maneStagger: true,  maneTop: 0.14, maneBottom: 0.94, maneSpread: 0.80 },
-  { maneRows: 3, manePerRow: 11, maneProud: 1.95, maneFlat: 0.36, maneStagger: true,  maneTop: 0.12, maneBottom: 0.95, maneSpread: 0.83 },
-  { maneRows: 4, manePerRow: 11, maneProud: 1.85, maneFlat: 0.38, maneStagger: true,  maneTop: 0.10, maneBottom: 0.97, maneSpread: 0.86 },
-  { maneRows: 4, manePerRow: 13, maneProud: 1.75, maneFlat: 0.40, maneStagger: true,  maneTop: 0.10, maneBottom: 0.97, maneSpread: 0.88 },
-  { maneRows: 5, manePerRow: 13, maneProud: 2.10, maneFlat: 0.40, maneStagger: true,  maneTop: 0.08, maneBottom: 0.98, maneSpread: 0.91 },
-  { maneRows: 5, manePerRow: 15, maneProud: 1.60, maneFlat: 0.42, maneStagger: false, maneTop: 0.08, maneBottom: 0.98, maneSpread: 0.94 },
-  { maneRows: 6, manePerRow: 15, maneProud: 2.00, maneFlat: 0.44, maneStagger: true,  maneTop: 0.06, maneBottom: 0.99, maneSpread: 0.97 },
+  { maneRows: 5, manePerRow: 9,  maneProud: 1.99, maneFlat: 0.34, maneStagger: true,  maneTop: 0.14, maneBottom: 0.94, maneSpread: 0.80 },
+  { maneRows: 5, manePerRow: 11, maneProud: 2.08, maneFlat: 0.36, maneStagger: true,  maneTop: 0.12, maneBottom: 0.95, maneSpread: 0.83 },
+  { maneRows: 6, manePerRow: 11, maneProud: 2.39, maneFlat: 0.38, maneStagger: true,  maneTop: 0.10, maneBottom: 0.97, maneSpread: 0.86 },
+  { maneRows: 6, manePerRow: 13, maneProud: 2.51, maneFlat: 0.40, maneStagger: true,  maneTop: 0.10, maneBottom: 0.97, maneSpread: 0.88 },
+  { maneRows: 7, manePerRow: 13, maneProud: 2.29, maneFlat: 0.40, maneStagger: true,  maneTop: 0.08, maneBottom: 0.98, maneSpread: 0.91 },
+  { maneRows: 7, manePerRow: 15, maneProud: 1.98, maneFlat: 0.42, maneStagger: false, maneTop: 0.08, maneBottom: 0.98, maneSpread: 0.94 },
+  { maneRows: 8, manePerRow: 15, maneProud: 2.42, maneFlat: 0.44, maneStagger: true,  maneTop: 0.06, maneBottom: 0.99, maneSpread: 0.97 },
 ]);
 
 export function applyManePreset(P, index) {
@@ -414,7 +420,7 @@ export const LION_GUI = Object.freeze({
     ['maneFaceGap', 0, 3.2], ['maneSpread', 1.0, 1.9], ['maneTall', 0.7, 1.4],
     ['maneDrop', -0.2, 0.6], ['manePush', -0.6, 0.3],
     ['maneSides', 0, 8, 1],
-    ['maneRows', 1, 8, 1], ['manePerRow', 3, 20, 1],
+    ['maneRows', MIN_MANE_ROWS, 10, 1], ['manePerRow', 3, 20, 1],
     ['maneAutoSize', 'bool'], ['maneTouch', 0.8, 1.6], ['maneSize', 0.08, 0.55],
     ['maneProud', 0.1, 3.0], ['maneFlat', 0, 1.2],
     ['maneTop', 0, 1], ['maneBottom', 0, 1], ['maneStagger', 'bool'],

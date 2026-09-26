@@ -549,8 +549,14 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   // What matters is how thick the halo reads.
   //
   // Crossed with the presets, because each one carries its own maneProud and the worst corner is
-  // a preset against the span floor, not the span floor alone -- measured 0.21x at spread 0.80
-  // with preset 5's proud of 1.60, where the floor on its own gives 0.35x. The default is 0.47x.
+  // a preset against the span floor, not the span floor alone -- measured 0.172x at spread
+  // 0.80 with preset 5, where the floor on its own gives 0.35x. The default is 0.40x.
+  //
+  // Those numbers moved when maneRows was floored at 5: more rows means touchingScallopSize
+  // returns SMALLER scallops, so the same maneProud reaches less far and the stand-off
+  // collapsed to 0.10x. Each preset's proud was re-solved for a stand-off target rather than
+  // nudged, because proud's effect depends on the row count and a hand-tuned number would
+  // drift again the next time the counts change.
   // Threshold sits below that worst corner so it catches a mane collapsing onto the skull rather
   // than firing on a tuning pass.
   for (const maneSpread of [kit.defaults.maneSpread, ...kit.randomRanges.maneSpread]) {
@@ -881,6 +887,33 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       }
     }
   }
+}
+
+// --- the mane has enough rows to be a mane ------------------------------------------------------
+//
+// Below five rows it stops reading as a mane whatever else is set -- a handful of long spikes is
+// a wolf's ruff or a hedgehog. That is a judgement made at the lab and it cannot be measured from
+// here, so what is asserted is only that the floor is applied EVERYWHERE it needs to be: the
+// default, every preset, and the slider's own minimum. Those are three separate places and the
+// presets are the ones randomise actually draws from.
+{
+  const kit = getSpecies('lion');
+  const MIN = 5;
+
+  assert.ok(kit.defaults.maneRows >= MIN,
+    `lion: the default mane needs at least ${MIN} rows, has ${kit.defaults.maneRows}`);
+
+  MANE_PRESETS.forEach((preset, i) => {
+    assert.ok(preset.maneRows >= MIN,
+      `lion: mane preset ${i} has ${preset.maneRows} rows, below the ${MIN} floor -- presets are `
+      + 'what randomise draws from, so a short one ships on rerolls');
+  });
+
+  // the slider too: a range whose bottom half produces nothing usable is a trap, not a control
+  const rowsEntry = kit.gui.mane.find((e) => e[0] === 'maneRows');
+  assert.ok(rowsEntry, 'lion: maneRows must still be on the mane folder');
+  assert.ok(rowsEntry[1] >= MIN,
+    `lion: the maneRows slider starts at ${rowsEntry[1]}, below the ${MIN} floor`);
 }
 
 console.log('npc.js rig self-check: all assertions passed');

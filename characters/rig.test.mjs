@@ -1325,4 +1325,24 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   assert.ok(gap >= MIN, `lion: the default mane is only ${gap.toFixed(1)} L* from the default body`);
 }
 
+// --- a spike is longer than it is wide ------------------------------------------------------------
+//
+// maneProud under 1 makes a spike wider than it is long -- a stub that reads as scales, not fur.
+// Same three sites as the row and length floors: the default, every preset (what randomise draws
+// from), and the slider (what a tuner drags). The slider's ceiling stays at 3.
+{
+  const kit = getSpecies('lion');
+  const MIN = 1.0;
+  assert.ok(kit.defaults.maneProud >= MIN,
+    `lion: the default maneProud ${kit.defaults.maneProud} is under the ${MIN} floor`);
+  MANE_PRESETS.forEach((preset, i) => {
+    assert.ok(preset.maneProud >= MIN,
+      `lion: mane preset ${i} has maneProud ${preset.maneProud}, under the ${MIN} floor`);
+  });
+  const entry = kit.gui.mane.find((e) => e[0] === 'maneProud');
+  assert.ok(entry, 'lion: maneProud must still be on the mane folder');
+  assert.ok(entry[1] >= MIN && entry[2] === 3,
+    `lion: the maneProud slider must run ${MIN} to 3 -- it runs ${entry[1]} to ${entry[2]}`);
+}
+
 console.log('npc.js rig self-check: all assertions passed');

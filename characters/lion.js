@@ -56,6 +56,11 @@ const MIN_MANE_ROWS = 5;
 // is the bottom pole and a mane that long simply hangs onto the shoulders, which is a lion.
 const MIN_MANE_BOTTOM = 0.50;
 
+// Spike length over its base width. Below 1 a spike is wider than it is long -- a stub, which
+// reads as scales or bumps rather than fur. Every shipped value already sits above it (1.14 to
+// 1.89); this keeps the slider from reaching under it. The ceiling stays at 3.
+const MIN_MANE_PROUD = 1.0;
+
 // How far out along its own direction a spike base may sit, as a fraction of the skull surface.
 // The same number and the same reason as EAR_SEAT in npc.js: 1.0 puts the base exactly on the
 // skin, which leaves nothing buried to hold the spike on. See skullInShell.
@@ -576,7 +581,7 @@ export const LION_GUI = Object.freeze({
     ['maneSides', 0, 8, 1],
     ['maneRows', MIN_MANE_ROWS, 10, 1], ['manePerRow', 3, 20, 1],
     ['maneAutoSize', 'bool'], ['maneTouch', 0.8, 1.6], ['maneSize', 0.08, 0.55],
-    ['maneProud', 0.1, 3.0],
+    ['maneProud', MIN_MANE_PROUD, 3.0],
     // maneTop keeps its bald-patch end reachable on purpose -- unlike maneRows there IS a lion
     // under part of it, and where the edge falls depends on the counts. See maneCrownGap.
     ['maneTop', 0, 0.4], ['maneBottom', MIN_MANE_BOTTOM, 1], ['maneStagger', 'bool'],

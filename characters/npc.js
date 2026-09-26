@@ -14,7 +14,7 @@ import { makeMotion, integrate, compose, POSE_KEYS, POSES } from './motion.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
-export const BUILD = '2026-09-26.5-mane-contrast-and-ranges';
+export const BUILD = '2026-09-26.6-mane-proud-floor';
 
 // ---------------------------------------------------------------- species registry
 

@@ -14,7 +14,7 @@ import { makeMotion, integrate, compose, POSE_KEYS, POSES } from './motion.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
-export const BUILD = '2026-09-25.1-snout-ears';
+export const BUILD = '2026-09-25.2-shell-symmetry';
 
 // ---------------------------------------------------------------- species registry
 
@@ -449,8 +449,14 @@ function scallopAngles({ rows, perRow, top, bottom, stagger, skipFront }) {
     const t = rows === 1 ? 0.5 : r / (rows - 1);
     const phi = Math.PI * (top + (bottom - top) * t);
     const offset = stagger && r % 2 ? Math.PI / perRow : 0;
+    // Columns are laid out symmetrically about +Z -- the FACE -- rather than from +X. skipFront
+    // cuts its gap about +Z, so a grid starting anywhere else decides which columns survive by
+    // an accident of where the first one landed, and the result is not left-right symmetric at
+    // ANY count. With small, numerous domes that is invisible; at perRow 3 it puts the whole
+    // mane down one side of the head and looks like the shell has been rotated 90 degrees.
+    const step = (Math.PI * 2) / perRow;
     for (let s = 0; s < perRow; s++) {
-      const theta = (s / perRow) * Math.PI * 2 + offset;
+      const theta = Math.PI / 2 + (s + 0.5) * step + offset;
       if (!inFaceGap(theta, skipFront)) angles.push({ phi, theta });
     }
   }

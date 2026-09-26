@@ -676,4 +676,73 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   }
 }
 
+// --- a scallop shell is left-right symmetric ----------------------------------------------------
+//
+// scallopAngles used to lay its columns out from +X while skipFront cuts its gap about +Z, so
+// which columns survived was an accident of where the first one landed. The shells were not
+// mirror-symmetric at ANY count -- measured 0.0% mirror-match on the owl's plumage and wings and
+// 0.1% on the llama's fleece, against 94.2% for an ordinary body mesh. With small, numerous domes
+// nobody could see it. At perRow 3 it puts the entire mane down one side of the head and reads as
+// the shell having been rotated 90 degrees, which is how it was finally spotted.
+//
+// perRow 3 is the case to assert, not the default: three columns is the coarsest the shell
+// allows, so it is where a misaligned grid is impossible to miss. The face gap is swept too,
+// because the bug was in the INTERACTION -- the gap decides which columns die.
+{
+  // Mirror the x coordinates, sort both, compare. Aggregate on purpose: a single scallop's own
+  // vertices are NOT mirror-symmetric (the sphere and cone primitives carry a seam), so a
+  // per-vertex pairing test reads 73.7% on a perfectly symmetric three-column shell and is
+  // measuring the primitive rather than the arrangement.
+  //
+  // A centroid test is not enough either -- it was tried. With the old code at perRow 3 and no
+  // face gap the centroid sits at ~0 while the shell is plainly lopsided (sorted-mirror 9.6e-2),
+  // because two columns can balance about x=0 without being mirror images.
+  const asymmetry = (mesh) => {
+    const pos = mesh.geometry.attributes.position;
+    const v = new THREE.Vector3();
+    const xs = [];
+    let maxAbs = 0;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrix);
+      xs.push(v.x);
+      maxAbs = Math.max(maxAbs, Math.abs(v.x));
+    }
+    const a = [...xs].sort((p, q) => p - q);
+    const b = xs.map((x) => -x).sort((p, q) => p - q);
+    let err = 0;
+    for (let i = 0; i < a.length; i++) err += Math.abs(a[i] - b[i]);
+    return err / a.length / maxAbs;
+  };
+
+  const maneOf = (over) => {
+    const P = { ...BASE_PARAMS, ...getSpecies('lion').defaults, ...over, mergeMeshes: false };
+    const built = createCharacter(P, 'lion');
+    built.root.updateMatrixWorld(true);
+    let mane = null;
+    built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
+    return mane;
+  };
+
+  for (const manePerRow of [3, 4, 9, 11]) {
+    for (const maneFaceGap of [0, 1.124, 2.5, 3.1]) {
+      const mane = maneOf({ manePerRow, maneFaceGap, maneStagger: false });
+      if (!mane) continue;                       // every column culled is a separate concern
+      // 1e-6 sits a long way below the 9.6e-2 the bug produced and a long way above the 5e-17
+      // float noise a symmetric shell leaves behind.
+      const m = asymmetry(mane);
+      assert.ok(m < 1e-6,
+        `lion: the mane must be left-right symmetric -- asymmetry ${m.toExponential(2)} `
+        + `at perRow ${manePerRow}, face gap ${maneFaceGap}`);
+    }
+  }
+
+  // and with the rows staggered, which shifts alternate rows by half a column
+  for (const manePerRow of [3, 11]) {
+    const m = asymmetry(maneOf({ manePerRow, maneStagger: true }));
+    assert.ok(m < 1e-6,
+      `lion: a staggered mane must be symmetric too -- ${m.toExponential(2)} `
+      + `at perRow ${manePerRow}`);
+  }
+}
+
 console.log('npc.js rig self-check: all assertions passed');

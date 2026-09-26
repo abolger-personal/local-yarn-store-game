@@ -14,7 +14,7 @@ import { makeMotion, integrate, compose, POSE_KEYS, POSES } from './motion.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
-export const BUILD = '2026-09-26.2-mane-sits-on-skull';
+export const BUILD = '2026-09-26.3-mane-underfur';
 
 // ---------------------------------------------------------------- species registry
 
@@ -524,6 +524,52 @@ function scallopMatrix(angle, shell) {
  * every character generates unique geometry, which blocks instancing and costs frame time
  * in attribute rebinds.
  */
+// back of the shell, where theta = 3PI/2 puts the normal on -Z; the face gap is centred opposite
+const BACK = Math.PI * 1.5;
+const fromBack = (theta) => ((((theta - BACK) % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+
+/**
+ * A skin laid under a seated shell's scallops, over exactly the span they occupy, so the gaps
+ * between them show coat colour instead of whatever the shell is laid over. `underfur` is how far
+ * out it sits, as a multiple of the `inside` surface -- just past 1/seat puts it just outside the
+ * part itself, clear of z-fighting.
+ *
+ * Bounded by the outermost row and column CENTRES rather than by top/bottom/skipFront, so it never
+ * shows as a bare band past the last spikes -- beside the face gap especially, where the columns
+ * flanking it sit a whole step back from the cut.
+ *
+ * SphereGeometry measures azimuth the other way round from scallopAngles (its x is -cos, ours is
+ * +cos), so phi = PI - theta: the back is at phi = -PI/2.
+ */
+// widest angle one underfur quad may span, radians -- see the sag note below
+const UNDERFUR_STEP = 0.2;
+
+function underfurGeometry(shell, angles) {
+  const phis = angles.map((a) => a.phi);
+  const top = Math.min(...phis), bottom = Math.max(...phis);
+  const culled = angles.length < shell.rows * shell.perRow;
+  const half = culled ? Math.max(...angles.map((a) => Math.abs(fromBack(a.theta)))) : Math.PI;
+  // Triangles are flat, so between vertices they sag inside the curve. At a fixed 24 x 10 the
+  // lion's underfur sagged from 1.02 to 0.999 of the skull at maneBottom 1.0 -- through the skin,
+  // so the head showed through and flickered. Capping the step at 0.2 rad holds it at 1.006.
+  const across = Math.max(3, Math.ceil((half * 2) / UNDERFUR_STEP));
+  const down = Math.max(1, Math.ceil((bottom - top) / UNDERFUR_STEP));
+  const skin = new THREE.SphereGeometry(1, across, down, -Math.PI / 2 - half, half * 2, top, bottom - top);
+  // its own copy of the part's surface, same centre, axes scaled -- scaling the seated distance
+  // instead would scale it about the SHELL's centre, which is not the part's, and land it off
+  // the surface by a different amount in every direction
+  const surface = { centre: shell.inside.centre, axes: shell.inside.axes.map((a) => a * shell.underfur) };
+  const pos = skin.attributes.position;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i).normalize();
+    v.multiplyScalar(baseDistance(v, 1, surface));
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  skin.computeVertexNormals();
+  return skin;
+}
+
 function makeScallopShell(opts) {
   const shell = normaliseShell(opts);
   const angles = scallopAngles(shell);
@@ -532,6 +578,7 @@ function makeScallopShell(opts) {
   // cache holds, so this never runs twice for the same settings
   const unit = shell.sides ? spikeGeometry(shell.sides) : GEO.dome;
   const scallops = angles.map((a) => unit.clone().applyMatrix4(scallopMatrix(a, shell)));
+  if (shell.inside && shell.underfur) scallops.push(underfurGeometry(shell, angles));
   const merged = mergeGeometries(scallops, false);
   scallops.forEach((g) => g.dispose());
   if (shell.sides) unit.dispose();   // GEO.dome is shared and must outlive this

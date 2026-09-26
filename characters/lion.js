@@ -60,6 +60,11 @@ const MIN_MANE_BOTTOM = 0.50;
 // skin, which leaves nothing buried to hold the spike on. See skullInShell.
 const MANE_SEAT = 0.95;
 
+// How far out the underfur sits, as a fraction of the skull surface: proud of the skin by more
+// than its own flat triangles sag between vertices (to 1.006 at worst, at npc.js's
+// UNDERFUR_STEP), so no face dips back into the head and flickers against it.
+const UNDERFUR = 1.02;
+
 // ---------------------------------------------------------------- params
 
 export const DEFAULT_PARAMS = {
@@ -263,6 +268,8 @@ const maneShell = (P) => {
     ...shape, size: curlSize(P, shape),
     flat: 0, proud: P.maneProud, stagger: P.maneStagger,
     inside: skullInShell(P),
+    // gaps between spikes show mane colour, not skin -- at any preset and any maneTouch
+    underfur: UNDERFUR / MANE_SEAT,
   };
 };
 

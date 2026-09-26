@@ -1126,18 +1126,19 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     return covered / n;
   };
 
-  // Measured at the default maneTouch: default 97%, presets 0-3 92-99%. 0.90 catches either
-  // cause coming back.
+  //   * And spikes alone never close. Few rows over a long mane left bands between rows (presets
+  //     4-6 at 76/82/87%), and every preset lost ~10 points at the maneTouch floor, because the
+  //     size maths assumes round bases where a five-sided spike's flat edges reach 81% as far.
+  //     The underfur -- a mane-coloured skin under the spikes -- closes whatever gap is left.
   //
-  // NOT YET: presets 4-6 measure 76%, 82% and 87%, and every preset loses ~10 points at the
-  // maneTouch floor (1.04). Few rows over a long mane leave bands between rows, and the size
-  // maths assumes round bases where a five-sided spike's flat edges only reach 81% as far. How
-  // to fill those is a look decision still open; add them here once it is made.
-  for (const [label, preset] of [['default', {}], ...MANE_PRESETS.slice(0, 4).map((p, i) => [`preset ${i}`, p])]) {
-    const cover = backCover({ ...D, ...preset });
-    assert.ok(cover >= 0.90,
-      `lion: from behind, the mane must cover the back of the head -- ${label} covers `
-      + `${Math.round(cover * 100)}% of the skull within its own reach`);
+  // Every preset, at the default maneTouch AND the randomiser's floor. Measured: 100% throughout.
+  for (const [label, preset] of [['default', {}], ...MANE_PRESETS.map((p, i) => [`preset ${i}`, p])]) {
+    for (const maneTouch of [kit.defaults.maneTouch, kit.randomRanges.maneTouch[0]]) {
+      const cover = backCover({ ...D, ...preset, maneTouch });
+      assert.ok(cover >= 0.98,
+        `lion: from behind, the mane must cover the back of the head -- ${label} covers `
+        + `${Math.round(cover * 100)}% of the skull within its own reach at maneTouch ${maneTouch}`);
+    }
   }
 }
 
@@ -1164,12 +1165,60 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     return Boolean(hit)
       && hit.point.clone().applyMatrix4(head.matrixWorld.clone().invert()).y / r > 0.94;
   };
-  for (let i = 0; i <= 15; i++) {
-    const P = { ...D, maneTop: i * 0.02 };
-    const saysCovered = maneCrownGap(P) <= 0;
-    assert.equal(saysCovered, crownCovered(P),
-      `lion: maneCrownGap says the crown is ${saysCovered ? 'covered' : 'bare'} at maneTop `
-      + `${P.maneTop.toFixed(2)} but a ray straight down says otherwise`);
+  // And again at a deep maneDrop, where the crown's spikes sit well past unit distance from the
+  // shell centre. The formula is only exact because npc.js grows each spike by that distance --
+  // on the default the distance is near 1, so there this sweep could not tell grown from ungrown.
+  for (const base of [D, { ...D, maneDrop: 0.4 }]) {
+    for (let i = 0; i <= 15; i++) {
+      const P = { ...base, maneTop: i * 0.02 };
+      const saysCovered = maneCrownGap(P) <= 0;
+      assert.equal(saysCovered, crownCovered(P),
+        `lion: maneCrownGap says the crown is ${saysCovered ? 'covered' : 'bare'} at maneTop `
+        + `${P.maneTop.toFixed(2)}, maneDrop ${P.maneDrop} but a ray straight down says otherwise`);
+    }
+  }
+}
+
+// --- the underfur stays outside the skin, triangles and all -------------------------------------
+//
+// Its vertices sit at UNDERFUR (1.02) of the skull, but its triangles are flat, so between the
+// vertices they sag back toward the head. At a fixed 24 x 10 that reached 0.999 at maneBottom 1.0
+// -- INSIDE the skin, where the head shows through and flickers -- and ray sampling passed it, so
+// this checks the geometry itself: every underfur edge midpoint must stand clear of the skull, at
+// each preset's own length and at the slider's end. Measured with the adaptive step: 1.006 worst.
+{
+  const kit = getSpecies('lion');
+  const D = { ...BASE_PARAMS, ...kit.defaults };
+  const HEAD = [1.04, 0.94, 1.00];
+  const cases = [['default', {}], ...MANE_PRESETS.map((p, i) => [`preset ${i}`, p])]
+    .flatMap(([name, p]) => [[name, p], [`${name} at maneBottom 1.0`, { ...p, maneBottom: 1.0 }]]);
+  for (const [label, preset] of cases) {
+    const P = { ...D, ...preset };
+    const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, 'lion');
+    built.root.updateMatrixWorld(true);
+    let mane = null;
+    built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
+    const pos = mane.geometry.attributes.position;
+    const index = mane.geometry.index;
+    const at = (i) => new THREE.Vector3().fromBufferAttribute(pos, i)
+      .applyMatrix4(mane.matrix).divideScalar(P.headRadius);
+    const norm = (v) => Math.hypot(v.x / HEAD[0], v.y / HEAD[1], v.z / HEAD[2]);
+    // underfur vertices are the ones sitting exactly on its surface; spike vertices only ever
+    // cross it, and never within this tolerance
+    const fur = new Set();
+    for (let i = 0; i < pos.count; i++) if (Math.abs(norm(at(i)) - 1.02) < 1e-7) fur.add(i);
+    assert.ok(fur.size > 50, `lion: ${label} has no underfur to check (${fur.size} vertices)`);
+    let lowest = Infinity;
+    for (let t = 0; t < index.count; t += 3) {
+      const tri = [index.getX(t), index.getX(t + 1), index.getX(t + 2)];
+      if (!tri.every((i) => fur.has(i))) continue;
+      for (let e = 0; e < 3; e++) {
+        lowest = Math.min(lowest, norm(at(tri[e]).add(at(tri[(e + 1) % 3])).multiplyScalar(0.5)));
+      }
+    }
+    assert.ok(lowest > 1.003,
+      `lion: ${label}'s underfur sags to ${lowest.toFixed(5)} of the skull between its vertices -- `
+      + 'at or under 1.0 the head shows through it and the two flicker');
   }
 }
 

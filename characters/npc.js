@@ -14,7 +14,7 @@ import { makeMotion, integrate, compose, POSE_KEYS, POSES } from './motion.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
-export const BUILD = '2026-09-25.8-seated-eyes-and-mane';
+export const BUILD = '2026-09-26.1-mane-wraps-skull';
 
 // ---------------------------------------------------------------- species registry
 
@@ -463,10 +463,47 @@ export function scallopAngles({ rows, perRow, top, bottom, stagger, skipFront })
   return angles;
 }
 
-function scallopMatrix({ phi, theta }, { size, flat, proud }) {
+/**
+ * How far out along its normal a scallop base sits. On a bare shell that is the unit sphere less
+ * however far `flat` sinks it.
+ *
+ * `inside` is an axis-aligned ellipsoid in the shell's own unit space -- the body part the shell
+ * is laid over. A base that would land outside it is pulled back along its normal onto its
+ * surface, so the shell WRAPS that part instead of hanging off it wherever the rows run past it.
+ * Only ever pulls in: bases already inside keep their distance.
+ */
+function baseDistance(normal, sunk, inside) {
+  if (!inside) return sunk;
+  const n = [normal.x / inside.axes[0], normal.y / inside.axes[1], normal.z / inside.axes[2]];
+  const c = inside.centre.map((v, i) => v / inside.axes[i]);
+  // |t*n - c| = 1 in the ellipsoid's own units: a quadratic in t
+  const a = n[0] ** 2 + n[1] ** 2 + n[2] ** 2;
+  const b = -2 * (n[0] * c[0] + n[1] * c[1] + n[2] * c[2]);
+  const k = c[0] ** 2 + c[1] ** 2 + c[2] ** 2 - 1;
+  // a shell centred OUTSIDE the part has no one surface to wrap, so leave it alone
+  if (k >= 0) return sunk;
+  return Math.min(sunk, (-b + Math.sqrt(b * b - 4 * a * k)) / (2 * a));
+}
+
+/** Where one scallop's base sits in the shell's unit space, and which way it faces. */
+function scallopBase({ phi, theta }, { size, flat, inside }) {
   const sinPhi = Math.sin(phi);
   const normal = new THREE.Vector3(sinPhi * Math.cos(theta), Math.cos(phi), sinPhi * Math.sin(theta));
-  const position = normal.clone().multiplyScalar(1 - size * flat);
+  return { normal, position: normal.clone().multiplyScalar(baseDistance(normal, 1 - size * flat, inside)) };
+}
+
+/**
+ * Every base of a shell, in its unit space. The SAME path the geometry is built from, which is
+ * what lets a test check the bases without the geometry and still be checking the geometry.
+ */
+export const scallopBases = (opts) => {
+  const shell = normaliseShell(opts);
+  return scallopAngles(shell).map((a) => scallopBase(a, shell).position);
+};
+
+function scallopMatrix(angle, shell) {
+  const { normal, position } = scallopBase(angle, shell);
+  const { size, proud } = shell;
   const rotation = new THREE.Quaternion().setFromUnitVectors(UP, normal);
   return new THREE.Matrix4().compose(position, rotation, new THREE.Vector3(size, size * proud, size));
 }

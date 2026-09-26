@@ -23,7 +23,7 @@ import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
   addEars, addEyes, createCharacter, deriveCoatColor, touchingScallopSize,
   feltMaterial, LIMB_TAPER, part, randomiseBase, registerSpecies, scallopAngles,
-  scallopGeometry, scallopMesh,
+  scallopBases, scallopGeometry, scallopMesh,
 } from './npc.js';
 
 // GEO.taper's narrow end, as a fraction of its wide end. Baked into the shared geometry, so
@@ -55,9 +55,9 @@ const MIN_MANE_ROWS = 5;
 // is the bottom pole and a mane that long simply hangs onto the shoulders, which is a lion.
 const MIN_MANE_BOTTOM = 0.50;
 
-// How far out along its own direction a spike base may sit, as a fraction of the head surface.
+// How far out along its own direction a spike base may sit, as a fraction of the skull surface.
 // The same number and the same reason as EAR_SEAT in npc.js: 1.0 puts the base exactly on the
-// skin, which leaves nothing buried to hold the spike on.
+// skin, which leaves nothing buried to hold the spike on. See skullInShell.
 const MANE_SEAT = 0.95;
 
 // ---------------------------------------------------------------- params
@@ -236,6 +236,31 @@ const curlSize = (P, shape) => (P.maneAutoSize
   ? touchingScallopSize(shape) * P.maneTouch
   : P.maneSize);
 
+/**
+ * The skull, as seen from inside the mane shell's own unit space, shrunk to MANE_SEAT of itself.
+ *
+ * This is what makes the mane WRAP the head instead of hanging off it. Every spike base sits on
+ * the shell's own oval, and once maneBottom runs the rows past the bottom of the skull that oval
+ * is out in the air below the jaw. With this, npc.js pulls any base that would land outside the
+ * skull back along its own direction onto it -- so the mane follows the skull round underneath,
+ * however far maneBottom is slid, and bases already inside do not move at all.
+ *
+ * The shell is scaled [spread, spread*tall, spread] and moved by (0, -drop, push) inside the head,
+ * so in its unit space the skull is still an axis-aligned ellipsoid: offset and squashed.
+ *
+ * ponytail: this puts drop, push, spread and tall into the geometry cache key, so randomised lions
+ * stop sharing a mane geometry (~0.5-1.5k verts each). Upgrade if a crowd ever shows the cost:
+ * quantise these four, or do the pull-in in the vertex shader.
+ */
+const skullInShell = (P) => {
+  const across = P.maneSpread, up = P.maneSpread * P.maneTall;
+  return {
+    centre: [0, P.maneDrop / up, -P.manePush / across],
+    axes: [HEAD_SHAPE[0] * MANE_SEAT / across, HEAD_SHAPE[1] * MANE_SEAT / up,
+      HEAD_SHAPE[2] * MANE_SEAT / across],
+  };
+};
+
 const maneShell = (P) => {
   const shape = {
     rows: P.maneRows, perRow: P.manePerRow,
@@ -246,6 +271,7 @@ const maneShell = (P) => {
   return {
     ...shape, size: curlSize(P, shape),
     flat: P.maneFlat, proud: P.maneProud, stagger: P.maneStagger,
+    inside: skullInShell(P),
   };
 };
 
@@ -263,11 +289,12 @@ const maneShell = (P) => {
  */
 export function maneCrownGap(P) {
   const shell = maneShell(P);
+  // Assumes each base sits at its full shell distance. The skull pull-in only ever moves a base
+  // CLOSER to the shell centre, along its own direction, where the same disc covers a wider arc
+  // -- so this can understate the cover, never overstate it. A safe bound, not an exact one.
   const reach = Math.atan2(shell.size, 1 - shell.size * shell.flat);
-  // the crown, seen from the shell's centre, mapped back into the shell's own unit space.
-  // The SEATED drop, not the parameter -- maneSeat pushes the shell down when maneTall would
-  // float it, and that move takes the crown further off the shell's pole.
-  const y = (HEAD_SHAPE[1] + maneSeat(P).drop) / P.maneTall;
+  // the crown, seen from the shell's centre, mapped back into the shell's own unit space
+  const y = (HEAD_SHAPE[1] + P.maneDrop) / P.maneTall;
   const z = -P.manePush;
   const n = Math.hypot(y, z);
   let nearest = Infinity;
@@ -278,48 +305,8 @@ export function maneCrownGap(P) {
   return nearest - reach;
 }
 
-/**
- * Where the mane shell sits, and how well buried its upper bases end up.
- *
- * Third instance of the same bug, after earSeat and eyeSeat. maneDrop, maneTall and maneSpread
- * are set independently -- maneTall by the randomiser, the other two by a preset -- and the crown
- * is where they collide: maneTall stretches the shell in Y and only maneDrop re-centres it, so at
- * maneTall 1.2 the shell's pole stands 1.2 head-radii above a shell centre that a legal maneDrop
- * of 0.08 has barely lowered, against a skull only 0.94 tall. The top ring of spikes then has
- * nothing behind it and reads as floating. Measured before this, as a multiple of the head's own
- * radius in that direction: 1.21 at the worst randomiser corner, and 1.06 at maneDrop 0 rising to
- * 1.27 at -0.20, which is why the slider's negative half was nothing but floating manes.
- *
- * Only ever pushes the shell DOWN, like eyeSeat only ever pushes an eye out: a mane already low
- * enough keeps the drop it was given.
- *
- * Only the UPPER bases are constrained. A base below head centre hangs over the neck, the scarf
- * and the shoulders -- that is what a shoulder-length mane IS -- so the lower half is deliberately
- * left free, and the solve is a floor on drop rather than a band around it.
- *
- * MANE_SEAT is a target, not a guarantee, and `worst` is the honest answer. Dropping the shell can
- * only fix the VERTICAL component: a base already too far out sideways -- maneSpread 1.00 on a
- * skull 1.04 wide, which is exactly the shipped default -- stays where it is however far the shell
- * sinks. Measured worst across every preset and every randomiser corner: 0.972, so still buried,
- * just shallowly. Anything at or past 1.0 is a spike with nothing behind it.
- */
-export function maneSeat(P) {
-  const shell = maneShell(P);
-  const out = (1 - shell.size * shell.flat) * P.maneSpread;   // base distance from shell centre
-  const [hx, hy, hz] = HEAD_SHAPE;
-  const bases = scallopAngles(shell).map(({ phi, theta }) => {
-    const ring = Math.sin(phi) * out;
-    return [ring * Math.cos(theta), Math.cos(phi) * out * P.maneTall,
-      ring * Math.sin(theta) + P.manePush];
-  });
-  // the skull leaves hy * sqrt(room) of vertical space at this base's own x and z; past that no
-  // drop can seat it at all, and head-centre height is the closest this gets
-  const lowest = ([x, y, z]) =>
-    y - hy * Math.sqrt(Math.max(0, MANE_SEAT ** 2 - (x / hx) ** 2 - (z / hz) ** 2));
-  const drop = Math.max(P.maneDrop, ...bases.map(lowest));
-  const buried = ([x, y, z]) => (y < drop ? 0 : Math.hypot(x / hx, (y - drop) / hy, z / hz));
-  return { drop, worst: Math.max(0, ...bases.map(buried)) };
-}
+/** Every mane spike base, in the shell's unit space -- the same path the geometry is built from. */
+export const maneBases = (P) => scallopBases(maneShell(P));
 
 // The mane rides on the HEAD, not the torso, so it never pushes the shoulders out. Returning 0
 // is the honest answer rather than an oversight: `bulge` exists to stop a thick coat swallowing
@@ -429,7 +416,7 @@ function addMane(ctx, P) {
     [radius, radius * P.maneTall, radius]);
   if (!shell) return;
   shell.name = 'mane';   // rig.test finds it by name to measure the face gap and the stand-off
-  shell.position.set(0, -P.headRadius * maneSeat(P).drop, P.headRadius * P.manePush);
+  shell.position.set(0, -P.headRadius * P.maneDrop, P.headRadius * P.manePush);
   ctx.head.add(shell);
 }
 
@@ -530,8 +517,8 @@ export const LION_GUI = Object.freeze({
     // maneSpread's slider used to start at 1.0 while every shipped value was below it, so the
     // control could not express the character it was tuning -- 1.0 was a floor, not a choice.
     ['maneFaceGap', 0, 4.2], ['maneSpread', 0.6, 1.4], ['maneTall', 0.7, 1.4],
-    // floored at 0: every negative drop was a floating mane, and maneSeat would silently clamp
-    // it back anyway -- a third of the travel doing nothing is worse than no travel
+    // floored at 0: a negative drop lifts the shell above the skull it grows from. The skull
+    // pull-in now stops that floating, but it does it by crushing the top rows flat onto the crown
     ['maneDrop', 0, 0.6], ['manePush', -0.6, 0.3],
     ['maneSides', 0, 8, 1],
     ['maneRows', MIN_MANE_ROWS, 10, 1], ['manePerRow', 3, 20, 1],

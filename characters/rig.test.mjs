@@ -25,7 +25,7 @@ import {
 } from './npc.js';
 import './owl.js';
 import './llama.js';
-import { MANE_PRESETS, maneCrownGap, maneSeat, snoutGap } from './lion.js';
+import { MANE_PRESETS, maneBases, maneCrownGap, snoutGap } from './lion.js';
 
 const build = (id) => createCharacter(
   { ...BASE_PARAMS, ...getSpecies(id).defaults, mergeMeshes: false }, id);
@@ -994,29 +994,41 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   const where = (P) => `${KEYS.map((k) => `${k}=${P[k]}`).join(' ')} rows=${P.maneRows} `
     + `bottom=${P.maneBottom} spread=${P.maneSpread}`;
 
-  // 1. Rooted. maneTall stretches the shell in Y and only maneDrop re-centres it, so at maneTall
-  //    1.2 with a legal maneDrop of 0.08 the top ring of spikes stood clear of a skull 0.94 tall
-  //    and floated. Measured before maneSeat: 1.21 at the worst corner, and 1.06 at maneDrop 0
-  //    rising to 1.27 at -0.20 -- the whole negative half of that slider was floating manes.
-  //    1.0 is a base exactly on the skin, so anything at or past it has nothing holding it on.
+  // 1. Wrapped. Every spike base on or inside the skull, whatever maneBottom is set to. The bases
+  //    sit on the shell's own oval, and two things used to throw them off the head: maneTall
+  //    stretching the oval up past the crown (1.21 of the skull's radius at the worst corner, so
+  //    the top ring floated), and maneBottom running the rows down past the jaw, where the oval
+  //    is out in the air. skullInShell hands npc.js the skull, and any base outside it is pulled
+  //    back along its own direction onto it -- so this walks the SLIDER's ends, 0.5 and 1.0, not
+  //    only the presets, because "regardless of the slider" is the requirement.
   //
-  //    Two halves, and the second one is the half that matters. `worst` alone only proves the
-  //    SOLVER is right -- it recomputes the seated drop from the params, so deleting the seat
-  //    from addMane left it passing. The mesh's own y is what says the shipped geometry uses it.
+  //    Measured off the BUILT mesh's own matrix, applied to the same bases the geometry is built
+  //    from, so dropping the skull from maneShell or the pull-in from npc.js both fail here.
+  //    0.95 is MANE_SEAT; worst measured 0.9500.
+  const HEAD = [1.04, 0.94, 1.00];
   for (const P of corners) {
-    const { worst, drop } = maneSeat(P);
-    assert.ok(worst < 1,
-      `lion: every upper spike base must be inside the skull -- worst ${worst.toFixed(3)} of the `
-      + `head's own radius at ${where(P)}`);
+    for (const maneBottom of [P.maneBottom, 0.5, 1.0]) {
+      const Q = { ...P, maneBottom };
+      const built = createCharacter({ ...BASE_PARAMS, ...Q, mergeMeshes: false }, 'lion');
+      built.root.updateMatrixWorld(true);
+      let mane = null;
+      built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
+      assert.ok(mane, `lion: no mane shell to measure at ${where(Q)}`);
+      for (const b of maneBases(Q)) {
+        const v = b.clone().applyMatrix4(mane.matrix).divideScalar(Q.headRadius);
+        const out = Math.hypot(v.x / HEAD[0], v.y / HEAD[1], v.z / HEAD[2]);
+        assert.ok(out <= 0.95 + 1e-9,
+          `lion: every spike base must wrap the skull, not hang off it -- one sits at `
+          + `${out.toFixed(3)} of the skull's radius at ${where(Q)}`);
+      }
+    }
+  }
+
+  for (const P of corners) {
     const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, 'lion');
     built.root.updateMatrixWorld(true);   // without this shell.matrix is identity and the vertex
     let shell = null;                     // scan below reads unplaced geometry and finds nothing
     built.joints.head.traverse((c) => { if (c.name === 'mane') shell = c; });
-    assert.ok(shell, `lion: no mane shell to measure at ${where(P)}`);
-    assert.ok(Math.abs(shell.position.y + P.headRadius * drop) < 1e-9,
-      `lion: the mane shell must hang at the SEATED drop -- sits at `
-      + `${shell.position.y.toFixed(4)}, seat wants ${(-P.headRadius * drop).toFixed(4)} `
-      + `at ${where(P)}`);
 
     // and no curl in front of an eye. The existing face-gap scan walks the span with the DEFAULT
     // counts; the gap quantises by manePerRow, so it takes a preset's own column count crossed
@@ -1062,11 +1074,11 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   assert.ok(bottomEntry[1] >= MIN,
     `lion: the maneBottom slider starts at ${bottomEntry[1]}, above the ${MIN} equator floor`);
 
-  // and the drop slider, whose negative half maneSeat would now silently clamp away
+  // and the drop slider: a negative drop lifts the shell off the skull it grows from
   const dropEntry = kit.gui.mane.find((e) => e[0] === 'maneDrop');
   assert.ok(dropEntry && dropEntry[1] >= 0,
     `lion: the maneDrop slider starts at ${dropEntry?.[1]} -- a mane never sits ABOVE the skull `
-    + 'it grows from, and maneSeat clamps the whole negative half back to the same value');
+    + 'it grows from, and the skull pull-in can only crush those rows flat onto the crown');
 }
 
 console.log('npc.js rig self-check: all assertions passed');

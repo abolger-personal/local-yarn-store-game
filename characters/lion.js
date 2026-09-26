@@ -19,9 +19,10 @@
 // mass, which is why a second shell on `ctx.chest` is the obvious next move if this reads too
 // light. Deliberately not built yet: one shell first, see how it sits.
 
+import * as THREE from 'three';
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
-  addEars, addEyes, createCharacter, deriveCoatColor, touchingScallopSize,
+  addEars, addEyes, createCharacter, hsl, pick, rand, touchingScallopSize,
   feltMaterial, LIMB_TAPER, part, randomiseBase, registerSpecies, scallopAngles,
   scallopBases, scallopGeometry, scallopMesh,
 } from './npc.js';
@@ -118,7 +119,7 @@ export const DEFAULT_PARAMS = {
 
   // mane
   mane:          true,
-  maneColor:     '#8a5a2b',
+  maneColor:     '#6e4220',   // 35.7 L* darker than the base body -- see deriveManeColor
   manePreset:    0,       // this default IS preset 0 -- tuned at the checker, then baked
   maneRows:      8,
   manePerRow:    11,
@@ -220,6 +221,12 @@ export const RANDOM_RANGES = Object.freeze({
   // but preset 1 (13 columns) only clears from 2.45, so the floor is 2.45 plus a step of margin.
   // Ceiling is stand-off: past 3.8 so many columns are culled that the halo thins to 0.30x.
   maneFaceGap:  [2.600, 3.800],
+  // Walked with every preset and every other range corner. The fold is safe across its whole
+  // slider; the ceiling here is taste -- past 0.9 the bottom edge lies flat enough to read as a
+  // collar again. manePush's ceiling is the eyes: at 0.26 the longest preset put 8 vertices in
+  // front of one at the narrowest face gap; clear from 0.24, so 0.22.
+  maneHug:      [0.300, 0.900],
+  manePush:     [0.100, 0.220],
   maneTall:     [0.940, 1.200],
   maneDrop:     [0.080, 0.260],
   eyeRadius:    [0.058, 0.082],
@@ -489,11 +496,56 @@ function solveSnout(P) {
   P.muzzleStart = (front - MIN_MUZZLE) / P.headRadius;
 }
 
+/** Perceived lightness, CIE L*: 0 black to 100 white. What "the same colour" actually tracks. */
+export function lightness(hex) {
+  const c = new THREE.Color(hex);   // three holds linear-sRGB components
+  const y = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+  return y > 216 / 24389 ? 116 * Math.cbrt(y) - 16 : (24389 / 27) * y;
+}
+
+// The least a mane may differ from the body in perceived lightness, L*.
+const MIN_MANE_CONTRAST = 28;
+
+/**
+ * A mane colour that reads as a separate mass from the body. Not deriveCoatColor: that makes owl
+ * and llama coats TONAL on purpose, a lightness step of 0.12-0.30 in HSL -- and measured over 2000
+ * lions it put the median mane 13.9 L* from the body and 24% of them under 10, where felt under soft
+ * light is one colour. A lion's mane is the opposite brief: its own mass, usually darker and richer
+ * than the coat, sometimes blond.
+ *
+ * Same hue family, so it still reads as one animal. Steps the lightness until the L* gap reaches a
+ * drawn target of at least MIN_MANE_CONTRAST; a body too dark or too light to get there one way
+ * goes the other, so the floor holds for every body colour.
+ */
+export function deriveManeColor(bodyHex) {
+  const body = {};
+  new THREE.Color(bodyHex).getHSL(body);
+  const target = rand(MIN_MANE_CONTRAST, 44);
+  const bodyL = lightness(bodyHex);
+  const darker = Math.random() < 0.75;
+  const hue = (body.h + (Math.random() < 0.3 ? rand(-0.06, 0.06) : 0) + 1) % 1;
+  const sat = THREE.MathUtils.clamp(body.s * (darker ? rand(1.0, 1.4) : rand(0.7, 1.0)), 0.05, 0.9);
+  const gap = (l) => Math.abs(lightness(hsl(hue, sat, l)) - bodyL);
+  const end = (d) => (d < 0 ? 0.05 : 0.95);
+  // the preferred way, unless it cannot make the floor at all; then aim for the drawn target,
+  // capped at what that way can reach
+  const dir = [darker ? -1 : 1, darker ? 1 : -1].find((d) => gap(end(d)) >= MIN_MANE_CONTRAST)
+    ?? (gap(0.05) > gap(0.95) ? -1 : 1);
+  const want = Math.min(target, gap(end(dir)));
+  let l = body.l;
+  while (gap(l) < want && Math.abs(l - end(dir)) > 1e-9) {
+    l = dir < 0 ? Math.max(end(dir), l - 0.01) : Math.min(end(dir), l + 0.01);
+  }
+  return hsl(hue, sat, l);
+}
+
 export function randomiseInto(P) {
   randomiseBase(P, RANDOM_RANGES);
   solveSnout(P);
   applyManePreset(P, Math.floor(Math.random() * MANE_PRESETS.length));
-  P.maneColor = deriveCoatColor(P.bodyColor);
+  // a whole number of faces: 3 is a sharp triangle, and 0 falls back to the dome that read as wool
+  P.maneSides = pick([4, 5, 6]);
+  P.maneColor = deriveManeColor(P.bodyColor);
   return P;
 }
 

@@ -25,7 +25,7 @@ import {
 } from './npc.js';
 import './owl.js';
 import './llama.js';
-import { MANE_PRESETS, maneBases, maneCrownGap, snoutGap } from './lion.js';
+import { MANE_PRESETS, lightness as maneLightness, maneBases, maneCrownGap, snoutGap } from './lion.js';
 
 const build = (id) => createCharacter(
   { ...BASE_PARAMS, ...getSpecies(id).defaults, mergeMeshes: false }, id);
@@ -976,18 +976,23 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
 {
   const kit = getSpecies('lion');
   const D = { ...BASE_PARAMS, ...kit.defaults };
-  const KEYS = ['maneDrop', 'maneTall', 'maneTouch', 'maneFaceGap'];
+  // every mane value the randomiser draws, crossed with every preset and both ends of maneSides'
+  // draw -- 1024 lions. manePush's ceiling was found here: at 0.26 the longest preset hung a curl
+  // in front of an eye.
+  const KEYS = ['maneDrop', 'maneTall', 'maneTouch', 'maneFaceGap', 'maneHug', 'manePush'];
   const spans = KEYS.map((k) => kit.randomRanges[k]);
   const corners = [];
   for (const preset of [{}, ...MANE_PRESETS]) {
-    for (let m = 0; m < (1 << KEYS.length); m++) {
-      const P = { ...D, ...preset };
-      KEYS.forEach((k, j) => { P[k] = spans[j][(m >> j) & 1]; });
-      corners.push(P);
+    for (const maneSides of [4, 6]) {
+      for (let m = 0; m < (1 << KEYS.length); m++) {
+        const P = { ...D, ...preset, maneSides };
+        KEYS.forEach((k, j) => { P[k] = spans[j][(m >> j) & 1]; });
+        corners.push(P);
+      }
     }
   }
-  const where = (P) => `${KEYS.map((k) => `${k}=${P[k]}`).join(' ')} rows=${P.maneRows} `
-    + `bottom=${P.maneBottom} proud=${P.maneProud}`;
+  const where = (P) => `${KEYS.map((k) => `${k}=${P[k]}`).join(' ')} sides=${P.maneSides} `
+    + `rows=${P.maneRows} bottom=${P.maneBottom} proud=${P.maneProud}`;
 
   // 1. Seated. Every spike base sits ON the skull, at MANE_SEAT of its radius, whatever maneBottom
   //    is set to -- exactly, in both directions. Off the shell's own oval, bases went wrong both
@@ -1133,8 +1138,10 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   //
   // Every preset, at the default maneTouch AND the randomiser's floor. Measured: 100% throughout.
   for (const [label, preset] of [['default', {}], ...MANE_PRESETS.map((p, i) => [`preset ${i}`, p])]) {
-    for (const maneTouch of [kit.defaults.maneTouch, kit.randomRanges.maneTouch[0]]) {
-      const cover = backCover({ ...D, ...preset, maneTouch });
+    // plus the worst of the newer draws, measured 99.6%: square spikes, the full fold, push at its floor
+    const extremes = [{}, { maneSides: 4, maneHug: kit.randomRanges.maneHug[1], manePush: kit.randomRanges.manePush[0] }];
+    for (const extra of extremes) for (const maneTouch of [kit.defaults.maneTouch, kit.randomRanges.maneTouch[0]]) {
+      const cover = backCover({ ...D, ...preset, ...extra, maneTouch });
       assert.ok(cover >= 0.98,
         `lion: from behind, the mane must cover the back of the head -- ${label} covers `
         + `${Math.round(cover * 100)}% of the skull within its own reach at maneTouch ${maneTouch}`);
@@ -1168,7 +1175,9 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   // And again at a deep maneDrop, where the crown's spikes sit well past unit distance from the
   // shell centre. The formula is only exact because npc.js grows each spike by that distance --
   // on the default the distance is near 1, so there this sweep could not tell grown from ungrown.
-  for (const base of [D, { ...D, maneDrop: 0.4 }]) {
+  // and at both ends of maneSides' draw: the formula treats a spike's base as round, and a
+  // square one's flat sides reach 71% as far -- measured, it still agrees at 4, 5 and 6
+  for (const base of [D, { ...D, maneDrop: 0.4 }, { ...D, maneSides: 4 }, { ...D, maneSides: 6 }]) {
     for (let i = 0; i <= 15; i++) {
       const P = { ...base, maneTop: i * 0.02 };
       const saysCovered = maneCrownGap(P) <= 0;
@@ -1284,6 +1293,36 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       `lion: maneHug must leave the upper half of the mane alone -- a spike there leans `
       + `${upper.toFixed(1)} degrees at maneBottom ${maneBottom}`);
   }
+}
+
+// --- the mane reads as its own mass, not the same colour as the body -----------------------------
+//
+// Seen in the checker: manes too close to the body. They were derived with deriveCoatColor, which
+// keeps owl and llama coats tonal on purpose -- measured over 2000 lions, the median mane sat 13.9
+// L* from the body and 24% under 10, where felt under soft light reads as one colour.
+// deriveManeColor guarantees MIN_MANE_CONTRAST (28 L*), turning either way if it must. Seeded, so
+// the same 2000 lions every run; measured: min 28.1, median 35.6.
+{
+  const kit = getSpecies('lion');
+  const MIN = 28;
+  const real = Math.random;
+  let seed = 7;
+  Math.random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  let worst = Infinity, at = '';
+  try {
+    for (let i = 0; i < 2000; i++) {
+      const P = kit.randomise(structuredClone({ ...BASE_PARAMS, ...kit.defaults }));
+      const gap = Math.abs(maneLightness(P.maneColor) - maneLightness(P.bodyColor));
+      if (gap < worst) { worst = gap; at = `body ${P.bodyColor}, mane ${P.maneColor}`; }
+    }
+  } finally {
+    Math.random = real;
+  }
+  assert.ok(worst >= MIN,
+    `lion: a random mane must differ from its body by at least ${MIN} L* -- got ${worst.toFixed(1)} (${at})`);
+  const D = { ...BASE_PARAMS, ...kit.defaults };
+  const gap = Math.abs(maneLightness(D.maneColor) - maneLightness(D.bodyColor));
+  assert.ok(gap >= MIN, `lion: the default mane is only ${gap.toFixed(1)} L* from the default body`);
 }
 
 console.log('npc.js rig self-check: all assertions passed');

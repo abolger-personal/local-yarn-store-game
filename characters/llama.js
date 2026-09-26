@@ -236,7 +236,7 @@ function buildKit(ctx, P) {
 
   addHead(ctx, P);
   // set wide and shallow: eyes on the sides of a narrow head, not owl-style forward discs
-  addEyes(ctx, P, { squash: 1.1 });
+  addEyes(ctx, P, { squash: 1.1, head: headScale(P) });
   addMuzzle(ctx, P);
   addNose(ctx, P);
   addEars(ctx, P, {

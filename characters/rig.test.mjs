@@ -25,7 +25,7 @@ import {
 } from './npc.js';
 import './owl.js';
 import './llama.js';
-import { MANE_PRESETS, snoutGap } from './lion.js';
+import { MANE_PRESETS, maneCrownGap, maneSeat, snoutGap } from './lion.js';
 
 const build = (id) => createCharacter(
   { ...BASE_PARAMS, ...getSpecies(id).defaults, mergeMeshes: false }, id);
@@ -500,22 +500,27 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
 {
   const kit = getSpecies('lion');
 
-  const maneOf = (P) => {
+  const lionOf = (P) => {
     const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, 'lion');
     built.root.updateMatrixWorld(true);
     let mane = null;
     built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
     assert.ok(mane, 'the mane shell must exist -- scallopGeometry returns null when every dome '
       + 'falls inside the face gap, which presents as a lion with no mane at all');
-    return mane;
+    return { built, mane };
   };
-
   // vertices sitting in front of an eye, and the widest radius the curls reach
+  //
+  // The eye landmark is read off the BUILT eye node, not recomputed from eyeFront. eyeSeat now
+  // pushes an eye forward when eyeFront would bury the white in the skull, so the parameter and
+  // the position are no longer the same number -- and a landmark that outlives the geometry it
+  // measured is how three assertions in this file went quietly vacuous already.
   const inspect = (P) => {
-    const mane = maneOf(P);
-    const ex = P.headRadius * P.eyeSpread;
-    const ey = P.headRadius * P.eyeLift;
-    const ez = P.headRadius * P.eyeFront;
+    const { built, mane } = lionOf(P);
+    const eye = built.joints.eye[0].node.position;
+    const ex = Math.abs(eye.x);
+    const ey = eye.y;
+    const ez = eye.z;
     const win = P.eyeRadius * 1.5;
     const pos = mane.geometry.attributes.position;
     const v = new THREE.Vector3();
@@ -548,30 +553,29 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   // normals, so tips clear a head half-width even at absurd settings and that test never fires.
   // What matters is how thick the halo reads.
   //
-  // Crossed with the presets, because each one carries its own maneProud and the worst corner is
-  // a preset against the span floor, not the span floor alone -- measured 0.172x at spread
-  // 0.80 with preset 5, where the floor on its own gives 0.35x. The default is 0.40x.
+  // Crossed with the presets, because each one carries its own maneSpread paired with its own
+  // SOLVED maneProud, and the worst corner is a preset against a randomised extreme rather than
+  // either alone. The crossed axis used to be randomRanges.maneSpread; that span is gone, because
+  // applyManePreset runs after randomiseBase and overwrote it on every roll -- the test was
+  // walking a span no character could ever have.
   //
-  // Those numbers moved when maneRows was floored at 5: more rows means touchingScallopSize
-  // returns SMALLER scallops, so the same maneProud reaches less far and the stand-off
-  // collapsed to 0.10x. Each preset's proud was re-solved for a stand-off target rather than
-  // nudged, because proud's effect depends on the row count and a hand-tuned number would
-  // drift again the next time the counts change.
-  // Threshold sits below that worst corner so it catches a mane collapsing onto the skull rather
+  // maneTouch is what replaces it: it scales the derived curl size, so its floor is the corner
+  // where the same maneProud reaches least far. Measured worst across all of it: 0.213x head
+  // half-width. Threshold sits below that so this catches a mane collapsing onto the skull rather
   // than firing on a tuning pass.
-  for (const maneSpread of [kit.defaults.maneSpread, ...kit.randomRanges.maneSpread]) {
+  for (const maneTouch of [kit.defaults.maneTouch, ...kit.randomRanges.maneTouch]) {
     for (const preset of [{}, ...MANE_PRESETS]) {
-      const P = { ...kit.defaults, ...preset, maneSpread };
+      const P = { ...kit.defaults, ...preset, maneTouch };
       const headHalf = P.headRadius * 1.04;
       const { maxR, overEye } = inspect(P);
       assert.ok(maxR - headHalf > headHalf * 0.15,
         `lion: mane must stand off the skull, not cling to it -- clearance `
         + `${(maxR - headHalf).toFixed(4)} is ${((maxR - headHalf) / headHalf).toFixed(2)}x `
-        + `head half-width at spread ${maneSpread}, proud ${P.maneProud}`);
+        + `head half-width at touch ${maneTouch}, spread ${P.maneSpread}, proud ${P.maneProud}`);
       // spread moves the spikes forward as well as outward, so the eyes are its business too
       assert.equal(overEye, 0,
-        `lion: mane must not reach in front of the eyes at spread ${maneSpread}, `
-        + `proud ${P.maneProud}`);
+        `lion: mane must not reach in front of the eyes at touch ${maneTouch}, `
+        + `spread ${P.maneSpread}, proud ${P.maneProud}`);
     }
   }
 
@@ -914,6 +918,155 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   assert.ok(rowsEntry, 'lion: maneRows must still be on the mane folder');
   assert.ok(rowsEntry[1] >= MIN,
     `lion: the maneRows slider starts at ${rowsEntry[1]}, below the ${MIN} floor`);
+}
+
+// --- an eye has to show some white ------------------------------------------------------------
+//
+// eyeFront is a fraction of headRadius. The depth of skull the eye has to clear is not: it falls
+// out of eyeSpread, eyeLift and the species' own head ellipsoid, which is 0.80 wide on the llama
+// and 1.06 on the owl. Four numbers drawn independently, and the one that has to win is the one
+// that cannot see the other three -- so the eye landed in front of the skin only by luck.
+//
+// It was not luck on the lion: its SHIPPED default had the white 0.0017 BEHIND the skin, so what
+// showed on screen was the pupil alone, stuck on a bare face. Measured as a multiple of the
+// white's own depth, before eyeSeat: lion default -0.04, and worst randomiser corners of -0.97
+// (lion), -0.26 (llama), -0.05 (owl). The GUI sliders reached -21x.
+//
+// Asserted across the corners rather than at the defaults, because the corners are what the
+// randomiser ships and they were an order of magnitude worse than any default.
+{
+  // eyeSeat's own floor is 0.25 of the white's depth; this sits below it so the assertion fires
+  // on an eye sinking into the skull rather than on a tuning pass that moves the floor.
+  const MIN_PROUD = 0.15;
+  const EYE_KEYS = ['eyeRadius', 'eyeSpread', 'eyeLift', 'eyeFront', 'headRadius'];
+
+  // off the BUILT character: eyeSeat is what is under test, so reading eyeFront back out of the
+  // params would measure the input and miss the clamp entirely
+  const proudness = (id, P) => {
+    const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, id);
+    let head = null;
+    for (const c of built.joints.head.children) {
+      if (c.isMesh && c.geometry?.type === 'SphereGeometry' && !head) head = c.scale.toArray();
+    }
+    assert.ok(head, `${id}: expected a sphere head to measure the eye against`);
+    const eye = built.joints.eye[0].node.position;
+    const depth = P.eyeRadius * 0.55;                 // eyeWhiteDepth, private to npc.js
+    const k = 1 - (eye.x / head[0]) ** 2 - (eye.y / head[1]) ** 2;
+    const skin = k > 0 ? head[2] * Math.sqrt(k) : 0;
+    return (eye.z + depth - skin) / depth;
+  };
+
+  for (const id of speciesIds()) {
+    const kit = getSpecies(id);
+    const D = { ...BASE_PARAMS, ...kit.defaults };
+    const spans = EYE_KEYS.map((k) => kit.randomRanges[k] ?? [D[k], D[k]]);
+    for (let corner = 0; corner < (1 << EYE_KEYS.length); corner++) {
+      const P = { ...D };
+      EYE_KEYS.forEach((k, i) => { P[k] = spans[i][(corner >> i) & 1]; });
+      const v = proudness(id, P);
+      assert.ok(v > MIN_PROUD,
+        `${id}: the eye white must stand out of the skull -- ${v.toFixed(3)}x its own depth at `
+        + `${EYE_KEYS.map((k) => `${k}=${P[k]}`).join(' ')}`);
+    }
+    assert.ok(proudness(id, D) > MIN_PROUD, `${id}: the default eye white is buried in the skull`);
+  }
+}
+
+// --- the mane hangs round the head, is rooted in it, and does not ring a bald patch -------------
+//
+// Three separate ways the halo comes off wrong, all of them the same shape of bug as earSeat and
+// eyeSeat: parameters that have to agree about the skull, set independently by people who cannot
+// see each other. Walked over every preset crossed with the randomiser's own corners, because
+// every one of these was found at a corner and none of them at a default.
+{
+  const kit = getSpecies('lion');
+  const D = { ...BASE_PARAMS, ...kit.defaults };
+  const KEYS = ['maneDrop', 'maneTall', 'maneTouch', 'maneFaceGap'];
+  const spans = KEYS.map((k) => kit.randomRanges[k]);
+  const corners = [];
+  for (const preset of [{}, ...MANE_PRESETS]) {
+    for (let m = 0; m < (1 << KEYS.length); m++) {
+      const P = { ...D, ...preset };
+      KEYS.forEach((k, j) => { P[k] = spans[j][(m >> j) & 1]; });
+      corners.push(P);
+    }
+  }
+  const where = (P) => `${KEYS.map((k) => `${k}=${P[k]}`).join(' ')} rows=${P.maneRows} `
+    + `bottom=${P.maneBottom} spread=${P.maneSpread}`;
+
+  // 1. Rooted. maneTall stretches the shell in Y and only maneDrop re-centres it, so at maneTall
+  //    1.2 with a legal maneDrop of 0.08 the top ring of spikes stood clear of a skull 0.94 tall
+  //    and floated. Measured before maneSeat: 1.21 at the worst corner, and 1.06 at maneDrop 0
+  //    rising to 1.27 at -0.20 -- the whole negative half of that slider was floating manes.
+  //    1.0 is a base exactly on the skin, so anything at or past it has nothing holding it on.
+  //
+  //    Two halves, and the second one is the half that matters. `worst` alone only proves the
+  //    SOLVER is right -- it recomputes the seated drop from the params, so deleting the seat
+  //    from addMane left it passing. The mesh's own y is what says the shipped geometry uses it.
+  for (const P of corners) {
+    const { worst, drop } = maneSeat(P);
+    assert.ok(worst < 1,
+      `lion: every upper spike base must be inside the skull -- worst ${worst.toFixed(3)} of the `
+      + `head's own radius at ${where(P)}`);
+    const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, 'lion');
+    built.root.updateMatrixWorld(true);   // without this shell.matrix is identity and the vertex
+    let shell = null;                     // scan below reads unplaced geometry and finds nothing
+    built.joints.head.traverse((c) => { if (c.name === 'mane') shell = c; });
+    assert.ok(shell, `lion: no mane shell to measure at ${where(P)}`);
+    assert.ok(Math.abs(shell.position.y + P.headRadius * drop) < 1e-9,
+      `lion: the mane shell must hang at the SEATED drop -- sits at `
+      + `${shell.position.y.toFixed(4)}, seat wants ${(-P.headRadius * drop).toFixed(4)} `
+      + `at ${where(P)}`);
+
+    // and no curl in front of an eye. The existing face-gap scan walks the span with the DEFAULT
+    // counts; the gap quantises by manePerRow, so it takes a preset's own column count crossed
+    // with the span to catch the leak -- preset 1's 13 columns put 16 vertices over an eye at a
+    // gap the default was clear at.
+    const eye = built.joints.eye[0].node.position;
+    const win = P.eyeRadius * 1.5;
+    const pos = shell.geometry.attributes.position;
+    const v = new THREE.Vector3();
+    let overEye = 0;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(shell.matrix);
+      if (Math.abs(Math.abs(v.x) - Math.abs(eye.x)) <= win && Math.abs(v.y - eye.y) <= win
+        && v.z > eye.z) overEye++;
+    }
+    assert.equal(overEye, 0,
+      `lion: mane must not hang in front of the eyes -- ${overEye} vertices do at ${where(P)}`);
+  }
+
+  // 2. No bald patch. maneTop moves the top row off the crown; how far it may go before bare head
+  //    shows through the middle depends on the curl size (both counts, and maneTouch), on maneFlat
+  //    and on where manePush and the seated drop put the shell -- which is why this is measured
+  //    rather than bounded by a constant. Negative is covered. Worst across all corners: -0.116.
+  for (const P of corners) {
+    const gap = maneCrownGap(P);
+    assert.ok(gap <= 0,
+      `lion: the mane must cover the crown, not ring a bald patch -- ${gap.toFixed(3)} rad of `
+      + `bare head at maneTop=${P.maneTop} ${where(P)}`);
+  }
+
+  // 3. Long enough to be a mane. Above the equator it is a cap sitting on the head rather than a
+  //    mane hanging round it. Same three sites as the row floor -- default, presets, slider --
+  //    because the presets are what randomise draws from and the slider is what a tuner drags.
+  const MIN = 0.50;
+  assert.ok(kit.defaults.maneBottom >= MIN,
+    `lion: the default mane stops at ${kit.defaults.maneBottom}, above the ${MIN} equator floor`);
+  MANE_PRESETS.forEach((preset, i) => {
+    assert.ok(preset.maneBottom >= MIN,
+      `lion: mane preset ${i} stops at ${preset.maneBottom}, above the ${MIN} equator floor`);
+  });
+  const bottomEntry = kit.gui.mane.find((e) => e[0] === 'maneBottom');
+  assert.ok(bottomEntry, 'lion: maneBottom must still be on the mane folder');
+  assert.ok(bottomEntry[1] >= MIN,
+    `lion: the maneBottom slider starts at ${bottomEntry[1]}, above the ${MIN} equator floor`);
+
+  // and the drop slider, whose negative half maneSeat would now silently clamp away
+  const dropEntry = kit.gui.mane.find((e) => e[0] === 'maneDrop');
+  assert.ok(dropEntry && dropEntry[1] >= 0,
+    `lion: the maneDrop slider starts at ${dropEntry?.[1]} -- a mane never sits ABOVE the skull `
+    + 'it grows from, and maneSeat clamps the whole negative half back to the same value');
 }
 
 console.log('npc.js rig self-check: all assertions passed');

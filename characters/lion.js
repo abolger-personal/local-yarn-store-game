@@ -22,8 +22,8 @@
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
   addEars, addEyes, createCharacter, deriveCoatColor, touchingScallopSize,
-  feltMaterial, LIMB_TAPER, part, randomiseBase, registerSpecies, scallopGeometry,
-  scallopMesh,
+  feltMaterial, LIMB_TAPER, part, randomiseBase, registerSpecies, scallopAngles,
+  scallopGeometry, scallopMesh,
 } from './npc.js';
 
 // GEO.taper's narrow end, as a fraction of its wide end. Baked into the shared geometry, so
@@ -48,6 +48,17 @@ const NOSE_PROUD = 0.30;
 // settings say. The floor is on the slider as well as the presets: there is no
 // lion anywhere under it, so leaving it reachable is just a trap.
 const MIN_MANE_ROWS = 5;
+
+// How far down the skull the mane may stop, as a fraction of PI from the crown. 0.5 is the
+// equator: above that the mane is a cap sitting on top of the head rather than a mane hanging
+// round it, and the animal reads as a punk hedgehog again. There is no matching ceiling -- 1.0
+// is the bottom pole and a mane that long simply hangs onto the shoulders, which is a lion.
+const MIN_MANE_BOTTOM = 0.50;
+
+// How far out along its own direction a spike base may sit, as a fraction of the head surface.
+// The same number and the same reason as EAR_SEAT in npc.js: 1.0 puts the base exactly on the
+// skin, which leaves nothing buried to hold the spike on.
+const MANE_SEAT = 0.95;
 
 // ---------------------------------------------------------------- params
 
@@ -103,48 +114,63 @@ export const DEFAULT_PARAMS = {
   // mane
   mane:          true,
   maneColor:     '#8a5a2b',
-  manePreset:    2,
-  maneRows:      5,    // MIN_MANE_ROWS -- fewer reads as a wolf or a hedgehog
+  manePreset:    0,       // this default IS preset 0 -- tuned at the checker, then baked
+  maneRows:      8,
   manePerRow:    11,
   maneAutoSize:  true,
-  maneTouch:     1.10,    // above 1.0 the curls overlap, which is what closes the mass
+  maneTouch:     1.155,   // above 1.0 the curls overlap, which is what closes the mass
   maneSize:      0.230,   // manual override, only used when maneAutoSize is off
-  maneFlat:      0.38,
+  maneFlat:      0.00,
   // Faceted spikes, not domes. A dome has no direction, so a mane built from them reads as
   // wool however the counts are tuned -- which is the owl's and the llama's whole point and
   // exactly wrong here. 0 falls back to the dome; 3 is a sharp triangular spike, 4 a pyramid,
   // and by 6 it is rounding off again.
-  maneSides:     4,
+  maneSides:     5,
   // a spike wants to be LONGER than it is wide; a dome at 0.92 is a bump
-  maneProud:     1.85,
-  maneTop:       0.10,    // near the crown
-  maneBottom:    0.97,    // hangs well below head centre, onto the shoulders
-  maneStagger:   true,
+  maneProud:     1.524,
+  maneTop:       0.00,    // starts at the crown itself -- see maneCrownGap
+  maneBottom:    0.58,    // a high tight halo, not a shoulder-length mane
+  maneStagger:   false,
   // Radians of +Z left open. The parameter that makes it a mane rather than a hood -- and it has
   // to be bigger than it looks, because skipFront culls scallop CENTRES while each scallop still
   // has a base radius, so the ones flanking the gap spill across it. It also quantises by
   // manePerRow: at 11 the steps are 0.571 rad, so a range of values collapses to one shell.
   // Measured with the spikes in: the eyes are covered with no gap at all and clear from 1.5 up,
   // so 2.50 sits well clear and still brings the mane around the cheeks.
-  maneFaceGap:   2.50,
+  maneFaceGap:   3.20,
   // BELOW 1 deliberately -- this places the spike BASES, which belong inside the skull so the
   // mane grows out of the head instead of hovering around it. Reach is maneProud's job.
-  maneSpread:    0.88,
-  maneTall:      1.06,    // Y scale relative to the spread, so the halo can hang oval
-  maneDrop:      0.16,    // shell centre below head centre, as a fraction of head radius
-  manePush:     -0.10,    // shell centre behind head centre, so it frames rather than wraps
+  maneSpread:    1.00,
+  maneTall:      0.981,   // Y scale relative to the spread, so the halo can hang oval
+  maneDrop:      0.111,   // shell centre below head centre, as a fraction of head radius
+  manePush:      0.185,   // shell centre in FRONT of head centre, bringing the halo to the cheeks
 };
 
-// Fewer, larger curls than the llama's fleece: a mane is coarse. Size is derived from the counts
-// so a preset only chooses how many curls there are and how far they stand proud.
+/**
+ * Fewer, larger curls than the llama's fleece: a mane is coarse. Size is derived from the counts,
+ * so a preset only chooses how many curls there are, how far down the skull they go, and how far
+ * they stand proud.
+ *
+ * maneBottom is the ladder now, running 0.58 to 0.97: a high tight halo at one end and a
+ * shoulder-length mane at the other. It used to run 0.94 to 0.99, so every preset was the same
+ * long mane and the only variation on screen was how many curls it was made of -- which at 150px
+ * is no variation at all. Preset 0 IS the shipped default; the rest walk away from it.
+ *
+ * maneProud is SOLVED, not chosen: stand-off is linear in it, so two samples fix it exactly for a
+ * target stand-off. Picking proud by hand does not survive a change to the counts or to
+ * maneBottom, because both move the derived curl size underneath it.
+ *
+ * Measured, worst randomised corner of each (the maneTouch floor): stand-off 0.28x to 0.40x head
+ * half-width, no curl in front of an eye, and the crown covered by 0.11 to 0.24 rad.
+ */
 export const MANE_PRESETS = Object.freeze([
-  { maneRows: 5, manePerRow: 9,  maneProud: 1.99, maneFlat: 0.34, maneStagger: true,  maneTop: 0.14, maneBottom: 0.94, maneSpread: 0.80 },
-  { maneRows: 5, manePerRow: 11, maneProud: 2.08, maneFlat: 0.36, maneStagger: true,  maneTop: 0.12, maneBottom: 0.95, maneSpread: 0.83 },
-  { maneRows: 6, manePerRow: 11, maneProud: 2.39, maneFlat: 0.38, maneStagger: true,  maneTop: 0.10, maneBottom: 0.97, maneSpread: 0.86 },
-  { maneRows: 6, manePerRow: 13, maneProud: 2.51, maneFlat: 0.40, maneStagger: true,  maneTop: 0.10, maneBottom: 0.97, maneSpread: 0.88 },
-  { maneRows: 7, manePerRow: 13, maneProud: 2.29, maneFlat: 0.40, maneStagger: true,  maneTop: 0.08, maneBottom: 0.98, maneSpread: 0.91 },
-  { maneRows: 7, manePerRow: 15, maneProud: 1.98, maneFlat: 0.42, maneStagger: false, maneTop: 0.08, maneBottom: 0.98, maneSpread: 0.94 },
-  { maneRows: 8, manePerRow: 15, maneProud: 2.42, maneFlat: 0.44, maneStagger: true,  maneTop: 0.06, maneBottom: 0.99, maneSpread: 0.97 },
+  { maneRows: 8, manePerRow: 11, maneProud: 1.524, maneFlat: 0.00, maneStagger: false, maneTop: 0.00, maneBottom: 0.58, maneSpread: 1.00 },
+  { maneRows: 8, manePerRow: 13, maneProud: 2.081, maneFlat: 0.08, maneStagger: true,  maneTop: 0.02, maneBottom: 0.63, maneSpread: 0.98 },
+  { maneRows: 7, manePerRow: 11, maneProud: 1.865, maneFlat: 0.14, maneStagger: false, maneTop: 0.04, maneBottom: 0.70, maneSpread: 0.96 },
+  { maneRows: 7, manePerRow: 13, maneProud: 2.513, maneFlat: 0.20, maneStagger: true,  maneTop: 0.06, maneBottom: 0.78, maneSpread: 0.94 },
+  { maneRows: 6, manePerRow: 13, maneProud: 2.583, maneFlat: 0.28, maneStagger: true,  maneTop: 0.08, maneBottom: 0.86, maneSpread: 0.90 },
+  { maneRows: 6, manePerRow: 15, maneProud: 2.967, maneFlat: 0.34, maneStagger: false, maneTop: 0.10, maneBottom: 0.92, maneSpread: 0.86 },
+  { maneRows: 5, manePerRow: 15, maneProud: 2.408, maneFlat: 0.40, maneStagger: true,  maneTop: 0.12, maneBottom: 0.97, maneSpread: 0.82 },
 ]);
 
 export function applyManePreset(P, index) {
@@ -178,10 +204,18 @@ export const RANDOM_RANGES = Object.freeze({
   earTilt:      [0.160, 0.440],
   earPoint:     [0.150, 0.550],
   maneTouch:    [1.040, 1.200],
-  maneSpread:   [0.800, 0.980],
-  // floor is 2.20, not taste: below about 2.10 the curls flanking the gap close over the muzzle.
-  // rig.test walks this span and asserts the face stays clear at both ends.
-  maneFaceGap:  [2.200, 3.100],
+  // maneSpread is NOT here. It was, and it did nothing: applyManePreset runs AFTER randomiseBase
+  // and overwrites it, so the span was drawn and thrown away on every roll. A preset pairs its
+  // spread with its own solved maneProud, which is the pairing that keeps the stand-off, so the
+  // preset is the right owner and the span was the dead one.
+  //
+  // Face gap floor is geometry, not taste, and it is set by the WORST preset rather than by the
+  // default. The gap quantises by manePerRow -- at 13 columns the steps are 0.483 rad -- so the
+  // column flanking the gap either clears the eye or sits right over it with nothing in between.
+  // Measured across every preset at every corner: the default (11 columns) is clear from 1.80,
+  // but preset 1 (13 columns) only clears from 2.45, so the floor is 2.45 plus a step of margin.
+  // Ceiling is stand-off: past 3.8 so many columns are culled that the halo thins to 0.30x.
+  maneFaceGap:  [2.600, 3.800],
   maneTall:     [0.940, 1.200],
   maneDrop:     [0.080, 0.260],
   eyeRadius:    [0.058, 0.082],
@@ -191,8 +225,12 @@ export const RANDOM_RANGES = Object.freeze({
 
 // ---------------------------------------------------------------- shell settings
 
-// broad and slightly flattened: a cat skull is wider than it is tall, where the owl's is a ball
-const headScale = (P) => [P.headRadius * 1.04, P.headRadius * 0.94, P.headRadius];
+// broad and slightly flattened: a cat skull is wider than it is tall, where the owl's is a ball.
+// Three things measure against this shape -- the head mesh, where the muzzle leaves the skin, and
+// where the mane has to reach to cover the crown -- so it is one triple rather than three copies
+// of 0.94 that can drift apart.
+const HEAD_SHAPE = Object.freeze([1.04, 0.94, 1.00]);
+const headScale = (P) => HEAD_SHAPE.map((k) => P.headRadius * k);
 
 const curlSize = (P, shape) => (P.maneAutoSize
   ? touchingScallopSize(shape) * P.maneTouch
@@ -210,6 +248,78 @@ const maneShell = (P) => {
     flat: P.maneFlat, proud: P.maneProud, stagger: P.maneStagger,
   };
 };
+
+/**
+ * The bare arc at the crown of the skull, in radians. Negative means a scallop covers the top of
+ * the head; positive is bare head ringed by mane, which reads as a bald patch.
+ *
+ * This is why maneTop has no fixed maximum. How far down the mane may start depends on how WIDE
+ * a scallop is (touchingScallopSize, so both counts and maneTouch), how far it is sunk into the
+ * shell (maneFlat), and where the shell sits relative to the skull -- manePush especially, since
+ * pushing the shell forward moves the crown off the shell's own pole and eats the margin from one
+ * side. A constant could only ever be right for one combination of those.
+ *
+ * Measured on the shipped default: -0.229 rad of cover, crossing to bare at maneTop ~0.155.
+ */
+export function maneCrownGap(P) {
+  const shell = maneShell(P);
+  const reach = Math.atan2(shell.size, 1 - shell.size * shell.flat);
+  // the crown, seen from the shell's centre, mapped back into the shell's own unit space.
+  // The SEATED drop, not the parameter -- maneSeat pushes the shell down when maneTall would
+  // float it, and that move takes the crown further off the shell's pole.
+  const y = (HEAD_SHAPE[1] + maneSeat(P).drop) / P.maneTall;
+  const z = -P.manePush;
+  const n = Math.hypot(y, z);
+  let nearest = Infinity;
+  for (const { phi, theta } of scallopAngles(shell)) {
+    const dot = (Math.cos(phi) * y + Math.sin(phi) * Math.sin(theta) * z) / n;
+    nearest = Math.min(nearest, Math.acos(Math.max(-1, Math.min(1, dot))));
+  }
+  return nearest - reach;
+}
+
+/**
+ * Where the mane shell sits, and how well buried its upper bases end up.
+ *
+ * Third instance of the same bug, after earSeat and eyeSeat. maneDrop, maneTall and maneSpread
+ * are set independently -- maneTall by the randomiser, the other two by a preset -- and the crown
+ * is where they collide: maneTall stretches the shell in Y and only maneDrop re-centres it, so at
+ * maneTall 1.2 the shell's pole stands 1.2 head-radii above a shell centre that a legal maneDrop
+ * of 0.08 has barely lowered, against a skull only 0.94 tall. The top ring of spikes then has
+ * nothing behind it and reads as floating. Measured before this, as a multiple of the head's own
+ * radius in that direction: 1.21 at the worst randomiser corner, and 1.06 at maneDrop 0 rising to
+ * 1.27 at -0.20, which is why the slider's negative half was nothing but floating manes.
+ *
+ * Only ever pushes the shell DOWN, like eyeSeat only ever pushes an eye out: a mane already low
+ * enough keeps the drop it was given.
+ *
+ * Only the UPPER bases are constrained. A base below head centre hangs over the neck, the scarf
+ * and the shoulders -- that is what a shoulder-length mane IS -- so the lower half is deliberately
+ * left free, and the solve is a floor on drop rather than a band around it.
+ *
+ * MANE_SEAT is a target, not a guarantee, and `worst` is the honest answer. Dropping the shell can
+ * only fix the VERTICAL component: a base already too far out sideways -- maneSpread 1.00 on a
+ * skull 1.04 wide, which is exactly the shipped default -- stays where it is however far the shell
+ * sinks. Measured worst across every preset and every randomiser corner: 0.972, so still buried,
+ * just shallowly. Anything at or past 1.0 is a spike with nothing behind it.
+ */
+export function maneSeat(P) {
+  const shell = maneShell(P);
+  const out = (1 - shell.size * shell.flat) * P.maneSpread;   // base distance from shell centre
+  const [hx, hy, hz] = HEAD_SHAPE;
+  const bases = scallopAngles(shell).map(({ phi, theta }) => {
+    const ring = Math.sin(phi) * out;
+    return [ring * Math.cos(theta), Math.cos(phi) * out * P.maneTall,
+      ring * Math.sin(theta) + P.manePush];
+  });
+  // the skull leaves hy * sqrt(room) of vertical space at this base's own x and z; past that no
+  // drop can seat it at all, and head-centre height is the closest this gets
+  const lowest = ([x, y, z]) =>
+    y - hy * Math.sqrt(Math.max(0, MANE_SEAT ** 2 - (x / hx) ** 2 - (z / hz) ** 2));
+  const drop = Math.max(P.maneDrop, ...bases.map(lowest));
+  const buried = ([x, y, z]) => (y < drop ? 0 : Math.hypot(x / hx, (y - drop) / hy, z / hz));
+  return { drop, worst: Math.max(0, ...bases.map(buried)) };
+}
 
 // The mane rides on the HEAD, not the torso, so it never pushes the shoulders out. Returning 0
 // is the honest answer rather than an oversight: `bulge` exists to stop a thick coat swallowing
@@ -272,10 +382,10 @@ function noseAt(P) {
   return { r, centre: front - r * 0.90, back: front - depth, depth, front };
 }
 
-/** Where the muzzle leaves the skull, at the muzzle's own height. The head is [r*1.04, r*.94, r]. */
+/** Where the muzzle leaves the skull, at the muzzle's own height. */
 function headSkinZ(P) {
-  const k = 1 - ((-P.headRadius * P.muzzleDrop) / (P.headRadius * 0.94)) ** 2;
-  return k > 0 ? P.headRadius * Math.sqrt(k) : 0;
+  const k = 1 - (-P.muzzleDrop / HEAD_SHAPE[1]) ** 2;
+  return k > 0 ? P.headRadius * HEAD_SHAPE[2] * Math.sqrt(k) : 0;
 }
 
 /**
@@ -319,7 +429,7 @@ function addMane(ctx, P) {
     [radius, radius * P.maneTall, radius]);
   if (!shell) return;
   shell.name = 'mane';   // rig.test finds it by name to measure the face gap and the stand-off
-  shell.position.set(0, -P.headRadius * P.maneDrop, P.headRadius * P.manePush);
+  shell.position.set(0, -P.headRadius * maneSeat(P).drop, P.headRadius * P.manePush);
   ctx.head.add(shell);
 }
 
@@ -350,7 +460,7 @@ function buildKit(ctx, P) {
   ctx.mat.nose = ctx.addMaterial(feltMaterial(P, P.noseColor));
 
   addHead(ctx, P);
-  addEyes(ctx, P, { squash: 1.0 });
+  addEyes(ctx, P, { squash: 1.0, head: headScale(P) });
   addMuzzle(ctx, P);
   addNose(ctx, P);
   addEars(ctx, P, {
@@ -417,13 +527,19 @@ export const LION_GUI = Object.freeze({
   mane: [
     ['mane', 'bool'], ['maneColor', 'color'],
     ['manePreset', 0, MANE_PRESETS.length - 1, 1],
-    ['maneFaceGap', 0, 3.2], ['maneSpread', 1.0, 1.9], ['maneTall', 0.7, 1.4],
-    ['maneDrop', -0.2, 0.6], ['manePush', -0.6, 0.3],
+    // maneSpread's slider used to start at 1.0 while every shipped value was below it, so the
+    // control could not express the character it was tuning -- 1.0 was a floor, not a choice.
+    ['maneFaceGap', 0, 4.2], ['maneSpread', 0.6, 1.4], ['maneTall', 0.7, 1.4],
+    // floored at 0: every negative drop was a floating mane, and maneSeat would silently clamp
+    // it back anyway -- a third of the travel doing nothing is worse than no travel
+    ['maneDrop', 0, 0.6], ['manePush', -0.6, 0.3],
     ['maneSides', 0, 8, 1],
     ['maneRows', MIN_MANE_ROWS, 10, 1], ['manePerRow', 3, 20, 1],
     ['maneAutoSize', 'bool'], ['maneTouch', 0.8, 1.6], ['maneSize', 0.08, 0.55],
     ['maneProud', 0.1, 3.0], ['maneFlat', 0, 1.2],
-    ['maneTop', 0, 1], ['maneBottom', 0, 1], ['maneStagger', 'bool'],
+    // maneTop keeps its bald-patch end reachable on purpose -- unlike maneRows there IS a lion
+    // under part of it, and where the edge falls depends on the counts. See maneCrownGap.
+    ['maneTop', 0, 0.4], ['maneBottom', MIN_MANE_BOTTOM, 1], ['maneStagger', 'bool'],
   ],
 });
 

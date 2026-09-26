@@ -14,7 +14,7 @@ import { makeMotion, integrate, compose, POSE_KEYS, POSES } from './motion.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
-export const BUILD = '2026-09-25.7-mane-rows';
+export const BUILD = '2026-09-25.8-seated-eyes-and-mane';
 
 // ---------------------------------------------------------------- species registry
 
@@ -443,7 +443,7 @@ const inFaceGap = (theta, gap) => {
   return delta < gap * 0.5;
 };
 
-function scallopAngles({ rows, perRow, top, bottom, stagger, skipFront }) {
+export function scallopAngles({ rows, perRow, top, bottom, stagger, skipFront }) {
   const angles = [];
   for (let r = 0; r < rows; r++) {
     const t = rows === 1 ? 0.5 : r / (rows - 1);
@@ -544,6 +544,32 @@ export function scallopMesh(geometry, material, scale) {
 
 const eyeWhiteDepth = (P) => P.eyeRadius * 0.55;
 
+// How far the eye white's front pole must stand out of the skull, as a fraction of the white's
+// own depth. At 0 the white is exactly tangent to the skin and nothing of it shows; this leaves a
+// visible ring of white around the pupil, which is what stops the eye reading as a bare pupil
+// stuck on the face.
+const EYE_PROUD = 0.25;
+
+/**
+ * Where the eye sits along +Z, kept OUT of the skull. The mirror of earSeat, and the same bug.
+ *
+ * eyeFront is a fraction of headRadius, while the depth of skull the eye has to clear depends on
+ * eyeSpread, eyeLift and the species' own head ellipsoid -- three numbers eyeFront knows nothing
+ * about, so it lands in front of the skin only by luck. Measured before this, as a multiple of
+ * the white's own depth: the lion's SHIPPED default sat at -0.04, fully buried, and the worst
+ * randomiser corner reached -0.97 on the lion, -0.26 on the llama and -0.05 on the owl.
+ *
+ * Only ever pushes the eye OUT. A species that wants its eyes further forward still gets them.
+ * Without a head scale, behaviour is unchanged.
+ */
+function eyeSeat(P, { spread, lift, front, head }) {
+  if (!head) return front;
+  const x = P.headRadius * spread, y = P.headRadius * lift;
+  const k = 1 - (x / head[0]) ** 2 - (y / head[1]) ** 2;
+  const skin = k > 0 ? head[2] * Math.sqrt(k) : 0;
+  return Math.max(front, (skin - eyeWhiteDepth(P) * (1 - EYE_PROUD)) / P.headRadius);
+}
+
 function buildEye(side, P, mat, { spread, lift, front, squash }) {
   const group = new THREE.Group();
   const depth = eyeWhiteDepth(P);
@@ -573,6 +599,7 @@ export function addEyes(ctx, P, opts = {}) {
     front: opts.front ?? P.eyeFront,
     squash: opts.squash ?? 1,
   };
+  placement.front = eyeSeat(P, { ...placement, head: opts.head });
   for (const side of [-1, 1]) {
     const eye = joint(buildEye(side, P, ctx.mat, placement), `${sideName(side)}Eye`);
     ctx.head.add(eye);

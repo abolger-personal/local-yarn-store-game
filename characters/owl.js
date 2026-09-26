@@ -193,7 +193,7 @@ function buildKit(ctx, P) {
   ctx.mat.beak = ctx.addMaterial(feltMaterial(P, P.beakColor));
 
   addHead(ctx, P);
-  addEyes(ctx, P);
+  addEyes(ctx, P, { head: headScale(P) });
   addBeak(ctx, P);
   addTorsoPlumage(ctx, P);
   // tufts fill the ears slot: not anatomically ears, but rigged as them so they can express

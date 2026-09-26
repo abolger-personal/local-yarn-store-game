@@ -45,7 +45,8 @@
 <div id="plateB" class="plate"></div>
 <div id="hud">
   <b>LYS species checker</b><br />
-  Drag to orbit · scroll to zoom<br />
+  Drag orbit · right-drag pan · scroll zoom<br />
+  <kbd>←→↑↓</kbd> orbit &nbsp; <kbd>V</kbd> front/side/back &nbsp; <kbd>T</kbd> turntable<br />
   <kbd>Tab</kbd> switch slot &nbsp; <kbd>R</kbd> randomise &nbsp; <kbd>Shift R</kbd> both<br />
   <kbd>1</kbd> felted &nbsp; <kbd>2</kbd> grey &nbsp; <kbd>3</kbd> silhouette<br />
   <kbd>F</kbd> frame &nbsp; <kbd>D</kbd> 150px test &nbsp; <kbd>B</kbd> squint<br />
@@ -147,6 +148,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.minDistance = 0.3;
 controls.maxDistance = 40;
+controls.autoRotateSpeed = 1.5;   // a slow turntable: one turn in ~40s, slow enough to read
 
 // sheen needs image-based light to read at all
 const pmrem = new THREE.PMREMGenerator(renderer);
@@ -254,10 +256,44 @@ function frameAll(targetPx = 0) {
     console.warn('frameAll: non-finite bounds, check for undefined params');
     return;
   }
-  center.x += size.x * 0.16;
+  // The GUI covers the right third, so the characters are pushed left of screen centre -- by
+  // shifting the FILM, not the target. Moving the target used to put the orbit pivot beside the
+  // characters instead of on them, so every drag swung them off to one side and a back view
+  // left them off-screen entirely.
+  // three shifts the frustum by near * filmOffset / filmWidth -- tangent units -- so this is the
+  // old world-space nudge (size.x * 0.16 at the target, `dist` away) as an angle
+  camera.filmOffset = ((size.x * 0.16) / dist) * camera.getFilmWidth();
+  camera.updateProjectionMatrix();
   controls.target.copy(center);
   camera.position.copy(center).addScaledVector(VIEW_DIR, dist);
   controls.update();
+}
+
+// Keyboard orbit about the current pivot -- the step-at-a-time half of what dragging does, and
+// the only way to land exactly on a side or back view. Stops just short of the poles, where the
+// azimuth goes undefined and OrbitControls flips.
+const ORBIT_STEP = Math.PI / 12;   // 15 degrees
+const SNAP_VIEWS = [0, Math.PI / 2, Math.PI, -Math.PI / 2];   // front, side, back, other side
+const spherical = new THREE.Spherical();
+let snapIndex = 0;
+
+function setOrbit(theta, phi) {
+  const offset = camera.position.clone().sub(controls.target);
+  spherical.setFromVector3(offset);
+  spherical.theta = theta ?? spherical.theta;
+  spherical.phi = THREE.MathUtils.clamp(phi ?? spherical.phi, 0.05, Math.PI - 0.05);
+  camera.position.copy(controls.target).add(offset.setFromSpherical(spherical));
+  controls.update();
+}
+
+function orbitBy(dTheta, dPhi) {
+  spherical.setFromVector3(camera.position.clone().sub(controls.target));
+  setOrbit(spherical.theta + dTheta, spherical.phi + dPhi);
+}
+
+function nextSnapView() {
+  snapIndex = (snapIndex + 1) % SNAP_VIEWS.length;
+  setOrbit(SNAP_VIEWS[snapIndex]);
 }
 
 // ---------------------------------------------------------------- nameplates
@@ -707,8 +743,14 @@ function buildGui() {
 const KEY_ACTIONS = {
   tab: () => { state.active = state.active === 'A' ? 'B' : 'A'; buildGui(); updatePlates(); },
   r: (e) => (e.shiftKey ? randomiseBoth() : randomiseSlot(state.active)),
-  f: () => frameAll(),
+  f: () => { snapIndex = 0; frameAll(); },
   d: () => frameAll(150),
+  arrowleft: () => orbitBy(-ORBIT_STEP, 0),
+  arrowright: () => orbitBy(ORBIT_STEP, 0),
+  arrowup: () => orbitBy(0, -ORBIT_STEP),
+  arrowdown: () => orbitBy(0, ORBIT_STEP),
+  v: () => nextSnapView(),
+  t: () => { controls.autoRotate = !controls.autoRotate; },
   b: () => renderer.domElement.classList.toggle('squint'),
   e: () => exportActive(),
   1: () => setView('felted'),

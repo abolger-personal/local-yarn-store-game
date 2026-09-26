@@ -341,7 +341,7 @@ function buildKit(ctx, P) {
   addEars(ctx, P, {
     size: P.earWidth, length: P.earLength, shape: 'leaf',
     spread: P.earSpread, tilt: P.earTilt, lift: 0.70, back: -0.14,
-    flatten: P.earFlatten,
+    flatten: P.earFlatten, head: headScale(P),
   });
   addEarTips(ctx, P);
   addMane(ctx, P);

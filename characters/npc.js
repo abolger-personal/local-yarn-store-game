@@ -14,7 +14,7 @@ import { makeMotion, integrate, compose, POSE_KEYS, POSES } from './motion.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
-export const BUILD = '2026-09-25.4-snout-ratio';
+export const BUILD = '2026-09-25.5-ear-seat';
 
 // ---------------------------------------------------------------- species registry
 
@@ -580,6 +580,30 @@ export function addEyes(ctx, P, opts = {}) {
   }
 }
 
+// How far out along its own direction an ear base may sit, as a fraction of the head surface.
+// 1.0 would put the pivot exactly on the skin, which leaves nothing buried to hold it there.
+const EAR_SEAT = 0.95;
+
+/**
+ * Where an ear base sits, kept inside the skull.
+ *
+ * spread/lift/back are three fractions a species picks INDEPENDENTLY, so `headRadius` times them
+ * lands on the head only by luck -- push spread up and the base leaves the skull and the ear
+ * floats off. Measured before this: the lion detached at earSpread 0.90 and the llama at 0.75,
+ * both well inside their own sliders.
+ *
+ * It cannot be solved on a sphere either, because every head is an ELLIPSOID with its own
+ * proportions -- the llama's is 0.80 wide where the owl's is 1.06 -- which is why the species
+ * passes its headScale in rather than this guessing. Without one, behaviour is unchanged.
+ */
+function earSeat(P, { spread, lift, back, head }) {
+  const x = P.headRadius * spread, y = P.headRadius * lift, z = P.headRadius * back;
+  if (!head) return [x, y, z];
+  const norm = Math.hypot(x / head[0], y / head[1], z / head[2]);
+  const k = norm > EAR_SEAT ? EAR_SEAT / norm : 1;
+  return [x * k, y * k, z * k];
+}
+
 /**
  * Ears as rigged joint nodes, for any species whose ears carry the silhouette.
  * `cone` is a spike -- owl tufts. `leaf` is a flattened ellipsoid, widest in the middle and
@@ -595,10 +619,11 @@ export function addEars(ctx, P, opts) {
   const leaf = shape === 'leaf';
   const geometry = leaf ? GEO.sphere : GEO.cone;
   const scale = leaf ? [size, length * 0.5, size * flatten] : [size, length, size];
+  const [sx, sy, sz] = earSeat(P, { spread, lift, back, head: opts.head });
 
   for (const side of [-1, 1]) {
     const ear = joint(new THREE.Group(), `${sideName(side)}Ear`);
-    ear.position.set(side * P.headRadius * spread, P.headRadius * lift, P.headRadius * back);
+    ear.position.set(side * sx, sy, sz);
     ear.rotation.set(P.earPerk ?? 0, 0, side * -(tilt + (P.earSplay ?? 0)));
     ear.add(part(geometry, material ?? ctx.mat.body, { pos: [0, length * 0.35, 0], scale }));
     ctx.head.add(ear);

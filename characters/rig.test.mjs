@@ -813,4 +813,60 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   }
 }
 
+// --- an ear stays attached to the head ----------------------------------------------------------
+//
+// spread/lift/back are three fractions a species picks independently, and headRadius times them
+// lands inside the skull only by luck. Push spread up and the base leaves the head: the lion
+// detached at earSpread 0.90 and the llama at 0.75, both well inside their own GUI sliders. Tilt
+// never detaches an ear on its own (0.755..0.832 across the whole tilt range) but it compounds --
+// at spread 0.75 the lion measured 0.871 leaning one way and 0.970 the other.
+//
+// It cannot be fixed on a sphere: each head is an ellipsoid with its own proportions (llama 0.80
+// wide, owl 1.06), which is why the species passes headScale to addEars rather than addEars
+// guessing. This walks EVERY species, because the bug was in the shared function and only two of
+// the three had been looked at.
+{
+  // the ellipsoid each species scales its head sphere by. Duplicated from the kits on purpose:
+  // if a kit changes its head shape and forgets to pass the new one to addEars, this should fail.
+  const HEAD = { owl: [1.06, 1.00, 0.98], llama: [0.80, 0.94, 1.16], lion: [1.04, 0.94, 1.00] };
+  const SPREAD = { owl: 'tuftSpread', llama: 'earSpread', lion: 'earSpread' };
+
+  const deepest = (id, over) => {
+    const P = { ...BASE_PARAMS, ...getSpecies(id).defaults, ...over, mergeMeshes: false };
+    const built = createCharacter(P, id);
+    built.root.updateMatrixWorld(true);
+    const [ax, ay, az] = HEAD[id].map((f) => f * P.headRadius);
+    const v = new THREE.Vector3();
+    let best = Infinity;
+    for (const ear of built.joints.ear) {
+      for (const child of ear.node.children) {
+        if (!child.isMesh) continue;
+        const pos = child.geometry.attributes.position;
+        const m = new THREE.Matrix4().multiplyMatrices(ear.node.matrix, child.matrix);
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(m);
+          best = Math.min(best, Math.hypot(v.x / ax, v.y / ay, v.z / az));
+        }
+      }
+    }
+    return best;   // < 1 means some of the ear is inside the head ellipsoid
+  };
+
+  for (const id of Object.keys(HEAD)) {
+    if (!getSpecies(id)) continue;
+    // the whole GUI span, not the randomisation span: this is a hand-tuning bug and the sliders
+    // are what the user actually drags
+    for (const spread of [0.10, 0.44, 0.60, 0.75, 0.90]) {
+      for (const tilt of [-0.6, 0, 0.3, 0.9]) {
+        const over = { [SPREAD[id]]: spread };
+        if (id === 'owl') over.tuftTilt = tilt; else over.earTilt = tilt;
+        const d = deepest(id, over);
+        assert.ok(d < 0.98,
+          `${id}: the ear must stay in the head -- deepest point is ${d.toFixed(3)} of the way `
+          + `out at spread ${spread}, tilt ${tilt}`);
+      }
+    }
+  }
+}
+
 console.log('npc.js rig self-check: all assertions passed');

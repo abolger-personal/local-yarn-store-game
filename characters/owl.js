@@ -199,7 +199,7 @@ function buildKit(ctx, P) {
   // tufts fill the ears slot: not anatomically ears, but rigged as them so they can express
   addConeEars(ctx, P, {
     size: P.tuftSize, length: P.tuftSize * 2.4,
-    spread: P.tuftSpread, tilt: P.tuftTilt, lift: 0.55,
+    spread: P.tuftSpread, tilt: P.tuftTilt, lift: 0.55, head: headScale(P),
   });
   for (const { node, side } of ctx.joints.upperArm) addWing(node, side, ctx, P);
 }

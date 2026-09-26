@@ -242,7 +242,7 @@ function buildKit(ctx, P) {
   addEars(ctx, P, {
     size: P.earWidth, length: P.earLength, shape: 'leaf',
     spread: P.earSpread, tilt: P.earTilt, lift: 0.72, back: -0.10,
-    flatten: P.earFlatten,
+    flatten: P.earFlatten, head: headScale(P),
   });
   addTorsoFleece(ctx, P);
   addNeckFleece(ctx, P);

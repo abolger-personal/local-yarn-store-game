@@ -252,9 +252,11 @@ const curlSize = (P, shape) => (P.maneAutoSize
  * The shell is scaled [spread, spread*tall, spread] and moved by (0, -drop, push) inside the head,
  * so in its unit space the skull is still an axis-aligned ellipsoid: offset and squashed.
  *
- * ponytail: this puts drop, push and tall into the geometry cache key, so randomised lions
- * stop sharing a mane geometry (~0.5-1.5k verts each). Upgrade if a crowd ever shows the cost:
- * quantise these three, or do the seating in the vertex shader.
+ * ponytail: drop, push and tall are now in the geometry cache key. That costs nothing new --
+ * measured, 60 random lions already made 60 distinct manes before this, because maneTouch and
+ * maneFaceGap are drawn continuously and both were already in the key. ~1k triangles each, one
+ * draw call. Upgrade if a big crowd ever shows the memory: quantise the drawn values so lions
+ * share geometry.
  */
 const skullInShell = (P) => ({
   centre: [0, P.maneDrop / P.maneTall, -P.manePush],

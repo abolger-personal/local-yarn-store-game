@@ -31,12 +31,23 @@ const TAU = Math.PI * 2;
 
 // ---------------------------------------------------------------- vocabulary (spec §2)
 
-export const STITCHES = Object.freeze(['plain', 'rib', 'garter', 'seed', 'waffle', 'puff', 'cable', 'lace']);
+// Stitches by craft (spec §2b.5). Not true to the real world -- you can knit lace -- but what the
+// relief budget can tell apart; revisit in a later optimising pass. The first of each is its plain.
+export const STITCHES_BY_CRAFT = Object.freeze({
+  knit: Object.freeze(['stockinette', 'rib', 'garter', 'seed', 'linen stitch', 'cable']),
+  crochet: Object.freeze(['single crochet', 'waffle', 'puff', 'lace']),
+});
+export const STITCHES = Object.freeze(Object.values(STITCHES_BY_CRAFT).flat());
+export const CRAFTS = Object.freeze(Object.keys(STITCHES_BY_CRAFT));
+/** The stitch as worked in `craft`: a stitch from the other craft falls back to this one's plain. */
+export function craftStitch(craft, stitch) {
+  const list = STITCHES_BY_CRAFT[craft] ?? STITCHES_BY_CRAFT.knit;
+  return list.includes(stitch) ? stitch : list[0];
+}
 export const COLOURWORKS = Object.freeze(['solid', 'stripes', 'checks', 'colour-block', 'motif', 'fair isle', 'marled']);
 export const EDGES = Object.freeze(['none', 'rolled', 'ribbed', 'fringed', 'picot', 'scalloped']);
 export const FORMS = Object.freeze(['draped', 'wrapped once', 'wrapped twice', 'tied', 'tucked']);
 export const ACCESSORIES = Object.freeze(['none', 'pom-pom', 'tassel', 'buttons', 'flower']);
-export const CRAFTS = Object.freeze(['knit', 'crochet']);
 export const SLEEVES = Object.freeze(['none', 'short', 'long']);
 export { YARN_WEIGHT_NAMES as WEIGHTS, YARN_MATERIALS as FIBRES };
 
@@ -69,9 +80,9 @@ export function defaultItem(type) {
   const g = GARMENTS[type];
   return {
     on: type === 'scarf', silhouette: g.silhouettes[0], fit: 1,
-    weight: 'worsted', fibre: 'wool', craft: 'knit',
+    weight: 'worsted', tool: null, fibre: 'wool', craft: 'knit',
     colorCount: 1, ...Object.fromEntries(colourKeys(MAX_COLOURS).map((k, i) => [k, PALETTE[i]])),
-    colourwork: 'solid', stitch: 'plain', edge: g.edge, accessory: 'none',
+    colourwork: 'solid', stitch: 'stockinette', edge: g.edge, accessory: 'none',
     form: 'wrapped once', sleeves: 'long',
   };
 }
@@ -88,6 +99,27 @@ const STITCH_W = Object.freeze({
   worsted: 0.0058, aran: 0.0065, bulky: 0.0085, 'super-bulky': 0.011,
 });
 
+// The usual needle or hook for each weight, in mm (Craft Yarn Council's ranges, mid-range). A
+// pattern names its own tool; when it doesn't, it is this one.
+const TOOL_MM = Object.freeze({
+  knit: { lace: 2, fingering: 2.75, sport: 3.5, dk: 4, worsted: 5, aran: 5.5, bulky: 7, 'super-bulky': 10 },
+  crochet: { lace: 2, fingering: 3, sport: 4, dk: 5, worsted: 6, aran: 6.5, bulky: 8, 'super-bulky': 10 },
+});
+export const TOOL_RANGE = Object.freeze([1.5, 15]);
+export const usualTool = (craft, weight) => (TOOL_MM[craft] ?? TOOL_MM.knit)[weight] ?? 5;
+
+/**
+ * A stitch's width in REAL gauge, from the yarn and the tool together: yarn ** 0.4 x tool ** 0.6,
+ * the tool the larger share. Both bigger, bigger stitch (spec §3). Worsted on the worsted needle is
+ * STITCH_W.worsted. Fit and the drawn stitch size both come from this.
+ */
+const TOOL_SHARE = 0.6;
+const MM = STITCH_W.worsted / TOOL_MM.knit.worsted;   // world units per mm of tool
+function realWidth(item) {
+  const tool = item.tool ?? usualTool(item.craft, item.weight);
+  return (STITCH_W[item.weight] ?? STITCH_W.worsted) ** (1 - TOOL_SHARE) * (tool * MM) ** TOOL_SHARE;
+}
+
 // Drape per fibre, 0 stiff .. 1 fluid (spec §3, proposed order). Picks how far ends and hems
 // stand off the body; there is no cloth simulation.
 const DRAPE = Object.freeze({
@@ -95,23 +127,87 @@ const DRAPE = Object.freeze({
 });
 
 /**
- * Knobs the dress-up page exposes. `stitchScale` is the stylisation: at 150px real stitches are
- * sub-pixel, so relief is drawn several times real size (spec §2, "big relief"). Mutable on purpose,
- * so the page can tune them live; nothing in the shop should write them.
+ * Knobs the dress-up page exposes. Mutable on purpose, so the page can tune them live; nothing in
+ * the shop should write them.
+ * - `stitchScale`: the stylisation, drawn stitch over real. Real stitches are sub-pixel at 150px, so
+ *   they are drawn larger (spec §2, "big relief").
+ * - `relief`: an overall depth, over each stitch's own (DEPTH).
+ * - `viewPx`: the on-screen character height garments are built for; 0 is no limit (close-ups).
+ *   Where a stitch would be under MIN_STITCH_PX there, its relief is not built (forView).
+ *
+ * Tuned by eye on the dress-up page, 2026-09-27, across the yarn weights, every crochet stitch and
+ * every hat. A `spread` knob that squeezed the weights towards super-bulky ended up at 1 -- real
+ * gauge -- so it was removed: weights read apart at their real ratios.
  */
-export const LOOK = { stitchScale: 3, relief: 0.9, rim: 0.35 };
+export const LOOK = { stitchScale: 2.1, relief: 1.8, rim: 0.42, viewPx: 150 };
 
-/** The resolved numbers a builder works from. */
-function fabric(item) {
-  const stitch = (STITCH_W[item.weight] ?? STITCH_W.worsted) * LOOK.stitchScale;
+// Below this many pixels a stitch, relief is shading noise, not texture: measured 2026-09-27 at
+// 150px, a lace-weight stitch is 0.9px and its relief ran to several triangles a pixel -- which
+// the GPU shades in 2x2 blocks, so about four times their size (WEARABLE-LOOK-VS-PERFORMANCE.md).
+const MIN_STITCH_PX = 1.5;
+
+/**
+ * The fabric as it can be seen at LOOK.viewPx: a stitch too small to see there is built as its
+ * craft's plain -- no relief, no crochet bumps, no lace holes. Colourwork, hatching, edges and the
+ * silhouette still carry the item.
+ */
+function forView(f, fit) {
+  if (!LOOK.viewPx || (f.stitchW * LOOK.viewPx) / fit.height >= MIN_STITCH_PX) return f;
+  return { ...f, stitch: (STITCHES_BY_CRAFT[f.craft] ?? STITCHES_BY_CRAFT.knit)[0], bump: 0 };
+}
+
+// Per craft (spec §2b.5): crochet rows stand taller than knit's, its fabric is thicker, and it is
+// bumpy all over, under whatever stitch -- knit is smooth. `bump` is in stitch widths.
+const CRAFT = Object.freeze({
+  knit: { row: 0.75, thick: 1, bump: 0 },
+  crochet: { row: 1.05, thick: 1.3, bump: 0.35 },
+});
+
+// Row height against the craft's own, where a stitch packs its rows differently: garter's ridges
+// and linen stitch's slipped dashes pull rows together; puffs stand tall.
+const ROW = Object.freeze({ garter: 0.6, 'linen stitch': 0.65, puff: 1.15 });
+
+/**
+ * The resolved numbers a builder works from, at fit 1 -- the pattern's own tool (spec §2b):
+ * - Stitch width is its real width (yarn and tool, realWidth) times `stitchScale`: neighbouring
+ *   weights look different, or a player has no reason to help find the right one.
+ * - Row height is the craft's, then the stitch's. It is also how wide a stripe is.
+ * - Fabric thickness is yarn weight's alone, and keeps the real spread: it is the input weight
+ *   dominates (spec §2b.2). Crochet is thicker than knit.
+ * - Relief depth is the stitch's (DEPTH), in stitch widths, so it grows with the stitch.
+ * - A tool off the usual one for the yarn opens or tightens the stitch through realWidth: width
+ *   and rows, never thickness. Fit comes from the same number, in madeItem.
+ */
+export function fabric(item) {
+  const g = STITCH_W[item.weight] ?? STITCH_W.worsted;
+  const craft = CRAFT[item.craft] ?? CRAFT.knit;
+  const stitch = craftStitch(item.craft, item.stitch);
+  const width = realWidth(item) * LOOK.stitchScale;
   return {
-    ...item,
-    stitchW: stitch, rowH: stitch * 0.8,
-    thick: stitch * 1.1,                     // a knit fabric is about two yarn diameters
+    ...item, stitch,
+    stitchW: width, rowH: width * craft.row * (ROW[stitch] ?? 1),
+    thick: g * LOOK.stitchScale * 1.1 * craft.thick,   // a knit fabric is about two yarn diameters
+    bump: craft.bump,
     drape: DRAPE[item.fibre] ?? 0.45,
     colours: colourKeys(Math.min(item.colorCount, MAX_COLOURS)).map((k) => new THREE.Color(item[k] ?? PALETTE[0])),
     colourwork: resolveColourwork(item.colourwork, item.colorCount),
   };
+}
+
+/**
+ * What an NPC actually makes from a pattern (spec §3): the pattern, with whatever it used instead --
+ * `used` holds only what differs (`tool`, `weight`, `fibre`, colours, a different stitch, edge,
+ * accessory or colourwork). Fit is not chosen: it is how much wider the stitches it made are than
+ * the pattern's, in REAL gauge (yarn weight and tool), so worsted on a fingering pattern comes out
+ * big and a good fit is the pattern's own yarn and tool -- the player's doing. `used.fit` forces it.
+ */
+export function madeItem(pattern, used = {}) {
+  const tool = pattern.tool ?? usualTool(pattern.craft, pattern.weight);
+  const made = { ...pattern, tool, ...used };
+  made.tool = used.tool ?? tool;
+  made.stitch = craftStitch(made.craft, made.stitch);
+  made.fit = used.fit ?? Math.min(FIT_RANGE[1], Math.max(FIT_RANGE[0], realWidth(made) / realWidth({ ...pattern, tool })));
+  return made;
 }
 
 /**
@@ -171,6 +267,7 @@ export function bodyFit(built) {
   const armR = Math.max(extent(arm, 'x'), extent(arm, 'z'));
   return {
     P, joints: j, floor,
+    height: new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3()).y,   // for forView
     head: [extent(head, 'x'), head.max.y, Math.max(-head.min.z, P.headRadius)],
     skull: skullRadii(j.head),
     torso: [extent(chest, 'x'), Math.max(chest.max.y, -chest.min.y), extent(chest, 'z')],
@@ -277,43 +374,76 @@ const fract = (x) => x - Math.floor(x);
 
 // Height 0..1 at stitch coordinates (us across, vs along). "Big relief": geometry, not a normal map.
 const RELIEF = {
-  plain: () => 0,
+  stockinette: () => 0,
+  'single crochet': () => 0,
+  // Slipped stitches: a short dash every other stitch, the dashes staggered row to row.
+  'linen stitch': (us, vs) => Math.max(0, Math.cos(Math.PI * (us + (Math.floor(vs) % 2)))) * Math.sin(Math.PI * fract(vs)),
   rib: (us) => (0.5 + 0.5 * Math.cos((TAU * us) / 4)) ** 2,
   garter: (us, vs) => 0.5 + 0.5 * Math.cos((TAU * vs) / 2),
   seed: (us, vs) => 0.5 + 0.5 * Math.sin(Math.PI * us) * Math.sin(Math.PI * vs),
   waffle: (us, vs) => Math.max(Math.abs(Math.cos((Math.PI * us) / 2)), Math.abs(Math.cos((Math.PI * vs) / 2))) ** 6,
-  puff: (us, vs) => Math.max(0, Math.sin((TAU * us) / 4) * Math.sin((TAU * vs) / 4)) ** 0.7,
+  // Poofs: round pillows three stitches by three rows, bricked -- each other row shifted half a puff.
+  // A dome, round on top and easing into the fabric at its edge -- a fuller dome walls up there,
+  // and a sharpened sine peaks: both read as spikes.
+  puff: (us, vs) => {
+    const row = Math.floor(vs / 3);
+    const d = 2 * Math.hypot(fract((us + (row % 2) * 1.5) / 3) - 0.5, fract(vs / 3) - 0.5);
+    return d >= 1 ? 0 : (1 - d * d) ** 1.5;
+  },
   cable: (us, vs) => Math.max(0, 1 - Math.abs(fract(us / 8) - 0.5 - 0.22 * Math.sin((TAU * vs) / 6)) * 5),
   lace: () => 0,
 };
 
-// Crochet's plain base is bumpier than knit's smooth rows (spec §2, proposed).
-const crochetBase = (us, vs) => 0.35 * (0.5 + 0.5 * Math.sin(TAU * us) * Math.sin(TAU * vs));
+// Crochet is bumpy under every stitch (CRAFT.bump says how deep). One knot spans two stitches and
+// two rows: a knot per stitch needs nine vertices a stitch to show, ~100k triangles on a lace hat.
+const crochetBase = (us, vs) => 0.5 + 0.5 * Math.sin(Math.PI * us) * Math.sin(Math.PI * vs);
 
-// Segments per stitch each relief needs to show at all. Plain needs none beyond the shape.
-const DENSITY = { plain: 0, rib: 2, garter: 1, seed: 2, waffle: 1.5, puff: 1.5, cable: 2, lace: 2 };
+// How deep each stitch stands, in stitch widths -- the input stitch dominates is texture (spec
+// §2b.3). Spread wide on purpose: the stitches have to read as different at 150px.
+const DEPTH = Object.freeze({
+  stockinette: 0, rib: 0.6, garter: 0.45, seed: 0.4, 'linen stitch': 0.35, cable: 0.9,
+  // Puff is low for its width: a poof is wide and soft, and at 0.9 the puffs stood as tall as wide.
+  'single crochet': 0, waffle: 0.6, puff: 0.5, lace: 0.2,
+});
 
-/** A lace hole every three stitches, offset on alternate courses (spec §2: cut, not alpha-tested). */
+// Segments [per stitch across, per row along] each relief needs: at least three per repeat of its
+// pattern in that direction, or the sampled pattern aliases. At exactly two a repeat, a sine is
+// sampled at its zeros and vanishes -- which is how crochet's bumps, garter's ridges and linen
+// stitch's dashes went missing. The plains need none beyond the shape.
+const DENSITY = Object.freeze({
+  stockinette: [0, 0], rib: [2, 0], garter: [0, 1.5], seed: [1.5, 1.5], 'linen stitch': [1.5, 3], cable: [2, 0.75],
+  'single crochet': [0, 0], waffle: [1.5, 1.5], puff: [2.5, 2.5], lace: [2.5, 2.5],
+});
+const CROCHET_DENSITY = [1.5, 1.5];   // its knot repeats every two stitches and two rows
+
+/**
+ * A lace hole every three stitches, offset on alternate courses (spec §2: cut, not alpha-tested).
+ * About 1.8 stitches across, so it reads as a hole at 150px -- 0.6 across was lost in the texture.
+ */
 const laceHole = (us, vs) => {
   const row = Math.floor(vs / 3);
   const a = fract(us / 3 + (row % 2) * 0.5) - 0.5, b = fract(vs / 3) - 0.5;
-  return a * a + b * b < 0.04;
+  return a * a + b * b < 0.09;
 };
 
 // Stitches across one repeat of each stitch and colourwork (RELIEF, COLOURWORK, laceHole). Marled
 // is a speckle with no repeat; its seam column may differ, which a speckle hides.
-const U_REPEAT = { rib: 4, seed: 2, waffle: 2, puff: 4, cable: 8, lace: 3, checks: 8, motif: 6, 'fair isle': 6 };
+const U_REPEAT = { rib: 4, seed: 2, 'linen stitch': 2, waffle: 2, puff: 3, cable: 8, lace: 3, checks: 8, motif: 6, 'fair isle': 6 };
 const gcd = (a, b) => (b ? gcd(b, a % b) : a);
 const lcm = (a, b) => (a * b) / gcd(a, b);
 const castOn = (stitches, repeat) => Math.max(1, Math.round(stitches / repeat)) * repeat;
 
 function relieve(geo, f, reps, seam) {
-  const h = f.stitch === 'plain' && f.craft === 'crochet' ? crochetBase : RELIEF[f.stitch] ?? RELIEF.plain;
-  if (h === RELIEF.plain) return;
+  const depth = DEPTH[f.stitch] ?? 0, bump = f.bump ?? 0;
+  if (!depth && !bump) return;
+  const h = RELIEF[f.stitch] ?? RELIEF.stockinette;
   const p = geo.attributes.position, n = geo.attributes.normal, uv = geo.attributes.uv;
-  const amp = f.thick * LOOK.relief;
+  const amp = f.stitchW * LOOK.relief;
   for (let i = 0; i < p.count; i++) {
-    const d = amp * h(uv.getX(i) * reps[0], uv.getY(i) * reps[1]);
+    const us = uv.getX(i) * reps[0], vs = uv.getY(i) * reps[1];
+    // Puff is its own crochet texture: the bumps stacked on it peaked into spikes, and between the
+    // puffs, at a puff's height, they were as loud as the puffs.
+    const d = amp * (depth * h(us, vs) + (f.stitch === 'puff' ? 0 : bump * crochetBase(us, vs)));
     p.setXYZ(i, p.getX(i) + n.getX(i) * d, p.getY(i) + n.getY(i) * d, p.getZ(i) + n.getZ(i) * d);
   }
   normals(geo, seam);   // re-weld the seam: a bare computeVertexNormals creases it again
@@ -385,10 +515,10 @@ function panel(fn, f, { closedU = false, mask = null, from = null, minU = 24, mi
   const reps = [lu / f.stitchW, lv / f.rowH];
   // In the round, cast on a whole number of pattern repeats, as a knitter does: otherwise the
   // stitch and colour patterns jump where the sheet meets itself, and relief opens a seam there.
-  if (closedU) reps[0] = castOn(reps[0], lcm(U_REPEAT[f.stitch] ?? 1, U_REPEAT[f.colourwork] ?? 1));
-  const dense = DENSITY[f.stitch] ?? 0;
-  const segU = Math.min(256, Math.max(minU, Math.ceil(reps[0] * dense)));
-  const segV = Math.min(192, Math.max(minV, Math.ceil(reps[1] * dense * 0.8)));
+  if (closedU) reps[0] = castOn(reps[0], lcm(lcm(U_REPEAT[f.stitch] ?? 1, U_REPEAT[f.colourwork] ?? 1), f.bump ? 2 : 1));
+  const [du, dv] = DENSITY[f.stitch] ?? [0, 0], [cu, cv] = f.bump ? CROCHET_DENSITY : [0, 0];
+  const segU = Math.min(256, Math.max(minU, Math.ceil(reps[0] * Math.max(du, cu))));
+  const segV = Math.min(192, Math.max(minV, Math.ceil(reps[1] * Math.max(dv, cv))));
   const lace = f.stitch === 'lace' ? (u, v) => laceHole(u * reps[0], v * reps[1]) : null;
   const holes = lace && mask ? (u, v) => mask(u, v) || lace(u, v) : lace ?? mask;
   const geo = sheet(fn, segU, segV, { closedU, mask: holes, from });
@@ -402,11 +532,21 @@ const piece = (joint, geo) => ({ joint, geo });
 // ---------------------------------------------------------------- edges (spec §2)
 
 /** A boundary of a panel, sampled: the points an edge treatment runs along. */
+/**
+ * A boundary of a panel, sampled: the points an edge treatment runs along, and at each the way the
+ * fabric runs on past it (`flow`), so a scallop or a picot can continue the fabric, not stick out.
+ */
 function ring(fn, v, samples = 48, { closed = true, u0 = 0, u1 = 1 } = {}) {
-  const pts = [];
+  const pts = [], flow = [];
   const n = closed ? samples : samples + 1;
-  for (let i = 0; i < n; i++) pts.push(fn(u0 + ((u1 - u0) * i) / samples, v, new THREE.Vector3()));
-  return { pts, closed };
+  const inward = v >= 0.5 ? v - 0.02 : v + 0.02;
+  for (let i = 0; i < n; i++) {
+    const u = u0 + ((u1 - u0) * i) / samples;
+    const p = fn(u, v, new THREE.Vector3());
+    pts.push(p);
+    flow.push(p.clone().sub(fn(u, inward, new THREE.Vector3())).normalize());
+  }
+  return { pts, closed, flow };
 }
 
 function tubeAlong({ pts, closed }, radius, radial = 8) {
@@ -414,12 +554,27 @@ function tubeAlong({ pts, closed }, radius, radial = 8) {
   return new THREE.TubeGeometry(curve, Math.max(16, pts.length * 2), radius, radial, closed);
 }
 
-function beads({ pts, closed }, spacing, make) {
+const DOWN = new THREE.Vector3(0, -1, 0);
+
+/** `make(point, tangent, flow)` at every `spacing` along an edge; `make` may return one geometry or several. */
+function beads({ pts, closed, flow }, spacing, make) {
   const curve = new THREE.CatmullRomCurve3(pts, closed);
   const count = Math.max(3, Math.floor(curve.getLength() / spacing));
   const geos = [];
-  for (let i = 0; i < count; i++) geos.push(make(curve.getPointAt(closed ? i / count : i / (count - 1))));
+  for (let i = 0; i < count; i++) {
+    const t = closed ? i / count : i / (count - 1);
+    const along = flow?.[Math.round(t * (closed ? pts.length : pts.length - 1)) % pts.length] ?? DOWN;
+    geos.push(...[make(curve.getPointAt(t), curve.getTangentAt(t), along)].flat());
+  }
   return geos;
+}
+
+/** Geometry built in an edge's own frame -- x along the edge, -y the way the fabric runs on -- moved there. */
+function onEdge(geo, p, tangent, flow) {
+  const x = tangent.clone().normalize(), y = flow.clone().negate();
+  y.addScaledVector(x, -y.dot(x)).normalize();
+  const z = new THREE.Vector3().crossVectors(x, y);
+  return geo.applyMatrix4(new THREE.Matrix4().makeBasis(x, y, z).setPosition(p));
 }
 
 const at = (geo, p, s) => geo.scale(...s).translate(p.x, p.y, p.z);
@@ -444,8 +599,18 @@ const EDGE = {
     const len = f.thick * 7 * (0.6 + 0.4 * f.drape);
     return new THREE.CylinderGeometry(f.thick * 0.35, f.thick * 0.25, len, 5).translate(p.x, p.y - len / 2, p.z);
   }),
-  picot: (r, f) => beads(r, f.thick * 2.6, (p) => at(new THREE.SphereGeometry(1, 6, 4), p, [f.thick * 0.45, f.thick * 0.45, f.thick * 0.45])),
-  scalloped: (r, f) => beads(r, f.thick * 2.4, (p) => at(new THREE.SphereGeometry(1, 8, 5), p.clone().setY(p.y - f.thick * 0.5), [f.thick, f.thick * 0.55, f.thick])),
+  // A small triangular point carrying on past the edge, flat in the fabric, with a tiny loop at its tip.
+  picot: (r, f) => beads(r, f.thick * 3, (p, tangent, flow) => {
+    const w = f.thick * 0.8, h = f.thick * 2.2;
+    const point = new THREE.ConeGeometry(w, h, 4).rotateZ(Math.PI).translate(0, -h / 2, 0).scale(1, 1, 0.45);
+    const loop = new THREE.TorusGeometry(w * 0.5, w * 0.16, 4, 10).translate(0, -h - w * 0.4, 0);
+    return [onEdge(point, p, tangent, flow), onEdge(loop, p, tangent, flow)];
+  }),
+  // Half-discs lying in the fabric's own surface, hanging on past the edge: a border, not a frill.
+  scalloped: (r, f) => beads(r, f.thick * 2.4, (p, tangent, flow) => {
+    const R = f.thick * 1.35;
+    return onEdge(new THREE.SphereGeometry(1, 10, 6).scale(R, R, f.thick * 0.5).translate(0, -R * 0.15, 0), p, tangent, flow);
+  }),
 };
 
 function edgePieces(joint, rings, f) {
@@ -495,8 +660,12 @@ function accessoryPieces(anchors, f) {
   const list = anchors?.[f.accessory];
   if (!make || !list) return [];
   const colour = trimColour(f);
+  // A button's anchor is on the surface BEFORE relief: lift it clear of the deepest stitch, or it
+  // sits half-buried in the fabric and the raised stitches hide it.
+  const proud = (size) => size * 0.2 + f.stitchW * LOOK.relief * ((DEPTH[f.stitch] ?? 0) + (f.bump ?? 0));
   return list.flatMap(({ joint, p, n, size }) => make(size).map((g) => {
     if (n && f.accessory !== 'pom-pom' && f.accessory !== 'tassel') g.applyQuaternion(_q.setFromUnitVectors(_z, n));
+    if (n && f.accessory === 'buttons') g.translate(n.x * proud(size), n.y * proud(size), n.z * proud(size));
     return piece(joint, flatColour(g.translate(p.x, p.y, p.z), colour));
   }));
 }
@@ -552,6 +721,18 @@ const dome = (top, low) => (v) => {
 // sits flat and leans sideways instead.
 const HAT_PITCH = THREE.MathUtils.degToRad(35);
 
+// Pom-pom size, from the body it sits on and never from the stitch size: a pom-pom is wound to the
+// size wanted, whatever the yarn, and sized from fabric thickness the stitch-size slider blew it up.
+// Each matches what it was at the default worsted x3 on the owl and lion.
+const POM_OF_HEAD = 0.4, POM_OF_TORSO = 0.36, POM_OF_SHIN = 1.8;
+// Button radius, the same way. Big enough to read at 150px: a torso button is ~12% of its width.
+const BUTTON_OF_HEAD = 0.14, BUTTON_OF_TORSO = 0.11, BUTTON_OF_SHIN = 0.6;
+
+/** A row of `count` buttons centred on `p`, a little over a button apart along `dir` (down by default). */
+function buttonRow(joint, p, n, size, count, dir = new THREE.Vector3(0, -1, 0)) {
+  return Array.from({ length: count }, (_, i) => ({ joint, p: p.clone().addScaledVector(dir, (i - (count - 1) / 2) * size * 2.6), n, size }));
+}
+
 /**
  * A slouch is a bag, not a dome: twice the head's height of fabric, fuller than the head above the
  * band, with a rounded end. `flop` folds it back over the crown so the end hangs down behind.
@@ -572,7 +753,8 @@ const HAT = {
     ? [lerp(0, 1.4, v / 0.55), lerp(1.18, 1.0, v / 0.55)]
     : [lerp(1.4, 0.92, (v - 0.55) / 0.45), lerp(1.0, 0.44, (v - 0.55) / 0.45)]) },
   earflap: { profile: dome(1.06, 0.3), seat: 0.3, flaps: true },
-  hood: { profile: dome(1.1, -0.95), seat: 0.44, face: true },
+  // eyesOut: a llama's eyes are on the sides of its head, outside the face opening, and were hidden.
+  hood: { profile: dome(1.1, -0.95), seat: 0.44, face: true, eyesOut: true },
   headband: { seat: 0.45, soft: 0.3, open: true, profile: (v) => { const y = lerp(0.79, 0.11, v); return [Math.sqrt(1 - y * y) * 1.05, y]; } },
   bucket: { seat: 0.35, soft: 0.5, profile: (v) => (v < 0.75 ? dome(1.05, 0.35)(v / 0.75) : [lerp(0.99, 1.45, (v - 0.75) / 0.25), lerp(0.35, 0.08, (v - 0.75) / 0.25)]) },
   cloche: { seat: 0.1, profile: (v) => (v < 0.85 ? dome(1.05, 0.0)(v / 0.85) : [lerp(1.04, 1.18, (v - 0.85) / 0.15), lerp(0.0, -0.1, (v - 0.85) / 0.15)]) },
@@ -674,17 +856,18 @@ function buildHat(fit, f) {
   const pieces = [piece(head, panel(body, f, { closedU: !spec.face, from: (p) => p.set(0, 0, 0) }))];
   if (spec.flaps) pieces.push(...earflaps(fn, head, f, r, 1 + f.thick / r[1]));
   pieces.push(...edgePieces(head, [ring(body, 1, 48, { closed: !spec.face })], f));
-  return [...pieces, ...accessoryPieces(hatAnchors(fn, head, Math.max(f.thick * 3.5, r[1] * 0.28) * s, f), f)];
+  return [...pieces, ...accessoryPieces(hatAnchors(fn, head, r[1] * POM_OF_HEAD * s, r[1] * BUTTON_OF_HEAD * s), f)];
 }
 
-function hatAnchors(fn, head, size, f) {
+function hatAnchors(fn, head, size, buttonSize) {
   const top = fn(0, 0, new THREE.Vector3());
   const side = fn(0.25, 0.6, new THREE.Vector3());
+  const band = [0, 1, 2, 3, 4].map((i) => fn(0.19 + i * 0.03, 0.78, new THREE.Vector3()));
   return {
     'pom-pom': [{ joint: head, p: top.clone().addScaledVector(top.clone().normalize(), size), size }],
     tassel: [{ joint: head, p: top, size: size * 0.8 }],
     flower: [{ joint: head, p: side, n: side.clone().normalize(), size: size * 0.7 }],
-    buttons: [{ joint: head, p: side, n: side.clone().normalize(), size: f.thick * 1.6 }],
+    buttons: band.map((p) => ({ joint: head, p, n: p.clone().normalize(), size: buttonSize })),
   };
 }
 
@@ -798,9 +981,10 @@ function coverUnderHat(built, f) {
   const cover = hatCover(fit, f);
   const head = built.joints.head, skull = skullMesh(head);
   const q = new THREE.Vector3();
-  // Ears are worn up through an open-top hat (a headband), and out of a fisherman's hat: only eyes go under.
+  // Ears are worn up through an open-top hat (a headband) and out of a fisherman's hat; a hood keeps
+  // the eyes out.
   const spec = HAT[f.silhouette] ?? HAT.beanie;
-  const parts = spec.open || spec.earsOut ? built.joints.eye : [...built.joints.eye, ...built.joints.ear];
+  const parts = [...(spec.eyesOut ? [] : built.joints.eye), ...(spec.open || spec.earsOut ? [] : built.joints.ear)];
   for (const { node } of parts) {
     if (!node.visible || !cover.under(head.worldToLocal(node.getWorldPosition(q)))) continue;
     node.visible = false;
@@ -959,7 +1143,8 @@ function scarfEnds(fit, f, spec, s, chest) {
     const path = endPath(fit, f, x, k * fit.torso[1] * s * tuck, { back: spec.back && i === 1 });
     out.pieces.push(piece(chest, strip(path, width, f, { from: (p) => p.set(0, p.y, 0) })));
     const tip = path.at(-1);
-    out.tips.push({ pts: [tip.clone().setX(tip.x - width / 2), tip, tip.clone().setX(tip.x + width / 2)], closed: false });
+    const run = tip.clone().sub(path.at(-2)).normalize();
+    out.tips.push({ pts: [tip.clone().setX(tip.x - width / 2), tip, tip.clone().setX(tip.x + width / 2)], closed: false, flow: [run, run, run] });
     out.anchors.tassel.push({ joint: chest, p: tip, size: width * 0.35 });
     out.anchors['pom-pom'].push({ joint: chest, p: tip, size: width * 0.3 });
   });
@@ -970,7 +1155,7 @@ function scarfEnds(fit, f, spec, s, chest) {
 function midAnchors(fit, f, chest, width, anchors) {
   const mid = endPath(fit, f, 0, fit.torso[1] * 0.5)[3];
   anchors.flower.push({ joint: chest, p: mid, n: new THREE.Vector3(0, 0, 1), size: width * 0.4 });
-  anchors.buttons.push({ joint: chest, p: mid, n: new THREE.Vector3(0, 0, 1), size: f.thick * 1.6 });
+  anchors.buttons.push(...buttonRow(chest, mid, new THREE.Vector3(0, 0, 1), fit.torso[0] * BUTTON_OF_TORSO, 3));
 }
 
 /** A cowl is a band, not a loop: it covers as much of the neck as there is, tallest on a llama. */
@@ -985,7 +1170,7 @@ function cowl(fit, f, neck, girth) {
   const geo = panel(fn, f, { closedU: true, from: (p) => p.set(0, p.y, 0) });
   const side = fn(0, 0.5, new THREE.Vector3());
   const anchors = { flower: [{ joint: neck, p: side, n: new THREE.Vector3(0, 0, 1), size: girth * 1.4 }],
-    buttons: [0.3, 0.7].map((v) => ({ joint: neck, p: fn(0.02, v, new THREE.Vector3()), n: new THREE.Vector3(0, 0, 1), size: f.thick * 1.4 })) };
+    buttons: [0.2, 0.5, 0.8].map((v) => ({ joint: neck, p: fn(0.02, v, new THREE.Vector3()), n: new THREE.Vector3(0, 0, 1), size: fit.torso[0] * BUTTON_OF_TORSO * 0.8 })) };
   return [piece(neck, geo), ...edgePieces(neck, [ring(fn, 1), ring(fn, 0)], f), ...accessoryPieces(anchors, f)];
 }
 
@@ -1054,17 +1239,17 @@ function buildShawl(fit, f) {
   if (spec.ends) pieces.push(...shawlEnds(fit, f, chest));
   if (spec.sleeves) pieces.push(...shrugSleeves(fit, f));
   const acc = spec.button && f.accessory === 'none' ? { ...f, accessory: 'buttons' } : f;
-  return [...pieces, ...accessoryPieces(shawlAnchors(fn, chest, front, f), acc)];
+  return [...pieces, ...accessoryPieces(shawlAnchors(fn, chest, front, f, fit.torso[0]), acc)];
 }
 
 
-function shawlAnchors(fn, chest, front, f) {
+function shawlAnchors(fn, chest, front, f, torso) {
   const low = fn(0.5, 1, new THREE.Vector3());
   return {
-    buttons: [{ joint: chest, p: front, n: new THREE.Vector3(0, 0, 1), size: f.thick * 1.8 }],
+    buttons: buttonRow(chest, front, new THREE.Vector3(0, 0, 1), torso * BUTTON_OF_TORSO, 3),
     flower: [{ joint: chest, p: fn(0.08, 0.3, new THREE.Vector3()), n: new THREE.Vector3(0, 0, 1), size: f.thick * 4 }],
     tassel: [{ joint: chest, p: low, size: f.thick * 5 }],
-    'pom-pom': [{ joint: chest, p: low, size: f.thick * 4 }],
+    'pom-pom': [{ joint: chest, p: low, size: torso * POM_OF_TORSO }],
   };
 }
 
@@ -1136,7 +1321,7 @@ function buildSweater(fit, f) {
   if (spec.collar) pieces.push(...cowl(fit, { ...f, fit: 1, accessory: 'none' }, fit.joints.neck, f.thick * 1.6));
   const line = [0.1, 0.3, 0.5, 0.7, 0.9].map((v) => fn(0, v * 0.8, new THREE.Vector3()));
   const anchors = {
-    buttons: (spec.open ? line : line.slice(0, 2)).map((p) => ({ joint: chest, p, n: new THREE.Vector3(0, 0, 1), size: f.thick * 1.4 })),
+    buttons: (spec.open ? line : line.slice(0, 2)).map((p) => ({ joint: chest, p, n: new THREE.Vector3(0, 0, 1), size: fit.torso[0] * BUTTON_OF_TORSO })),
     flower: [{ joint: chest, p: fn(0.06, 0.25, new THREE.Vector3()), n: new THREE.Vector3(0, 0, 1), size: f.thick * 4 }],
   };
   const acc = spec.open && f.accessory === 'none' ? { ...f, accessory: 'buttons' } : f;
@@ -1255,14 +1440,14 @@ function buildBag(fit, f) {
   pieces.push(...strapPaths(fit, spec, centre, dims).map((pts) => piece(chest, flatColour(
     tubeAlong({ pts, closed: spec.strap === 'cross' }, f.thick * 1.2 * thin, 6), trimColour(f)))));
   pieces.push(...edgePieces(chest, [ring(fn, 0.82)], f));
-  return [...pieces, ...accessoryPieces(bagAnchors(fn, centre, chest, dims, f), f)];
+  return [...pieces, ...accessoryPieces(bagAnchors(fn, centre, chest, dims, fit.torso[0] * BUTTON_OF_TORSO * 0.8), f)];
 }
 
-function bagAnchors(fn, centre, chest, dims, f) {
+function bagAnchors(fn, centre, chest, dims, buttonSize) {
   const face = fn(0, 0.45, new THREE.Vector3());
   const n = face.clone().sub(centre).normalize();
   return {
-    buttons: [{ joint: chest, p: face, n, size: f.thick * 1.8 }],
+    buttons: buttonRow(chest, face, n, buttonSize, 3),
     flower: [{ joint: chest, p: face, n, size: dims[0] * 0.4 }],
     tassel: [{ joint: chest, p: fn(0.1, 0.95, new THREE.Vector3()), size: dims[1] * 0.35 }],
     'pom-pom': [{ joint: chest, p: fn(0, 0.05, new THREE.Vector3()), size: dims[0] * 0.25 }],
@@ -1309,10 +1494,10 @@ function sockLeg(fit, f, spec, node, { up, loose, bunch }, anchors) {
   const yTop = -tib * (1 - up), yBot = -tib * (1 - (spec.from ?? 0));
   const t = tube(yTop, yBot, (v) => (shinR(fit, lerp(yTop, yBot, v)) + f.thick * 1.2) * loose, f, { bunch });
   const cuff = t.fn(0, 0, new THREE.Vector3());
-  anchors['pom-pom'].push({ joint: node, p: t.fn(0.5, 0.2, new THREE.Vector3()), size: f.thick * 2.5 });
+  anchors['pom-pom'].push({ joint: node, p: t.fn(0.5, 0.2, new THREE.Vector3()), size: fit.leg.shinR * POM_OF_SHIN });
   anchors.tassel.push({ joint: node, p: cuff, size: f.thick * 3 });
   anchors.flower.push({ joint: node, p: cuff, n: new THREE.Vector3(0, 0, 1), size: f.thick * 3 });
-  anchors.buttons.push({ joint: node, p: t.fn(0.25, 0.3, new THREE.Vector3()), n: new THREE.Vector3(1, 0, 0), size: f.thick * 1.2 });
+  anchors.buttons.push(...[0.15, 0.3, 0.45].map((v) => ({ joint: node, p: t.fn(0.25, v, new THREE.Vector3()), n: new THREE.Vector3(1, 0, 0), size: fit.leg.shinR * BUTTON_OF_SHIN })));
   const out = [piece(node, t.geo), ...edgePieces(node, [ring(t.fn, 0)], f)];
   if (!spec.noFoot) out.push(piece(node, sockFoot(fit, f, tib)));
   return out;
@@ -1378,7 +1563,7 @@ export function outfitPieces(built, outfit) {
   const fit = bodyFit(built);
   return Object.entries(outfit)
     .filter(([type, item]) => item?.on && BUILDERS[type])
-    .flatMap(([type, item]) => BUILDERS[type](fit, fabric(item)));
+    .flatMap(([type, item]) => BUILDERS[type](fit, forView(fabric(item), fit)));
 }
 
 /**

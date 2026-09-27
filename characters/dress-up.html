@@ -45,7 +45,7 @@
   <b>LYS dress-up</b> — one outfit, three species<br />
   Drag orbit · right-drag pan · scroll zoom<br />
   <kbd>←→↑↓</kbd> orbit &nbsp; <kbd>V</kbd> front/side/back &nbsp; <kbd>T</kbd> turntable<br />
-  <kbd>R</kbd> new individuals &nbsp; <kbd>O</kbd> randomise open item<br />
+  <kbd>R</kbd> new individuals &nbsp; <kbd>O</kbd> randomise open item's pattern<br />
   <kbd>1</kbd> felted &nbsp; <kbd>2</kbd> grey &nbsp; <kbd>3</kbd> silhouette<br />
   <kbd>F</kbd> frame &nbsp; <kbd>D</kbd> 150px test &nbsp; <kbd>B</kbd> squint<br />
   <kbd>P</kbd> next pose &nbsp; <kbd>M</kbd> motion on/off &nbsp; <kbd>W</kbd> walk &nbsp; <kbd>X</kbd> next dance<br />
@@ -78,8 +78,9 @@ import {
 } from './npc.js';
 import { randomTraits } from './visit.js';
 import {
-  GARMENTS, STITCHES, COLOURWORKS, EDGES, FORMS, ACCESSORIES, CRAFTS, SLEEVES, WEIGHTS, FIBRES,
-  FIT_RANGE, LOOK, MAX_COLOURS, defaultItem, defaultOutfit, dress, undress, garmentMaterial, resolveColourwork,
+  GARMENTS, STITCHES_BY_CRAFT, COLOURWORKS, EDGES, FORMS, ACCESSORIES, CRAFTS, SLEEVES, WEIGHTS, FIBRES, craftStitch,
+  FIT_RANGE, TOOL_RANGE, LOOK, MAX_COLOURS, defaultItem, dress, undress, garmentMaterial, resolveColourwork,
+  madeItem, usualTool,
 } from './garments.js';
 import './owl.js';
 import './llama.js';
@@ -91,11 +92,47 @@ console.info('LYS build', BUILD);
 const SLOTS = ['owl', 'llama', 'lion'];
 const STORE_KEY = 'lys.dressUp.v1';
 
+// A pattern names its tool; the page keeps it a number so a slider can hold it.
+function freshPattern(type) {
+  const p = defaultItem(type);
+  return { ...p, tool: usualTool(p.craft, p.weight) };
+}
+function freshPatterns() { return Object.fromEntries(Object.keys(GARMENTS).map((t) => [t, freshPattern(t)])); }
+
+const AS = 'as pattern';
+function freshUse() {
+  return {
+    ownTool: false, tool: 5, weight: AS, fibre: AS,
+    ownColours: false, colorCount: 2, ...Object.fromEntries(Array.from({ length: MAX_COLOURS }, (_, i) => [`color${i + 1}`, defaultItem('hat')[`color${i + 1}`]])),
+    colourwork: AS, stitch: AS, edge: AS, accessory: AS, forceFit: false, fit: 1,
+  };
+}
+function freshUsed() { return Object.fromEntries(Object.keys(GARMENTS).map((t) => [t, freshUse()])); }
+
+/** The overrides that are on, as madeItem takes them: only what differs from the pattern. */
+function usedOf(type) {
+  const u = state.used[type], out = {};
+  if (u.ownTool) out.tool = u.tool;
+  for (const k of ['weight', 'fibre', 'colourwork', 'stitch', 'edge', 'accessory']) if (u[k] !== AS) out[k] = u[k];
+  if (u.ownColours) {
+    out.colorCount = u.colorCount;
+    for (let i = 1; i <= MAX_COLOURS; i++) out[`color${i}`] = u[`color${i}`];
+  }
+  if (u.forceFit) out.fit = u.fit;
+  return out;
+}
+const madeOf = (type) => madeItem(state.patterns[type], usedOf(type));
+const madeOutfit = () => Object.fromEntries(Object.keys(GARMENTS).map((t) => [t, madeOf(t)]));
+
 const state = {
   detail: 'high', view: 'felted', pose: 'rest', exposure: 0.40, toneMapping: 'ACES', spacing: 0.62,
   play: false, idle: true, walk: false, speed: 0.5, dance: 'none', repeat: true,
-  look: { ...LOOK },
-  outfit: defaultOutfit(),
+  // Close-ups by default: the page is where the look is judged. LOOK's own default is the game's.
+  look: { ...LOOK, viewPx: 0 },
+  // Per wearable: the PATTERN (the item as designed, made to pattern it is fit 1), and what the NPC
+  // USED instead -- each override off, or 'as pattern', until set. garments.js's madeItem joins them.
+  patterns: freshPatterns(),
+  used: freshUsed(),
   params: { owl: null, llama: null, lion: null },
 };
 
@@ -103,6 +140,7 @@ const state = {
 // off here so the neck slot is only ever an FO. Un-merged, because garments.js dresses an un-merged
 // rig -- see the ponytail note at the top of garments.js.
 const freshParams = (id) => Object.assign(structuredClone(getSpecies(id).defaults), { mergeMeshes: false, scarf: false });
+
 
 // ---------------------------------------------------------------- renderer
 const app = document.getElementById('app');
@@ -171,7 +209,7 @@ function buildSlot(id) {
 /** Put the one outfit on one character. Garments ride the rig's joints, so motion needs nothing. */
 function dressSlot(id) {
   if (!built[id]) return;
-  dress(built[id], state.outfit);
+  dress(built[id], madeOutfit());
   setViewMode(built[id].root, state.view);
   slotState[id].height = new THREE.Box3().setFromObject(built[id].root).getSize(new THREE.Vector3()).y;
 }
@@ -268,8 +306,18 @@ function load() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null');
     if (!saved) return;
-    Object.assign(state, saved, { dance: 'none', look: { ...LOOK, ...saved.look } });
-    state.outfit = Object.fromEntries(Object.keys(GARMENTS).map((type) => [type, { ...defaultItem(type), ...saved.outfit?.[type] }]));
+    const { spread: _spread, ...look } = saved.look ?? {};   // `spread` was removed from LOOK (tuned to 1)
+    Object.assign(state, saved, { dance: 'none', look: { ...LOOK, viewPx: 0, ...look } });
+    // A save from before patterns kept one `outfit`: its items become the patterns, fit dropped.
+    const pats = saved.patterns ?? saved.outfit;
+    state.patterns = Object.fromEntries(Object.keys(GARMENTS).map((type) => [type, { ...freshPattern(type), ...pats?.[type] }]));
+    for (const p of Object.values(state.patterns)) {
+      p.stitch = craftStitch(p.craft, p.stitch);
+      p.tool ??= usualTool(p.craft, p.weight);
+      delete p.fit;
+    }
+    state.used = Object.fromEntries(Object.keys(GARMENTS).map((type) => [type, { ...freshUse(), ...saved.used?.[type] }]));
+    delete state.outfit;
     state.params = Object.fromEntries(SLOTS.map((id) => [id, saved.params?.[id] ? { ...freshParams(id), ...saved.params[id] } : null]));
     if (!(state.pose in POSES)) state.pose = 'rest';
   } catch { /* corrupt save, defaults */ }
@@ -293,16 +341,16 @@ const randomiseAll = () => SLOTS.forEach(randomiseSlot);
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const randomHex = () => `#${new THREE.Color().setHSL(Math.random(), 0.35 + Math.random() * 0.45, 0.3 + Math.random() * 0.45).getHexString()}`;
 
-/** A random combination for one item: the fastest way to find a pairing that breaks. */
+/** A random PATTERN for one item, made to pattern: the fastest way to find a pairing that breaks. */
 function randomiseItem(type) {
   const g = GARMENTS[type];
-  Object.assign(state.outfit[type], {
+  const craft = pick(CRAFTS), weight = pick(WEIGHTS);
+  Object.assign(state.patterns[type], {
     on: true, silhouette: pick(g.silhouettes),
-    fit: FIT_RANGE[0] + Math.random() * (FIT_RANGE[1] - FIT_RANGE[0]),
-    weight: pick(WEIGHTS), fibre: pick(FIBRES), craft: pick(CRAFTS),
+    weight, tool: usualTool(craft, weight), fibre: pick(FIBRES), craft,
     colorCount: 1 + Math.floor(Math.random() * MAX_COLOURS),
     ...Object.fromEntries(Array.from({ length: MAX_COLOURS }, (_, i) => [`color${i + 1}`, randomHex()])),
-    colourwork: pick(COLOURWORKS), stitch: pick(STITCHES), edge: pick(EDGES), accessory: pick(ACCESSORIES),
+    colourwork: pick(COLOURWORKS), stitch: pick(STITCHES_BY_CRAFT[craft]), edge: pick(EDGES), accessory: pick(ACCESSORIES),
     form: pick(FORMS), sleeves: pick(SLEEVES),
   });
   refreshGui();
@@ -310,7 +358,13 @@ function randomiseItem(type) {
 }
 
 function resetItem(type) {
-  Object.assign(state.outfit[type], defaultItem(type), { on: true });
+  Object.assign(state.patterns[type], freshPattern(type), { on: true });
+  refreshGui();
+  dressAll();
+}
+
+function clearUsed(type) {
+  Object.assign(state.used[type], freshUse());
   refreshGui();
   dressAll();
 }
@@ -450,7 +504,10 @@ function addLookFolder() {
   const folder = gui.addFolder('knit look (all items)');
   const apply = () => { Object.assign(LOOK, state.look); dressAll(); };
   folder.add(state.look, 'stitchScale', 1, 6, 0.1).name('stitch size ×').onFinishChange(apply);
-  folder.add(state.look, 'relief', 0, 2, 0.05).name('relief depth').onFinishChange(apply);
+  // What the game builds for its crowd (LOOK's default): relief too small to see there is skipped.
+  folder.add(state.look, 'viewPx', { 'close-up (no limit)': 0, '300px': 300, '150px (game crowd)': 150 })
+    .name('build for').onChange(apply);
+  folder.add(state.look, 'relief', 0, 4, 0.05).name('relief depth').onFinishChange(apply);
   folder.add(state.look, 'rim', 0, 1, 0.01).name('rim highlight').onChange((v) => {
     LOOK.rim = v;
     garmentMaterial().userData.rim.value = v;
@@ -460,24 +517,24 @@ function addLookFolder() {
 }
 
 /**
- * One folder per wearable (spec §1), every attribute the spec's vocabulary gives it. Changes redress
- * all three characters on RELEASE (onFinishChange): a sweater with cables is tens of thousands of
- * triangles, and regenerating three of them per slider tick makes the drag stutter.
+ * One folder per wearable (spec §1), in two tabs: the PATTERN -- the item as designed, which made to
+ * pattern is fit 1 -- and what the NPC MADE IT WITH instead. Changes redress all three characters on
+ * RELEASE (onFinishChange): a sweater with cables is tens of thousands of triangles, and regenerating
+ * three of them per slider tick makes the drag stutter.
  */
 function addItemFolder(type) {
-  const g = GARMENTS[type];
-  const item = state.outfit[type];
+  const pattern = state.patterns[type];
   const folder = gui.addFolder(type);
-  const redress = () => dressAll();
-  folder.add(item, 'on').name(`wear ${type}`).onChange(redress);
-  folder.add(item, 'silhouette', g.silhouettes).onChange(redress);
-  folder.add(item, 'fit', FIT_RANGE[0], FIT_RANGE[1], 0.01).name(type === 'bag' ? 'size' : 'fit (1 = fitted)').onFinishChange(redress);
-  if (g.form) folder.add(item, 'form', FORMS).onChange(redress);
-  if (g.sleeves) folder.add(item, 'sleeves', SLEEVES).onChange(redress);
-  addYarnControls(folder, item, redress);
-  addLookControls(folder, item, redress);
-  folder.add({ f: () => randomiseItem(type) }, 'f').name('randomise this item  (O)');
-  folder.add({ f: () => resetItem(type) }, 'f').name('reset this item');
+  const redress = () => { dressAll(); refreshGui(); };
+  folder.add(pattern, 'on').name(`wear ${type}`).onChange(redress);
+  const out = {
+    get fit() { return madeOf(type).fit.toFixed(2); },
+    get drawn() { const m = madeOf(type); return `${m.stitch}, ${resolveColourwork(m.colourwork, m.colorCount)}`; },
+  };
+  folder.add(out, 'fit').name(type === 'bag' ? '→ size (1 = pattern)' : '→ fit (1 = fitted)').disable();
+  folder.add(out, 'drawn').name('→ drawn as').disable();
+  addPatternFolder(folder.addFolder('pattern (as designed)'), type, redress);
+  addUsedFolder(folder.addFolder('made with (overrides)'), type, redress);
   // The item last touched is the one O randomises. A DOM listener, not lil-gui's onOpenClose: three
   // 0.160 bundles lil-gui 0.17.0, which does not have it -- calling it threw inside buildGui, before
   // the render loop started, and the page drew nothing at all.
@@ -485,21 +542,49 @@ function addItemFolder(type) {
   if (type !== openItem) folder.close();
 }
 
-function addYarnControls(folder, item, redress) {
-  folder.add(item, 'weight', WEIGHTS).name('yarn weight').onChange(redress);
-  folder.add(item, 'fibre', FIBRES).name('fibre (drape)').onChange(redress);
-  folder.add(item, 'craft', CRAFTS).onChange(redress);
-  folder.add(item, 'colorCount', 1, MAX_COLOURS, 1).name('yarn colours').onFinishChange(() => { redress(); refreshGui(); });
-  for (let i = 1; i <= MAX_COLOURS; i++) folder.addColor(item, `color${i}`).name(`colour ${i}`).onFinishChange(redress);
+function addPatternFolder(folder, type, redress) {
+  const g = GARMENTS[type], p = state.patterns[type];
+  folder.add(p, 'silhouette', g.silhouettes).onChange(redress);
+  if (g.form) folder.add(p, 'form', FORMS).onChange(redress);
+  if (g.sleeves) folder.add(p, 'sleeves', SLEEVES).onChange(redress);
+  // Changing the craft or the yarn resets the pattern's tool to the usual one for them.
+  const retool = () => { p.tool = usualTool(p.craft, p.weight); };
+  folder.add(p, 'craft', CRAFTS).onChange(() => {
+    p.stitch = craftStitch(p.craft, p.stitch);
+    retool();
+    redress();
+    queueMicrotask(buildGui);   // the stitch menus are the craft's; rebuilt after lil-gui's own handler returns
+  });
+  folder.add(p, 'stitch', STITCHES_BY_CRAFT[p.craft] ?? STITCHES_BY_CRAFT.knit).onChange(redress);
+  folder.add(p, 'colourwork', COLOURWORKS).onChange(redress);
+  folder.add(p, 'edge', EDGES).onChange(redress);
+  folder.add(p, 'accessory', ACCESSORIES).onChange(redress);
+  folder.add(p, 'weight', WEIGHTS).name('yarn weight').onChange(() => { retool(); redress(); });
+  folder.add(p, 'tool', TOOL_RANGE[0], TOOL_RANGE[1], 0.25).name('hook/needle mm').onFinishChange(redress);
+  folder.add(p, 'fibre', FIBRES).name('fibre').onChange(redress);
+  folder.add(p, 'colorCount', 1, MAX_COLOURS, 1).name('yarn colours').onFinishChange(redress);
+  for (let i = 1; i <= MAX_COLOURS; i++) folder.addColor(p, `color${i}`).name(`colour ${i}`).onFinishChange(redress);
+  folder.add({ f: () => randomiseItem(type) }, 'f').name('randomise pattern  (O)');
+  folder.add({ f: () => resetItem(type) }, 'f').name('reset pattern');
 }
 
-function addLookControls(folder, item, redress) {
-  const shown = { get resolved() { return resolveColourwork(item.colourwork, item.colorCount); } };
-  folder.add(item, 'colourwork', COLOURWORKS).onChange(() => { redress(); refreshGui(); });
-  folder.add(shown, 'resolved').name('→ drawn as').disable();
-  folder.add(item, 'stitch', STITCHES).onChange(redress);
-  folder.add(item, 'edge', EDGES).onChange(redress);
-  folder.add(item, 'accessory', ACCESSORIES).onChange(redress);
+function addUsedFolder(folder, type, redress) {
+  const u = state.used[type], craft = state.patterns[type].craft;
+  folder.add(u, 'ownTool').name('own hook/needle').onChange(redress);
+  folder.add(u, 'tool', TOOL_RANGE[0], TOOL_RANGE[1], 0.25).name('  hook/needle mm').onFinishChange(redress);
+  folder.add(u, 'weight', [AS, ...WEIGHTS]).name('yarn weight').onChange(redress);
+  folder.add(u, 'fibre', [AS, ...FIBRES]).name('fibre').onChange(redress);
+  folder.add(u, 'ownColours').name('own colours').onChange(redress);
+  folder.add(u, 'colorCount', 1, MAX_COLOURS, 1).name('  yarn colours').onFinishChange(redress);
+  for (let i = 1; i <= MAX_COLOURS; i++) folder.addColor(u, `color${i}`).name(`  colour ${i}`).onFinishChange(redress);
+  folder.add(u, 'stitch', [AS, ...(STITCHES_BY_CRAFT[craft] ?? STITCHES_BY_CRAFT.knit)]).onChange(redress);
+  folder.add(u, 'colourwork', [AS, ...COLOURWORKS]).onChange(redress);
+  folder.add(u, 'edge', [AS, ...EDGES]).onChange(redress);
+  folder.add(u, 'accessory', [AS, ...ACCESSORIES]).onChange(redress);
+  folder.add(u, 'forceFit').name('force fit').onChange(redress);
+  folder.add(u, 'fit', FIT_RANGE[0], FIT_RANGE[1], 0.01).name('  fit').onFinishChange(redress);
+  folder.add({ f: () => clearUsed(type) }, 'f').name('back to pattern');
+  folder.close();
 }
 
 function buildGui() {

@@ -146,7 +146,9 @@ relief pattern), **sheen**, and **drape**.
    thickness**, where its effect dominates. Tool size does not change fabric thickness.
 3. **Stitch** has the dominant effect on **texture**.
 4. **Fibre**, in the real world, affects:
-   - **Sheen:** silk and mercerised cotton are reflective. Modelled.
+   - **Sheen:** silk and mercerised cotton are reflective. **Not modelled yet:** every garment shares
+     one material. **To do:** a cheap per-fibre sheen, for example a vertex attribute the shared
+     shader reads, rather than a material per fibre.
    - **Drape:** on hold, because it is hard to model cheaply. **To do:** find a cheap way.
    - **Pilling or halo, and durability:** not a game mechanic now, and not planned.
    - **Washability and care:** may become a mechanic later, since washing could shrink or felt a
@@ -162,6 +164,32 @@ relief pattern), **sheen**, and **drape**.
    This split is **not accurate to the real world**. For example, you can knit lace. It is set by
    the performance and graphics depth available now, and should be revisited in a later
    optimising pass.
+
+**As built (2026-09-27, `fabric()` in `characters/garments.js`), at fit 1:**
+
+| Output | Driven by | How |
+| --- | --- | --- |
+| Real stitch width | yarn weight and tool | `yarn ** 0.4 × tool ** 0.6`: both bigger, bigger stitch; the tool is the larger share. Each weight has a usual tool (`TOOL_MM`, knit and crochet) |
+| Drawn stitch width | real stitch width | Real width times the stylisation (`LOOK.stitchScale`, **2.1**). Weights keep their real ratios; a `spread` knob to squeeze them was tuned to 1 and removed. Neighbouring weights stay at least 5% apart |
+| Fit | real stitch width | `madeItem(pattern, used)`: what was made over what the pattern asked for. Made to pattern is exactly 1; worsted on a fingering pattern is about 1.16. It can be forced |
+| Row height (and stripe width) | stitch width, craft, stitch | knit 0.75 of width, crochet 1.05; garter 0.6x, linen stitch 0.65x, puff 1.15x |
+| Fabric thickness | yarn weight alone, the real spread | Crochet is 1.3x knit. The tool never changes it |
+| Relief depth | stitch, in stitch widths | from 0 (stockinette, single crochet) to 0.9 (cable), times `LOOK.relief` (**1.8**). Puff is 0.5: low for its width, see below |
+| Relief at a distance | on-screen stitch size | Built for `LOOK.viewPx` (150, the game's crowd). A stitch under 1.5px there is built as its craft's plain: no relief, bumps or lace holes. Colourwork, hatching, edges and silhouette still carry it. The dress-up page builds close-up by default |
+| Craft texture | craft | Crochet adds a bump (0.35 stitch widths) under every stitch except puff, one knot per two stitches and two rows; knit is smooth. A knot per stitch would need ~100k triangles on a lace hat |
+
+**Puff stitch reads as poofs (decided 2026-09-27, by eye).** Three things had made the puffs spikes,
+and each has a rule now:
+- **Low for their width.** At the tuned relief (1.8), puff's own depth of 0.9 made puffs 0.75 as
+  tall as wide: cones. At 0.5 they are 0.30 as tall as wide. The self-check holds them under 0.4.
+- **No crochet bumps on puff.** Stacked on a puff they peaked into points. Laid between the puffs,
+  they were as loud as the puffs. Puff is crochet's texture on its own.
+- **A dome that eases into the fabric.** `(1 - d²) ** 1.5` over a 3-stitch by 3-row pillow, the
+  rows bricked. A fuller dome walled up at its edge, and a sharpened sine peaked. At 2.5 segments a
+  stitch, about 7 across a puff, so it is drawn round.
+
+A stitch from the other craft falls back to the item's craft's plain one (`craftStitch`). Drape
+(beyond the per-fibre placeholder) and sheen are not inputs yet.
 
 ---
 

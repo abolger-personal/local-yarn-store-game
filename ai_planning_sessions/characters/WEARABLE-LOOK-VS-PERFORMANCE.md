@@ -104,3 +104,133 @@ lion body's 77k at `high` detail.
 - Relief must scale with the detail tier.
 - Relief density could cap at what reads at 150px.
 - On-device frame time is still to be measured.
+
+### 2026-09-27: triangle counts after the yarn/stitch/craft model (`fabric()`, spec §2b)
+
+**Method.** Same as 2026-09-26: headless geometry counts on the lion at default proportions, no
+frame time. The model's defaults are `stitchScale` 3 for super-bulky and `spread` 0.8. Relief still
+ignores the detail tiers.
+
+**Kilo-triangles, hat / long-sleeve sweater:**
+
+| Stitch | fingering | worsted | super-bulky |
+| --- | --- | --- | --- |
+| knit stockinette | 2.1 / 9.3 | 2.1 / 9.3 | 2.1 / 9.3 |
+| knit rib | 7.5 / 33.3 | 5.0 / 22.9 | 3.1 / 14.7 |
+| knit cable | 7.5 / 32.9 | 5.4 / 21.8 | 3.1 / 14.7 |
+| single crochet | 6.0 / 27.0 | 4.3 / 19.8 | 2.7 / 13.9 |
+| crochet puff | 5.4 / 24.6 | 3.8 / 18.4 | 2.7 / 13.6 |
+
+**Updates section 2, "Big relief":**
+- **Cheaper at the fine end.** The squeezed spread makes fine-yarn stitches bigger, so there are
+  fewer of them. A fingering rib hat went from 25.0k to 7.5k; a fingering sweater from 44k to 33k.
+- **Crochet now costs geometry everywhere.** Its bumps need segments under every stitch: a worsted
+  single-crochet hat is 4.3k, against knit stockinette's 2.1k.
+
+### 2026-09-27 (later): relief sampled per axis, crochet knots every two stitches
+
+**What changed.** Each stitch now gets its own segment density along each direction, with at least
+three samples per repeat of its pattern. Before, rows got 0.8 of the across-density whatever the
+pattern. At exactly two samples per repeat a sine is sampled at its zeros: crochet's bumps peaked
+at 0.18 of their depth at lace weight, and garter's ridges and linen stitch's dashes aliased the
+same way. Crochet's knot now spans two stitches and two rows. Same method as the entry above.
+
+**Kilo-triangles, hat / long-sleeve sweater:**
+
+| Stitch | lace | fingering | worsted | super-bulky |
+| --- | --- | --- | --- | --- |
+| knit stockinette | 2.1 / 9.3 | 2.1 / 9.3 | 2.1 / 9.3 | 2.1 / 9.3 |
+| knit rib | 4.0 / 15.8 | 3.8 / 15.2 | 3.3 / 13.5 | 2.7 / 11.8 |
+| knit garter | 4.1 / 15.9 | 3.8 / 15.0 | 3.3 / 12.9 | 2.7 / 10.9 |
+| knit cable | 5.1 / 23.1 | 4.4 / 20.2 | 3.5 / 15.2 | 2.7 / 12.0 |
+| single crochet | 5.4 / 23.9 | 4.6 / 21.1 | 3.5 / 16.2 | 2.5 / 11.8 |
+| crochet puff | 4.8 / 21.8 | 4.3 / 19.5 | 3.2 / 15.0 | 2.4 / 11.6 |
+
+**Updates section 2, "Big relief":** cheaper again, and the relief now actually shows. Rib and
+cable had been paying for rows their patterns never used: a fingering rib hat went from 7.5k to
+3.8k. The worst case measured is now a lace single-crochet sweater, at 24k.
+
+### 2026-09-27 (later still): rounder puffs and bigger lace holes
+
+**What changed.** Two stitches, in crochet (both are crochet-only):
+- **Puff** is now round, bricked pillows, 3 stitches by 3 rows, at 2 segments a stitch each way (was
+  1). The old sharpened sine drew spikes.
+- **Lace holes** are 1.8 stitches across (were 0.6), at 2.5 segments a stitch (was 2). Same method as
+  above.
+
+**Kilo-triangles, hat / long-sleeve sweater (crochet):**
+
+| Stitch | lace weight | worsted | super-bulky |
+| --- | --- | --- | --- |
+| puff | 10.2 / 43.8 | 4.1 / 18.8 | 2.8 / 13.9 |
+| lace | 12.8 / 47.3 | 4.9 / 21.1 | 3.1 / 14.8 |
+
+**Updates section 2, "Big relief":** the fine-yarn corner is now the worst case. A lace-weight
+sweater in lace stitch is **47k**, double the 24k worst case before; at worsted these cost about
+what they did. That corner is exactly what relief-by-detail-tier (§4) is for. If it can't wait, cap
+segments per item, or give fine yarn a coarser puff and lace.
+
+### 2026-09-27: the tuned look, measured on screen, and relief built for the view size
+
+**Method.** Same headless counts as above, on the lion at the tuned look (`stitchScale` 2.1,
+`relief` 1.8). On-screen sizes assume the character is 150px tall (the lion is 0.987 units, so 152px
+a unit).
+
+**A stitch at 150px:**
+
+| Yarn | lace | fingering | DK | worsted | bulky | super-bulky |
+| --- | --- | --- | --- | --- | --- | --- |
+| knit | 0.87px | 1.11px | 1.55px | 1.85px | 2.64px | 3.62px |
+| crochet | 0.87px | 1.17px | 1.77px | 2.07px | 2.86px | 3.62px |
+
+**Findings:**
+- **The tuned size made fine yarn expensive.** A smaller `stitchScale` (2.1, down from 3) means
+  more stitches. A lace-weight crochet-lace sweater went from 47k to **95k** triangles; a single-crochet
+  one from 24k to 70k.
+- **Below DK, textured items average 0.1–0.4 px² a triangle at 150px:** several triangles a pixel,
+  which the GPU shades in 2x2 blocks. A stitch under ~1.5px can't show its pattern at all, so this
+  was pure cost.
+
+**Change:** garments are built for `LOOK.viewPx` (150 by default). A stitch under 1.5px there is
+built as its craft's plain.
+
+**Fully dressed lion (all 6 slots, long sleeves; 9 meshes either way):**
+
+| Outfit | close-up | built for 150px |
+| --- | --- | --- |
+| lace-weight crochet lace | 292k | **21k** |
+| lace-weight crochet puff | 291k | **21k** |
+| fingering knit cable | 141k | **21k** |
+| worsted knit cable | 84k | 84k |
+| worsted crochet puff | 108k | 108k |
+| bulky crochet puff | 72k | 72k |
+
+**Updates section 2, "Big relief":**
+- The fine-yarn worst case is gone at crowd size.
+- The crowd's worst case is now the middle weights, whose stitches are just visible: worsted
+  crochet puff, at 108k against the body's 77k. See the to-do list for the threshold call.
+- Close-ups (the dress-up page, any zoomed view) still pay the full cost, and should set
+  `LOOK.viewPx` to 0 only while zoomed.
+
+### 2026-09-27: puff as poofs
+
+**What changed** (spec §2b, "Puff stitch reads as poofs"). Puff's depth dropped from 0.9 to 0.5.
+Its dome is now `(1 - d²) ** 1.5`, it has no crochet bumps, and it has 2.5 segments a stitch each
+way (was 2). Same method as above, at the tuned look.
+
+**Kilo-triangles, crochet puff, hat / long-sleeve sweater:**
+
+| Weight | close-up | built for 150px |
+| --- | --- | --- |
+| lace | 39.9 / 113.7 | 2.1 / 9.3 |
+| fingering | 27.2 / 80.0 | 2.1 / 9.3 |
+| DK | 12.9 / 51.4 | 12.9 / 51.4 |
+| worsted | 10.4 / 44.3 | 10.4 / 44.3 |
+| bulky | 6.8 / 30.4 | 6.8 / 30.4 |
+| super-bulky | 4.7 / 22.6 | 4.7 / 22.6 |
+
+**Updates section 2, "Big relief":** the denser sampling is about 1.5x puff's close-up cost, at
+every weight. At the crowd size, fine-yarn puff is still built plain. DK and worsted puff are now
+the costliest items the crowd shows: a worsted puff sweater is 44k on its own, against the body's
+77k. That sharpens the middle-weights threshold call on the to-do list.
+

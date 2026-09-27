@@ -6,30 +6,40 @@ Strike items through when they're done, with the date.
 
 ## Look
 
-- [ ] **Relief depth and the stitch-size multiplier fight the per-weight stitch size.** Lowering
-  the stitch size for a lighter yarn is undone by the other two knobs. This is still wrong
-  (2026-09-27).
+- [x] ~~**Relief depth and the stitch-size multiplier fight the per-weight stitch size.**~~ Done
+  2026-09-27. Width, rows, thickness and depth each have their own driver now (spec §2b, "As
+  built").
+- [x] ~~**Tune by eye:** the knit look.~~ Done 2026-09-27 across the yarn weights, every crochet
+  stitch and every hat: `stitchScale` 2.1, `relief` 1.8, `rim` 0.42. The spread came out at 1, so
+  it was removed. `DEPTH` and `CRAFT` are unchanged.
+- [ ] **Middle weights at 150px:** DK and worsted stitches are 1.5–2px there, just above
+  `MIN_STITCH_PX` (1.5). They keep their relief, and are now the crowd's most expensive items (a
+  fully dressed worsted crochet-puff lion was 108k triangles, and puff's denser sampling since
+  makes a worsted puff sweater 44k on its own). Raising the threshold to 2px would drop worsted
+  knit's relief. Judge with the page's "build for 150px".
 - [ ] **Stitch size does crazy things to the accessories; they aren't scaled right.** Accessory
   sizes come from the fabric's thickness, which comes from the stitch size, so the stitch-size
   slider inflates them:
-  - pom-pom: `max(thick × 3.5, head × 0.28) × fit`
+  - ~~pom-pom~~: done 2026-09-27. Sized from the skull, torso or shin (`POM_OF_*`). The hat's
+    tassel and flower share its size, so they're fixed on hats too.
   - buttons: `thick × 1.4–1.8`
-  - flower: `thick × 4`
-  - tassel: `thick × 5`
+  - flower (scarf, shawl, sweater): `thick × 4`
+  - tassel (shawl): `thick × 5`
 
   They probably want to size from the item and the body, with yarn weight at most a small factor
   (2026-09-27).
-- [ ] **Stitch size vs yarn weight.** Proposed: keep the order but compress the spread (the square
-  root of real gauge, with super-bulky pinned at today's ×3), and split the page's slider into
-  "stitch size" and "weight spread". Waiting on a go-ahead.
-- [ ] **Craft must read much more strongly:** crochet visibly bumpier and more open than knit (spec
-  §2b.5).
-- [ ] **Stitches follow craft** (spec §2b.5):
-  - Add stockinette (today's `plain` for knit) and linen stitch.
-  - Knit gets stockinette, rib, garter, seed, linen stitch and cable; crochet gets waffle, puff and
-    lace.
-  - The page's stitch menu should offer only the chosen craft's stitches.
-- [ ] **Tool size** isn't modelled. It should drive fit, stitch size and drape (spec §2b.1).
+- [x] ~~**Stitch size vs yarn weight.**~~ Done 2026-09-27. The spread is compressed by
+  `LOOK.spread` (0.8, not the square root proposed: neighbouring weights must stay apart), with
+  super-bulky pinned. The page has "stitch size" and "weight spread" sliders.
+- [x] ~~**Craft must read much more strongly.**~~ Done 2026-09-27: crochet is bumpy under every
+  stitch, with taller rows and thicker fabric. Still to judge by eye.
+- [x] ~~**Stitches follow craft.**~~ Done 2026-09-27: stockinette and linen stitch added, the
+  per-craft lists are in `STITCHES_BY_CRAFT`, and the page's stitch menu follows the craft.
+- [ ] **Fibre sheen** isn't modelled: every garment shares one material (spec §2b.4).
+- [x] ~~**Tool size**~~ Done 2026-09-27: it drives fit and stitch size (`realWidth`, `madeItem`).
+  It doesn't drive drape yet, which waits on the drape model below.
+- [ ] **Tune `TOOL_SHARE`** (0.6, the tool's share of real stitch width against the yarn's) and the
+  usual tools in `TOOL_MM`.
 - [ ] **Drape:** find a cheap way to model it (spec §2b.4).
 - [ ] **Hats' fit 1:** the beanie and the slouch are tuned (`size` in `HAT`); review the rest.
 
@@ -37,5 +47,8 @@ Strike items through when they're done, with the date.
 
 - [ ] **Dress before the merge pass.** Hiding eyes and ears under a hat and pressing the mane only
   work on an un-merged rig; today the merge bakes the eyes into the head.
-- [ ] **Relief respects the geometry detail tiers** (`WEARABLE-LOOK-VS-PERFORMANCE.md` §5).
+- [x] ~~**Relief respects the geometry detail tiers.**~~ Done 2026-09-27 as on-screen size
+  (`LOOK.viewPx`) rather than tier: relief under 1.5px a stitch isn't built.
+- [ ] **The game sets `LOOK.viewPx`** to its real crowd size (150 is assumed), and to 0 for any
+  close-up view.
 - [ ] The rest of the spec's §6 (wear slots, catalogue types and costs, `scarf` default off).

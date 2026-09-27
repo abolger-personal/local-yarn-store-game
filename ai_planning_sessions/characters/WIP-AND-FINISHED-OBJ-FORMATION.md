@@ -5,7 +5,7 @@ A WIP is either: UNSTARTED, IN PROGRESS, FINISHED OBJECT, (or FROGGED, a post MV
 
 An UNSTARTED WIP slot at NPC Generation time is initialized with: 
 - 0 or 1 PATTERNS
-- 0 to 1 items of YARN (note: 1 unit != 1 item. Units of yarn determined by physical grid size on that yarn item)
+- 0 to 1 items of YARN (1 unit = 1 yarn item. A pattern costs 1 to 8 items of its own recommended weight. See inventory/PATTERNS.md)
 - 0 or 1 TOOL NOTIONS (crochet hook or knitting needles)
 - (POST MVP MECHANIC) 0 or 1 ACCESSORY NOTIONS (stitch markers)
 - 0 percent "progress to completion"
@@ -25,6 +25,10 @@ After a "Buy" in the game mechanic, WIPs can be moved from UNSTARTED to IN PROGR
 - 1 pattern exists
 - 1 or more YARN units exist
 - 1 or more Tool notions exist 
+
+Yarn is bought BY UNITS (items), until the WIP has what its pattern calls for. An NPC can end up with the wrong colour if the player has not stocked matching units together. Every colour a WIP ends up holding appears in the finished object (VISUAL-DESIGN-FINISHED-OBJ.md §3). How skill and personality decide those purchases is not specified yet (open).
+
+A careful crafter may SWATCH before a WIP goes IN PROGRESS. The swatch affects whether the FO comes out well, and it leaves a 1x1x1 swatch object behind for the swatch wall (VISUAL-DESIGN-FINISHED-OBJ.md §4). Who swatches, and what exactly it changes, is not specified yet (open).
 
 During the NPC's "Work on a WIP" action, a single round of a WIP can have progress incremented as follows: 
         1/(number of units of yarn called for by pattern) * characterWeight
@@ -46,3 +50,4 @@ HOW WIPs determine an NPC shopping list:
 -- A WIP that has a YARN but no pattern, then notion tools should not match
 -- A WIP that has a YARN but no pattern, then any pattern with the same yarn attributes (weight, material) will  match (at least for MVP)
 
+Crafter skill (1 to 5) also decides how closely the FO matches its pattern: below the pattern's skill level it comes out simplified, or wonky if well below (VISUAL-DESIGN-FINISHED-OBJ.md §3).

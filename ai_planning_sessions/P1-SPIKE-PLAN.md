@@ -113,7 +113,21 @@ once per species.
 | --- | --- |
 | **Shared body** | torso, arms, hands, legs, feet, neck \u2014 identical across all species |
 | **Species kit** | head, ears, muzzle, tail, markings |
-| **Garment slots** | head (hat, beanie, tam) \u00b7 neck (scarf, cowl, shawl) \u00b7 torso (sweater, vest, cardigan) \u00b7 hands (mittens, fingerless mitts) \u00b7 feet (socks) \u00b7 carried (blanket, project bag, WIP) |
+| **Garment slots** | head (hat) · neck (scarf, cowl) · shoulders (shawl) · torso (sweater) · bag · feet (socks). No mittens. Superseded by `characters/VISUAL-DESIGN-FINISHED-OBJ.md` |
+
+> **Superseded for finished objects (2026-09-26).** The garment research below is kept for its
+> reasoning, but where it disagrees with `characters/VISUAL-DESIGN-FINISHED-OBJ.md`, that spec wins.
+> Superseded here:
+> - "one form per slot, colour only"
+> - the knit normal map and constant gauge
+> - the garment value band
+> - colourwork from purchase history (now only a fallback)
+> - the slot list
+> - "most NPCs wear 0–2 items"
+> - waist-hung long garments
+> - identity by signature accessory from day one
+>
+> Look costs are tracked in `characters/WEARABLE-LOOK-VS-PERFORMANCE.md`.
 
 ### Rigid segmentation makes garments *easier*, not harder
 

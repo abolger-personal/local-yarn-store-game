@@ -14,7 +14,7 @@ import {
   POSES, POSE_KEYS, MOTION_KEYS, MOTION_DEFAULTS, BASE_MOTION_RANGES, STYLE_RANGES,
   makeMotion, resetMotion, integrate, compose, valueOf, velocityOf,
   motionOf, walkPhase, phaseStep, walkLayer, walkGain, spanBounds,
-  DANCES, DANCE_POSES, DANCE_NAMES, makeDance, stepDance,
+  DANCES, DANCE_POSES, DANCE_NAMES, makeDance, stepDance, tailStep,
 } from './motion.js';
 
 const opts = (over = {}) => ({ ...MOTION_DEFAULTS, ...over });
@@ -1431,6 +1431,66 @@ function t(all, over = {}) {
   assert.ok(Math.abs(last.turn % (Math.PI * 2)) < 1e-9,
     `a pirouette must end on a whole turn -- ended ${last.turn.toFixed(4)} rad off`);
   assert.equal(last.rise, 0, 'and back down off the releve');
+}
+
+// --- the tail: a passive spring, steered by temperament and pose -------------------------------
+//
+// Three things steer it and one thing throws it. Carriage (temperament) and lift/wag (pose) set
+// where it wants to be; the body's roll swings it against the stride; the base's acceleration
+// throws it the other way, which is what makes it passive. Signs matter: a yaw that went the
+// wrong way would make a tail lead the body into a turn instead of trailing it.
+{
+  const spring = { stiff: 260, zeta: 0.35, reach: 0.3, droop: -1.0 };
+  const buf = { ...out(), tailYaw: 0, tailPitch: 0 };
+
+  // Thrown by the base: accelerating to the character's left (+x) leaves the tail behind, to the
+  // right, which is positive yaw. And it lags: the tip peaks after the root does.
+  const m = makeMotion(POSES.rest, 0.3);
+  let rootPeakAt = -1, tipPeakAt = -1, rootPeak = 0, tipPeak = 0, firstSwing = 0;
+  for (let i = 0; i < 240; i++) {
+    buf.tailYaw = 0; buf.tailPitch = 0; buf.spineRoll = 0;
+    tailStep(m, buf, [i < 6 ? 30 : 0, 0, 0], 1 / 120, spring);
+    if (i === 8) firstSwing = buf.tailYaw;
+    if (buf.tailYaw > rootPeak) { rootPeak = buf.tailYaw; rootPeakAt = i; }
+    if (buf.tailYawTip > tipPeak) { tipPeak = buf.tailYawTip; tipPeakAt = i; }
+  }
+  // The FIRST swing, not the peak: an under-damped tail overshoots, so a shove with the wrong sign
+  // still peaks positive on the rebound.
+  assert.ok(firstSwing > 0.02, `a sideways shove must swing the tail the other way first -- got ${firstSwing.toFixed(3)}`);
+  assert.ok(rootPeak > 0.05, `and visibly -- peak yaw ${rootPeak.toFixed(3)}`);
+  assert.ok(tipPeakAt > rootPeakAt, `the tip must trail the root (root peaked at ${rootPeakAt}, tip at ${tipPeakAt})`);
+  assert.ok(Math.abs(buf.tailYaw) < 0.01 && Math.abs(buf.tailYawTip) < 0.01,
+    `and it settles back: yaw ${buf.tailYaw.toFixed(4)} two seconds later`);
+
+  // Swings against the roll: leaning to the left (+roll) carries the tail to the right (+yaw).
+  const r = makeMotion(POSES.rest, 0.3);
+  for (let i = 0; i < 240; i++) {
+    Object.assign(buf, { tailYaw: 0, tailPitch: 0, spineRoll: 0.1 });
+    tailStep(r, buf, [0, 0, 0], 1 / 60, spring);
+  }
+  assert.ok(buf.tailYaw > 0.1, `a tail must swing against the body's roll -- got ${buf.tailYaw.toFixed(3)}`);
+
+  // Carriage is temperament: outgoing carries it high, anxious low, and it survives idle off.
+  const up = motionOf(t(3, { Enthusiasm: 5, Assertiveness: 5, Volatility: 1, Withdrawal: 1 }));
+  const down = motionOf(t(3, { Enthusiasm: 1, Assertiveness: 1, Volatility: 5, Withdrawal: 5 }));
+  assert.ok(up.tailCarry > 0.2 && down.tailCarry < -0.2,
+    `outgoing must carry the tail up and anxious tuck it -- got ${up.tailCarry} and ${down.tailCarry}`);
+  const c = makeMotion(POSES.rest, 0.3);
+  integrate(c, POSES.rest, 1 / 60, opts({ ...up, idleAmount: 0 }));
+  compose(buf, c, opts({ ...up, idleAmount: 0 }));
+  assert.equal(buf.tailPitch, up.tailCarry, 'carriage is posture, so it holds with the idle off');
+  assert.equal(buf.tailYaw, 0, 'and with the idle off and no wag the tail is still');
+
+  // Wagging is the pose's: delighted wags, rest does not.
+  let wag = 0;
+  const d = makeMotion(POSES.rest, 0.3);
+  for (let i = 0; i < 180; i++) {
+    integrate(d, POSES.delighted, 1 / 60, opts({ idleAmount: 0 }));
+    compose(buf, d, opts({ idleAmount: 0 }));
+    wag = Math.max(wag, Math.abs(buf.tailYaw));
+  }
+  assert.ok(wag > 0.3, `a delighted character wags -- peak target yaw ${wag.toFixed(3)}`);
+  assert.ok(POSES.sit.tailLift > 0.5, 'a seated tail is lifted clear of the seat cube');
 }
 
 console.log('motion.js self-check: all assertions passed');

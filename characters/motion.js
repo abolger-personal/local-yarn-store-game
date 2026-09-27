@@ -33,7 +33,7 @@
 export const POSE_KEYS = [
   'armSwing', 'armSwingAlt', 'armOut', 'armOutAlt', 'elbowBend', 'legSwing', 'kneeBend',
   'hipFlex', 'spineBend', 'spineRoll', 'spineTwist', 'earPerk', 'earSplay',
-  'headYaw', 'headPitch', 'headTilt',
+  'headYaw', 'headPitch', 'headTilt', 'tailLift', 'tailWag',
 ];
 
 // What the interpolator actually integrates: every pose channel, plus `hold`.
@@ -48,7 +48,7 @@ const TAU = Math.PI * 2;
 export const REST_POSE = Object.freeze({
   armSwing: 0, armSwingAlt: 0, armOut: 0, armOutAlt: 0, elbowBend: 0, legSwing: 0, kneeBend: 0,
   hipFlex: 0, spineBend: 0, spineRoll: 0, spineTwist: 0, earPerk: 0, earSplay: 0,
-  headYaw: 0, headPitch: 0, headTilt: 0,
+  headYaw: 0, headPitch: 0, headTilt: 0, tailLift: 0, tailWag: 0,
   holdItem: false, blink: 0,
 });
 
@@ -70,8 +70,12 @@ export const POSES = definePoses({
   reach:  { armSwing: -1.15, armOut: 0.30, elbowBend: 0.35 },
   browse: { armSwing: -0.45, armOut: 0.34, elbowBend: 0.85, spineBend: 0.14 },
   // thighs forward to horizontal, shins dropped back to vertical: kneeBend has to match hipFlex
-  sit:    { armSwing: -0.10, armOut: 0.22, elbowBend: 0.75, kneeBend: 1.45, hipFlex: 1.45, spineBend: 0.10 },
-  delighted: { armSwing: -0.30, armOut: 2.55, elbowBend: 0.55, kneeBend: 0.10, earPerk: 0.38, earSplay: 0.22 },
+  // tailLift: a chair is a cube, so a hanging tail would go into the seat. Lifted, it lies out
+  // behind instead.
+  sit:    { armSwing: -0.10, armOut: 0.22, elbowBend: 0.75, kneeBend: 1.45, hipFlex: 1.45, spineBend: 0.10,
+            tailLift: 1.0 },
+  delighted: { armSwing: -0.30, armOut: 2.55, elbowBend: 0.55, kneeBend: 0.10, earPerk: 0.38, earSplay: 0.22,
+               tailLift: 0.45, tailWag: 1 },
   'walk+carry': { armSwing: -0.10, armOut: 0.03, elbowBend: 1.40, legSwing: 0.30, kneeBend: 1.50, holdItem: true },
 });
 
@@ -477,6 +481,7 @@ export const MOTION_DEFAULTS = Object.freeze({
   headCarry: 0,      // posture, not gait: applied standing AND walking
   headCock:  0,      // sideways head tilt held while curious; sign is per-character
   armTuck:   0,
+  tailCarry: 0,      // tail held up (outgoing) or down (anxious); posture, like headCarry
   lean:      0.06,   // forward lean at full speed
   // Ground speed at which the walk layer reaches full weight. Raised from 0.35 after tuning in
   // the lab: against a top honest walk near 1.2 this means the legs ease in over most of the
@@ -621,6 +626,11 @@ export const STYLE_RANGES = Object.freeze({
   // rather than as a broken reach. The real fix is posture that fades out while a pose needs a
   // specific arm shape; do that if the knitting pose ever lands.
   armTuck:   [0.00, 0.50],   // elbows bent, arms held in against the body
+  // TAIL CARRIAGE: up and out when outgoing, down toward tucked when anxious. The same E-N read
+  // as headCarry, on the other end of the body, so the two agree -- a head held high over a
+  // tucked tail would read as two characters. An angle added to the species' own resting droop,
+  // so a lion's J and an owl's fan both lift by the same amount for the same temperament.
+  tailCarry: [-0.35, 0.35],
 });
 
 // ---------------------------------------------------------------- traits -> coefficients
@@ -654,7 +664,7 @@ export function motionOf(traits, ranges = BASE_MOTION_RANGES) {
     kneeLift: pick('kneeLift'),
     headArc: pick('headArc'), armGain: style('armGain'), sway: style('sway'),
     lean: style('lean'), headCarry: style('headCarry'), headCock: style('headCock'),
-    attend: style('attend'), armTuck: style('armTuck'),
+    attend: style('attend'), armTuck: style('armTuck'), tailCarry: style('tailCarry'),
   };
 }
 
@@ -738,9 +748,7 @@ function traitPositions(t) {
     // exactly critical. Low here means overshoot.
     zeta: pair(0.5 * (C - N)),
     idleAmp: pair(0.5 * (E - N)),
-    idleRate: N,
-    stride: C,
-    bounce: E,
+    idleRate: N, stride: C, bounce: E,
     // A diligent character picks their feet up; a careless one scuffs along.
     kneeLift: C,
     headArc: O,
@@ -764,6 +772,9 @@ function traitPositions(t) {
     // The channel and its knob stay, for an emotional layer to drive when there is one.
     // Personality leaves it at zero.
     armTuck: 0,
+    // Outgoing carries the tail high, anxious tucks it. Opposite sign to headCarry, whose
+    // positive is head DOWN.
+    tailCarry: pair(0.5 * (E - N)),
   };
 }
 
@@ -783,6 +794,8 @@ const MAX_DT = 1 / 30;
 // 1.089 / 1.089 / 1.089. Cost at the worst frame is ~12 substeps, on a frame already late.
 const MAX_H = 1 / 120;
 
+const WAG_W = TAU * 2.0;
+const WAG_AMP = 0.45;     // radians either side at tailWag 1
 const FLICK_DUR = 0.34;   // an ear flick is quick; slower reads as a droop
 const BLINK_DUR = 0.12;
 const BREATH_W = TAU * 0.25;    // ~4s per breath at idleRate 1
@@ -868,6 +881,7 @@ function rhythms(seed) {
     // Which way this character cocks their head. Fixed for life: a head that changed sides
     // would read as a twitch rather than as a way of holding yourself.
     cockWay: seed < 0.5 ? -1 : 1,
+    wagPhase: seed * TAU,
   };
 }
 
@@ -877,6 +891,9 @@ export function makeMotion(pose, seed = Math.random()) {
     cur: new Float64Array(n), vel: new Float64Array(n),
     from: new Float64Array(n), fromVel: new Float64Array(n), to: new Float64Array(n),
     target: null,      // identity only, for interrupt detection. NEVER read for values.
+    // The tail's own spring: [yaw, pitch, yawVel, pitchVel] at the root, then the same at the tip.
+    // Separate from cur[] and never written into it -- see tailStep.
+    tail: new Float64Array(8),
     t: 1,
     walkGain: 0,
     ...rhythms(seed),
@@ -894,6 +911,7 @@ export function resetMotion(m, pose) {
   m.target = null;
   m.t = 1;
   m.walkGain = 0;
+  m.tail.fill(0);
   return m;
 }
 
@@ -960,6 +978,11 @@ function advanceClocks(m, dt, opts) {
   m.fidgetPhase += dt * FIDGET_W * opts.idleRate
     * dutyGate(m.idlePhase, opts.idleDuty ?? 1, m.seed);
   if (m.fidgetPhase > TAU * 1e6) m.fidgetPhase %= TAU;
+
+  // Faster for a keyed-up character, as the fidget is -- but only partly, or an anxious lion's
+  // tail buzzes. ~2 wags a second at idleRate 1.
+  m.wagPhase += dt * WAG_W * (0.7 + 0.3 * opts.idleRate);
+  if (m.wagPhase > TAU * 1e6) m.wagPhase %= TAU;
 
   m.blinkT -= dt;
   if (m.blinkT < -BLINK_DUR) m.blinkT = 2 + Math.random() * 5;
@@ -1049,6 +1072,11 @@ export function compose(out, m, opts) {
   out.headTilt += (opts.headCock ?? 0) * m.cockWay;
   out.spineBend += opts.attend ?? 0;
   out.elbowBend += opts.armTuck ?? 0;
+  // The tail's TARGET, not its angle: tailStep is the spring that chases it, so a wag arrives
+  // with lag and overshoot and a lifted tail swings up rather than snapping. Carriage is posture,
+  // so it sits up here with headCarry and survives the idle being turned down.
+  out.tailPitch = out.tailLift + (opts.tailCarry ?? 0);
+  out.tailYaw = out.tailWag * WAG_AMP * Math.sin(m.wagPhase);
 
   // THE EARLY-OUT IS ON THE MASTER DIAL ONLY, and the difference between the two is the whole
   // point of having two. `idleAmount` is "run no idle at all" -- the reduce-motion answer, and
@@ -1202,6 +1230,10 @@ function idleLayer(out, m, opts, a) {
   // joint already exists and applyPose already writes it every frame.
   out.neckCurve = look * 0.075 * Math.sin(q * m.rateB * 0.62 + m.seed * 5);
 
+  // The tail's idle sway, on the fidget clock so it holds still when they do. Slow and small:
+  // the species signal SPIKE-FUN.md asks for, not a wag.
+  out.tailYaw += a * 0.12 * Math.sin(q * m.rateB * 0.7 + m.seed * 7);
+
   headLook(out, m, look, q, w, g * still);
   earFlick(out, m, a);
 }
@@ -1230,6 +1262,78 @@ function headLook(out, m, look, q, w, lean) {
   out.headPitch += look * 0.055 * Math.sin(q * m.rateB * 0.8 + m.seed * 3);
 }
 
+// ---------------------------------------------------------------- the tail
+
+// The tip's spring against the root's. Softer, so the tip trails the root and a tail whips
+// rather than swinging as a stick.
+const TAIL_TIP = 0.55;
+// Past this a tail is folding back on itself. Clamped on the OUTPUT side of the spring state,
+// never by rewriting the target.
+const TAIL_MAX = 1.3;
+// THE COUNTER-SWING: the tail swings against the body's roll, the way a tail balances a stride.
+// Needed because inertia alone does not reach it -- measured walking, the base's own acceleration
+// moved a lion's tail under a degree. The base sits near the roll's pivot and the stride is slow
+// against the tail's frequency, so physics says it rides along rigidly. This puts the swing in
+// the TARGET, so it still arrives through the spring, lagged and overshooting.
+const TAIL_COUNTER = 2.5;
+const tailLim = (v) => (v > TAIL_MAX ? TAIL_MAX : v < -TAIL_MAX ? -TAIL_MAX : v);
+
+/**
+ * THE TAIL: a passive spring, and the one thing on the rig that is MEANT to lag.
+ *
+ * The header's invariant still holds -- cur[] is never touched. This is a separate filter on the
+ * COMPOSED target, with its own state in m.tail, and the reasons the header gives for keeping
+ * springs off the idle are exactly what a tail wants: a phase-lagged copy of the body's motion
+ * is follow-through, and overshoot is the tail settling. Both are the point.
+ *
+ * Two inputs. The TARGET (out.tailYaw / out.tailPitch, from compose: carriage, wag, idle sway)
+ * pulls it where the character wants it. The ACCELERATION of the tail's base, in the body's own
+ * frame, throws it the other way -- which is what makes it passive: the walk's bob and sway, a
+ * turn, a stop, a hop, a pirouette all reach the tail without anything telling it they happened.
+ * npc.js measures that acceleration, because only it has the world transform.
+ *
+ * The forcing is a pendulum's: the component of the inertial push perpendicular to the tail,
+ * over its length. `droop` is the species' resting pitch, so a tail hanging straight down swings
+ * fore-aft when the body stops, and one held out level bounces with the step instead.
+ *
+ * Stiffness is per species and NOT per temperament, so a wag's amplitude does not depend on
+ * personality by accident. An under-damped spring does amplify a wag, and the wag clock runs
+ * faster for a keyed-up character, which is nearer resonance -- measured delivered/asked: lion
+ * 1.35 to 1.49 across its idleRate span, owl 1.21 to 1.27, llama 1.14 to 1.20. That is a
+ * species constant plus under 10% from temperament, so it is tuned through WAG_AMP, not fought.
+ *
+ * @param {Motion} m
+ * @param {Record<string, number>} out the composed pose; tail targets in, tail angles out
+ * @param {number[]} accel base acceleration [x, y, z] in the body's frame
+ * @param {number} dt seconds
+ * @param {{stiff: number, zeta: number, reach: number, droop: number}} tail
+ */
+export function tailStep(m, out, accel, dt, { stiff, zeta, reach, droop }) {
+  const step = dt > MAX_DT ? MAX_DT : dt;
+  const n = Math.ceil(step / MAX_H) || 1, h = step / n;
+  const s = m.tail, c = 2 * zeta * Math.sqrt(stiff);
+  const kt = stiff * TAIL_TIP, ct = 2 * zeta * Math.sqrt(kt);
+  const p = droop + s[1];
+  const fy = accel[0] / reach;   // yaw swings across the tail at any droop: see addTail
+  const fp = -(accel[1] * Math.cos(p) + accel[2] * Math.sin(p)) / reach;
+  const yaw = out.tailYaw + TAIL_COUNTER * out.spineRoll;
+  for (let i = 0; i < n; i++) {
+    chase(s, 0, yaw, stiff, c, fy, h);
+    chase(s, 1, out.tailPitch, stiff, c, fp, h);
+    chase(s, 4, s[0], kt, ct, fy, h);
+    chase(s, 5, s[1], kt, ct, fp, h);
+  }
+  out.tailYaw = tailLim(s[0]);
+  out.tailPitch = tailLim(s[1]);
+  out.tailYawTip = tailLim(s[4]);
+  out.tailPitchTip = tailLim(s[5]);
+}
+
+/** One damped-spring substep of angle s[i], whose velocity is s[i + 2], toward `to`, pushed by `f`. */
+function chase(s, i, to, k, c, f, h) {
+  s[i + 2] += ((to - s[i]) * k - s[i + 2] * c + f) * h;
+  s[i] += s[i + 2] * h;
+}
 
 /**
  * Stride phase, stride length and swing amplitude, from DISTANCE TRAVELLED rather than time.

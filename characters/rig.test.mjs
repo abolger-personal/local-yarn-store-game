@@ -22,6 +22,7 @@ import {
   POSES, POSE_KEYS, MOTION_DEFAULTS, BASE_PARAMS, createCharacter, stepMotion, applyPose,
   valueOf, walkPhase, walkLayer, speciesIds, getSpecies, resetMotion,
   DANCES, DANCE_NAMES, makeDance, stepDance, LIMB_TAPER,
+  motionOf, walkGain, tailBaseHeight,
 } from './npc.js';
 import './owl.js';
 import './llama.js';
@@ -1412,6 +1413,138 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   const ring = cap - kit.randomRanges.pupilScale[1];
   assert.ok(ring >= 0.05,
     `lion: the largest random pupil leaves only ${ring.toFixed(3)} of the eye's radius of white showing`);
+}
+
+// --- every species has a tail, seated, clear of the floor and the seat, and it moves ------------
+{
+  const traits = (o) => ({ Volatility: 3, Withdrawal: 3, Enthusiasm: 3, Assertiveness: 3, Openness: 3,
+    Intellect: 3, Compassion: 3, Politeness: 3, Industriousness: 3, Orderliness: 3, ...o });
+  const anxious = traits({ Enthusiasm: 1, Assertiveness: 1, Volatility: 5, Withdrawal: 5 });
+  const tailLow = (b) => {
+    b.root.updateMatrixWorld(true);
+    return Math.min(...b.joints.tail.map(({ node }) => new THREE.Box3().setFromObject(node).min.y));
+  };
+  // Standing 3s, then walking 3s, tucked. Walking lowers the body, so this is where a tail drags.
+  const lowestWalking = (P, id) => {
+    const kit = getSpecies(id);
+    const o = { ...MOTION_DEFAULTS, ...motionOf(anxious, kit.motionRanges) };
+    const b = createCharacter({ ...P, mergeMeshes: false }, id);
+    const L = P.legHeight + P.hipInset;
+    let phase = 0, lo = Infinity;
+    for (let i = 0; i < 360; i++) {
+      const speed = i < 180 ? 0 : 1.0;
+      const w = walkPhase(phase, speed, L, o);
+      phase = (phase + speed / 60 / (2 * L)) % 1;
+      const g = walkGain(b.motion, speed, 1 / 60, o);
+      stepMotion(b, POSES.rest, 1 / 60, o, (out) => walkLayer(out, w, g, o));
+      lo = Math.min(lo, tailLow(b));
+    }
+    return lo;
+  };
+
+  for (const id of speciesIds()) {
+    const kit = getSpecies(id);
+    const D = { ...BASE_PARAMS, ...kit.defaults };
+    const b = build(id);
+    assert.ok(b.joints.tail.length >= 1, `${id}: every species has a tail`);
+    // Seated: the root is buried in the torso, not floating off it or lost inside.
+    b.root.updateMatrixWorld(true);
+    const rel = b.joints.tail[0].node.getWorldPosition(new THREE.Vector3())
+      .sub(b.joints.chest.getWorldPosition(new THREE.Vector3()));
+    const seat = Math.hypot(rel.x / D.torsoW, rel.y / D.torsoH, rel.z / D.torsoD);
+    assert.ok(seat > 0.8 && seat < 1, `${id}: the tail root must sit just inside the torso, at ${seat.toFixed(3)}`);
+
+    // Clear of the floor, tucked and walking, for the default and for the worst corner randomise
+    // can draw: shortest legs, shortest torso, longest tail.
+    const R = kit.randomRanges;
+    const torsoH = id === 'lion' ? D.torsoH * 0.72 * 0.92 : R.torsoH[0];
+    const worst = { ...D, legHeight: R.legHeight[0], torsoH };
+    worst.tailLength = id === 'lion' ? 1.0 * tailBaseHeight(worst) : R.tailLength[1];
+    for (const [name, P] of [['default', D], ['worst corner', worst]]) {
+      const lo = lowestWalking(P, id);
+      assert.ok(lo > 0.01, `${id} ${name}: a tucked tail walking dips to ${lo.toFixed(3)} -- through the floor`);
+    }
+
+    // Seated on a cube chair, the tail lies out behind rather than through the seat -- even tucked.
+    // An anxious lion's hook dips 0.016 into the seat without the sit pose's lift.
+    const s = build(id);
+    const tucked = { ...MOTION_DEFAULTS, ...motionOf(anxious, kit.motionRanges), idleAmount: 0 };
+    for (let i = 0; i < 240; i++) stepMotion(s, POSES.sit, 1 / 60, tucked);
+    s.root.updateMatrixWorld(true);
+    const bottom = new THREE.Box3().setFromObject(s.joints.chest.children[0]).min.y;
+    assert.ok(tailLow(s) > bottom, `${id}: seated, the tail goes ${(bottom - tailLow(s)).toFixed(3)} into the seat`);
+    // And a static pose -- the checker's sliders, cast.js measuring the seat -- lifts it too. Only
+    // compose turns tailLift into a target, so without a fallback a raw pose ignored it.
+    const lifted = build(id);
+    applyPose(lifted, { ...lifted.params, tailLift: 0.8 });
+    assert.ok(tailLow(lifted) > tailLow(build(id)) + 0.01, `${id}: tailLift on a static pose must lift the tail`);
+
+    // Passive: slide the body sideways and stop, and the tail swings; teleport it, and it does not.
+    const o = { ...MOTION_DEFAULTS, idleAmount: 0 };
+    const slide = build(id);
+    let swing = 0;
+    for (let i = 0; i < 90; i++) {
+      slide.root.position.x = Math.min(i, 30) * 0.02;
+      swing = Math.max(swing, Math.abs(stepMotion(slide, POSES.rest, 1 / 60, o).tailYaw));
+    }
+    assert.ok(swing > 0.1, `${id}: a body that moves and stops must swing its tail -- peak ${swing.toFixed(3)}`);
+    // In the BODY's frame: turned to face +x and moving forward along it, the stop is fore-aft, so
+    // the tail must not swing sideways. Read in world axes it would.
+    const turned = build(id);
+    turned.root.rotation.y = Math.PI / 2;
+    let side = 0;
+    for (let i = 0; i < 90; i++) {
+      turned.root.position.x = Math.min(i, 30) * 0.02;
+      side = Math.max(side, Math.abs(stepMotion(turned, POSES.rest, 1 / 60, o).tailYaw));
+    }
+    assert.ok(side < 1e-3, `${id}: stopping dead ahead swung the tail sideways by ${side.toFixed(3)}`);
+    const jump = build(id);
+    let fling = 0;
+    for (let i = 0; i < 60; i++) {
+      if (i === 10) jump.root.position.x = 40;
+      fling = Math.max(fling, Math.abs(stepMotion(jump, POSES.rest, 1 / 60, o).tailYaw));
+    }
+    assert.ok(fling < 1e-9, `${id}: a teleport (spawn, reset) must not fling the tail -- peak ${fling.toFixed(3)}`);
+    // Walking steadily from the first frame is no acceleration at all -- a customer spawns already
+    // on the move, and reading that as a standing start would throw every tail at the door.
+    const cruise = build(id);
+    let drift = 0;
+    for (let i = 0; i < 30; i++) {
+      cruise.root.position.z = i * 0.02;
+      drift = Math.max(drift, Math.abs(stepMotion(cruise, POSES.rest, 1 / 60, o).tailPitch));
+    }
+    assert.ok(drift < 1e-6, `${id}: steady walking from spawn swung the tail ${drift.toFixed(4)}`);
+
+    // One draw per segment: every tail joint's parts merge into a single mesh.
+    const merged = createCharacter({ ...D }, id);
+    for (const { node } of merged.joints.tail) {
+      const meshes = node.children.filter((c) => c.isMesh).length;
+      assert.equal(meshes, 1, `${id}: tail joint ${node.name} merged to ${meshes} meshes -- each is a draw call`);
+    }
+  }
+
+  // A wag swings a HANGING tail across itself. Yawing about the body's vertical instead spins it
+  // about its own length, and the lion's hook barely moves: the tip must travel sideways by most
+  // of what a rigid tail swung through the same angle would.
+  const L = build('lion');
+  const tip = () => {
+    L.root.updateMatrixWorld(true);
+    return new THREE.Box3().setFromObject(L.joints.tail.at(-1).node).getCenter(new THREE.Vector3());
+  };
+  applyPose(L, { ...L.params, tailYaw: 0 });
+  const before = tip();
+  applyPose(L, { ...L.params, tailYaw: 0.5 });
+  const moved = Math.abs(tip().x - before.x);
+  const reach = L.params.tailLength * Math.sin(0.5);
+  assert.ok(moved > 0.6 * reach, `lion: a 0.5 rad wag moves the tip ${moved.toFixed(3)} of a possible ${reach.toFixed(3)}`);
+
+  // The lion's random tail is drawn against its own base height, never past the floor-safe ratio.
+  const lion = getSpecies('lion');
+  for (let i = 0; i < 300; i++) {
+    const P = lion.randomise(structuredClone({ ...BASE_PARAMS, ...lion.defaults }));
+    const ratio = P.tailLength / tailBaseHeight(P);
+    assert.ok(ratio <= 1.0 + 1e-9, `lion: a random tail ${ratio.toFixed(3)}x its base height can reach the floor`);
+  }
 }
 
 console.log('npc.js rig self-check: all assertions passed');

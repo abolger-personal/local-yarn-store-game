@@ -12,7 +12,7 @@
 
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
-  addEars, addEyes, createCharacter, deriveCoatColor, touchingScallopSize,
+  addEars, addEyes, addTail, createCharacter, deriveCoatColor, touchingScallopSize,
   feltMaterial, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh,
 } from './npc.js';
 
@@ -71,6 +71,13 @@ export const DEFAULT_PARAMS = {
   fleeceNeckCoverage: 0.50,   // fraction of neck LENGTH the ruff spans
   fleeceNeckSpread:   2.40,   // multiple of neck THICKNESS for the ruff radius
   fleeceNeckScale:    0.85,   // curl size relative to the body's
+
+  // A short fleecy stub, carried a little up off the rump and stiff: it bobs, it does not swing.
+  tailLength:    0.085,
+  tailThick:     0.036,
+  tailDroop:    -0.35,
+  tailStiff:     420,
+  tailZeta:      0.45,
 };
 
 // Fewer and bigger than the owl's, and much rounder. Size is derived from the counts, so a
@@ -118,6 +125,7 @@ export const RANDOM_RANGES = Object.freeze({
   eyeRadius:    [0.048, 0.070],   // smaller than the owl's; the neck carries identity instead
   eyeSpread:    [0.520, 0.660],   // set wider, toward the sides of the head
   eyeFront:     [0.620, 0.780],
+  tailLength:   [0.065, 0.110],
 });
 
 // ---------------------------------------------------------------- shell settings
@@ -246,6 +254,18 @@ function buildKit(ctx, P) {
   });
   addTorsoFleece(ctx, P);
   addNeckFleece(ctx, P);
+  addLlamaTail(ctx, P);
+}
+
+// Two curls of fleece, the second smaller and further out, so the stub tapers.
+function addLlamaTail(ctx, P) {
+  const r = P.tailThick;
+  addTail(ctx, P, {
+    dress(node, i, len) {
+      node.add(part(GEO.sphere, ctx.mat.fleece, { pos: [0, 0, -len * 0.35], scale: [r, r * 1.1, len * 0.45] }));
+      node.add(part(GEO.sphere, ctx.mat.fleece, { pos: [0, 0, -len * 0.80], scale: [r * 0.75, r * 0.8, len * 0.30] }));
+    },
+  });
 }
 
 // ---------------------------------------------------------------- randomisation

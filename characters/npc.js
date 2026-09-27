@@ -10,11 +10,11 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { makeMotion, integrate, compose, POSE_KEYS, POSES } from './motion.js';
+import { makeMotion, integrate, compose, tailStep, POSE_KEYS, POSES } from './motion.js';
 
 // Bumped on every meaningful change. Viewers log it, so a stale browser cache shows up as an
 // old value in the console instead of as mysteriously unchanged behaviour.
-export const BUILD = '2026-09-26.7-lion-build-variety';
+export const BUILD = '2026-09-26.8-tails';
 
 // ---------------------------------------------------------------- species registry
 
@@ -107,6 +107,8 @@ export const BASE_PARAMS = Object.freeze({
                           // and everything that turns a head is then correct for free.
   headPitch:     0.00,    // positive looks DOWN, matching spineBend's positive-forward
   headTilt:      0.00,    // positive takes the top of the head to the character's left
+  tailLift:      0.00,    // raises the tail from the species' resting droop; negative tucks it
+  tailWag:       0.00,    // wag amount, 0 still, 1 a happy wag. A rate lives in motion.js
   blink:         0.00,    // 0 open, 1 shut. Not interpolated -- see motion.js
   holdItem:      false,
   heldColor:     '#7a9e6b',
@@ -136,6 +138,16 @@ export const BASE_PARAMS = Object.freeze({
 
   partShadows:   true,    // small parts casting shadows roughly doubles their draw cost
   mergeMeshes:   true,    // bake each joint's static meshes down to one per material
+
+  // tail -- every species has one, shaped by its kit. Length and droop are the silhouette;
+  // stiff and zeta are the spring, per species, so a llama's stub stays stiff and a lion's rope
+  // swings. See tailStep in motion.js.
+  tailLength:    0.200,   // root to tip, world units
+  tailThick:     0.020,
+  tailDroop:    -0.90,    // resting pitch at the root: 0 straight out behind, negative hangs down
+  tailCurl:      0.00,    // added pitch per segment after the first; positive curls the tip up
+  tailStiff:     260,     // spring stiffness; natural frequency is sqrt(stiff) rad/s
+  tailZeta:      0.35,    // under-damped on purpose: a tail that settles without swinging is a stick
 
   // garment
   scarf:         true,
@@ -798,6 +810,61 @@ export function addEars(ctx, P, opts) {
 
 export const addConeEars = (ctx, P, opts) => addEars(ctx, P, { ...opts, shape: 'cone' });
 
+// Where the tail leaves the body: this far below the torso's equator, round the back, and sunk to
+// this fraction of the torso so the root is buried rather than touching.
+const TAIL_BASE = 0.55;
+const TAIL_SEAT = 0.9;
+
+/**
+ * A tail as a chain of rigged joints, for the kit to dress.
+ *
+ * The chain is shared and the look is not: `dress(node, i, len)` adds segment i's geometry, laid
+ * along the node's -Z from its origin to (0, 0, -len). Every segment is a joint, so each costs one
+ * draw call after merging -- a kit wants as few as still bend.
+ *
+ * On the CHEST, not the hips, so the root rides the spine's lean and roll and stays seated in the
+ * torso; the tail spring then feels the body's sway as well as its travel.
+ */
+/** How high above the floor the tail leaves the body, standing. A kit sizes a hanging tail by it. */
+export const tailBaseHeight = (P) => P.legHeight + P.torsoH * (1 - Math.sin(TAIL_BASE) * TAIL_SEAT);
+
+export function addTail(ctx, P, { segments = 1, dress }) {
+  const len = P.tailLength / segments;
+  let parent = ctx.chest;
+  for (let i = 0; i < segments; i++) {
+    const node = joint(new THREE.Group(), `tail${i}`);
+    if (i === 0) {
+      node.position.set(0, -P.torsoH * Math.sin(TAIL_BASE) * TAIL_SEAT,
+        -P.torsoD * Math.cos(TAIL_BASE) * TAIL_SEAT);
+    } else {
+      node.position.z = -len;
+    }
+    dress(node, i, len);
+    parent.add(node);
+    ctx.joints.tail.push({ node, rest: i === 0 ? P.tailDroop : P.tailCurl, chord: 0 });
+    parent = node;
+  }
+  ctx.joints.tail[0].chord = tailChord(ctx.joints.tail);
+}
+
+/**
+ * The pitch of the root-to-tip line in the root's own frame, which is what a wag swings ACROSS.
+ *
+ * Yawing about the body's vertical spins a hanging tail about its own length, and yawing about
+ * the root segment's own up leaves a hooked tip -- curled up over that axis -- nearly still:
+ * measured, the lion's tip moved half as far as the tail's reach. Across the chord, the whole tail
+ * swings sideways whatever its shape.
+ */
+function tailChord(tail) {
+  let y = 0, z = 0, angle = 0;
+  for (let i = 0; i < tail.length; i++) {
+    if (i) angle += tail[i].rest;
+    y += Math.sin(angle);
+    z -= Math.cos(angle);
+  }
+  return Math.atan2(y, -z);
+}
+
 // ---------------------------------------------------------------- arm clearance
 
 // Elbow clearance is scanned rather than solved: folding the coat scale and the elbow radius
@@ -1072,7 +1139,7 @@ export function createCharacter(P, species) {
   const mat = baseMaterials(P, addMaterial);
   const joints = {
     hips: null, spine: null, chest: null, neck: null, head: null,
-    upperArm: [], lowerArm: [], upperLeg: [], lowerLeg: [], foot: [], ear: [], eye: [],
+    upperArm: [], lowerArm: [], upperLeg: [], lowerLeg: [], foot: [], ear: [], eye: [], tail: [],
   };
   const bulge = Math.max(0, kit.coatBulge?.(P) ?? 0);
   const body = buildBody(P, mat, joints, addMaterial, bulge);
@@ -1318,6 +1385,31 @@ function applyHead(joints, pose, P) {
   for (const { node } of joints.eye) node.scale.y = lid;
 }
 
+const X_AXIS = new THREE.Vector3(1, 0, 0);
+const _tailQX = new THREE.Quaternion(), _tailQY = new THREE.Quaternion();
+
+/**
+ * The tail's angles along the chain. The ROOT takes the whole root angle from tailStep, so lifting,
+ * tucking and wagging move the tail from its base as a tail does; the segments after it share out
+ * only how far the tip LAGS the root, so a trailing tip is a curve down the tail rather than a kink
+ * at the end. Without tailStep (a static pose) the tip is the root and the tail is simply held.
+ */
+function applyTail(tail, pose) {
+  const n = tail.length;
+  if (!n) return;
+  // A raw pose -- a POSES entry, or params in the checker -- has only the commanded lift; compose is
+  // what turns that into a target, so without it the lift is the angle.
+  const yaw = pose.tailYaw ?? 0, pitch = pose.tailPitch ?? pose.tailLift ?? 0;
+  const lagYaw = n > 1 ? ((pose.tailYawTip ?? yaw) - yaw) / (n - 1) : 0;
+  const lagPitch = n > 1 ? ((pose.tailPitchTip ?? pitch) - pitch) / (n - 1) : 0;
+  // The root: pitched to the chord, yawed across it, then pitched back. See tailChord.
+  const { node, rest, chord } = tail[0];
+  node.quaternion.setFromAxisAngle(X_AXIS, rest + pitch + chord)
+    .multiply(_tailQY.setFromAxisAngle(UP, yaw))
+    .multiply(_tailQX.setFromAxisAngle(X_AXIS, -chord));
+  for (let i = 1; i < n; i++) tail[i].node.rotation.set(tail[i].rest + lagPitch, lagYaw, 0);
+}
+
 // One reused output object for the whole cast: applyPose consumes it synchronously, so one is
 // enough, and a fresh object per character per frame is real GC pressure at 40 characters.
 //
@@ -1332,7 +1424,8 @@ function applyHead(joints, pose, P) {
 // and a neck that never curved, on a rig where both look plausible.
 const _out = Object.seal(Object.fromEntries(
   [...POSE_KEYS.map((k) => [k, 0]),
-    ['holdItem', false], ['blink', 0], ['kneeSwing', 0], ['neckCurve', 0]],
+    ['holdItem', false], ['blink', 0], ['kneeSwing', 0], ['neckCurve', 0],
+    ['tailYaw', 0], ['tailPitch', 0], ['tailYawTip', 0], ['tailPitchTip', 0]],
 ));
 
 /** Re-poses an existing character without rebuilding it. */
@@ -1358,9 +1451,14 @@ export function applyPose(built, pose) {
     node.rotation.set(pose.earPerk ?? 0, 0, side * -(tilt + (pose.earSplay ?? 0)));
   }
   applyHead(joints, pose, params);
+  applyTail(joints.tail, pose);
   if (held && pose.holdItem !== undefined) held.visible = Boolean(pose.holdItem);
   groundCharacter(built, pose);
 }
+
+const tailSpring = (P) => ({
+  stiff: P.tailStiff, zeta: P.tailZeta, reach: P.tailLength, droop: P.tailDroop,
+});
 
 /**
  * Advances one character's motion by `dt` and applies it. The whole per-frame path.
@@ -1377,7 +1475,51 @@ export function stepMotion(built, target, dt, opts, add) {
   compose(_out, built.motion, opts);
   if (add) add(_out);
   applyPose(built, _out);
+  // AFTER applyPose, so the tail base is measured where this frame's body put it -- then the tail
+  // alone is posed again from its spring. Posing it twice is three rotations; measuring before
+  // would read last frame's spine against this frame's root.
+  if (built.joints.tail.length) {
+    tailStep(built.motion, _out, tailAcceleration(built, dt), dt, tailSpring(built.params));
+    applyTail(built.joints.tail, _out);
+  }
   return _out;
+}
+
+// Faster than anything walks or dances: a jump bigger than this in one frame is a TELEPORT -- a
+// spawn, a slot reset, the lab snapping a character home -- and differentiating it would fling
+// the tail. Measured top honest walk is ~1.5 units/s.
+const TAIL_TELEPORT = 6;
+const _tailAt = new THREE.Vector3(), _tailV = new THREE.Vector3(), _tailQ = new THREE.Quaternion();
+const _tailA = [0, 0, 0];
+
+/**
+ * The tail base's acceleration in the chest's frame, by differencing its world position.
+ *
+ * World position rather than anything the pose knows, because whoever owns the root moves it --
+ * cast.js walks and turns it, a dance spins it, a hop lifts it -- and none of that is in the pose.
+ * Differencing catches all of it with no one having to report it.
+ */
+function tailAcceleration(built, dt) {
+  const root = built.joints.tail[0].node;
+  root.getWorldPosition(_tailAt);
+  _tailA.fill(0);
+  if (!(dt > 1e-4)) return _tailA;
+  // No velocity until there are two real positions, and no acceleration until two real velocities.
+  // Priming either with zero reads a character that spawns already walking as one that went from
+  // standing to walking speed in a single frame -- which threw every tail at the door.
+  const track = (built.tailTrack ??= { at: null, vel: null });
+  const v = track.at && _tailV.subVectors(_tailAt, track.at).divideScalar(dt);
+  track.at = (track.at ?? new THREE.Vector3()).copy(_tailAt);
+  if (!v || v.length() > TAIL_TELEPORT) {
+    track.vel = null;
+    return _tailA;
+  }
+  if (track.vel) {
+    track.vel.sub(v).multiplyScalar(-1 / dt)   // (v - vPrev) / dt, in place
+      .applyQuaternion(root.parent.getWorldQuaternion(_tailQ).invert()).toArray(_tailA);
+  }
+  track.vel = (track.vel ?? new THREE.Vector3()).copy(v);
+  return _tailA;
 }
 
 /** Swaps every mesh to grey or flat black for the shape and silhouette checks. */
@@ -1476,6 +1618,7 @@ export const BASE_GUI = Object.freeze({
     ['earPerk', -1.2, 1.2], ['earSplay', -0.8, 1.2],
     ['armSwingAlt', -1.0, 1.0], ['armOutAlt', -1.5, 1.5], ['spineTwist', -1.2, 1.2],
     ['headYaw', -5.0, 5.0], ['headPitch', -0.9, 0.9], ['headTilt', -0.8, 0.8],
+    ['tailLift', -1.2, 1.2], ['tailWag', 0, 1.5],
     ['blink', 0, 1],
     ['holdItem', 'bool'],
   ],
@@ -1497,6 +1640,11 @@ export const BASE_GUI = Object.freeze({
     ['pupilScale', 0.1, 0.9], ['pupilDepth', 0.0, 0.06],
     ['eyeColor', 'color'], ['pupilColor', 'color'],
     ['eyeSheen', 0, 1], ['eyeSheenRough', 0, 1], ['eyeRough', 0, 1], ['eyeClearcoat', 0, 1],
+  ],
+  tail: [
+    ['tailLength', 0.04, 0.50], ['tailThick', 0.006, 0.06],
+    ['tailDroop', -1.6, 1.2], ['tailCurl', -0.8, 0.8],
+    ['tailStiff', 60, 800], ['tailZeta', 0.1, 1.2],
   ],
   garment: [
     ['scarf', 'bool'], ['scarfColor', 'color'],

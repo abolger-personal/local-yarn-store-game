@@ -6,7 +6,7 @@
 
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
-  addConeEars, addEyes, createCharacter, deriveCoatColor,
+  addConeEars, addEyes, addTail, createCharacter, deriveCoatColor,
   feltMaterial, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh,
 } from './npc.js';
 
@@ -60,6 +60,14 @@ export const DEFAULT_PARAMS = {
   featherFaceGap: 1.25,   // radians of clear space at the front, so plumage misses the eyes
   featherWings:  true,
   featherWingScale: 0.62,
+
+  // A short fan of tail feathers poking out below the back, angled down. Stiff: a bird's tail
+  // flicks, it does not swing.
+  tailLength:    0.110,
+  tailThick:     0.030,   // one feather's width
+  tailDroop:    -0.75,
+  tailStiff:     380,
+  tailZeta:      0.40,
 };
 
 // Quantised so feather geometry can be SHARED between characters. Per-character generated
@@ -98,6 +106,7 @@ export const RANDOM_RANGES = Object.freeze({
   wingWidth:   [0.175, 0.260],
   wingDepth:   [0.280, 0.440],
   beakSize:    [0.070, 0.110],
+  tailLength:  [0.080, 0.140],
 });
 
 // ---------------------------------------------------------------- shell settings
@@ -202,6 +211,22 @@ function buildKit(ctx, P) {
     spread: P.tuftSpread, tilt: P.tuftTilt, lift: 0.55, head: headScale(P),
   });
   for (const { node, side } of ctx.joints.upperArm) addWing(node, side, ctx, P);
+  addTail(ctx, P, { dress: (node, i, len) => addTailFan(node, len, ctx, P) });
+}
+
+// Five flat feathers fanned about the tail's own axis, lying in its plane, so the fan spreads
+// sideways and tips down with the droop. In the plumage colour.
+const TAIL_FAN = [-0.55, -0.28, 0, 0.28, 0.55];
+
+function addTailFan(node, len, ctx, P) {
+  const w = P.tailThick;
+  for (const a of TAIL_FAN) {
+    node.add(part(GEO.sphere, P.feathers ? ctx.mat.feather : ctx.mat.body, {
+      pos: [-Math.sin(a) * len * 0.5, 0, -Math.cos(a) * len * 0.5],
+      scale: [w * 0.5, w * 0.16, len * 0.5],
+      rot: [0, a, 0],
+    }));
+  }
 }
 
 // ---------------------------------------------------------------- randomisation

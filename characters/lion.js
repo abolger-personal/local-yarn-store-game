@@ -22,7 +22,7 @@
 import * as THREE from 'three';
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
-  addEars, addEyes, createCharacter, hsl, pick, rand, touchingScallopSize,
+  addEars, addEyes, addTail, createCharacter, hsl, pick, rand, tailBaseHeight, touchingScallopSize,
   feltMaterial, LIMB_TAPER, part, randomiseBase, registerSpecies, scallopAngles,
   scallopBases, scallopGeometry, scallopMesh,
 } from './npc.js';
@@ -124,6 +124,12 @@ export const DEFAULT_PARAMS = {
 
   // mane
   mane:          true,
+  // A rope that hangs, then curls up at the end into the tuft: the J that reads as a cat's tail.
+  // Three segments, because the curl and the whip need somewhere to bend.
+  tailLength:    0.300,
+  tailThick:     0.016,
+  tailDroop:    -1.00,
+  tailCurl:      0.85,   // a hook, not a hang: see TAIL_RATIO
   maneColor:     '#6e4220',   // 35.7 L* darker than the base body -- see deriveManeColor
   manePreset:    0,       // this default IS preset 0 -- tuned at the checker, then baked
   maneRows:      8,
@@ -228,6 +234,7 @@ export const RANDOM_RANGES = Object.freeze({
   earSpread:    [0.440, 0.600],
   earTilt:      [0.160, 0.440],
   earPoint:     [0.150, 0.550],
+  // tailLength is NOT here: it is drawn against the lion's own height, see TAIL_RATIO.
   maneTouch:    [1.040, 1.200],
   // Face gap floor is geometry, not taste, and it is set by the WORST preset rather than by the
   // default. The gap quantises by manePerRow -- at 13 columns the steps are 0.483 rad -- so the
@@ -482,6 +489,23 @@ function buildKit(ctx, P) {
   });
   addEarTips(ctx, P);
   addMane(ctx, P);
+  addLionTail(ctx, P);
+}
+
+// Rope segments with a ball at each joint to close the seam, and the tuft on the last -- in the
+// mane's colour, which is what makes it read as a lion's tail rather than a rat's.
+function addLionTail(ctx, P) {
+  const r = P.tailThick;
+  addTail(ctx, P, {
+    segments: 3,
+    dress(node, i, len) {
+      node.add(part(GEO.cyl, ctx.mat.body, { pos: [0, 0, -len / 2], scale: [r, len, r], rot: [Math.PI / 2, 0, 0] }));
+      node.add(part(GEO.sphere, ctx.mat.body, { scale: [r, r, r] }));
+      if (i === 2) {
+        node.add(part(GEO.sphere, ctx.mat.mane, { pos: [0, 0, -len], scale: [r * 2.6, r * 2.6, r * 3.4] }));
+      }
+    },
+  });
 }
 
 // ---------------------------------------------------------------- randomisation
@@ -566,6 +590,13 @@ const ARM_SIZE = [0.75, 1.30];
 // 0.002 clear at a ratio of 0.85. The default is 0.45 (0.21 clear); the old per-value ranges
 // topped out near 0.69; at 0.70 the worst hand still clears the floor by ~0.03.
 const MAX_ARM_RATIO = 0.70;
+
+// Tail length as a multiple of how high the tail leaves the body. A hanging tail has to fit under
+// its own base, so it is drawn against that height rather than on its own: drawn as a length, the
+// shortest-legged lion dragged 0.17 of tail through the floor. The ceiling is measured -- an
+// anxious lion (tail tucked) walking, on the shortest legs and torso varyBody draws, clears the
+// floor by 0.034 at 1.0 -- and the hook (tailDroop -1.0, tailCurl 0.85) is what buys that much.
+const TAIL_RATIO = [0.85, 1.00];
 const round3 = (n) => Math.round(n * 1000) / 1000;
 
 function varyBody(P) {
@@ -580,6 +611,7 @@ function varyBody(P) {
 export function randomiseInto(P) {
   randomiseBase(P, RANDOM_RANGES);
   varyBody(P);
+  P.tailLength = rand(...TAIL_RATIO) * tailBaseHeight(P);
   solveSnout(P);
   applyManePreset(P, Math.floor(Math.random() * MANE_PRESETS.length));
   // a whole number of faces: 3 is a sharp triangle, and 0 falls back to the dome that read as wool

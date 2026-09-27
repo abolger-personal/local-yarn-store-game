@@ -107,7 +107,7 @@ const S = {
   // merge keeps BOTH -- personality still spreads the cast, these shift the whole cast at once.
   scale: { stiff: 1, zeta: 1, stride: 1, bounce: 1, idleRate: 1,
            armGain: 1, sway: 1, lean: 1, headCarry: 1, headCock: 1, attend: 1, kneeLift: 1,
-           armTuck: 1 },
+           armTuck: 1, tailCarry: 1 },
   ranges: spansOf(speciesIds()[0]),
 };
 
@@ -819,6 +819,7 @@ const SPAN_HELP = {
   lean: 'how far they lean into a walk',
   headCarry: 'how low they carry their head',
   armTuck: 'how much they hold their arms in',
+  tailCarry: 'how high they carry their tail',
 };
 
 const fRanges = gui.addFolder('how much members of a species differ');
@@ -1010,6 +1011,10 @@ knob(fWalk, S.scale, 'headCock', 'head cocked to one side',
 knob(fWalk, S.scale, 'armTuck', 'arms held in',
   'How much they keep their elbows bent and their arms against the body. Withdrawn characters '
   + 'hold themselves in. Scales the whole cast; personality still spreads them.',
+  0, 2.5).onChange(retune);
+knob(fWalk, S.scale, 'tailCarry', 'tail carried high',
+  'Tail up when outgoing, tucked down when anxious — the same read as head carriage, at the '
+  + 'other end. Added to each species\' own resting droop. Scales the whole cast.',
   0, 2.5).onChange(retune);
 
 knob(fWalk, S, 'lookOver', 'look over the shoulder',

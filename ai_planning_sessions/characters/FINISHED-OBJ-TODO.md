@@ -9,6 +9,16 @@ Strike items through when they're done, with the date.
 - [ ] **Relief depth and the stitch-size multiplier fight the per-weight stitch size.** Lowering
   the stitch size for a lighter yarn is undone by the other two knobs. This is still wrong
   (2026-09-27).
+- [ ] **Stitch size does crazy things to the accessories; they aren't scaled right.** Accessory
+  sizes come from the fabric's thickness, which comes from the stitch size, so the stitch-size
+  slider inflates them:
+  - pom-pom: `max(thick × 3.5, head × 0.28) × fit`
+  - buttons: `thick × 1.4–1.8`
+  - flower: `thick × 4`
+  - tassel: `thick × 5`
+
+  They probably want to size from the item and the body, with yarn weight at most a small factor
+  (2026-09-27).
 - [ ] **Stitch size vs yarn weight.** Proposed: keep the order but compress the spread (the square
   root of real gauge, with super-bulky pinned at today's ×3), and split the page's slider into
   "stitch size" and "weight spread". Waiting on a go-ahead.

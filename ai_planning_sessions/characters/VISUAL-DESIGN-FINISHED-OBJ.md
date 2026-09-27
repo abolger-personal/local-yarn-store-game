@@ -28,7 +28,7 @@ rendered fingers.
 
 | Type | Slot | Spec'd silhouettes | Proposed additions to reach 5–10 |
 | --- | --- | --- | --- |
-| **Hat** | head | traditional knit hat, beret, hood, headband; pom-pom or not | slouch beanie, earflap/trapper, bucket hat (crochet), cloche, pixie hat with a long tip **(proposed)** |
+| **Hat** | head | traditional knit hat, fisherman's hat, beret, hood, headband; pom-pom or not (an accessory) | slouch beanie, earflap/trapper, bucket hat (crochet), cloche, pixie hat with a long tip **(proposed)** |
 | **Scarf** | neck | cowl, ascot, long scarf; one so long it trails on the ground | infinity (double-wrapped loop), skinny scarf, kerchief/bandana triangle, chunky fringed wrap **(proposed)** |
 | **Sweater** | torso | vest, short sleeve, long sleeve × cardigan (open front) or pullover (closed front) | turtleneck, cropped, oversized tunic, raglan with a colour yoke **(proposed)** |
 | **Shawl** | shoulders | triangle, half circle, rectangular wrap; closes or knots at the front; alone or over a sweater | crescent, capelet, shrug **(proposed)** |
@@ -82,7 +82,7 @@ PATTERNS.md's old `["stripes", "star", "pom pom", "fringe"]` hint list:
 
 | Kind | Values | Read at 150px as |
 | --- | --- | --- |
-| **Stitch texture** (relief) | plain (stockinette or single crochet), rib, garter, seed/moss, waffle, puff, cable, lace (holes) | surface bumps, or holes the background shows through |
+| **Stitch texture** (relief) | knit: stockinette, rib, garter, seed/moss, linen stitch, cable. Crochet: single crochet (its plain base), waffle, puff, lace (holes). See §2b | surface bumps, or holes the background shows through |
 | **Colourwork** (which colour goes where) | solid, stripes, checks, colour-block, motif (a star, heart and so on), fair isle, marled (two strands held together, speckled) | colour regions |
 | **Edge** (hem and cuff treatment) | rolled, ribbed, fringed, picot, scalloped | a silhouette break at the edges; cheap, and it reads at 150px |
 | **Form** (how it is worn; scarves and shawls) | draped, wrapped once, wrapped twice, tied, tucked | the same silhouette worn differently |
@@ -90,11 +90,13 @@ PATTERNS.md's old `["stripes", "star", "pom pom", "fringe"]` hint list:
 
 Fringe is an **edge**, not an accessory. These additions (edge, form, marled) come from P1-SPIKE-PLAN.md's `WearableAppearance` sketch.
 
-**Knit vs crochet (proposed):**
+**Knit vs crochet (decided 2026-09-27, see §2b):**
 
 - Both share every silhouette.
-- Each craft has its own plain base texture: knit is smooth V-rows, crochet is bumpier and more open.
-- A few textures belong to one craft only: cable is knit only; puff, shell and granny are crochet only.
+- Craft should read much more strongly than it does now: even cartoonish, **knit is smoother than
+  crochet**. Each craft has its own plain base texture: knit is smooth V-rows, crochet is bumpier
+  and more open.
+- Stitch and craft are **not independent**: each stitch belongs to one craft (the §2 table).
 - The amigurumi and the granny-square potholder are crochet by default.
 
 **The 2D image.** When the player clicks or inspects a PATTERN, a detail screen shows the BASE FO:
@@ -122,6 +124,44 @@ there is one source of truth. There are no shop-level thumbnails, since they wou
 
 **Performance.** What each look choice costs, estimated and measured, is tracked in
 `WEARABLE-LOOK-VS-PERFORMANCE.md`. Check it before committing to a look.
+
+---
+
+## 2b. Real-world inputs and what they drive (reference)
+
+Check this when deciding what to model. It maps how each real-world input changes a real piece of
+knitting or crochet onto the visual outputs the generator has (`characters/garments.js`). Tuning
+still happens by eye in `characters/dress-up.html`.
+
+The generator's outputs: **fit** (size relative to fitted), **stitch size** (stitch width, row
+height, which is also stripe width, and relief depth), **fabric thickness**, **texture** (the
+relief pattern), **sheen**, and **drape**.
+
+1. **Tool size** (needle or hook). A bigger tool changes:
+   - **gauge**, which shows here as **fit**
+   - **stitch size**: stitch width, relief depth, and row height, which sets how wide stripes are
+   - **drape**. This is possibly the biggest effect in the real world, but it is hard to show on
+     screen. It is on hold (below).
+2. **Yarn size** (weight). Heavier yarn changes everything a bigger tool does, **plus fabric
+   thickness**, where its effect dominates. Tool size does not change fabric thickness.
+3. **Stitch** has the dominant effect on **texture**.
+4. **Fibre**, in the real world, affects:
+   - **Sheen:** silk and mercerised cotton are reflective. Modelled.
+   - **Drape:** on hold, because it is hard to model cheaply. **To do:** find a cheap way.
+   - **Pilling or halo, and durability:** not a game mechanic now, and not planned.
+   - **Washability and care:** may become a mechanic later, since washing could shrink or felt a
+     garment. Not now.
+   - **Cost in money:** explicitly not part of this game.
+   - **Softness:** not really modellable in a visual game.
+5. **Craft** should have a much stronger visual effect than it does now. Even cartoonish, knit is
+   smoother than crochet. Stitch and craft are not independent:
+   - **Knit stitches:** stockinette, rib, garter, seed, linen stitch. Cable stays knit, as §2 had
+     it.
+   - **Crochet stitches:** waffle, puff, lace.
+
+   This split is **not accurate to the real world**. For example, you can knit lace. It is set by
+   the performance and graphics depth available now, and should be revisited in a later
+   optimising pass.
 
 ---
 
@@ -156,7 +196,8 @@ object comes out relative to the pattern's intended size.
 - Colour comes from the yarn(s) the NPC used. **Every colour appears somewhere.** The colourwork
   decides where.
 - Colours beyond what the colourwork has slots for go onto trim, the accessory, or extra stripes.
-- **Purchase fallback:** if the NPC ended up with more colours than the pattern's colourwork has slots, the colourwork upgrades to make room: solid becomes stripes, and stripes become fair isle at 3 or more colours (P1-SPIKE-PLAN.md's purchase-history rule, kept as a fallback). The pattern still decides first.
+- **Purchase fallback:** if the NPC ended up with more colours than the pattern's colourwork has slots, the colourwork upgrades to make room: solid becomes stripes. Stripes repeat through any number of colours, so they need no further upgrade (P1-SPIKE-PLAN.md's purchase-history rule, kept as a fallback). The pattern still decides first.
+  - **Decided 2026-09-27:** more colours on stripes is **not** a penalty and does not turn them into fair isle; in the dress-up page that looked a mess. Picking fair isle for extra colours is an NPC's taste, to be specified with personality.
 - The result is never completely random.
 - How many yarns a WIP ends up with is decided by shopping, not here. See
   `WIP-AND-FINISHED-OBJ-FORMATION.md`.
@@ -164,10 +205,10 @@ object comes out relative to the pattern's intended size.
 ### Yarn weight and fibre shape it
 
 - **Weight sets thickness (bulk).** A bulky scarf is fat and a lace one is thin, independent of
-  size/fit.
-- **Fibre sets drape.** It picks among a few pre-shaped drape meshes, from stiff (linen, cotton) to
-  fluid (alpaca, silk, mohair). There is no cloth simulation. The exact fibre-to-drape order is
-  **(proposed)**.
+  size/fit. Weight also shares everything tool size drives (§2b).
+- **Fibre sets sheen; its drape is on hold** (§2b). Where drape is drawn today, it picks among a few
+  pre-shaped drape meshes, from stiff (linen, cotton) to fluid (alpaca, silk, mohair), with no
+  cloth simulation. The fibre-to-drape order stays **(proposed)** until a cheap drape model exists.
 
 ### NPC skill
 
@@ -269,3 +310,4 @@ Not changed yet; listed so nothing is missed.
   - `yarnUnits`: **1 per yarn item**, not footprint. Pattern costs are 1–8 items of the pattern's weight (PATTERNS.md), and a wrong-weight item is a near-miss, not a conversion.
 - **`characters/npc.js`** `scarf` default off: characters start bare-necked, and the neck slot is an FO.
 - **`P1-SPIKE-PLAN.md`**'s `WearableAppearance` sketch should be reconciled with §2's vocabulary.
+- Implementation to-dos from tuning on the dress-up page are in `FINISHED-OBJ-TODO.md`.

@@ -43,7 +43,7 @@ export { YARN_WEIGHT_NAMES as WEIGHTS, YARN_MATERIALS as FIBRES };
 /** Spec §1. `form` marks the types the "how it is worn" field applies to. */
 export const GARMENTS = Object.freeze({
   hat: { slot: 'head', edge: 'rolled',
-    silhouettes: ['beanie', 'slouch', 'bobble', 'beret', 'earflap', 'hood', 'headband', 'bucket', 'cloche', 'pixie'] },
+    silhouettes: ['beanie', 'slouch', 'fisherman', 'beret', 'earflap', 'hood', 'headband', 'bucket', 'cloche', 'pixie'] },
   scarf: { slot: 'neck', edge: 'none', form: true,
     silhouettes: ['cowl', 'infinity', 'ascot', 'long', 'trailing', 'skinny', 'kerchief', 'chunky wrap'] },
   shawl: { slot: 'shoulders', edge: 'none', form: true,
@@ -57,9 +57,12 @@ export const GARMENTS = Object.freeze({
 });
 
 /** Worn size relative to a fitted one. 1 is fitted; both ends are allowed to look silly (spec §3). */
-export const FIT_RANGE = Object.freeze([0.6, 1.6]);
+export const FIT_RANGE = Object.freeze([0.2, 1.6]);
 
-const PALETTE = ['#c0504d', '#f2e3c6', '#3d5a80'];
+/** Most yarn colours one item can be knitted in. Colour slots are item keys color1..color6. */
+export const MAX_COLOURS = 6;
+const PALETTE = ['#c0504d', '#f2e3c6', '#3d5a80', '#e0b04a', '#5b8c5a', '#8a5a9e'];
+const colourKeys = (n) => Array.from({ length: n }, (_, i) => `color${i + 1}`);
 
 /** One item's attributes, as a pattern plus how it was made would give them. */
 export function defaultItem(type) {
@@ -67,7 +70,7 @@ export function defaultItem(type) {
   return {
     on: type === 'scarf', silhouette: g.silhouettes[0], fit: 1,
     weight: 'worsted', fibre: 'wool', craft: 'knit',
-    colorCount: 1, color1: PALETTE[0], color2: PALETTE[1], color3: PALETTE[2],
+    colorCount: 1, ...Object.fromEntries(colourKeys(MAX_COLOURS).map((k, i) => [k, PALETTE[i]])),
     colourwork: 'solid', stitch: 'plain', edge: g.edge, accessory: 'none',
     form: 'wrapped once', sleeves: 'long',
   };
@@ -106,19 +109,19 @@ function fabric(item) {
     stitchW: stitch, rowH: stitch * 0.8,
     thick: stitch * 1.1,                     // a knit fabric is about two yarn diameters
     drape: DRAPE[item.fibre] ?? 0.45,
-    colours: [item.color1, item.color2, item.color3].slice(0, item.colorCount).map((c) => new THREE.Color(c)),
+    colours: colourKeys(Math.min(item.colorCount, MAX_COLOURS)).map((k) => new THREE.Color(item[k] ?? PALETTE[0])),
     colourwork: resolveColourwork(item.colourwork, item.colorCount),
   };
 }
 
 /**
- * The purchase fallback (spec §3): more colours than the pattern's colourwork has slots upgrades it,
- * solid to stripes and stripes to fair isle at three or more. The pattern still decides first.
+ * The purchase fallback (spec §3): a solid pattern knitted in more than one colour becomes stripes,
+ * which repeat through every colour, so stripes need no further upgrade. The pattern still decides
+ * first. Choosing fair isle for extra colours instead is an NPC's taste, not a penalty: to come
+ * with personality (spec §3).
  */
 export function resolveColourwork(colourwork, count) {
-  if (colourwork === 'solid' && count > 1) return count >= 3 ? 'fair isle' : 'stripes';
-  if (colourwork === 'stripes' && count >= 3) return 'fair isle';
-  return colourwork;
+  return colourwork === 'solid' && count > 1 ? 'stripes' : colourwork;
 }
 
 // ---------------------------------------------------------------- the body, measured
@@ -146,13 +149,14 @@ function carried(joint) {
 const extent = (box, axis) => Math.max(-box.min[axis], box.max[axis]);
 
 /** The skull: every species kit adds it as a sphere on the head, and it is the largest one there. */
-function skullRadii(head) {
+function skullMesh(head) {
   let best = null;
   for (const child of head.children) {
     if (child.isMesh && child.geometry === GEO.sphere && (!best || child.scale.x > best.scale.x)) best = child;
   }
-  return best ? best.scale.toArray() : [0.17, 0.17, 0.17];
+  return best;
 }
+const skullRadii = (head) => skullMesh(head)?.scale.toArray() ?? [0.17, 0.17, 0.17];
 
 /**
  * Everything a garment has to clear, measured off the built rig in the pose it is standing in.
@@ -296,7 +300,14 @@ const laceHole = (us, vs) => {
   return a * a + b * b < 0.04;
 };
 
-function relieve(geo, f, reps) {
+// Stitches across one repeat of each stitch and colourwork (RELIEF, COLOURWORK, laceHole). Marled
+// is a speckle with no repeat; its seam column may differ, which a speckle hides.
+const U_REPEAT = { rib: 4, seed: 2, waffle: 2, puff: 4, cable: 8, lace: 3, checks: 8, motif: 6, 'fair isle': 6 };
+const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+const lcm = (a, b) => (a * b) / gcd(a, b);
+const castOn = (stitches, repeat) => Math.max(1, Math.round(stitches / repeat)) * repeat;
+
+function relieve(geo, f, reps, seam) {
   const h = f.stitch === 'plain' && f.craft === 'crochet' ? crochetBase : RELIEF[f.stitch] ?? RELIEF.plain;
   if (h === RELIEF.plain) return;
   const p = geo.attributes.position, n = geo.attributes.normal, uv = geo.attributes.uv;
@@ -305,7 +316,7 @@ function relieve(geo, f, reps) {
     const d = amp * h(uv.getX(i) * reps[0], uv.getY(i) * reps[1]);
     p.setXYZ(i, p.getX(i) + n.getX(i) * d, p.getY(i) + n.getY(i) * d, p.getZ(i) + n.getZ(i) * d);
   }
-  geo.computeVertexNormals();
+  normals(geo, seam);   // re-weld the seam: a bare computeVertexNormals creases it again
 }
 
 // ---------------------------------------------------------------- colourwork (spec §2, §3)
@@ -372,13 +383,16 @@ function flatColour(geo, colour, rows = 40) {
 function panel(fn, f, { closedU = false, mask = null, from = null, minU = 24, minV = 12 } = {}) {
   const [lu, lv] = spans(fn);
   const reps = [lu / f.stitchW, lv / f.rowH];
+  // In the round, cast on a whole number of pattern repeats, as a knitter does: otherwise the
+  // stitch and colour patterns jump where the sheet meets itself, and relief opens a seam there.
+  if (closedU) reps[0] = castOn(reps[0], lcm(U_REPEAT[f.stitch] ?? 1, U_REPEAT[f.colourwork] ?? 1));
   const dense = DENSITY[f.stitch] ?? 0;
   const segU = Math.min(256, Math.max(minU, Math.ceil(reps[0] * dense)));
   const segV = Math.min(192, Math.max(minV, Math.ceil(reps[1] * dense * 0.8)));
   const lace = f.stitch === 'lace' ? (u, v) => laceHole(u * reps[0], v * reps[1]) : null;
   const holes = lace && mask ? (u, v) => mask(u, v) || lace(u, v) : lace ?? mask;
   const geo = sheet(fn, segU, segV, { closedU, mask: holes, from });
-  relieve(geo, f, reps);
+  relieve(geo, f, reps, { closedU, cols: segU + 1, rows: segV + 1 });
   paint(geo, f, reps);
   return geo;
 }
@@ -412,14 +426,14 @@ const at = (geo, p, s) => geo.scale(...s).translate(p.x, p.y, p.z);
 
 const EDGE = {
   none: () => [],
-  rolled: (r, f) => [tubeAlong(r, f.thick * 1.6)],
+  rolled: (r, f) => [tubeAlong(r, f.thick * 0.6)],
   ribbed: (r, f) => {
-    const g = tubeAlong(r, f.thick * 1.3, 10);
+    const g = tubeAlong(r, f.thick * 0.45, 10);
     const len = new THREE.CatmullRomCurve3(r.pts, r.closed).getLength();
     const ribs = len / (f.stitchW * 2);
     const p = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv;
     for (let i = 0; i < p.count; i++) {
-      const d = f.thick * 0.5 * Math.cos(TAU * uv.getX(i) * ribs);
+      const d = f.thick * 0.15 * Math.cos(TAU * uv.getX(i) * ribs);
       p.setXYZ(i, p.getX(i) + n.getX(i) * d, p.getY(i) + n.getY(i) * d, p.getZ(i) + n.getZ(i) * d);
     }
     g.computeVertexNormals();
@@ -430,8 +444,8 @@ const EDGE = {
     const len = f.thick * 7 * (0.6 + 0.4 * f.drape);
     return new THREE.CylinderGeometry(f.thick * 0.35, f.thick * 0.25, len, 5).translate(p.x, p.y - len / 2, p.z);
   }),
-  picot: (r, f) => beads(r, f.thick * 2.6, (p) => at(new THREE.SphereGeometry(1, 6, 4), p, [f.thick * 0.9, f.thick * 0.9, f.thick * 0.9])),
-  scalloped: (r, f) => beads(r, f.thick * 3.4, (p) => at(new THREE.SphereGeometry(1, 8, 5), p.clone().setY(p.y - f.thick), [f.thick * 1.8, f.thick * 1.1, f.thick * 1.8])),
+  picot: (r, f) => beads(r, f.thick * 2.6, (p) => at(new THREE.SphereGeometry(1, 6, 4), p, [f.thick * 0.45, f.thick * 0.45, f.thick * 0.45])),
+  scalloped: (r, f) => beads(r, f.thick * 2.4, (p) => at(new THREE.SphereGeometry(1, 8, 5), p.clone().setY(p.y - f.thick * 0.5), [f.thick, f.thick * 0.55, f.thick])),
 };
 
 function edgePieces(joint, rings, f) {
@@ -534,17 +548,33 @@ const dome = (top, low) => (v) => {
   return [Math.sin(a) * 1.04, Math.cos(a) * top];
 };
 
+// Hats are worn pushed back off the brow, crown towards the nape. A beret sets its own (0): it
+// sits flat and leans sideways instead.
+const HAT_PITCH = THREE.MathUtils.degToRad(35);
+
+/**
+ * A slouch is a bag, not a dome: twice the head's height of fabric, fuller than the head above the
+ * band, with a rounded end. `flop` folds it back over the crown so the end hangs down behind.
+ */
+function slouchBag(v) {
+  const t = 1 - v;                                             // 0 at the band .. 1 at the end
+  const band = Math.sqrt(1 - 0.25 * 0.25) * 1.04;              // the seat ring, as hatSeat has it
+  const full = lerp(band, 1.35, clamp(t / 0.35, 0, 1) ** 0.7);
+  const end = t > 0.45 ? Math.sqrt(Math.max(0, 1 - ((t - 0.45) / 0.55) ** 2)) : 1;
+  return [full * end, 0.25 + t * 1.5];
+}
+
 const HAT = {
-  beanie: { profile: dome(1.06, 0.25), seat: 0.25 },
-  slouch: { profile: dome(1.3, 0.25), seat: 0.25, bend: 0.55 },
-  bobble: { profile: dome(1.08, 0.25), seat: 0.25, pom: true },
-  beret: { seat: 0.44, tilt: 0.3, profile: (v) => (v < 0.55
-    ? [lerp(0, 1.4, v / 0.55), lerp(1.0, 0.86, v / 0.55)]
-    : [lerp(1.4, 0.92, (v - 0.55) / 0.45), lerp(0.86, 0.44, (v - 0.55) / 0.45)]) },
+  beanie: { profile: dome(1.06, 0.25), seat: 0.25, size: 0.9 },   // size: what reads as fitted at fit 1
+  slouch: { profile: slouchBag, seat: 0.25, size: 0.9, flop: { hinge: 0.9, back: 1.0, angle: 2.7 }, soft: 1.2 },
+  fisherman: { profile: dome(1.08, 0.25), seat: 0.25, earsOut: true },
+  beret: { seat: 0.44, tilt: 0.3, pitch: 0, soft: 1.6, profile: (v) => (v < 0.55
+    ? [lerp(0, 1.4, v / 0.55), lerp(1.18, 1.0, v / 0.55)]
+    : [lerp(1.4, 0.92, (v - 0.55) / 0.45), lerp(1.0, 0.44, (v - 0.55) / 0.45)]) },
   earflap: { profile: dome(1.06, 0.3), seat: 0.3, flaps: true },
   hood: { profile: dome(1.1, -0.95), seat: 0.44, face: true },
-  headband: { seat: 0.45, profile: (v) => { const y = lerp(0.62, 0.28, v); return [Math.sqrt(1 - y * y) * 1.05, y]; } },
-  bucket: { seat: 0.35, profile: (v) => (v < 0.75 ? dome(1.05, 0.35)(v / 0.75) : [lerp(0.99, 1.45, (v - 0.75) / 0.25), lerp(0.35, 0.08, (v - 0.75) / 0.25)]) },
+  headband: { seat: 0.45, soft: 0.3, open: true, profile: (v) => { const y = lerp(0.79, 0.11, v); return [Math.sqrt(1 - y * y) * 1.05, y]; } },
+  bucket: { seat: 0.35, soft: 0.5, profile: (v) => (v < 0.75 ? dome(1.05, 0.35)(v / 0.75) : [lerp(0.99, 1.45, (v - 0.75) / 0.25), lerp(0.35, 0.08, (v - 0.75) / 0.25)]) },
   cloche: { seat: 0.1, profile: (v) => (v < 0.85 ? dome(1.05, 0.0)(v / 0.85) : [lerp(1.04, 1.18, (v - 0.85) / 0.15), lerp(0.0, -0.1, (v - 0.85) / 0.15)]) },
   pixie: { seat: 0.3, bend: 1.2, tip: true, profile: (v) => {
     const y = lerp(2.3, 0.3, v);
@@ -562,56 +592,258 @@ function hatSeat(spec, s) {
   const want = s * ringR;
   const restY = want < 1 ? Math.sqrt(1 - want * want) : 0;
   const slip = clamp((want - 1) * 4, 0, 1);
-  return { dy: restY - s * spec.seat - slip * 0.35, tilt: slip * 0.55 + (spec.tilt ?? 0), dx: slip * 0.25 };
+  return { dy: restY - s * spec.seat - slip * 0.35, tilt: slip * 0.55 + (spec.tilt ?? 0), dx: slip * 0.25,
+    pitch: spec.pitch ?? HAT_PITCH };
+}
+
+
+/** A seated hat's lean: pitched back about the head's centre, then slipped to the side. */
+const hatRotation = (seat) => new THREE.Matrix4().makeRotationZ(-seat.tilt).multiply(new THREE.Matrix4().makeRotationX(-seat.pitch));
+
+/**
+ * Knit has no stiffness: nothing it makes is a clean surface of revolution. On the unit head, the
+ * fabric above the seat slumps back and down under its own weight -- more in fluid fibre, more the
+ * more fabric there is above the seat -- and the circumference wobbles in two or three soft lobes.
+ * The seat itself grips the head, so both fade out towards it. `soft` scales both per silhouette.
+ * ponytail: fixed lobe phases, so every beanie slumps the same way; seed them per item for variety.
+ */
+function slump(spec, f, v, py, th) {
+  const soft = spec.soft ?? 1;
+  const free = (1 - v) ** 1.5;
+  const sag = soft * (0.35 + f.drape) * 0.12 * free * Math.max(0, py);
+  const wobble = 1 + soft * 0.035 * (0.3 + free) * (Math.sin(2 * th + 0.7) * 0.6 + Math.sin(3 * th + 2.1) * 0.4);
+  return { sag, wobble };
+}
+
+/**
+ * A hat rests ON the head: whatever the profile, slump, seat or flap does, no point may sink past
+ * the skull `r` scaled by `lift` (one fabric thickness). Pushed straight out from the skull centre.
+ */
+function outsideSkull(p, r, lift) {
+  const len = Math.hypot(p.x / r[0], p.y / r[1], p.z / r[2]);
+  return len < lift ? p.multiplyScalar(lift / Math.max(len, 1e-6)) : p;
+}
+
+/**
+ * Folds everything above the hinge back, about a side-to-side axis at the hinge height and at the
+ * BACK of the bag (`back`, on the unit head): the fold deepens towards the end, so the end hangs
+ * down behind (angle ~155 degrees). Hinged at the head's centreline instead, the end swung down
+ * into the back of the skull.
+ */
+function flop(p, { hinge: h, back, angle }, k, dy, v) {
+  const hinge = h * k + dy, pivot = -back * k;
+  const dh = p.y - hinge;
+  if (dh <= 0) return;
+  const a = angle * (1 - v);
+  // Knit has no body: as it folds, the bag collapses flat against its own back instead of
+  // staying a tube, whose front would swing a whole bag-width out behind the head.
+  const dz = (p.z - pivot) * lerp(1, 0.3, a / angle);
+  const c = Math.cos(a), sn = Math.sin(a);
+  p.set(p.x, hinge + dh * c + dz * sn, pivot - dh * sn + dz * c);
 }
 
 function hatShape(spec, r, s, f) {
   const seat = hatSeat(spec, s);
   const lift = 1 + f.thick / r[1];
-  const rot = new THREE.Matrix4().makeRotationZ(-seat.tilt);
+  const rot = hatRotation(seat);
   return (u, v, out) => {
     const [pr, py] = spec.profile(v);
     const th = u * TAU;
     const bent = spec.bend ? Math.max(0, py - 0.8) ** 2 * spec.bend : 0;
-    out.set(pr * Math.sin(th) * s * lift, py * s * lift + seat.dy, pr * Math.cos(th) * s * lift - bent);
+    const { sag, wobble } = slump(spec, f, v, py, th);
+    const w = pr * wobble * s * lift;
+    out.set(w * Math.sin(th), (py - sag * 0.6) * s * lift + seat.dy, w * Math.cos(th) - bent - sag);
+    if (spec.flop) flop(out, spec.flop, s * lift, seat.dy, v);
     out.applyMatrix4(rot);
-    return out.set(out.x * r[0] + seat.dx * r[0], out.y * r[1], out.z * r[2]);
+    out.x += seat.dx;
+    return outsideSkull(out.set(out.x * r[0], out.y * r[1], out.z * r[2]), r, lift);
   };
 }
 
 function buildHat(fit, f) {
   const spec = HAT[f.silhouette] ?? HAT.beanie;
   const head = fit.joints.head;
-  const r = fit.head;
-  const s = f.fit;
+  // The skull, not the head's box: the box holds the lion's mane and the owl's feather shell, and a
+  // hat sized to those sits on them like a lampshade. Mane and feathers clip instead (spec §3).
+  const r = fit.skull;
+  const s = f.fit * (spec.size ?? 1);
   const fn = hatShape(spec, r, s, f);
-  // A hood's face opening: the front, below the brow.
-  const mask = spec.face ? (u, v) => Math.cos(u * TAU) > 0.45 && v > 0.42 : null;
-  const pieces = [piece(head, panel(fn, f, { closedU: true, mask, from: (p) => p.set(0, 0, 0) }))];
-  if (spec.flaps) pieces.push(...earflaps(fn, head, f));
-  pieces.push(...edgePieces(head, [ring(fn, 1)], f));
-  const acc = spec.pom && f.accessory === 'none' ? { ...f, accessory: 'pom-pom' } : f;
-  return [...pieces, ...accessoryPieces(hatAnchors(fn, head, Math.max(f.thick * 3.5, r[1] * 0.28) * s, f), acc)];
+  // A hood's sheet runs round from one side of the face to the other, so its edge IS the opening's
+  // rounded arch -- where masking quads out of a closed sheet cut a stair-stepped rectangle.
+  const body = spec.face ? (u, v, out) => { const h = faceHalf(v); return fn((h + u * (TAU - 2 * h)) / TAU, v, out); } : fn;
+  const pieces = [piece(head, panel(body, f, { closedU: !spec.face, from: (p) => p.set(0, 0, 0) }))];
+  if (spec.flaps) pieces.push(...earflaps(fn, head, f, r, 1 + f.thick / r[1]));
+  pieces.push(...edgePieces(head, [ring(body, 1, 48, { closed: !spec.face })], f));
+  return [...pieces, ...accessoryPieces(hatAnchors(fn, head, Math.max(f.thick * 3.5, r[1] * 0.28) * s, f), f)];
 }
 
 function hatAnchors(fn, head, size, f) {
   const top = fn(0, 0, new THREE.Vector3());
   const side = fn(0.25, 0.6, new THREE.Vector3());
   return {
-    'pom-pom': [{ joint: head, p: top.clone().setY(top.y + size * 0.6), size }],
+    'pom-pom': [{ joint: head, p: top.clone().addScaledVector(top.clone().normalize(), size), size }],
     tassel: [{ joint: head, p: top, size: size * 0.8 }],
     flower: [{ joint: head, p: side, n: side.clone().normalize(), size: size * 0.7 }],
     buttons: [{ joint: head, p: side, n: side.clone().normalize(), size: f.thick * 1.6 }],
   };
 }
 
-function earflaps(fn, head, f) {
+function earflaps(fn, head, f, r, lift) {
   return [-1, 1].map((side) => {
     const u0 = side < 0 ? 0.75 : 0.25;
     const base = fn(u0, 1, new THREE.Vector3());
-    const flap = (u, v, out) => fn(u0 + (u - 0.5) * 0.12 * (1 - v * 0.6), 1, out).setY(base.y - v * base.length() * 0.7);
-    return piece(head, panel(flap, f, { minU: 6, minV: 8, from: (p) => p.set(0, p.y, 0) }));
+    const out = new THREE.Vector3();
+    // Hangs from the brim itself, wherever the hat's tilt has put it, straight down under gravity.
+    // A padded tab, not a sheet: u runs round its cross-section, a flat oval that stands out from
+    // the head by up to two fabric thicknesses and pinches shut along both edges, the top one against
+    // the brim -- open there, a big flap read as an ice-cream cone.
+    const flap = (u, v, p) => {
+      const a = u * TAU;
+      fn(u0 + Math.cos(a) * 0.06 * (1 - v * 0.6), 1, p);
+      p.y -= v * base.length() * 0.7;
+      const puff = f.thick * 1.5 * Math.sqrt(Math.max(0, 1 - (2 * v - 1) ** 4));   // 0 at both ends: closed
+      p.addScaledVector(out.set(p.x, 0, p.z).normalize(), puff * (1 + Math.sin(a)));
+      return outsideSkull(p, r, lift);
+    };
+    return piece(head, panel(flap, f, { closedU: true, minU: 16, minV: 8, from: (p) => p.set(base.x, p.y, base.z) }));
   });
+}
+
+// ---------------------------------------------------------------- what a hat covers
+
+/**
+ * The hat as a volume in the head's space: its profile turned about the head, in the same frame
+ * hatShape builds in. Slump, wobble and bends are left out, so `press` works to an INNER volume a
+ * margin inside it.
+ * ponytail: a very drapey crown slumps past that margin at the front and can bare a pressed tip;
+ * fold slump() into the profile here if it shows.
+ */
+function hatCover(fit, f) {
+  const spec = HAT[f.silhouette] ?? HAT.beanie;
+  const r = fit.skull;
+  const s = f.fit * (spec.size ?? 1);
+  const seat = hatSeat(spec, s);
+  const k = s * (1 + f.thick / r[1]);
+  const unrot = hatRotation(seat).invert();
+  const { top, rAt, inFace } = hatProfile(spec);
+  const low = spec.profile(1)[1];
+  const toProfile = (q, out) => out.set(q.x / r[0] - seat.dx, q.y / r[1], q.z / r[2]).applyMatrix4(unrot).setY(out.y - seat.dy).divideScalar(k);
+  const inside = (p, m) => p.y >= low && p.y <= top * m && Math.hypot(p.x, p.z) < rAt(p.y) * m && !inFace(p);
+  const p = new THREE.Vector3();
+  const byOpening = (pt) => inFace(pt) || (spec.open && pt.y > top * 0.9 - 0.02);
+  return {
+    /** A head-space point the hat hides: inside it, and not in a hood's face opening. */
+    under: (q) => inside(toProfile(q, p), 1),
+    press: hatPress(toProfile, (pt) => inside(pt, 0.9), byOpening),
+  };
+}
+
+/**
+ * A head-space point that shows through the hat is pulled in, towards the head's centre, to just
+ * inside it; returns false if it was clear. "Shows through" is: the line from the head's centre
+ * out to it passes through the hat and leaves by the fabric -- not by an opening (a hood's face, a
+ * headband's open top) -- so a tiny perched hat only presses what is under it.
+ */
+function hatPress(toProfile, inside, byOpening) {
+  const p = new THREE.Vector3(), step = new THREE.Vector3();
+  const along = (q, t) => toProfile(step.copy(q).multiplyScalar(t), p);
+  return (q) => {
+    if (inside(toProfile(q, p))) return false;
+    let last = -1;
+    for (let i = 1; i <= 24; i++) if (inside(along(q, i / 24))) last = i;
+    if (last < 0 || byOpening(along(q, (last + 1) / 24))) return false;
+    q.multiplyScalar(last / 24);
+    return true;
+  };
+}
+
+// A hood's face opening: an arch from the brow (v 0.42) down to the hem, round at the top and as
+// wide as +-64 degrees about the front at the hem.
+const FACE_BROW = 0.42, FACE_HALF = Math.acos(0.45);
+function faceHalf(v) {
+  const t = (v - FACE_BROW) / (1 - FACE_BROW);
+  return t <= 0 ? 0 : FACE_HALF * Math.sqrt(Math.max(0, 2 * t - t * t));
+}
+
+/** A hat's profile read back as a solid: its crown height, its radius at a height, its face opening. */
+function hatProfile(spec) {
+  const prof = Array.from({ length: 65 }, (_, i) => spec.profile(i / 64));   // crown .. brim, y falling
+  const sample = (y) => {                                                      // [r, v] at height y
+    for (let i = 0; i < 64; i++) {
+      const [r0, y0] = prof[i], [r1, y1] = prof[i + 1];
+      const t = (y0 - y) / (y0 - y1 || 1);
+      if (y <= y0 && y >= y1) return [lerp(r0, r1, t), (i + t) / 64];
+    }
+    return [0, y > prof[0][1] ? 0 : 1];
+  };
+  return {
+    top: prof[0][1], rAt: (y) => sample(y)[0],
+    inFace: (p) => Boolean(spec.face) && Math.abs(Math.atan2(p.x, p.z)) < faceHalf(sample(p.y)[1]),
+  };
+}
+
+/**
+ * Whatever the head carries that the hat should cover (spec §3: fit is measured, never per
+ * species). Eyes and ears are joints: under the hat, not drawn at all -- fewer draws, not more.
+ * A coat over the skull -- the lion's mane, the owl's feather shell -- is one mesh that cannot be
+ * dropped whole, so its points are pressed under the hat, once, at dressing time: the head and
+ * hat never move relative to each other, so nothing runs per frame. Each pressed mesh gets its own
+ * copy of the geometry (rigs share primitives), undone by undress.
+ *
+ * Only coats: a coat is what goes over the crown. The face -- snout, beak, nose -- sits under a
+ * bucket's brim, which the profile reads as solid, and pressing it put the face inside the skull.
+ */
+function coverUnderHat(built, f) {
+  const fit = bodyFit(built);
+  const cover = hatCover(fit, f);
+  const head = built.joints.head, skull = skullMesh(head);
+  const q = new THREE.Vector3();
+  // Ears are worn up through an open-top hat (a headband), and out of a fisherman's hat: only eyes go under.
+  const spec = HAT[f.silhouette] ?? HAT.beanie;
+  const parts = spec.open || spec.earsOut ? built.joints.eye : [...built.joints.eye, ...built.joints.ear];
+  for (const { node } of parts) {
+    if (!node.visible || !cover.under(head.worldToLocal(node.getWorldPosition(q)))) continue;
+    node.visible = false;
+    built.covered.push(() => { node.visible = true; });
+  }
+  for (const mesh of coats(head, skull, new THREE.Vector3(0, fit.skull[1] * 0.9, 0))) pressMesh(built, head, mesh, cover);
+}
+
+/** The meshes the head carries, bar the skull, whose bounds take in the crown. */
+function coats(head, skull, crown) {
+  const out = [], box = new THREE.Box3();
+  const visit = (node) => {
+    for (const mesh of node.children) {
+      if (mesh.userData.joint || mesh.userData.garment) continue;
+      visit(mesh);
+      if (!mesh.isMesh || mesh === skull) continue;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+      box.copy(mesh.geometry.boundingBox).applyMatrix4(_rel.multiplyMatrices(_inv.copy(head.matrixWorld).invert(), mesh.matrixWorld));
+      if (box.containsPoint(crown)) out.push(mesh);
+    }
+  };
+  visit(head);
+  return out;
+}
+
+function pressMesh(built, head, mesh, cover) {
+  const toHead = new THREE.Matrix4().multiplyMatrices(_inv.copy(head.matrixWorld).invert(), mesh.matrixWorld);
+  const toMesh = toHead.clone().invert();
+  const geo = mesh.geometry.clone(), pos = geo.attributes.position, q = new THREE.Vector3();
+  let moved = false;
+  for (let i = 0; i < pos.count; i++) {
+    if (!cover.press(q.fromBufferAttribute(pos, i).applyMatrix4(toHead))) continue;
+    q.applyMatrix4(toMesh);
+    pos.setXYZ(i, q.x, q.y, q.z);
+    moved = true;
+  }
+  if (!moved) { geo.dispose(); return; }
+  geo.computeVertexNormals();
+  geo.computeBoundingBox();      // clone() copied the old bounds: culling and fit would read the unpressed mane
+  geo.computeBoundingSphere();
+  const original = mesh.geometry;
+  mesh.geometry = geo;
+  built.covered.push(() => { geo.dispose(); mesh.geometry = original; });
 }
 
 // ---------------------------------------------------------------- SCARF
@@ -1155,6 +1387,7 @@ export function outfitPieces(built, outfit) {
  */
 export function dress(built, outfit) {
   undress(built);
+  if (outfit.hat?.on) coverUnderHat(built, fabric(outfit.hat));
   const byJoint = new Map();
   for (const { joint, geo } of outfitPieces(built, outfit)) {
     if (!byJoint.has(joint)) byJoint.set(joint, []);
@@ -1187,4 +1420,6 @@ export function undress(built) {
     mesh.geometry.dispose();
   }
   built.garments = [];
+  for (const undo of built.covered ?? []) undo();
+  built.covered = [];
 }

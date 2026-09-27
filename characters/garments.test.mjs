@@ -12,7 +12,7 @@ import './owl.js';
 import './llama.js';
 import './lion.js';
 import {
-  GARMENTS, STITCHES, EDGES, ACCESSORIES, COLOURWORKS, FORMS, SLEEVES, FIT_RANGE,
+  GARMENTS, STITCHES, EDGES, ACCESSORIES, COLOURWORKS, FORMS, SLEEVES, FIT_RANGE, MAX_COLOURS,
   bodyFit, defaultItem, dress, undress, resolveColourwork,
 } from './garments.js';
 
@@ -32,7 +32,7 @@ const boxOf = (mesh) => new THREE.Box3().setFromObject(mesh);
       g.silhouettes.forEach((silhouette, i) => {
         for (const fit of [FIT_RANGE[0], 1, FIT_RANGE[1]]) {
           const it = item(type, {
-            silhouette, fit, colorCount: 1 + (i % 3),
+            silhouette, fit, colorCount: 1 + (i % MAX_COLOURS),
             stitch: STITCHES[(i + n) % STITCHES.length], edge: EDGES[(i + 1) % EDGES.length],
             accessory: ACCESSORIES[(i + 2) % ACCESSORIES.length], colourwork: COLOURWORKS[i % COLOURWORKS.length],
             form: FORMS[i % FORMS.length], sleeves: SLEEVES[i % SLEEVES.length],
@@ -104,6 +104,13 @@ for (const id of speciesIds()) {
   const coatMax = Math.max(...carriedVerts(built.joints.chest).filter((p) => p.y > -fit.torso[1] * 0.4 && p.y < fit.torso[1] * 0.5).map(norm));
   assert.ok(sweaterMin > coatMax,
     `${id}: a fitted sweater sits inside the coat -- sweater ${sweaterMin.toFixed(3)} vs coat ${coatMax.toFixed(3)} (torso-normalised)`);
+
+  // Too small gets SHORTER, never tighter: the smallest sweater is a collar, still outside the coat.
+  dress(built, { sweater: item('sweater', { fit: FIT_RANGE[0] }) });
+  const tiny = built.garments.find((m) => m.parent === built.joints.chest).geometry.attributes.position;
+  let tinyMin = Infinity;
+  for (let i = 0; i < tiny.count; i++) tinyMin = Math.min(tinyMin, norm(new THREE.Vector3().fromBufferAttribute(tiny, i)));
+  assert.ok(tinyMin >= 1, `${id}: a too-small sweater cuts into the body (${tinyMin.toFixed(3)} of the torso's clearance)`);
 }
 
 // --- the two silhouettes the spec names on purpose are reachable ------------------------------
@@ -123,15 +130,117 @@ for (const id of speciesIds()) {
   };
   const small = hatAt(FIT_RANGE[0]), fitted = hatAt(1), big = hatAt(FIT_RANGE[1]);
   assert.ok(small.min.y > fitted.min.y, `${id}: a hat too small must perch higher than a fitted one`);
+  // Fit 1 hugs the skull: sized to the head's box instead, a lion's hat sits out on its mane.
+  const skullX = bodyFit(built).skull[0];
+  assert.ok((fitted.max.x - fitted.min.x) / 2 < skullX * 1.35,
+    `${id}: a fitted hat is ${((fitted.max.x - fitted.min.x) / 2 / skullX).toFixed(2)}x the skull's width`);
   const lean = (b) => (b.max.x + b.min.x) / 2 - built.joints.head.getWorldPosition(new THREE.Vector3()).x;
   assert.ok(Math.abs(lean(big)) > Math.abs(lean(fitted)) + 0.01, `${id}: an oversized hat must slip to one side`);
+}
+
+// --- every hat rests ON the skull, never through it -----------------------------------------
+//
+// The slump pulls crowns down; a beret's started at the skull's own height and sank into it.
+for (const id of speciesIds()) {
+  const built = build(id);
+  const [a, b, c] = bodyFit(built).skull;
+  for (const silhouette of GARMENTS.hat.silhouettes) {
+    for (const fit of [FIT_RANGE[0], 1, FIT_RANGE[1]]) {
+      dress(built, { hat: item('hat', { silhouette, fit, edge: 'none', fibre: 'silk' }) });
+      const p = built.garments[0].geometry.attributes.position;
+      let inside = Infinity;
+      for (let i = 0; i < p.count; i++) inside = Math.min(inside, Math.hypot(p.getX(i) / a, p.getY(i) / b, p.getZ(i) / c));
+      assert.ok(inside >= 1, `${id}: a ${silhouette} at fit ${fit} goes into the skull (${inside.toFixed(3)} of its radius)`);
+    }
+  }
+}
+
+// --- the slouch's fold hangs behind the head, not down into it ------------------------------
+//
+// Hinged at the head's centreline, the fold swung its end into the back of the skull, where the
+// skull clamp flattened it on: 28% of the bag lay on the skull at fit 1.
+for (const id of speciesIds()) {
+  const built = build(id);
+  const [a, b, c] = bodyFit(built).skull;
+  dress(built, { hat: item('hat', { silhouette: 'slouch', fit: 1, edge: 'none', stitch: 'plain' }) });
+  const g = built.garments[0].geometry, p = g.attributes.position, uv = g.attributes.uv;
+  let onSkull = 0;
+  for (let i = 0; i < p.count; i++) {
+    if (uv.getY(i) <= 0.5) onSkull += Math.hypot(p.getX(i) / a, p.getY(i) / b, p.getZ(i) / c) < 1.12;
+  }
+  assert.equal(onSkull, 0, `${id}: ${onSkull} points of the slouch's fold lie on the skull`);
+}
+
+// --- what the hat covers stays under it ------------------------------------------------------
+//
+// Eyes and ears under the hat are not drawn; the mane is pressed in; a fitted hat keeps the eyes.
+for (const id of speciesIds()) {
+  const built = build(id);
+  const head = built.joints.head;
+  const mane = head.getObjectByName('mane');
+  const original = mane?.geometry;
+  dress(built, { hat: item('hat', { fit: 1 }) });
+  assert.ok(built.joints.eye.every((e) => e.node.visible), `${id}: a fitted beanie hides the eyes`);
+  for (const silhouette of ['headband', 'fisherman']) {
+    for (const fit of [1, FIT_RANGE[1]]) {
+      dress(built, { hat: item('hat', { silhouette, fit }) });
+      assert.ok(built.joints.ear.every((e) => e.node.visible), `${id}: a ${silhouette} at fit ${fit} hides the ears`);
+    }
+  }
+  dress(built, { hat: item('hat', { silhouette: 'hood', fit: 1 }) });
+  assert.ok(built.joints.eye.every((e) => e.node.visible), `${id}: a fitted hood's face opening hides the eyes`);
+  dress(built, { hat: item('hat', { fit: FIT_RANGE[1] }) });
+  assert.ok(built.joints.ear.every((e) => !e.node.visible), `${id}: the ears poke through an oversized hat`);
+  if (mane) {
+    built.root.updateMatrixWorld(true);
+    const hatTop = new THREE.Box3().setFromObject(built.garments[0]).max.y;
+    const maneTop = new THREE.Box3().setFromObject(mane).max.y;
+    assert.ok(maneTop < hatTop, `${id}: the mane pokes out of the hat's crown (${maneTop.toFixed(3)} vs ${hatTop.toFixed(3)})`);
+  }
+  // The face is not a coat: a bucket's brim reads as solid, and pressing the snout sank it into the skull.
+  undress(built);
+  const face = [];
+  head.traverse((o) => {
+    if (o.isMesh && o !== mane && head.worldToLocal(new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3())).z > 0.05) face.push([o, o.geometry]);
+  });
+  for (const silhouette of GARMENTS.hat.silhouettes) {
+    dress(built, { hat: item('hat', { silhouette, fit: 1 }) });
+    const moved = face.filter(([o, g]) => o.geometry !== g).length;
+    assert.equal(moved, 0, `${id}: a fitted ${silhouette} presses ${moved} face parts into the head`);
+  }
+  undress(built);
+  assert.ok([...built.joints.eye, ...built.joints.ear].every((e) => e.node.visible), `${id}: undress leaves parts hidden`);
+  assert.equal(mane?.geometry, original, `${id}: undress leaves the mane pressed`);
+}
+
+// --- knit in the round has no seam, whatever the relief ---------------------------------------
+//
+// A non-whole number of pattern repeats round the hat made the relief jump where the sheet meets
+// itself, and relief's own normals re-creased it: the hat looked split.
+{
+  const built = build('lion');
+  for (const stitch of STITCHES) {
+    dress(built, { hat: item('hat', { stitch, edge: 'none', colourwork: 'checks', colorCount: 2 }) });
+    const g = built.garments[0].geometry, p = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv;
+    const start = new Map();
+    for (let i = 0; i < uv.count; i++) if (uv.getX(i) === 0) start.set(uv.getY(i), i);
+    let worst = 0, crease = 0;
+    for (let i = 0; i < uv.count; i++) {
+      const j = uv.getX(i) === 1 ? start.get(uv.getY(i)) : undefined;
+      if (j === undefined) continue;
+      worst = Math.max(worst, Math.hypot(p.getX(i) - p.getX(j), p.getY(i) - p.getY(j), p.getZ(i) - p.getZ(j)));
+      crease = Math.max(crease, Math.hypot(n.getX(i) - n.getX(j), n.getY(i) - n.getY(j), n.getZ(i) - n.getZ(j)));
+    }
+    assert.ok(worst < 1e-5, `${stitch}: the hat's seam opens by ${worst.toFixed(5)}`);
+    assert.ok(crease < 1e-5, `${stitch}: the hat's seam is creased (normals differ by ${crease.toFixed(4)})`);
+  }
 }
 
 // --- the purchase fallback (spec §3) ----------------------------------------------------------
 assert.equal(resolveColourwork('solid', 1), 'solid');
 assert.equal(resolveColourwork('solid', 2), 'stripes', 'two colours on a solid pattern become stripes');
-assert.equal(resolveColourwork('solid', 3), 'fair isle', 'three colours on a solid pattern become fair isle');
-assert.equal(resolveColourwork('stripes', 3), 'fair isle', 'stripes become fair isle at three colours');
+assert.equal(resolveColourwork('solid', 3), 'stripes', 'three colours on a solid pattern become three-colour stripes');
+assert.equal(resolveColourwork('stripes', 3), 'stripes', 'stripes repeat through three colours; they do not become fair isle');
 assert.equal(resolveColourwork('checks', 3), 'checks', 'a colourwork with its own slots is left alone');
 
 console.log('garments.js self-check: all assertions passed');

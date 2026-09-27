@@ -79,7 +79,7 @@ import {
 import { randomTraits } from './visit.js';
 import {
   GARMENTS, STITCHES, COLOURWORKS, EDGES, FORMS, ACCESSORIES, CRAFTS, SLEEVES, WEIGHTS, FIBRES,
-  FIT_RANGE, LOOK, defaultItem, defaultOutfit, dress, undress, garmentMaterial, resolveColourwork,
+  FIT_RANGE, LOOK, MAX_COLOURS, defaultItem, defaultOutfit, dress, undress, garmentMaterial, resolveColourwork,
 } from './garments.js';
 import './owl.js';
 import './llama.js';
@@ -300,7 +300,8 @@ function randomiseItem(type) {
     on: true, silhouette: pick(g.silhouettes),
     fit: FIT_RANGE[0] + Math.random() * (FIT_RANGE[1] - FIT_RANGE[0]),
     weight: pick(WEIGHTS), fibre: pick(FIBRES), craft: pick(CRAFTS),
-    colorCount: 1 + Math.floor(Math.random() * 3), color1: randomHex(), color2: randomHex(), color3: randomHex(),
+    colorCount: 1 + Math.floor(Math.random() * MAX_COLOURS),
+    ...Object.fromEntries(Array.from({ length: MAX_COLOURS }, (_, i) => [`color${i + 1}`, randomHex()])),
     colourwork: pick(COLOURWORKS), stitch: pick(STITCHES), edge: pick(EDGES), accessory: pick(ACCESSORIES),
     form: pick(FORMS), sleeves: pick(SLEEVES),
   });
@@ -488,10 +489,8 @@ function addYarnControls(folder, item, redress) {
   folder.add(item, 'weight', WEIGHTS).name('yarn weight').onChange(redress);
   folder.add(item, 'fibre', FIBRES).name('fibre (drape)').onChange(redress);
   folder.add(item, 'craft', CRAFTS).onChange(redress);
-  folder.add(item, 'colorCount', 1, 3, 1).name('yarn colours').onFinishChange(() => { redress(); refreshGui(); });
-  folder.addColor(item, 'color1').name('colour 1').onFinishChange(redress);
-  folder.addColor(item, 'color2').name('colour 2').onFinishChange(redress);
-  folder.addColor(item, 'color3').name('colour 3').onFinishChange(redress);
+  folder.add(item, 'colorCount', 1, MAX_COLOURS, 1).name('yarn colours').onFinishChange(() => { redress(); refreshGui(); });
+  for (let i = 1; i <= MAX_COLOURS; i++) folder.addColor(item, `color${i}`).name(`colour ${i}`).onFinishChange(redress);
 }
 
 function addLookControls(folder, item, redress) {

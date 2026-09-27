@@ -44,6 +44,7 @@ Status: **estimate** (reasoned from the baseline) or **measured YYYY-MM-DD** (wi
 | Decor objects on shelves | ~1 draw and 1 node each | Every object has its own shape, so they can't share one instanced mesh the way yarn does. A few dozen placed wants `BatchedMesh`. Matcap is the cheap material | estimate |
 | Per-character garment geometry | Memory and build time, not frame rate | Cache on quantised parameters, as the mane does (`scallopGeometry`) | estimate |
 | Pattern 2D image | Negligible | One offscreen render when a pattern is inspected, cached | estimate |
+| Parts under a hat (eyes, ears, mane) | Saves draws; memory for a pressed copy | **Decided 2026-09-27.** Eyes and ears under the hat are not drawn. The mane and feather shell are pressed in on the CPU once at dressing (head and hat never move apart), into a per-character copy of the geometry. Nothing runs per frame, and shadows stay right. Rejected: cutting away pixels with `discard` (the same tile-GPU cost as lace cutouts). In the game this needs dressing before the merge pass, which today bakes the eyes into the head | estimate |
 
 ## 3. Worst case: fully dressed (estimate)
 

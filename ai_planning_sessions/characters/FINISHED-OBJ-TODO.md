@@ -45,8 +45,22 @@ Strike items through when they're done, with the date.
 
 ## Game integration
 
-- [ ] **Dress before the merge pass.** Hiding eyes and ears under a hat and pressing the mane only
-  work on an un-merged rig; today the merge bakes the eyes into the head.
+- [ ] **Dress before the merge pass.** The game merges each joint's meshes into one per material
+  family (felt, knit, eye), with `npc.js` `mergeCharacter`. Dressing a merged rig breaks:
+  - **Hat fit:** the skull is found as the head's own sphere, which the merge bakes into the head's
+    one felt mesh. Hats would fall back to a generic head size.
+  - **Pressing the mane:** skull, muzzle, nose and mane are one mesh after the merge, so the whole
+    head would count as a coat over the crown. The face gets pressed into the skull (the
+    bucket-brim bug).
+  - **Colour, if merged after dressing:** `paintGeometry` repaints every mesh from its material
+    colour, wiping colourwork.
+
+  **Not broken:** hiding eyes and ears. They are joints, so each keeps its own node through the
+  merge. (Corrected 2026-09-27: this note used to say the merge baked the eyes into the head.)
+
+  **Fix:** build un-merged, `dress()`, then `mergeCharacter()`, and teach `paintGeometry` to keep
+  a mesh's existing colour attribute. A merged character can't be re-dressed in place, so changing
+  clothes means rebuilding it or keeping an un-merged copy. Decide which when the game needs it.
 - [x] ~~**Relief respects the geometry detail tiers.**~~ Done 2026-09-27 as on-screen size
   (`LOOK.viewPx`) rather than tier: relief under 1.5px a stitch isn't built.
 - [ ] **The game sets `LOOK.viewPx`** to its real crowd size (150 is assumed), and to 0 for any

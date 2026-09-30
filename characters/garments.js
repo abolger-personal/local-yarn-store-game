@@ -108,6 +108,27 @@ const TOOL_MM = Object.freeze({
 export const TOOL_RANGE = Object.freeze([1.5, 15]);
 export const usualTool = (craft, weight) => (TOOL_MM[craft] ?? TOOL_MM.knit)[weight] ?? 5;
 
+const pickOne = (list) => list[Math.floor(Math.random() * list.length)];
+const randomHex = () => `#${new THREE.Color().setHSL(Math.random(), 0.35 + Math.random() * 0.45, 0.3 + Math.random() * 0.45).getHexString()}`;
+
+/** A random PATTERN for one item, made to pattern: the fastest way to find a pairing that breaks. */
+export function randomItem(type) {
+  const g = GARMENTS[type];
+  const craft = pickOne(CRAFTS), weight = pickOne(YARN_WEIGHT_NAMES);
+  return {
+    ...defaultItem(type), on: true, silhouette: pickOne(g.silhouettes),
+    weight, tool: usualTool(craft, weight), fibre: pickOne(YARN_MATERIALS), craft,
+    colorCount: 1 + Math.floor(Math.random() * MAX_COLOURS),
+    ...Object.fromEntries(colourKeys(MAX_COLOURS).map((k) => [k, randomHex()])),
+    colourwork: pickOne(COLOURWORKS), stitch: pickOne(STITCHES_BY_CRAFT[craft]), edge: pickOne(EDGES), accessory: pickOne(ACCESSORIES),
+    form: pickOne(FORMS), sleeves: pickOne(SLEEVES),
+  };
+}
+
+/** Every slot filled, each at random, sleeves long: the most a character can wear, for budgets. */
+export const worstOutfit = () =>
+  Object.fromEntries(Object.keys(GARMENTS).map((type) => [type, { ...randomItem(type), sleeves: 'long' }]));
+
 /**
  * A stitch's width in REAL gauge, from the yarn and the tool together: yarn ** 0.4 x tool ** 0.6,
  * the tool the larger share. Both bigger, bigger stitch (spec §3). Worsted on the worsted needle is
@@ -244,6 +265,31 @@ function carried(joint) {
 
 const extent = (box, axis) => Math.max(-box.min[axis], box.max[axis]);
 
+/** The bottom of the lowest eye, in the neck's frame: a scarf wrapped up high stops under it. */
+function eyeBottom(j) {
+  const low = Math.min(Infinity, ...(j.eye ?? []).map(({ node }) => new THREE.Box3().setFromObject(node).min.y));
+  return Number.isFinite(low) ? j.neck.worldToLocal(new THREE.Vector3(0, low, 0)).y : Infinity;
+}
+
+/**
+ * Any coat the neck wears -- the llama's ruff: its top and its radius, or 0s for a bare neck. A
+ * coat is a mesh on the neck well wider than the neck itself. Neck items start above it rather
+ * than through it: the ruff is the llama's silhouette, so it stays in view (and a band over bare
+ * neck is cheaper). A scarf's ends come down over it.
+ */
+function neckCoat(neck, r) {
+  _inv.copy(neck.matrixWorld).invert();
+  const coat = { coatTop: 0, coatR: 0 };
+  for (const child of neck.children) {
+    if (!child.isMesh || child.userData.garment) continue;
+    if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
+    _box.copy(child.geometry.boundingBox).applyMatrix4(_rel.multiplyMatrices(_inv, child.matrixWorld));
+    const wide = Math.max(extent(_box, 'x'), extent(_box, 'z'));
+    if (wide > r * 1.5) Object.assign(coat, { coatTop: Math.max(coat.coatTop, _box.max.y), coatR: Math.max(coat.coatR, wide) });
+  }
+  return coat;
+}
+
 /** The skull: every species kit adds it as a sphere on the head, and it is the largest one there. */
 function skullMesh(head) {
   let best = null;
@@ -274,7 +320,7 @@ export function bodyFit(built) {
     shoulderX: P.torsoW * (P.shoulderOut + (built.bulge ?? 0)) + armR,
     arm: { r: armR, upper: P.upperArmLen, fore: P.forearmLen, foreR: P.limbThick * 1.05 * LIMB_TAPER },
     neck: { r: P.neckThick, len: P.neckLength, y: P.torsoH - P.headOverlap, overlap: P.headOverlap,
-      headY: P.neckLength + P.headRadius * 0.62 },
+      headY: P.neckLength + P.headRadius * 0.62, ...neckCoat(j.neck, P.neckThick), eyeBottom: eyeBottom(j) },
     leg: { thighR: P.limbThick, shinR: P.limbThick * LIMB_TAPER, femur: femurOf(P), tibia: tibiaOf(P) },
   };
 }
@@ -352,20 +398,26 @@ function flip(geo) {
   for (let i = 0; i < n.array.length; i++) n.array[i] = -n.array[i];
 }
 
-/** How long the sheet is along u and along v, sampled, so stitch counts come from real size. */
-function spans(fn) {
+/**
+ * How long the sheet is along u and along v, sampled, so stitch counts come from real size. u is
+ * measured halfway along, or with `widest` where it is widest: a scarf is knitted to its flat width
+ * and bunched round the neck, and counted at the bunch, a lace scarf got a super-bulky's stitches.
+ */
+function spans(fn, widest = false) {
   const a = new THREE.Vector3(), b = new THREE.Vector3();
-  const walk = (at) => {
+  const walk = (at, n = 16) => {
     let len = 0;
     fn(...at(0), a);
-    for (let i = 1; i <= 16; i++) {
-      fn(...at(i / 16), b);
+    for (let i = 1; i <= n; i++) {
+      fn(...at(i / n), b);
       len += a.distanceTo(b);
       a.copy(b);
     }
     return len;
   };
-  return [walk((t) => [t, 0.5]), walk((t) => [0.5, t])];
+  if (!widest) return [walk((t) => [t, 0.5]), walk((t) => [0.5, t])];
+  const across = Math.max(...[0.05, 0.15, 0.25, 0.35, 0.5, 0.65, 0.75, 0.85, 0.95].map((v) => walk((t) => [t, v])));
+  return [across, walk((t) => [0.5, t], 96)];   // finely along: it winds round the neck
 }
 
 // ---------------------------------------------------------------- stitch relief (spec §2)
@@ -390,7 +442,17 @@ const RELIEF = {
     const d = 2 * Math.hypot(fract((us + (row % 2) * 1.5) / 3) - 0.5, fract(vs / 3) - 0.5);
     return d >= 1 ? 0 : (1 - d * d) ** 1.5;
   },
-  cable: (us, vs) => Math.max(0, 1 - Math.abs(fract(us / 8) - 0.5 - 0.22 * Math.sin((TAU * vs) / 6)) * 5),
+  // A rope: two round strands swapping sides every 6 rows, the one crossing over standing higher,
+  // with 10 plain stitches between ropes. One wavy ridge every 8 stitches read as rows of bumps.
+  cable: (us, vs) => {
+    const x = fract(us / 16) * 16 - 8, phi = (TAU * vs) / 12;
+    let h = 0;
+    for (const side of [1, -1]) {
+      const d = (x - side * 1.5 * Math.cos(phi)) / 1.6;
+      if (Math.abs(d) < 1) h = Math.max(h, (1 - d * d) ** 0.6 * (0.8 + 0.2 * side * Math.sin(phi)));
+    }
+    return h;
+  },
   lace: () => 0,
 };
 
@@ -411,7 +473,7 @@ const DEPTH = Object.freeze({
 // sampled at its zeros and vanishes -- which is how crochet's bumps, garter's ridges and linen
 // stitch's dashes went missing. The plains need none beyond the shape.
 const DENSITY = Object.freeze({
-  stockinette: [0, 0], rib: [2, 0], garter: [0, 1.5], seed: [1.5, 1.5], 'linen stitch': [1.5, 3], cable: [2, 0.75],
+  stockinette: [0, 0], rib: [2, 0], garter: [0, 1.5], seed: [1.5, 1.5], 'linen stitch': [1.5, 3], cable: [1.5, 1],
   'single crochet': [0, 0], waffle: [1.5, 1.5], puff: [2.5, 2.5], lace: [2.5, 2.5],
 });
 const CROCHET_DENSITY = [1.5, 1.5];   // its knot repeats every two stitches and two rows
@@ -428,7 +490,7 @@ const laceHole = (us, vs) => {
 
 // Stitches across one repeat of each stitch and colourwork (RELIEF, COLOURWORK, laceHole). Marled
 // is a speckle with no repeat; its seam column may differ, which a speckle hides.
-const U_REPEAT = { rib: 4, seed: 2, 'linen stitch': 2, waffle: 2, puff: 3, cable: 8, lace: 3, checks: 8, motif: 6, 'fair isle': 6 };
+const U_REPEAT = { rib: 4, seed: 2, 'linen stitch': 2, waffle: 2, puff: 3, cable: 16, lace: 3, checks: 8, motif: 6, 'fair isle': 6 };
 const gcd = (a, b) => (b ? gcd(b, a % b) : a);
 const lcm = (a, b) => (a * b) / gcd(a, b);
 const castOn = (stitches, repeat) => Math.max(1, Math.round(stitches / repeat)) * repeat;
@@ -510,15 +572,15 @@ function flatColour(geo, colour, rows = 40) {
  * must be tessellated to show them, the holes, the bumps, the colours -- follows from its real size
  * and the fabric, identically for every piece of every garment.
  */
-function panel(fn, f, { closedU = false, mask = null, from = null, minU = 24, minV = 12 } = {}) {
-  const [lu, lv] = spans(fn);
+function panel(fn, f, { closedU = false, mask = null, from = null, minU = 24, minV = 12, widest = false } = {}) {
+  const [lu, lv] = spans(fn, widest);
   const reps = [lu / f.stitchW, lv / f.rowH];
   // In the round, cast on a whole number of pattern repeats, as a knitter does: otherwise the
   // stitch and colour patterns jump where the sheet meets itself, and relief opens a seam there.
   if (closedU) reps[0] = castOn(reps[0], lcm(lcm(U_REPEAT[f.stitch] ?? 1, U_REPEAT[f.colourwork] ?? 1), f.bump ? 2 : 1));
   const [du, dv] = DENSITY[f.stitch] ?? [0, 0], [cu, cv] = f.bump ? CROCHET_DENSITY : [0, 0];
   const segU = Math.min(256, Math.max(minU, Math.ceil(reps[0] * Math.max(du, cu))));
-  const segV = Math.min(192, Math.max(minV, Math.ceil(reps[1] * Math.max(dv, cv))));
+  const segV = Math.min(768, Math.max(minV, Math.ceil(reps[1] * Math.max(dv, cv))));
   const lace = f.stitch === 'lace' ? (u, v) => laceHole(u * reps[0], v * reps[1]) : null;
   const holes = lace && mask ? (u, v) => mask(u, v) || lace(u, v) : lace ?? mask;
   const geo = sheet(fn, segU, segV, { closedU, mask: holes, from });
@@ -527,7 +589,8 @@ function panel(fn, f, { closedU = false, mask = null, from = null, minU = 24, mi
   return geo;
 }
 
-const piece = (joint, geo) => ({ joint, geo });
+// `skinTo`: a second joint the piece's vertices may also follow (skinned, see neckSkin).
+const piece = (joint, geo, skinTo = null) => ({ joint, geo, skinTo });
 
 // ---------------------------------------------------------------- edges (spec §2)
 
@@ -1045,28 +1108,227 @@ function loopRadius(fit, y, pad) {
   const onTorso = chestY < torso[1] ? Math.max(torso[0], torso[2]) * Math.sqrt(Math.max(0, 1 - (chestY / torso[1]) ** 2)) : 0;
   const hy = (y - neck.headY) / sk[1];
   const onHead = Math.abs(hy) < 1 ? Math.max(sk[0], sk[2]) * Math.sqrt(1 - hy * hy) : 0;
-  return Math.max(neck.r, onTorso, onHead) + pad;
+  return Math.max(neck.r, y < neck.coatTop ? neck.coatR : 0, onTorso, onHead) + pad;
 }
 
-/** The visible band of neck a scarf can wrap: from just into the torso top up to under the chin. */
+/** The visible band of neck a scarf can wrap: from just into the torso top, or above a neck coat, up to under the chin. */
 function neckBand(fit, girth) {
-  const lo = fit.neck.overlap * 0.4;
+  const lo = Math.max(fit.neck.overlap * 0.4, fit.neck.coatTop);
   const chin = fit.neck.headY - fit.skull[1] * 0.8;
   return [lo, Math.max(lo + girth * 2.2, chin)];
 }
 
+/**
+ * A closed loop round the neck, once or doubled -- an infinity scarf, a kerchief's band. Doubled,
+ * it is one loop gone round twice and joined to itself. Its two strands must pass each other
+ * somewhere, so they part in height at the back and in depth at the front, where the outer one
+ * hangs looser and lower over the inner.
+ */
 function scarfLoop(fit, f, { wraps, girth, sag = 0, loose = 1 }) {
   const [lo, hi] = neckBand(fit, girth);
-  const top = wraps > 1 ? hi : lerp(lo, hi, 0.35);
+  const double = wraps > 1;
+  // Doubled, it rests on the shoulders and reaches no higher than the bottom of the head. On a
+  // short neck that is below the neck's base: up the neck it wrapped the face.
+  const underHead = fit.neck.headY - fit.skull[1] - girth * 2.7;
+  const mid = double ? Math.min(lo + girth * (2.7 + 2 * sag), underHead) : lerp(lo, hi, 0.175);
   const fn = (u, v, out) => {
-    const th = v * TAU * wraps;
-    const yc = lerp(lo, top, wraps > 1 ? v : 0.5) - sag * (0.5 + 0.5 * Math.cos(th)) * girth * 3;
-    const R = loopRadius(fit, yc, girth) * loose;
+    const psi = v * TAU, th = wraps * psi + Math.PI;   // joined at the back
+    const outer = double ? Math.sin(psi) : 0, lift = double ? Math.cos(psi) : 0;
+    const yc = mid + lift * girth * 1.4 - sag * (0.5 + 0.5 * Math.cos(th)) * (0.5 + 0.5 * outer) * girth * 2;
+    const R = (loopRadius(fit, yc, girth) + outer * girth * 1.3) * loose;
     const a = u * TAU;
     const rr = R + girth * Math.cos(a);
     return out.set(rr * Math.sin(th), yc + girth * 1.3 * Math.sin(a), rr * Math.cos(th));
   };
-  return { fn, geo: panel(fn, f, { minU: 10, minV: 48, from: (p) => p.set(0, p.y, 0) }), front: fn(0, 0, new THREE.Vector3()) };
+  // ponytail: the join at the back is not welded, so relief and normals may step there; weld v like
+  // closedU welds u if it shows.
+  return { fn, geo: panel(fn, f, { minU: 10, minV: 48, from: (p) => p.set(0, p.y, 0) }), front: fn(0, 0.5 / wraps, new THREE.Vector3()) };
+}
+
+// How many times round the neck a scarf with ends goes. Draped goes none: a U over the nape.
+const BAND_WRAPS = { draped: 0, 'wrapped once': 1, 'wrapped twice': 2, tied: 1, tucked: 1 };
+const UP = new THREE.Vector3(0, 1, 0);
+const SHORT_ENDS = 0.4;   // an end shorter than this, of the torso's height, rides the neck
+
+/**
+ * A scarf with ends is ONE band: up from one tip, round the neck as often as it is wrapped, and
+ * down to the other tip. Hanging, it lies flat; round the neck it bunches, narrow and thick. The
+ * part round the neck rides the neck joint and the ends the chest -- one sheet cut in three, so the
+ * stitches run on unbroken where they meet.
+ */
+function scarfBand(fit, f, spec, girth) {
+  const { neck: nk, joints: { neck, chest } } = fit;
+  const width = (spec.width ?? 1) * Math.max(0.05, fit.torso[0] * 0.38);
+  const band = bandSpine(fit, f, spec, girth, width);
+  const { fn, curve } = bandShape(band, width, girth, f);
+  // Short ends (an ascot's) hang at the throat: all of it rides the neck, or the ends stay put
+  // while the head turns. Long ends ride the chest: on the neck they would swing through the body.
+  const short = Math.max(...spec.ends) * f.fit < SHORT_ENDS;
+  const pieces = cutBand(fit, fn, f, curve, band, short);
+  const tips = [curve.getPointAt(0), curve.getPointAt(1)];
+  const anchors = { tassel: tips.map((p) => ({ joint: chest, p, size: width * 0.35 })), 'pom-pom': tips.map((p) => ({ joint: chest, p, size: width * 0.3 })), flower: [], buttons: [] };
+  midAnchors(fit, f, chest, width, anchors);
+  const edgeF = spec.edge && f.edge === 'none' ? { ...f, edge: spec.edge } : f;
+  pieces.push(...edgePieces(chest, [ring(fn, 0, 24), ring(fn, 1, 24)], edgeF));
+  if (f.form === 'tied') {
+    const tie = knot(chest, band.spine[band.legs[0]], girth * 1.5, f);
+    pieces.push(short ? tie : piece(chest, neckSkin(tie.geo, () => 1), neck));
+  }
+  const all = [...pieces, ...accessoryPieces(anchors, f)];
+  // everything was built in the chest frame; what rides the neck moves into its frame
+  return short ? all.map(({ geo }) => piece(neck, geo.translate(0, -nk.y, 0))) : all;
+}
+
+/**
+ * How far up the neck the wraps climb: half a band's height a turn, so each turn lies over the
+ * one before, but the top one no higher than the bottom of the eyes, so they peep over a chunky
+ * scarf wrapped twice. It covered them.
+ */
+function wrapRise(fit, y0, girth, wraps) {
+  const top = fit.neck.y + fit.neck.eyeBottom - girth * 1.3;   // the top wrap's centre
+  return clamp(top - y0, 0, girth * 1.3 * wraps);
+}
+
+/** From the wrap straight down to an end's top, pushed out of the body and whatever the neck carries (the llama's ruff). */
+/**
+ * The turns round the neck, from azimuth a0 to a1, rising `rise` from y0. Each turn lies over the
+ * one before, half a band up and `out` further out, so the loop covers where an end comes out of
+ * it. A band's height up a turn, the loop passed clear above that start: loop, stub and end read as
+ * three pieces.
+ */
+function bandWrap(clear, [y0, rise], [a0, a1], out) {
+  const steps = Math.ceil(((a1 - a0) / TAU) * 16);
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const y = y0 + rise * (i / steps), ang = lerp(a0, a1, i / steps);
+    const R = clear(y) + out * ((ang - a0) / TAU);
+    return new THREE.Vector3(R * Math.sin(ang), y, R * Math.cos(ang));
+  });
+}
+
+const bandDrop = (clear, from, to) => [0.35, 0.7].map((t) => {
+  const p = from.clone().lerp(to, t);
+  const r = Math.hypot(p.x, p.z), R = clear(p.y);
+  return r < R ? p.set((p.x * R) / r, p.y, (p.z * R) / r) : p;
+});
+
+/**
+ * Round the neck the long way, by the nape, from end A to end B: the start and end azimuths on a
+ * loop of radius R, `wraps` whole turns more than that apart. Wrapped, each end comes out of the
+ * wrap in front of it. Draped, the U meets each end straight above it, over the shoulder: from in
+ * front of the neck it hooked back out to the ends, and read as a separate piece.
+ */
+function bandArc(a, b, wraps, R) {
+  const azimuth = (p) => {
+    if (wraps) return Math.atan2(p.x, p.z);
+    const s = Math.asin(clamp(p.x / R, -0.95, 0.95));
+    return p.z >= 0 ? s : Math.PI - s;
+  };
+  // the long way: by the nape to ends in front, round the front to ends behind
+  const a0 = azimuth(a);
+  let a1 = azimuth(b);
+  while (a1 - a0 < Math.PI * 0.9) a1 += TAU;
+  return [a0, a1 + TAU * wraps];
+}
+
+/**
+ * The band's centre line, in the chest frame, and how bunched it is at each point. `legs` are the
+ * spine indices where it leaves the neck for each end.
+ */
+function bandSpine(fit, f, spec, girth, width) {
+  const { torso, neck: nk } = fit;
+  const tuck = f.form === 'tucked' ? 0.35 : 1, wraps = BAND_WRAPS[f.form] ?? 1;
+  // Draped, the ends hang either side of the neck, apart: together they closed the U at the throat.
+  const x = torso[0] * (spec.cross ? 0.05 : 0.28) + (wraps ? 0 : width * 0.5);
+  const [endA, endB] = spec.ends.map((k, i) => endPath(fit, f, i ? -x : x, k * torso[1] * f.fit * tuck, { back: spec.back?.[i] }));
+  const clear = (y) => loopRadius(fit, y - nk.y, girth);   // in the chest frame
+  const y0 = nk.y + neckBand(fit, girth)[0] + girth * 1.3, rise = wrapRise(fit, y0, girth, wraps);
+  const [a0, a1] = bandArc(endA[0], endB[0], wraps, clear(y0));   // each turn above the last
+  const wrap = bandWrap(clear, [y0, rise], [a0, a1], wraps ? girth * 1.8 : 0);
+  const legA = [...endA].reverse(), dropA = bandDrop(clear, wrap[0], endA[0]).reverse(), dropB = bandDrop(clear, wrap.at(-1), endB[0]);
+  return {
+    spine: [...legA, ...dropA, ...wrap, ...dropB, ...endB],
+    bunch: [...legA.map(() => 0), ...dropA.map(() => 0.5), ...wrap.map(() => 1), ...dropB.map(() => 0.5), ...endB.map(() => 0)],
+    legs: [legA.length - 1, legA.length + dropA.length + wrap.length + dropB.length],
+  };
+}
+
+/** The band's surface round its spine: flat and wide hanging, narrow and thick where it bunches. */
+function bandShape({ spine, bunch }, width, girth, f) {
+  const curve = new THREE.CatmullRomCurve3(spine, false, 'centripetal');
+  const c = new THREE.Vector3(), t = new THREE.Vector3(), wide = new THREE.Vector3(), thick = new THREE.Vector3();
+  const bunchW = Math.min(width, girth * 2.6), flatT = f.thick * 1.2;
+  const fn = (u, v, out) => {
+    curve.getPointAt(v, c);
+    curve.getTangentAt(v, t);
+    const k = curve.getUtoTmapping(v) * (spine.length - 1), i = Math.min(spine.length - 2, Math.floor(k));
+    const b = lerp(bunch[i], bunch[i + 1], k - i);
+    // flat: across the body's surface; bunched: upright against the neck
+    wide.set(-c.z, 0, c.x).normalize().lerp(UP, b);
+    wide.addScaledVector(t, -wide.dot(t));
+    if (wide.lengthSq() < 1e-8) wide.set(1, 0, 0);
+    wide.normalize();
+    thick.crossVectors(t, wide).normalize();
+    const a = u * TAU;
+    return out.copy(c).addScaledVector(wide, lerp(width, bunchW, b) * 0.5 * Math.cos(a)).addScaledVector(thick, lerp(flatT, girth, b) * Math.sin(a));
+  };
+  return { fn, curve };
+}
+
+/** The band as one sheet, cut where it leaves the neck: the part between rides the neck, the ends the chest. */
+function cutBand(fit, fn, f, curve, { spine, legs }, whole) {
+  const samples = curve.getSpacedPoints(200);
+  const nearest = (p) => p.copy(samples.reduce((best, s) => (s.distanceToSquared(p) < best.distanceToSquared(p) ? s : best)));
+  const geo = panel(fn, f, { closedU: true, minU: 8, minV: Math.max(48, spine.length * 2), from: nearest, widest: true });
+  if (whole) return [piece(fit.joints.chest, geo)];
+  const [cols, rows] = gridOf(geo);
+  const rowAt = (idx) => {   // the sheet row at a spine index: v is arc length, the spine is not
+    let lo = 0, hi = 1;
+    for (let n = 0; n < 24; n++) { const m = (lo + hi) / 2; if (curve.getUtoTmapping(m) * (spine.length - 1) < idx) lo = m; else hi = m; }
+    return Math.round(lo * (rows - 1));
+  };
+  const [cutA, cutB] = legs.map(rowAt), { neck, chest } = fit.joints;
+  // Round the neck it follows the neck; hanging, the chest; across each cut, a few rows of both, so
+  // it bends there as the head turns. Cut in two pieces, one on each joint, it tore apart.
+  const k = Math.max(2, Math.round(rows * 0.03));
+  const ease = (a, b, r) => clamp((r - a) / (b - a), 0, 1) ** 2 * (3 - 2 * clamp((r - a) / (b - a), 0, 1));
+  return [piece(chest, neckSkin(geo, (i) => {
+    const r = Math.floor(i / cols);
+    return ease(cutA - k, cutA + k, r) * (1 - ease(cutB - k, cutB + k, r));
+  }), neck)];
+}
+
+/** Bone 0 is the joint a piece hangs on, bone 1 the one it also follows: vertex i follows it by `w(i)`. */
+function neckSkin(geo, w) {
+  const n = geo.attributes.position.count;
+  const index = new Uint16Array(n * 4), weight = new Float32Array(n * 4);
+  for (let i = 0; i < n; i++) {
+    index[i * 4 + 1] = 1;
+    weight[i * 4 + 1] = w(i);
+    weight[i * 4] = 1 - weight[i * 4 + 1];
+  }
+  geo.setAttribute('skinIndex', new THREE.BufferAttribute(index, 4));
+  geo.setAttribute('skinWeight', new THREE.BufferAttribute(weight, 4));
+  return geo;
+}
+
+/**
+ * A garment mesh on `joint` that also follows `other`, bound in the REST pose: its geometry was
+ * built with the other joint unposed, whatever pose the character stands in now. Bone matrices
+ * map the joint's own space to world, so the bind matrix is the identity.
+ */
+function skinnedGarment(geo, joint, other) {
+  const mesh = new THREE.SkinnedMesh(geo, garmentMaterial());
+  const p = other.position;
+  mesh.bind(new THREE.Skeleton([joint, other], [new THREE.Matrix4(), new THREE.Matrix4().makeTranslation(-p.x, -p.y, -p.z)]), new THREE.Matrix4());
+  return mesh;
+}
+
+/** A sheet's grid: [columns, rows] of vertices, the first row being where v is 0. */
+function gridOf(geo) {
+  const uv = geo.attributes.uv.array;
+  let cols = 0;
+  while (uv[cols * 2 + 1] === 0) cols++;
+  return [cols, geo.attributes.uv.count / cols];
 }
 
 /**
@@ -1077,9 +1339,13 @@ function scarfLoop(fit, f, { wraps, girth, sag = 0, loose = 1 }) {
 /** How far in front of (or behind) the torso an end hangs at chest height y. */
 function endDepth(fit, f, back) {
   const { torso } = fit;
-  const standoff = f.thick * 2 + (1 - f.drape) * 0.03;
-  return (y) => {
-    const k = y > -torso[1] ? Math.sqrt(Math.max(0, 1 - (y / torso[1]) ** 2)) : 0;
+  // The band's own half-thickness and a hair: an end lies ON the body, at no angle to it. A
+  // stand-off for stiff fibre, and a depth read on the centre line when the end hangs to the side,
+  // where the torso curves back, held the ends out in the air.
+  const standoff = f.thick * 1.4;
+  return (y, x) => {
+    // below the chest's widest it hangs straight, not in under the belly
+    const k = Math.sqrt(Math.max(0, 1 - (Math.max(0, y) / torso[1]) ** 2 - (x / torso[0]) ** 2));
     return (back ? -1 : 1) * (torso[2] * k + standoff);
   };
 }
@@ -1091,66 +1357,54 @@ function endPath(fit, f, x, length, { back = false } = {}) {
   let y = Math.min(neck.y, torso[1] * 0.9), left = length;
   const step = length / 24;
   const floor = fit.floor + f.thick;
-  pts.push(new THREE.Vector3(x, y, zAt(y)));
+  pts.push(new THREE.Vector3(x, y, zAt(y, x)));
   for (let i = 0; i < 24 && left > 0; i++, left -= step) {
-    if (y - step > floor) y -= step;
+    // Down to the floor, then along it. It used to stop a step short and pile up points there.
     const last = pts.at(-1);
-    pts.push(y - step > floor || last.y > floor + 1e-4
-      ? new THREE.Vector3(x * (1 + (1 - f.drape) * 0.2), Math.max(y, floor), zAt(y))
-      : last.clone().add(new THREE.Vector3(0, 0, back ? -step : step)));
+    if (last.y > floor + 1e-4) {
+      y = Math.max(floor, y - step);
+      const splay = x * (1 + (1 - f.drape) * 0.2);
+      pts.push(new THREE.Vector3(splay, y, zAt(y, splay)));
+    } else pts.push(last.clone().add(new THREE.Vector3(0, 0, back ? -step : step)));
   }
   return pts.length > 1 ? pts : [pts[0], pts[0].clone().setY(pts[0].y - 0.01)];
 }
 
+// `formless`: no ends, so nothing to drape, tie or tuck; the item's form is ignored and not offered.
 const SCARF = {
-  cowl: { cowl: true },
-  infinity: { wraps: 2, loose: 1.25, sag: 1 },
-  ascot: { ends: [0.5, 0.45], cross: true },
+  cowl: { cowl: true, formless: true },
+  infinity: { wraps: 2, loose: 1.25, sag: 1, formless: true },
+  ascot: { ends: [0.2, 0.18], cross: true, width: 0.7, tube: 0.7 },
   long: { ends: [1.6, 1.3] },
-  trailing: { ends: [9, 8.6] },
-  skinny: { ends: [1.9, 1.7], width: 0.55, tube: 0.55, back: true },
+  // Trailing behind, like a scarf flung back: trailing down the front, the ends were under the feet.
+  trailing: { ends: [9, 8.6], back: [true, true] },
+  skinny: { ends: [1.9, 1.7], width: 0.55, tube: 0.55, back: [false, true] },
   kerchief: { kerchief: true },
   'chunky wrap': { ends: [1.3, 1.1], width: 1.5, tube: 1.8, edge: 'fringed' },
 };
 
 const FORM_WRAPS = { draped: 1, 'wrapped once': 1, 'wrapped twice': 2, tied: 1, tucked: 1 };
 
-function buildScarf(fit, f) {
-  const spec = SCARF[f.silhouette] ?? SCARF.long;
+/** Whether this item's form changes how it is worn (the dress-up page hides the menu if not). */
+export const hasForm = (type, silhouette) => Boolean(GARMENTS[type].form) && !(type === 'scarf' && SCARF[silhouette]?.formless);
+
+function buildScarf(fit, item) {
+  const spec = SCARF[item.silhouette] ?? SCARF.long;
+  const f = spec.formless ? { ...item, form: null } : item;
   const { neck, chest } = fit.joints;
   const girth = f.thick * 1.6 * (spec.tube ?? 1);
   if (spec.cowl) return cowl(fit, f, neck, girth);
+  if (spec.ends) return scarfBand(fit, f, spec, girth);
   const loop = scarfLoop(fit, f, {
     wraps: spec.wraps ?? FORM_WRAPS[f.form] ?? 1, girth,
     sag: spec.sag ?? (f.form === 'draped' ? 1 : 0), loose: (spec.loose ?? 1) * (f.fit > 1 ? 1 + (f.fit - 1) * 0.4 : 1),
   });
   const pieces = [piece(neck, loop.geo)];
   if (spec.kerchief) pieces.push(kerchief(fit, f, chest, f.fit));
-  const ends = scarfEnds(fit, f, spec, f.fit, chest);
-  pieces.push(...ends.pieces, ...edgePieces(chest, ends.tips, spec.edge && f.edge === 'none' ? { ...f, edge: spec.edge } : f));
   if (f.form === 'tied') pieces.push(knot(neck, loop.front, girth * 1.5, f));
-  return [...pieces, ...accessoryPieces(ends.anchors, f)];
+  return pieces;
 }
 
-
-function scarfEnds(fit, f, spec, s, chest) {
-  const lens = spec.ends ?? [];
-  const width = (spec.width ?? 1) * Math.max(0.05, fit.torso[0] * 0.38);
-  const tuck = f.form === 'tucked' ? 0.35 : 1;
-  const out = { pieces: [], tips: [], anchors: { tassel: [], 'pom-pom': [], flower: [], buttons: [] } };
-  lens.forEach((k, i) => {
-    const x = (i ? -1 : 1) * fit.torso[0] * (spec.cross ? 0.05 : 0.28);
-    const path = endPath(fit, f, x, k * fit.torso[1] * s * tuck, { back: spec.back && i === 1 });
-    out.pieces.push(piece(chest, strip(path, width, f, { from: (p) => p.set(0, p.y, 0) })));
-    const tip = path.at(-1);
-    const run = tip.clone().sub(path.at(-2)).normalize();
-    out.tips.push({ pts: [tip.clone().setX(tip.x - width / 2), tip, tip.clone().setX(tip.x + width / 2)], closed: false, flow: [run, run, run] });
-    out.anchors.tassel.push({ joint: chest, p: tip, size: width * 0.35 });
-    out.anchors['pom-pom'].push({ joint: chest, p: tip, size: width * 0.3 });
-  });
-  if (out.pieces.length) midAnchors(fit, f, chest, width, out.anchors);
-  return out;
-}
 
 function midAnchors(fit, f, chest, width, anchors) {
   const mid = endPath(fit, f, 0, fit.torso[1] * 0.5)[3];
@@ -1531,6 +1785,9 @@ let material = null;
 export function garmentMaterial() {
   if (material) return material;
   material = knitMaterial('#ffffff');
+  // Its own family, one for the whole cast: the merge pass folds garments into a character's merged
+  // meshes and uses this as it is -- a clone would drop the hatching and rim hooks.
+  Object.assign(material.userData, { family: 'garment', shared: true });
   material.vertexColors = true;
   material.side = THREE.DoubleSide;
   material.defines = { ...material.defines, USE_HATCH_SCALE: '' };
@@ -1573,26 +1830,32 @@ export function outfitPieces(built, outfit) {
 export function dress(built, outfit) {
   undress(built);
   if (outfit.hat?.on) coverUnderHat(built, fabric(outfit.hat));
-  const byJoint = new Map();
-  for (const { joint, geo } of outfitPieces(built, outfit)) {
+  const byJoint = new Map(), skinOf = new Map();
+  for (const { joint, geo, skinTo } of outfitPieces(built, outfit)) {
     if (!byJoint.has(joint)) byJoint.set(joint, []);
     byJoint.get(joint).push(geo);
+    if (skinTo) skinOf.set(joint, skinTo);
   }
-  built.garments = [...byJoint].map(([joint, geos]) => {
-    const merged = geos.length === 1 ? geos[0] : mergeGeometries(geos.map(strip4), false);
-    if (geos.length > 1) geos.forEach((g) => g.dispose());
-    const mesh = new THREE.Mesh(merged, garmentMaterial());
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    mesh.userData.garment = true;
-    joint.add(mesh);
-    return mesh;
-  });
+  built.garments = [...byJoint].map(([joint, geos]) => garmentMesh(joint, geos, skinOf.get(joint)));
   return built.garments;
 }
 
+/** Everything worn on one joint as one mesh, on it; skinned if part of it also follows `other`. */
+function garmentMesh(joint, geos, other) {
+  // still one mesh a joint: the rest of what is worn there follows the joint alone
+  if (other) geos.forEach((g) => g.attributes.skinIndex || neckSkin(g, () => 0));
+  const merged = geos.length === 1 ? strip4(geos[0]) : mergeGeometries(geos.map(strip4), false);
+  if (geos.length > 1) geos.forEach((g) => g.dispose());
+  const mesh = other ? skinnedGarment(merged, joint, other) : new THREE.Mesh(merged, garmentMaterial());
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.garment = true;
+  joint.add(mesh);
+  return mesh;
+}
+
 // mergeGeometries needs every part to carry exactly the same attributes.
-const KEEP = new Set(['position', 'normal', 'uv', 'color', 'aHatchScale']);
+const KEEP = new Set(['position', 'normal', 'uv', 'color', 'aHatchScale', 'skinIndex', 'skinWeight']);
 function strip4(geo) {
   for (const name of Object.keys(geo.attributes)) if (!KEEP.has(name)) geo.deleteAttribute(name);
   if (!geo.index) geo.setIndex([...Array(geo.attributes.position.count).keys()]);
@@ -1603,6 +1866,7 @@ export function undress(built) {
   for (const mesh of built.garments ?? []) {
     mesh.removeFromParent();
     mesh.geometry.dispose();
+    mesh.skeleton?.dispose();
   }
   built.garments = [];
   for (const undo of built.covered ?? []) undo();

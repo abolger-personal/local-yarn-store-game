@@ -234,3 +234,27 @@ every weight. At the crowd size, fine-yarn puff is still built plain. DK and wor
 the costliest items the crowd shows: a worsted puff sweater is 44k on its own, against the body's
 77k. That sharpens the middle-weights threshold call on the to-do list.
 
+### 2026-09-27: scarf stitches at their real size
+
+**What changed.** Two bugs had drawn every scarf's stitches about as big as super bulky's:
+- **Counted at the bunch:** stitches were counted round the bunched part at the neck, so the flat
+  ends got a few stitches stretched across them. Now they're counted across the widest point.
+- **Rows capped:** a sheet's rows were capped at 192. A textured stitch on a long scarf needs
+  240–700 rows, so the pattern aliased along its length. The cap is now 768.
+
+**Kilo-triangles, lion, long draped scarf, seed / cable:**
+
+| Weight | close-up | built for 150px |
+| --- | --- | --- |
+| lace | 62.8 / 44.7 | 2.8 / 2.8 |
+| fingering | 40.7 / 18.1 | 2.8 / 2.8 |
+| DK | 24.1 / 14.3 | 24.1 / 14.3 |
+| worsted | 19.0 / 12.7 | 19.0 / 12.7 |
+| bulky | 11.3 / 10.0 | 11.3 / 10.0 |
+| super-bulky | 7.2 / 8.3 | 7.2 / 8.3 |
+
+Worsted cable used to cost 5.9k with the stitches drawn wrong. A trailing cable scarf is now 27.6k
+(was 6.2k). At the crowd size, fine yarn is still built plain. DK and worsted scarves join puff
+sweaters as the costliest items the crowd shows, which is more reason to settle the middle-weights
+threshold on the to-do list.
+

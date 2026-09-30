@@ -88,6 +88,34 @@ PATTERNS.md's old `["stripes", "star", "pom pom", "fringe"]` hint list:
 | **Form** (how it is worn; scarves and shawls) | draped, wrapped once, wrapped twice, tied, tucked | the same silhouette worn differently |
 | **Accessory** (added geometry) | pom-pom, tassel, buttons, appliqué flower | a silhouette break |
 
+**Scarf shapes (decided 2026-09-27).**
+- **A scarf with ends is one band.** It runs from one tip, round the neck as often as the form
+  says, and down to the other tip. It lies flat where it hangs and bunches narrow and thick round
+  the neck. The part round the neck rides the neck joint and the ends ride the chest: one sheet cut
+  in two places, so the pieces share their edge rows. Before, a ring round the neck and two
+  strips starting at the chest read as separate parts, and wrapped ends didn't connect.
+- **Turns by form.** Draped: none, so a U over the nape, with the ends hanging either side of the
+  neck. The U meets each end straight above it, over the shoulder. Wrapped once or tied: one turn.
+  Wrapped twice: two turns, each above the last, and the top turn stops under the eyes so they
+  peep over an oversized chunky wrap.
+- **Ends lie on the body,** at no angle to it, on the torso where they actually hang (it curves
+  back to the sides), with only the band's thickness between. Below the chest's widest point
+  they hang straight.
+- **Trailing ends go behind,** like a scarf flung back. In front they trailed under the feet.
+- **Infinity is a closed loop gone round twice.** Its two strands have to pass each other, so they
+  sit at different heights at the back and one in front of the other at the front, where the
+  outer strand hangs lower. It rests on the shoulders and reaches no higher than the bottom of
+  the head: up a short neck it wrapped the face.
+- **Infinity and cowl have no form.** With no ends there is nothing to drape, tie or tuck, so the
+  dress-up page hides the menu and the builder ignores it (`hasForm`).
+- **Ascot at fit 1 is a small tie at the throat:** ends 0.2 of the torso long, 0.7 as wide.
+  Ends shorter than 0.4 of the torso ride the neck with the rest of the scarf, so they turn with
+  the head. On the chest they stayed put and hung in midair. Longer ends stay on the chest,
+  because on the neck they would swing through the body.
+- **Llama:** the ends come down outside its ruff.
+- **Cost:** 1–2k triangles more than before (the band has thickness where the strips didn't). A
+  cable long scarf is 7.6–9.2k.
+
 Fringe is an **edge**, not an accessory. These additions (edge, form, marled) come from P1-SPIKE-PLAN.md's `WearableAppearance` sketch.
 
 **Knit vs crochet (decided 2026-09-27, see §2b):**
@@ -187,6 +215,12 @@ and each has a rule now:
 - **A dome that eases into the fabric.** `(1 - d²) ** 1.5` over a 3-stitch by 3-row pillow, the
   rows bricked. A fuller dome walled up at its edge, and a sharpened sine peaked. At 2.5 segments a
   stitch, about 7 across a puff, so it is drawn round.
+
+**Cable reads as ropes (decided 2026-09-27).** One wavy ridge every 8 stitches read as rows of
+bumps. A cable is now a rope: two round strands that swap sides every 6 rows, with the strand
+crossing over standing higher. Ropes repeat every 16 stitches, so there are half as many, with
+10 plain stitches between them. That's about 4 ropes round a lion's hat. The cost is about
+the same as before: 1.5 segments a stitch across and 1 a row.
 
 A stitch from the other craft falls back to the item's craft's plain one (`craftStitch`). Drape
 (beyond the per-fibre placeholder) and sheen are not inputs yet.

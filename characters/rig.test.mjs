@@ -1515,11 +1515,11 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     }
     assert.ok(drift < 1e-6, `${id}: steady walking from spawn swung the tail ${drift.toFixed(4)}`);
 
-    // One draw per segment: every tail joint's parts merge into a single mesh.
+    // No draw of its own: every tail joint's parts ride the character's one skinned mesh a family.
     const merged = createCharacter({ ...D }, id);
     for (const { node } of merged.joints.tail) {
       const meshes = node.children.filter((c) => c.isMesh).length;
-      assert.equal(meshes, 1, `${id}: tail joint ${node.name} merged to ${meshes} meshes -- each is a draw call`);
+      assert.equal(meshes, 0, `${id}: tail joint ${node.name} keeps ${meshes} meshes of its own -- each is a draw call`);
     }
   }
 
@@ -1547,20 +1547,22 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   }
 }
 
-// --- the merged body, neck, head and eyes still move, as one skinned mesh per material ----------
+// --- merged, every joint still moves: the character is one skinned mesh per material ------------
 //
-// Each of those joints was its own mesh per material family: ~5 of a character's ~20 draws. Merged
-// they ride one rigidly skinned mesh per family on the spine. The merge must change the draw count
-// and nothing else: posed with the head turned and tilted and the eyes mid-blink, the merged
-// character's skinned vertices land exactly where the unmerged character's parts do.
+// Each joint was its own mesh per material family: 14-20 draws a character. Merged, every joint's
+// parts ride one rigidly skinned mesh per family on the hips. The merge must change the draw count
+// and nothing else: mid-stride and reaching, the head turned and tilted and the eyes mid-blink, the
+// merged character's skinned vertices land exactly where the unmerged character's parts do, joint
+// by joint.
 {
-  const SKINNED = new Set(['spine', 'neck', 'head', 'leftEye', 'rightEye']);
-  const pose = { ...POSES.rest, headYaw: 0.9, headPitch: 0.5, headTilt: 0.3, neckCurve: 0.2, blink: 0.6 };
-  // the world box of every mesh the skinned joints carry, by joint, skinned or not
+  const SKINNED = { has: (name) => Boolean(name) };   // every joint
+  const pose = { ...POSES.walk, ...POSES.reach, headYaw: 0.9, headPitch: 0.5, headTilt: 0.3, neckCurve: 0.2, blink: 0.6, legSwing: 0.5 };
+  // the world box of every mesh each joint carries, skinned or not
   const boxes = (built) => {
     applyPose(built, pose);
     built.root.updateMatrixWorld(true);
-    const out = new Map([...SKINNED].map((k) => [k, new THREE.Box3()]));
+    const out = new Map();
+    built.root.traverse((o) => { if (o.userData.joint) out.set(o.name, new THREE.Box3()); });
     const v = new THREE.Vector3();
     built.root.traverse((o) => {
       if (!o.isMesh) return;
@@ -1582,7 +1584,10 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     const P = { ...BASE_PARAMS, ...getSpecies(id).defaults, scarf: true };
     const merged = createCharacter({ ...P, mergeMeshes: true }, id), apart = createCharacter({ ...P, mergeMeshes: false }, id);
     const [m, a2] = [boxes(merged), boxes(apart)];
-    for (const k of SKINNED) {
+    for (const k of m.keys()) {
+      // a joint that carries nothing (the hips) is empty both ways
+      assert.equal(m.get(k).isEmpty(), a2.get(k).isEmpty(), `${id}: the ${k} lost or gained its parts in the merge`);
+      if (a2.get(k).isEmpty()) continue;
       const d = Math.max(...['min', 'max'].flatMap((e) => ['x', 'y', 'z'].map((ax) => Math.abs(m.get(k)[e][ax] - a2.get(k)[e][ax]))));
       assert.ok(d < 1e-4, `${id}: merged, the ${k} lands ${d.toFixed(4)} from where it is unmerged -- the skin does not follow the pose`);
     }

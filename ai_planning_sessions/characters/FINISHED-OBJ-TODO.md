@@ -45,6 +45,11 @@ Strike items through when they're done, with the date.
 
 ## Game integration
 
+- [ ] **Layering: garments don't know about each other.** Each is fitted to the bare body, so a
+  scarf's ends lying on the torso sink into a sweater worn under them, and a shawl over a sweater
+  does the same. The old stiff-fibre stand-off hid this for scarves by accident; it was removed
+  because the ends stood off the body. Fix: fit outer layers to the inner garment's measured
+  surface (dress sweaters first, then measure the torso with them on).
 - [ ] **Dress before the merge pass.** The game merges each joint's meshes into one per material
   family (felt, knit, eye), with `npc.js` `mergeCharacter`. Dressing a merged rig breaks:
   - **Hat fit:** the skull is found as the head's own sphere, which the merge bakes into the head's

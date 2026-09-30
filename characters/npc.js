@@ -325,6 +325,8 @@ export function knitMaterial(color) {
 const sharedMaterials = new Map();
 
 function sharedMaterial(source) {
+  // Already one for the whole cast (garments' knit, with its own shader hooks a clone would drop).
+  if (source.userData.shared) return source;
   const family = source.userData.family ?? 'felt';
   if (!sharedMaterials.has(family)) {
     const shared = source.clone();
@@ -1173,9 +1175,10 @@ export function createCharacter(P, species) {
 
 // ---------------------------------------------------------------- mesh merging
 //
-// Draw calls per character are the measured bottleneck, not triangles. Everything beneath one
-// articulated node shares that node's transform, so those meshes can be baked into a single
-// geometry per material -- with no change to the rig, the poses or the species kits.
+// Draw calls per character are the measured bottleneck, not triangles. Every static mesh is baked
+// into one rigidly skinned geometry per material family, each vertex following its own joint -- so
+// a character (clothes included) is ~3 draws, with no change to the rig, the poses or the species
+// kits. The skin's price is a skinned vertex shader and one bone texture a character.
 //
 // The cost is per-character geometry, which cannot be shared between characters. That trade
 // only pays while draw submission dominates, so it stays switchable.
@@ -1202,6 +1205,7 @@ function bakedGeometry(mesh, toJointSpace) {
 // colour moves from the material to the vertices, which is what lets one material serve the
 // whole cast instead of one per character per part
 function paintGeometry(geometry, color) {
+  if (geometry.attributes.color) return geometry;   // painted already: a garment's colourwork
   const count = geometry.attributes.position.count;
   const colors = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
@@ -1211,18 +1215,6 @@ function paintGeometry(geometry, color) {
   }
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   return geometry;
-}
-
-function groupByFamily(meshes, toJointSpace) {
-  const groups = new Map();
-  for (const mesh of meshes) {
-    const family = mesh.material.userData.family ?? 'felt';
-    const entry = groups.get(family)
-      ?? { parts: [], shadow: mesh.castShadow, material: sharedMaterial(mesh.material) };
-    entry.parts.push(bakedGeometry(mesh, toJointSpace));
-    groups.set(family, entry);
-  }
-  return groups;
 }
 
 function mergedMesh({ parts, shadow, material }) {
@@ -1237,37 +1229,62 @@ function mergedMesh({ parts, shadow, material }) {
   return mesh;
 }
 
-function mergeAt(node) {
-  const meshes = staticMeshes(node);
-  if (!meshes.length) return;
-  const toJointSpace = new THREE.Matrix4().copy(node.matrixWorld).invert();
-  const groups = groupByFamily(meshes, toJointSpace);
-  meshes.forEach((mesh) => mesh.removeFromParent());
-  for (const entry of groups.values()) node.add(mergedMesh(entry));
+/** A mesh baked into a merged one leaves the rig; a garment's geometry is its own, so it goes too. */
+function unmerge(mesh) {
+  mesh.removeFromParent();
+  if (mesh.userData.garment) mesh.geometry.dispose();
 }
 
 /**
- * The joints skinned together onto the spine: the body, neck, head and eyes. Each of them was a
- * mesh per material family of its own -- about 5 of a character's ~20 draws. Skinned, each vertex
- * follows its own joint at full weight, so the head still turns and nods and the eyes still blink
- * (the rig poses the joints; the skeleton reads them), and the five share one mesh per family.
+ * Every joint, skinned together onto the topmost (the hips). Each joint was a mesh per material
+ * family of its own: 14-20 draws a character, and ~4 more dressed. Skinned, each vertex follows its
+ * own joint at full weight, so every limb, the head, the tail still move and the eyes still blink
+ * (the rig poses the joints; the skeleton reads them), and the whole character is one mesh per
+ * family -- felt, eye, garment.
  */
-const skinnedJoints = ({ spine, neck, head, eye = [] }) => (spine && neck && head ? [spine, neck, head, ...eye.map((e) => e.node)] : []);
+function skinnedJoints(root) {
+  const joints = [];
+  root.traverse((node) => { if (node.userData.joint) joints.push(node); });
+  return joints;
+}
 
-/** Every static mesh of every bone, baked into the root's space and grouped by material family. */
+/**
+ * Every static mesh of every bone, baked into the root's space and grouped by material family. A
+ * part follows its own bone -- or, skinned already (a scarf that bends from the chest up round the
+ * neck), keeps its own weights on the same joints here: a joint that is not a bone (the chest) is
+ * the bone it rides.
+ */
 function skinnedGroups(bones, toRoot) {
   const groups = new Map();
+  const boneOf = (node) => {
+    for (let n = node; n; n = n.parent) if (bones.includes(n)) return bones.indexOf(n);
+    return 0;
+  };
   bones.forEach((bone, index) => {
+    if (!bone.visible) return;   // an eye under a hat stays hidden, and unmerged
     const meshes = staticMeshes(bone);
-    for (const [family, entry] of groupByFamily(meshes, toRoot)) {
-      entry.parts.forEach((geo) => rigidTo(geo, index));
-      const into = groups.get(family);
-      if (into) into.parts.push(...entry.parts);
-      else groups.set(family, entry);
+    for (const mesh of meshes) {
+      const family = mesh.material.userData.family ?? 'felt';
+      if (!groups.has(family)) groups.set(family, { parts: [], shadow: mesh.castShadow, material: sharedMaterial(mesh.material) });
+      groups.get(family).parts.push(skinnedPart(mesh, toRoot, index, boneOf));
     }
-    meshes.forEach((mesh) => mesh.removeFromParent());
+    meshes.forEach(unmerge);
   });
   return groups;
+}
+
+/** One mesh baked for the skin: following bone `index`, or its own skeleton's bones mapped here. */
+function skinnedPart(mesh, toRoot, index, boneOf) {
+  const geo = bakedGeometry(mesh, toRoot);
+  if (mesh.isSkinnedMesh) remapSkin(geo, mesh.skeleton.bones.map(boneOf));
+  else rigidTo(geo, index);
+  return geo;
+}
+
+/** A skinned part's bone indices, through `to`: its skeleton's bone i is bone to[i] here. */
+function remapSkin(geo, to) {
+  const index = geo.attributes.skinIndex.array;
+  for (let i = 0; i < index.length; i++) index[i] = to[index[i]];
 }
 
 /** One rigidly skinned mesh per material family for `bones`' static meshes, hung on the first bone. */
@@ -1297,15 +1314,10 @@ function rigidTo(geo, index) {
   geo.setAttribute('skinWeight', new THREE.BufferAttribute(skinWeight, 4));
 }
 
-/** Collapses each articulated node's static meshes down to one mesh per material. */
+/** Collapses every joint's static meshes into one skinned mesh per material family. */
 export function mergeCharacter(built) {
   built.root.updateMatrixWorld(true);
-  const skinned = skinnedJoints(built.joints ?? {});
-  const roots = [];
-  built.root.traverse((node) => {
-    if (node.userData.joint && !skinned.includes(node)) roots.push(node);
-  });
-  roots.forEach(mergeAt);
+  const skinned = skinnedJoints(built.root);
   if (skinned.length) skinAt(skinned);
 }
 

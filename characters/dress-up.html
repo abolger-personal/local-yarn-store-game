@@ -79,7 +79,7 @@ import {
 import { randomTraits } from './visit.js';
 import {
   GARMENTS, STITCHES_BY_CRAFT, COLOURWORKS, EDGES, FORMS, ACCESSORIES, CRAFTS, SLEEVES, WEIGHTS, FIBRES, craftStitch,
-  FIT_RANGE, TOOL_RANGE, LOOK, MAX_COLOURS, defaultItem, dress, undress, garmentMaterial, resolveColourwork,
+  FIT_RANGE, TOOL_RANGE, LOOK, MAX_COLOURS, defaultItem, dress, undress, garmentMaterial, resolveColourwork, hasForm, randomItem,
   madeItem, usualTool,
 } from './garments.js';
 import './owl.js';
@@ -338,21 +338,9 @@ function randomiseSlot(id) {
 
 const randomiseAll = () => SLOTS.forEach(randomiseSlot);
 
-const pick = (list) => list[Math.floor(Math.random() * list.length)];
-const randomHex = () => `#${new THREE.Color().setHSL(Math.random(), 0.35 + Math.random() * 0.45, 0.3 + Math.random() * 0.45).getHexString()}`;
-
 /** A random PATTERN for one item, made to pattern: the fastest way to find a pairing that breaks. */
 function randomiseItem(type) {
-  const g = GARMENTS[type];
-  const craft = pick(CRAFTS), weight = pick(WEIGHTS);
-  Object.assign(state.patterns[type], {
-    on: true, silhouette: pick(g.silhouettes),
-    weight, tool: usualTool(craft, weight), fibre: pick(FIBRES), craft,
-    colorCount: 1 + Math.floor(Math.random() * MAX_COLOURS),
-    ...Object.fromEntries(Array.from({ length: MAX_COLOURS }, (_, i) => [`color${i + 1}`, randomHex()])),
-    colourwork: pick(COLOURWORKS), stitch: pick(STITCHES_BY_CRAFT[craft]), edge: pick(EDGES), accessory: pick(ACCESSORIES),
-    form: pick(FORMS), sleeves: pick(SLEEVES),
-  });
+  Object.assign(state.patterns[type], randomItem(type));
   refreshGui();
   dressAll();
 }
@@ -544,8 +532,10 @@ function addItemFolder(type) {
 
 function addPatternFolder(folder, type, redress) {
   const g = GARMENTS[type], p = state.patterns[type];
-  folder.add(p, 'silhouette', g.silhouettes).onChange(redress);
-  if (g.form) folder.add(p, 'form', FORMS).onChange(redress);
+  // Form only where it changes the item: an infinity scarf or a cowl has no ends to tie.
+  let form = null;
+  folder.add(p, 'silhouette', g.silhouettes).onChange(() => { form?.show(hasForm(type, p.silhouette)); redress(); });
+  if (g.form) form = folder.add(p, 'form', FORMS).onChange(redress).show(hasForm(type, p.silhouette));
   if (g.sleeves) folder.add(p, 'sleeves', SLEEVES).onChange(redress);
   // Changing the craft or the yarn resets the pattern's tool to the usual one for them.
   const retool = () => { p.tool = usualTool(p.craft, p.weight); };

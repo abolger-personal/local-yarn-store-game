@@ -7,13 +7,13 @@
 
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { BASE_PARAMS, createCharacter, getSpecies, speciesIds } from './npc.js';
+import { BASE_PARAMS, createCharacter, getSpecies, speciesIds, mergeCharacter, applyPose, POSES } from './npc.js';
 import './owl.js';
 import './llama.js';
 import './lion.js';
 import {
   GARMENTS, STITCHES, STITCHES_BY_CRAFT, EDGES, ACCESSORIES, COLOURWORKS, FORMS, SLEEVES, FIT_RANGE, MAX_COLOURS, fabric,
-  LOOK, WEIGHTS, madeItem, usualTool, bodyFit, defaultItem, dress, undress, resolveColourwork,
+  LOOK, WEIGHTS, madeItem, usualTool, bodyFit, defaultItem, dress, undress, resolveColourwork, hasForm, garmentMaterial,
 } from './garments.js';
 
 // Judge the look close up, as the dress-up page does; the game's 150px cull has its own check.
@@ -23,6 +23,9 @@ const build = (id) => createCharacter({ ...BASE_PARAMS, ...getSpecies(id).defaul
 const item = (type, over = {}) => ({ ...defaultItem(type), on: true, ...over });
 const craftOf = (stitch) => Object.keys(STITCHES_BY_CRAFT).find((c) => STITCHES_BY_CRAFT[c].includes(stitch));
 const boxOf = (mesh) => new THREE.Box3().setFromObject(mesh);
+// A scarf with ends is one mesh on the chest, skinned to the neck; `onNeck(i)`: vertex i is round it.
+const bandOf = (built) => built.garments.find((m) => m.isSkinnedMesh);
+const onNeck = (mesh) => (i) => mesh.geometry.attributes.skinWeight.getY(i) > 0.5;
 
 // --- every silhouette, on every species, at both fit extremes, builds finite geometry ------------
 //
@@ -440,6 +443,49 @@ for (const id of speciesIds()) {
   assert.ok(peak / across < 0.4, `a puff stands ${(peak / across).toFixed(2)} as tall as it is wide -- a spike, not a poof`);
 }
 
+// --- cable is ropes, not rows of bumps ------------------------------------------------------
+//
+// A wavy ridge every 8 stitches read as bumps. A cable is a rope: two strands crossing, so along it
+// some rows show two strands side by side and some one strand crossing over; and few ropes, with
+// plain fabric between wider than the rope, so each reads as a raised braid.
+{
+  const built = build('lion');
+  const was = LOOK.relief;
+  const it = item('hat', { stitch: 'cable', edge: 'none' });
+  const surface = (relief) => {
+    LOOK.relief = relief;
+    dress(built, { hat: it });
+    return built.garments[0].geometry;
+  };
+  const flat = surface(0).attributes.position.array.slice(), g = surface(was);
+  LOOK.relief = was;
+  const p = g.attributes.position.array, uv = g.attributes.uv.array;
+  const lift = (i) => Math.hypot(p[i * 3] - flat[i * 3], p[i * 3 + 1] - flat[i * 3 + 1], p[i * 3 + 2] - flat[i * 3 + 2]);
+  let cols = 0;
+  while (uv[cols * 2 + 1] === 0) cols++;
+  const rows = g.attributes.uv.count / cols;
+  const peak = Math.max(...Array.from({ length: g.attributes.uv.count }, (_, i) => lift(i)));
+  const strands = new Set();
+  for (let r = Math.floor(rows * 0.3); r < rows * 0.6; r++) {
+    const h = Array.from({ length: cols - 1 }, (_, c) => lift(r * cols + c));   // the last column is the first again
+    const up = h.map((x) => x > peak * 0.15);
+    const start = up.findIndex((x, c) => x && !up[(c + 1) % up.length]);   // the end of a rope
+    let ropes = 0, tops = 0, widest = 0, run = 0, gap = 0, narrowestGap = Infinity;
+    for (let k = 1; k <= h.length; k++) {
+      const c = (start + k) % h.length, prev = (c + h.length - 1) % h.length, next = (c + 1) % h.length;
+      if (up[c]) {
+        if (!up[prev]) { ropes++; narrowestGap = Math.min(narrowestGap, gap); run = 0; }
+        run++; widest = Math.max(widest, run);
+        if (h[c] > h[prev] && h[c] >= h[next]) tops++;
+      } else { if (up[prev]) gap = 0; gap++; }
+    }
+    assert.ok(ropes >= 2 && ropes <= 8, `row ${r}: ${ropes} cables around the hat -- a few ropes, not a ridge every few stitches`);
+    assert.ok(narrowestGap > widest, `row ${r}: ${narrowestGap} plain columns between ropes ${widest} wide -- they crowd into bumps`);
+    strands.add(Math.round(tops / ropes));
+  }
+  assert.ok(strands.has(1) && strands.has(2), `along the cable, rows show ${[...strands]} strands a rope -- a rope shows two, then one crossing over`);
+}
+
 // --- relief too small to see at the game's size is not built ---------------------------------
 //
 // At 150px a lace-weight stitch is under a pixel; its relief was several triangles a pixel.
@@ -466,5 +512,299 @@ assert.equal(resolveColourwork('solid', 2), 'stripes', 'two colours on a solid p
 assert.equal(resolveColourwork('solid', 3), 'stripes', 'three colours on a solid pattern become three-colour stripes');
 assert.equal(resolveColourwork('stripes', 3), 'stripes', 'stripes repeat through three colours; they do not become fair isle');
 assert.equal(resolveColourwork('checks', 3), 'checks', 'a colourwork with its own slots is left alone');
+
+// --- neck items start above the llama's ruff, not through it --------------------------------
+//
+// The ruff is the llama's silhouette: a cowl or a scarf loop wraps the bare neck above it, and a
+// scarf's ends come down outside it. The ruff's nominal size comes from the llama's own params (its
+// scalloped shape stops a little short).
+for (const id of speciesIds()) {
+  const built = build(id);
+  const P = built.params;
+  const ruffTop = P.fleece && P.fleeceNeck ? P.neckLength * P.fleeceNeckCoverage : 0;
+  const ruffR = Math.min(P.neckThick * P.fleeceNeckSpread, ruffTop * 0.85);
+  assert.ok(id !== 'llama' || ruffTop > 0.1, 'the default llama has a neck ruff to clear');
+  dress(built, { scarf: item('scarf', { silhouette: 'long', edge: 'none' }) });
+  const band = bandOf(built).geometry.attributes.position, neckY = bodyFit(built).neck.y;
+  for (let i = 0; i < band.count; i++) {
+    const y = band.getY(i) - neckY, r = Math.hypot(band.getX(i), band.getZ(i));
+    assert.ok(!(y > ruffTop * 0.3 && y < ruffTop * 0.7 && r < ruffR * 0.95), `${id}: a scarf end comes down ${r.toFixed(3)} from the neck, inside a ruff ${ruffR.toFixed(3)} wide`);
+  }
+  undress(built);
+  for (const silhouette of ['cowl', 'infinity']) {
+    dress(built, { scarf: item('scarf', { silhouette, edge: 'none' }) });
+    const loop = built.garments.find((m) => m.parent === built.joints.neck);
+    loop.geometry.computeBoundingBox();
+    const low = loop.geometry.boundingBox.min.y;
+    assert.ok(!ruffTop || low > ruffTop - 0.02, `${id}: the ${silhouette} reaches ${low.toFixed(3)}, through a neck ruff that tops out at ${ruffTop.toFixed(3)}`);
+    if (!ruffTop && silhouette === 'cowl') assert.ok(low < 0.05, `${id}: the ${silhouette} starts ${low.toFixed(3)} up a bare neck -- it should wrap from its base`);
+    undress(built);
+  }
+}
+
+// --- a scarf is one piece of fabric ------------------------------------------------------------
+//
+// Its ends used to be strips starting at the chest and its wrap a ring round the neck: two parts
+// that never met. Now a scarf with ends is one band, cut where it passes from the chest to the
+// neck joint, so the two meshes share whole rows of vertices there. Draped is a U over the nape,
+// open at the throat; wrapped goes round the front too. An infinity scarf closes on itself.
+{
+  const built = build('lion');
+  // triangles round the neck that straddle the front midline (x = 0, in front of the neck)
+  const throat = (m) => {
+    const p = m.geometry.attributes.position, idx = m.geometry.index.array, round = onNeck(m);
+    let n = 0;
+    for (let i = 0; i < idx.length; i += 3) {
+      const tri = [idx[i], idx[i + 1], idx[i + 2]];
+      if (tri.every((k) => round(k) && p.getZ(k) > 0) && Math.min(...tri.map((k) => p.getX(k))) < 0 && Math.max(...tri.map((k) => p.getX(k))) > 0) n++;
+    }
+    return n;
+  };
+  // the longest step between neighbouring rows, as the character stands now (skinned)
+  const longestRowStep = (m, cols) => {
+    const v = new THREE.Vector3(), w = new THREE.Vector3();
+    let worst = 0;
+    for (let i = 0; i + cols < m.geometry.attributes.position.count; i++) {
+      worst = Math.max(worst, m.getVertexPosition(i, v).distanceTo(m.getVertexPosition(i + cols, w)));
+    }
+    return worst;
+  };
+  for (const form of ['draped', 'wrapped once', 'wrapped twice']) {
+    const meshes = dress(built, { scarf: item('scarf', { silhouette: 'long', form, edge: 'none' }) });
+    const band = bandOf(built), uv = band.geometry.attributes.uv;
+    assert.ok(band && meshes.length === 1 && band.skeleton.bones.includes(built.joints.neck), `${form}: the scarf is ${meshes.length} meshes -- it is one band, following the neck round it`);
+    // The head turns, nods and tilts; the band bends with it and stays one piece. Cut in two, one
+    // piece on each joint, the ends stayed on the chest and a gap opened at the cut.
+    let cols = 0;
+    while (uv.getY(cols) === uv.getY(0)) cols++;
+    built.root.updateMatrixWorld(true);
+    const still = longestRowStep(band, cols);
+    built.joints.neck.rotation.set(0.35, 0.6, -0.25);
+    built.root.updateMatrixWorld(true);
+    const turned = longestRowStep(band, cols);
+    built.joints.neck.rotation.set(0, 0, 0);
+    built.root.updateMatrixWorld(true);
+    assert.ok(turned < still * 2, `${form}: with the head turned, the band's rows step ${turned.toFixed(3)} apart, ${(turned / still).toFixed(1)}x standing still -- it tears at the neck`);
+    const round = band, ends = band;
+    const front = throat(round);
+    assert.ok(form === 'draped' ? front === 0 : front > 0, `${form}: ${front} triangles of the scarf cross the throat -- draped is a U, open there; wrapped goes round`);
+    if (form === 'draped') {
+      // The U meets each end over the shoulder, straight above it. Starting in front of the neck, it
+      // hooked back out to the ends and read as a separate piece.
+      // Nor does it swing out past them on the way.
+      const across = (m, which) => {
+        const p = m.geometry.attributes.position;
+        let lo = Infinity, hi = 0;
+        for (let i = 0; i < p.count; i++) if (which(i) && p.getZ(i) > 0) { lo = Math.min(lo, Math.abs(p.getX(i))); hi = Math.max(hi, Math.abs(p.getX(i))); }
+        return [lo, hi];
+      };
+      const [uIn, uOut] = across(round, onNeck(round)), [eIn, eOut] = across(ends, (i) => !onNeck(ends)(i));
+      assert.ok(uIn >= eIn * 0.95, `draped: the U comes in to ${uIn.toFixed(3)} from the middle, inside its ends at ${eIn.toFixed(3)} -- it hooks round to meet them`);
+      assert.ok(uOut <= eOut * 1.05, `draped: the U swings out to ${uOut.toFixed(3)}, past its ends at ${eOut.toFixed(3)} -- it bows out to meet them`);
+    }
+  }
+  const loop = dress(built, { scarf: item('scarf', { silhouette: 'infinity', edge: 'none', stitch: 'stockinette' }) })[0].geometry;
+  const p = loop.attributes.position, uv = loop.attributes.uv;
+  let cols = 0;
+  while (uv.getY(cols) === 0) cols++;
+  const last = p.count - cols;
+  let gap = 0;
+  for (let c = 0; c < cols; c++) gap = Math.max(gap, Math.hypot(p.getX(c) - p.getX(last + c), p.getY(c) - p.getY(last + c), p.getZ(c) - p.getZ(last + c)));
+  assert.ok(gap < 1e-4, `the infinity scarf's ends are ${gap.toFixed(3)} apart -- it should close on itself`);
+  // At fit 1 an ascot is a small tie at the throat: its ends stop well up the chest.
+  dress(built, { scarf: item('scarf', { silhouette: 'ascot', edge: 'none' }) });
+  const fit = bodyFit(built);
+  const ends = built.garments.find((m) => m.parent === built.joints.neck).geometry;   // an ascot rides the neck
+  ends.computeBoundingBox();
+  const drop = -ends.boundingBox.min.y / fit.torso[1];
+  assert.ok(drop < 0.45, `the ascot's ends hang ${drop.toFixed(2)} of the torso below the neck -- it is a scarf, not a tie`);
+  undress(built);
+}
+
+// --- an ascot moves with the head; an infinity scarf sits on the shoulders and has no form --------
+//
+// An ascot's short ends rode the chest while its wrap rode the neck: turn the head and the ends
+// hung in midair. An infinity scarf climbed a short neck into the face. And a scarf with no ends
+// can't be tied or tucked, so its form is neither offered nor used.
+for (const id of speciesIds()) {
+  const built = build(id);
+  for (const fitK of [1, FIT_RANGE[1]]) {
+    const meshes = dress(built, { scarf: item('scarf', { silhouette: 'ascot', fit: fitK, edge: 'none', accessory: 'tassel' }) });
+    assert.ok(meshes.every((m) => m.parent === built.joints.neck), `${id}: an ascot at fit ${fitK} hangs partly on the ${meshes.map((m) => m.parent.name).join(', ')} -- it must all turn with the head`);
+  }
+  const fit = bodyFit(built);
+  const loop = dress(built, { scarf: item('scarf', { silhouette: 'infinity', edge: 'none' }) })[0].geometry;
+  loop.computeBoundingBox();
+  const headBottom = fit.neck.headY - fit.skull[1];
+  assert.ok(loop.boundingBox.max.y < headBottom + 0.01, `${id}: the infinity scarf reaches ${loop.boundingBox.max.y.toFixed(3)}, up past the bottom of the head at ${headBottom.toFixed(3)}`);
+  undress(built);
+}
+{
+  assert.ok(!hasForm('scarf', 'infinity') && !hasForm('scarf', 'cowl'), 'a scarf with no ends offers a form');
+  assert.ok(hasForm('scarf', 'long') && hasForm('shawl', 'triangle') && !hasForm('hat', 'beanie'), 'form is offered where it is not, or hidden where it matters');
+  const built = build('lion');
+  const tris = (form) => dress(built, { scarf: item('scarf', { silhouette: 'infinity', form, edge: 'none' }) }).reduce((n, m) => n + m.geometry.index.count, 0);
+  assert.equal(tris('tied'), tris('wrapped once'), 'an infinity scarf grew a knot: its form must be ignored');
+  undress(built);
+}
+
+// --- a scarf's ends lie on the body -----------------------------------------------------------
+//
+// At no angle to it. They stood off in the air: a stand-off for stiff fibre, and the chest's depth
+// read on the centre line when the end hangs to the side, where the torso curves back. Above the
+// chest's widest, every height of an end has some vertex within 5% of the torso's own surface
+// (below it, an end hangs straight and leaves the body, as it should).
+for (const id of speciesIds()) {
+  const built = build(id);
+  const fit = bodyFit(built), [tx, ty, tz] = fit.torso;
+  for (const [silhouette, form] of [['ascot', 'draped'], ['long', 'draped'], ['long', 'wrapped once']]) {
+    const meshes = dress(built, { scarf: item('scarf', { silhouette, form, fibre: 'linen', edge: 'none' }) });
+    const nearest = new Map();
+    for (const m of meshes) {
+      const p = m.geometry.attributes.position, dy = m.parent === built.joints.neck ? fit.neck.y : 0;
+      for (let i = 0; i < p.count; i++) {
+        const y = p.getY(i) + dy;
+        // the hanging ends: from 3 cm under the neck base, below where the wrap's layers bunch
+        if (y < 0 || y > fit.neck.y - 0.03 || p.getZ(i) < 0) continue;
+        const k = Math.round(y * 50);
+        nearest.set(k, Math.min(nearest.get(k) ?? Infinity, Math.hypot(p.getX(i) / tx, y / ty, p.getZ(i) / tz)));
+      }
+    }
+    const gap = Math.max(...nearest.values()) - 1;
+    assert.ok(gap < 0.05, `${id} ${silhouette}/${form}: its ends stand ${(gap * 100).toFixed(0)}% of the torso off the body -- they should lie on it`);
+  }
+  undress(built);
+}
+
+// --- the eyes peep over a scarf wrapped up high; a trailing scarf trails behind --------------------
+//
+// An oversized chunky wrap, wrapped twice, climbed over the eyes. And the trailing scarf's ends
+// trailed down the front, under the feet: they go behind, like a scarf flung back.
+for (const id of speciesIds()) {
+  const built = build(id);
+  const fit = bodyFit(built);
+  assert.ok(Number.isFinite(fit.neck.eyeBottom), `${id}: no eyes measured`);
+  const meshes = dress(built, { scarf: item('scarf', { silhouette: 'chunky wrap', form: 'wrapped twice', fit: FIT_RANGE[1], edge: 'none' }) });
+  assert.equal(meshes.length, 1, `${id}: the chunky wrap is ${meshes.length} meshes`);
+  const wrap = meshes[0].geometry.attributes.position, round = onNeck(meshes[0]);
+  let top = -Infinity;
+  for (let i = 0; i < wrap.count; i++) if (round(i)) top = Math.max(top, wrap.getY(i) - fit.neck.y);
+  assert.ok(top < fit.neck.eyeBottom + 0.01, `${id}: the chunky wrap reaches ${top.toFixed(3)}, over the eyes at ${fit.neck.eyeBottom.toFixed(3)}`);
+  dress(built, { scarf: item('scarf', { silhouette: 'trailing', edge: 'none' }) });
+  const ends = built.garments.find((m) => m.parent === built.joints.chest).geometry.attributes.position;
+  let low = 0, front = 0;
+  for (let i = 0; i < ends.count; i++) if (ends.getY(i) < fit.floor + 0.05) { low++; if (ends.getZ(i) > 0) front++; }
+  assert.ok(low > 0 && front === 0, `${id}: ${front} of the trailing scarf's ${low} vertices on the floor are in front -- it trails behind`);
+  // Draped with both ends behind, it is flung back over both shoulders: round the throat, not
+  // hung off the nape.
+  const [draped] = dress(built, { scarf: item('scarf', { silhouette: 'trailing', form: 'draped', edge: 'none' }) });
+  const u = draped.geometry.attributes.position, uRound = onNeck(draped);
+  let throat = Infinity;
+  for (let i = 0; i < u.count; i++) if (uRound(i) && u.getZ(i) > 0) throat = Math.min(throat, Math.abs(u.getX(i)));
+  assert.ok(throat < 0.02, `${id}: a draped trailing scarf comes no nearer the throat than ${throat.toFixed(3)} -- it hangs off the nape`);
+  undress(built);
+}
+
+// --- a fine-yarn scarf has fine stitches ------------------------------------------------------
+//
+// A scarf's stitches were counted round the bunch at its neck, so a lace scarf got a super-bulky's
+// few stitches stretched across its flat ends; and its rows were capped far below what a textured
+// stitch needs along its length. Every yarn but super bulky blended into the same mush. Lace has
+// about three times super bulky's stitches, around and along.
+{
+  const built = build('lion');
+  const grid = (weight) => {
+    const [band] = dress(built, { scarf: item('scarf', { silhouette: 'long', form: 'draped', stitch: 'seed', weight, edge: 'none' }) });
+    const g = band.geometry;
+    const uv = g.attributes.uv;
+    let cols = 0;
+    while (uv.getY(cols) === uv.getY(0)) cols++;
+    return [cols, new Set(Array.from({ length: uv.count }, (_, i) => uv.getY(i))).size];
+  };
+  const [lace, bulky] = [grid('lace'), grid('super-bulky')];
+  assert.ok(lace[0] > bulky[0] * 2.2, `a lace scarf has ${lace[0]} columns round it to super bulky's ${bulky[0]} -- its stitches are drawn as big`);
+  assert.ok(lace[1] > bulky[1] * 1.8, `a lace scarf has ${lace[1]} rows along it to super bulky's ${bulky[1]} -- its rows are capped`);
+  undress(built);
+}
+
+// --- dressed, then merged: the clothes fold into the character's merged meshes ----------------------
+//
+// Dressing a merged rig broke the fit, the hat's cover and the colourwork, so a crowd dresses first
+// and merges after. Then everything worn is ONE mesh more, in the character's skin; the garments
+// keep their own material (its shader hooks) and their colourwork; and what the hat hid stays
+// hidden.
+{
+  const SKINNED = new Set(['spine', 'neck', 'head', 'leftEye', 'rightEye']);
+  const groupOf = (mesh) => {
+    let j = mesh.parent;
+    while (j && !j.userData.joint) j = j.parent;
+    return SKINNED.has(j?.name) ? 'body' : j?.name;
+  };
+  // an oversized hat, so it hides the eyes too: they are skinned with the head, the case that can leak
+  const outfit = Object.fromEntries(Object.keys(GARMENTS).map((type) => [type, item(type, {
+    sleeves: 'long', colourwork: 'stripes', colorCount: 2, color1: '#ff0000', color2: '#0000ff', ...(type === 'hat' && { fit: FIT_RANGE[1] }),
+  })]));
+  for (const id of speciesIds()) {
+    const built = build(id);
+    dress(built, outfit);
+    const wearing = new Set(built.garments.map(groupOf));
+    const hidden = [...built.joints.eye, ...built.joints.ear].map(({ node }) => node).filter((n) => !n.visible);
+    assert.ok(hidden.some((n) => built.joints.eye.some((e) => e.node === n)), `${id}: the hat hides no eye -- the check below would miss the skinned case`);
+    mergeCharacter(built);
+    const undressed = createCharacter({ ...BASE_PARAMS, ...getSpecies(id).defaults, scarf: false }, id);
+    // drawn: visible all the way up. Hiding under the hat only ever takes draws away.
+    const count = (b, clothes) => { let n = 0; b.root.traverseVisible((o) => { if (o.isMesh && (o.material === garmentMaterial()) === clothes) n++; }); return n; };
+    assert.ok(wearing.size > 1, `${id}: the outfit sits on one joint -- the check below would pass unmerged`);
+    assert.equal(count(built, true), 1, `${id}: dressed and merged, the clothes on ${wearing.size} joints cost ${count(built, true)} draws -- they are one mesh`);
+    assert.ok(count(built, false) <= count(undressed, false), `${id}: dressed, the body draws ${count(built, false)} meshes to ${count(undressed, false)} undressed -- dressing split it`);
+    const knit = [];
+    built.root.traverse((o) => { if (o.isMesh && o.material === garmentMaterial()) knit.push(o); });
+    assert.equal(knit.length, 1, `${id}: ${knit.length} merged meshes use the garment material -- the merge swapped it for a plain clone`);
+    const c = knit.find((m) => m.isSkinnedMesh).geometry.attributes.color;
+    let red = 0, blue = 0;
+    for (let i = 0; i < c.count; i++) { if (c.getX(i) > 0.9 && c.getZ(i) < 0.1) red++; if (c.getZ(i) > 0.9 && c.getX(i) < 0.1) blue++; }
+    assert.ok(red > 0 && blue > 0, `${id}: the merged clothes lost their stripes (${red} red, ${blue} blue vertices) -- the merge repainted them`);
+    for (const node of hidden) {
+      let shown = false;
+      node.traverse((o) => { if (o.isMesh && o.parent.visible && node.visible) shown = true; });
+      built.root.traverse((o) => {
+        if (!o.isSkinnedMesh) return;
+        const b = o.skeleton.bones.indexOf(node), si = o.geometry.attributes.skinIndex;
+        for (let i = 0; b >= 0 && i < si.count; i++) if (si.getX(i) === b) shown = true;
+      });
+      assert.ok(!shown, `${id}: the ${node.name} the hat hid shows again after the merge`);
+    }
+  }
+}
+
+// --- merged, a scarf still bends from the chest round the neck --------------------------------------
+//
+// A scarf with ends is one band skinned to the chest and the neck. Merged into the character's
+// skinned mesh it must keep both: with the head turned hard, every vertex of the merged scarf lands
+// where the unmerged one's does. Pinned to the spine alone, the wrap stayed put as the neck turned.
+{
+  const turned = { ...POSES.rest, headYaw: 1.1, headPitch: 0.4, neckCurve: 0.3 };
+  const scarfBox = (built) => {
+    applyPose(built, turned);
+    built.root.updateMatrixWorld(true);
+    const box = new THREE.Box3(), v = new THREE.Vector3();
+    built.root.traverse((o) => {
+      if (!o.isSkinnedMesh || o.material !== garmentMaterial()) return;
+      for (let i = 0; i < o.geometry.attributes.position.count; i++) box.expandByPoint(o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld));
+    });
+    return box;
+  };
+  for (const id of speciesIds()) {
+    const outfit = { scarf: item('scarf', { silhouette: 'long', form: 'wrapped once', edge: 'none' }) };
+    const [merged, apart] = [build(id), build(id)];
+    dress(merged, outfit);
+    dress(apart, outfit);
+    mergeCharacter(merged);
+    const [m, a2] = [scarfBox(merged), scarfBox(apart)];
+    assert.ok(!a2.isEmpty(), `${id}: the unmerged scarf is not skinned -- the check would be empty`);
+    const d = Math.max(...['min', 'max'].flatMap((e) => ['x', 'y', 'z'].map((ax) => Math.abs(m[e][ax] - a2[e][ax]))));
+    assert.ok(d < 1e-4, `${id}: merged, the scarf lands ${d.toFixed(4)} from where it is unmerged with the head turned -- it lost the neck`);
+  }
+}
 
 console.log('garments.js self-check: all assertions passed');

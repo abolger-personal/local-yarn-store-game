@@ -75,10 +75,11 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
   BASE_PARAMS, TONE_MAPPING, POSES, BUILD, MOTION_DEFAULTS,
-  createCharacter, setViewMode, disposeCharacter, stepMotion, resetMotion, motionOf,
+  createCharacter, setViewMode, disposeCharacter, stepMotion, resetMotion, motionOf, mergeCharacter,
   setGeometryDetail, GEO_DETAIL, getSpecies, speciesIds, pick,
 } from './npc.js';
 import { randomTraits } from './visit.js';
+import { dress, undress, worstOutfit } from './garments.js';
 
 console.info('LYS build', BUILD);
 
@@ -99,6 +100,7 @@ const S = {
   poseInterval: 3.0,
   cyclePoses:   true,
   idle:         true,
+  dressed:      false,
   detail:       'high',
   renderScale:  1.0,
   partShadows:  true,
@@ -264,6 +266,7 @@ scene.add(crowdGroup);
 function clearCrowd() {
   for (const o of crowd) {
     crowdGroup.remove(o.built.root);
+    undress(o.built);   // an unmerged dressed character's garments are geometry of its own
     disposeCharacter(o.built);
   }
   crowd = [];
@@ -275,8 +278,16 @@ function spawn(speciesId) {
   const kit = getSpecies(speciesId);
   const P = kit.randomise(structuredClone(kit.defaults));
   P.partShadows = S.partShadows;
-  P.mergeMeshes = S.mergeMeshes;
-  return { kit, P, built: createCharacter(P, kit) };
+  // Dressed, the merge waits until the clothes are on: the fit is measured off the unmerged body,
+  // and the clothes then merge into the character's meshes like any other part.
+  P.mergeMeshes = S.mergeMeshes && !S.dressed;
+  if (S.dressed) P.scarf = false;   // the old knitted ring would be a second scarf
+  const built = createCharacter(P, kit);
+  if (S.dressed) {
+    dress(built, worstOutfit());
+    if (S.mergeMeshes) mergeCharacter(built);
+  }
+  return { kit, P, built };
 }
 
 function buildCrowd() {
@@ -495,6 +506,8 @@ gui.add(S, 'view', ['felted', 'grey', 'silhouette']).onChange((v) => setViewMode
 gui.add(S, 'cyclePoses').name('cycle poses');
 gui.add(S, 'poseInterval', 0.5, 8, 0.1).name('pose interval (s)');
 gui.add(S, 'idle').name('idle layer (blinks, breathing)');
+// The worst case for the budget: every NPC wearing every slot, each item a random pattern.
+gui.add(S, 'dressed').name('dressed up (every slot)').onChange(buildCrowd);
 gui.add(S, 'spacing', 0.5, 2.5, 0.05).onFinishChange(buildCrowd);
 gui.add(S, 'jitter', 0, 1.2, 0.02).onFinishChange(buildCrowd);
 gui.add(S, 'seedFacing').name('random facing').onFinishChange(buildCrowd);

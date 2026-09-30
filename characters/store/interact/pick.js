@@ -8,7 +8,6 @@ import { items, touchView, aim, drag } from '../core/state.js';
 import { EMPTY, anySlot, lift } from '../../../inventory/grid.js';
 import { placeItem, settleYaw } from '../../../inventory/pick-place.js';
 
-import * as THREE from 'three';
 
 import { byId } from '../scene/displays.js';
 import { refresh, refreshFloating } from '../goods/paint.js';
@@ -63,8 +62,7 @@ export function putDown() {
   // not run. It also carries the layer count and applies a turned drop, both of which this
   // function used to do by hand and one of which it would now be silently dropping.
   const home = byId(item.display);
-  placeItem(item, drag.index, t, home, item.shelf,
-            { layers: (i) => i.layers ?? 1, anySlot });
+  placeItem(item, drag.index, t, { home, homeShelf: item.shelf, layers: (i) => i.layers ?? 1, anySlot });
   item.held = false;
   settleYaw(item);
 

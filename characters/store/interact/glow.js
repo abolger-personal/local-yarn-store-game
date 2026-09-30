@@ -100,8 +100,7 @@ function movingReadout(disp) {
         ? 'fits here' : 'blocked — releasing puts it back'}</span>`
     : '';
   return `<span class="k">moving the shop</span> <b>${esc(m ? m.id : '—')}</b>`
-    + '<br /><span class="k">drag a display or a chair · ↺ ↻ or Q/E turn 45°'
-    + ' · M to arrange stock again</span>' + verdict;
+    + `<br /><span class="k">drag a display or a chair · ↺ ↻ or Q/E turn 45° · M to arrange stock again</span>${verdict}`;
 }
 
 /**
@@ -177,7 +176,7 @@ export function paintActivePlane() {
       // darker ink at full opacity against the pale floor. If genuinely fat lines are wanted,
       // that needs three's Line2/LineMaterial addon, which is a real dependency on a fat-line
       // shader rather than a settings change.
-      lines.material.color.set(noRoom ? GHOST_NO : isActive ? '#5e2408' : '#6f6456');
+      lines.material.color.set(latticeInk(noRoom, isActive));
       lines.material.opacity = noRoom || isActive ? 1 : 0.6;
       lines.material.transparent = !(noRoom || isActive);
       // A full lattice is drawn through its own stock, for the same reason the wash is: the boxes
@@ -243,9 +242,18 @@ function ghostSlot(disp, item, t) {
 export function ghost(item) {
   const disp = activeDisplay();
   const t = drag.target;
-  dropMarker.visible = !!t;
-  if (t) return ghostSlot(disp, item, t);
+  dropMarker.visible = Boolean(t);
+  if (t) {
+    ghostSlot(disp, item, t);
+    return;
+  }
   if (!firstFreeSlot(disp, item)) ghostNoRoom(disp);
+}
+
+/** A lattice's ink: alarm red when full, dark on the level being aimed at, pale otherwise. */
+function latticeInk(noRoom, isActive) {
+  if (noRoom) return GHOST_NO;
+  return isActive ? '#5e2408' : '#6f6456';
 }
 
 /** Everything this module does ONCE, at boot. Called from main.js, in order. */

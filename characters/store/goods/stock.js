@@ -17,10 +17,11 @@ import { YARN_FIT } from './yarn.js';
  * Which atlas cell an item draws. Yarn and patterns vary their icon by an ATTRIBUTE — shape and
  * type respectively — so this is not simply the item's name.
  */
-export const cellNameFor = (item) =>
-  item.name === 'yarn' ? `yarn-${item.shape}`
-  : item.name === 'pattern' ? `pattern-${item.patternType}`
-  : item.name;
+export function cellNameFor(item) {
+  if (item.name === 'yarn') return `yarn-${item.shape}`;
+  if (item.name === 'pattern') return `pattern-${item.patternType}`;
+  return item.name;
+}
 
 // The package a NOTION comes in, as a [cols, rows] footprint. It belongs to the KIND, not to the
 // instance — a random shape per box would invent a property the product does not have.
@@ -105,7 +106,7 @@ function layersFor(spec, w, h) {
  * @param {{c?: number, r?: number, avoidWall?: boolean}} start
  */
 function cellOrder(display, { c, r, avoidWall }) {
-  const g = display.g;
+  const { g } = display;
   const cells = [];
   for (let rr = 0; rr < g.rows; rr++)
     for (let cc = 0; cc < g.cols; cc++) {
@@ -124,7 +125,7 @@ function cellOrder(display, { c, r, avoidWall }) {
  */
 export function addItem(display, shelf, spec, { c, r, avoidWall = false, shape } = {}) {
   if (items.length >= CAPACITY) return -1;   // the instanced buffers cannot grow past this
-  const g = display.g;
+  const { g } = display;
   // Yarn and patterns bring their own footprint; a notion gets one of its packagings.
   const [w, h] = shape ?? (spec.w ? [spec.w, spec.h] : packageFor(spec.name));
   const layers = layersFor(spec, w, h);
@@ -132,7 +133,7 @@ export function addItem(display, shelf, spec, { c, r, avoidWall = false, shape }
   for (const cell of cellOrder(display, { c, r, avoidWall })) {
     // footprint() returns null the moment any covered cell runs off the grid or hits a mask, and
     // fits() treats null as "no" — so an oversized package simply fails over to the next cell.
-    const keys = footprint(g, shelf, cell.c, cell.r, w, h);
+    const keys = footprint(g, shelf, [cell.c, cell.r], [w, h]);
     if (!fits(g, keys, layers)) continue;
     const index = items.length;
     items.push({

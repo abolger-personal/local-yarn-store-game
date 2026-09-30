@@ -70,7 +70,7 @@ export function boxGeometry(display, item, p) {
 function paintBox(index, g) {
   _pos.set(g.cx, g.base + g.h / 2, g.cz);
   setInstance(boxes, index,
-    { matrix: placeBoxMatrix(_pos, g.w, g.d, g.h, g.yaw, _boxMat).premultiply(g.F) });
+    { matrix: placeBoxMatrix(_pos, [g.w, g.d, g.h], g.yaw, _boxMat).premultiply(g.F) });
 }
 
 /**
@@ -152,7 +152,8 @@ function paintInstance(display, index, p) {
   // honours the same level frame, so every caller — rest, float, NPC shuffle — is unchanged.
   if (item.name === 'yarn') {
     hideBox(index);                 // the two representations are exclusive; blank the other one
-    return paintYarn(display, index, p);
+    paintYarn(display, index, p);
+    return;
   }
   hideYarn(index);
   const g = boxGeometry(display, item, p);

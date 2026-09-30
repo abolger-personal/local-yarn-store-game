@@ -10,9 +10,9 @@ import {
   TRAITS, randomTraits, maxWips, maxRounds, ACTION, STATE, CLOSEOUT_SEQUENCE,
   makeNpc, makeWorld, advanceRound, browseActionSet, DetermineNextBrowseAction,
   interact, noticeable, buyableTargets, visibleTo, labelOf, inDoorway, seatById, fullyExposed,
-  findPath, obstacles, closeoutFor, consideredHere, rejoin, regulars,
+  findPath, obstacles, closeoutFor, rejoin, regulars,
 } from './visit.js';
-import { WIP_STATE, wantsOf, canStart, workRound, wearOrOffer, returnToNpc } from './wip.js';
+import { WIP_STATE, wantsOf, canStart, workRound, returnToNpc } from './wip.js';
 
 // A WIP built by hand rather than rolled, so a test asserts behaviour and not luck. Defaults to a
 // crochet hat that already has its yarn and is short only a hook — which makes `crochet-hook` the
@@ -62,9 +62,10 @@ function fixture({ rng = seq(0.5), traits, seats = SEATS, wips } = {}) {
   const items = [];
   const world = makeWorld({ displays: [pile, shelf], items, room: ROOM, seats, rng });
 
-  const add = (display, shelfIndex, c, r, name, size) => {
+  // an item `name` of `size`, placed on `display` at [shelf, column, row]
+  const add = (display, [shelfIndex, c, r], name, size) => {
     const index = items.length;
-    const keys = footprint(display.g, shelfIndex, c, r, 1, 1);
+    const keys = footprint(display.g, shelfIndex, [c, r], [1, 1]);
     items.push({ name, size, display: display.id, shelf: shelfIndex, c, r, w: 1, h: 1, keys, layer: 0 });
     items[index].layer = place(display.g, keys, index);
     return index;
@@ -113,7 +114,7 @@ function fixture({ rng = seq(0.5), traits, seats = SEATS, wips } = {}) {
 // --- having just been at a display suppresses new walk actions --------------
 {
   const { world, npc, pile, add } = fixture({ rng: seq(0.99) });   // 0.99 => never sociable
-  add(pile, 0, 0, 0, 'crochet-hook', 4.5);                          // makes the pile attractive
+  add(pile, [0, 0, 0], 'crochet-hook', 4.5);                          // makes the pile attractive
   const before = browseActionSet(npc, world, []);
   assert.ok(before.some((a) => a.type === ACTION.WALK_TO_DISPLAY),
     'an attractive, visible display is walkable when the NPC is elsewhere');
@@ -243,8 +244,8 @@ function fixture({ rng = seq(0.5), traits, seats = SEATS, wips } = {}) {
 // --- buy: the top of a pile is noticeable, a buried item is not -------------
 {
   const { world, pile, items, npc, add } = fixture();
-  const buried = add(pile, 0, 0, 0, 'crochet-hook', 4.5);
-  const onTop = add(pile, 0, 0, 0, 'darning-needle', null);   // stacks over the hook
+  const buried = add(pile, [0, 0, 0], 'crochet-hook', 4.5);
+  const onTop = add(pile, [0, 0, 0], 'darning-needle', null);   // stacks over the hook
 
   assert.ok(!noticeable(pile, items, buried), 'buried in a stack cannot be noticed');
   assert.ok(noticeable(pile, items, onTop), 'the top of the stack can');
@@ -271,17 +272,17 @@ function fixture({ rng = seq(0.5), traits, seats = SEATS, wips } = {}) {
 
 // --- a multi-cell package is exposed only when ALL its columns are clear ----
 {
-  const { world, pile, items, npc, add } = fixture();
+  const { pile, items, npc, add } = fixture();
   // a 2x1 bridging columns 0 and 1
   const wide = items.length;
-  const keys = footprint(pile.g, 0, 0, 0, 2, 1);
+  const keys = footprint(pile.g, 0, [0, 0], [2, 1]);
   items.push({ name: 'crochet-hook', size: 4.5, display: 'pile', shelf: 0, c: 0, r: 0, w: 2, h: 1,
                keys, layer: place(pile.g, keys, wide), gone: false, held: false });
 
   assert.ok(fullyExposed(pile, items, wide), 'nothing on it yet, so it is exposed');
   assert.ok(noticeable(pile, items, wide), 'and noticeable');
 
-  add(pile, 0, 0, 0, 'darning-needle', null);   // lands on column 0 only, half-burying the 2x1
+  add(pile, [0, 0, 0], 'darning-needle', null);   // lands on column 0 only, half-burying the 2x1
   assert.equal(topAt(pile.g, 0, 1, 0), wide, 'it is still the top of its OTHER column');
   assert.ok(!fullyExposed(pile, items, wide), 'but half of it is buried, so it is not exposed');
   assert.ok(!noticeable(pile, items, wide),
@@ -293,7 +294,7 @@ function fixture({ rng = seq(0.5), traits, seats = SEATS, wips } = {}) {
 {
   const { shelf, items } = fixture();
   const deep = items.length;
-  const keys = footprint(shelf.g, 0, 0, 0, 1, 2);   // rows 0 and 1; row 0 is the wall
+  const keys = footprint(shelf.g, 0, [0, 0], [1, 2]);   // rows 0 and 1; row 0 is the wall
   items.push({ name: 'crochet-hook', size: 4.5, display: 'shelf', shelf: 0, c: 0, r: 0, w: 1, h: 2,
                keys, layer: place(shelf.g, keys, deep), gone: false, held: false });
   assert.ok(noticeable(shelf, items, deep),
@@ -303,7 +304,7 @@ function fixture({ rng = seq(0.5), traits, seats = SEATS, wips } = {}) {
 // --- an item in the player's hand is invisible to NPCs ----------------------
 {
   const { pile, items, npc, add } = fixture();
-  const idx = add(pile, 0, 0, 0, 'crochet-hook', 4.5);
+  const idx = add(pile, [0, 0, 0], 'crochet-hook', 4.5);
   assert.equal(buyableTargets(pile, items, npc.target).length, 1, 'on the display it is buyable');
   items[idx].held = true;
   assert.ok(!noticeable(pile, items, idx), 'held by the player, it is not on the display at all');
@@ -314,7 +315,7 @@ function fixture({ rng = seq(0.5), traits, seats = SEATS, wips } = {}) {
 // --- a shelf never sells off its wall-facing row ----------------------------
 {
   const { shelf, items, npc, add } = fixture();
-  const atWall = add(shelf, 0, 0, 0, 'crochet-hook', 4.5);    // row 0 === shelf.wallRow
+  const atWall = add(shelf, [0, 0, 0], 'crochet-hook', 4.5);    // row 0 === shelf.wallRow
   assert.ok(!noticeable(shelf, items, atWall), 'the wall-facing row is not an outside face');
   assert.equal(buyableTargets(shelf, items, npc.target).length, 0, 'so it cannot be bought');
 }
@@ -541,7 +542,7 @@ const runCloseout = (world, npc) => {
 {
   // Buying marks them, through the real interact() path rather than by setting the flag.
   const { world, pile, npc, add } = fixture();
-  add(pile, 0, 0, 0, 'crochet-hook', 4.5);
+  add(pile, [0, 0, 0], 'crochet-hook', 4.5);
   assert.equal(npc.willReturn, false, 'not marked on arrival');
   interact(npc, pile, world);                 // consider
   assert.equal(npc.willReturn, false, 'considering alone is not enough');
@@ -571,7 +572,7 @@ const runCloseout = (world, npc) => {
 {
   // A returning NPC comes back as THEMSELVES. This is the assertion that matters: the whole point
   // of the roster is that a twenty-round sweater can span visits.
-  const { world, npc } = fixture();
+  const { npc } = fixture();
   npc.prefs.skill = 5;                                    // earned by finishing something
   npc.traits.Openness = 1;
   const sweater = WIP({ id: 'sweater', state: WIP_STATE.IN_PROGRESS, progress: 64,
@@ -720,7 +721,7 @@ const runCloseout = (world, npc) => {
   const impatient = { ...Object.fromEntries(TRAITS.map((x) => [x, 3])), Volatility: 5 };
   const { world, pile, npc, add } = fixture({ traits: impatient });
   npc.maxRounds = 12;
-  add(pile, 0, 0, 0, 'darning-needle', null);   // present, but not what they came for
+  add(pile, [0, 0, 0], 'darning-needle', null);   // present, but not what they came for
 
   assert.equal(interact(npc, pile, world), 'complete', 'nothing to buy and nothing to restructure');
   assert.equal(npc.maxRounds, 1, 'Volatility 5 cuts MAX_ROUNDS to 1 after a fruitless interaction');
@@ -731,7 +732,7 @@ const runCloseout = (world, npc) => {
   const impatient = { ...Object.fromEntries(TRAITS.map((x) => [x, 3])), Volatility: 5 };
   const { world, pile, npc, add } = fixture({ traits: impatient });
   npc.maxRounds = 12;
-  add(pile, 0, 0, 0, 'crochet-hook', 4.5);
+  add(pile, [0, 0, 0], 'crochet-hook', 4.5);
 
   // Considering is not a fruitless interaction — they have found the thing, they are deciding.
   assert.equal(interact(npc, pile, world), 'incomplete', 'the hook is there, so they consider it');
@@ -745,7 +746,7 @@ const runCloseout = (world, npc) => {
   // A calmer shopper is unaffected by the same fruitless interaction.
   const { world, pile, npc, add } = fixture();
   npc.maxRounds = 12;
-  add(pile, 0, 0, 0, 'darning-needle', null);
+  add(pile, [0, 0, 0], 'darning-needle', null);
   interact(npc, pile, world);
   assert.equal(npc.maxRounds, 12, 'Volatility 3 shrugs it off');
 }
@@ -817,16 +818,20 @@ const runCloseout = (world, npc) => {
 
   // A deterministic sweep of the whole floor, which is what actually catches the corner cases.
   let checked = 0, routed = 0, crossings = 0;
-  for (let ax = -25; ax <= 25; ax += 5)
-    for (let az = -25; az <= 25; az += 5)
-      for (let bx = -25; bx <= 25; bx += 10)
-        for (let bz = -25; bz <= 25; bz += 10) {
-          const from = { x: ax / 10, z: az / 10 }, to = { x: bx / 10, z: bz / 10 };
-          const path = findPath(world, from, to);
-          checked++;
-          if (path.length > 1) routed++;
-          crossings += clips(from, path);
-        }
+  // every point of a grid over the floor, x outer, in tenths of a unit from -2.5 to 2.5
+  const floor = (step) => {
+    const at = [];
+    for (let x = -25; x <= 25; x += step) for (let z = -25; z <= 25; z += step) at.push({ x: x / 10, z: z / 10 });
+    return at;
+  };
+  for (const from of floor(5)) {
+    for (const to of floor(10)) {
+      const path = findPath(world, from, to);
+      checked++;
+      if (path.length > 1) routed++;
+      crossings += clips(from, path);
+    }
+  }
   assert.equal(crossings, 0, `${crossings} route samples cut through furniture across ${checked} routes`);
   assert.ok(routed > checked * 0.1, 'suspiciously few routes were diverted — is the pathing running?');
 }

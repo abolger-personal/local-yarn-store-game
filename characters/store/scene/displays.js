@@ -376,7 +376,10 @@ function addLevel(d, s, w, depth) {
   d.lines.push(lines);
   node.add(lines);
 
-  if (d.tilt) return addTiltedBoard(node, w, depth);
+  if (d.tilt) {
+    addTiltedBoard(node, w, depth);
+    return;
+  }
   if (s === 0) return;
   const panel = new THREE.Mesh(new THREE.BoxGeometry(w * 1.06, GLASS_T, depth * 1.06), glassMat);
   panel.position.y = -GLASS_T / 2;

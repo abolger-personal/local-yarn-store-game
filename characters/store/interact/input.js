@@ -35,12 +35,25 @@ function endPointer(event) {
  *
  * Only meaningful on touch; the mouse takes its orbit from `controls.mouseButtons` (right-drag).
  */
-function beginStockGesture(event, claim) {
+function stockPress(event) {
   drag.pickedThisPress = drag.index === EMPTY;
   const found = drag.pickedThisPress ? pickCandidate(event) : null;
-  if (found || !drag.pickedThisPress) claim();
+  return { found, mine: Boolean(found) || !drag.pickedThisPress };
+}
+
+/** After the claim: an aiming press refreshes the ghost, a press on stock picks it up. */
+function beginStockGesture(event, found) {
   if (!drag.pickedThisPress) onPointerMove(event);   // aiming press: refresh the ghost NOW
   else if (found) pickUp(event, found);
+}
+
+/**
+ * Claim this gesture for the player: stop it reaching OrbitControls, which has not seen it yet
+ * because this listener captures at the window. In the handler itself, never deferred.
+ */
+function claimGesture(event) {
+  gestureOwner = 'player';
+  event.stopPropagation();
 }
 
 export function onPointerDown(event) {
@@ -59,18 +72,17 @@ export function onPointerDown(event) {
   drag.downY = event.clientY;
   drag.moved = false;
 
-  // Claim this gesture for the player: stop it reaching OrbitControls, which has not seen it yet
-  // because this listener captures at the window.
-  const claim = () => { gestureOwner = 'player'; event.stopPropagation(); };
   gestureOwner = 'camera';
 
   // Move mode takes the whole gesture: one finger moves a display if there is one under it, and
   // orbits the camera if there is not — the same "verb or camera" split the stock drag uses.
   if (S.moveMode) {
-    if (grabMovable(event)) claim();
+    if (grabMovable(event)) claimGesture(event);
     return;
   }
-  beginStockGesture(event, claim);
+  const { found, mine } = stockPress(event);
+  if (mine) claimGesture(event);
+  beginStockGesture(event, found);
 }
 
 export function onPointerUp(event) {
@@ -96,7 +108,10 @@ export function onPointerUp(event) {
  * lower one.
  */
 export function onPointerMove(event) {
-  if (mover.m) return dragDisplay(event);
+  if (mover.m) {
+    dragDisplay(event);
+    return;
+  }
   if (pastSlop(event)) drag.moved = true;
   if (trackHover(event)) touchView();
   if (drag.index !== EMPTY) carryItem(event);

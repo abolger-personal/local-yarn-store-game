@@ -7,16 +7,16 @@ import { makeDisplay, footprint, fits, place, lift, topAt, dropLayer, columnAt, 
 {
   // shelf 0 full, shelf 1 masks out column 0
   const g = makeDisplay(3, 2, { shelves: 2, mask: (s, c) => !(s === 1 && c === 0) });
-  assert.equal(footprint(g, 0, 2, 0, 2, 1), null, '2×1 running off the right edge is invalid');
-  assert.ok(footprint(g, 0, 1, 0, 2, 1), '2×1 that fits is valid');
-  assert.equal(footprint(g, 1, 0, 0, 1, 1), null, 'a masked slot is a hole');
-  assert.ok(footprint(g, 1, 1, 0, 1, 1), 'unmasked slot on the same shelf is fine');
+  assert.equal(footprint(g, 0, [2, 0], [2, 1]), null, '2×1 running off the right edge is invalid');
+  assert.ok(footprint(g, 0, [1, 0], [2, 1]), '2×1 that fits is valid');
+  assert.equal(footprint(g, 1, [0, 0], [1, 1]), null, 'a masked slot is a hole');
+  assert.ok(footprint(g, 1, [1, 0], [1, 1]), 'unmasked slot on the same shelf is fine');
 }
 
 // --- stacking + top-only pick ----------------------------------------------
 {
   const g = makeDisplay(2, 1, { shelves: 1, headroom: 3 });
-  const at = (c) => footprint(g, 0, c, 0, 1, 1);
+  const at = (c) => footprint(g, 0, [c, 0], [1, 1]);
   assert.equal(place(g, at(0), 10), 0, 'first item lands on the shelf floor');
   assert.equal(place(g, at(0), 11), 1, 'second item stacks on top');
   assert.equal(topAt(g, 0, 0, 0), 11, 'pick grabs the TOP of the pile');
@@ -34,8 +34,8 @@ import { makeDisplay, footprint, fits, place, lift, topAt, dropLayer, columnAt, 
 // --- footprint bridges columns of unequal height ---------------------------
 {
   const g = makeDisplay(2, 1, { shelves: 1, headroom: 4 });
-  place(g, footprint(g, 0, 0, 0, 1, 1), 1);  // column 0 now height 1, column 1 empty
-  const wide = footprint(g, 0, 0, 0, 2, 1);  // a 2×1 across both
+  place(g, footprint(g, 0, [0, 0], [1, 1]), 1);  // column 0 now height 1, column 1 empty
+  const wide = footprint(g, 0, [0, 0], [2, 1]);  // a 2×1 across both
   assert.equal(place(g, wide, 2), 1, 'the 2×1 rests on top of the taller column');
   assert.equal(topAt(g, 0, 0, 0), 2, 'it is the top of the tall column');
   assert.equal(topAt(g, 0, 1, 0), 2, 'and the top of the bridged column');
@@ -55,8 +55,8 @@ import { makeDisplay, footprint, fits, place, lift, topAt, dropLayer, columnAt, 
 // --- clearShelf wipes only its own shelf --------------------------------
 {
   const g = makeDisplay(2, 1, { shelves: 2, headroom: 3 });
-  place(g, footprint(g, 0, 0, 0, 1, 1), 1);
-  place(g, footprint(g, 1, 0, 0, 1, 1), 2);
+  place(g, footprint(g, 0, [0, 0], [1, 1]), 1);
+  place(g, footprint(g, 1, [0, 0], [1, 1]), 2);
   clearShelf(g, 0);
   assert.equal(topAt(g, 0, 0, 0), EMPTY, 'cleared shelf is empty');
   assert.equal(topAt(g, 1, 0, 0), 2, 'other shelf is untouched');
@@ -69,7 +69,7 @@ import { makeDisplay, footprint, fits, place, lift, topAt, dropLayer, columnAt, 
 // clip through it, and a lift that pops one layer leaves ghost layers a column never recovers from.
 {
   const g = makeDisplay(3, 3, { shelves: 1, headroom: 10, cell: 0.2 });
-  const keys = footprint(g, 0, 0, 0, 1, 1);
+  const keys = footprint(g, 0, [0, 0], [1, 1]);
 
   assert.equal(place(g, keys, 7, 3), 0, 'a three-layer item still lands on layer 0');
   assert.equal(topAt(g, 0, 0, 0), 7, 'and is the top of its column');
@@ -90,7 +90,7 @@ import { makeDisplay, footprint, fits, place, lift, topAt, dropLayer, columnAt, 
 // --- headroom counts an item's whole height ----------------------------------
 {
   const g = makeDisplay(2, 2, { shelves: 1, headroom: 4, cell: 0.2 });
-  const keys = footprint(g, 0, 0, 0, 1, 1);
+  const keys = footprint(g, 0, [0, 0], [1, 1]);
   place(g, keys, 1, 2);                       // two layers used, two left
 
   assert.ok(fits(g, keys, 2), 'a two-layer item still fits in the remaining two');
@@ -101,11 +101,11 @@ import { makeDisplay, footprint, fits, place, lift, topAt, dropLayer, columnAt, 
 // --- a tall item bridging two columns ----------------------------------------
 {
   const g = makeDisplay(3, 3, { shelves: 1, headroom: 10, cell: 0.2 });
-  const wide = footprint(g, 0, 0, 0, 2, 1);   // spans columns 0 and 1
+  const wide = footprint(g, 0, [0, 0], [2, 1]);   // spans columns 0 and 1
   place(g, wide, 5, 3);
 
   for (const c of [0, 1]) assert.equal(topAt(g, 0, c, 0), 5, `column ${c} is topped by the tall item`);
-  assert.equal(dropLayer(g, footprint(g, 0, 0, 0, 1, 1)), 3, 'both its columns are three deep');
+  assert.equal(dropLayer(g, footprint(g, 0, [0, 0], [1, 1])), 3, 'both its columns are three deep');
   lift(g, wide);
   for (const c of [0, 1]) assert.equal(topAt(g, 0, c, 0), EMPTY, `column ${c} fully cleared`);
 }
@@ -122,26 +122,26 @@ import { makeDisplay, footprint, fits, place, lift, topAt, dropLayer, columnAt, 
 
   // Dead centre of a free slot picks that slot.
   const mid = at(2, 1);
-  assert.deepEqual(pick(nearestSlot(g, 0, one, mid.x, mid.z, REACH)), [2, 1], 'an accurate aim is unchanged');
+  assert.deepEqual(pick(nearestSlot(g, 0, one, [mid.x, mid.z], { reach: REACH })), [2, 1], 'an accurate aim is unchanged');
 
   // Fill column 2 to the roof: the same aim now snaps to a neighbour instead of failing.
-  for (let l = 0; l < 2; l++) place(g, footprint(g, 0, 2, 1, 1, 1), 90 + l);
+  for (let l = 0; l < 2; l++) place(g, footprint(g, 0, [2, 1], [1, 1]), 90 + l);
   assert.equal(columnAt(g, mid.x, mid.z).c, 2, 'the pointer is still over the full column');
-  const spill = nearestSlot(g, 0, one, mid.x, mid.z, REACH);
+  const spill = nearestSlot(g, 0, one, [mid.x, mid.z], { reach: REACH });
   assert.ok(spill && fits(g, spill.keys, 1), 'a full column spills onto a neighbour rather than refusing');
   assert.ok(Math.hypot(at(spill.c, spill.r).x - mid.x, at(spill.c, spill.r).z - mid.z) <= REACH,
             'and stays inside the reach');
 
   // Missing the lattice by less than the reach still lands; missing it by a mile does not.
   const edge = at(0, 0);
-  assert.ok(nearestSlot(g, 0, one, edge.x - CELL * 0.9, edge.z, REACH), 'just off the edge still snaps');
-  assert.equal(nearestSlot(g, 0, one, 0, 5, REACH), null, 'a wild aim snaps to nothing');
+  assert.ok(nearestSlot(g, 0, one, [edge.x - CELL * 0.9, edge.z], { reach: REACH }), 'just off the edge still snaps');
+  assert.equal(nearestSlot(g, 0, one, [0, 5], { reach: REACH }), null, 'a wild aim snaps to nothing');
 
   // It never invents a target: fill the level and there is none, at any reach.
   for (let r = 0; r < g.rows; r++)
     for (let c = 0; c < g.cols; c++)
-      for (let l = 0; l < 2; l++) place(g, footprint(g, 0, c, r, 1, 1), 90);
-  assert.equal(nearestSlot(g, 0, one, mid.x, mid.z, 99), null, 'a full level offers no target');
+      for (let l = 0; l < 2; l++) place(g, footprint(g, 0, [c, r], [1, 1]), 90);
+  assert.equal(nearestSlot(g, 0, one, [mid.x, mid.z], { reach: 99 }), null, 'a full level offers no target');
 }
 
 // --- a drop turns itself a quarter turn when that is what fits -------------------------
@@ -152,8 +152,8 @@ import { makeDisplay, footprint, fits, place, lift, topAt, dropLayer, columnAt, 
   const peg = makeDisplay(1, 5, { shelves: 1, headroom: 3, cell: CELL });   // one column, five rows
   const log = { w: 2, h: 1, layers: 1 };
 
-  assert.equal(footprint(peg, 0, 0, 0, 2, 1), null, 'a 2x1 genuinely does not fit a 1-wide board');
-  const got = nearestSlot(peg, 0, log, 0, 0, REACH);
+  assert.equal(footprint(peg, 0, [0, 0], [2, 1]), null, 'a 2x1 genuinely does not fit a 1-wide board');
+  const got = nearestSlot(peg, 0, log, [0, 0], { reach: REACH });
   assert.ok(got, 'but the snap finds a placement anyway');
   assert.ok(got.turned, 'by turning it');
   assert.deepEqual([got.w, got.h], [1, 2], 'so the footprint comes back swapped');
@@ -162,20 +162,20 @@ import { makeDisplay, footprint, fits, place, lift, topAt, dropLayer, columnAt, 
 
   // A turn must be a LAST resort, not a preference: where the natural orientation fits, it wins.
   const open = makeDisplay(5, 5, { shelves: 1, headroom: 3, cell: CELL });
-  const easy = nearestSlot(open, 0, log, 0, 0, REACH);
+  const easy = nearestSlot(open, 0, log, [0, 0], { reach: REACH });
   assert.ok(easy && !easy.turned, 'an unturned fit is preferred when one is in reach');
 
   // ...and a square is never turned, since there would be nothing to see.
-  const square = nearestSlot(open, 0, { w: 2, h: 2, layers: 1 }, 0, 0, REACH);
+  const square = nearestSlot(open, 0, { w: 2, h: 2, layers: 1 }, [0, 0], { reach: REACH });
   assert.ok(square && !square.turned, 'a square footprint is never reported as turned');
 
   // The turn can be refused, for a caller that wants the literal answer.
-  assert.equal(nearestSlot(peg, 0, log, 0, 0, REACH, { turn: false }), null, 'turning is optional');
+  assert.equal(nearestSlot(peg, 0, log, [0, 0], { reach: REACH, turn: false }), null, 'turning is optional');
   assert.equal(anySlot(peg, log, { turn: false }), null, 'for anySlot too');
 
   // Layers still count when turned — the turn must not smuggle a tall item into a shallow stack.
   const shallow = makeDisplay(1, 5, { shelves: 1, headroom: 1, cell: CELL });
-  assert.equal(nearestSlot(shallow, 0, { w: 2, h: 1, layers: 2 }, 0, 0, REACH), null,
+  assert.equal(nearestSlot(shallow, 0, { w: 2, h: 1, layers: 2 }, [0, 0], { reach: REACH }), null,
                'a turned drop is still refused when it does not fit vertically');
 }
 
@@ -189,12 +189,12 @@ import { makeDisplay, footprint, fits, place, lift, topAt, dropLayer, columnAt, 
   for (let s = 0; s < g.shelves; s++)
     for (let r = 0; r < g.rows; r++)
       for (let c = 0; c < g.cols; c++)
-        for (let l = 0; l < 3; l++) place(g, footprint(g, s, c, r, 1, 1), 90);
+        for (let l = 0; l < 3; l++) place(g, footprint(g, s, [c, r], [1, 1]), 90);
   assert.equal(anySlot(g, { w: 1, h: 1, layers: 1 }), null, 'a full display has room for nothing');
 
   // Height counts, not just floor area: a super-bulky ball is three layers tall (YARN.md).
   const t = makeDisplay(2, 2, { shelves: 1, headroom: 3, cell: 0.2 });
-  place(t, footprint(t, 0, 0, 0, 2, 2), 7, 1);          // one layer used everywhere, two left
+  place(t, footprint(t, 0, [0, 0], [2, 2]), 7, 1);          // one layer used everywhere, two left
   assert.ok(anySlot(t, { w: 1, h: 1, layers: 2 }), 'a two-layer ball fits the two layers left');
   assert.equal(anySlot(t, { w: 1, h: 1, layers: 3 }), null, 'a three-layer one does not');
 }

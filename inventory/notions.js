@@ -46,7 +46,7 @@ export function extendAtlas(loaded, shapes, { cell = 128 } = {}) {
   // The source is drawn at its NATIVE size and the new row is fitted to it. Scaling the sheet up
   // to fit a 128px-per-cell row instead would resample every existing illustration — the notions
   // all went soft the first time this was written that way.
-  const width = source.width;
+  const { width } = source;
   const band = Math.min(cell, Math.floor(width / Math.max(1, names.length)));
   const topH = source.height;
   const canvas = document.createElement('canvas');
@@ -54,14 +54,22 @@ export function extendAtlas(loaded, shapes, { cell = 128 } = {}) {
   canvas.height = topH + band;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(source, 0, 0);
+  const cells = squashedCells(loaded.manifest.cells, topH / canvas.height);
+  drawShapes(ctx, shapes, names, { band, topH, width, height: canvas.height }, cells);
+  return { texture: atlasTexture(canvas), manifest: { ...loaded.manifest, cells }, names: Object.keys(cells) };
+}
 
+/** The loaded cells keep their content but are squashed into the top band of the taller canvas. */
+function squashedCells(loadedCells, vScale) {
   const cells = {};
-  // The loaded cells keep their content but are squashed into the top band of the taller canvas.
-  const vScale = topH / canvas.height;
-  for (const [name, c] of Object.entries(loaded.manifest.cells)) {
+  for (const [name, c] of Object.entries(loadedCells)) {
     cells[name] = { u0: c.u0, u1: c.u1, v0: 1 - (1 - c.v0) * vScale, v1: 1 - (1 - c.v1) * vScale };
   }
+  return cells;
+}
 
+/** Each placeholder shape drawn white into its cell of the new bottom row, and its cell recorded. */
+function drawShapes(ctx, shapes, names, { band, topH, width, height }, cells) {
   ctx.strokeStyle = '#ffffff';
   ctx.fillStyle = '#ffffff';
   ctx.lineCap = 'round';
@@ -73,16 +81,19 @@ export function extendAtlas(loaded, shapes, { cell = 128 } = {}) {
     ctx.restore();
     cells[name] = {
       u0: (i * band) / width, u1: ((i + 1) * band) / width,
-      v0: 0, v1: band / canvas.height,
+      v0: 0, v1: band / height,
     };
   });
+}
 
+/** A canvas as an atlas texture: sRGB, filtered and mipmapped, as both atlases want it. */
+function atlasTexture(canvas) {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.magFilter = THREE.LinearFilter;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.generateMipmaps = true;
-  return { texture, manifest: { ...loaded.manifest, cells }, names: Object.keys(cells) };
+  return texture;
 }
 
 /** Atlas rect for one notion, as the shader wants it: origin plus size. */
@@ -116,13 +127,7 @@ export function makeSizeAtlas(labels, { cell = 128 } = {}) {
     if (label !== 'blank') ctx.fillText(label, i * cell + cell / 2, cell / 2);
     cells[label] = { u0: i / all.length, u1: (i + 1) / all.length, v0: 0, v1: 1 };
   });
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.magFilter = THREE.LinearFilter;
-  texture.minFilter = THREE.LinearMipmapLinearFilter;
-  texture.generateMipmaps = true;
-  return { texture, manifest: { cells } };
+  return { texture: atlasTexture(canvas), manifest: { cells } };
 }
 
 // ---------------------------------------------------------------- grid lines
@@ -134,7 +139,7 @@ export function makeSizeAtlas(labels, { cell = 128 } = {}) {
 export function makeGridLines(g, shelf, color = '#8d8172') {
   const { w, d } = gridSize(g);
   const points = [];
-  const seg = (x0, z0, x1, z1) => points.push(x0, 0, z0, x1, 0, z1);
+  const seg = (x0, z0, x1, z1) => { points.push(x0, 0, z0, x1, 0, z1); };
   for (let r = 0; r < g.rows; r++)
     for (let c = 0; c < g.cols; c++) {
       if (!usableAt(g, shelf, c, r)) continue;
@@ -158,10 +163,10 @@ function patchAtlasUV(material, extraVertex = '', extraFragment = '') {
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 aCell;\nvarying vec2 vLocalUv;\nuniform float uGrow;')
       .replace('#include <uv_vertex>', '#include <uv_vertex>\nvLocalUv = vMapUv;\nvMapUv = aCell.xy + vMapUv * aCell.zw;')
-      .replace('#include <begin_vertex>', `#include <begin_vertex>\n${extraVertex}`);
+      .replace('#include <begin_vertex>', () => `#include <begin_vertex>\n${extraVertex}`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying vec2 vLocalUv;\nuniform float uShade;')
-      .replace('#include <color_fragment>', `#include <color_fragment>\n${extraFragment}`);
+      .replace('#include <color_fragment>', () => `#include <color_fragment>\n${extraFragment}`);
   };
   material.customProgramCacheKey = () => `notion-${extraVertex}${extraFragment}`;
 }
@@ -326,8 +331,8 @@ export function placeMatrix(position, sx, sy, yaw, target = new THREE.Matrix4())
 
 const _yaw = new THREE.Euler();
 
-/** A box standing on the shelf — the physical volume that gives an item real depth. */
-export function placeBoxMatrix(position, w, d, h, yaw, target = new THREE.Matrix4()) {
+/** A box of size [w, d, h] standing on the shelf — the physical volume that gives an item real depth. */
+export function placeBoxMatrix(position, [w, d, h], yaw, target = new THREE.Matrix4()) {
   _q.setFromEuler(_yaw.set(0, yaw, 0));
   return target.compose(position, _q, _s.set(w, h, d));
 }

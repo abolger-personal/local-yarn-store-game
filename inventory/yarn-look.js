@@ -203,7 +203,15 @@ export function makeMatcap({
   const ctx = canvas.getContext('2d', { willReadFrequently: false });
   const img = ctx.createImageData(size, size);
   const [cb, cl, cs] = [base, light, shadow].map((h) => new THREE.Color(h));
+  paintMatcap(img, size, { cb, cl, cs, rim, rimWidth, wrap });
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
 
+/** Every texel of a matcap: the lit sphere, and transparent outside it. */
+function paintMatcap(img, size, { cb, cl, cs, rim, rimWidth, wrap }) {
   // Key from the upper left, which is where every hand-painted matcap puts it.
   const L = new THREE.Vector3(-0.42, 0.52, 0.74).normalize();
   const c = new THREE.Color();
@@ -227,10 +235,6 @@ export function makeMatcap({
       img.data[i + 3] = 255;
     }
   }
-  ctx.putImageData(img, 0, 0);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
 }
 
 /**
@@ -325,7 +329,7 @@ export function yarnMaterial(mode, { matcap, ramp, color = '#ffffff' } = {}) {
  * time; upgrade there if the shapes ever stop being convex.
  */
 export function bakeVertexAO(geometry, { floor = 0.45, power = 1.1 } = {}) {
-  const normal = geometry.attributes.normal;
+  const { normal } = geometry.attributes;
   const colors = new Float32Array(normal.count * 3);
   for (let i = 0; i < normal.count; i++) {
     const up = normal.getY(i) * 0.5 + 0.5;             // 0 facing down, 1 facing up
@@ -335,6 +339,52 @@ export function bakeVertexAO(geometry, { floor = 0.45, power = 1.1 } = {}) {
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   return geometry;
 }
+
+// Our OWN varying, not three's vUv: vUv only exists when the material has a map, and a matcap
+// typically does not — so relying on it works under toon and silently no-ops under matcap.
+//
+// `aHatchScale` is an optional per-instance multiplier. It is a plain instanced float, the same
+// mechanism as instanceColor: 4 bytes per instance, no branch, no extra draw call. That is the
+// whole cost of "different yarns have different strand counts". Defaults to 1 when the attribute
+// is absent, so a mesh that does not supply one behaves exactly as before.
+const HATCH_VERTEX_COMMON = `#include <common>
+        varying vec2 vYarnUv;
+        varying float vHatchScale;
+        #ifdef USE_HATCH_SCALE
+          attribute float aHatchScale;
+        #endif`;
+const HATCH_BEGIN_VERTEX = `#include <begin_vertex>
+        vYarnUv = uv;
+        #ifdef USE_HATCH_SCALE
+          vHatchScale = aHatchScale;
+        #else
+          vHatchScale = 1.0;
+        #endif`;
+const HATCH_FRAGMENT_COMMON = `#include <common>
+        varying vec2 vYarnUv;
+        varying float vHatchScale;
+        uniform float uHatchFreq;
+        uniform float uHatchDepth;`;
+// After the diffuse colour is established and before lighting uses it.
+const HATCH_COLOR_FRAGMENT = `#include <color_fragment>
+        {
+          float f = uHatchFreq * vHatchScale;
+          float phase = vYarnUv.y * f;
+          // ANTI-MOIRE, and this is the part that matters. Procedural stripes alias hard once a
+          // stripe gets near one pixel wide: the strands stop being strands and become a shimmer.
+          // The textbook fix is not a global frequency cap — the limit is not global, since a ball
+          // at the back of the shelf and one at the front are sampled at completely different
+          // rates in the SAME frame. It is per-pixel: measure how much the phase changes across
+          // this pixel with fwidth, and fade the pattern toward its own average as that
+          // approaches the Nyquist half-cycle. Two ALU, and it is correct at every zoom, every
+          // window size and every distance without anything having to be computed on the CPU.
+          float w = fwidth(phase);
+          float fade = 1.0 - smoothstep(0.35, 0.5, w);
+          // abs(sin) gives evenly spaced soft bands; the pow sharpens them into strands with gaps,
+          // rather than a smooth ripple that just reads as noise at distance.
+          float hatch = pow(abs(sin(phase * 3.14159)), 0.45);
+          diffuseColor.rgb *= 1.0 - uHatchDepth * fade * (1.0 - hatch);
+        }`;
 
 /**
  * Wound-strand hatching, in one line of shader and no texture.
@@ -367,56 +417,15 @@ export function applyHatching(material, { freq = 26, depth = 0.16 } = {}) {
   material.userData.hatch = uniforms;
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
-    // Our OWN varying, not three's vUv: vUv only exists when the material has a map, and a matcap
-    // typically does not — so relying on it works under toon and silently no-ops under matcap.
-    //
-    // `aHatchScale` is an optional per-instance multiplier. It is a plain instanced float, the
-    // same mechanism as instanceColor: 4 bytes per instance, no branch, no extra draw call. That
-    // is the whole cost of "different yarns have different strand counts". Defaults to 1 when the
-    // attribute is absent, so a mesh that does not supply one behaves exactly as before.
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>
-        varying vec2 vYarnUv;
-        varying float vHatchScale;
-        #ifdef USE_HATCH_SCALE
-          attribute float aHatchScale;
-        #endif`)
-      .replace('#include <begin_vertex>', `#include <begin_vertex>
-        vYarnUv = uv;
-        #ifdef USE_HATCH_SCALE
-          vHatchScale = aHatchScale;
-        #else
-          vHatchScale = 1.0;
-        #endif`);
+      .replace('#include <common>', () => HATCH_VERTEX_COMMON)
+      .replace('#include <begin_vertex>', () => HATCH_BEGIN_VERTEX);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>
-        varying vec2 vYarnUv;
-        varying float vHatchScale;
-        uniform float uHatchFreq;
-        uniform float uHatchDepth;`)
-      // After the diffuse colour is established and before lighting uses it.
-      .replace('#include <color_fragment>', `#include <color_fragment>
-        {
-          float f = uHatchFreq * vHatchScale;
-          float phase = vYarnUv.y * f;
-          // ANTI-MOIRE, and this is the part that matters. Procedural stripes alias hard once a
-          // stripe gets near one pixel wide: the strands stop being strands and become a shimmer.
-          // The textbook fix is not a global frequency cap — the limit is not global, since a ball
-          // at the back of the shelf and one at the front are sampled at completely different
-          // rates in the SAME frame. It is per-pixel: measure how much the phase changes across
-          // this pixel with fwidth, and fade the pattern toward its own average as that
-          // approaches the Nyquist half-cycle. Two ALU, and it is correct at every zoom, every
-          // window size and every distance without anything having to be computed on the CPU.
-          float w = fwidth(phase);
-          float fade = 1.0 - smoothstep(0.35, 0.5, w);
-          // abs(sin) gives evenly spaced soft bands; the pow sharpens them into strands with gaps,
-          // rather than a smooth ripple that just reads as noise at distance.
-          float hatch = pow(abs(sin(phase * 3.14159)), 0.45);
-          diffuseColor.rgb *= 1.0 - uHatchDepth * fade * (1.0 - hatch);
-        }`);
+      .replace('#include <common>', () => HATCH_FRAGMENT_COMMON)
+      .replace('#include <color_fragment>', () => HATCH_COLOR_FRAGMENT);
   };
   // Materials differing only by a compiled-in patch can otherwise share a cached program.
-  material.customProgramCacheKey = () => `yarn-hatch-${material.type}-${!!material.defines?.USE_HATCH_SCALE}`;
+  material.customProgramCacheKey = () => `yarn-hatch-${material.type}-${Boolean(material.defines?.USE_HATCH_SCALE)}`;
   return material;
 }
 

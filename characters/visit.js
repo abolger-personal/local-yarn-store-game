@@ -16,10 +16,18 @@
 import { EMPTY, footprint, fits, place, clearShelf, usableAt, fullyExposed }
   from '../inventory/grid.js';
 import {
-  WIP_STATE, WEAR_SLOTS, makeCraftPrefs, makeWip, wantsOf, wantFor, stow, workRound,
-  wearOrOffer, finishedOf, everythingMade, photoSubject, lend, slotFor, describeWip, labelWant,
+  WIP_STATE, WEAR_SLOTS, makeCraftPrefs, makeWip, wantFor, stow, workRound,
+  wearOrOffer, photoSubject, lend, labelWant,
 } from './wip.js';
 import { labelOf as labelItem, TOOL_NOTIONS } from '../inventory/catalog.js';
+
+// One label function for the whole game, in catalog.js — it is the only place that knows a yarn
+// is named by its weight and material rather than by the word "yarn". Re-exported here because
+// every consumer of the sim already imports from this module.
+export const labelOf = labelItem;
+// Wants are named by wip.js, which owns their shape. Re-exported for the same reason labelOf is:
+// every consumer of the sim already imports from this module.
+export { labelWant };
 
 // ---------------------------------------------------------------- traits
 //
@@ -112,25 +120,37 @@ export function makeNpc({ id, name, species, target, traits, prefs, rng = Math.r
   // what make an NPC arrive needing something specific, which is what gives them a reason to shop.
   const wips = Array.from({ length: 1 + Math.floor(rng() * 3) },
                           (_, i) => makeWip(`WIP ${i + 1}`, t, p, rng));
-  const npc = {
+  return {
     id, name, species,
     traits: t,
     prefs: p,                     // { skill, crafts, materials, weights }
     target,                       // headline want, for the debug panel — see matchesAnyWant
-    state: STATE.QUEUED,
     x: 0, z: 0,                   // centroid at the END of the round just resolved
     from: { x: 0, z: 0 },         // where it was at the start of it, so the scene can interpolate
     facing: 0,
-    roundsInStore: 0,
-    maxRounds: maxRounds(t, rng),
-    action: null,                 // { type, params } chosen for the round just resolved
-    lastAction: null,             // the round before that — the "Round N-1" the spec keeps citing
-    prescribed: null,             // { type, params } forced for the NEXT round, or null
-    atDisplay: null,
     wips,
     // WEARABLE-FINISHED-OBJ.md: four clothing slots. An NPC wears what they make by default and
     // only lends the overflow, so this is what decides whether the Drop Off step happens at all.
     worn: Object.fromEntries(WEAR_SLOTS.map((s) => [s, null])),
+    visits: 1,                    // how many times this customer has been in
+    ...visitState(t, rng),
+  };
+}
+
+/**
+ * Everything that lasts one visit, fresh: a new customer starts with it, and so does one coming
+ * back (rejoin). One list, so a per-visit field cannot be reset in one place and forgotten in the
+ * other.
+ */
+function visitState(traits, rng) {
+  return {
+    state: STATE.QUEUED,
+    roundsInStore: 0,
+    maxRounds: maxRounds(traits, rng),
+    action: null,                 // { type, params } chosen for the round just resolved
+    lastAction: null,             // the round before that — the "Round N-1" the spec keeps citing
+    prescribed: null,             // { type, params } forced for the NEXT round, or null
+    atDisplay: null,
     // The item currently being turned over. DISPLAYS.md makes buying a two-round beat: consider in
     // one round, buy in the next.
     considering: null,
@@ -138,7 +158,17 @@ export function makeNpc({ id, name, species, target, traits, prefs, rng = Math.r
     carrying: null,               // the most recent of those, for the hand and the HUD
     path: [],                     // this round's waypoints, last one is the destination
     seat: null,                   // id of the seat this NPC currently occupies, or null
+    // DISPLAYS.md rule 9 is explicitly per-visit: "an NPC who leaves and comes back on a later
+    // visit starts fresh", so they may restructure the same display again.
     restructured: [],             // displays this NPC has already tidied/spread/dug through
+    note: '',                     // one line of "why", for the debug panel
+    ...leavingState(),
+  };
+}
+
+/** The part of a visit that is about leaving: the closeout and what the Guestbook is written from. */
+function leavingState() {
+  return {
     closeoutStep: 0,
     closeout: [],                 // the steps this visit will actually take, fixed when it starts
     toLend: [],                   // finished objects with no free clothing slot — the shop's share
@@ -149,10 +179,7 @@ export function makeNpc({ id, name, species, target, traits, prefs, rng = Math.r
     stormedOut: false,
     // Set the moment they buy anything or get some crafting done; read when they walk out.
     willReturn: false,
-    visits: 1,                    // how many times this customer has been in
-    note: '',                     // one line of "why", for the debug panel
   };
-  return npc;
 }
 
 // ---------------------------------------------------------------- world
@@ -350,30 +377,51 @@ function routeAt(world, from, to, solid, pad) {
   const hit = solid.map((b) => grow(b, Math.max(0, pad - 0.02)));
   const blocked = (a, c) => hit.some((b) => segmentHitsBox(a, c, b));
 
-  const { minX, maxX, minZ, maxZ } = world.room.bounds;
   const start = nudgeClear(from, solid, pad);
   const goal = nudgeClear(to, solid, pad);
-  if (!blocked(start, goal)) {
-    const direct = [to];
-    if (start.x !== from.x || start.z !== from.z) direct.unshift(start);
-    return direct;
-  }
+  if (!blocked(start, goal)) return fromStart([to], start, from);
 
-  const nodes = [start, goal];
+  const nodes = graphNodes(world.room.bounds, [start, goal], solid, pad, hit);
+  const prev = shortestPath(nodes, blocked);
+  if (prev[1] < 0) return null;
+
+  const path = [];
+  for (let i = 1; i !== 0; i = prev[i]) path.unshift(nodes[i]);
+  // The graph ran between the nudged copies; the walker has to leave from where it actually is and
+  // arrive where it was actually sent. The stitched-on legs are short and point straight out of (or
+  // into) the berth they were nudged from, so neither can cut a corner.
+  path[path.length - 1] = to;
+  return fromStart(path, start, from);
+}
+
+/** `path`, led by the nudged start if nudging moved it off where the walker actually is. */
+function fromStart(path, start, from) {
+  if (start.x !== from.x || start.z !== from.z) path.unshift(start);
+  return path;
+}
+
+/** The route graph: the two ends, then every obstacle corner inside the room and clear of the rest. */
+function graphNodes({ minX, maxX, minZ, maxZ }, ends, solid, pad, hit) {
+  const nodes = [...ends];
   for (const b of solid)
     for (const c of cornersOf(b, pad))
       if (c.x >= minX && c.x <= maxX && c.z >= minZ && c.z <= maxZ &&
           !hit.some((o) => insideBox(c, o))) nodes.push(c);
+  return nodes;
+}
 
-  // Dijkstra. Small enough that a linear scan for the nearest unvisited node beats a heap.
+/**
+ * Dijkstra from node 0 to node 1 over every unblocked pair: each node's predecessor, -1 where it
+ * was never reached. Small enough that a linear scan for the nearest unvisited node beats a heap.
+ */
+function shortestPath(nodes, blocked) {
   const n = nodes.length;
-  const dist = new Array(n).fill(Infinity);
-  const prev = new Array(n).fill(-1);
-  const done = new Array(n).fill(false);
+  const dist = Array.from({ length: n }, () => Infinity);
+  const prev = Array.from({ length: n }, () => -1);
+  const done = Array.from({ length: n }, () => false);
   dist[0] = 0;
   for (;;) {
-    let u = -1;
-    for (let i = 0; i < n; i++) if (!done[i] && dist[i] < (u < 0 ? Infinity : dist[u])) u = i;
+    const u = nearestOpen(dist, done);
     if (u < 0 || u === 1) break;
     done[u] = true;
     for (let v = 0; v < n; v++) {
@@ -384,16 +432,14 @@ function routeAt(world, from, to, solid, pad) {
       prev[v] = u;
     }
   }
-  if (prev[1] < 0) return null;
+  return prev;
+}
 
-  const path = [];
-  for (let i = 1; i !== 0; i = prev[i]) path.unshift(nodes[i]);
-  // The graph ran between the nudged copies; the walker has to leave from where it actually is and
-  // arrive where it was actually sent. The stitched-on legs are short and point straight out of (or
-  // into) the berth they were nudged from, so neither can cut a corner.
-  path[path.length - 1] = to;
-  if (start.x !== from.x || start.z !== from.z) path.unshift(start);
-  return path;
+/** The unvisited node nearest the start, or -1 when none is left. */
+function nearestOpen(dist, done) {
+  let u = -1;
+  for (let i = 0; i < dist.length; i++) if (!done[i] && dist[i] < (u < 0 ? Infinity : dist[u])) u = i;
+  return u;
 }
 
 /**
@@ -538,6 +584,10 @@ export function attractiveness(npc, display, items) {
   return clamp(a, 0, 1);
 }
 
+/** The patch of floor around the door that nobody may loiter on. */
+export const inDoorway = (world, p) =>
+  Math.hypot(p.x - world.room.door.x, p.z - world.room.door.z) < world.room.doorClearance;
+
 // ---------------------------------------------------------------- the browse action set
 //
 // CHARACTER-VISIT.md: "the remaining visit sequence options are recalculated, then another option
@@ -546,55 +596,14 @@ export function attractiveness(npc, display, items) {
 
 export function browseActionSet(npc, world, snapshot) {
   const set = [];
-  const rng = world.rng;
-  const t = npc.traits;
   const wasAtDisplay = npc.action?.type === ACTION.WALK_TO_DISPLAY ||
                        npc.action?.type === ACTION.INTERACT;
 
   // --- Walk to a Noticed Display -------------------------------------------------
   // "If the NPC walked to a display or interacted with a display in the last round, no new walking
   // actions will be added to this round's set" — the NPC should stay put at the one they are at.
-  if (!wasAtDisplay) {
-    for (const display of world.displays) {
-      if (!visibleTo(world, npc, display)) continue;
-      if (attractiveness(npc, display, world.items) > 0.5) {
-        set.push({ type: ACTION.WALK_TO_DISPLAY, params: { displayId: display.id } });
-      }
-    }
-  }
-
-  // --- Walk to closest NPC -------------------------------------------------------
-  // "calculated from XY position of NPCs at the LAST round" — hence the snapshot, not live state.
-  if (rng() < approachChance(t)) {
-    const others = snapshot.filter((o) => o.id !== npc.id && o.state === STATE.BROWSE);
-    if (others.length) {
-      const closest = others.reduce((m, o) => (dist2(npc, o) < dist2(npc, m) ? o : m));
-      set.push({ type: ACTION.WALK_TO_NPC, params: { npcId: closest.id } });
-    }
-  }
-
-  // --- Work on a project from WIPs -----------------------------------------------
-  // "More than 1 can be added: more WIPs deliberately makes it more likely this action gets picked".
-  // You cannot work on a project standing in the middle of the shop, so an NPC who is not already
-  // sitting has to go and find a chair first — the same walk-then-do shape as a display. The
-  // per-WIP duplication stays, it just weights the walk instead of the work.
-  // A finished object is not something you sit down and work on, so only live slots weight the
-  // draw. Params carry `wip.id`, not the object: an action travels through the debug panel and
-  // through a prescription, and a whole WIP in there is a snapshot that can go stale.
-  const workable = npc.wips.filter((w) => w.state !== WIP_STATE.FINISHED);
-  if (npc.seat !== null) {
-    for (const wip of workable) {
-      set.push({ type: ACTION.WORK_ON_WIP, params: { wip: wip.id, seatId: npc.seat } });
-    }
-  } else {
-    const open = freeSeats(world, npc);
-    if (open.length) {
-      const nearest = open.reduce((m, s) => (dist2(npc, s) < dist2(npc, m) ? s : m));
-      for (const wip of workable) {
-        set.push({ type: ACTION.WALK_TO_SEAT, params: { wip: wip.id, seatId: nearest.id } });
-      }
-    }
-  }
+  if (!wasAtDisplay) set.push(...displayWalks(npc, world));
+  set.push(...npcWalks(npc, world, snapshot), ...wipActions(npc, world));
 
   // --- Always available ----------------------------------------------------------
   // ...except waiting in the doorway. An NPC parked on the mat blocks the one place everybody
@@ -605,9 +614,41 @@ export function browseActionSet(npc, world, snapshot) {
   return set;
 }
 
-/** The patch of floor around the door that nobody may loiter on. */
-export const inDoorway = (world, p) =>
-  Math.hypot(p.x - world.room.door.x, p.z - world.room.door.z) < world.room.doorClearance;
+/** A walk to every display this NPC can see and finds attractive enough. */
+function displayWalks(npc, world) {
+  return world.displays
+    .filter((display) => visibleTo(world, npc, display) && attractiveness(npc, display, world.items) > 0.5)
+    .map((display) => ({ type: ACTION.WALK_TO_DISPLAY, params: { displayId: display.id } }));
+}
+
+// --- Walk to closest NPC -------------------------------------------------------
+// "calculated from XY position of NPCs at the LAST round" — hence the snapshot, not live state.
+function npcWalks(npc, world, snapshot) {
+  if (!(world.rng() < approachChance(npc.traits))) return [];
+  const others = snapshot.filter((o) => o.id !== npc.id && o.state === STATE.BROWSE);
+  if (!others.length) return [];
+  const closest = others.reduce((m, o) => (dist2(npc, o) < dist2(npc, m) ? o : m));
+  return [{ type: ACTION.WALK_TO_NPC, params: { npcId: closest.id } }];
+}
+
+// --- Work on a project from WIPs -----------------------------------------------
+// "More than 1 can be added: more WIPs deliberately makes it more likely this action gets picked".
+// You cannot work on a project standing in the middle of the shop, so an NPC who is not already
+// sitting has to go and find a chair first — the same walk-then-do shape as a display. The
+// per-WIP duplication stays, it just weights the walk instead of the work.
+// A finished object is not something you sit down and work on, so only live slots weight the
+// draw. Params carry `wip.id`, not the object: an action travels through the debug panel and
+// through a prescription, and a whole WIP in there is a snapshot that can go stale.
+function wipActions(npc, world) {
+  const workable = npc.wips.filter((w) => w.state !== WIP_STATE.FINISHED);
+  if (npc.seat !== null) {
+    return workable.map((wip) => ({ type: ACTION.WORK_ON_WIP, params: { wip: wip.id, seatId: npc.seat } }));
+  }
+  const open = freeSeats(world, npc);
+  if (!open.length) return [];
+  const nearest = open.reduce((m, s) => (dist2(npc, s) < dist2(npc, m) ? s : m));
+  return workable.map((wip) => ({ type: ACTION.WALK_TO_SEAT, params: { wip: wip.id, seatId: nearest.id } }));
+}
 
 /**
  * The spec names this function, so it keeps the spec's casing rather than the file's.
@@ -650,28 +691,32 @@ const cellsOf = (display, shelf) => {
  * of it and not three. Whatever is placed LAST ends up on top of its column, i.e. noticeable.
  */
 function rebuildPlane(display, items, shelf, order, { spread = false } = {}) {
-  const g = display.g;
+  const { g } = display;
   clearShelf(g, shelf);
   const cells = cellsOf(display, shelf)
     .filter((cell) => !(display.kind === 'shelf' && cell.r === display.wallRow) || !spread);
   let cursor = 0;
   for (const index of order) {
     const item = items[index];
-    let placed = false;
-    for (let attempt = 0; attempt < cells.length; attempt++) {
-      const cell = cells[(cursor + attempt) % cells.length];
-      const keys = footprint(g, shelf, cell.c, cell.r, item.w, item.h);
-      if (!fits(g, keys, item.layers ?? 1)) continue;
-      item.c = cell.c; item.r = cell.r; item.keys = keys;
-      item.layer = place(g, keys, index, item.layers ?? 1);
-      if (spread) cursor = (cursor + attempt + 1) % cells.length;   // one per column: flatten
-      placed = true;
-      break;
-    }
+    const attempt = firstFit({ g, shelf, cells }, cursor, item, index);
+    if (attempt >= 0 && spread) cursor = (cursor + attempt + 1) % cells.length;   // one per column: flatten
     // ponytail: a plane with no room left keeps the item's old slot record, which the renderer
     // still draws. Only reachable if headroom is set absurdly low; revisit if it shows up.
-    if (!placed) item.layer = place(g, item.keys, index, item.layers ?? 1);
+    if (attempt < 0) item.layer = place(g, item.keys, index, item.layers ?? 1);
   }
+}
+
+/** Places item `index` in the first cell from `cursor` on that it fits: how many it tried past the cursor, or -1. */
+function firstFit({ g, shelf, cells }, cursor, item, index) {
+  for (let attempt = 0; attempt < cells.length; attempt++) {
+    const cell = cells[(cursor + attempt) % cells.length];
+    const keys = footprint(g, shelf, [cell.c, cell.r], [item.w, item.h]);
+    if (!fits(g, keys, item.layers ?? 1)) continue;
+    item.c = cell.c; item.r = cell.r; item.keys = keys;
+    item.layer = place(g, keys, index, item.layers ?? 1);
+    return attempt;
+  }
+  return -1;
 }
 
 /**
@@ -679,38 +724,8 @@ function rebuildPlane(display, items, shelf, order, { spread = false } = {}) {
  * caller turns into a prescription. DISPLAYS.md §8: an interaction never spans rounds.
  */
 export function interact(npc, display, world) {
-  const items = world.items;
-  const t = npc.traits;
-
-  // --- "if (can Buy from pile)" -------------------------------------------------------------
-  //
-  // DISPLAYS.md now gates the buy on the PREVIOUS round: "An item will be *bought* if it was
-  // *considered* in the previous round AND the consideration interaction came back 'true'."
-  // So buying is no longer something that can happen the instant an NPC walks up — they pick a
-  // thing up, turn it over, and decide next round. That deliberate beat is the whole point of the
-  // new mechanic, and it is why `npc.considering` is state rather than a local.
-  //
-  // MVP: "100% of considered items will be purchased. Later this wont be true."
-  const pending = npc.considering;
-  if (pending && pending.displayId === display.id && available(items[pending.index]) &&
-      noticeable(display, items, pending.index)) {
-    const index = pending.index;
-    const item = items[index];
-    const want = wantFor(npc, item);
-    npc.considering = null;
-    if (want) {
-      item.gone = true;                      // "Inventory removed from display"
-      rebuildPlane(display, items, item.shelf, onPlane(display, items, item.shelf));
-      const bought = { ...item };
-      npc.bought.push(bought);
-      npc.carrying = bought;
-      const wip = stow(npc, bought, want);
-      npc.willReturn = true;      // "NPC Visitors who manage to either buy any items or..."
-      say(world, npc, `bought ${labelOf(bought)} for ${want.wip}` +
-        (wip?.state === WIP_STATE.IN_PROGRESS ? ' — that WIP can be started now' : ''));
-      return 'complete';
-    }
-  }
+  const { items } = world;
+  if (buyConsidered(npc, display, world)) return 'complete';
   // Whatever they were holding is no longer wanted, or has gone. Put it down.
   npc.considering = null;
 
@@ -730,47 +745,91 @@ export function interact(npc, display, world) {
     say(world, npc, `considered ${labelOf(items[index])}`);
     return 'incomplete';
   }
+  if (restructure(npc, display, world)) return 'incomplete';
+  return lookOver(npc, display, world);
+}
 
-  // --- "else If (Rules for display result in Rearrange or Tidy)" ----------------------------
+// --- "if (can Buy from pile)" -------------------------------------------------------------
+//
+// DISPLAYS.md now gates the buy on the PREVIOUS round: "An item will be *bought* if it was
+// *considered* in the previous round AND the consideration interaction came back 'true'."
+// So buying is no longer something that can happen the instant an NPC walks up — they pick a
+// thing up, turn it over, and decide next round. That deliberate beat is the whole point of the
+// new mechanic, and it is why `npc.considering` is state rather than a local.
+//
+// MVP: "100% of considered items will be purchased. Later this wont be true."
+/** What they considered last round is on this display still, and can still be seen. */
+const stillThere = (pending, display, items) => pending && pending.displayId === display.id &&
+  available(items[pending.index]) && noticeable(display, items, pending.index);
+
+/** Buys what this NPC considered here last round, if it is still here and still wanted: whether they did. */
+function buyConsidered(npc, display, world) {
+  const { items } = world;
+  const pending = npc.considering;
+  if (!stillThere(pending, display, items)) return false;
+  const { index } = pending;
+  const item = items[index];
+  const want = wantFor(npc, item);
+  npc.considering = null;
+  if (!want) return false;
+  item.gone = true;                      // "Inventory removed from display"
+  rebuildPlane(display, items, item.shelf, onPlane(display, items, item.shelf));
+  const bought = { ...item };
+  npc.bought.push(bought);
+  npc.carrying = bought;
+  const wip = stow(npc, bought, want);
+  npc.willReturn = true;      // "NPC Visitors who manage to either buy any items or..."
+  say(world, npc, `bought ${labelOf(bought)} for ${want.wip}${
+    wip?.state === WIP_STATE.IN_PROGRESS ? ' — that WIP can be started now' : ''}`);
+  return true;
+}
+
+// --- "else If (Rules for display result in Rearrange or Tidy)" ----------------------------
+//
+// DISPLAYS.md rule 9: an NPC may restructure a given display at most ONCE per visit, after which
+// further interactions can only Buy or Look. That rule is what makes "Interaction Not Complete"
+// terminate instead of prescribing the same tidy every round forever.
+/** Spreads, tidies or digs through the display, once a visit: whether they did. */
+function restructure(npc, display, world) {
+  const { items } = world;
   const shelf = pickPlane(display, items, npc);
   const present = onPlane(display, items, shelf);
-  const mine = present.filter((i) => matchesAnyWant(npc, items[i]));
+  if (npc.restructured.includes(display.id)) return false;
+  const plan = restructurePlan(npc, display, items, present);
+  if (!plan) return false;
+  npc.restructured.push(display.id);
+  rebuildPlane(display, items, shelf, plan.order, { spread: plan.spread });
+  say(world, npc, plan.note);
+  return true;
+}
 
-  // Order matters: DISPLAYS.md lists these "in order of satisfying".
-  // DISPLAYS.md rule 9: an NPC may restructure a given display at most ONCE per visit, after which
-  // further interactions can only Buy or Look. That rule is what makes "Interaction Not Complete"
-  // terminate instead of prescribing the same tidy every round forever.
-  const canRestructure = !npc.restructured.includes(display.id);
-
-  if (canRestructure && display.kind === 'pile' && t.Orderliness === 1 && present.length) {
-    npc.restructured.push(display.id);
-    rebuildPlane(display, items, shelf, present, { spread: true });
-    say(world, npc, 'Orderliness 1 — spread the pile out into a mess');
-    return 'incomplete';
+/** Which restructure this NPC's temperament makes of the plane, if any. DISPLAYS.md lists them "in order of satisfying". */
+function restructurePlan(npc, display, items, present) {
+  const t = npc.traits;
+  const pile = display.kind === 'pile' && present.length;
+  if (pile && t.Orderliness === 1) {
+    return { order: present, spread: true, note: 'Orderliness 1 — spread the pile out into a mess' };
   }
-  if (canRestructure && display.kind === 'pile' && t.Orderliness === 5 && present.length) {
-    npc.restructured.push(display.id);
+  if (pile && t.Orderliness === 5) {
     const sorted = [...present].sort((a, b) => items[a].name.localeCompare(items[b].name));
-    rebuildPlane(display, items, shelf, sorted);
-    say(world, npc, 'Orderliness 5 — tidied the pile by category');
-    return 'incomplete';
+    return { order: sorted, spread: false, note: 'Orderliness 5 — tidied the pile by category' };
   }
+  const mine = present.filter((i) => matchesAnyWant(npc, items[i]));
   const rearrangeGate = display.kind === 'pile' ? 3 : 4;   // pile > 3, shelf > 4
-  if (canRestructure && mine.length && t.Assertiveness > rearrangeGate) {
-    npc.restructured.push(display.id);
-    const rest = present.filter((i) => !mine.includes(i));
-    rebuildPlane(display, items, shelf, [...rest, ...mine]);   // wanted items placed last => on top
-    say(world, npc, `Assertiveness ${t.Assertiveness} — dug out what they needed to the top`);
-    return 'incomplete';
-  }
+  if (!(mine.length && t.Assertiveness > rearrangeGate)) return null;
+  const rest = present.filter((i) => !mine.includes(i));
+  // wanted items placed last => on top
+  return { order: [...rest, ...mine], spread: false, note: `Assertiveness ${t.Assertiveness} — dug out what they needed to the top` };
+}
 
-  // --- "else" — they look, and that is the end of it ----------------------------------------
-  //
-  // CHARACTER-VISIT.md: "Volatility=5: an interaction with a Noticed Display that does not result
-  // in finding what they need will reduce original calculation of MAX_ROUNDS to 1". This is the
-  // one branch that genuinely finds nothing — a consideration or a restructure returns above, and
-  // both are on their way to finding something.
-  if (t.Volatility === 5 && npc.maxRounds > 1) {
+// --- "else" — they look, and that is the end of it ----------------------------------------
+//
+// CHARACTER-VISIT.md: "Volatility=5: an interaction with a Noticed Display that does not result
+// in finding what they need will reduce original calculation of MAX_ROUNDS to 1". This is the
+// one branch that genuinely finds nothing — a consideration or a restructure returns above, and
+// both are on their way to finding something.
+function lookOver(npc, display, world) {
+  if (npc.traits.Volatility === 5 && npc.maxRounds > 1) {
     npc.maxRounds = 1;
     npc.stormedOut = true;
     say(world, npc, `Volatility 5 — nothing at the ${display.id}, MAX_ROUNDS cut to 1`);
@@ -794,14 +853,6 @@ function pickPlane(display, items, npc) {
   }
   return 0;
 }
-
-// One label function for the whole game, in catalog.js — it is the only place that knows a yarn
-// is named by its weight and material rather than by the word "yarn". Re-exported here because
-// every consumer of the sim already imports from this module.
-export const labelOf = labelItem;
-// Wants are named by wip.js, which owns their shape. Re-exported for the same reason labelOf is:
-// every consumer of the sim already imports from this module.
-export { labelWant };
 
 // ---------------------------------------------------------------- the round
 
@@ -859,21 +910,7 @@ function separate(world) {
   for (let pass = 0; pass < 64; pass++) {
     const slide = stalled > 2 ? 0.5 : 0;
     for (let i = 0; i < movable.length; i++) {
-      for (let j = i + 1; j < movable.length; j++) {
-        const a = movable[i], b = movable[j];
-        const dx = b.x - a.x, dz = b.z - a.z;
-        const len = Math.hypot(dx, dz);
-        if (len >= gap) continue;
-        // Direction and distance are separate: exactly coincident NPCs have no direction, but the
-        // overlap is still the full gap. Faking the distance to 1 here makes the push NEGATIVE and
-        // pulls them together instead.
-        const [ux, uz] = len < 1e-6 ? [1, 0] : [dx / len, dz / len];
-        const push = (gap - len) / 2 + 1e-4;   // overshoot a hair, so it converges instead of grazing
-        const turn = slide * ((i + j) % 2 ? 1 : -1);
-        const vx = ux - uz * turn, vz = uz + ux * turn;
-        a.x -= vx * push; a.z -= vz * push;
-        b.x += vx * push; b.z += vz * push;
-      }
+      for (let j = i + 1; j < movable.length; j++) pushApart(movable[i], movable[j], gap, slide * ((i + j) % 2 ? 1 : -1));
     }
     for (const npc of movable) constrain(world, npc);
     const worst = worstOverlap(movable, gap);
@@ -881,6 +918,21 @@ function separate(world) {
     stalled = worst >= previous - 1e-6 ? stalled + 1 : 0;
     previous = worst;
   }
+}
+
+/** A pair standing closer than `gap`: pushed straight apart, and `turn` round each other. */
+function pushApart(a, b, gap, turn) {
+  const dx = b.x - a.x, dz = b.z - a.z;
+  const len = Math.hypot(dx, dz);
+  if (len >= gap) return;
+  // Direction and distance are separate: exactly coincident NPCs have no direction, but the
+  // overlap is still the full gap. Faking the distance to 1 here makes the push NEGATIVE and
+  // pulls them together instead.
+  const [ux, uz] = len < 1e-6 ? [1, 0] : [dx / len, dz / len];
+  const push = (gap - len) / 2 + 1e-4;   // overshoot a hair, so it converges instead of grazing
+  const vx = ux - uz * turn, vz = uz + ux * turn;
+  a.x -= vx * push; a.z -= vz * push;
+  b.x += vx * push; b.z += vz * push;
 }
 
 function worstOverlap(movable, gap) {
@@ -924,6 +976,37 @@ function admitOne(world) {
   next.state = STATE.ENTERING;
 }
 
+// What a round does in each state. BROWSE and CLOSEOUT are the visit proper; the rest are the
+// walk in and out through the door. GONE, or anything else, does nothing.
+const ROUND = {
+  [STATE.QUEUED](npc, world) {
+    npc.action = { type: ACTION.QUEUE, params: {} };
+    say(world, npc, 'waiting outside — the door is busy');
+  },
+  [STATE.ENTERING](npc, world) {
+    npc.action = { type: ACTION.ENTER, params: {} };
+    moveTo(world, npc, world.room.door);
+    npc.state = STATE.BROWSE;
+    world.door.busy = null;
+    say(world, npc, `came in looking for ${labelWant(npc.target)}`);
+  },
+  [STATE.BROWSE](npc, world, snapshot) {
+    npc.roundsInStore += 1;
+    stepBrowse(npc, world, snapshot);
+  },
+  [STATE.CLOSEOUT](npc, world) {
+    npc.roundsInStore += 1;
+    stepCloseout(npc, world);
+  },
+  [STATE.LEAVING](npc, world) {
+    npc.action = { type: ACTION.LEAVE, params: {} };
+    moveTo(world, npc, world.room.outside);
+    npc.state = STATE.GONE;
+    world.door.busy = null;
+    say(world, npc, 'left');
+  },
+};
+
 function stepNpc(npc, world, snapshot) {
   npc.from = { x: npc.x, z: npc.z };
   npc.lastAction = npc.action;
@@ -931,41 +1014,103 @@ function stepNpc(npc, world, snapshot) {
   // would walk that stale detour and loop back to where it started, since the destination is now
   // where the NPC already is. Cleared here, at the one point every round passes through.
   npc.path = [];
-
-  switch (npc.state) {
-    case STATE.QUEUED:
-      npc.action = { type: ACTION.QUEUE, params: {} };
-      say(world, npc, 'waiting outside — the door is busy');
-      return;
-
-    case STATE.ENTERING:
-      npc.action = { type: ACTION.ENTER, params: {} };
-      moveTo(world, npc, world.room.door);
-      npc.state = STATE.BROWSE;
-      world.door.busy = null;
-      say(world, npc, `came in looking for ${labelWant(npc.target)}`);
-      return;
-
-    case STATE.BROWSE:
-      npc.roundsInStore += 1;
-      return stepBrowse(npc, world, snapshot);
-
-    case STATE.CLOSEOUT:
-      npc.roundsInStore += 1;
-      return stepCloseout(npc, world);
-
-    case STATE.LEAVING:
-      npc.action = { type: ACTION.LEAVE, params: {} };
-      moveTo(world, npc, world.room.outside);
-      npc.state = STATE.GONE;
-      world.door.busy = null;
-      say(world, npc, 'left');
-      return;
-
-    default:                                          // GONE
-      npc.action = null;
-  }
+  const round = ROUND[npc.state];
+  if (round) round(npc, world, snapshot);
+  else npc.action = null;                             // GONE
 }
+
+const displayOf = (world, action) => world.displays.find((d) => d.id === action.params.displayId);
+
+// What each browse action does with the round it was chosen for.
+const BROWSE = {
+  [ACTION.WALK_TO_DISPLAY](npc, world, action) {
+    const display = displayOf(world, action);
+    moveTo(world, npc, display.standAt);
+    npc.atDisplay = display.id;
+    // "PRESCRIBED NEXT ACTION: Interact with noticed display."
+    npc.prescribed = { type: ACTION.INTERACT, params: { displayId: display.id } };
+    say(world, npc, `walked to the ${display.id} (attractiveness ` +
+                    `${attractiveness(npc, display, world.items).toFixed(2)})`);
+  },
+
+  [ACTION.INTERACT](npc, world, action) {
+    const display = displayOf(world, action);
+    const outcome = interact(npc, display, world);
+    // "If NPC finds something to interact with inside the noticed display then PRESCRIBED NEXT
+    //  ACTION is once again Interact with noticed display. Otherwise it's None"
+    npc.prescribed = outcome === 'incomplete'
+      ? { type: ACTION.INTERACT, params: { displayId: display.id } }
+      : null;
+  },
+
+  [ACTION.WALK_TO_NPC](npc, world, action, snapshot) {
+    const other = snapshot.find((o) => o.id === action.params.npcId);
+    moveTo(world, npc, approach(npc, other, world.room.personalSpace));
+    npc.atDisplay = null;
+    npc.prescribed = { type: ACTION.WAIT, params: {} };   // "NPC wait 1 round"
+    say(world, npc, `went over to ${world.npcs.find((n) => n.id === other.id).name}`);
+  },
+
+  [ACTION.WALK_TO_SEAT](npc, world, action) {
+    const seat = seatById(world, action.params.seatId);
+    // Somebody else may have taken it since the set was built — fall back to any other free one.
+    const free = seat && seat.occupiedBy === null ? seat : freeSeats(world, npc)[0];
+    if (!free) {                       // every chair is taken; wander instead of standing still
+      npc.action = { type: ACTION.MOVE, params: {} };
+      moveTo(world, npc, randomSpot(world));
+      npc.atDisplay = null;
+      npc.prescribed = null;
+      say(world, npc, 'went looking for a seat, all taken');
+      return;
+    }
+    claimSeat(world, npc, free);
+    moveTo(world, npc, free);
+    npc.facing = free.facing ?? npc.facing;
+    npc.atDisplay = null;
+    npc.prescribed = { type: ACTION.WORK_ON_WIP, params: { ...action.params, seatId: free.id } };
+    say(world, npc, `took a seat to work on ${action.params.wip}`);
+  },
+
+  [ACTION.WORK_ON_WIP](npc, world, action) {
+    const seat = npc.seat !== null ? seatById(world, npc.seat) : null;
+    if (seat) npc.facing = seat.facing ?? npc.facing;
+    npc.prescribed = null;
+    const wip = npc.wips.find((w) => w.id === action.params.wip);
+    if (!wip) return;                     // it finished, or the slot went away
+    if (wip.state !== WIP_STATE.IN_PROGRESS) {
+      // Sitting down with a project you cannot start yet is still what the round was spent on.
+      say(world, npc, `sat with ${wip.id}, but it is ${wip.state.toLowerCase()}`);
+      return;
+    }
+    // Deterministic progress, per the spec's formula — no dice. How long a thing takes is a
+    // property of the pattern and the crafter, which is what lets the player reason about it.
+    // "work on a WIP" means actually working on it — sitting down with something you cannot
+    // start yet, handled above, is not the same thing and does not earn a return.
+    npc.satAndWorked = true;
+    npc.willReturn = true;
+    const done = workRound(npc, wip, world.round);
+    say(world, npc, done
+      ? `finished ${labelOf(wip.pattern)}! (crafter skill now ${npc.prefs.skill})`
+      : `worked on ${labelOf(wip.pattern)} — ${Math.round(wip.progress)}%`);
+  },
+
+  [ACTION.WAIT](npc, world) {
+    const near = world.npcs.some((o) => o.id !== npc.id && o.state === STATE.BROWSE &&
+                                        dist2(npc, o) < world.room.personalSpace ** 2);
+    if (near) npc.chatted = true;
+    npc.prescribed = near && world.rng() < keepChattingChance(npc.traits)
+      ? { type: ACTION.WAIT, params: {} }
+      : null;
+    say(world, npc, near ? 'stayed to keep chatting' : 'waited a round');
+  },
+
+  [ACTION.MOVE](npc, world) {
+    moveTo(world, npc, randomSpot(world));
+    npc.atDisplay = null;
+    npc.prescribed = null;
+    say(world, npc, 'wandered across the store');
+  },
+};
 
 function stepBrowse(npc, world, snapshot) {
   const action = DetermineNextBrowseAction(npc, world, snapshot);
@@ -975,110 +1120,17 @@ function stepBrowse(npc, world, snapshot) {
     say(world, npc, npc.roundsInStore >= npc.maxRounds
       ? `MAX_ROUNDS ${npc.maxRounds} reached — closing out`
       : 'nothing left to do — closing out');
-    return stepCloseout(npc, world);
+    stepCloseout(npc, world);
+    return;
   }
 
   npc.action = action;
-  const display = world.displays.find((d) => d.id === action.params.displayId);
-
   // Getting up is implicit: anything that is not sitting and working frees the chair for whoever
   // is waiting on one.
   if (action.type !== ACTION.WORK_ON_WIP && action.type !== ACTION.WALK_TO_SEAT) {
     releaseSeat(world, npc);
   }
-
-  switch (action.type) {
-    case ACTION.WALK_TO_DISPLAY:
-      moveTo(world, npc, display.standAt);
-      npc.atDisplay = display.id;
-      // "PRESCRIBED NEXT ACTION: Interact with noticed display."
-      npc.prescribed = { type: ACTION.INTERACT, params: { displayId: display.id } };
-      say(world, npc, `walked to the ${display.id} (attractiveness ` +
-                      `${attractiveness(npc, display, world.items).toFixed(2)})`);
-      return;
-
-    case ACTION.INTERACT: {
-      const outcome = interact(npc, display, world);
-      // "If NPC finds something to interact with inside the noticed display then PRESCRIBED NEXT
-      //  ACTION is once again Interact with noticed display. Otherwise it's None"
-      npc.prescribed = outcome === 'incomplete'
-        ? { type: ACTION.INTERACT, params: { displayId: display.id } }
-        : null;
-      return;
-    }
-
-    case ACTION.WALK_TO_NPC: {
-      const other = snapshot.find((o) => o.id === action.params.npcId);
-      moveTo(world, npc, approach(npc, other, world.room.personalSpace));
-      npc.atDisplay = null;
-      npc.prescribed = { type: ACTION.WAIT, params: {} };   // "NPC wait 1 round"
-      say(world, npc, `went over to ${world.npcs.find((n) => n.id === other.id).name}`);
-      return;
-    }
-
-    case ACTION.WALK_TO_SEAT: {
-      const seat = seatById(world, action.params.seatId);
-      // Somebody else may have taken it since the set was built — fall back to any other free one.
-      const free = seat && seat.occupiedBy === null ? seat : freeSeats(world, npc)[0];
-      if (!free) {                       // every chair is taken; wander instead of standing still
-        npc.action = { type: ACTION.MOVE, params: {} };
-        moveTo(world, npc, randomSpot(world));
-        npc.atDisplay = null;
-        npc.prescribed = null;
-        say(world, npc, 'went looking for a seat, all taken');
-        return;
-      }
-      claimSeat(world, npc, free);
-      moveTo(world, npc, free);
-      npc.facing = free.facing ?? npc.facing;
-      npc.atDisplay = null;
-      npc.prescribed = { type: ACTION.WORK_ON_WIP, params: { ...action.params, seatId: free.id } };
-      say(world, npc, `took a seat to work on ${action.params.wip}`);
-      return;
-    }
-
-    case ACTION.WORK_ON_WIP: {
-      const seat = npc.seat !== null ? seatById(world, npc.seat) : null;
-      if (seat) npc.facing = seat.facing ?? npc.facing;
-      npc.prescribed = null;
-      const wip = npc.wips.find((w) => w.id === action.params.wip);
-      if (!wip) return;                     // it finished, or the slot went away
-      if (wip.state !== WIP_STATE.IN_PROGRESS) {
-        // Sitting down with a project you cannot start yet is still what the round was spent on.
-        say(world, npc, `sat with ${wip.id}, but it is ${wip.state.toLowerCase()}`);
-        return;
-      }
-      // Deterministic progress, per the spec's formula — no dice. How long a thing takes is a
-      // property of the pattern and the crafter, which is what lets the player reason about it.
-      // "work on a WIP" means actually working on it — sitting down with something you cannot
-      // start yet, handled above, is not the same thing and does not earn a return.
-      npc.satAndWorked = true;
-      npc.willReturn = true;
-      const done = workRound(npc, wip, world.round);
-      say(world, npc, done
-        ? `finished ${labelOf(wip.pattern)}! (crafter skill now ${npc.prefs.skill})`
-        : `worked on ${labelOf(wip.pattern)} — ${Math.round(wip.progress)}%`);
-      return;
-    }
-
-    case ACTION.WAIT: {
-      const near = world.npcs.some((o) => o.id !== npc.id && o.state === STATE.BROWSE &&
-                                          dist2(npc, o) < world.room.personalSpace ** 2);
-      if (near) npc.chatted = true;
-      npc.prescribed = near && world.rng() < keepChattingChance(npc.traits)
-        ? { type: ACTION.WAIT, params: {} }
-        : null;
-      say(world, npc, near ? 'stayed to keep chatting' : 'waited a round');
-      return;
-    }
-
-    case ACTION.MOVE:
-      moveTo(world, npc, randomSpot(world));
-      npc.atDisplay = null;
-      npc.prescribed = null;
-      say(world, npc, 'wandered across the store');
-      return;
-  }
+  BROWSE[action.type]?.(npc, world, action, snapshot);
 }
 
 /**
@@ -1151,30 +1203,35 @@ function stepCloseout(npc, world) {
   }
   const type = npc.closeout[npc.closeoutStep];
   npc.action = { type, params: {} };
+  if (type === ACTION.SIGN_GUESTBOOK) signAtGuestbook(npc, world);
+  else if (type === ACTION.DROP_OFF) lendAtDropOff(npc, world);
+  else headForDoor(npc, world);
+}
 
-  if (type === ACTION.SIGN_GUESTBOOK) {
-    moveTo(world, npc, world.room.guestbook);
-    npc.closeoutStep += 1;
-    const entry = signGuestbook(world, npc);
-    say(world, npc, entry.kind === 'photo'
-      ? `signed the Guestbook — a picture of them holding ${entry.object}`
-      : `signed the Guestbook — a ${entry.mood} note`);
-    return;
-  }
-  if (type === ACTION.DROP_OFF) {
-    moveTo(world, npc, world.room.dropOff);
-    npc.closeoutStep += 1;
-    // Lent, not given: it goes on display in the shop and the NPC can be handed it back later
-    // (returnToNpc in wip.js), which is why the WIP itself is recorded rather than a label.
-    // THIS is where it leaves the WIP slots, per the spec — not earlier, and so not before the
-    // Guestbook photo two steps back.
-    const wip = lend(npc, npc.toLend.shift());
-    world.dropOff.push({ npc: npc.name, npcId: npc.id, wip, object: labelOf(wip.pattern),
-                         round: world.round });
-    say(world, npc, `lent ${labelOf(wip.pattern)} to the Drop Off`);
-    return;
-  }
-  // LEAVE — needs the door, and may have to queue for it behind an arrival.
+function signAtGuestbook(npc, world) {
+  moveTo(world, npc, world.room.guestbook);
+  npc.closeoutStep += 1;
+  const entry = signGuestbook(world, npc);
+  say(world, npc, entry.kind === 'photo'
+    ? `signed the Guestbook — a picture of them holding ${entry.object}`
+    : `signed the Guestbook — a ${entry.mood} note`);
+}
+
+function lendAtDropOff(npc, world) {
+  moveTo(world, npc, world.room.dropOff);
+  npc.closeoutStep += 1;
+  // Lent, not given: it goes on display in the shop and the NPC can be handed it back later
+  // (returnToNpc in wip.js), which is why the WIP itself is recorded rather than a label.
+  // THIS is where it leaves the WIP slots, per the spec — not earlier, and so not before the
+  // Guestbook photo two steps back.
+  const wip = lend(npc, npc.toLend.shift());
+  world.dropOff.push({ npc: npc.name, npcId: npc.id, wip, object: labelOf(wip.pattern),
+                       round: world.round });
+  say(world, npc, `lent ${labelOf(wip.pattern)} to the Drop Off`);
+}
+
+/** LEAVE — needs the door, and may have to queue for it behind an arrival. */
+function headForDoor(npc, world) {
   if (world.door.busy !== null && world.door.busy !== npc.id) {
     say(world, npc, 'waiting for the doorway to clear');
     return;
@@ -1213,29 +1270,7 @@ function stepCloseout(npc, world) {
  * @param {{at?: {x: number, z: number}, rng?: () => number}} [opts]
  */
 export function rejoin(npc, { at, rng = Math.random } = {}) {
-  npc.state = STATE.QUEUED;
-  npc.roundsInStore = 0;
-  npc.maxRounds = maxRounds(npc.traits, rng);   // fresh patience, same temperament
-  npc.action = null;
-  npc.lastAction = null;
-  npc.prescribed = null;
-  npc.atDisplay = null;
-  npc.considering = null;
-  npc.bought = [];
-  npc.carrying = null;
-  npc.seat = null;
-  npc.path = [];
-  // DISPLAYS.md rule 9 is explicitly per-visit: "an NPC who leaves and comes back on a later visit
-  // starts fresh", so they may restructure the same display again.
-  npc.restructured = [];
-  npc.closeoutStep = 0;
-  npc.closeout = [];
-  npc.toLend = [];
-  npc.chatted = false;
-  npc.satAndWorked = false;
-  npc.stormedOut = false;
-  npc.willReturn = false;
-  npc.note = '';
+  Object.assign(npc, visitState(npc.traits, rng));   // fresh patience, same temperament
   npc.visits += 1;
   // Kept, deliberately: traits, prefs (including earned skill), wips and their progress, worn.
   if (at) { npc.x = at.x; npc.z = at.z; npc.from = { ...at }; }

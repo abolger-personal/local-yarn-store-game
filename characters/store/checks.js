@@ -74,7 +74,10 @@ export function checkWallCulling() {
  * item must resolve to a real atlas cell, or it silently draws the whole sheet.
  */
 function checkLabels() {
-  const wrong = items.filter((it) => (it.size != null) !== SIZED_NOTIONS.has(it.name));
+  const wrong = items.filter((it) => {
+    const sized = it.size != null;
+    return sized !== SIZED_NOTIONS.has(it.name);
+  });
   console.assert(wrong.length === 0,
     `item sizes: ${wrong.length} wrong`, wrong.slice(0, 5).map((it) => `${it.name}=${it.size}`));
   const noArt = items.filter((it) => !atlas.manifest.cells[cellNameFor(it)]);
@@ -124,7 +127,7 @@ function checkStockable() {
   const unstockable = YARN_SHAPES.flatMap((sh) => SHOP_RANGE.weights
     .map((wn) => /** @type {[string, string, number]} */
       ([sh, wn, yarnFit(sh, yarnWeight(wn).size, yarnWeight(wn).size, YARN_FIT).layers]))
-    .filter(([, , L]) => L > tallest));
+    .filter((row) => row[2] > tallest));
   console.assert(unstockable.length === 0, 'yarn the shop can roll but nothing can hold:',
     unstockable.map(([sh, wn, L]) => `${sh}/${wn}=${L} layers > ${tallest}`));
 }
@@ -158,8 +161,8 @@ export function checkSlotMasking() {
   console.assert(dead.length === 0,
     'slot masking: display(s) left with no usable slots', dead.map((x) => x.id));
   const carved = report.filter((x) => x.usable < x.total);
-  console.info(`slot masking: ${carved.length} of ${report.length} displays carved` +
-    (carved.length ? ` — ${carved.map((x) => `${x.id} ${x.usable}/${x.total}`).join(', ')}` : ''));
+  const which = carved.length ? ` — ${carved.map((x) => `${x.id} ${x.usable}/${x.total}`).join(', ')}` : '';
+  console.info(`slot masking: ${carved.length} of ${report.length} displays carved${which}`);
 }
 
 /**
@@ -256,7 +259,7 @@ function checkDetents(pile, fails) {
  */
 function checkStockTravels(pile, fails) {
   const index = items.findIndex((it) => it.display === pile.id && !it.gone && !it.held);
-  if (index < 0 || !boxes) return;
+  if (index === -1 || !boxes) return;
   const m = new THREE.Matrix4(), before = new THREE.Vector3(), after = new THREE.Vector3();
   boxes.getMatrixAt(index, m); before.setFromMatrixPosition(m);
   applyTransform(pile, pile.x + 0.5, pile.z - 0.25, pile.yaw);

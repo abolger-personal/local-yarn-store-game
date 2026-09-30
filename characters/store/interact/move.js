@@ -259,7 +259,7 @@ export function grabMovable(event) {
 /** Release: a legal pose sticks, an illegal one goes back where it came from. Either way the piece
  *  stays selected, so the rotate handles are still on it. */
 export function dropMovable() {
-  const m = mover.m;
+  const { m } = mover;
   mover.m = null;
   if (!m) return;
   if (!mover.ok) {
@@ -300,9 +300,13 @@ export function rotateMovable(step) {
   const m = mover.m ?? mover.sel ?? activeDisplay();
   if (!m) return;
   const from = movePose(m);
-  const ok = proposeMove(m, from.x, from.z, from.yaw + step);
-  if (mover.m) return;
-  if (ok) {
+  // Proposed before the early exit on purpose: a drag in progress still turns, it just is not
+  // settled here.
+  if (mover.m) {
+    proposeMove(m, from.x, from.z, from.yaw + step);
+    return;
+  }
+  if (proposeMove(m, from.x, from.z, from.yaw + step)) {
     if (!isSeat(m)) remaskMoved(m);
   } else {
     moveApply(m, from.x, from.z, from.yaw);

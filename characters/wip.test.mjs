@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {
   PATTERN_TYPES, YARN_WEIGHTS, yarnUnits, makeYarn, makePattern, makeNotion, labelOf,
-  TOOL_FOR_CRAFT, SIZED_NOTIONS, NOTION_NAMES,
+  SIZED_NOTIONS, NOTION_NAMES,
 } from '../inventory/catalog.js';
 import {
   WIP_STATE, WEAR_SLOTS, makeCraftPrefs, makeWip, heldUnits, unitsShort, toolFits, canStart,

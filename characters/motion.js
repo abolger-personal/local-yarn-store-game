@@ -400,6 +400,17 @@ function advanceDance(d, dance, dt) {
   }
 }
 
+/**
+ * The root extras a step blends FROM. At step 0 that is the LAST step once the dance has wrapped,
+ * and nothing at all on the first pass. Getting this wrong is invisible until an extra alternates:
+ * a loop whose shift goes +0.035 / -0.035 would snap from -0.035 to 0 on every wrap, because the
+ * first step lerped from nothing. It cost nothing while every looping dance had all-zero extras.
+ */
+function extrasBefore(d, extras) {
+  if (d.i > 0) return extras[d.i - 1];
+  return d.looped ? extras[extras.length - 1] : NO_EXTRAS;
+}
+
 export function stepDance(d, dt) {
   const dance = DANCES[d.name];
   const { steps, extras, walkAt } = dance;
@@ -409,11 +420,7 @@ export function stepDance(d, dt) {
   // Eased within the step, so the root does not change speed abruptly at a key pose. The pose
   // itself is NOT eased here -- the spring is doing that, which is the whole design.
   const u = sCurve(raw);
-  // At step 0 the previous step is the LAST one once the dance has wrapped, and nothing at all on
-  // the first pass. Getting this wrong is invisible until an extra alternates: a loop whose shift
-  // goes +0.035 / -0.035 would snap from -0.035 to 0 on every wrap, because the first step lerped
-  // from nothing. It cost nothing while every looping dance had all-zero extras.
-  const from = d.i === 0 ? (d.looped ? extras[extras.length - 1] : NO_EXTRAS) : extras[d.i - 1];
+  const from = extrasBefore(d, extras);
   const to = extras[d.i];
   // The hop rides the RAW progress, not the eased one: sin of an already-eased t flattens the top
   // into a hover. A half sine from the linear progress is the ballistic shape -- fastest leaving
@@ -635,7 +642,7 @@ export const STYLE_RANGES = Object.freeze({
 
 // ---------------------------------------------------------------- traits -> coefficients
 
-const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const span = (range, u) => range[0] + (range[1] - range[0]) * clamp01(u);
 
 /**
@@ -839,9 +846,8 @@ const breathDepth = (amp) => 0.65 + 0.35 * amp;
 
 /** Reads a pose object into a channel array. `hold` is derived, never stored, so it cannot drift. */
 function readInto(arr, pose) {
-  for (let i = 0; i < MOTION_KEYS.length; i++) {
-    arr[i] = i === HOLD ? (pose.holdItem ? 1 : 0) : (pose[MOTION_KEYS[i]] ?? 0);
-  }
+  for (let i = 0; i < MOTION_KEYS.length; i++) arr[i] = pose[MOTION_KEYS[i]] ?? 0;
+  arr[HOLD] = pose.holdItem ? 1 : 0;
   return arr;
 }
 
@@ -1016,7 +1022,7 @@ function spring(m, dt, opts) {
 function hermite(m, dt, opts) {
   const dur = opts.blend;
   m.t = Math.min(1, m.t + dt / dur);
-  const t = m.t, t2 = t * t, t3 = t2 * t;
+  const { t } = m, t2 = t * t, t3 = t2 * t;
   // The h11 basis and its derivative are absent on purpose: the outgoing tangent m1 is 0, so a
   // transition arrives at rest and both terms are multiplications by zero.
   const h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = -2 * t3 + 3 * t2;
@@ -1234,17 +1240,6 @@ function idleLayer(out, m, opts, a) {
   // the species signal SPIKE-FUN.md asks for, not a wag.
   out.tailYaw += a * 0.12 * Math.sin(q * m.rateB * 0.7 + m.seed * 7);
 
-  headLook(out, m, look, q, w, g * still);
-  earFlick(out, m, a);
-}
-
-/**
- * Glancing round the room: runs at a FRACTION of the fidget clock, because looking about is a
- * slower beat than jiggling on the spot and a head whipping around at tapping speed reads as
- * alarmed rather than interested. Still incommensurate with the body rhythm, so no visible
- * repeat.
- */
-function headLook(out, m, look, q, w, lean) {
   // THE TILT IS NOT LOOKING AROUND, and scaling it as though it were is the other half of the
   // head-coming-off report. It rides `w` -- the BODY's weight-shift wave -- so it is postural
   // follow-through, the body's roll continuing up the spine, not a glance. Curiosity already
@@ -1255,9 +1250,20 @@ function headLook(out, m, look, q, w, lean) {
   // of head tilt against 2.9 of body roll, IN PHASE on the same wave. A head swinging nearly
   // five times as far as the shoulders it sits on does not read as calm, it reads as loose.
   //
-  // `lean` is that same g * still the weight shift uses, so the head now tracks the body it is
-  // attached to at any fidget amount and fades out with it when they start walking.
-  out.headTilt += lean * 0.070 * w;
+  // It uses the same g * still the weight shift uses, so the head tracks the body it is attached
+  // to at any fidget amount and fades out with it when they start walking.
+  out.headTilt += g * still * 0.070 * w;
+  headLook(out, m, look, q);
+  earFlick(out, m, a);
+}
+
+/**
+ * Glancing round the room: runs at a FRACTION of the fidget clock, because looking about is a
+ * slower beat than jiggling on the spot and a head whipping around at tapping speed reads as
+ * alarmed rather than interested. Still incommensurate with the body rhythm, so no visible
+ * repeat.
+ */
+function headLook(out, m, look, q) {
   out.headYaw += look * 0.180 * Math.sin(q * m.rateB + m.seed * 2);
   out.headPitch += look * 0.055 * Math.sin(q * m.rateB * 0.8 + m.seed * 3);
 }
@@ -1267,6 +1273,9 @@ function headLook(out, m, look, q, w, lean) {
 // The tip's spring against the root's. Softer, so the tip trails the root and a tail whips
 // rather than swinging as a stick.
 const TAIL_TIP = 0.55;
+// The tail's two springs as [stiffness, damping, substep], refilled on every step rather than
+// allocated: tailStep runs per character per frame.
+const _rootSpring = [0, 0, 0], _tipSpring = [0, 0, 0];
 // Past this a tail is folding back on itself. Clamped on the OUTPUT side of the spring state,
 // never by rewriting the target.
 const TAIL_MAX = 1.3;
@@ -1276,7 +1285,7 @@ const TAIL_MAX = 1.3;
 // against the tail's frequency, so physics says it rides along rigidly. This puts the swing in
 // the TARGET, so it still arrives through the spring, lagged and overshooting.
 const TAIL_COUNTER = 2.5;
-const tailLim = (v) => (v > TAIL_MAX ? TAIL_MAX : v < -TAIL_MAX ? -TAIL_MAX : v);
+const tailLim = (v) => Math.min(TAIL_MAX, Math.max(-TAIL_MAX, v));
 
 /**
  * THE TAIL: a passive spring, and the one thing on the rig that is MEANT to lag.
@@ -1311,17 +1320,17 @@ const tailLim = (v) => (v > TAIL_MAX ? TAIL_MAX : v < -TAIL_MAX ? -TAIL_MAX : v)
 export function tailStep(m, out, accel, dt, { stiff, zeta, reach, droop }) {
   const step = dt > MAX_DT ? MAX_DT : dt;
   const n = Math.ceil(step / MAX_H) || 1, h = step / n;
-  const s = m.tail, c = 2 * zeta * Math.sqrt(stiff);
-  const kt = stiff * TAIL_TIP, ct = 2 * zeta * Math.sqrt(kt);
+  const s = m.tail;
+  const root = springOf(_rootSpring, stiff, zeta, h), tip = springOf(_tipSpring, stiff * TAIL_TIP, zeta, h);
   const p = droop + s[1];
   const fy = accel[0] / reach;   // yaw swings across the tail at any droop: see addTail
   const fp = -(accel[1] * Math.cos(p) + accel[2] * Math.sin(p)) / reach;
   const yaw = out.tailYaw + TAIL_COUNTER * out.spineRoll;
   for (let i = 0; i < n; i++) {
-    chase(s, 0, yaw, stiff, c, fy, h);
-    chase(s, 1, out.tailPitch, stiff, c, fp, h);
-    chase(s, 4, s[0], kt, ct, fy, h);
-    chase(s, 5, s[1], kt, ct, fp, h);
+    chase(s, 0, yaw, fy, root);
+    chase(s, 1, out.tailPitch, fp, root);
+    chase(s, 4, s[0], fy, tip);
+    chase(s, 5, s[1], fp, tip);
   }
   out.tailYaw = tailLim(s[0]);
   out.tailPitch = tailLim(s[1]);
@@ -1329,8 +1338,17 @@ export function tailStep(m, out, accel, dt, { stiff, zeta, reach, droop }) {
   out.tailPitchTip = tailLim(s[5]);
 }
 
+/** A critically-scaled spring of stiffness k and damping ratio zeta, substepped by h, into `sp`. */
+function springOf(sp, k, zeta, h) {
+  sp[0] = k;
+  sp[1] = 2 * zeta * Math.sqrt(k);
+  sp[2] = h;
+  return sp;
+}
+
 /** One damped-spring substep of angle s[i], whose velocity is s[i + 2], toward `to`, pushed by `f`. */
-function chase(s, i, to, k, c, f, h) {
+function chase(s, i, to, f, sp) {
+  const k = sp[0], c = sp[1], h = sp[2];
   s[i + 2] += ((to - s[i]) * k - s[i + 2] * c + f) * h;
   s[i] += s[i + 2] * h;
 }

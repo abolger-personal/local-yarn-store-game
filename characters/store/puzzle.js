@@ -112,7 +112,7 @@ const standingAt = () => byId(bench.at) ?? displays[0];
 
 /** Put the customer on their feet in front of the display they are shopping. */
 function placeNpc() {
-  const npc = bench.npc, disp = standingAt();
+  const { npc } = bench, disp = standingAt();
   if (!npc || !disp) return;
   Object.assign(npc, { x: disp.standAt.x, z: disp.standAt.z });
   npc.from = { x: npc.x, z: npc.z };
@@ -133,7 +133,8 @@ function spawnNpc({ traits, prefs } = {}) {
   const kit = getSpecies(pick(speciesIds()));
   const P = bodyParams(kit, null, S);
   bench.built = createCharacter(P, kit);
-  const npc = makeNpc({ id: 'bench', name: pick(NAMES), species: kit.label, traits, prefs });
+  // any: the bench adds what world.js's spawn adds (speciesId, body) to what makeNpc builds
+  const npc = /** @type {any} */ (makeNpc({ id: 'bench', name: pick(NAMES), species: kit.label, traits, prefs }));
   npc.speciesId = kit.id;
   // They are in the shop, looking. Nothing on the bench counts rounds or walks them anywhere.
   npc.state = /** @type {any} */ (STATE.BROWSE);
@@ -167,24 +168,31 @@ const field = (key, label, list, labelOfValue) =>
   `<label class="row" data-for="${key}"><span>${label}</span>` +
   `<select data-build="${key}">${options(list, build[key], labelOfValue)}</select></label>`;
 
-function renderPalette() {
-  panels.palette.innerHTML =
-    field('kind', 'kind', ['yarn', 'pattern', 'notion'])
-    + field('weight', 'weight', YARN_WEIGHT_NAMES)
-    + field('material', 'material', YARN_MATERIALS)
-    + field('shape', 'shape', YARN_SHAPES)
-    + `<label class="row" data-for="colorIndex"><span>colour</span>` +
-      `<input type="number" min="0" max="${YARN_COLOR_COUNT - 1}" data-build="colorIndex" ` +
-      `value="${build.colorIndex}" /></label>`
-    + field('patternType', 'pattern', PATTERN_NAMES)
-    + field('craft', 'craft', CRAFTS)
-    + field('notion', 'notion', NOTION_NAMES)
-    + field('toolSize', 'size mm', HOOK_SIZES_MM, (v) => v.toFixed(1))
-    + `<div class="btns">
+const PALETTE_BUTTONS = `<div class="btns">
          <button data-act="put">put it out</button>
          <button class="ghost" data-act="give">hand it to them</button>
          <button class="ghost" data-act="clear">clear the shop</button>
        </div>`;
+
+const colourField = () => [
+  '<label class="row" data-for="colorIndex"><span>colour</span>',
+  `<input type="number" min="0" max="${YARN_COLOR_COUNT - 1}" data-build="colorIndex" `,
+  `value="${build.colorIndex}" /></label>`,
+].join('');
+
+function renderPalette() {
+  panels.palette.innerHTML = [
+    field('kind', 'kind', ['yarn', 'pattern', 'notion']),
+    field('weight', 'weight', YARN_WEIGHT_NAMES),
+    field('material', 'material', YARN_MATERIALS),
+    field('shape', 'shape', YARN_SHAPES),
+    colourField(),
+    field('patternType', 'pattern', PATTERN_NAMES),
+    field('craft', 'craft', CRAFTS),
+    field('notion', 'notion', NOTION_NAMES),
+    field('toolSize', 'size mm', HOOK_SIZES_MM, (v) => v.toFixed(1)),
+    PALETTE_BUTTONS,
+  ].join('');
   syncPalette();
 }
 
@@ -238,7 +246,10 @@ function specOf() {
 function putOut() {
   const disp = standingAt();
   const index = addItem(disp, disp.plane, specOf());
-  if (index < 0) return say(`no room on ${disp.id} for that`);
+  if (index < 0) {
+    say(`no room on ${disp.id} for that`);
+    return;
+  }
   sizeInstanceBuffers();
   refreshAll();
   say(`stocked ${labelOf(items[index])} on ${disp.id}`);
@@ -247,12 +258,15 @@ function putOut() {
 /** Hand it straight to the customer, into the first WIP slot that has room for it. */
 function giveToNpc() {
   const spec = specOf();
-  const kind = spec.name === 'yarn' ? 'yarn' : spec.name === 'pattern' ? 'pattern' : 'tool';
+  const kind = { yarn: 'yarn', pattern: 'pattern' }[spec.name] ?? 'tool';
   // stow() owns what filing an item into a project means, including starting the project when it
   // finally has everything. A want is the shape it takes, so one is made for it.
   const slot = bench.npc.wips.find((w) => w.state !== WIP_STATE.FINISHED
     && (kind !== 'pattern' || !w.pattern));
-  if (!slot) return say('no open WIP slot wants that');
+  if (!slot) {
+    say('no open WIP slot wants that');
+    return;
+  }
   stow(bench.npc, spec, { kind, wip: slot.id });
   say(`handed ${labelOf(spec)} to ${bench.npc.name} for ${slot.id}`);
   renderNpc();
@@ -275,24 +289,25 @@ const numField = (key, value, max) =>
   `<label class="row"><span>${esc(key)}</span>` +
   `<input type="number" min="1" max="${max}" data-trait="${esc(key)}" value="${value}" /></label>`;
 
-function renderNpc() {
-  const npc = bench.npc;
-  if (!npc) return;
-  panels.npcPanel.innerHTML =
-    `<label class="row"><span>standing at</span>` +
-    `<select data-at>${options(displays.map((d) => d.id), bench.at)}</select></label>`
-    + '<h4>personality</h4>'
-    + `<div class="traits">${TRAITS.map((t) => numField(t, npc.traits[t], 5)).join('')}</div>`
-    + '<h4>craft</h4>'
-    + `<div class="traits">${numField('skill', npc.prefs.skill, 5)}</div>`
-    + `<div class="k">${esc(npc.prefs.crafts.join(', '))} · likes ` +
-      `${esc(npc.prefs.materials.join('/'))} in ${esc(npc.prefs.weights.join('/'))}</div>`
-    + `<div class="btns">
+const NPC_BUTTONS = `<div class="btns">
          <button data-act="look">ask what they make of it</button>
          <button class="ghost" data-act="sign">sign the guestbook</button>
          <button class="ghost" data-act="reroll">new customer</button>
          <button class="ghost" data-act="rewip">new projects, same person</button>
        </div>`;
+
+function renderNpc() {
+  const { npc } = bench;
+  if (!npc) return;
+  panels.npcPanel.innerHTML = [
+    `<label class="row"><span>standing at</span><select data-at>${options(displays.map((d) => d.id), bench.at)}</select></label>`,
+    '<h4>personality</h4>',
+    `<div class="traits">${TRAITS.map((t) => numField(t, npc.traits[t], 5)).join('')}</div>`,
+    '<h4>craft</h4>',
+    `<div class="traits">${numField('skill', npc.prefs.skill, 5)}</div>`,
+    `<div class="k">${esc(npc.prefs.crafts.join(', '))} · likes ${esc(npc.prefs.materials.join('/'))} in ${esc(npc.prefs.weights.join('/'))}</div>`,
+    NPC_BUTTONS,
+  ].join('');
   renderHints();
   touchView();
 }
@@ -318,12 +333,11 @@ const HINTS = [
 ];
 
 function renderHints() {
-  const npc = bench.npc;
-  panels.hints.innerHTML =
-    `<div class="btns" style="margin:0 0 6px">
+  const { npc } = bench;
+  const toolbar = `<div class="btns" style="margin:0 0 6px">
        <button class="ghost" data-act="view">${bench.playerView ? '👁 player view' : '🔧 designer view'}</button>
-     </div>`
-    + HINTS.map(([key, label, value]) => {
+     </div>`;
+  panels.hints.innerHTML = toolbar + HINTS.map(([key, label, value]) => {
       const shown = bench.reveal[key];
       const body = shown || !bench.playerView
         ? value(npc)
@@ -344,39 +358,48 @@ function renderHints() {
 // slots over re-answers the question immediately. That loop — move a thing, watch the verdict
 // change — is the thing the bench is FOR.
 
+/**
+ * Why a customer would or would not take an item. `held` first: a carried item is lifted out of its
+ * grid column, so it covers nothing and nothing covers it — every other branch would fall through
+ * to a vague "out of reach" for what is plainly in the player's hand. It is also the one line here
+ * that is a MECHANIC rather than a diagnosis: while you hold a thing, it is out of the simulation.
+ */
+function whyNot(disp, it, i, seen, want) {
+  if (it.held) return 'in your hand — out of the shop until you set it down';
+  if (seen) return want ? 'matches a want' : 'nothing they need';
+  const under = coveredBy(disp, it, i);
+  if (under.length) return `under ${esc(under.join(', '))}`;
+  if (disp.kind === 'shelf' && it.r === disp.wallRow) return 'in the wall-facing row';
+  return 'out of reach';
+}
+
+/** One stock item's line: can this customer see it, do they want it, and if not, why not. */
+function readoutLine(npc, disp, { it, i }) {
+  const seen = noticeable(disp, items, i);
+  const want = wantFor(npc, it);
+  const why = whyNot(disp, it, i, seen, want);
+  return `<div class="item"><span class="dot ${seen ? 'seen' : 'hidden'}">${seen ? '●' : '○'}</span>`
+    + `<span class="${want ? 'wanted' : ''}">${esc(labelOf(it))}</span><span class="why">— ${why}</span></div>`;
+}
+
+/** What they would do here: pick something up, or not, and what they are already turning over. */
+function readoutVerdict(npc, considered) {
+  const choice = considered.length
+    ? `they would pick up <b>${esc(labelOf(items[considered[0]]))}</b>`
+    : 'nothing here is both wanted and reachable';
+  const turning = npc.considering
+    ? `<div class="item k">turning over ${esc(labelOf(items[npc.considering.index]))} — ask again and they buy it</div>`
+    : '';
+  return `<h4>verdict</h4><div class="item"><span>${choice}</span></div>${turning}`;
+}
+
 function renderReadout() {
-  const npc = bench.npc, disp = standingAt();
+  const { npc } = bench, disp = standingAt();
   if (!npc || !disp) return;
   const stock = stockOf(disp);
-  const considered = consideredHere(npc, disp, items);
-  const lines = stock.map(({ it, i }) => {
-    const seen = noticeable(disp, items, i);
-    const want = wantFor(npc, it);
-    const under = coveredBy(disp, it, i);
-    // `held` first: a carried item is lifted out of its grid column, so it covers nothing and
-    // nothing covers it — every other branch would fall through to a vague "out of reach" for
-    // what is plainly in the player's hand. It is also the one line here that is a MECHANIC
-    // rather than a diagnosis: while you hold a thing, it is out of the simulation.
-    const why = it.held ? 'in your hand — out of the shop until you set it down'
-      : seen ? (want ? 'matches a want' : 'nothing they need')
-      : under.length ? `under ${esc(under.join(', '))}`
-      : disp.kind === 'shelf' && it.r === disp.wallRow ? 'in the wall-facing row'
-      : 'out of reach';
-    return `<div class="item"><span class="dot ${seen ? 'seen' : 'hidden'}">${seen ? '●' : '○'}</span>` +
-      `<span class="${want ? 'wanted' : ''}">${esc(labelOf(it))}</span>` +
-      `<span class="why">— ${why}</span></div>`;
-  });
-  panels.readout.innerHTML =
-    `<div class="k">${esc(disp.id)} · ${disp.kind} · ${stock.length} out</div>`
-    + (lines.join('') || '<div class="k">nothing on this display</div>')
-    + `<h4>verdict</h4>`
-    + `<div class="item"><span>${considered.length
-        ? `they would pick up <b>${esc(labelOf(items[considered[0]]))}</b>`
-        : 'nothing here is both wanted and reachable'}</span></div>`
-    + (npc.considering
-        ? `<div class="item k">turning over ${esc(labelOf(items[npc.considering.index]))} — ` +
-          'ask again and they buy it</div>'
-        : '');
+  const lines = stock.map((entry) => readoutLine(npc, disp, entry)).join('') || '<div class="k">nothing on this display</div>';
+  const verdict = readoutVerdict(npc, consideredHere(npc, disp, items));
+  panels.readout.innerHTML = `<div class="k">${esc(disp.id)} · ${disp.kind} · ${stock.length} out</div>${lines}${verdict}`;
 }
 
 // ---------------------------------------------------------------- doing things
@@ -419,7 +442,16 @@ function installBench() {
     build[t.dataset.build] = t.value;
     syncPalette();
   });
-  // One delegated click handler for every button on the page: they all do one named thing.
+  installButtons();
+  panels.rail.addEventListener('change', onRailChange);
+  addEventListener('keydown', (e) => {
+    if (e.key === 'f' || e.key === 'F') frameRoom(standingAt());
+    if (e.key === 'g' || e.key === 'G') { S.showGrid = !S.showGrid; touchView(); }
+  });
+}
+
+/** One delegated click handler for every button on the page: they all do one named thing. */
+function installButtons() {
   document.addEventListener('click', (e) => {
     const btn = /** @type {HTMLElement} */
       (/** @type {HTMLElement} */ (e.target).closest?.('[data-act]'));
@@ -431,25 +463,23 @@ function installBench() {
       view: () => { bench.playerView = !bench.playerView; renderHints(); },
     })[act]?.();
   });
-  panels.rail.addEventListener('change', (e) => {
-    const t = /** @type {HTMLInputElement} */ (e.target);
-    if (t.dataset.trait === 'skill') bench.npc.prefs.skill = Number(t.value);
-    else if (t.dataset.trait) bench.npc.traits[t.dataset.trait] = Number(t.value);
-    else if (t.dataset.reveal) bench.reveal[t.dataset.reveal] = t.checked;
-    else if (t.hasAttribute('data-at')) {
-      bench.at = t.value;
-      placeNpc();
-      syncPalette();
-      frameRoom(standingAt());
-    }
-    else return;
-    if (t.dataset.reveal) renderHints(); else renderNpc();
-    touchView();
-  });
-  addEventListener('keydown', (e) => {
-    if (e.key === 'f' || e.key === 'F') frameRoom(standingAt());
-    if (e.key === 'g' || e.key === 'G') { S.showGrid = !S.showGrid; touchView(); }
-  });
+}
+
+/** The customer panel's inputs: a trait, a hint's reveal, or where they are standing. */
+function onRailChange(e) {
+  const t = /** @type {HTMLInputElement} */ (e.target);
+  if (t.dataset.trait === 'skill') bench.npc.prefs.skill = Number(t.value);
+  else if (t.dataset.trait) bench.npc.traits[t.dataset.trait] = Number(t.value);
+  else if (t.dataset.reveal) bench.reveal[t.dataset.reveal] = t.checked;
+  else if (t.hasAttribute('data-at')) {
+    bench.at = t.value;
+    placeNpc();
+    syncPalette();
+    frameRoom(standingAt());
+  }
+  else return;
+  if (t.dataset.reveal) renderHints(); else renderNpc();
+  touchView();
 }
 
 function buildBench() {

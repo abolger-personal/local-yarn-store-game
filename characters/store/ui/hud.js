@@ -135,12 +135,15 @@ export function drawTimer() {
   const mm = String(minutes % 60).padStart(2, '0');
   const live = shop.world.npcs.filter((n) => n.state !== STATE.GONE).length;
   const inDoor = shop.world.npcs.find((n) => n.id === shop.world.door.busy);
-  clockLabel.textContent = `${hh}:${mm} · ${live}/${shop.world.npcs.length} visiting` +
-    (inDoor ? ` · door: ${inDoor.name}` : ' · door clear');
+  clockLabel.textContent = `${hh}:${mm} · ${live}/${shop.world.npcs.length} visiting${inDoor ? ` · door: ${inDoor.name}` : ' · door clear'}`;
   advanceBtn.disabled = live === 0 && !autoDayBox.checked;
-  advanceBtn.textContent = live === 0
-    ? (autoDayBox.checked ? 'closing up…' : 'everyone has gone home — start next shop.day')
-    : 'Advance round →';
+  advanceBtn.textContent = advanceLabel(live);
+}
+
+/** The advance button's label: a round to play, or a shop that has emptied. */
+function advanceLabel(live) {
+  if (live > 0) return 'Advance round →';
+  return autoDayBox.checked ? 'closing up…' : 'everyone has gone home — start next shop.day';
 }
 
 // ---------------------------------------------------------------- perf overlay
@@ -149,6 +152,12 @@ const perfEl = document.getElementById('perfBody');
 
 let fps = 60, lastPerf = 0;
 
+/** A reading's colour on the overlay: fine, getting there, or over budget. */
+function cls(v, warn, bad) {
+  if (v >= bad) return 'bad';
+  return v >= warn ? 'warn' : 'ok';
+}
+
 export function updatePerf(dt) {
   fps += (1 / Math.max(dt, 1e-4) - fps) * 0.06;
   if (performance.now() - lastPerf < 250) return;
@@ -156,7 +165,6 @@ export function updatePerf(dt) {
 
   const r = renderer.info.render;
   const mem = renderer.info.memory;
-  const cls = (v, warn, bad) => (v >= bad ? 'bad' : v >= warn ? 'warn' : 'ok');
   const tri = r.triangles;
 
   perfEl.innerHTML =

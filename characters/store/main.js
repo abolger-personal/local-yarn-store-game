@@ -159,7 +159,7 @@ restoreFolds();
 // On the HUD as well as in the console: when a fix "does not work", the first thing worth ruling
 // out is that the page is running an older module than the one on disk.
 document.getElementById('build').textContent = BUILD;
-const brokenSubsystems = buildShop();
+buildShop();   // it reports its own broken subsystems
 
 /**
  * Report a boot failure honestly.

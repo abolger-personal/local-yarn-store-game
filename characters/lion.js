@@ -571,7 +571,7 @@ export function deriveManeColor(bodyHex) {
   const dir = [darker ? -1 : 1, darker ? 1 : -1].find((d) => gap(end(d)) >= MIN_MANE_CONTRAST)
     ?? (gap(0.05) > gap(0.95) ? -1 : 1);
   const want = Math.min(target, gap(end(dir)));
-  let l = body.l;
+  let { l } = body;
   while (gap(l) < want && Math.abs(l - end(dir)) > 1e-9) {
     l = dir < 0 ? Math.max(end(dir), l - 0.01) : Math.min(end(dir), l + 0.01);
   }

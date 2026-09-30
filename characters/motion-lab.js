@@ -314,13 +314,13 @@ function addPair(id, slot, slots) {
   const shown = shownEngines();
   shown.forEach((engine, row) => {
     const lane = slot * (shown.length + 0.7) + row;
-    addOne(kit, params, engine, traits, seed, walkDist,
-      (lane - (slots * (shown.length + 0.7) - 1.7) / 2) * 0.8, corner?.label, corner?.odd);
+    const z = (lane - (slots * (shown.length + 0.7) - 1.7) / 2) * 0.8;
+    addOne(kit, params, engine, { traits, seed, walkDist, z, label: corner?.label, odd: corner?.odd });
   });
 }
 
 /** One built character in one lane, running one engine. */
-function addOne(kit, params, engine, traits, seed, walkDist, z, label, odd) {
+function addOne(kit, params, engine, { traits, seed, walkDist, z, label, odd }) {
   const built = createCharacter({ ...params }, kit);
   built.root.position.set(0, 0, z);
   group.add(built.root);
@@ -410,15 +410,17 @@ function showPose() {
   // 0.0227 across one clean pose change, 0.2670 across an interrupted one. So a walking cast
   // holding a pose shows three bit-identical rows, and that reads as a broken engine switch
   // when it is the system working correctly.
-  const tail = runStage !== 'done'
-    ? `<span class="stage">${RUN_STAGES[runStage] ?? ''}</span>`
-    : shownEngines().length > 1
-      ? '<span class="hint">the rows differ ONLY across a pose change \u2014 press '
-        + '<kbd>Enter</kbd> to interrupt one. Walking and fidgeting are added after the '
-        + 'interpolator, the same way for every row.</span>'
-      : '<span class="hint">spring \u2014 press <kbd>Enter</kbd> to interrupt a move. Switch on '
-        + 'hermite or smoothstep under \u201chow motion gets from A to B\u201d to compare '
-        + 'against it.</span>';
+  let tail;
+  if (runStage !== 'done') tail = `<span class="stage">${RUN_STAGES[runStage] ?? ''}</span>`;
+  else if (shownEngines().length > 1) {
+    tail = '<span class="hint">the rows differ ONLY across a pose change \u2014 press '
+      + '<kbd>Enter</kbd> to interrupt one. Walking and fidgeting are added after the '
+      + 'interpolator, the same way for every row.</span>';
+  } else {
+    tail = '<span class="hint">spring \u2014 press <kbd>Enter</kbd> to interrupt a move. Switch on '
+      + 'hermite or smoothstep under \u201chow motion gets from A to B\u201d to compare '
+      + 'against it.</span>';
+  }
   const arrow = prev ? `${prev} \u2192 ` : '';
   poseEl.innerHTML = `<b>${arrow}${now}</b><span>${POSE_MEANS[now] ?? ''}</span>${tail}`;
 }
@@ -491,19 +493,11 @@ const clock = new THREE.Clock();
 let stepOnce = false;
 let paused = false;
 
-/** One character: interpolate, sum the additive layers, apply. */
-function tickOne(a, dt) {
-  const before = velocityOf(a.motion, S.scopeChannel);
-  integrate(a.motion, target, dt, a.opts);
-  const after = velocityOf(a.motion, S.scopeChannel);
-  a.maxDv = Math.max(a.maxDv ?? 0, Math.abs(after - before));
-
-  const out = compose(scratch, a.motion, a.opts);
-  // Deliberate head turn, as a fraction of what this species can physically do. applyPose
-  // clamps to headYawMax, so asking for more than an animal has simply saturates.
-  if (S.lookOver !== 0) out.headYaw += S.lookOver * (a.built.params.headYawMax ?? 1.4);
-
-  // walk: distance-driven, so the phase freezes when the character does
+/**
+ * The walk layer onto `out`: distance-driven, so the phase freezes when the character does.
+ * Returns the gait's gain, which the lane walk below turns and travels by.
+ */
+function walkStep(a, out, dt) {
   const P = a.built.params;
   const L = P.legHeight + P.hipInset;
   // walkDist stays, but ONLY for the lane position below. The gait phase is accumulated
@@ -518,7 +512,22 @@ function tickOne(a, dt) {
   walkLayer(out, w, gain, a.opts);
   a.skate = w.skate;
   a.top = topSpeed(L, a.opts);
+  return gain;
+}
 
+/** One character: interpolate, sum the additive layers, apply. */
+function tickOne(a, dt) {
+  const before = velocityOf(a.motion, S.scopeChannel);
+  integrate(a.motion, target, dt, a.opts);
+  const after = velocityOf(a.motion, S.scopeChannel);
+  a.maxDv = Math.max(a.maxDv ?? 0, Math.abs(after - before));
+
+  const out = compose(scratch, a.motion, a.opts);
+  // Deliberate head turn, as a fraction of what this species can physically do. applyPose
+  // clamps to headYawMax, so asking for more than an animal has simply saturates.
+  if (S.lookOver !== 0) out.headYaw += S.lookOver * (a.built.params.headYawMax ?? 1.4);
+
+  const gain = walkStep(a, out, dt);
   applyPose(a.built, out);
 
   // Walk along +X, in a lane of their own, and TURN to face the way they are going -- reusing
@@ -725,8 +734,9 @@ const gui = new GUI({ title: 'motion lab' });
  * "sinMax", "armGain") -- fine in the source, useless on a tuning surface where the whole job is
  * deciding what to drag. Every knob says what it does and which way is which.
  */
-function knob(folder, obj, prop, label, help, ...rest) {
-  const c = folder.add(obj, prop, ...rest).name(label);
+function knob(folder, obj, prop, label, ...rest) {
+  const [help, ...range] = rest;   // the tooltip, then whatever lil-gui's add() takes after prop
+  const c = folder.add(obj, prop, ...range).name(label);
   c.domElement.title = help;
   const name = c.domElement.querySelector('.name');
   if (name) name.title = help;

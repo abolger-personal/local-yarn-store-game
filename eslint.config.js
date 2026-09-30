@@ -18,6 +18,9 @@ import unicorn from 'eslint-plugin-unicorn';
  * `no-null` would rewrite the sentinel this codebase uses on purpose, and `prefer-math-trunc`
  * would replace mulberry32's `| 0` — which is a 32-bit WRAP, not a truncation, and the generator
  * diverges after ~4.9M draws once its state is free to grow past 2^53).
+ *
+ * Every rule is an ERROR. A warning nobody has to fix is one nobody reads: there were 107 of them,
+ * and the TDZ that blanked a page was one. They were fixed once, and now a new one fails the lint.
  */
 const CORRECTNESS = {
   // Real bug classes. All of these are clean on this codebase today, so they cost nothing to
@@ -41,8 +44,21 @@ const CORRECTNESS = {
   'no-new-wrappers': 'error',
   'no-throw-literal': 'error',
   'prefer-promise-reject-errors': 'error',
-  'no-await-in-loop': 'warn',             // usually a serialised fetch that meant to be parallel
-  'require-atomic-updates': 'warn',
+  'no-await-in-loop': 'error',             // usually a serialised fetch that meant to be parallel
+  'require-atomic-updates': 'error',
+};
+
+const MODULARITY = {
+  // Shape limits beside max-lines-per-function: they keep a function doing one thing and a helper
+  // callable. Measured before they were turned on: 120 hits, all fixed. Left out on purpose:
+  // max-lines (garments.js and npc.js are ~1800 lines -- a split, not a lint fix) and
+  // no-magic-numbers (3060 hits: this is geometry, and the numbers are the tuned constants).
+  complexity: ['error', 12],
+  'max-depth': ['error', 4],
+  'max-params': ['error', 5],             // past five, an options object reads better at the call
+  'consistent-return': 'error',           // a value on some paths and none on others is a bug class
+  'no-nested-ternary': 'error',
+  'prefer-destructuring': ['error', { object: true, array: false }],
 };
 
 const SECURITY = {
@@ -55,29 +71,29 @@ const SECURITY = {
 };
 
 const CLEANLINESS = {
-  // Warnings, because these are judgement calls and a couple of them already have hits.
-  'no-shadow': 'warn',                    // cast.js shadows the imported `key` light
-  'default-param-last': 'warn',           // `(rng = Math.random, type)` cannot be called sanely
-  'no-implicit-coercion': 'warn',
-  'no-sequences': 'warn',
-  'no-useless-concat': 'warn',
-  'no-useless-rename': 'warn',
-  'no-useless-computed-key': 'warn',
-  'no-object-constructor': 'warn',
-  'no-array-constructor': 'warn',
-  'prefer-object-spread': 'warn',
-  'prefer-rest-params': 'warn',
-  'prefer-spread': 'warn',
-  'no-multi-str': 'warn',
-  'symbol-description': 'warn',
-  'new-cap': ['warn', { capIsNew: false }],
-  'camelcase': ['warn', { properties: 'never' }],
+  // Judgement calls, but cheap ones to honour: each had a handful of hits, all fixed.
+  'no-shadow': 'error',
+  'default-param-last': 'error',           // `(rng = Math.random, type)` cannot be called sanely
+  'no-implicit-coercion': 'error',
+  'no-sequences': 'error',
+  'no-useless-concat': 'error',
+  'no-useless-rename': 'error',
+  'no-useless-computed-key': 'error',
+  'no-object-constructor': 'error',
+  'no-array-constructor': 'error',
+  'prefer-object-spread': 'error',
+  'prefer-rest-params': 'error',
+  'prefer-spread': 'error',
+  'no-multi-str': 'error',
+  'symbol-description': 'error',
+  'new-cap': ['error', { capIsNew: false }],
+  'camelcase': ['error', { properties: 'never' }],
 };
 
 const UNICORN = {
   // Only the bug-catchers core has no equivalent for. Deliberately NOT unicorn/recommended —
   // see the note above.
-  'unicorn/no-unsafe-string-replacement': 'warn',  // an unescaped `$&` in a replacement string
+  'unicorn/no-unsafe-string-replacement': 'error',  // an unescaped `$&` in a replacement string
   'unicorn/no-invalid-remove-event-listener': 'error',
   'unicorn/no-invalid-fetch-options': 'error',
   'unicorn/no-single-promise-in-promise-methods': 'error',
@@ -85,17 +101,17 @@ const UNICORN = {
   'unicorn/require-array-join-separator': 'error',
   'unicorn/no-magic-array-flat-depth': 'error',
   'unicorn/error-message': 'error',
-  'unicorn/no-instanceof-builtins': 'warn',
-  'unicorn/prefer-add-event-listener': 'warn',
-  'unicorn/prefer-set-has': 'warn',
-  'unicorn/no-new-array': 'warn',
-  'unicorn/no-return-array-push': 'warn',
-  'unicorn/no-useless-spread': 'warn',
-  'unicorn/no-unreadable-array-destructuring': 'warn',
-  'unicorn/consistent-existence-index-check': 'warn',
-  'unicorn/no-chained-comparison': 'warn',
-  'unicorn/no-declarations-before-early-exit': 'warn',
-  'unicorn/no-late-event-control': 'warn',         // stopPropagation() deferred out of the handler
+  'unicorn/no-instanceof-builtins': 'error',
+  'unicorn/prefer-add-event-listener': 'error',
+  'unicorn/prefer-set-has': 'error',
+  'unicorn/no-new-array': 'error',
+  'unicorn/no-return-array-push': 'error',
+  'unicorn/no-useless-spread': 'error',
+  'unicorn/no-unreadable-array-destructuring': 'error',
+  'unicorn/consistent-existence-index-check': 'error',
+  'unicorn/no-chained-comparison': 'error',
+  'unicorn/no-declarations-before-early-exit': 'error',
+  'unicorn/no-late-event-control': 'error',         // stopPropagation() deferred out of the handler
 };
 
 export default [
@@ -112,21 +128,21 @@ export default [
       'prefer-const': 'error',
       'no-var': 'error',
       eqeqeq: ['error', 'smart'],
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'no-empty': ['error', { allowEmptyCatch: true }],
       // A `const` read above its own declaration is a TDZ ReferenceError at module load — the
       // whole graph fails and the page is blank white, with a stack pointing at a line that looks
       // fine. Nothing else here catches it: it is not a cycle, not a missing export, not a type.
       // `functions: false` because function declarations hoist and calling one earlier is normal.
-      // A warning repo-wide: the existing sim files have several of these and they are all safe
-      // (used inside a function, which runs long after the declaration). An ERROR in the shop
-      // below, where module-eval order is load-bearing and getting it wrong blanks the page.
-      'no-use-before-define': ['warn', { functions: false, classes: true, variables: true }],
+      // An error everywhere: a page script runs top to bottom at load exactly as the shop does,
+      // and the harmless cases (read inside a function that runs later) cost a line move to fix.
+      'no-use-before-define': ['error', { functions: false, classes: true, variables: true }],
       // A function longer than this is doing more than one thing. Comments and blanks do not
       // count — this codebase explains itself, and prose is not complexity.
-      'max-lines-per-function': ['warn', { max: 20, skipComments: true, skipBlankLines: true }],
-      'prefer-template': 'warn',
-      'object-shorthand': 'warn',
+      'max-lines-per-function': ['error', { max: 20, skipComments: true, skipBlankLines: true }],
+      'prefer-template': 'error',
+      'object-shorthand': 'error',
+      ...MODULARITY,
       ...CORRECTNESS,
       ...SECURITY,
       ...CLEANLINESS,
@@ -134,30 +150,35 @@ export default [
     },
   },
   {
-    // The shop's module graph. These four rules replace hand-rolled scripts that did the same
-    // job worse: a cycle detector, an export/import linker, a layering check and a length check.
-    // eslint already parses every file — it was always the right place for this.
-    files: ['characters/store/**/*.js'],
+    // The module graph, everywhere: pages, the shop, the characters, the inventory and the node
+    // self-checks. These replace hand-rolled scripts that did the same job worse: a cycle
+    // detector and an export/import linker. eslint already parses every file — it was always the
+    // right place for this. They started in the shop alone; repo-wide they had no hits.
+    files: ['**/*.js', '**/*.mjs'],
     plugins: { 'import-x': importX },
     settings: {
       // `three` and its addons come from a CDN import map at runtime, so they are unresolvable
       // on disk by design. Everything relative must resolve.
       'import-x/ignore': ['^three'],
-      'import-x/resolver': { node: { extensions: ['.js'] } },
+      'import-x/resolver': { node: { extensions: ['.js', '.mjs'] } },
     },
     rules: {
-      // The one that matters most: a cycle here is not a style issue. `yarn.js` read a `const`
-      // from `items.js` while `items.js` was still evaluating `yarn.js`, which is a TDZ
-      // ReferenceError and a blank page.
+      // The one that matters most: a cycle is not a style issue. `yarn.js` read a `const` from
+      // `items.js` while `items.js` was still evaluating `yarn.js`, which is a TDZ ReferenceError
+      // and a blank page.
       'import-x/no-cycle': ['error', { maxDepth: Infinity, ignoreExternal: true }],
       // `import { x }` where the target has no `export x` is a SyntaxError in the browser and a
       // clean lint everywhere else, because eslint checks one file at a time. Not any more.
       'import-x/named': 'error',
       'import-x/no-unresolved': ['error', { ignore: ['^three'] }],
       'import-x/no-self-import': 'error',
-      // Here it is an error, not a warning. This is the rule that would have caught the TDZ that
-      // blanked the page: a `const` read above its own declaration at module-eval time.
-      'no-use-before-define': ['error', { functions: false, classes: true, variables: true }],
+    },
+  },
+  {
+    // The shop's module graph, on top of the checks above: its layering.
+    files: ['characters/store/**/*.js'],
+    plugins: { 'import-x': importX },
+    rules: {
       // The layering, declared rather than computed: core < scene < goods < interact < sim < ui.
       // Each zone may only import from the ones below it. This is what stops the graph drifting
       // back into a tangle one reasonable-looking edge at a time.

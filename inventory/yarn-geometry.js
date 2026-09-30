@@ -182,6 +182,7 @@ export const FAMILY_FOOTPRINT = Object.freeze({
  * Bulk grows the SHORT axis and adds the same amount to the long one, rather than multiplying:
  * a bulky skein at 2x scale would be 4x2 and could not fit a 5-wide shelf beside anything else.
  */
+/** @returns {[number, number]} */
 export const familyFootprint = (name, bulk = 1) => {
   const [w, h] = FAMILY_FOOTPRINT[name] ?? [1, 1];
   return [w + bulk - 1, h + bulk - 1];

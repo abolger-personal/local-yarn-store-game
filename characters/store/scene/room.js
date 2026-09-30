@@ -34,7 +34,7 @@ export const walls = [];
 
 const wallMat = new THREE.MeshStandardMaterial({ color: '#ded4c2', roughness: 0.95, side: THREE.DoubleSide });
 
-export function wall(w, h, x, y, z, ry) {
+export function wall([w, h], [x, y, z], ry) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.08), wallMat);
   m.position.set(x, y, z);
   m.rotation.y = ry;
@@ -77,7 +77,7 @@ const mat = new THREE.Mesh(
 // The counter (Guestbook lives on it) and the Drop Off floor area. Both are markers, not mechanics.
 // TODO: the Guestbook and the Drop Off floor display are real diegetic objects per LYS.md 5c —
 // signing and lending are logged to the console today and drawn as coloured rectangles.
-function marker(w, d, x, z, color, y = 0.005) {
+function marker([w, d], [x, z], color, y = 0.005) {
   const m = new THREE.Mesh(
     new THREE.PlaneGeometry(w, d),
     new THREE.MeshStandardMaterial({ color, roughness: 1, transparent: true, opacity: 0.75 })
@@ -116,7 +116,7 @@ export const GLASS_T = 0.012;
 
 /** Empty a group and free what it owns. Shared materials are left alone; per-build ones are not. */
 export function clearGroup(group) {
-  for (const child of [...group.children]) {
+  for (const child of group.children.slice()) {   // a copy: removing while iterating skips
     child.traverse?.((n) => {
       n.geometry?.dispose();
       // makeGridLines mints a material per call, so it has to go too. The shared furniture
@@ -137,13 +137,13 @@ function layFloor() {
 
 /** Four walls, with the front one split around the doorway and a lintel over it. */
 function raiseWalls() {
-  wall(ROOM.w, ROOM.wallH, 0, ROOM.wallH / 2, -HALF_D, 0);                    // back
-  wall(ROOM.d, ROOM.wallH, -HALF_W, ROOM.wallH / 2, 0, Math.PI / 2);          // left
-  wall(ROOM.d, ROOM.wallH, HALF_W, ROOM.wallH / 2, 0, Math.PI / 2);           // right
-  wall(sideW, ROOM.wallH, -(ROOM.doorW / 2 + sideW / 2), ROOM.wallH / 2, HALF_D, 0);
-  wall(sideW, ROOM.wallH, (ROOM.doorW / 2 + sideW / 2), ROOM.wallH / 2, HALF_D, 0);
-  wall(ROOM.doorW, ROOM.wallH - ROOM.doorH, 0,
-       ROOM.wallH - (ROOM.wallH - ROOM.doorH) / 2, HALF_D, 0);                // lintel
+  wall([ROOM.w, ROOM.wallH], [0, ROOM.wallH / 2, -HALF_D], 0);                    // back
+  wall([ROOM.d, ROOM.wallH], [-HALF_W, ROOM.wallH / 2, 0], Math.PI / 2);          // left
+  wall([ROOM.d, ROOM.wallH], [HALF_W, ROOM.wallH / 2, 0], Math.PI / 2);           // right
+  wall([sideW, ROOM.wallH], [-(ROOM.doorW / 2 + sideW / 2), ROOM.wallH / 2, HALF_D], 0);
+  wall([sideW, ROOM.wallH], [(ROOM.doorW / 2 + sideW / 2), ROOM.wallH / 2, HALF_D], 0);
+  wall([ROOM.doorW, ROOM.wallH - ROOM.doorH],
+       [0, ROOM.wallH - (ROOM.wallH - ROOM.doorH) / 2, HALF_D], 0);           // lintel
 }
 
 /** The doormat, the counter, and the two floor markers. Places you can see, not mechanics. */
@@ -155,8 +155,8 @@ function placeFixtures() {
   counter.castShadow = true;
   counter.receiveShadow = true;
   roomGroup.add(counter);
-  marker(0.9, 0.7, -2.1, 1.15, '#c9a24a');      // where an NPC stands to sign
-  marker(1.0, 1.0, 2.2, 1.7, '#7f9ec2');        // the Drop Off floor display
+  marker([0.9, 0.7], [-2.1, 1.15], '#c9a24a');      // where an NPC stands to sign
+  marker([1.0, 1.0], [2.2, 1.7], '#7f9ec2');        // the Drop Off floor display
 }
 
 /**

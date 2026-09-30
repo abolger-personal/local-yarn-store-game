@@ -143,7 +143,7 @@ function seedOne(npc, i, unseeded) {
   let placed = 0;
   wants.forEach((want, k) => {
     const open = pick(spots[(i + k) % spots.length]);
-    const spec = specFor(want, npc);
+    const spec = specFor(want);
     console.assert(satisfies(spec, want), 'seeded item does not satisfy its own want', spec, want);
     if (addItem(open, 0, spec, { avoidWall: true }) >= 0) placed++;
     else unseeded.push(`${npc.name} wants ${want.kind} (no room on ${open.id})`);
@@ -157,7 +157,7 @@ function seedOne(npc, i, unseeded) {
  * would bridge onto neighbouring columns instead of sitting squarely on top and burying it.
  */
 function buryOne(npc, i, want, unburied) {
-  const spec = specFor(want, npc);
+  const spec = specFor(want);
   const spots = stockSpots();
   // Every PLACE in turn, not just the next one. A 1x1 cone still reserves four layers and a wall
   // shelf only clears three, so the one display this used to try can legitimately refuse — and a
@@ -198,7 +198,7 @@ function seedWants(npcs) {
  * the right KIND. It has to be built from the want. Asserted below, because a seed that silently
  * fails to match is indistinguishable from browse logic that does not work.
  */
-function specFor(want, npc) {
+function specFor(want) {
   if (want.kind === 'pattern') {
     const p = makeStockPattern();
     // A WIP already holding yarn only matches patterns that suit THAT yarn.
@@ -379,9 +379,8 @@ function stockTheShop(npcs) {
   // would happen constantly.
   const seeded = seedWants(npcs);
   const filled = fillStock(S.stockCount - seeded);
-  console.info(`stock: ${items.length} boxes — ${seeded} seeded for customers, ${filled} general`
-    + (items.length < S.stockCount
-      ? ` (asked for ${S.stockCount}; the shop had no room for more)` : ''));
+  const short = items.length < S.stockCount ? ` (asked for ${S.stockCount}; the shop had no room for more)` : '';
+  console.info(`stock: ${items.length} boxes — ${seeded} seeded for customers, ${filled} general${short}`);
 }
 
 /** Point every instanced mesh at the stock that now exists. */
@@ -483,7 +482,9 @@ export function doAdvanceRound() {
   const order = cast.map((_, i) => i);
   for (let i = order.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [order[i], order[j]] = [order[j], order[i]];
+    const swap = order[i];
+    order[i] = order[j];
+    order[j] = swap;
   }
   order.forEach((castIndex, slot) => retarget(cast[castIndex], slot, cast.length));
   refreshAll();       // an interaction may have bought, tidied or restacked a display

@@ -37,7 +37,7 @@ const HELD_W = CELL * FILL, HELD_H = BOX_H;
 function heldLabel(atlasPack, material, cellName, w, h) {
   const [u0, v0, du, dv] = cellRect(atlasPack.manifest, cellName);
   const geo = new THREE.PlaneGeometry(w, h);
-  const uv = geo.attributes.uv;
+  const { uv } = geo.attributes;
   for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) * du, v0 + uv.getY(i) * dv);
   uv.needsUpdate = true;
   return new THREE.Mesh(geo, material);
@@ -544,7 +544,7 @@ const SIT_LEAN = 0.30;
  * off still starts from the chair.
  */
 function placeSeated(rec) {
-  const root = rec.built.root;
+  const { root } = rec.built;
   const sat = seatedness(rec);
   // THE SEAT OUTLIVES THE ASSIGNMENT, by exactly as long as the legs stay folded.
   //

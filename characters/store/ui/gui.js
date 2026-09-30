@@ -4,7 +4,7 @@
 
 import { setMoveMode } from '../interact/input.js';
 import { activeDisplay } from '../interact/pointer.js';
-import { cast, displays, aim } from '../core/state.js';
+import { displays, aim } from '../core/state.js';
 import { GEO_DETAIL, TONE_MAPPING, setGeometryDetail, setViewMode } from '../../npc.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import { QUALITY, S } from '../core/config.js';

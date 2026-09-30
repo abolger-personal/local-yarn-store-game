@@ -192,8 +192,8 @@ export const labelWant = (want) => {
   if (want.kind === 'yarn') {
     // labelOf still does the naming; it is handed a shape it understands. "or" because the want is
     // satisfied by ANY of the pattern's materials, and "and" would read as needing all of them.
-    return `${want.units} unit${want.units === 1 ? '' : 's'} of ` +
-           labelOf({ name: 'yarn', weight: want.weight, material: want.materials.join(' or ') });
+    return `${want.units} unit${want.units === 1 ? '' : 's'} of ${
+      labelOf({ name: 'yarn', weight: want.weight, material: want.materials.join(' or ') })}`;
   }
   return labelOf({ name: want.tool, size: want.size });
 };
@@ -361,7 +361,7 @@ export function returnToNpc(world, npc, wip) {
   const slot = slotFor(wip);
   if (!slot) return false;
   const index = world.dropOff.findIndex((d) => d.wip === wip);
-  if (index < 0) return false;
+  if (index === -1) return false;
   world.dropOff.splice(index, 1);
   const displaced = npc.worn[slot];
   npc.worn[slot] = wip;
@@ -373,7 +373,7 @@ export function returnToNpc(world, npc, wip) {
 export const describeWip = (wip) =>
   `${wip.pattern ? labelOf(wip.pattern) : 'no pattern'} · ` +
   `${heldUnits(wip)}${wip.pattern ? `/${wip.pattern.yarnUnits}` : ''} units · ` +
-  `${wip.tool ? labelOf(wip.tool) : 'no tool'}` +
-  (wip.state === WIP_STATE.IN_PROGRESS ? ` · ${Math.round(wip.progress)}%` : '');
+  `${wip.tool ? labelOf(wip.tool) : 'no tool'}${
+    wip.state === WIP_STATE.IN_PROGRESS ? ` · ${Math.round(wip.progress)}%` : ''}`;
 
 export { PATTERN_TYPES, YARN_MATERIALS };

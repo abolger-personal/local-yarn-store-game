@@ -42,7 +42,7 @@ function table() {
   const frame = new THREE.Matrix4().makeTranslation(0, TABLE_Y, 0);
   const disp = { id: 'table', g, frame };
   const put = (spec, c, r) => {
-    const keys = footprint(g, 0, c, r, spec.w, spec.h);
+    const keys = footprint(g, 0, [c, r], [spec.w, spec.h]);
     const i = items.length;
     items.push({ ...spec, c, r, keys, shelf: 0, layer: place(g, keys, i, spec.layers) });
     return i;

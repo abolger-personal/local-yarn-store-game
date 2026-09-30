@@ -171,7 +171,7 @@ for (const id of speciesIds()) {
   const built = build(id);
   const [a, b, c] = bodyFit(built).skull;
   dress(built, { hat: item('hat', { silhouette: 'slouch', fit: 1, edge: 'none', stitch: 'stockinette' }) });
-  const g = built.garments[0].geometry, p = g.attributes.position, uv = g.attributes.uv;
+  const g = built.garments[0].geometry, p = g.attributes.position, { uv } = g.attributes;
   let onSkull = 0;
   for (let i = 0; i < p.count; i++) {
     if (uv.getY(i) <= 0.5) onSkull += Math.hypot(p.getX(i) / a, p.getY(i) / b, p.getZ(i) / c) < 1.12;
@@ -184,7 +184,7 @@ for (const id of speciesIds()) {
 // Eyes and ears under the hat are not drawn; the mane is pressed in; a fitted hat keeps the eyes.
 for (const id of speciesIds()) {
   const built = build(id);
-  const head = built.joints.head;
+  const { head } = built.joints;
   const mane = head.getObjectByName('mane');
   const original = mane?.geometry;
   dress(built, { hat: item('hat', { fit: 1 }) });
@@ -231,7 +231,7 @@ for (const id of speciesIds()) {
   const built = build('lion');
   for (const stitch of STITCHES) {
     dress(built, { hat: item('hat', { stitch, craft: craftOf(stitch), edge: 'none', colourwork: 'checks', colorCount: 2 }) });
-    const g = built.garments[0].geometry, p = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv;
+    const g = built.garments[0].geometry, p = g.attributes.position, n = g.attributes.normal, { uv } = g.attributes;
     const start = new Map();
     for (let i = 0; i < uv.count; i++) if (uv.getX(i) === 0) start.set(uv.getY(i), i);
     let worst = 0, crease = 0;
@@ -365,7 +365,7 @@ for (const id of speciesIds()) {
   for (let i = 0, q = built.garments[0].geometry.attributes.position; i < bare; i++) low = Math.min(low, q.getY(i));
   dress(built, { hat: item('hat', { edge: 'scalloped' }) });
   const g = built.garments[0].geometry, p = g.attributes.position, nrm = g.attributes.normal;
-  const thick = fabric(item('hat')).thick;
+  const { thick } = fabric(item('hat'));
   const v = new THREE.Vector3(), b = new THREE.Vector3(), n = new THREE.Vector3();
   let lo = Infinity, hi = -Infinity, hangs = Infinity;
   for (let k = bare; k < p.count; k++) {
@@ -571,7 +571,7 @@ for (const id of speciesIds()) {
   };
   for (const form of ['draped', 'wrapped once', 'wrapped twice']) {
     const meshes = dress(built, { scarf: item('scarf', { silhouette: 'long', form, edge: 'none' }) });
-    const band = bandOf(built), uv = band.geometry.attributes.uv;
+    const band = bandOf(built), { uv } = band.geometry.attributes;
     assert.ok(band && meshes.length === 1 && band.skeleton.bones.includes(built.joints.neck), `${form}: the scarf is ${meshes.length} meshes -- it is one band, following the neck round it`);
     // The head turns, nods and tilts; the band bends with it and stays one piece. Cut in two, one
     // piece on each joint, the ends stayed on the chest and a gap opened at the cut.
@@ -604,7 +604,7 @@ for (const id of speciesIds()) {
     }
   }
   const loop = dress(built, { scarf: item('scarf', { silhouette: 'infinity', edge: 'none', stitch: 'stockinette' }) })[0].geometry;
-  const p = loop.attributes.position, uv = loop.attributes.uv;
+  const p = loop.attributes.position, { uv } = loop.attributes;
   let cols = 0;
   while (uv.getY(cols) === 0) cols++;
   const last = p.count - cols;
@@ -657,19 +657,21 @@ for (const id of speciesIds()) {
 for (const id of speciesIds()) {
   const built = build(id);
   const fit = bodyFit(built), [tx, ty, tz] = fit.torso;
+  // per 2 cm of height, the vertex nearest the torso, as a scale of it (1 is on its surface)
+  const nearestTo = (m, nearest) => {
+    const p = m.geometry.attributes.position, dy = m.parent === built.joints.neck ? fit.neck.y : 0;
+    for (let i = 0; i < p.count; i++) {
+      const y = p.getY(i) + dy;
+      // the hanging ends: from 3 cm under the neck base, below where the wrap's layers bunch
+      if (y < 0 || y > fit.neck.y - 0.03 || p.getZ(i) < 0) continue;
+      const k = Math.round(y * 50);
+      nearest.set(k, Math.min(nearest.get(k) ?? Infinity, Math.hypot(p.getX(i) / tx, y / ty, p.getZ(i) / tz)));
+    }
+  };
   for (const [silhouette, form] of [['ascot', 'draped'], ['long', 'draped'], ['long', 'wrapped once']]) {
     const meshes = dress(built, { scarf: item('scarf', { silhouette, form, fibre: 'linen', edge: 'none' }) });
     const nearest = new Map();
-    for (const m of meshes) {
-      const p = m.geometry.attributes.position, dy = m.parent === built.joints.neck ? fit.neck.y : 0;
-      for (let i = 0; i < p.count; i++) {
-        const y = p.getY(i) + dy;
-        // the hanging ends: from 3 cm under the neck base, below where the wrap's layers bunch
-        if (y < 0 || y > fit.neck.y - 0.03 || p.getZ(i) < 0) continue;
-        const k = Math.round(y * 50);
-        nearest.set(k, Math.min(nearest.get(k) ?? Infinity, Math.hypot(p.getX(i) / tx, y / ty, p.getZ(i) / tz)));
-      }
-    }
+    for (const m of meshes) nearestTo(m, nearest);
     const gap = Math.max(...nearest.values()) - 1;
     assert.ok(gap < 0.05, `${id} ${silhouette}/${form}: its ends stand ${(gap * 100).toFixed(0)}% of the torso off the body -- they should lie on it`);
   }
@@ -716,7 +718,7 @@ for (const id of speciesIds()) {
   const grid = (weight) => {
     const [band] = dress(built, { scarf: item('scarf', { silhouette: 'long', form: 'draped', stitch: 'seed', weight, edge: 'none' }) });
     const g = band.geometry;
-    const uv = g.attributes.uv;
+    const { uv } = g.attributes;
     let cols = 0;
     while (uv.getY(cols) === uv.getY(0)) cols++;
     return [cols, new Set(Array.from({ length: uv.count }, (_, i) => uv.getY(i))).size];

@@ -873,21 +873,30 @@ function tailChord(tail) {
 // into the ellipsoid test makes the closed form a quartic. Deliberately allocation-free -- it
 // runs per character per frame while poses blend.
 
+// minArmOut's frame, refilled on every call rather than returned fresh: it runs per frame.
+const _arm = { a: 0, b: 0, c: 0, reach: 0, x0: 0, y0: 0, cs: 0, sn: 0 };
+
+/** The body ellipsoid the elbow must clear, padded by the arm; the shoulder; the swing. */
+function armFrame(P, bulge, armSwing) {
+  const coat = 1 + bulge;   // the coat surface is exactly this multiple of the torso
+  const pad = P.limbThick * 1.05 * LIMB_TAPER + (P.armClearance ?? 0);
+  _arm.a = coat * P.torsoW + pad;
+  _arm.b = coat * P.torsoH + pad;
+  _arm.c = coat * P.torsoD + pad;
+  _arm.reach = P.upperArmLen;
+  _arm.x0 = P.torsoW * (P.shoulderOut + bulge);
+  _arm.y0 = P.torsoH * P.shoulderLift;
+  _arm.cs = Math.cos(armSwing);
+  _arm.sn = Math.sin(armSwing);
+  return _arm;
+}
+
 /**
  * The smallest armOut that keeps the elbow outside the body, coat included.
  * 24 samples over a quarter turn is well inside the precision a resting pose needs.
  */
 export function minArmOut(P, bulge = 0, armSwing = 0) {
-  const coat = 1 + bulge;   // the coat surface is exactly this multiple of the torso
-  const pad = P.limbThick * 1.05 * LIMB_TAPER + (P.armClearance ?? 0);
-  const a = coat * P.torsoW + pad;
-  const b = coat * P.torsoH + pad;
-  const c = coat * P.torsoD + pad;
-  const reach = P.upperArmLen;
-  const x0 = P.torsoW * (P.shoulderOut + bulge);
-  const y0 = P.torsoH * P.shoulderLift;
-  const cs = Math.cos(armSwing);
-  const sn = Math.sin(armSwing);
+  const { a, b, c, reach, x0, y0, cs, sn } = armFrame(P, bulge, armSwing);
 
   // Interpolated between the bracketing samples rather than returned as the first failing
   // sample. Returning the index made this a STAIRCASE in armSwing, which was invisible while
@@ -1048,7 +1057,7 @@ function buildHeldItem(P, addMaterial) {
   return held;
 }
 
-function attachArms(chest, P, mat, joints, addMaterial, bulge) {
+function attachArms(chest, P, { mat, joints, addMaterial, bulge }) {
   const arms = [-1, 1].map((side) => buildArm(side, P, mat, joints, bulge));
   arms.forEach(({ upperArm }) => chest.add(upperArm));
   const held = buildHeldItem(P, addMaterial);
@@ -1097,7 +1106,7 @@ function buildUpperBody(P, mat, joints, addMaterial, bulge) {
   const chest = buildChest(P, mat);
   spine.add(chest);
 
-  const { held, holds } = attachArms(chest, P, mat, joints, addMaterial, bulge);
+  const { held, holds } = attachArms(chest, P, { mat, joints, addMaterial, bulge });
   const neck = buildNeck(P, mat);
   const head = buildHeadNode(P);
   neck.add(head);
@@ -1137,7 +1146,7 @@ function disableShadowCasting(root) {
 export function createCharacter(P, species) {
   const kit = resolveSpecies(species);
   const materials = [];
-  const addMaterial = (m) => (materials.push(m), m);
+  const addMaterial = (m) => { materials.push(m); return m; };
   const mat = baseMaterials(P, addMaterial);
   const joints = {
     hips: null, spine: null, chest: null, neck: null, head: null,
@@ -1206,7 +1215,7 @@ function bakedGeometry(mesh, toJointSpace) {
 // whole cast instead of one per character per part
 function paintGeometry(geometry, color) {
   if (geometry.attributes.color) return geometry;   // painted already: a garment's colourwork
-  const count = geometry.attributes.position.count;
+  const { count } = geometry.attributes.position;
   const colors = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
     colors[i * 3] = color.r;
@@ -1589,10 +1598,11 @@ function tailAcceleration(built, dt) {
 
 /** Swaps every mesh to grey or flat black for the shape and silhouette checks. */
 export function setViewMode(root, mode) {
+  const override = { grey: greyMat, silhouette: blackMat }[mode];   // felted: none
   root.traverse((o) => {
     if (!o.isMesh) return;
     o.userData.felt ??= o.material;
-    o.material = mode === 'grey' ? greyMat : mode === 'silhouette' ? blackMat : o.userData.felt;
+    o.material = override ?? o.userData.felt;
   });
 }
 

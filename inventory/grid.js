@@ -22,7 +22,7 @@ export function makeDisplay(cols, rows, opts = {}) {
   for (let s = 0; s < shelves; s++)
     for (let r = 0; r < rows; r++)
       for (let c = 0; c < cols; c++)
-        g.usable[key(g, s, c, r)] = mask ? (mask(s, c, r) ? 1 : 0) : 1;
+        g.usable[key(g, s, c, r)] = !mask || mask(s, c, r) ? 1 : 0;
   g.piles = Array.from({ length: n }, () => []);   // pile[layer] = item index, bottom→top
   return g;
 }
@@ -34,8 +34,8 @@ export function usableAt(g, s, c, r) {
   return g.usable[key(g, s, c, r)] === 1;
 }
 
-/** Column keys a footprint would cover, or null if any cell is off-grid or masked. */
-export function footprint(g, s, c, r, w, h) {
+/** Column keys a footprint [w, h] at cell [c, r] would cover, or null if any cell is off-grid or masked. */
+export function footprint(g, s, [c, r], [w, h]) {
   const keys = [];
   for (let dr = 0; dr < h; dr++)
     for (let dc = 0; dc < w; dc++) {
@@ -142,12 +142,12 @@ export function fullyExposed(display, items, index) {
  * Anchored on the footprint CENTRE, so a 2x2 package centres on the pointer rather than hanging
  * off one corner of it.
  */
-export function nearestSlot(g, s, item, x, z, reach, { turn = true, turnPenalty = 0.6 } = {}) {
+export function nearestSlot(g, s, item, [x, z], { reach, turn = true, turnPenalty = 0.6 }) {
   let best = null;
   for (const o of orientations(item, turn, turnPenalty * g.cell))
     for (let r = 0; r < g.rows; r++)
       for (let c = 0; c < g.cols; c++) {
-        const keys = footprint(g, s, c, r, o.w, o.h);
+        const keys = footprint(g, s, [c, r], [o.w, o.h]);
         if (!fits(g, keys, item.layers ?? 1)) continue;
         const rect = slotRect(g, c, r, o.w, o.h);
         const d = Math.hypot(rect.x - x, rect.z - z);
@@ -191,14 +191,20 @@ function orientations(item, turn, bias) {
  */
 export function anySlot(g, item, { turn = true } = {}) {
   for (const o of orientations(item, turn, 0))
-    for (let s = 0; s < g.shelves; s++)
-      for (let r = 0; r < g.rows; r++)
-        for (let c = 0; c < g.cols; c++) {
-          const keys = footprint(g, s, c, r, o.w, o.h);
-          if (fits(g, keys, item.layers ?? 1)) {
-            return { shelf: s, c, r, keys, turned: o.turned, w: o.w, h: o.h };
-          }
-        }
+    for (let s = 0; s < g.shelves; s++) {
+      const spot = slotOnShelf(g, s, item, o);
+      if (spot) return spot;
+    }
+  return null;
+}
+
+/** The first slot on shelf `s` that `item` fits, in orientation `o` — or null. */
+function slotOnShelf(g, s, item, o) {
+  for (let r = 0; r < g.rows; r++)
+    for (let c = 0; c < g.cols; c++) {
+      const keys = footprint(g, s, [c, r], [o.w, o.h]);
+      if (fits(g, keys, item.layers ?? 1)) return { shelf: s, c, r, keys, turned: o.turned, w: o.w, h: o.h };
+    }
   return null;
 }
 

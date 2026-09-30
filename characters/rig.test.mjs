@@ -1107,7 +1107,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     built.root.updateMatrixWorld(true);
     let mane = null;
     built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
-    const head = built.joints.head;
+    const { head } = built.joints;
     const toLocal = head.matrixWorld.clone().invert();
     const r = P.headRadius;
     // lowest reach of the mane, head-local radii: below this the skull is supposed to be bare
@@ -1165,7 +1165,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     built.root.updateMatrixWorld(true);
     let mane = null;
     built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
-    const head = built.joints.head;
+    const { head } = built.joints;
     const r = P.headRadius;
     const from = new THREE.Vector3(0, 5 * r, 0).applyMatrix4(head.matrixWorld);
     const to = new THREE.Vector3(0, 0, 0).applyMatrix4(head.matrixWorld);
@@ -1209,7 +1209,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     let mane = null;
     built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
     const pos = mane.geometry.attributes.position;
-    const index = mane.geometry.index;
+    const { index } = mane.geometry;
     const at = (i) => new THREE.Vector3().fromBufferAttribute(pos, i)
       .applyMatrix4(mane.matrix).divideScalar(P.headRadius);
     const norm = (v) => Math.hypot(v.x / HEAD[0], v.y / HEAD[1], v.z / HEAD[2]);

@@ -1547,4 +1547,55 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   }
 }
 
+// --- the merged body, neck, head and eyes still move, as one skinned mesh per material ----------
+//
+// Each of those joints was its own mesh per material family: ~5 of a character's ~20 draws. Merged
+// they ride one rigidly skinned mesh per family on the spine. The merge must change the draw count
+// and nothing else: posed with the head turned and tilted and the eyes mid-blink, the merged
+// character's skinned vertices land exactly where the unmerged character's parts do.
+{
+  const SKINNED = new Set(['spine', 'neck', 'head', 'leftEye', 'rightEye']);
+  const pose = { ...POSES.rest, headYaw: 0.9, headPitch: 0.5, headTilt: 0.3, neckCurve: 0.2, blink: 0.6 };
+  // the world box of every mesh the skinned joints carry, by joint, skinned or not
+  const boxes = (built) => {
+    applyPose(built, pose);
+    built.root.updateMatrixWorld(true);
+    const out = new Map([...SKINNED].map((k) => [k, new THREE.Box3()]));
+    const v = new THREE.Vector3();
+    built.root.traverse((o) => {
+      if (!o.isMesh) return;
+      if (o.isSkinnedMesh) {
+        const { skinIndex } = o.geometry.attributes;
+        for (let i = 0; i < skinIndex.count; i++) {
+          o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld);
+          out.get(o.skeleton.bones[skinIndex.getX(i)].name).expandByPoint(v);
+        }
+        return;
+      }
+      let j = o.parent;
+      while (j && !j.userData.joint) j = j.parent;
+      if (SKINNED.has(j?.name)) out.get(j.name).expandByObject(o, true);   // precise: by vertex, as the skin is
+    });
+    return out;
+  };
+  for (const id of speciesIds()) {
+    const P = { ...BASE_PARAMS, ...getSpecies(id).defaults, scarf: true };
+    const merged = createCharacter({ ...P, mergeMeshes: true }, id), apart = createCharacter({ ...P, mergeMeshes: false }, id);
+    const [m, a2] = [boxes(merged), boxes(apart)];
+    for (const k of SKINNED) {
+      const d = Math.max(...['min', 'max'].flatMap((e) => ['x', 'y', 'z'].map((ax) => Math.abs(m.get(k)[e][ax] - a2.get(k)[e][ax]))));
+      assert.ok(d < 1e-4, `${id}: merged, the ${k} lands ${d.toFixed(4)} from where it is unmerged -- the skin does not follow the pose`);
+    }
+    let draws = 0;
+    merged.root.traverse((o) => { if (o.isMesh && SKINNED.has(o.parent.name)) draws++; });
+    const families = new Set();
+    apart.root.traverse((o) => {
+      let j = o.parent;
+      while (j && !j.userData.joint) j = j.parent;
+      if (o.isMesh && SKINNED.has(j?.name)) families.add(o.material.userData.family ?? 'felt');
+    });
+    assert.equal(draws, families.size, `${id}: the body, neck, head and eyes are ${draws} meshes, one per material family would be ${families.size}`);
+  }
+}
+
 console.log('npc.js rig self-check: all assertions passed');

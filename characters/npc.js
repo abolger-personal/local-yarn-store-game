@@ -1246,14 +1246,67 @@ function mergeAt(node) {
   for (const entry of groups.values()) node.add(mergedMesh(entry));
 }
 
+/**
+ * The joints skinned together onto the spine: the body, neck, head and eyes. Each of them was a
+ * mesh per material family of its own -- about 5 of a character's ~20 draws. Skinned, each vertex
+ * follows its own joint at full weight, so the head still turns and nods and the eyes still blink
+ * (the rig poses the joints; the skeleton reads them), and the five share one mesh per family.
+ */
+const skinnedJoints = ({ spine, neck, head, eye = [] }) => (spine && neck && head ? [spine, neck, head, ...eye.map((e) => e.node)] : []);
+
+/** Every static mesh of every bone, baked into the root's space and grouped by material family. */
+function skinnedGroups(bones, toRoot) {
+  const groups = new Map();
+  bones.forEach((bone, index) => {
+    const meshes = staticMeshes(bone);
+    for (const [family, entry] of groupByFamily(meshes, toRoot)) {
+      entry.parts.forEach((geo) => rigidTo(geo, index));
+      const into = groups.get(family);
+      if (into) into.parts.push(...entry.parts);
+      else groups.set(family, entry);
+    }
+    meshes.forEach((mesh) => mesh.removeFromParent());
+  });
+  return groups;
+}
+
+/** One rigidly skinned mesh per material family for `bones`' static meshes, hung on the first bone. */
+function skinAt(bones) {
+  const [root] = bones;
+  const groups = skinnedGroups(bones, new THREE.Matrix4().copy(root.matrixWorld).invert());
+  const skeleton = new THREE.Skeleton(bones);   // bind inverses from the pose it is built in
+  for (const entry of groups.values()) {
+    const merged = mergedMesh(entry);
+    const mesh = new THREE.SkinnedMesh(merged.geometry, merged.material);
+    Object.assign(mesh, { castShadow: merged.castShadow, receiveShadow: merged.receiveShadow });
+    mesh.userData.merged = true;
+    root.add(mesh);
+    mesh.bind(skeleton, root.matrixWorld);
+  }
+}
+
+/** Every vertex of `geo` follows bone `index` alone. */
+function rigidTo(geo, index) {
+  const n = geo.attributes.position.count;
+  const skinIndex = new Uint16Array(n * 4), skinWeight = new Float32Array(n * 4);
+  for (let i = 0; i < n; i++) {
+    skinIndex[i * 4] = index;
+    skinWeight[i * 4] = 1;
+  }
+  geo.setAttribute('skinIndex', new THREE.BufferAttribute(skinIndex, 4));
+  geo.setAttribute('skinWeight', new THREE.BufferAttribute(skinWeight, 4));
+}
+
 /** Collapses each articulated node's static meshes down to one mesh per material. */
 export function mergeCharacter(built) {
   built.root.updateMatrixWorld(true);
+  const skinned = skinnedJoints(built.joints ?? {});
   const roots = [];
   built.root.traverse((node) => {
-    if (node.userData.joint) roots.push(node);
+    if (node.userData.joint && !skinned.includes(node)) roots.push(node);
   });
   roots.forEach(mergeAt);
+  if (skinned.length) skinAt(skinned);
 }
 
 // the foot sphere sits at y +0.016 with a y radius of 0.028, so its sole is this far below
@@ -1538,6 +1591,7 @@ export function disposeCharacter(built) {
   }
   built.root.traverse((o) => {
     if (o.isMesh && o.userData.merged) o.geometry.dispose();
+    o.skeleton?.dispose();   // its bone texture; shared by a character's skinned meshes, and safe twice
   });
 }
 

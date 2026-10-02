@@ -1206,9 +1206,13 @@ function staticMeshes(node, out = []) {
 }
 
 // geometry expressed in the joint's own space, so the merged mesh lands where the parts were
+// `userData.dropOnMerge`: attributes that only mean anything in the mesh's own space and skeleton
+// (a garment's arm capsules) -- baked, they would point at whatever bone took their number.
 function bakedGeometry(mesh, toJointSpace) {
   const local = new THREE.Matrix4().multiplyMatrices(toJointSpace, mesh.matrixWorld);
-  return paintGeometry(mesh.geometry.clone().applyMatrix4(local), mesh.material.color);
+  const geometry = mesh.geometry.clone().applyMatrix4(local);
+  for (const name of mesh.userData.dropOnMerge ?? []) geometry.deleteAttribute(name);
+  return paintGeometry(geometry, mesh.material.color);
 }
 
 // colour moves from the material to the vertices, which is what lets one material serve the

@@ -448,6 +448,7 @@ function addMane(ctx, P) {
     [radius, radius * P.maneTall, radius]);
   if (!shell) return;
   shell.name = 'mane';   // rig.test finds it by name to measure the face gap and the stand-off
+  shell.userData.trimUnderHat = true;   // a hat cuts away what it covers: pressed only, it showed through the crown
   shell.position.set(0, -P.headRadius * P.maneDrop, P.headRadius * P.manePush);
   ctx.head.add(shell);
 }

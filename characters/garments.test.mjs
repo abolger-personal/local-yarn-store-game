@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { BASE_PARAMS, createCharacter, getSpecies, speciesIds, mergeCharacter, applyPose, POSES } from './npc.js';
+import { BASE_PARAMS, createCharacter, getSpecies, speciesIds, mergeCharacter, applyPose, POSES, DANCE_POSES } from './npc.js';
 import './owl.js';
 import './llama.js';
 import './lion.js';
@@ -219,6 +219,29 @@ for (const id of speciesIds()) {
     const moved = face.filter(([o, g]) => o.geometry !== g).length;
     assert.equal(moved, 0, `${id}: a fitted ${silhouette} presses ${moved} face parts into the head`);
   }
+  // A hat cuts away the mane it covers: pressed only, it showed through the crown of a big beret (15
+  // triangles) and a pixie, where the real hat slumps inside the volume pressing works to. Seen out
+  // from the head's centre, no mane in the hat's top half lies past the hat.
+  if (mane) {
+    const ray = new THREE.Raycaster(), v = [0, 1, 2].map(() => new THREE.Vector3());
+    for (const [silhouette, fit] of [['beret', 1.4], ['pixie', 1.2], ['pixie', 1.4], ['beanie', 1]]) {
+      dress(built, { hat: item('hat', { silhouette, fit, edge: 'none' }) });
+      built.root.updateMatrixWorld(true);
+      const hat = built.garments[0], box = new THREE.Box3().setFromObject(hat), crown = (box.min.y + box.max.y) / 2;
+      hat.material.side = THREE.DoubleSide;
+      const centre = head.getWorldPosition(new THREE.Vector3()), pos = mane.geometry.attributes.position, idx = mane.geometry.index.array;
+      let poke = 0;
+      for (let t = 0; t < idx.length; t += 3) {
+        v.forEach((p, k) => p.fromBufferAttribute(pos, idx[t + k]).applyMatrix4(mane.matrixWorld));
+        const m = v[0].clone().add(v[1]).add(v[2]).divideScalar(3), out = m.clone().sub(centre);
+        if (m.y < crown || m.y > box.max.y) continue;
+        ray.set(centre, out.clone().normalize());
+        const hit = ray.intersectObject(hat, false)[0];
+        if (hit && hit.distance < out.length() - 1e-4) poke++;
+      }
+      assert.equal(poke, 0, `${id}: ${poke} mane triangles show through the crown of a ${silhouette} at fit ${fit}`);
+    }
+  }
   undress(built);
   assert.ok([...built.joints.eye, ...built.joints.ear].every((e) => e.node.visible), `${id}: undress leaves parts hidden`);
   assert.equal(mane?.geometry, original, `${id}: undress leaves the mane pressed`);
@@ -270,6 +293,38 @@ for (const id of speciesIds()) {
     assert.ok(Math.abs(big / small - 1) < 0.05, `${type}: the pom-pom grows ${(big / small).toFixed(2)}x with the stitch size`);
   }
   LOOK.stitchScale = was;
+  // A pixie's point is fabric: it folds over behind and its tip hangs near plumb. Bent back as a
+  // stiff horn it stood out ~72 degrees, near parallel to the floor.
+  for (const id of speciesIds()) {
+    const who = build(id);
+    dress(who, { hat: item('hat', { silhouette: 'pixie', edge: 'none', accessory: 'pom-pom' }) });
+    who.root.updateMatrixWorld(true);
+    const m = who.garments[0], pos = m.geometry.attributes.position, { uv } = m.geometry.attributes;
+    const centre = (a, b) => {
+      const c = new THREE.Vector3(); let n = 0;
+      for (let i = 0; i < pos.count; i++) if (uv.getY(i) >= a && uv.getY(i) <= b) { c.add(new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld)); n++; }
+      return c.divideScalar(n);
+    };
+    const tip = centre(0, 0.06), tail = tip.clone().sub(centre(0.15, 0.25)).normalize();
+    const off = THREE.MathUtils.radToDeg(Math.acos(-tail.y));
+    assert.ok(off < 20, `${id}: a pixie's tip stands ${off.toFixed(0)} degrees off plumb -- a stick, not fabric`);
+    // ...and its pom-pom hangs off that tip, on along the tail; pushed out from the head's centre it
+    // sat on the back of the tail.
+    const pomMesh = who.garments.at(-1), pp = pomMesh.geometry.attributes.position, pom = new THREE.Vector3();
+    for (let i = pp.count - SPHERE_VERTS; i < pp.count; i++) pom.add(new THREE.Vector3().fromBufferAttribute(pp, i).applyMatrix4(pomMesh.matrixWorld).divideScalar(SPHERE_VERTS));
+    const along = THREE.MathUtils.radToDeg(pom.sub(tip).angleTo(tail));
+    assert.ok(along < 30, `${id}: a pixie's pom-pom is ${along.toFixed(0)} degrees off the line of its tail -- not on the end`);
+  }
+  // A headband has no crown: its pom-pom sits at a temple, not mid-forehead, at about half a
+  // beanie's size (half its own head-sized one; a beanie is sized 0.9 of the head, so 0.56).
+  const ratio = 1 / pomWidth('hat', 'beanie') * pomWidth('hat', 'headband');   // the headband stays on
+  assert.ok(ratio > 0.4 && ratio < 0.65, `a headband's pom-pom is ${ratio.toFixed(2)}x a beanie's, not about half`);
+  const p = built.garments.at(-1).geometry.attributes.position;
+  let x = 0;
+  for (let i = p.count - SPHERE_VERTS; i < p.count; i++) x += p.getX(i) / SPHERE_VERTS;
+  const band = new THREE.Box3().setFromBufferAttribute(built.garments[0].geometry.attributes.position);
+  const off = Math.abs(x - band.getCenter(new THREE.Vector3()).x) / band.getSize(new THREE.Vector3()).x;
+  assert.ok(off > 0.25, `a headband's pom-pom is ${off.toFixed(2)} band-widths off centre -- mid-forehead`);
 }
 
 // --- yarn, stitch and craft each read differently at fit 1 (spec §2b) ------------------------
@@ -972,6 +1027,30 @@ for (const id of speciesIds()) {
   assert.ok(high < f.thick * 4, `${id}: dressed while leaning, the trailing scarf's floor run rises to ${high.toFixed(3)} behind -- it lies at an angle, not on the floor`);
 }
 
+// --- a trailing scarf's floor run stays on the floor through a plié and a relevé ---------------------
+//
+// Bound to the root, it went wherever grounding put the root: 66mm down into the floor as the
+// attitude's knees bent, and up with the relevé after, like skis bobbing with the dancer.
+for (const id of speciesIds()) {
+  const built = build(id), f = fabric(item('scarf'));
+  const m = dress(built, { scarf: item('scarf', { silhouette: 'trailing', form: 'wrapped once', edge: 'none', accessory: 'none' }) }).find((g) => g.isSkinnedMesh);
+  const v = new THREE.Vector3();
+  const world = () => {
+    built.root.updateMatrixWorld(true);
+    return Array.from({ length: m.geometry.attributes.position.count }, (_, i) => m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld).y);
+  };
+  const still = world(), floorY = Math.min(...still);
+  const lying = still.map((y, i) => (y < floorY + f.thick * 2.5 ? i : -1)).filter((i) => i >= 0);
+  let moved = 0;
+  for (const [pose, rise] of [['att-prep', 0], ['att-hold', 0.02]]) {
+    applyPose(built, DANCE_POSES[pose]);
+    built.root.position.y += rise;   // a dance's relevé, as dress-up adds it
+    const now = world();
+    moved = Math.max(moved, ...lying.map((i) => Math.abs(now[i] - still[i])));
+  }
+  assert.ok(moved < 0.005, `${id}: the attitude moves the trailing scarf's floor run ${moved.toFixed(3)} up or down -- it should lie still on the floor`);
+}
+
 // --- a pom-pom on a scarf's end hangs off the end ---------------------------------------------------
 //
 // Centred on the tip, half of each pom-pom sat up on the scarf.
@@ -1230,6 +1309,57 @@ for (const id of speciesIds()) for (const silhouette of GARMENTS.bag.silhouettes
   }
 }
 
+// One bag's body box and its (first) strap: every vertex, the centreline row by row, and its width midway.
+function bagStrap(built, silhouette, fit) {
+  const pieces = outfitPieces(built, { bag: item('bag', { silhouette, fit, edge: 'none', accessory: 'none', colourwork: 'solid', colorCount: 2, color1: '#ff0000', color2: '#00ff00' }) });
+  const bag = new THREE.Box3().setFromBufferAttribute(pieces[0].geo.attributes.position);
+  const { position: p, uv } = pieces.slice(1).find(({ geo }) => geo.attributes.color.getY(0) > 0.5).geo.attributes;
+  let cols = 0;
+  while (uv.getY(cols) === 0) cols++;
+  const verts = Array.from({ length: p.count }, (_, i) => new THREE.Vector3().fromBufferAttribute(p, i));
+  const row = (r) => verts.slice(r * cols, (r + 1) * cols);
+  const line = Array.from({ length: p.count / cols }, (_, r) => row(r).reduce((a, b) => a.clone().add(b)).divideScalar(cols));
+  const mid = row(Math.floor(line.length / 2));
+  return { bag, verts, line, wide: Math.max(...mid.flatMap((a) => mid.map((b) => a.distanceTo(b)))) };
+}
+
+// --- a bag's strap is knitted at its gauge: it grows and lengthens with fit ------------------------
+//
+// The bag hung at a fixed height and swelled about it, and its strap -- sized from the torso alone --
+// stayed put, the same width, a hoop round the hips at any fit, lace or super-bulky. Its strap is
+// knitted at the bag's gauge: a bigger fit is a wider strap and a longer drop, so the strap's lowest
+// point falls with it. A cross strap at the hip comes down to the bag's top, not past it.
+for (const id of speciesIds()) for (const silhouette of GARMENTS.bag.silhouettes) {
+  if (silhouette === 'backpack' || silhouette === 'drawstring bag') continue;   // worn on the back
+  const built = build(id), t = bodyFit(built).torso;
+  const [small, big] = [0.6, 1.4].map((fit) => bagStrap(built, silhouette, fit));
+  const low = (s) => Math.min(...s.line.map((p) => p.y));
+  assert.ok(big.wide > small.wide * 1.8, `${id}: a ${silhouette}'s strap is ${small.wide.toFixed(3)} wide at fit 0.6 and ${big.wide.toFixed(3)} at 1.4 -- fit does not widen it`);
+  assert.ok(low(big) < low(small) - t[1] * 0.3, `${id}: a ${silhouette}'s strap comes down to ${low(small).toFixed(3)} at fit 0.6 and ${low(big).toFixed(3)} at 1.4 -- fit does not lengthen it`);
+  if (silhouette !== 'shoulder bag' && silhouette !== 'bucket bag') continue;
+  for (const s of [small, big]) {
+    const free = s.line.filter((p) => !s.bag.containsPoint(p));
+    assert.ok(Math.min(...free.map((p) => p.y)) > s.bag.max.y - t[1] * 0.1, `${id}: a ${silhouette}'s strap hangs to ${Math.min(...free.map((p) => p.y)).toFixed(3)}, past the bag's top at ${s.bag.max.y.toFixed(3)} -- a hoop round the hips`);
+  }
+}
+
+// --- a cross strap goes round the body and into the bag, never through the body ---------------------
+//
+// Opened at its lowest, on the near hip, a pouch hung in front took the strap's back end straight
+// through the torso to it: a pie-slice V. Every vertex of a cross strap outside the bag is outside the
+// torso, both ends are in the bag, and it bends smoothly: no corner between two rows of its centreline.
+for (const id of speciesIds()) for (const silhouette of ['shoulder bag', 'bucket bag', 'crossbody pouch']) for (const fit of [0.2, 1, 1.6]) {
+  const built = build(id), t = bodyFit(built).torso;
+  const { bag, verts, line } = bagStrap(built, silhouette, fit), at = (p) => p.toArray().map((x) => x.toFixed(3));
+  for (const p of verts) {
+    if (bag.containsPoint(p)) continue;
+    assert.ok(Math.hypot(p.x / t[0], p.y / t[1], p.z / t[2]) > 0.97, `${id}: a ${silhouette}'s strap at fit ${fit} runs through the body at ${at(p)}`);
+  }
+  for (const p of [line[0], line.at(-1)]) assert.ok(bag.clone().expandByScalar(0.002).containsPoint(p), `${id}: a ${silhouette}'s strap at fit ${fit} ends at ${at(p)}, outside the bag`);
+  const turn = Math.max(...line.slice(1, -1).map((p, i) => p.clone().sub(line[i]).angleTo(line[i + 2].clone().sub(p))));
+  assert.ok(turn < THREE.MathUtils.degToRad(45), `${id}: a ${silhouette}'s strap at fit ${fit} turns ${THREE.MathUtils.radToDeg(turn).toFixed(0)} degrees between two rows -- a V`);
+}
+
 // --- a draped shawl goes over the shoulders and arms, not under them -------------------------------
 //
 // Hung from inside the shoulders' width, a shawl's sides came down between the arm and the body, and
@@ -1339,6 +1469,269 @@ for (const silhouette of GARMENTS.sweater.silhouettes) {
   const hsl = Array.from({ length: 300 }, () => new THREE.Color(randomItem('scarf').color1).getHSL({}, THREE.SRGBColorSpace));
   assert.ok(Math.min(...hsl.map((h) => h.s)) < 0.2, 'no random pattern is in a natural, undyed or heathered colour');
   assert.ok(Math.min(...hsl.map((h) => h.l)) < 0.25, 'no random pattern is in a dark colour');
+}
+
+// --- an open shawl's long edge has no corner at the collarbone --------------------------------
+//
+// Its top edge round the neck and its cut down the front are one edge. Turned down by the roll
+// alone, it met the cut at two kinks of ~50 degrees each, on the collarbones.
+for (const id of speciesIds()) for (const silhouette of ['triangle', 'half circle', 'crescent', 'rectangular wrap']) {
+  const built = build(id);
+  dress(built, { shawl: item('shawl', { silhouette, form: 'draped', edge: 'none', accessory: 'none' }) });
+  const g = built.garments[0].geometry, pos = g.attributes.position, { uv } = g.attributes, idx = g.index.array;
+  // weld the closed seam, then the open boundary is the edges one triangle uses
+  const ids = new Map(), rep = [];
+  const w = Array.from({ length: pos.count }, (_, i) => {
+    const k = [pos.getX(i), pos.getY(i), pos.getZ(i)].map((x) => Math.round(x * 1e4)).join();
+    if (!ids.has(k)) { ids.set(k, rep.length); rep.push(i); }
+    return ids.get(k);
+  });
+  const count = new Map();
+  for (let t = 0; t < idx.length; t += 3) for (let k = 0; k < 3; k++) {
+    const a = w[idx[t + k]], b = w[idx[t + (k + 1) % 3]], e = a < b ? `${a} ${b}` : `${b} ${a}`;
+    if (a !== b) count.set(e, (count.get(e) ?? 0) + 1);
+  }
+  const adj = new Map();
+  for (const [e, n] of count) if (n === 1) for (const [a, b] of [e.split(' ').map(Number), e.split(' ').map(Number).reverse()]) adj.set(a, [...(adj.get(a) ?? []), b]);
+  const at = (i) => new THREE.Vector3().fromBufferAttribute(pos, rep[i]);
+  let worst = 0;
+  for (const [b, [a, c]] of adj) {
+    if (uv.getY(rep[b]) > 0.5) continue;   // the hem has its points; only the long edge is judged
+    worst = Math.max(worst, THREE.MathUtils.radToDeg(at(b).sub(at(a)).angleTo(at(c).sub(at(b)))));
+  }
+  assert.ok(worst < 35, `${id}: a ${silhouette} shawl's long edge turns ${worst.toFixed(0)} degrees at one stitch -- a corner`);
+  // A stole's front: each end's two square bottom corners, and no other corner short of the arms.
+  // Stepped from its long ends straight to its side hem, it turned a right angle there as well.
+  if (silhouette === 'rectangular wrap') {
+    built.root.updateMatrixWorld(true);
+    const fit = bodyFit(built), toWorld = built.garments[0].matrixWorld;
+    const arms = built.joints.upperArm.map(({ node }) => new THREE.Line3(node.getWorldPosition(new THREE.Vector3()), node.localToWorld(new THREE.Vector3(0, -fit.arm.upper, 0))));
+    let corners = 0;
+    for (const [b, [a, c]] of adj) {
+      const p = at(b), world = p.clone().applyMatrix4(toWorld);
+      if (p.z < 0.02 || arms.some((arm) => arm.closestPointToPoint(world, true, new THREE.Vector3()).distanceTo(world) < fit.arm.r * 3)) continue;
+      if (THREE.MathUtils.radToDeg(p.clone().sub(at(a)).angleTo(at(c).sub(p))) > 45) corners++;
+    }
+    assert.ok(corners <= 4, `${id}: a rectangular wrap's front has ${corners} corners, more than its ends' four`);
+    // A stole is a band: round the back it is far shorter than its ends. Hung to the owl's long
+    // wings, its back came down as far as its ends -- a blanket.
+    let backHem = Infinity, endHem = Infinity;
+    for (let i = 0; i < pos.count; i++) {
+      if (Math.abs(uv.getX(i) - 0.5) < 0.05) backHem = Math.min(backHem, pos.getY(i));
+      endHem = Math.min(endHem, pos.getY(i));
+    }
+    const top = new THREE.Box3().setFromBufferAttribute(pos).max.y;
+    assert.ok(top - backHem < (top - endHem) * 0.75, `${id}: a rectangular wrap's back hangs ${((top - backHem) / (top - endHem)).toFixed(2)} as far as its ends -- a blanket`);
+  }
+}
+
+// --- a shawl drapes over the arms, not round them like a sleeve ----------------------------------
+//
+// Its side hem ended on the lion's splayed arm and hugged it front, top and back -- a cuff; hung on
+// past it, the side went back in under the arm. Now the hem hangs clear of the arm, and nothing is
+// in the hollow under it.
+for (const id of speciesIds()) for (const silhouette of ['triangle', 'half circle', 'crescent', 'rectangular wrap']) {
+  const built = build(id);
+  dress(built, { shawl: item('shawl', { silhouette, form: 'draped', edge: 'none', accessory: 'none' }) });
+  built.root.updateMatrixWorld(true);
+  const fit = bodyFit(built), m = built.garments[0], pos = m.geometry.attributes.position, { uv } = m.geometry.attributes;
+  const p = new THREE.Vector3(), q = new THREE.Vector3(), flatP = new THREE.Vector3(), flatQ = new THREE.Vector3();
+  for (const { node } of built.joints.upperArm) {
+    const arm = new THREE.Line3(node.getWorldPosition(new THREE.Vector3()), node.localToWorld(new THREE.Vector3(0, -fit.arm.upper, 0)));
+    const flat = new THREE.Line3(arm.start.clone().setY(0), arm.end.clone().setY(0));
+    let cuff = 0, hollow = 0;
+    for (let i = 0; i < pos.count; i++) {
+      p.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+      const t = arm.closestPointToPointParameter(p, false);
+      if (uv.getY(i) > 0.99 && t > 0.1 && t < 1.1 && arm.at(t, q).distanceTo(p) < fit.arm.r * 3) cuff++;
+      const s = flat.closestPointToPointParameter(flatP.set(p.x, 0, p.z), true);
+      if (s > 0.05 && flat.at(s, flatQ).distanceTo(flatP) < fit.arm.r && p.y < arm.at(s, q).y - fit.arm.r) hollow++;
+    }
+    // Only a splayed arm can be cuffed: a hem across a wing hanging straight down (the owl's) is
+    // cloth over an arm, as a stole's band crosses it.
+    const splayed = arm.delta(new THREE.Vector3()).normalize().y > -Math.cos(THREE.MathUtils.degToRad(20));
+    if (splayed && silhouette !== 'crescent') assert.equal(cuff, 0, `${id}: a ${silhouette} shawl's hem hugs the upper arm at ${cuff} points -- a cuff, a sleeve`);
+    assert.equal(hollow, 0, `${id}: a ${silhouette} shawl has ${hollow} points in the hollow under the arm -- round it, not over it`);
+  }
+}
+
+// --- an over-knee sock bends with the knee ------------------------------------------------------
+//
+// Its weights were the wrong way up (a smoothstep given its edges high then low): the half below
+// the knee followed the thigh and the half above it the shin. Straight, nothing showed; in the
+// attitude both tubes turned half a turn about the knee, its rings 3 thigh radii off the leg.
+for (const id of speciesIds()) {
+  const built = build(id);
+  dress(built, { socks: item('socks', { silhouette: 'over-knee', accessory: 'none', edge: 'none' }) });
+  applyPose(built, { ...POSES.rest, ...DANCE_POSES['att-hold'] });
+  built.root.updateMatrixWorld(true);
+  const fit = bodyFit(built);
+  built.joints.upperLeg.forEach(({ node: thigh }, k) => {
+    const shin = built.joints.lowerLeg[k].node, m = built.garments.find((g) => g.parent === thigh && g.isSkinnedMesh);
+    m.skeleton.update();
+    const knee = shin.getWorldPosition(new THREE.Vector3());
+    const leg = [new THREE.Line3(thigh.getWorldPosition(new THREE.Vector3()), knee), new THREE.Line3(knee, shin.localToWorld(new THREE.Vector3(0, -fit.leg.tibia, 0)))];
+    const rings = new Map(), { uv } = m.geometry.attributes;
+    for (let i = 0; i < uv.count; i++) {
+      const v = Math.round(uv.getY(i) * 40);
+      rings.set(v, [...(rings.get(v) ?? []), m.getVertexPosition(i, new THREE.Vector3()).applyMatrix4(m.matrixWorld)]);
+    }
+    let off = 0;
+    for (const ring of rings.values()) {
+      const c = ring.reduce((s, p) => s.add(p), new THREE.Vector3()).divideScalar(ring.length);
+      off = Math.max(off, Math.min(...leg.map((b) => b.closestPointToPoint(c, true, new THREE.Vector3()).distanceTo(c))) / fit.leg.thighR);
+    }
+    assert.ok(off < 0.5, `${id}: in the attitude an over-knee sock's ring is ${off.toFixed(2)} thigh radii off leg ${k}`);
+  });
+}
+
+// --- an arm lifts a shawl, it never goes up through it ---------------------------------------------
+//
+// Hung on the chest, shaped round the arms as they stand, a swinging arm went through it (the
+// lion's: 6-14 points inside the arm), and one raised in the attitude more (the owl's wing, 154).
+// Its side panels now lift with the arms, as a cape held out (garments.js flapSkin); pushed off the
+// arm instead, it stacked round it like a sleeve. A sweater's body is still pushed: `armPushed`
+// mirrors the shader's offArm (garments.js addArmPush) on a skinned vertex, in the mesh's frame.
+const offArm = (p, a, b, r) => {
+  const ab = b.clone().sub(a), t = p.clone().sub(a).dot(ab) / Math.max(ab.lengthSq(), 1e-8), q = a.clone().addScaledVector(ab, Math.min(t, 1));
+  const l = p.distanceTo(q);
+  return t >= 0 && l < r && l > 1e-6 ? q.addScaledVector(p.clone().sub(q), r / l) : p;
+};
+const armPushed = (m, i, p) => {
+  const g = m.geometry.attributes;
+  if (!(g.aArmR?.getX(i) > 0)) return p;
+  for (const s of [0, 1]) {
+    const toNow = m.bindMatrixInverse.clone().multiply(m.skeleton.bones[3 + s].matrixWorld).multiply(m.skeleton.boneInverses[3 + s]);
+    const end = (name) => new THREE.Vector3().fromBufferAttribute(g[name], i).applyMatrix4(toNow);
+    p = offArm(p, end(`aArmA${s}`), end(`aArmB${s}`), g.aArmR.getX(i));
+  }
+  return p;
+};
+/**
+ * Points of `m` inside either upper arm, past its root, as the character stands now: their indices.
+ * `above`: only those in the arm's upper half -- a drape hangs below an arm, hidden in it.
+ */
+const insideArms = (built, m, { above = false } = {}) => {
+  const fit = bodyFit(built), q = new THREE.Vector3(), inside = new Set();
+  built.root.updateMatrixWorld(true);
+  m.skeleton.update();
+  const arms = built.joints.upperArm.map(({ node }) => new THREE.Line3(node.getWorldPosition(new THREE.Vector3()), node.localToWorld(new THREE.Vector3(0, -fit.arm.upper, 0))));
+  for (let i = 0; i < m.geometry.attributes.position.count; i++) {
+    const p = armPushed(m, i, m.getVertexPosition(i, new THREE.Vector3())).applyMatrix4(m.matrixWorld);
+    if (arms.some((arm) => arm.closestPointToPointParameter(p, true) > 0.15 && arm.closestPointToPoint(p, true, q).distanceTo(p) < fit.arm.r * 0.9
+      && (!above || p.y >= q.y))) inside.add(i);
+  }
+  return inside;
+};
+{
+  // the shader really gets the push: a replace that matched nothing would leave it out silently
+  const shader = { vertexShader: THREE.ShaderLib.physical.vertexShader, fragmentShader: THREE.ShaderLib.physical.fragmentShader, uniforms: {} };
+  garmentMaterial().onBeforeCompile(shader, null);
+  for (const piece of ['attribute float aArmR;', 'vec3 offArm(', 'getBoneMatrix(3.0)', 'transformed = offArm(transformed']) {
+    assert.ok(shader.vertexShader.includes(piece), `the garment vertex shader is missing "${piece}"`);
+  }
+  assert.ok(shader.vertexShader.indexOf('vec3 offArm(') < shader.vertexShader.indexOf('transformed = offArm('), 'offArm is used before it is declared');
+}
+for (const id of speciesIds()) for (const silhouette of ['triangle', 'rectangular wrap']) {
+  const built = build(id);
+  dress(built, { shawl: item('shawl', { silhouette, form: 'draped', edge: 'none', accessory: 'none' }) });
+  const m = built.garments.find((g) => g.parent === built.joints.chest);
+  for (const swing of [{ armSwing: 0.5 }, { armSwing: -0.5 }, { armOut: 0.4 }, DANCE_POSES['att-hold']]) {
+    applyPose(built, { ...POSES.rest, ...swing });
+    const inside = insideArms(built, m, { above: true }).size;
+    assert.equal(inside, 0, `${id}: a ${silhouette} shawl has ${inside} points inside the top of an arm at ${JSON.stringify(swing)}`);
+  }
+}
+// ...and is the same shawl whenever it is put on: the dress-up page redresses mid-dance, and one
+// cut round the arms where they swung came out with other points (the owl's: 5303 for 5081) or
+// off by up to 0.3m (the lion's), and stayed so. The pose it was dressed in is left as it was.
+for (const id of speciesIds()) {
+  const built = build(id), shawl = { shawl: item('shawl', { silhouette: 'triangle', form: 'draped', edge: 'picot', accessory: 'none' }) };
+  const worn = () => {
+    applyPose(built, POSES.rest);
+    built.root.updateMatrixWorld(true);
+    const m = built.garments.find((g) => g.parent === built.joints.chest);
+    m.skeleton.update();
+    return Array.from({ length: m.geometry.attributes.position.count }, (_, i) => m.getVertexPosition(i, new THREE.Vector3()));
+  };
+  applyPose(built, POSES.rest);
+  dress(built, shawl);
+  const atRest = worn();
+  applyPose(built, { ...POSES.rest, ...DANCE_POSES['att-hold'] });
+  const arm = built.joints.upperArm[0].node.quaternion.clone();
+  dress(built, shawl);
+  assert.ok(built.joints.upperArm[0].node.quaternion.equals(arm), `${id}: dressing put the arm back to rest`);
+  const again = worn();
+  assert.equal(again.length, atRest.length, `${id}: a shawl dressed mid-dance has ${again.length} points, ${atRest.length} at rest`);
+  const off = Math.max(...again.map((p, i) => p.distanceTo(atRest[i])));
+  assert.ok(off < 1e-6, `${id}: a shawl dressed mid-dance sits ${(off * 1000).toFixed(0)}mm off one dressed at rest`);
+}
+// ...and the cloth on top of the shoulder stays resting on it: turned with the arm from inside the
+// shoulder joint, it swung down into the body as the arm rose (240-300 points in the attitude).
+for (const id of speciesIds()) for (const silhouette of ['triangle', 'rectangular wrap']) {
+  const built = build(id);
+  dress(built, { shawl: item('shawl', { silhouette, form: 'draped', edge: 'none', accessory: 'none' }) });
+  const m = built.garments.find((g) => g.parent === built.joints.chest), [rx, ry, rz] = bodyFit(built).torso;
+  const inBody = () => {
+    built.root.updateMatrixWorld(true);
+    m.skeleton.update();
+    return Array.from({ length: m.geometry.attributes.position.count }, (_, i) => {
+      const p = m.getVertexPosition(i, new THREE.Vector3());
+      return (p.x / rx) ** 2 + (p.y / ry) ** 2 + (p.z / rz) ** 2 < 0.9;
+    });
+  };
+  applyPose(built, POSES.rest);
+  const worn = inBody();
+  applyPose(built, { ...POSES.rest, ...DANCE_POSES['att-hold'] });
+  const sunk = inBody().filter((v, i) => v && !worn[i]).length;
+  assert.equal(sunk, 0, `${id}: a ${silhouette} shawl sinks ${sunk} points into the body in the attitude`);
+}
+// ...and its edging stays on its hem, whatever the edging: skinned to follow the arms on its own
+// weights, a triangle's ribbed edge came 20-30mm off its hem with an arm raised (seen from the side,
+// a tear); fringe and picot standing off the hem found no weights at all and stayed put while the
+// hem rose, stretched out under the arm like gum (up to 290mm).
+for (const id of speciesIds()) for (const edge of EDGES.filter((e) => e !== 'none')) {
+  const built = build(id), shawl = item('shawl', { silhouette: 'triangle', form: 'draped', edge, accessory: 'none' });
+  const sheetN = outfitPieces(built, { shawl })[0].geo.attributes.position.count;
+  dress(built, { shawl });
+  const m = built.garments.find((g) => g.parent === built.joints.chest), n = m.geometry.attributes.position.count;
+  // the hem: the sheet's last row, in order round -- measured to as a line, not to its vertices,
+  // which a raised arm draws apart where the hem stretches over it
+  const { uv } = m.geometry.attributes, hem = [];
+  for (let j = 0; j < sheetN; j++) if (uv.getY(j) === 1) hem.push(j);
+  hem.sort((a, b) => uv.getX(a) - uv.getX(b));
+  const seg = new THREE.Line3(), q = new THREE.Vector3();
+  const gaps = () => {
+    built.root.updateMatrixWorld(true);
+    m.skeleton.update();
+    const P = (i) => armPushed(m, i, m.getVertexPosition(i, new THREE.Vector3()));
+    const line = hem.map(P), out = [];
+    for (let i = sheetN; i < n; i += 9) {
+      const p = P(i);
+      out.push(Math.min(...line.slice(1).map((b, k) => seg.set(line[k], b).closestPointToPoint(p, true, q).distanceTo(p))));
+    }
+    return out;
+  };
+  applyPose(built, POSES.rest);
+  const worn = gaps();
+  applyPose(built, { ...POSES.rest, ...DANCE_POSES['att-hold'] });
+  const off = Math.max(...gaps().map((g, k) => g - worn[k]));
+  assert.ok(off < 0.012, `${id}: a shawl's ${edge} edge comes ${(off * 1000).toFixed(0)}mm off its hem with an arm raised`);
+}
+// A sweater's body stays on the chest, and an arm raised overhead went through it (the owl's wing
+// in the attitude: up to 91 points). Under its sleeve at the armhole it is inside the arm as worn,
+// and stays so; nothing else may be.
+for (const id of speciesIds()) for (const silhouette of GARMENTS.sweater.silhouettes) {
+  const built = build(id);
+  dress(built, { sweater: item('sweater', { silhouette, accessory: 'none' }) });
+  const m = built.garments.find((g) => g.parent === built.joints.chest);
+  applyPose(built, POSES.rest);
+  const worn = insideArms(built, m);
+  for (const swing of [{ armSwing: 0.5 }, { armSwing: -0.5 }, DANCE_POSES['att-hold']]) {
+    applyPose(built, { ...POSES.rest, ...swing });
+    const into = [...insideArms(built, m)].filter((i) => !worn.has(i)).length;
+    assert.equal(into, 0, `${id}: an arm goes ${into} points into a ${silhouette}'s body at ${JSON.stringify(swing)}`);
+  }
 }
 
 console.log('garments.js self-check: all assertions passed');

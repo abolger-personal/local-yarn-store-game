@@ -23,7 +23,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { GEO, LIMB_TAPER, femurOf, knitMaterial, tibiaOf } from './npc.js';
+import { GEO, LIMB_TAPER, POSES, applyPose, femurOf, knitMaterial, tibiaOf } from './npc.js';
 import { applyHatching, yarnColor } from '../inventory/yarn-look.js';
 import { YARN_MATERIALS, YARN_WEIGHT_NAMES } from '../inventory/catalog.js';
 
@@ -328,7 +328,7 @@ export function bodyFit(built) {
   const floor = j.chest.worldToLocal(new THREE.Vector3(chestWorld.x, 0, chestWorld.z)).y;
   const armR = Math.max(extent(arm, 'x'), extent(arm, 'z'));
   return {
-    P, joints: j, floor, root: built.root,
+    P, joints: j, floor, root: floorOf(built.root),   // what lies on the floor follows
     height: new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3()).y,   // for forView
     head: [extent(head, 'x'), head.max.y, Math.max(-head.min.z, P.headRadius)],
     skull: skullRadii(j.head),
@@ -1005,7 +1005,8 @@ const HAT = {
   headband: { seat: 0.45, soft: 0.3, open: true, profile: (v) => { const y = lerp(0.79, 0.11, v); return [Math.sqrt(1 - y * y) * 1.05, y]; } },
   bucket: { seat: 0.35, soft: 0.5, profile: (v) => (v < 0.75 ? dome(1.05, 0.35)(v / 0.75) : [lerp(0.99, 1.45, (v - 0.75) / 0.25), lerp(0.35, 0.08, (v - 0.75) / 0.25)]) },
   cloche: { seat: 0.1, profile: (v) => (v < 0.85 ? dome(1.05, 0.0)(v / 0.85) : [lerp(1.04, 1.18, (v - 0.85) / 0.15), lerp(0.0, -0.1, (v - 0.85) / 0.15)]) },
-  pixie: { seat: 0.3, bend: 1.2, tip: true, profile: (v) => {
+  // The point is fabric, not a horn: it folds over behind and hangs, its tip ~10 degrees off plumb.
+  pixie: { seat: 0.3, flop: { hinge: 1.0, back: 0.8, angle: 2.0 }, tip: true, profile: (v) => {
     const y = lerp(2.3, 0.3, v);
     return [Math.sqrt(clamp(1 - 0.3 * 0.3, 0, 1)) * 1.04 * (1 - (1 - v) ** 1.6), y];
   } },
@@ -1078,10 +1079,9 @@ function hatShape(spec, r, s, f) {
   return (u, v, out) => {
     const [pr, py] = spec.profile(v);
     const th = u * TAU;
-    const bent = spec.bend ? Math.max(0, py - 0.8) ** 2 * spec.bend : 0;
     const { sag, wobble } = slump(spec, f, v, py, th);
     const w = pr * wobble * s * lift;
-    out.set(w * Math.sin(th), (py - sag * 0.6) * s * lift + seat.dy, w * Math.cos(th) - bent - sag);
+    out.set(w * Math.sin(th), (py - sag * 0.6) * s * lift + seat.dy, w * Math.cos(th) - sag);
     if (spec.flop) flop(out, spec.flop, s * lift, seat.dy, v);
     out.applyMatrix4(rot);
     out.x += seat.dx;
@@ -1103,15 +1103,23 @@ function buildHat(fit, f) {
   const pieces = [piece(head, panel(body, f, { closedU: !spec.face, from: (p) => p.set(0, 0, 0) }))];
   if (spec.flaps) pieces.push(...earflaps(fn, head, f, r, 1 + f.thick / r[1]));
   pieces.push(...edgePieces(head, [ring(body, 1, 48, { closed: !spec.face })], f));
-  return [...pieces, ...accessoryPieces(hatAnchors(fn, head, r[1] * POM_OF_HEAD * s, r[1] * BUTTON_OF_HEAD * s), f)];
+  return [...pieces, ...accessoryPieces(hatAnchors(fn, head, r[1] * POM_OF_HEAD * s, r[1] * BUTTON_OF_HEAD * s, spec.open), f)];
 }
 
-function hatAnchors(fn, head, size, buttonSize) {
+function hatAnchors(fn, head, size, buttonSize, open) {
   const top = fn(0, 0, new THREE.Vector3());
   const side = fn(0.25, 0.6, new THREE.Vector3());
   const band = [0, 1, 2, 3, 4].map((i) => fn(0.19 + i * 0.03, 0.78, new THREE.Vector3()));
+  // An open top (a headband) has no crown: its v=0 is the band's front edge, and a pom-pom there sat
+  // mid-forehead. It goes on the band at one temple instead, half the size.
+  const pomAt = open ? fn(0.2, 0.5, new THREE.Vector3()) : top, pomSize = open ? size / 2 : size;
+  // Off the crown along the hat's own axis there (from a ring just below it out through it): pushed
+  // out from the head's centre, a pixie's hanging tip put its pom-pom against the back of the tail.
+  const below = Array.from({ length: 8 }, (_, i) => fn(i / 8, 0.2, new THREE.Vector3()))
+    .reduce((c, p) => c.add(p), new THREE.Vector3()).divideScalar(8);
+  const out = open ? pomAt.clone().normalize() : top.clone().sub(below).normalize();
   return {
-    'pom-pom': [{ joint: head, p: top.clone().addScaledVector(top.clone().normalize(), size), size }],
+    'pom-pom': [{ joint: head, p: pomAt.clone().addScaledVector(out, pomSize), size: pomSize }],
     tassel: [{ joint: head, p: top, size: size * 0.8 }],
     flower: [{ joint: head, p: side, n: side.clone().normalize(), size: size * 0.7 }],
     buttons: band.map((p) => ({ joint: head, p, n: p.clone().normalize(), size: buttonSize })),
@@ -1261,20 +1269,32 @@ function pressMesh(built, head, mesh, cover) {
   const toHead = new THREE.Matrix4().multiplyMatrices(_inv.copy(head.matrixWorld).invert(), mesh.matrixWorld);
   const toMesh = toHead.clone().invert();
   const geo = mesh.geometry.clone(), pos = geo.attributes.position, q = new THREE.Vector3();
+  const under = new Uint8Array(pos.count);   // after pressing: what trimUnder may cut
   let moved = false;
   for (let i = 0; i < pos.count; i++) {
-    if (!cover.press(q.fromBufferAttribute(pos, i).applyMatrix4(toHead))) continue;
-    q.applyMatrix4(toMesh);
-    pos.setXYZ(i, q.x, q.y, q.z);
-    moved = true;
+    const pressed = cover.press(q.fromBufferAttribute(pos, i).applyMatrix4(toHead));
+    under[i] = pressed || cover.under(q) ? 1 : 0;
+    if (pressed) { q.applyMatrix4(toMesh); pos.setXYZ(i, q.x, q.y, q.z); moved = true; }
   }
   if (!moved) { geo.dispose(); return; }
+  if (mesh.userData.trimUnderHat) trimUnder(geo, under);
   geo.computeVertexNormals();
   geo.computeBoundingBox();      // clone() copied the old bounds: culling and fit would read the unpressed mane
   geo.computeBoundingSphere();
   const original = mesh.geometry;
   mesh.geometry = geo;
   built.covered.push(() => { geo.dispose(); mesh.geometry = original; });
+}
+
+/**
+ * A coat that marks itself `trimUnderHat` (the lion's mane) loses every triangle wholly `under` the
+ * hat: pressed only, some still showed through the crown, where the real hat slumps inside the
+ * volume `press` works to. Triangles across the rim stay: tufts there read as fluffy hair.
+ */
+function trimUnder(geo, under) {
+  const idx = geo.index ? geo.index.array : Array.from({ length: geo.attributes.position.count }, (_, i) => i), keep = [];
+  for (let t = 0; t < idx.length; t += 3) if (!(under[idx[t]] && under[idx[t + 1]] && under[idx[t + 2]])) keep.push(idx[t], idx[t + 1], idx[t + 2]);
+  geo.setIndex(keep);
 }
 
 // ---------------------------------------------------------------- SCARF
@@ -1460,8 +1480,7 @@ function scarfBand(fit, f, spec, girth) {
   const short = Math.max(...spec.ends) * f.fit < SHORT_ENDS;
   const pieces = cutBand(fit, f, shape, band, short), surface = pieces[0].geo;
   const anchors = bandAnchors(fit, f, shape, band, dims);
-  const edgeF = spec.edge && f.edge === 'none' ? { ...f, edge: spec.edge } : f;
-  pieces.push(...edgePieces(chest, [ring(fn, 0, 24), ring(fn, 1, 24)], edgeF));
+  pieces.push(...edgePieces(chest, [ring(fn, 0, 24), ring(fn, 1, 24)], f));
   if (f.form === 'tied') {
     const tie = knot(chest, band.spine[band.legs[0]], girth * 1.5, f);
     pieces.push(short ? tie : piece(chest, neckSkin(tie.geo, () => 1)));
@@ -1481,6 +1500,28 @@ function grounded(fit, f, pieces) {
   const floor = fit.floor + f.thick * 3.5, rise = endBend(fit, fit.floor) * 1.5;
   const ground = (y) => 1 - THREE.MathUtils.smoothstep(y, floor, floor + rise);
   return pieces.map(({ geo }) => piece(chest, groundSkin(geo.attributes.skinIndex ? geo : neckSkin(geo, () => 0), ground), [neck, fit.root]));
+}
+
+const FLOORS = new WeakMap();
+/**
+ * The root's place and facing, down on the floor: what lies there follows the character about and
+ * round, but not up and down. On the root itself, grounding dropped it 66mm as the attitude's knees
+ * bent and a relevé lifted it, and the floor run of a trailing scarf bobbed with it like skis.
+ * ponytail: cancels the root's height in the root's own frame, right while the root only turns
+ * about the vertical; one that tilts or scales would need it rebuilt from the world matrix.
+ */
+function floorOf(root) {
+  if (FLOORS.has(root)) return FLOORS.get(root);
+  const floor = new THREE.Object3D();
+  floor.name = 'floor';
+  floor.updateMatrix = function updateMatrix() {
+    this.position.y = -root.position.y;
+    THREE.Object3D.prototype.updateMatrix.call(this);
+  };
+  root.add(floor);
+  floor.updateMatrixWorld();   // a scarf binds it as it stands, before anything renders
+  FLOORS.set(root, floor);
+  return floor;
 }
 
 /**
@@ -1801,14 +1842,15 @@ function groundSkin(geo, w) {
 /**
  * A garment mesh on `joint` that also follows `others`. A child joint (the neck) is bound in the
  * REST pose: the geometry was built with it unposed, whatever pose the character stands in now.
- * Anything else (the root) is bound as it stands: the floor was measured in this pose. Bone
- * matrices map the joint's own space to world, so the bind matrix is the identity.
+ * Anything else (the root, an arm's drape) is bound as it stands: the floor was measured in this
+ * pose. Bone matrices map the joint's own space to world, so the bind matrix is the identity.
+ * Read fresh: a drape made this dressing had never had its world matrix worked out.
  */
 function skinnedGarment(geo, joint, others) {
   const mesh = new THREE.SkinnedMesh(geo, garmentMaterial());
   const inverse = (b) => (b.parent === joint
     ? new THREE.Matrix4().makeTranslation(-b.position.x, -b.position.y, -b.position.z)
-    : new THREE.Matrix4().copy(b.matrixWorld).invert().multiply(joint.matrixWorld));
+    : new THREE.Matrix4().copy((b.updateWorldMatrix(true, false), b.matrixWorld)).invert().multiply(joint.matrixWorld));
   mesh.bind(new THREE.Skeleton([joint, ...others], [new THREE.Matrix4(), ...others.map(inverse)]), new THREE.Matrix4());
   return mesh;
 }
@@ -1872,7 +1914,7 @@ const SCARF = {
   trailing: { ends: [9, 8.6], back: [true, true] },
   skinny: { ends: [1.9, 1.7], width: 0.55, tube: 0.55, back: [false, true] },
   kerchief: { kerchief: true },
-  'chunky wrap': { ends: [1.3, 1.1], width: 1.5, tube: 1.8, edge: 'fringed' },
+  'chunky wrap': { ends: [1.3, 1.1], width: 1.5, tube: 1.8 },
 };
 
 const FORM_WRAPS = { draped: 1, 'wrapped once': 1, 'wrapped twice': 2, tied: 1, tucked: 1 };
@@ -2073,11 +2115,21 @@ function hemOf(front, back, { open, easeFront = (t) => t, easeBack = (t) => t })
 // one to the elbow. A shawl has no armhole: it goes round the body, over the shoulder and the arm.
 // The shrug's `depth` is the old outline, in extra polar angle past the shoulder line: it looked right.
 const back = (th) => Math.max(0, -Math.cos(th));
+const STOLE_TURN = 0.6;   // radians round from the end of a stole's front drop to its side
+const STOLE_WIDTH = 0.6;   // a stole's band, in torso half-heights below the shoulder line
 const SHAWL = {
   triangle: { hem: hemOf(1.1, 1.4, { open: 0.35 }), open: 0.35, arm: 0.8 },
   'half circle': { hem: hemOf(0.8, 1.05, { open: 0.3, easeFront: (t) => t * t, easeBack: (t) => 1 - (1 - t) ** 2 }), open: 0.3, arm: 0.7 },
-  // a stole: as wide all round, its ends hanging long in front
-  'rectangular wrap': { hem: (th, side) => (Math.abs((((th + Math.PI) % TAU) + TAU) % TAU - Math.PI) < 0.45 + 0.55 ? 1.6 : side), open: 0.45, arm: 0.75 },
+  // A stole: as wide all round, its ends hanging long in front. Each end's square bottom corner is
+  // real; its outer edge then rises straight up off it and curves round into the side over STOLE_TURN.
+  // Stepped straight from the end to the side, it turned a right angle on the front. Round the back
+  // it is the band's own width, STOLE_WIDTH at most: hung to the arms, the owl's long wings took its
+  // back down as far as its ends, a blanket.
+  'rectangular wrap': { hem: (th, side) => {
+    const a = Math.abs((((th + Math.PI) % TAU) + TAU) % TAU - Math.PI);
+    const t = clamp((a - 1.0) / STOLE_TURN, 0, 1), b = clamp((a - 2.0) / (Math.PI - 2.0), 0, 1);
+    return lerp(lerp(1.6, side, Math.sqrt(1 - (1 - t) ** 2)), Math.min(side, STOLE_WIDTH), b * b * (3 - 2 * b));
+  }, open: 0.45, arm: 0.75 },
   crescent: { hem: hemOf(1.0, 0.45, { open: 0.6, easeFront: Math.sqrt }), open: 0.6, arm: 0.35 },
   // a 3/4 circle: closed round the shoulders it is a cone standing 49 degrees out, not a tube
   capelet: { hem: () => 0.55, open: 0, button: true, circle: 0.75 },
@@ -2098,6 +2150,20 @@ function rollDown(a, open) {
   return open > 0 ? 1 - Math.sqrt(1 - (1 - t) ** 2) : 0;
 }
 
+/**
+ * The front edge's top, swung round the neck: at v=0 the edge column sits CURVE further round than
+ * the opening and comes back to it by v=CURVE_V, so the long edge turns from round the neck to down
+ * the front over several rows. Turned by the roll alone, the whole turn fell between the first
+ * column past the cut and the cut itself: two corners on the collarbones. Columns out to ROLL past
+ * the opening are squeezed along with it, so they keep their order.
+ */
+const CURVE = 0.5, CURVE_V = 0.3;
+function frontCurve(th, v, open) {
+  if (!open) return th;
+  const s = Math.atan2(Math.sin(th), Math.cos(th)), a = Math.abs(s);
+  return Math.sign(s) * (a + CURVE * Math.max(0, 1 - v / CURVE_V) ** 2 * Math.max(0, 1 - (a - open) / ROLL));
+}
+
 /** Out from the body in a soft lump where the top edge rolls (`drop` part way), as over the owl's wings. */
 function bunched(p, drop, v) {
   const k = 1 + 4 * drop * (1 - drop) * Math.max(0, 1 - v / 0.35) ** 2 * 0.18;
@@ -2115,7 +2181,7 @@ function shawlShape(fit, f, spec) {
   const fall = r[1] * 1.6;   // how far it hangs a radian past the shoulder line
   const side = sideHem(fit, r, spec.arm ?? 0.5), arms = upperArms(fit), clear = fit.arm.r * 1.15 + pad;   // room for its relief, and to round the arm
   return (u, v, out) => {
-    const th = u * TAU, drop = spec.hem ? rollDown(Math.abs(Math.atan2(Math.sin(th), Math.cos(th))), spec.open) : 0;
+    const th = spec.hem ? frontCurve(u * TAU, v, spec.open) : u * TAU, drop = spec.hem ? rollDown(Math.abs(Math.atan2(Math.sin(th), Math.cos(th))), spec.open) : 0;
     const reach = SHOULDER + (spec.hem ? (spec.hem(th, side) * torso[1] * f.fit) / fall : spec.depth(th) * Math.PI * f.fit);
     const phi = lerp(Math.min(top + drop * ROLL * 0.5, reach), reach, v);
     if (phi <= SHOULDER) onEllipsoid(r, phi, th, out);
@@ -2138,29 +2204,47 @@ function upperArms(fit) {
  * Over the arms, not through them: a point nearer an upper arm than `clear` goes out to lie on the
  * arm's outer side -- flipped there if it was between the arm and the body. The lion's arms splay
  * out from the shoulder, and a side hanging straight down went in through them.
+ * Below an arm it hangs from the arm's outline, as cloth over a rail does: a point under the arm,
+ * inside its outline seen from above, goes straight out away from the body until it is outside it.
+ * Left there, a side hanging on past a splayed arm went back in under it, round it like a sleeve.
  */
 function overArms(p, arms, clear) {
   const q = new THREE.Vector3(), d = new THREE.Vector3(), out = new THREE.Vector3();
   for (const arm of arms) {
     arm.closestPointToPoint(p, true, q);
-    if (q.distanceTo(p) >= clear) continue;
-    d.subVectors(p, q);
-    out.set(q.x, 0, q.z).normalize();   // away from the body
-    if (d.dot(out) < 0) d.addScaledVector(out, -2 * d.dot(out));
-    if (d.lengthSq() < 1e-10) d.copy(out);
-    p.copy(q).addScaledVector(d.normalize(), clear);
+    if (q.distanceTo(p) < clear) {
+      d.subVectors(p, q);
+      out.set(q.x, 0, q.z).normalize();   // away from the body
+      if (d.dot(out) < 0) d.addScaledVector(out, -2 * d.dot(out));
+      if (d.lengthSq() < 1e-10) d.copy(out);
+      p.copy(q).addScaledVector(d.normalize(), clear);
+    }
+    // ponytail: marched in steps of clear/4, so the outline is found to within that; solve the
+    // capsule exit exactly if the step shows.
+    out.set(p.x, 0, p.z).normalize();
+    for (let i = 0; i < 64 && underArm(p, arm, clear); i++) p.addScaledVector(out, clear / 4);
   }
   return p;
+}
+
+const _flat = new THREE.Line3(), _f = new THREE.Vector3(), _g = new THREE.Vector3();
+/** Whether p is below `arm` and within `clear` of it seen from above. */
+function underArm(p, arm, clear) {
+  _flat.set(_f.copy(arm.start).setY(0), _g.copy(arm.end).setY(0));
+  const t = _flat.closestPointToPointParameter(_f.set(p.x, 0, p.z), true);
+  return t > 0 && _flat.at(t, _g).distanceTo(_f) < clear && p.y < lerp(arm.start.y, arm.end.y, t);
 }
 
 /**
  * How far below the shoulder line, in torso half-heights, a shawl comes at the sides: `arm` of the
  * way down the upper arm from where it joins to the elbow, as the arm stands -- the lion's splay
- * out, and an elbow is far higher than a hanging arm's length below the shoulder.
+ * out, and an elbow is far higher than a hanging arm's length below the shoulder. It hangs on past
+ * the arm's underside there: ended on the arm, a splayed arm's hem wrapped it front, top and back --
+ * a cuff, which read as a sleeve.
  */
 function sideHem(fit, r, arm) {
   const [{ start, end }] = upperArms(fit);
-  return Math.max(0.05, r[1] * Math.cos(SHOULDER) - lerp(start.y, end.y, arm)) / fit.torso[1];
+  return Math.max(0.05, r[1] * Math.cos(SHOULDER) - lerp(start.y, end.y, arm) + fit.arm.r * 2) / fit.torso[1];
 }
 
 /** Straight down `hang` from a shoulder-line point p, flaring out by `flare` of its fall. */
@@ -2189,13 +2273,131 @@ function buildShawl(fit, f) {
   const mask = open ? (u) => { const th = u * TAU; return Math.cos(th) > Math.cos(open); } : null;
   // fine enough to bend over an arm (overArms): 24 round by 12 down, its quads spanned one
   const pieces = [piece(chest, panel(fn, f, { closedU: true, mask, minU: 72, minV: 24, from: (p) => p.set(0, p.y * 0.3, 0) }))];
-  pieces.push(...edgePieces(chest, [ring(fn, 1, 64, open ? { closed: false, u0: open / TAU, u1: 1 - open / TAU } : {})], f));
+  const edging = edgePieces(chest, [ring(fn, 1, 64, open ? { closed: false, u0: open / TAU, u1: 1 - open / TAU } : {})], f);
+  pieces.push(...edging);
   const front = fn(0, 0.1, new THREE.Vector3());
   if (f.form === 'tied') pieces.push(knot(chest, front, f.thick * 2.6, f));
   if (spec.sleeves) pieces.push(...shrugSleeves(fit, f));
   if (f.accessory === 'pin') pieces.push(...pinOn(fit, f, fn, spec));
   const acc = spec.button && f.accessory === 'none' ? { ...f, accessory: 'buttons' } : f;
-  return [...pieces, ...accessoryPieces(shawlAnchors(fn, chest, front, f, fit.torso[0]), acc)];
+  // Hung on the chest, shaped round the arms as they stand, a swinging arm went through it.
+  const [u0, u1] = open ? [open / TAU, 1 - open / TAU] : [0, 1];
+  const hem = Array.from({ length: 257 }, (_, k) => fn(lerp(u0, u1, k / 256), 1, new THREE.Vector3()));
+  return offArms(fit, [...pieces, ...accessoryPieces(shawlAnchors(fn, chest, front, f, fit.torso[0]), acc)], fit.arm.r * 0.95, { flap: { hem, edging: edging.length }, keepWorn: true });
+}
+
+/**
+ * Chest pieces kept off the upper arms whatever the pose: the vertex shader pushes what an arm moves
+ * into out to `r` from its axis (armCapsules; 0, none). `flap` (a drape): its side panels lift with
+ * the arms instead (flapSkin): its edging (`flap.edging` pieces after the sheet, `pieces[0]`) by the
+ * point of `flap.hem` it hangs from, so it moves as one with its bit of hem; the rest -- the sheet,
+ * a pin -- by where it sits (a pin on the chest given its nearest hem's place flew off). By their
+ * own place, a fringe strand's tip sat further round than its root and stretched; by the nearest
+ * vertex of the sheet, neighbours snapped to different columns and pulled apart like gum.
+ * Pushed alone, not lifted, a drape stacked up round the arm like a sleeve; lifted, only the cloth
+ * at the shoulder joint is left for the push (the owl's wing in the attitude: 142 of 5081 points).
+ */
+function offArms(fit, pieces, r, { flap = null, keepWorn = false } = {}) {
+  const { chest } = fit.joints, toHem = flap && ontoLine(flap.hem);
+  const skin = (geo, k) => {
+    if (!flap) return neckSkin(geo, () => 0);
+    return flapSkin(geo, fit, k >= 1 && k <= flap.edging ? toHem : null);
+  };
+  return pieces.map((pc, k) => (pc.joint === chest ? piece(chest, armCapsules(skin(pc.geo, k), fit, r, { keepWorn }), armBones(fit)) : pc));
+}
+
+/** Moves a point onto the nearest point of the polyline `line` (an array of points). */
+function ontoLine(line) {
+  const seg = new THREE.Line3(), q = new THREE.Vector3(), best = new THREE.Vector3();
+  return (p) => {
+    let d = Infinity;
+    for (let k = 1; k < line.length; k++) {
+      seg.set(line[k - 1], line[k]).closestPointToPoint(p, true, q);
+      if (q.distanceToSquared(p) < d) { d = q.distanceToSquared(p); best.copy(q); }
+    }
+    return p.copy(best);
+  };
+}
+
+/**
+ * A drape's side panels lift with the arms, as a cape does held out: each vertex's weight on each
+ * arm (bones 3, 4; slots 1, 2) is how far round towards that arm's side it lies, easing out by 80
+ * degrees from it, times how far out past the shoulder joint, none inside it and all an arm and a half
+ * beyond -- so the panel turns about the shoulder as one piece and the front, back and neck stay. Cloth
+ * inside the joint turned with it swung down into the body as the arm rose (from partway out from the
+ * neck: 240-300 points into the torso in the attitude); what the arm's root lifts into at the joint
+ * the shader pushes off (offArms). Weighted by
+ * closeness to the arm, the cloth on and round it went with it and the cloth beside it did not:
+ * layers of it stacked round the raised arm like a sleeve, and sheared where the weight fell off.
+ */
+function flapSkin(geo, fit, onto = null) {
+  const pos = geo.attributes.position, n = pos.count, p = new THREE.Vector3();
+  const index = new Uint16Array(n * 4).map((_, i) => [0, 3, 4, 1][i % 4]), weight = new Float32Array(n * 4);
+  const arms = upperArms(fit), sides = arms.map(({ start }) => new THREE.Vector2(start.x, start.z).normalize());
+  const pivot = Math.min(...arms.map(({ start }) => Math.hypot(start.x, start.z)));
+  for (let i = 0; i < n; i++) {
+    p.fromBufferAttribute(pos, i);
+    if (onto) onto(p);
+    const out = Math.hypot(p.x, p.z), dir = new THREE.Vector2(p.x, p.z).divideScalar(Math.max(out, 1e-6));
+    const away = THREE.MathUtils.smoothstep(out, pivot, pivot + fit.arm.r * 1.5);
+    sides.forEach((side, s) => { weight[i * 4 + 1 + s] = away * THREE.MathUtils.smoothstep(dir.dot(side), 0, Math.cos(0.3)); });
+  }
+  for (let i = 0; i < n; i++) {
+    const arm = weight[i * 4 + 1] + weight[i * 4 + 2], k = arm > 1 ? 1 / arm : 1;
+    weight.set([1 - Math.min(arm, 1), weight[i * 4 + 1] * k, weight[i * 4 + 2] * k], i * 4);
+  }
+  geo.setAttribute('skinIndex', new THREE.BufferAttribute(index, 4));
+  geo.setAttribute('skinWeight', new THREE.BufferAttribute(weight, 4));
+  return geo;
+}
+
+/** A chest piece's bones: the neck and root (a scarf's 1, 2), then each upper arm as it stands (3, 4). */
+function armBones(fit) {
+  const { neck, upperArm } = fit.joints;
+  return [neck, fit.root, ...upperArm.map(({ node }) => armRef(node))];
+}
+
+const ARM_ATTRIBUTES = ['aArmA0', 'aArmB0', 'aArmA1', 'aArmB1', 'aArmR'];
+/**
+ * Each upper arm as a capsule the vertex shader keeps this piece out of, whatever the pose (see
+ * garmentMaterial): the segment in the piece's bind space, carried to where the arm is now by bones
+ * 3 and 4. Skinning alone cannot: what half follows an arm raised overhead (the attitude) sits half
+ * way, and the arm went up through it. Per vertex, not uniforms: the material is shared by every
+ * garment on every character. A radius of 0 (anything not given this) is never pushed; `r` is how
+ * far out from the arm's axis it is pushed to.
+ */
+function armCapsules(geo, fit, r, { keepWorn = false } = {}) {
+  const pos = geo.attributes.position, n = pos.count, p = new THREE.Vector3(), q = new THREE.Vector3();
+  // Open at the shoulder end, from a little way down the arm, where the arm grows out of the body.
+  const arms = upperArms(fit).map(({ start, end }) => new THREE.Line3(start.clone().lerp(end, 0.15), end));
+  arms.forEach(({ start, end }, s) => {
+    geo.setAttribute(`aArmA${s}`, new THREE.BufferAttribute(new Float32Array(n * 3).map((_, i) => start.getComponent(i % 3)), 3));
+    geo.setAttribute(`aArmB${s}`, new THREE.BufferAttribute(new Float32Array(n * 3).map((_, i) => end.getComponent(i % 3)), 3));
+  });
+  // `keepWorn`: only what an arm moves INTO is pushed; what is deep inside one already as worn (a
+  // sweater's body under its sleeve, at the armhole) keeps 0. Pushed, it moved nearly an arm's
+  // radius at rest. Only deep: one just inside was left to the owl's wing swinging further in.
+  const inside = (i) => keepWorn && arms.some((arm) => arm.closestPointToPointParameter(p.fromBufferAttribute(pos, i), false) >= 0
+    && arm.closestPointToPoint(p, true, q).distanceTo(p) < r * 0.8);
+  geo.setAttribute('aArmR', new THREE.BufferAttribute(new Float32Array(n).map((_, i) => (inside(i) ? 0 : r)), 1));
+  return geo;
+}
+
+const ARM_REFS = new WeakMap();
+/**
+ * The bone a garment follows an upper arm by: an empty node on it. The arm joint itself is the
+ * chest's child, which skinnedGarment binds unposed; this one is bound as it stands, as the shawl
+ * was shaped round the arm (overArms). Made once per arm and kept: it costs nothing unused.
+ * (Squeezed along a raised arm, to slide the cloth off it, it flattened the owl's into a disc.)
+ */
+function armRef(arm) {
+  if (!ARM_REFS.has(arm)) {
+    const ref = new THREE.Object3D();
+    ref.name = 'arm';
+    arm.add(ref);
+    ARM_REFS.set(arm, ref);
+  }
+  return ARM_REFS.get(arm);
 }
 
 const PIN_COLOUR = new THREE.Color('#b8975a');   // brass
@@ -2318,7 +2520,9 @@ function buildSweater(fit, f) {
     flower: [{ joint: chest, p: fn(0.06, 0.25, new THREE.Vector3()), n: new THREE.Vector3(0, 0, 1), size: f.thick * 4 }],
   };
   const acc = spec.open && f.accessory === 'none' ? { ...f, accessory: 'buttons' } : f;
-  return [...pieces, ...accessoryPieces(anchors, acc)];
+  // The body stays on the chest, but an arm raised overhead (the attitude) is pushed clear of it --
+  // to just inside the sleeve, which covers it there at rest.
+  return offArms(fit, [...pieces, ...accessoryPieces(anchors, acc)], fit.arm.r * 0.95, { keepWorn: true });
 }
 
 /**
@@ -2413,12 +2617,17 @@ function bagBody(dims, round, centre) {
   };
 }
 
-function bagPlace(fit, spec, dims) {
+function bagPlace(fit, spec, dims, s) {
   const { torso } = fit;
   const out = new THREE.Vector3();
   if (spec.at === 'back') return out.set(0, -torso[1] * 0.05, -(torso[2] + dims[2] + 0.01));
-  if (spec.at === 'front') return out.set(torso[0] * 0.35, -torso[1] * 0.7, torso[2] + dims[2] + 0.005);
-  return out.set(torso[0] + dims[0] * 0.55, -torso[1] * 0.75, torso[2] * 0.15);
+  // Its strap is knitted at the bag's gauge, so the bag's drop from over the shoulder grows with
+  // fit: hung at a fixed height, the bag swelled about it and its strap never changed. Its top
+  // stays under the arm, its bottom off the floor.
+  const sh = torso[1] * 1.15;
+  const hang = (y) => clamp(sh - (sh - y) * s, fit.floor + dims[1] * 1.1, fit.shoulderY - fit.arm.r * 2 - dims[1]);
+  if (spec.at === 'front') return out.set(torso[0] * 0.35, hang(-torso[1] * 0.7), torso[2] + dims[2] + 0.005);
+  return out.set(torso[0] + dims[0] * 0.55, hang(-torso[1] * 0.75), torso[2] * 0.15);
 }
 
 /** Strap paths in the chest frame, and the body they lie on (R, the torso's padded radii). */
@@ -2434,22 +2643,28 @@ function strapPaths(fit, spec, body, dims) {
 
 /**
  * From the bag's top in front, over the far shoulder, and down the back into its top behind: a loop
- * tilted from the bag's side over that shoulder, opened where it passes the bag. Closed round the
- * body, it never met the bag -- two pieces, the bag hung from nothing.
+ * round the body over that shoulder, opened where it passes the bag. Closed round the body, it
+ * never met the bag -- two pieces, the bag hung from nothing.
  */
 function crossStrap(R, top, dims) {
-  const tilt = Math.atan2(top.x + R[0] * 0.7, R[1] * 1.3);
-  const axis = new THREE.Vector3(0, 0, 1), n = 32;
-  const loop = Array.from({ length: n }, (_, i) => {
-    const a = (i / n) * TAU;
-    return new THREE.Vector3(Math.sin(a) * R[0], Math.cos(a) * R[1] * 1.15, Math.sin(a + Math.PI / 2) * R[2])
-      .applyAxisAngle(axis, -tilt);
-  });
-  // open it at its lowest, by the bag, dropping the stretch that would run past the bag's top
-  const low = loop.reduce((k, p, i) => (p.y < loop[k].y ? i : k), 0);
-  const open = Array.from({ length: n - 5 }, (_, i) => loop[(low + 3 + i) % n]);
-  const [front, behind] = [1, -1].map((sd) => top.clone().setZ(top.z + sd * dims[2] * 0.6));
-  return open[0].z > open.at(-1).z ? [front, ...open, behind] : [behind, ...open, front];
+  // The loop is where the plane through the far shoulder and the bag's top, standing front to back,
+  // cuts the padded body: it lies on the body, wherever the bag hangs. A hoop sized from the torso
+  // alone stood up to 1.6 torsos off it and hung past the bag. In p / R space the cut is a circle.
+  // ponytail: one flat cut, so a pouch's strap runs on past it, ~0.1 lower, round the near hip; a
+  // strap pulled level round the waist needs a second plane behind the bag.
+  const S = new THREE.Vector3(-R[0] * 0.55, R[1] * 0.83, 0), radii = new THREE.Vector3(...R), n = 32;
+  const m = new THREE.Vector3((top.y - S.y) * R[0], (S.x - top.x) * R[1], 0), c = (top.y - S.y) * S.x + (S.x - top.x) * S.y;
+  const centre = m.clone().multiplyScalar(c / m.lengthSq()), r = Math.sqrt(Math.max(0, 1 - (c * c) / m.lengthSq()));
+  const u = new THREE.Vector3(0, 0, 1), v = new THREE.Vector3().crossVectors(m, u).normalize();
+  const loop = Array.from({ length: n }, (_, i) => centre.clone().addScaledVector(u, r * Math.cos((i / n) * TAU))
+    .addScaledVector(v, r * Math.sin((i / n) * TAU)).multiply(radii));
+  // Opened where it passes nearest the bag, both ends run on into the bag's top the way the loop
+  // goes there. Opened at its lowest, a pouch in front took its back end straight through the body.
+  const k = loop.reduce((j, p, i) => (p.distanceToSquared(top) < loop[j].distanceToSquared(top) ? i : j), 0);
+  const way = loop[(k + 1) % n].clone().sub(loop[(k + n - 1) % n]).setY(0).normalize();
+  const reach = 0.6 * Math.hypot(way.x * dims[0], way.z * dims[2]);
+  const open = Array.from({ length: n - 5 }, (_, i) => loop[(k + 3 + i) % n]);
+  return [top.clone().addScaledVector(way, reach), ...open, top.clone().addScaledVector(way, -reach)];
 }
 
 function shortStrap(fit, R, top, dims) {
@@ -2479,7 +2694,7 @@ function buildBag(fit, f) {
   const { chest } = fit.joints;
   // Width and depth from torso width, height from torso height; fit is the bag's size (3+ sizes).
   const dims = spec.size.map((k, i) => k * fit.torso[i === 1 ? 1 : 0] * 0.5 * f.fit);
-  const centre = bagPlace(fit, spec, dims);
+  const centre = bagPlace(fit, spec, dims, f.fit);
   const fn = bagBody(dims, spec.round ?? 0, centre);
   const netted = spec.net ? { ...f, stitch: 'lace', stitchW: f.stitchW * 2, rowH: f.rowH * 2 } : f;
   const pieces = [piece(chest, panel(fn, netted, { closedU: true, minU: 32, minV: 20, from: () => centre.clone() }))];
@@ -2494,8 +2709,9 @@ function bagStraps(fit, f, spec, { centre, dims }) {
   if (spec.strap === 'cords') return paths.map((pts) => tubeAlong({ pts, closed: false }, f.thick * 0.5, 6));
   // out from the torso, a padded ellipsoid: the gradient of its surface
   const normal = (p, out) => out.set(p.x / R[0] ** 2, p.y / R[1] ** 2, p.z / R[2] ** 2).normalize();
-  // as wide as the body calls for, but never under 3.5 times the fabric is thick: or it is a cord
-  const width = Math.max(fit.torso[0] * (spec.strap === 'pack' ? 0.16 : 0.12), f.thick * 3.5);
+  // as wide as the body calls for, but never under 3.5 times the fabric is thick: or it is a cord.
+  // Knitted at the bag's gauge, fit widens it with the bag: at a fixed width it never changed.
+  const width = Math.max(fit.torso[0] * (spec.strap === 'pack' ? 0.16 : 0.12), f.thick * 3.5) * f.fit;
   return paths.map((pts) => strapBand(pts, f, { width, thick: f.thick * 0.5, normal }));
 }
 
@@ -2568,13 +2784,16 @@ function sockLeg(fit, f, node, { spec, up, loose, bunch, thigh }, anchors) {
  * ankle, easing from the thigh's girth to the shin's across the knee, its stitches below the knee
  * following the shin (skinned, as a scarf's band follows the neck). Two tubes, one on each joint,
  * left an open step at the knee -- the thigh is the wider -- and a hole when it bent.
+ * Both eases are 1 minus a rising smoothstep: three's smoothstep takes its edges low then high, and
+ * given them high then low it gave the ankle half to the thigh and the thigh half to the shin -- a
+ * bent knee turned the sock half a turn about it, two tubes sticking out like boomerangs.
  */
 function overKnee(fit, f, shin, { node: thigh, reach, yBot, loose, bunch }) {
   const knee = shin.position.y, d = fit.leg.thighR;   // the shin's joint, in the thigh's frame
-  const top = -fit.leg.femur * (1 - reach), bot = knee + yBot;
-  const radius = (y) => (y > knee ? lerp(fit.leg.thighR, shinR(fit, 0), THREE.MathUtils.smoothstep(y, knee + d, knee)) : shinR(fit, y - knee));
+  const top = -fit.leg.femur * (1 - reach), bot = knee + yBot, below = (y, a, b) => 1 - THREE.MathUtils.smoothstep(y, a, b);
+  const radius = (y) => (y > knee ? lerp(fit.leg.thighR, shinR(fit, 0), below(y, knee, knee + d)) : shinR(fit, y - knee));
   const t = tube(top, bot, (v) => (radius(lerp(top, bot, v)) + f.thick * 1.2) * loose, f, { bunch });
-  const { uv } = t.geo.attributes, bend = (v) => THREE.MathUtils.smoothstep(lerp(top, bot, v), knee + d * 0.5, knee - d * 0.5);
+  const { uv } = t.geo.attributes, bend = (v) => below(lerp(top, bot, v), knee - d * 0.5, knee + d * 0.5);
   neckSkin(t.geo, (i) => bend(uv.getY(i)));
   return { t, joint: thigh, skin: [shin] };
 }
@@ -2614,9 +2833,44 @@ export function garmentMaterial() {
   material.onBeforeCompile = (shader, renderer) => {
     hatch(shader, renderer);
     addRim(shader, rim);
+    addArmPush(shader);
   };
-  material.customProgramCacheKey = () => 'garment-knit-hatch-rim';
+  material.customProgramCacheKey = () => 'garment-knit-hatch-rim-arms';
   return material;
+}
+
+/**
+ * After skinning, a vertex inside an upper arm's capsule (armCapsules) goes straight out to its
+ * surface: cloth the arm moves into is pushed aside, every frame, on the GPU. The capsule is carried
+ * to the arm's present place by bones 3 and 4. garments.test.mjs mirrors offArm to check it.
+ */
+const ARM_PUSH_COMMON = `#include <common>
+attribute vec3 aArmA0;
+attribute vec3 aArmB0;
+attribute vec3 aArmA1;
+attribute vec3 aArmB1;
+attribute float aArmR;
+vec3 offArm(vec3 p, vec3 a, vec3 b, float r) {
+  vec3 ab = b - a;
+  float t = dot(p - a, ab) / max(dot(ab, ab), 1e-8);
+  vec3 q = a + ab * min(t, 1.0);
+  float l = length(p - q);
+  return (t >= 0.0 && l < r && l > 1e-6) ? q + (p - q) * (r / l) : p;
+}`;
+
+const ARM_PUSH_VERTEX = `#include <skinning_vertex>
+#ifdef USE_SKINNING
+  if (aArmR > 0.0) {
+    mat4 arm0 = bindMatrixInverse * getBoneMatrix(3.0), arm1 = bindMatrixInverse * getBoneMatrix(4.0);
+    transformed = offArm(transformed, (arm0 * vec4(aArmA0, 1.0)).xyz, (arm0 * vec4(aArmB0, 1.0)).xyz, aArmR);
+    transformed = offArm(transformed, (arm1 * vec4(aArmA1, 1.0)).xyz, (arm1 * vec4(aArmB1, 1.0)).xyz, aArmR);
+  }
+#endif`;
+
+function addArmPush(shader) {
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', () => ARM_PUSH_COMMON)
+    .replace('#include <skinning_vertex>', () => ARM_PUSH_VERTEX);
 }
 
 /** A Fresnel rim, added to the lit colour: light where the surface turns away from the camera. */
@@ -2640,27 +2894,42 @@ export function outfitPieces(built, outfit) {
 }
 
 /**
+ * Runs `build` with the character in its rest pose, then puts its pose of the moment back: what is
+ * worn is shaped round, and bound to, the body as it stands. Dressed mid-motion (the dress-up page
+ * redresses on every change while it dances), a lean tilted everything hung from the chest, and a
+ * shawl was cut round the arms where they swung -- off by up to 0.3m, and still off once redressed.
+ */
+function atRest(built, build) {
+  const rig = [];
+  built.root.traverse((o) => { rig.push([o, o.position.clone(), o.quaternion.clone(), o.visible]); });
+  applyPose(built, POSES.rest);
+  built.root.updateMatrixWorld(true);
+  build();
+  for (const [o, p, q, visible] of rig) {
+    o.position.copy(p);
+    o.quaternion.copy(q);
+    o.visible = visible;
+  }
+  built.root.updateMatrixWorld(true);
+}
+
+/**
  * Put an outfit on a built character, replacing whatever it wore. One mesh per joint, whatever is
  * worn there (rule 3 at the top). Returns the meshes, which are also kept on `built.garments`.
  */
 export function dress(built, outfit) {
   undress(built);
   if (outfit.hat?.on) coverUnderHat(built, fabric(outfit.hat));
-  // Built against an upright spine, whatever its pose of the moment: a lean tilted everything hung
-  // from the chest with it, and a trailing scarf's floor run, bound to the root, kept the tilt.
-  const { spine } = built.joints, bent = spine?.rotation.clone();
-  spine?.rotation.set(0, 0, 0);
-  const byJoint = new Map(), skinOf = new Map();
-  for (const { joint, geo, skinTo } of outfitPieces(built, outfit)) {
-    if (!byJoint.has(joint)) byJoint.set(joint, []);
-    byJoint.get(joint).push(geo);
-    if (skinTo) skinOf.set(joint, skinTo);
-  }
-  built.garments = [...byJoint].map(([joint, geos]) => garmentMesh(joint, geos, skinOf.get(joint)));
-  if (bent) {
-    spine.rotation.copy(bent);
-    built.root.updateMatrixWorld(true);
-  }
+  atRest(built, () => {
+    const byJoint = new Map(), skinOf = new Map();
+    for (const { joint, geo, skinTo } of outfitPieces(built, outfit)) {
+      if (!byJoint.has(joint)) byJoint.set(joint, []);
+      byJoint.get(joint).push(geo);
+      // the longest list: a shawl's [neck, root, arms] starts with a scarf's [neck, root]
+      if (skinTo && skinTo.length > (skinOf.get(joint)?.length ?? 0)) skinOf.set(joint, skinTo);
+    }
+    built.garments = [...byJoint].map(([joint, geos]) => garmentMesh(joint, geos, skinOf.get(joint)));
+  });
   return built.garments;
 }
 
@@ -2668,18 +2937,26 @@ export function dress(built, outfit) {
 function garmentMesh(joint, geos, others) {
   // still one mesh a joint: the rest of what is worn there follows the joint alone
   if (others) geos.forEach((g) => g.attributes.skinIndex || neckSkin(g, () => 0));
+  // the merge needs them on every part: a part without arms gets a radius of 0, never pushed
+  if (geos.some((g) => g.attributes.aArmR)) {
+    for (const g of geos) {
+      const n = g.attributes.position.count;
+      for (const name of ARM_ATTRIBUTES) if (!g.attributes[name]) g.setAttribute(name, new THREE.BufferAttribute(new Float32Array(n * (name === 'aArmR' ? 1 : 3)), name === 'aArmR' ? 1 : 3));
+    }
+  }
   const merged = geos.length === 1 ? strip4(geos[0]) : mergeGeometries(geos.map(strip4), false);
   if (geos.length > 1) geos.forEach((g) => g.dispose());
   const mesh = others ? skinnedGarment(merged, joint, others) : new THREE.Mesh(merged, garmentMaterial());
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.userData.garment = true;
+  mesh.userData.dropOnMerge = ARM_ATTRIBUTES;   // the arm push needs this mesh's own skeleton
   joint.add(mesh);
   return mesh;
 }
 
 // mergeGeometries needs every part to carry exactly the same attributes.
-const KEEP = new Set(['position', 'normal', 'uv', 'color', 'aHatchScale', 'skinIndex', 'skinWeight']);
+const KEEP = new Set(['position', 'normal', 'uv', 'color', 'aHatchScale', 'skinIndex', 'skinWeight', ...ARM_ATTRIBUTES]);
 function strip4(geo) {
   for (const name of Object.keys(geo.attributes)) if (!KEEP.has(name)) geo.deleteAttribute(name);
   if (!geo.index) geo.setIndex([...Array(geo.attributes.position.count).keys()]);

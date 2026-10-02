@@ -13,7 +13,7 @@ import {
 } from './npc.js';
 import { randomTraits } from './visit.js';
 import {
-  GARMENTS, STITCHES_BY_CRAFT, COLOURWORKS, EDGES, FORMS, ACCESSORIES, CRAFTS, SLEEVES, WEIGHTS, FIBRES, craftStitch,
+  GARMENTS, STITCHES_BY_CRAFT, COLOURWORKS, EDGES, formsOf, accessoriesOf, CRAFTS, SLEEVES, WEIGHTS, FIBRES, craftStitch,
   FIT_RANGE, TOOL_RANGE, LOOK, MAX_COLOURS, defaultItem, dress, undress, garmentMaterial, resolveColourwork, hasForm, randomItem,
   madeItem, usualTool,
 } from './garments.js';
@@ -237,6 +237,20 @@ function save() {
 
 // Merged OVER defaults, never used wholesale: a save from before a key existed would leave it
 // undefined, and one undefined number is a NaN mesh scale and a culled character.
+/**
+ * A saved pattern made good against today's vocabulary: a form or accessory its type no longer
+ * offers (a shawl wrapped twice) becomes the first it does, or none; a stitch off its craft, a
+ * missing tool and a fit (patterns no longer keep one) as they always were.
+ */
+function mendPattern(type, p) {
+  if (!GARMENTS[type].silhouettes.includes(p.silhouette)) p.silhouette = GARMENTS[type].silhouettes[0];
+  if (formsOf(type).length && !formsOf(type).includes(p.form)) p.form = formsOf(type)[0];
+  if (!accessoriesOf(type).includes(p.accessory)) p.accessory = 'none';
+  p.stitch = craftStitch(p.craft, p.stitch);
+  p.tool ??= usualTool(p.craft, p.weight);
+  delete p.fit;
+}
+
 function load() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null');
@@ -246,11 +260,7 @@ function load() {
     // A save from before patterns kept one `outfit`: its items become the patterns, fit dropped.
     const pats = saved.patterns ?? saved.outfit;
     state.patterns = Object.fromEntries(Object.keys(GARMENTS).map((type) => [type, { ...freshPattern(type), ...pats?.[type] }]));
-    for (const p of Object.values(state.patterns)) {
-      p.stitch = craftStitch(p.craft, p.stitch);
-      p.tool ??= usualTool(p.craft, p.weight);
-      delete p.fit;
-    }
+    for (const [type, p] of Object.entries(state.patterns)) mendPattern(type, p);
     state.used = Object.fromEntries(Object.keys(GARMENTS).map((type) => [type, { ...freshUse(), ...saved.used?.[type] }]));
     delete state.outfit;
     state.params = /** @type {typeof state.params} */ (Object.fromEntries(SLOTS.map((id) => [id, saved.params?.[id] ? { ...freshParams(id), ...saved.params[id] } : null])));
@@ -472,7 +482,7 @@ function addShapeControls(folder, type, redress) {
   // Form only where it changes the item: an infinity scarf or a cowl has no ends to tie.
   let form = null;
   folder.add(p, 'silhouette', g.silhouettes).onChange(() => { form?.show(hasForm(type, p.silhouette)); redress(); });
-  if (g.form) form = folder.add(p, 'form', FORMS).onChange(redress).show(hasForm(type, p.silhouette));
+  if (formsOf(type).length) form = folder.add(p, 'form', formsOf(type)).onChange(redress).show(hasForm(type, p.silhouette));
   if (g.sleeves) folder.add(p, 'sleeves', SLEEVES).onChange(redress);
 }
 
@@ -502,7 +512,7 @@ function addPatternFolder(folder, type, redress) {
   folder.add(p, 'stitch', STITCHES_BY_CRAFT[p.craft] ?? STITCHES_BY_CRAFT.knit).onChange(redress);
   folder.add(p, 'colourwork', COLOURWORKS).onChange(redress);
   folder.add(p, 'edge', EDGES).onChange(redress);
-  folder.add(p, 'accessory', ACCESSORIES).onChange(redress);
+  folder.add(p, 'accessory', accessoriesOf(type)).onChange(redress);
   addYarnControls(folder, type, redress, retool);
 }
 
@@ -518,7 +528,7 @@ function addUsedFolder(folder, type, redress) {
   folder.add(u, 'stitch', [AS, ...(STITCHES_BY_CRAFT[craft] ?? STITCHES_BY_CRAFT.knit)]).onChange(redress);
   folder.add(u, 'colourwork', [AS, ...COLOURWORKS]).onChange(redress);
   folder.add(u, 'edge', [AS, ...EDGES]).onChange(redress);
-  folder.add(u, 'accessory', [AS, ...ACCESSORIES]).onChange(redress);
+  folder.add(u, 'accessory', [AS, ...accessoriesOf(type)]).onChange(redress);
   folder.add(u, 'forceFit').name('force fit').onChange(redress);
   folder.add(u, 'fit', FIT_RANGE[0], FIT_RANGE[1], 0.01).name('  fit').onFinishChange(redress);
   folder.add({ f: () => clearUsed(type) }, 'f').name('back to pattern');

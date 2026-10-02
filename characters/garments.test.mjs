@@ -13,7 +13,8 @@ import './llama.js';
 import './lion.js';
 import {
   GARMENTS, STITCHES, STITCHES_BY_CRAFT, EDGES, ACCESSORIES, COLOURWORKS, FORMS, SLEEVES, FIT_RANGE, MAX_COLOURS, fabric,
-  LOOK, WEIGHTS, madeItem, usualTool, bodyFit, defaultItem, dress, undress, resolveColourwork, hasForm, garmentMaterial,
+  LOOK, WEIGHTS, madeItem, usualTool, bodyFit, defaultItem, dress, undress, resolveColourwork, hasForm, garmentMaterial, randomItem, outfitPieces,
+  formsOf, accessoriesOf,
 } from './garments.js';
 
 // Judge the look close up, as the dress-up page does; the game's 150px cull has its own check.
@@ -261,7 +262,7 @@ for (const id of speciesIds()) {
     return hi - lo;
   };
   const was = LOOK.stitchScale;
-  for (const [type, silhouette] of [['hat', 'beanie'], ['shawl', 'triangle'], ['socks', 'crew']]) {
+  for (const [type, silhouette] of [['hat', 'beanie'], ['socks', 'crew']]) {
     LOOK.stitchScale = 1;
     const small = pomWidth(type, silhouette);
     LOOK.stitchScale = 6;
@@ -413,6 +414,36 @@ for (const id of speciesIds()) {
     const kept = g.index.count / 3 / (2 * g.attributes.position.count);
     assert.ok(kept < 0.8, `${craft} lace keeps ${(kept * 100).toFixed(0)}% of its fabric -- the holes are too small to read`);
   }
+}
+
+// --- lace holes are triangles with straight edges ------------------------------------------------
+//
+// Round holes cut from whole quads were staircases: pixelated circles. An eyelet's edges run along
+// quad sides across the fabric (its base) and along diagonals: never straight up the fabric, which
+// is the riser of every stair. Counted on the hole edges inside the sheet.
+{
+  const built = build('lion');
+  dress(built, { hat: item('hat', { stitch: 'lace', craft: 'crochet', edge: 'none' }) });
+  const g = built.garments[0].geometry, { uv } = g.attributes, idx = g.index.array;
+  let cols = 0;
+  while (uv.getY(cols) === 0) cols++;
+  const rows = uv.count / cols, uses = new Map();
+  for (let t = 0; t < idx.length; t += 3) {
+    for (const [a, b] of [[idx[t], idx[t + 1]], [idx[t + 1], idx[t + 2]], [idx[t + 2], idx[t]]]) {
+      const k = Math.min(a, b) * uv.count + Math.max(a, b);
+      uses.set(k, (uses.get(k) ?? 0) + 1);
+    }
+  }
+  let risers = 0, edges = 0;
+  for (const [k, n] of uses) {
+    if (n !== 1) continue;
+    const a = Math.floor(k / uv.count), b = k % uv.count, [ca, ra, cb, rb] = [a % cols, Math.floor(a / cols), b % cols, Math.floor(b / cols)];
+    if ([ca, cb].some((c) => c === 0 || c === cols - 1) || [ra, rb].some((r) => r === 0 || r === rows - 1)) continue;
+    edges++;
+    if (ca === cb) risers++;
+  }
+  assert.ok(edges > 50, `the lace hat has only ${edges} hole edges -- no holes to check`);
+  assert.equal(risers, 0, `${risers} of the lace holes' ${edges} edges run straight up the fabric -- they are stair-stepped, not triangles`);
 }
 
 // --- puff stitch is poofs, not spikes ---------------------------------------------------------
@@ -635,8 +666,9 @@ for (const id of speciesIds()) {
   const fit = bodyFit(built);
   const loop = dress(built, { scarf: item('scarf', { silhouette: 'infinity', edge: 'none' }) })[0].geometry;
   loop.computeBoundingBox();
-  const headBottom = fit.neck.headY - fit.skull[1];
-  assert.ok(loop.boundingBox.max.y < headBottom + 0.01, `${id}: the infinity scarf reaches ${loop.boundingBox.max.y.toFixed(3)}, up past the bottom of the head at ${headBottom.toFixed(3)}`);
+  // Under the eyes, not under the head: a lion's or an owl's head comes down to its shoulders, and
+  // kept under it the scarf ringed the shoulders, out to the arms.
+  assert.ok(loop.boundingBox.max.y < fit.neck.eyeBottom + 0.002, `${id}: the infinity scarf reaches ${loop.boundingBox.max.y.toFixed(3)}, up past the eyes at ${fit.neck.eyeBottom.toFixed(3)}`);
   undress(built);
 }
 {
@@ -807,6 +839,506 @@ for (const id of speciesIds()) {
     const d = Math.max(...['min', 'max'].flatMap((e) => ['x', 'y', 'z'].map((ax) => Math.abs(m[e][ax] - a2[e][ax]))));
     assert.ok(d < 1e-4, `${id}: merged, the scarf lands ${d.toFixed(4)} from where it is unmerged with the head turned -- it lost the neck`);
   }
+}
+
+// --- wrapped, a scarf is a strip of fabric snug round the neck, not a tube out to the arms ---------
+//
+// Round the neck a band was bunched about a centre line, as thick as wide, at the radius of the
+// widest thing at its middle height, each turn a tube's width further out: wrapped, it reached the
+// arms, and an infinity scarf passed them even in lace weight. Measured: the part round the neck.
+{
+  const reach = (id, over) => {
+    const built = build(id), fit = bodyFit(built);
+    let r = 0;
+    for (const m of dress(built, { scarf: item('scarf', { edge: 'none', accessory: 'none', ...over }) })) {
+      const p = m.geometry.attributes.position, sw = m.geometry.attributes.skinWeight;
+      for (let i = 0; i < p.count; i++) if (m.parent === built.joints.neck || sw?.getY(i) > 0.5) r = Math.max(r, Math.hypot(p.getX(i), p.getZ(i)));
+    }
+    return r / fit.shoulderX;
+  };
+  for (const id of speciesIds()) {
+    for (const [silhouette, form, most] of [['long', 'wrapped once', 1], ['long', 'wrapped twice', 1.1], ['chunky wrap', 'wrapped once', 1.2], ['infinity', 'draped', 1]]) {
+      const r = reach(id, { silhouette, form });
+      assert.ok(r <= most, `${id}: a worsted ${silhouette} ${form} reaches ${r.toFixed(2)} of the way to the shoulder's edge -- at most ${most}`);
+    }
+    const lace = reach(id, { silhouette: 'infinity', weight: 'lace', tool: null });
+    assert.ok(lace <= 0.8, `${id}: a lace-weight infinity scarf reaches ${lace.toFixed(2)} of the way to the shoulder's edge -- it is a fine scarf, snug`);
+  }
+}
+
+// --- wrapped, a band stands upright round the neck: its edges are no further out than its face -------
+//
+// Out to the body at each height, in the owl's and the lion's crease the top edge rode out over the
+// head and the bottom out over the shoulders, past the band's own outer face: a C in section, a
+// saucer round the neck. Measured round the neck, in each row across the band.
+{
+  for (const id of speciesIds()) {
+    for (const [silhouette, form] of [['long', 'wrapped once'], ['chunky wrap', 'wrapped twice'], ['infinity', 'draped'], ['kerchief', 'draped']]) {
+      const built = build(id);
+      const m = dress(built, { scarf: item('scarf', { silhouette, form, edge: 'none', accessory: 'none' }) })[0];
+      const { position: p, uv, skinWeight: sw } = m.geometry.attributes;
+      const rows = new Map();
+      for (let i = 0; i < p.count; i++) {
+        if (sw && sw.getY(i) < 0.99) continue;
+        const row = rows.get(uv.getY(i)) ?? [];
+        rows.set(uv.getY(i), [...row, [p.getY(i), Math.hypot(p.getX(i), p.getZ(i))]]);
+      }
+      let worst = Infinity;
+      for (const row of rows.values()) {
+        const ys = row.map(([y]) => y), lo = Math.min(...ys), hi = Math.max(...ys), mid = (lo + hi) / 2;
+        const edges = (row.find(([y]) => y === lo)[1] + row.find(([y]) => y === hi)[1]) / 2;
+        const face = Math.max(...row.filter(([y]) => Math.abs(y - mid) < (hi - lo) * 0.25).map(([, r]) => r));
+        worst = Math.min(worst, face - edges);
+      }
+      assert.ok(worst > 0, `${id}: a ${silhouette} ${form}'s edges stand ${(-worst).toFixed(3)} further out than its face -- a saucer, not a band`);
+    }
+  }
+}
+
+// --- a kerchief's triangle hangs from its band ------------------------------------------------------
+//
+// The triangle was a flat piece on the chest and the band a loop on the neck, and they never met:
+// the triangle's top must be tucked inside the band at the front, and follow the neck with it.
+for (const id of speciesIds()) for (const form of ['draped', 'wrapped once', 'tied']) for (const weight of ['lace', 'super-bulky']) {
+  const built = build(id), fit = bodyFit(built);
+  dress(built, { scarf: item('scarf', { silhouette: 'kerchief', form, weight, tool: null, edge: 'none', accessory: 'none' }) });
+  const band = built.garments.find((m) => m.parent === built.joints.neck).geometry.attributes.position;
+  const tri = built.garments.find((m) => m.parent === built.joints.chest).geometry;
+  const p = tri.attributes.position, { uv, skinWeight } = tri.attributes;
+  let tops = 0;
+  for (let i = 0; i < p.count; i++) {
+    if (uv.getY(i) !== 0) continue;
+    tops++;
+    assert.ok(skinWeight.getY(i) > 0.99, `${id} ${form}: the kerchief's top follows the neck by ${skinWeight.getY(i).toFixed(2)} -- it parts from the band when the head turns`);
+    const y = p.getY(i) - fit.neck.y, az = Math.atan2(p.getX(i), p.getZ(i)), r = Math.hypot(p.getX(i), p.getZ(i));
+    let lo = Infinity, hi = -Infinity, outR = 0;
+    for (let k = 0; k < band.count; k++) {
+      const d = Math.abs(((Math.atan2(band.getX(k), band.getZ(k)) - az + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+      if (d > 0.2) continue;
+      lo = Math.min(lo, band.getY(k));
+      hi = Math.max(hi, band.getY(k));
+      outR = Math.max(outR, Math.hypot(band.getX(k), band.getZ(k)));
+    }
+    assert.ok(y > lo && y < hi && r < outR, `${id} ${form} ${weight}: the kerchief's top is at y ${y.toFixed(3)} r ${r.toFixed(3)}, outside its band (y ${lo.toFixed(3)}..${hi.toFixed(3)}, out to ${outR.toFixed(3)}) -- it floats free of it`);
+  }
+  assert.ok(tops > 0, `${id}: the kerchief has no top row to check`);
+}
+
+// --- a trailing scarf lies on the floor, bends onto it, and stays there as the body leans ----------
+//
+// Its ends met the floor in a corner, and rode the chest: lean forward and the part on the floor
+// rose behind like skis. The floor part follows the root; the bend onto it is gradual.
+for (const id of speciesIds()) {
+  const built = build(id), fit = bodyFit(built), f = fabric(item('scarf'));
+  dress(built, { scarf: item('scarf', { silhouette: 'trailing', form: 'wrapped once', edge: 'none', accessory: 'none' }) });
+  const m = bandOf(built), v = new THREE.Vector3();
+  const world = () => {
+    built.root.updateMatrixWorld(true);
+    return Array.from({ length: m.geometry.attributes.position.count }, (_, i) => m.getVertexPosition(i, new THREE.Vector3()).applyMatrix4(m.matrixWorld).y);
+  };
+  const still = world(), floorY = Math.min(...still);
+  const lying = still.map((y, i) => (y < floorY + f.thick * 2.5 ? i : -1)).filter((i) => i >= 0);
+  assert.ok(lying.length > 20, `${id}: only ${lying.length} vertices of a trailing scarf lie on the floor`);
+  built.joints.spine.rotation.x = 0.45;
+  const leant = world();
+  const rose = Math.max(...lying.map((i) => leant[i] - still[i]));
+  assert.ok(rose < f.thick, `${id}: leaning forward lifts the trailing scarf ${rose.toFixed(3)} off the floor -- it should stay down`);
+  built.joints.spine.rotation.x = 0;
+  // the bend onto the floor: no two row steps along the band more than 40 degrees apart near it
+  const p = m.geometry.attributes.position, { uv } = m.geometry.attributes;
+  let cols = 0;
+  while (uv.getY(cols) === 0) cols++;
+  let sharpest = 0;
+  const a = new THREE.Vector3(), b = new THREE.Vector3();
+  for (let i = cols; i + cols < p.count; i += cols) {
+    if (p.getY(i) > fit.floor + fit.torso[1] * 0.6) continue;
+    a.fromBufferAttribute(p, i).sub(v.fromBufferAttribute(p, i - cols));
+    b.fromBufferAttribute(p, i + cols).sub(v.fromBufferAttribute(p, i));
+    if (a.lengthSq() > 1e-10 && b.lengthSq() > 1e-10) sharpest = Math.max(sharpest, a.angleTo(b));
+  }
+  assert.ok(sharpest < THREE.MathUtils.degToRad(40), `${id}: the trailing scarf turns ${THREE.MathUtils.radToDeg(sharpest).toFixed(0)} degrees in one step onto the floor -- a kink, not a drape`);
+  // Dressed mid-lean (the dress-up page dresses whatever the idle is doing), then standing up: the
+  // floor run was built in the leaning chest's frame and lay tilted 15 degrees off the floor.
+  built.joints.spine.rotation.x = 0.26;
+  dress(built, { scarf: item('scarf', { silhouette: 'trailing', form: 'wrapped once', edge: 'none', accessory: 'none' }) });
+  built.joints.spine.rotation.x = 0;
+  const lean = bandOf(built);
+  built.root.updateMatrixWorld(true);
+  let high = 0;
+  for (let i = 0; i < lean.geometry.attributes.position.count; i++) {
+    const w = lean.getVertexPosition(i, v).applyMatrix4(lean.matrixWorld);
+    if (w.z < -fit.torso[2] * 1.5) high = Math.max(high, w.y);
+  }
+  assert.ok(high < f.thick * 4, `${id}: dressed while leaning, the trailing scarf's floor run rises to ${high.toFixed(3)} behind -- it lies at an angle, not on the floor`);
+}
+
+// --- a pom-pom on a scarf's end hangs off the end ---------------------------------------------------
+//
+// Centred on the tip, half of each pom-pom sat up on the scarf.
+for (const id of speciesIds()) {
+  const built = build(id);
+  dress(built, { scarf: item('scarf', { silhouette: 'long', form: 'draped', edge: 'none', accessory: 'pom-pom', colourwork: 'checks', colorCount: 3, color1: '#ff0000', color2: '#ff0000', color3: '#00ff00' }) });   // the third colour is the trim
+  const g = bandOf(built).geometry, p = g.attributes.position, c = g.attributes.color;
+  // Its centre is most of its own radius clear of the scarf: past the tip, below it or (trailing, on
+  // the owl's short legs) along the floor beyond it.
+  for (const side of [1, -1]) {
+    const scarf = [], pom = [];
+    for (let i = 0; i < p.count; i++) {
+      if (Math.sign(p.getX(i)) !== side) continue;
+      const v = new THREE.Vector3().fromBufferAttribute(p, i);
+      if (c.getX(i) > 0.5) scarf.push(v);
+      else if (c.getY(i) > 0.5) pom.push(v);
+    }
+    assert.ok(pom.length > 0, `${id}: no pom-pom found on the ${side > 0 ? 'left' : 'right'} end`);
+    const centre = pom.reduce((s, v) => s.add(v), new THREE.Vector3()).divideScalar(pom.length);
+    const radius = Math.max(...pom.map((v) => v.distanceTo(centre)));
+    const clear = Math.min(...scarf.map((v) => v.distanceTo(centre)));
+    assert.ok(clear > radius * 0.8, `${id}: a pom-pom's centre is ${(clear / radius).toFixed(2)} of its radius from the scarf -- it sits on the scarf, not off its end`);
+  }
+}
+
+// --- a flower or buttons on a scarf are on the scarf -----------------------------------------------
+//
+// They went down the middle of the chest whatever the scarf did: between its ends, on the body.
+for (const id of speciesIds()) for (const accessory of ['flower', 'buttons']) for (const form of ['draped', 'wrapped once']) {
+  const built = build(id);
+  dress(built, { scarf: item('scarf', { silhouette: 'long', form, edge: 'none', accessory, colourwork: 'checks', colorCount: 3, color1: '#ff0000', color2: '#ff0000', color3: '#00ff00' }) });
+  const g = bandOf(built).geometry, p = g.attributes.position, c = g.attributes.color;
+  const scarf = [], acc = [];
+  for (let i = 0; i < p.count; i++) (c.getX(i) > 0.5 ? scarf : c.getY(i) > 0.5 ? acc : []).push(new THREE.Vector3().fromBufferAttribute(p, i));
+  const centre = acc.reduce((s, v) => s.add(v), new THREE.Vector3()).divideScalar(acc.length);
+  const off = Math.min(...scarf.map((v) => v.distanceTo(centre)));
+  assert.ok(acc.length && off < bodyFit(built).torso[0] * 0.1, `${id} ${form}: the ${accessory} sits ${off.toFixed(3)} from the scarf -- it is on the body, not on the scarf`);
+}
+
+// --- every scarf wears the accessories it can -----------------------------------------------------
+//
+// A loop (kerchief, infinity) offered no place for any: a flower on a kerchief was simply not made.
+// Every scarf takes every one: a pom-pom or tassel hangs off an end or a point, or a loop's or a
+// cowl's bottom edge.
+for (const silhouette of GARMENTS.scarf.silhouettes) for (const accessory of ['flower', 'buttons', 'pom-pom', 'tassel']) {
+  const built = build('lion');
+  const meshes = dress(built, { scarf: item('scarf', { silhouette, form: 'wrapped twice', weight: 'super-bulky', tool: null, edge: 'none', accessory, colourwork: 'checks', colorCount: 3, color1: '#ff0000', color2: '#ff0000', color3: '#00ff00' }) });
+  const trim = meshes.reduce((n, m) => {
+    const c = m.geometry.attributes.color;
+    let k = 0;
+    for (let i = 0; i < c.count; i++) if (c.getY(i) > 0.5 && c.getX(i) < 0.5) k++;
+    return n + k;
+  }, 0);
+  assert.ok(trim > 0, `a ${silhouette} with a ${accessory} has none -- it offers nowhere to put one`);
+}
+
+// --- a flower on super-bulky stands on the stitches, not sunk among them, nor over them -----------
+//
+// It was placed on the fabric's surface before relief, and super-bulky's deep stitches swallowed all
+// but its centre. Then lifted by the deepest stitch wherever it was, between two cables it hovered.
+// Little of it is behind the fabric's face, and it touches the stitches.
+for (const id of speciesIds()) {
+  const built = build(id);
+  dress(built, { scarf: item('scarf', { silhouette: 'long', form: 'draped', edge: 'none', accessory: 'flower', weight: 'super-bulky', tool: null, stitch: 'cable', colourwork: 'checks', colorCount: 3, color1: '#ff0000', color2: '#ff0000', color3: '#00ff00' }) });
+  const g = bandOf(built).geometry, p = g.attributes.position, c = g.attributes.color, n = g.attributes.normal;
+  const scarf = [], bloom = [];
+  for (let i = 0; i < p.count; i++) (c.getX(i) > 0.5 ? scarf : c.getY(i) > 0.5 ? bloom : []).push(i);
+  const v = new THREE.Vector3(), s = new THREE.Vector3(), centre = new THREE.Vector3();
+  bloom.forEach((i) => centre.add(v.fromBufferAttribute(p, i)));
+  centre.divideScalar(bloom.length);
+  const size = Math.max(...bloom.map((i) => v.fromBufferAttribute(p, i).distanceTo(centre)));
+  let behind = 0, touch = Infinity;
+  for (const i of bloom) {
+    v.fromBufferAttribute(p, i);
+    let best = -1, d = Infinity;
+    for (const k of scarf) {
+      const e = v.distanceToSquared(s.fromBufferAttribute(p, k));
+      if (e < d) [d, best] = [e, k];
+    }
+    touch = Math.min(touch, Math.sqrt(d));
+    if (v.sub(s.fromBufferAttribute(p, best)).dot(new THREE.Vector3().fromBufferAttribute(n, best)) < 0) behind++;
+  }
+  assert.ok(behind / bloom.length < 0.15, `${id}: ${((100 * behind) / bloom.length).toFixed(0)}% of a flower on super-bulky is behind the fabric -- sunk among the stitches`);
+  assert.ok(touch < size * 0.15, `${id}: a flower on super-bulky is ${(touch / size).toFixed(2)} of its size off the stitches -- it hovers`);
+}
+
+// --- a kerchief hangs off its band, with no shelf where the neck's coat starts ---------------------
+//
+// On the llama its band sat above the ruff and the triangle stepped straight out over the ruff's top:
+// a shelf round the neck.
+for (const id of speciesIds()) {
+  const built = build(id);
+  dress(built, { scarf: item('scarf', { silhouette: 'kerchief', form: 'draped', edge: 'none', accessory: 'none' }) });
+  const g = built.garments.find((m) => m.parent === built.joints.chest).geometry, p = g.attributes.position, { uv } = g.attributes;
+  let cols = 0;
+  while (uv.getY(cols) === 0) cols++;
+  const mid = Math.round((cols - 1) / 2);
+  // Draped, it runs out less steeply the further down it gets (round a lion's chest it starts steep
+  // and eases). A shelf is the slope jumping UP partway down.
+  let last = Infinity, jump = 0;
+  for (let i = mid + cols; i < p.count; i += cols) {
+    const dr = Math.hypot(p.getX(i), p.getZ(i)) - Math.hypot(p.getX(i - cols), p.getZ(i - cols)), dy = Math.abs(p.getY(i) - p.getY(i - cols));
+    if (dy < 1e-6) continue;
+    jump = Math.max(jump, dr / dy - last);
+    last = dr / dy;
+  }
+  assert.ok(jump < 0.5, `${id}: partway down its middle the kerchief turns ${jump.toFixed(1)} steeper outward at once -- a shelf, not a drape`);
+}
+
+// --- every accessory on every scarf is on it: touching the fabric, not sunk in it -----------------
+//
+// Lifted by the deepest stitch, a button between two cables hovered; hung off a band's centre line, a
+// tassel hung below the open end of a flat band; a straight row of buttons left a curved kerchief at
+// both ends. Super-bulky cable is the deepest fabric there is. Each accessory -- the pieces that are
+// trim-coloured and not there without it -- has some point within 15% of its size of the fabric, and
+// its centre is not sunk in it.
+{
+  const q = new THREE.Vector3(), v = new THREE.Vector3();
+  const PARTS = { 'pom-pom': 1, tassel: 2, flower: 6, buttons: 1 }, SUNK = { 'pom-pom': 0.3, tassel: 0.3, flower: 0.08, buttons: 0.08 };
+  const near = (tris, p, box) => {
+    let d = Infinity;
+    for (const t of tris) {
+      if (box && !box.intersectsTriangle(t)) continue;
+      d = Math.min(d, t.closestPointToPoint(p, q).distanceTo(p));
+    }
+    return d;
+  };
+  for (const id of speciesIds()) {
+    const built = build(id);
+    built.root.updateMatrixWorld(true);
+    const world = (pcs) => pcs.map(({ joint, geo }) => geo.clone().applyMatrix4(joint.matrixWorld));
+    const trim = ({ geo }) => geo.attributes.color.getY(0) > 0.5;
+    const key = ({ geo }) => { const a = geo.attributes.position; return `${a.count}:${a.getX(0)}:${a.getY(0)}:${a.getZ(0)}`; };
+    for (const silhouette of GARMENTS.scarf.silhouettes) {
+      const base = { silhouette, form: 'wrapped twice', weight: 'super-bulky', tool: null, stitch: 'cable', edge: 'none', colourwork: 'solid', colorCount: 2, color1: '#ff0000', color2: '#00ff00' };
+      const bare = outfitPieces(built, { scarf: item('scarf', { ...base, accessory: 'none' }) });
+      const had = new Set(bare.filter(trim).map(key));
+      const tris = world(bare.filter((pc) => !trim(pc))).flatMap((g) => {
+        const p = g.attributes.position, idx = g.index.array, out = [];
+        for (let t = 0; t < idx.length; t += 3) out.push(new THREE.Triangle(...[0, 1, 2].map((k) => new THREE.Vector3().fromBufferAttribute(p, idx[t + k]))));
+        return out;
+      });
+      for (const accessory of ['pom-pom', 'tassel', 'flower', 'buttons']) {
+        const parts = world(outfitPieces(built, { scarf: item('scarf', { ...base, accessory }) }).filter((pc) => trim(pc) && !had.has(key(pc))));
+        assert.ok(parts.length, `${id}: a ${silhouette} with a ${accessory} has none`);
+        for (let u = 0; u < parts.length; u += PARTS[accessory]) {
+          const box = new THREE.Box3();
+          parts.slice(u, u + PARTS[accessory]).forEach((g) => box.expandByObject(new THREE.Mesh(g)));
+          const size = box.getSize(new THREE.Vector3()).length() / 2, centre = box.getCenter(new THREE.Vector3()), around = box.clone().expandByScalar(size);
+          let gap = Infinity;
+          for (const g of parts.slice(u, u + PARTS[accessory])) {
+            const p = g.attributes.position;
+            for (let i = 0; i < p.count; i += 3) gap = Math.min(gap, near(tris, v.fromBufferAttribute(p, i), around));
+          }
+          const what = `${id}: a ${accessory} (#${u / PARTS[accessory]}) on a super-bulky cable ${silhouette}`;
+          assert.ok(gap < size * 0.15, `${what} is ${(gap / size).toFixed(2)} of its size off the fabric -- it hovers`);
+          assert.ok(near(tris, centre, null) > size * SUNK[accessory], `${what} has its centre ${(near(tris, centre, null) / size).toFixed(2)} of its size from the fabric -- sunk in it`);
+        }
+      }
+    }
+  }
+}
+
+// --- a band never shears from one row to the next ----------------------------------------------------
+//
+// Its width was taken fresh at each point, from "round the body" leaning to "up" as it bunched. Where
+// it turned up off the llama's chest into its wrap, its way passed through that very direction, the
+// width flipped, and the band sheared inside out across one row: a blade off the neck. And pressed
+// onto the body at each stitch's own height, a band crossing the top of the llama's ruff tore in two.
+// From each row to the next no stitch moves far more than stitches usually do. (The QA scarf.)
+for (const id of speciesIds()) for (const tool of [2.5, 6]) for (const form of ['wrapped once', 'wrapped twice']) {
+  const built = build(id);
+  dress(built, { scarf: item('scarf', { silhouette: 'long', form, craft: 'crochet', stitch: 'single crochet', colourwork: 'solid', edge: 'ribbed', accessory: 'pom-pom', weight: 'worsted', fibre: 'alpaca', tool }) });
+  const { position: p, uv } = bandOf(built).geometry.attributes;
+  let cols = 0;
+  while (uv.getY(cols) === 0) cols++;
+  // the band's own rows: what is merged after it (its edging, its pom-poms) starts v over
+  let rows = 1;
+  while ((rows + 1) * cols <= p.count && uv.getY(rows * cols) > uv.getY((rows - 1) * cols)) rows++;
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), steps = [];
+  for (let r = 0; r + 1 < rows; r++) for (let c = 0; c < cols; c++) steps.push(a.fromBufferAttribute(p, r * cols + c).distanceTo(b.fromBufferAttribute(p, (r + 1) * cols + c)));
+  const sorted = [...steps].sort((x, y) => x - y), worst = sorted.at(-1) / sorted[sorted.length >> 1];
+  assert.ok(worst < 7, `${id}: a crochet scarf ${form} with a ${tool}mm hook steps ${worst.toFixed(1)} times the usual from one row to the next -- it shears`);
+}
+
+// --- a scarf the wrong size reads as wrong: too big slumps to one side, too small chokes -------------
+//
+// Fit only made the ends longer or shorter: an oversized scarf looked like a long one, an undersized
+// one like a short one. Like a hat, a scarf too big is a ring too wide for the neck: it slides down
+// onto the shoulders and slumps to one side -- or, held up by an owl's wings, hangs from the back of
+// the neck and droops in front, not round it like a hula hoop; too small, it is a ribbon pulled tight,
+// high under the chin. Measured on what goes round the neck, in the world, against fit 1.
+{
+  const round = (id, silhouette, fit) => {
+    const built = build(id);
+    const meshes = dress(built, { scarf: item('scarf', { silhouette, form: 'wrapped once', fit, edge: 'none', accessory: 'none' }) });
+    built.root.updateMatrixWorld(true);
+    const axis = new THREE.Vector3().setFromMatrixPosition(built.joints.neck.matrixWorld), pts = [];
+    for (const m of meshes) {
+      const sw = m.geometry.attributes.skinWeight;
+      for (let i = 0; i < m.geometry.attributes.position.count; i++) {
+        if (m.parent === built.joints.neck || sw?.getY(i) > 0.5) pts.push(m.getVertexPosition(i, new THREE.Vector3()).applyMatrix4(m.matrixWorld).sub(axis));
+      }
+    }
+    const mean = (a) => a.reduce((t, x) => t + x, 0) / a.length;
+    const side = (sg) => mean(pts.filter((q) => Math.sign(q.x) === sg).map((q) => q.y));
+    const end = (sg) => mean(pts.filter((q) => Math.sign(q.z) === sg).map((q) => q.y));
+    // the band's own width, across its tip row
+    const g = meshes[0].geometry, { uv, position: p } = g.attributes, tip = [];
+    for (let i = 0; i < uv.count && uv.getY(i) === 0; i++) tip.push(new THREE.Vector3().fromBufferAttribute(p, i));
+    const wide = Math.max(...tip.flatMap((a) => tip.map((b) => a.distanceTo(b))));
+    return { y: mean(pts.map((q) => q.y)), r: mean(pts.map((q) => Math.hypot(q.x, q.z))), slump: side(-1) - side(1), droop: end(-1) - end(1), wide };
+  };
+  for (const id of speciesIds()) for (const silhouette of ['long', 'chunky wrap', 'infinity', 'kerchief', 'cowl']) {
+    const [small, fitted, big] = [FIT_RANGE[0], 1, FIT_RANGE[1]].map((fit) => round(id, silhouette, fit));
+    const what = `${id}: a ${silhouette}`;
+    const fell = Math.max(big.slump - fitted.slump, big.droop - fitted.droop);
+    assert.ok(fell > 0.04, `${what} too big slumps ${fell.toFixed(3)} to one side or the front -- it should slump over a shoulder or droop`);
+    assert.ok(big.y < fitted.y && big.r > fitted.r * 1.3, `${what} too big sits at ${big.y.toFixed(3)}, ${big.r.toFixed(3)} out -- it should drop, loose, onto the shoulders (fitted: ${fitted.y.toFixed(3)}, ${fitted.r.toFixed(3)})`);
+    if (['long', 'chunky wrap'].includes(silhouette)) {
+      assert.ok(small.wide < fitted.wide * 0.5, `${what} too small is ${small.wide.toFixed(3)} wide -- a ribbon, not ${fitted.wide.toFixed(3)}`);
+    } else {
+      // tighter, or up under the chin -- where a lion's head is wider, but it is pulled tight there
+      assert.ok(small.y >= fitted.y - 1e-6 && (small.r < fitted.r || small.y > fitted.y + 0.02), `${what} too small sits at ${small.y.toFixed(3)}, ${small.r.toFixed(3)} out -- it should be tight and high (fitted: ${fitted.y.toFixed(3)}, ${fitted.r.toFixed(3)})`);
+    }
+  }
+}
+
+// --- a bag's strap is a flat strap, its ends in the bag ---------------------------------------------
+//
+// A cross strap was a loop round the body that never met the bag: two pieces, the bag hung from
+// nothing. Every strap was a round tube, a cord; and a backpack's ran from the chest straight back
+// through the body to the bag. Each strap's two ends are inside the bag's body, it is at least three
+// times as wide as it is thick, and its middle stays out of the torso. (A drawstring's cords are cords.)
+for (const id of speciesIds()) for (const silhouette of GARMENTS.bag.silhouettes) {
+  if (silhouette === 'drawstring bag') continue;
+  const built = build(id), fit = bodyFit(built);
+  const pieces = outfitPieces(built, { bag: item('bag', { silhouette, edge: 'none', accessory: 'none', colourwork: 'solid', colorCount: 2, color1: '#ff0000', color2: '#00ff00' }) });
+  const bag = new THREE.Box3().setFromBufferAttribute(pieces[0].geo.attributes.position).expandByScalar(0.002);
+  const straps = pieces.slice(1).filter(({ geo }) => geo.attributes.color.getY(0) > 0.5);
+  assert.ok(straps.length, `${id}: a ${silhouette} has no strap`);
+  for (const { geo } of straps) {
+    const { position: p, uv } = geo.attributes;
+    let cols = 0;
+    while (uv.getY(cols) === 0) cols++;
+    const rows = p.count / cols, row = (r) => Array.from({ length: cols }, (_, c) => new THREE.Vector3().fromBufferAttribute(p, r * cols + c));
+    const middle = (r) => row(r).reduce((a, b) => a.add(b), new THREE.Vector3()).divideScalar(cols);
+    for (const r of [0, rows - 1]) assert.ok(bag.containsPoint(middle(r)), `${id}: a ${silhouette}'s strap ends at ${middle(r).toArray().map((x) => x.toFixed(3))}, outside the bag -- it does not meet it`);
+    const mid = row(Math.floor(rows / 2)), wide = Math.max(...mid.flatMap((a) => mid.map((b) => a.distanceTo(b))));
+    const [a, b] = mid.flatMap((x) => mid.map((y) => [x, y])).find(([x, y]) => x.distanceTo(y) === wide);
+    const line = new THREE.Line3(a, b), q = new THREE.Vector3();
+    const thick = 2 * Math.max(...mid.map((x) => line.closestPointToPoint(x, false, q).distanceTo(x)));
+    assert.ok(wide > thick * 3, `${id}: a ${silhouette}'s strap is ${wide.toFixed(3)} wide and ${thick.toFixed(3)} thick -- a tube, not a strap`);
+    const c = middle(Math.floor(rows / 2)), t = fit.torso, inside = Math.hypot(c.x / t[0], c.y / t[1], c.z / t[2]);
+    assert.ok(inside > 0.97, `${id}: a ${silhouette}'s strap runs through the body at ${c.toArray().map((x) => x.toFixed(3))}`);
+  }
+}
+
+// --- a draped shawl goes over the shoulders and arms, not under them -------------------------------
+//
+// Hung from inside the shoulders' width, a shawl's sides came down between the arm and the body, and
+// the arm came out through it as through a vest's armhole. A shawl has no armhole: it goes round the
+// body, over the shoulder and the arm. Nothing of it -- no vertex, no triangle's middle -- is inside
+// an upper arm below the shoulder.
+for (const id of speciesIds()) for (const silhouette of GARMENTS.shawl.silhouettes) {
+  if (silhouette === 'shrug') continue;   // a shrug is sleeves: its back meets them
+  const built = build(id), fit = bodyFit(built);
+  const meshes = dress(built, { shawl: item('shawl', { silhouette, form: 'draped', edge: 'none', accessory: 'none' }) });
+  built.root.updateMatrixWorld(true);
+  const arms = built.joints.upperArm.map(({ node }) => new THREE.Line3(node.getWorldPosition(new THREE.Vector3()), node.localToWorld(new THREE.Vector3(0, -fit.arm.upper, 0))));
+  const q = new THREE.Vector3();
+  const inArm = (v) => arms.some((l) => l.closestPointToPoint(v, true, q).distanceTo(v) < fit.arm.r * 0.9 && q.distanceTo(l.start) > fit.arm.r);
+  let inside = 0;
+  for (const m of meshes.filter((mm) => mm.parent === built.joints.chest)) {
+    const p = m.geometry.attributes.position, idx = m.geometry.index.array, w = (i) => m.getVertexPosition(i, new THREE.Vector3()).applyMatrix4(m.matrixWorld);
+    for (let i = 0; i < p.count; i++) if (inArm(w(i))) inside++;
+    for (let t = 0; t < idx.length; t += 3) if (inArm(w(idx[t]).add(w(idx[t + 1])).add(w(idx[t + 2])).divideScalar(3))) inside++;
+  }
+  assert.equal(inside, 0, `${id}: ${inside} points of a draped ${silhouette} are inside an arm -- the arm comes through it, as through a vest`);
+}
+
+// --- an open shawl's top edge rolls over the collarbone, not round a square corner -----------------
+//
+// Its long straight edge went round the neck as a level ring and the front was cut straight down
+// from it: a right angle at each collarbone. The edge goes round the nape and on down the front, so
+// at the opening the fabric starts well below the top of the ring.
+for (const id of speciesIds()) for (const silhouette of GARMENTS.shawl.silhouettes) {
+  if (silhouette === 'shrug' || silhouette === 'capelet') continue;   // open to the shoulders; closed round the neck
+  const built = build(id), fit = bodyFit(built);
+  const [{ geo }] = outfitPieces(built, { shawl: item('shawl', { silhouette, form: 'draped', edge: 'none', accessory: 'none' }) });
+  const p = geo.attributes.position, ys = [], front = [];
+  for (let i = 0; i < p.count; i++) (Math.atan2(Math.abs(p.getX(i)), p.getZ(i)) < 0.5 ? front : ys).push(p.getY(i));
+  const sag = Math.max(...ys) - Math.max(...front);
+  assert.ok(sag > fit.torso[1] * 0.05, `${id}: a draped ${silhouette}'s front edges start only ${sag.toFixed(3)} below its neck -- a square corner at the collarbone`);
+}
+
+// --- a shawl is draped or tied, and takes a pin: across its front edges draped, on a shoulder tied ----
+//
+// Wrapped or tucked, a shawl read as nothing in particular. A pin is a shawl's alone. Draped, it
+// spans the two front edges -- across the middle of the chest; tied (and on a shrug, open to the
+// shoulders), it is on one shoulder.
+{
+  assert.deepEqual([...formsOf('shawl')], ['draped', 'tied'], 'a shawl is worn draped or tied, nothing else');
+  assert.ok(accessoriesOf('shawl').includes('pin') && !accessoriesOf('hat').includes('pin'), 'a pin is a shawl\'s accessory, and only a shawl\'s');
+  for (const id of speciesIds()) for (const silhouette of GARMENTS.shawl.silhouettes) for (const form of formsOf('shawl')) {
+    // the pin's pieces are brass (a capelet without one has buttons, so counting pieces will not do)
+    const brass = new THREE.Color('#b8975a'), c = new THREE.Color();
+    const pin = outfitPieces(build(id), { shawl: item('shawl', { silhouette, form, edge: 'none', accessory: 'pin' }) })
+      .filter(({ geo }) => { c.fromBufferAttribute(geo.attributes.color, 0); return Math.abs(c.r - brass.r) + Math.abs(c.g - brass.g) + Math.abs(c.b - brass.b) < 1e-3; });
+    assert.ok(pin.length, `${id}: a ${form} ${silhouette} with a pin has none`);
+    const box = pin.reduce((b, { geo }) => b.union(new THREE.Box3().setFromBufferAttribute(geo.attributes.position)), new THREE.Box3());
+    const across = form === 'draped' && silhouette !== 'shrug';
+    if (across) assert.ok(box.min.x < 0 && box.max.x > 0, `${id}: a draped ${silhouette}'s pin is at x ${box.min.x.toFixed(3)}..${box.max.x.toFixed(3)} -- not across its front edges`);
+    else assert.ok(box.min.x > 0 || box.max.x < 0, `${id}: a ${form} ${silhouette}'s pin is across the chest (x ${box.min.x.toFixed(3)}..${box.max.x.toFixed(3)}) -- not on a shoulder`);
+  }
+}
+
+// --- an over-knee sock is one piece over the knee -------------------------------------------------
+//
+// It was two tubes, the thigh's on its joint and the shin's on its own: an open step at the knee,
+// where the thigh is wider, and a hole as the knee bent. One tube on the thigh, its stitches below
+// the knee following the shin: only the foot is on the shin, and bent, its rows stretch but hold.
+for (const id of speciesIds()) {
+  const built = build(id);
+  const meshes = dress(built, { socks: item('socks', { silhouette: 'over-knee', edge: 'none', accessory: 'none' }) });
+  const thigh = built.joints.upperLeg[0].node, shin = built.joints.lowerLeg[0].node;
+  const m = meshes.find((x) => x.parent === thigh);
+  assert.ok(m?.isSkinnedMesh && m.skeleton.bones.includes(shin), `${id}: an over-knee sock's leg is not one piece on the thigh following the shin`);
+  assert.equal(meshes.filter((x) => x.parent === shin).length, 1, `${id}: an over-knee sock has more than its foot on the shin -- a second tube, and a hole at the knee`);
+  shin.rotation.x = 1.2;
+  built.root.updateMatrixWorld(true);
+  const { position: p, uv } = m.geometry.attributes, w = (i) => m.getVertexPosition(i, new THREE.Vector3()).applyMatrix4(m.matrixWorld);
+  let cols = 0;
+  while (uv.getY(cols) === 0) cols++;
+  let rows = 1;
+  while ((rows + 1) * cols <= p.count && uv.getY(rows * cols) > uv.getY((rows - 1) * cols)) rows++;
+  const steps = [];
+  for (let r = 0; r + 1 < rows; r++) for (let c = 0; c < cols; c++) steps.push(w(r * cols + c).distanceTo(w((r + 1) * cols + c)));
+  steps.sort((a, b) => a - b);
+  assert.ok(steps.at(-1) < steps[steps.length >> 1] * 8, `${id}: bent, an over-knee sock's rows part by ${(steps.at(-1) / steps[steps.length >> 1]).toFixed(1)} times the usual at the knee`);
+  shin.rotation.x = 0;
+}
+
+// --- a sweater has a neckline: a band worked on round its opening -------------------------------------
+//
+// Its neck was a raw edge; in a knitted or crocheted sweater the neckline is much of how it reads. Every
+// sweater but a turtleneck (its collar is its neckline) has a band in the trim colour at the top of its
+// body; a cardigan's runs on down both fronts to the hem, a button band.
+for (const silhouette of GARMENTS.sweater.silhouettes) {
+  if (silhouette === 'turtleneck') continue;
+  const built = build('lion');
+  const pieces = outfitPieces(built, { sweater: item('sweater', { silhouette, edge: 'none', accessory: 'none', sleeves: 'none', colourwork: 'solid', colorCount: 2, color1: '#ff0000', color2: '#00ff00' }) });
+  const body = new THREE.Box3().setFromBufferAttribute(pieces[0].geo.attributes.position);
+  const bands = pieces.slice(1).filter(({ geo }) => geo.attributes.color.getY(0) > 0.5).map(({ geo }) => new THREE.Box3().setFromBufferAttribute(geo.attributes.position));
+  const band = bands.find((b) => b.max.y > body.max.y - 0.01);
+  assert.ok(band, `a ${silhouette} has no neckline band at the top of its body -- its neck is a raw edge`);
+  if (silhouette === 'cardigan') assert.ok(band.min.y < body.min.y + 0.02, `a cardigan's neckline band stops at ${band.min.y.toFixed(3)}, above its hem at ${body.min.y.toFixed(3)} -- no button band`);
+}
+
+// --- a pattern's random colours are the shop's yarn, not an Easter parade -----------------------
+//
+// They came from one HSL band, at least a third saturated and never dark: every pattern pastel-ish.
+// Undyed and heathered yarns are low in chroma, and the shop goes down to charcoal.
+{
+  const hsl = Array.from({ length: 300 }, () => new THREE.Color(randomItem('scarf').color1).getHSL({}, THREE.SRGBColorSpace));
+  assert.ok(Math.min(...hsl.map((h) => h.s)) < 0.2, 'no random pattern is in a natural, undyed or heathered colour');
+  assert.ok(Math.min(...hsl.map((h) => h.l)) < 0.25, 'no random pattern is in a dark colour');
 }
 
 console.log('garments.js self-check: all assertions passed');

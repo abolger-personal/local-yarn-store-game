@@ -33,6 +33,8 @@ import { installFeedback, paintActivePlane, tickGlow, updateHeldReadout } from '
 import { installWorld, restart, doAdvanceRound } from './sim/world.js';
 import { tickCast } from './sim/cast.js';
 import { drawDebug, drawTimer, installHud, autoBar, autoBox, autoDayBox, updatePerf } from './ui/hud.js';
+import { installBook } from './ui/book.js';
+import { installBoard } from './ui/board.js';
 import { frameRoom } from './ui/framing.js';
 import { buildGui } from './ui/gui.js';
 import { checkWallCulling, checkItemSizes, checkSlotMasking, checkFloorTiling, checkDisplayMoves, checkHeldItem } from './checks.js';
@@ -80,7 +82,8 @@ function buildShop() {
     ['stage', installStage], ['room', buildRoomShell], ['seating', installSeating],
     ['displays', installDisplays], ['placeholder art', installPlaceholderArt],
     ['feedback', installFeedback], ['move mode', installMove], ['input', installInput],
-    ['world', installWorld], ['hud', installHud], ['gui', buildGui],
+    ['world', installWorld], ['hud', installHud], ['book', installBook], ['board', installBoard],
+    ['gui', buildGui],
   ];
   const broken = [];
   for (const [name, step] of steps) {

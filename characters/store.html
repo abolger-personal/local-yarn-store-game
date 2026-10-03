@@ -173,6 +173,31 @@
   #debug .book { margin-top: 8px; border-top: 1px solid rgba(0,0,0,.1); padding-top: 6px; font-size: 10px; color: #4a3f35; }
   #debug .book div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #debug .book .tags { opacity: .9; letter-spacing: 1px; }
+  /* A photo entry's button: a pill, so it reads as something to press rather than as an emoji. */
+  .snap {
+    font: 600 10px/1.5 ui-sans-serif, system-ui, sans-serif; color: #8a4a22; cursor: pointer;
+    background: #fbeee4; border: 1px solid #c2703f; border-radius: 9px; padding: 0 6px; margin-right: 2px;
+  }
+  .snap:hover { background: #c2703f; color: #fff; }
+  /* The guestbook selfie, beside the rail it was opened from. */
+  #debug .book .open-book { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: underline dotted; }
+  /* The Guestbook, opened: one day's page, paged back through the days. */
+  #book { right: 292px; top: 12px; width: 280px; max-height: calc(100vh - 24px); overflow-y: auto;
+          overscroll-behavior: contain; font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; color: #4a3f35; }
+  #book[hidden] { display: none; }
+  #book .head { display: flex; align-items: center; justify-content: space-between; gap: 6px;
+                margin: 0 18px 6px 0; font-weight: 700; color: #111; }
+  #book .head button { border: 1px solid rgba(0,0,0,.15); background: #fff; border-radius: 6px; cursor: pointer; padding: 1px 8px; }
+  #book .head button:disabled { opacity: .35; cursor: default; }
+  #book .tags { letter-spacing: 1px; }
+  #book .close { position: absolute; top: 4px; right: 6px; border: 0; background: none; font-size: 16px; cursor: pointer; color: #5c5349; }
+  #photo { right: 292px; top: 12px; margin: 0; padding: 10px 10px 6px; text-align: center; }
+  /* Beside the open book, not on top of it. */
+  #book:not([hidden]) ~ #photo { right: 582px; }
+  #photo[hidden] { display: none; }
+  #photo img { display: block; width: 240px; height: 300px; border-radius: 4px; }
+  #photo figcaption { font-size: 11px; color: #4a3f35; padding-top: 6px; }
+  #photo .close { position: absolute; top: 4px; right: 6px; border: 0; background: none; font-size: 16px; cursor: pointer; color: #5c5349; }
   #debug .log { margin-top: 8px; border-top: 1px solid rgba(0,0,0,.1); padding-top: 6px; font-size: 10px; color: #6a5f55; }
   #debug .log div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
@@ -208,6 +233,22 @@
 </details>
 <div id="guiSlot"></div>
 </div>
+
+<section id="book" class="panel" hidden aria-label="Guestbook">
+  <button class="close" aria-label="Close the guestbook">&times;</button>
+  <div class="head">
+    <button id="bookOlder" aria-label="Earlier day">&#9664;</button>
+    <span id="bookDay"></span>
+    <button id="bookNewer" aria-label="Later day">&#9654;</button>
+  </div>
+  <div id="bookEntries"></div>
+</section>
+
+<figure id="photo" class="panel" hidden>
+  <button class="close" aria-label="Close the photo">&times;</button>
+  <img alt="The customer, wearing what they made" />
+  <figcaption></figcaption>
+</figure>
 
 <!-- Reset the camera. A corner button rather than only the F key, because a tablet has no F key
      and getting lost is the one state you cannot orbit your way out of. -->

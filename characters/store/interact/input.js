@@ -8,8 +8,9 @@
 import { EMPTY } from '../../../inventory/grid.js';
 import { S } from '../core/config.js';
 import { renderer } from '../scene/stage.js';
-import { mover, drag, touchView } from '../core/state.js';
-import { pickCandidate } from './pointer.js';
+import { mover, drag, shop, touchHud, touchView } from '../core/state.js';
+import { pickCandidate, raycaster, setRayFromEvent } from './pointer.js';
+import { boardFace, bulletin, guestbook } from '../scene/room.js';
 import { abortDrag, carryItem, pickUp, putDown, trackHover } from './pick.js';
 import { clearSelection, dropMovable, floorPoint, grabMovable, movePose, proposeMove } from './move.js';
 
@@ -39,6 +40,20 @@ function stockPress(event) {
   drag.pickedThisPress = drag.index === EMPTY;
   const found = drag.pickedThisPress ? pickCandidate(event) : null;
   return { found, mine: Boolean(found) || !drag.pickedThisPress };
+}
+
+/**
+ * A press on the Guestbook on the counter opens the book; on the bulletin board, the photo pressed. Only asked of a press nothing else claimed:
+ * empty-handed, with no stock under it.
+ */
+function pressesBook(event) {
+  setRayFromEvent(event);
+  // the bulletin board hangs on a wall that is hidden when the camera is outside it
+  const hit = raycaster.intersectObjects([guestbook, bulletin], true).find((h) => h.object.visible && h.object.parent.visible);
+  if (!hit) return false;
+  shop.press = hit.object === boardFace ? { on: 'board', uv: hit.uv } : { on: 'book' };
+  touchHud();
+  return true;
 }
 
 /** After the claim: an aiming press refreshes the ghost, a press on stock picks it up. */
@@ -81,7 +96,7 @@ export function onPointerDown(event) {
     return;
   }
   const { found, mine } = stockPress(event);
-  if (mine) claimGesture(event);
+  if (mine || pressesBook(event)) claimGesture(event);   // not mine: empty-handed, no stock under it
   beginStockGesture(event, found);
 }
 

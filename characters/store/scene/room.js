@@ -138,7 +138,7 @@ function layFloor() {
 /** Four walls, with the front one split around the doorway and a lintel over it. */
 function raiseWalls() {
   wall([ROOM.w, ROOM.wallH], [0, ROOM.wallH / 2, -HALF_D], 0);                    // back
-  wall([ROOM.d, ROOM.wallH], [-HALF_W, ROOM.wallH / 2, 0], Math.PI / 2);          // left
+  hangBulletin(wall([ROOM.d, ROOM.wallH], [-HALF_W, ROOM.wallH / 2, 0], Math.PI / 2));   // left
   wall([ROOM.d, ROOM.wallH], [HALF_W, ROOM.wallH / 2, 0], Math.PI / 2);           // right
   wall([sideW, ROOM.wallH], [-(ROOM.doorW / 2 + sideW / 2), ROOM.wallH / 2, HALF_D], 0);
   wall([sideW, ROOM.wallH], [(ROOM.doorW / 2 + sideW / 2), ROOM.wallH / 2, HALF_D], 0);
@@ -192,6 +192,29 @@ function buildGuestbook() {
   guestbook.add(cover);
   guestbookPages();
   roomGroup.add(guestbook);
+}
+
+/**
+ * The bulletin board (LYS.md 5c): "Customer of the Week", with their photos pinned up. Hung ON the
+ * left wall, as its child, so the cutaway that hides the wall hides the board with it. It sits over
+ * the spot where NPCs stand to sign, high enough to clear a peg board below it. Blank cork here;
+ * ui/board.js paints the photos onto `boardFace`.
+ */
+export const bulletin = new THREE.Group();
+export const boardFace = new THREE.Mesh(
+  new THREE.PlaneGeometry(1.1, 0.7),
+  new THREE.MeshStandardMaterial({ color: '#c49a6c', roughness: 0.95 }));
+
+function hangBulletin(leftWall) {
+  // Wall-local: x runs along the wall (world -z), z points into the room.
+  // Scaled up whole (face, frame and depth) so the photos read from the default camera: the board
+  // is 1.76 x 1.12m, spanning 1.24-2.36m up a 2.6m wall.
+  bulletin.scale.setScalar(1.6);
+  bulletin.position.set(-1.0, 1.8 - ROOM.wallH / 2, 0.06);
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.78, 0.03), woodMat);
+  boardFace.position.z = 0.016;
+  bulletin.add(frame, boardFace);
+  leftWall.add(bulletin);
 }
 
 /** Everything this module does ONCE, at boot. Called from main.js, in order. */

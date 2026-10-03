@@ -389,10 +389,26 @@ export function sizeInstanceBuffers() {
   for (const m of [sideField, sideEdge, sizeSide]) m.count = items.length * 4;
 }
 
+/**
+ * Put the day's Guestbook page on the shelf before the world that holds it is replaced. A photo
+ * entry keeps who signed it, as they were that day: the visitor may never come back, and a regular
+ * who does may be wearing something else by then. Wiping the regulars wipes the history too.
+ */
+function fileGuestbook(keepRegulars) {
+  if (!keepRegulars) { shop.pastBooks.length = 0; return; }
+  if (!shop.world?.guestbook.length) return;
+  for (const g of shop.world.guestbook) {
+    const npc = shop.world.npcs.find((n) => n.id === g.npcId);
+    if (g.kind === 'photo' && npc) g.who = { body: npc.body, speciesId: npc.speciesId, worn: { ...npc.worn } };
+  }
+  shop.pastBooks.push({ day: shop.day, entries: shop.world.guestbook });
+}
+
 /** Start a new day. Regulars from the last one come back first, with everything they had. */
 export function restart({ keepRegulars = true } = {}) {
   // Keeping the regulars IS what makes it the next day rather than a fresh game; wiping them
   // resets the calendar too, so the day counter never claims a history the customers do not have.
+  fileGuestbook(keepRegulars);
   shop.day = keepRegulars ? shop.day + 1 : 1;
   clocks.day = 0;
   clocks.auto = 0;

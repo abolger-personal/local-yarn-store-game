@@ -382,6 +382,14 @@ const npcWith = (wips, over = {}) => ({
   assert.equal(photoSubject(onlyHome).id, 'from home', 'and is photographed when nothing beats it');
 
   assert.equal(photoSubject(npcWith([])), null, 'nothing made means no photo subject');
+
+  // Once it is in the book it is not photographed again: a regular back in yesterday's hat.
+  const regular = npcWith([fo('hat', 'hat', 9)]);
+  wearOrOffer(regular);
+  regular.worn.head.photographed = true;
+  assert.equal(photoSubject(regular), null, 'something already photographed is not news');
+  regular.wips.push(fo('cowl', 'cowl', 2));
+  assert.equal(photoSubject(regular).id, 'cowl', 'even an older stamp beats a photographed object');
 }
 
 // --- workRound stamps the round it finished on ------------------------------

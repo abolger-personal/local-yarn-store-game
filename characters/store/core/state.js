@@ -51,8 +51,14 @@ export const clocks = {
  * `hudDirty` is how the sim tells the HUD something happened WITHOUT importing it. world.js used
  * to call drawDebug() directly, which made the model depend on the view and closed another cycle.
  * The frame loop consumes the flag.
+ *
+ * `pastBooks` is every finished day's Guestbook, oldest first, as { day, entries }. A world only
+ * lives one day, and its guestbook used to go with it. `press` is a press on the book on the
+ * counter ({ on: 'book' }) or on the bulletin board ({ on: 'board', uv }), handed to the view the
+ * same way the dirty flags are: the pointer layer does not import the view.
  */
-export const shop = { world: null, day: 0, hudDirty: true, viewDirty: true };
+export const shop = { world: null, day: 0, hudDirty: true, viewDirty: true, pastBooks: [],
+  press: null };
 
 /**
  * Mark the view stale rather than repainting from inside the mechanics.

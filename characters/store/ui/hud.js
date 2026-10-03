@@ -8,6 +8,8 @@ import { S } from '../core/config.js';
 import { labelOf, maxWips, STATE, TRAITS, labelWant } from '../../visit.js';
 import { WIP_STATE, describeWip, WEAR_SLOTS } from '../../wip.js';
 import { renderer } from '../scene/stage.js';
+import { guestbookLine, redrawBook } from './book.js';
+import { drawBoard } from './board.js';
 
 import { doAdvanceRound, restart } from '../sim/world.js';
 
@@ -73,9 +75,9 @@ function npcCard(n, rec) {
  * a log line — so it gets its own block. A photo means they had a finished object; a note means
  * they did not, and says whether they left happy.
  */
-const guestbookBlock = () => `<div class="book"><span class="k">guestbook</span>${
+const guestbookBlock = () => `<div class="book"><button class="open-book k" title="open the guestbook">guestbook</button>${
   shop.world.guestbook.length
-    ? shop.world.guestbook.slice(-6).reverse().map(guestbookLine).join('')
+    ? shop.world.guestbook.map((g, i) => guestbookLine(g, i)).slice(-6).reverse().join('')
     : '<div>no entries yet</div>'}</div>`;
 
 const logBlock = () =>
@@ -85,31 +87,8 @@ export function drawDebug() {
   if (!shop.world) return;
   npcStateEl.innerHTML = shop.world.npcs.map((n, i) => npcCard(n, cast[i])).join('')
     + guestbookBlock() + logBlock();
-}
-
-// CHARACTER-VISIT.md's guestbook icon list. One mood icon — the photo if they made something,
-// otherwise happy or disappointed — plus a tag per thing that happened on the visit, so a page of
-// the book reads at a glance instead of as a paragraph.
-const TAG_ICONS = {
-  yarn: ['🧶', 'bought yarn'],
-  pattern: ['📖', 'bought a pattern'],
-  tool: ['🪡', 'bought a hook or needles'],
-  lent: ['🎁', 'lent a finished object to the shop'],
-  chatted: ['🧑‍🤝‍🧑', 'chatted with another customer'],
-  sat: ['🪑', 'sat and worked on a WIP'],
-  ranOut: ['⏳', 'ran out of rounds before finding anything'],
-  huff: ['💨', 'gave up and left in a huff'],
-};
-
-function guestbookLine(g) {
-  const mood = g.kind === 'photo'
-    ? `📷 ${esc(g.npc)} in ${esc(g.object)}`
-    : `${g.mood === 'happy' ? '🙂' : '🙁'} ${esc(g.npc)} — ${esc(g.mood)}`;
-  const tags = (g.tags ?? [])
-    .filter((k) => TAG_ICONS[k])
-    .map((k) => `<span title="${esc(TAG_ICONS[k][1])}">${TAG_ICONS[k][0]}</span>`)
-    .join('');
-  return `<div>${mood}${tags ? ` <span class="tags">${tags}</span>` : ''}</div>`;
+  redrawBook();
+  drawBoard();
 }
 
 // ---------------------------------------------------------------- timer window

@@ -52,7 +52,7 @@ const mulberry32 = (a) => () => {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
 
-const YARN_COLORS = (() => {
+export const YARN_COLORS = (() => {
   const rng = mulberry32(0x105);
   // PLACE the hues on a jittered even grid instead of rolling them. Rolling is right for one item
   // and wrong for a fixed index — 48 rolls left holes of up to 103 degrees across seeds, and

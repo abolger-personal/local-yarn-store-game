@@ -242,6 +242,29 @@ export function madeItem(pattern, used = {}) {
   return made;
 }
 
+// The shop's pattern types (catalog.js PATTERN_TYPES) as wearables: a cowl is a scarf silhouette.
+const WORN_AS = Object.freeze({ hat: ['hat'], sweater: ['sweater'], shawl: ['shawl'], cowl: ['scarf', 'cowl'] });
+
+/**
+ * A finished WIP as the shop's sim holds it, as { type, item } for dress(), or null if it is not
+ * worn (decor). `colourOf` turns one ball of its yarn into a hex. More than one colour is stripes:
+ * every multi-colour pattern in the shop hints stripes but the shawl, and stripes read on all four.
+ */
+export function wornAs(wip, colourOf) {
+  const p = wip.pattern;
+  const [type, silhouette] = WORN_AS[p?.patternType] ?? [];
+  if (!type) return null;
+  const colours = [...new Set(wip.yarn.map(colourOf))].slice(0, MAX_COLOURS);
+  const item = {
+    ...defaultItem(type), on: true, silhouette: silhouette ?? GARMENTS[type].silhouettes[0],
+    craft: p.craft === 'crochet' ? 'crochet' : 'knit',    // catalog.js says 'knitting'
+    weight: p.weight, fibre: p.materials[0], tool: p.toolSize,
+    colorCount: Math.max(1, colours.length), colourwork: colours.length > 1 ? 'stripes' : 'solid',
+    ...Object.fromEntries(colours.map((c, i) => [`color${i + 1}`, c])),
+  };
+  return { type, item: madeItem(item) };
+}
+
 /**
  * The purchase fallback (spec §3): a solid pattern knitted in more than one colour becomes stripes,
  * which repeat through every colour, so stripes need no further upgrade. The pattern still decides
@@ -2890,7 +2913,7 @@ export function outfitPieces(built, outfit) {
   const fit = bodyFit(built);
   return Object.entries(outfit)
     .filter(([type, item]) => item?.on && BUILDERS[type])
-    .flatMap(([type, item]) => BUILDERS[type](fit, forView(fabric(item), fit)));
+    .flatMap(([type, item]) => BUILDERS[type](fit, forView(fabric(item), fit)).map((p) => ({ ...p, type })));
 }
 
 /**
@@ -2921,14 +2944,17 @@ export function dress(built, outfit) {
   undress(built);
   if (outfit.hat?.on) coverUnderHat(built, fabric(outfit.hat));
   atRest(built, () => {
-    const byJoint = new Map(), skinOf = new Map();
-    for (const { joint, geo, skinTo } of outfitPieces(built, outfit)) {
+    const byJoint = new Map(), skinOf = new Map(), typesOf = new Map();
+    for (const { joint, geo, skinTo, type } of outfitPieces(built, outfit)) {
       if (!byJoint.has(joint)) byJoint.set(joint, []);
       byJoint.get(joint).push(geo);
+      typesOf.set(joint, new Set([...(typesOf.get(joint) ?? []), type]));
       // the longest list: a shawl's [neck, root, arms] starts with a scarf's [neck, root]
       if (skinTo && skinTo.length > (skinOf.get(joint)?.length ?? 0)) skinOf.set(joint, skinTo);
     }
     built.garments = [...byJoint].map(([joint, geos]) => garmentMesh(joint, geos, skinOf.get(joint)));
+    // which types each merged mesh holds, so a viewer can find one item again (the selfie does)
+    for (const mesh of built.garments) mesh.userData.worn = [...typesOf.get(mesh.parent)];
   });
   return built.garments;
 }

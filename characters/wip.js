@@ -302,8 +302,12 @@ export const everythingMade = (npc) =>
   [...finishedOf(npc), ...Object.values(npc.worn).filter(Boolean)]
     .sort((a, b) => (b.finishedRound ?? -Infinity) - (a.finishedRound ?? -Infinity));
 
-/** What the Guestbook photographs them in: the newest thing they have made, or null. */
-export const photoSubject = (npc) => everythingMade(npc)[0] ?? null;
+/**
+ * What the Guestbook photographs them in: the newest thing they have made that is not in the book
+ * yet, or null. A thing is finished once, so it is photographed once: a regular who walks back in
+ * wearing yesterday's hat has nothing new to show, and signs with a note instead.
+ */
+export const photoSubject = (npc) => everythingMade(npc).find((w) => !w.photographed) ?? null;
 
 /** Which wear slot a finished WIP would take, or null for something not wearable. */
 export const slotFor = (wip) => WEAR_SLOT_FOR[wip.pattern?.patternType] ?? null;

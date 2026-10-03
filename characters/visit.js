@@ -1164,11 +1164,12 @@ export function signGuestbook(world, npc) {
   // Drop Off 2nd-to-last, so anything being lent is still in their hands here — they are
   // photographed wearing it, and hand it over on the next step.
   const made = photoSubject(npc);
+  if (made) made.photographed = true;     // and never again: see photoSubject
   const object = made ? labelOf(made.pattern) : null;
   const entry = object
     // `wornInPhoto` is what tells the renderer to put the object ON them for the picture even
     // though it is about to leave: the photo is the payoff, and the shop's copy is the leftover.
-    ? { npc: npc.name, kind: 'photo', object, mood: null, round: world.round,
+    ? { npc: npc.name, npcId: npc.id, kind: 'photo', object, mood: null, round: world.round,
         wip: made, wornInPhoto: !Object.values(npc.worn).includes(made), tags: guestbookTags(npc) }
     // "happy (found what they are looking for) or disappointed (did not find what they needed)" —
     // buying something IS having found it, which is what the buy branch of interact() records.

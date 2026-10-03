@@ -22,8 +22,9 @@ import {
   POSES, POSE_KEYS, MOTION_DEFAULTS, BASE_PARAMS, createCharacter, stepMotion, applyPose,
   valueOf, walkPhase, walkLayer, speciesIds, getSpecies, resetMotion,
   DANCES, DANCE_NAMES, makeDance, stepDance, LIMB_TAPER,
-  motionOf, walkGain, tailBaseHeight,
+  motionOf, walkGain, tailBaseHeight, seatedHipsAlong, lowestResting, GEO,
 } from './npc.js';
+import { CHAIR_BACK_Z, CHAIR_W } from './store/core/config.js';
 import './owl.js';
 import './llama.js';
 import { MANE_PRESETS, lightness as maneLightness, maneBases, maneCrownGap, snoutGap } from './lion.js';
@@ -1581,7 +1582,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     return out;
   };
   for (const id of speciesIds()) {
-    const P = { ...BASE_PARAMS, ...getSpecies(id).defaults, scarf: true };
+    const P = { ...BASE_PARAMS, ...getSpecies(id).defaults };
     const merged = createCharacter({ ...P, mergeMeshes: true }, id), apart = createCharacter({ ...P, mergeMeshes: false }, id);
     const [m, a2] = [boxes(merged), boxes(apart)];
     for (const k of m.keys()) {
@@ -1597,9 +1598,77 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     apart.root.traverse((o) => {
       let j = o.parent;
       while (j && !j.userData.joint) j = j.parent;
+      // The held skein stays out of the merge (noMerge: it is toggled at runtime), so its knit is
+      // not a skinned draw. The rig's old torus scarf used to supply a skinned knit family that
+      // hid this; with it gone the held item has to be left out by name.
+      if (o.parent?.userData.noMerge) return;
       if (o.isMesh && SKINNED.has(j?.name)) families.add(o.material.userData.family ?? 'felt');
     });
     assert.equal(draws, families.size, `${id}: the body, neck, head and eyes are ${draws} meshes, one per material family would be ${families.size}`);
+  }
+}
+
+// --- no placeholder ring at the neck --------------------------------------------------------------
+// The rig used to put a knitted torus round every neck as a stand-in scarf; real wearables
+// (garments.js) replaced it. A regular restored from an old save still carries `scarf: true`, and
+// that must build nothing: no torus may ride the neck joint, merged or not. (The held skein's band
+// is a torus too, but it rides the hand.)
+for (const id of speciesIds()) {
+  for (const mergeMeshes of [false, true]) {
+    const built = createCharacter({ ...BASE_PARAMS, ...getSpecies(id).defaults, scarf: true, mergeMeshes }, id);
+    built.root.traverse((o) => {
+      let j = o.parent;
+      while (j && !j.userData.joint) j = j.parent;
+      assert.ok(!(o.isMesh && o.geometry === GEO.torus && j?.name === 'neck'), `${id}: a torus scarf is back on the neck`);
+    });
+  }
+}
+
+// --- seated bodies clear the chair back ------------------------------------------
+// The shop's chair has a back now (scene/seating.js), stood off behind the seat by CHAIR_BACK_Z.
+// A seated torso is an ellipsoid torsoD deep centred over the hips, so its back is half that
+// behind wherever seatedHipsAlong puts them. Rolled many times per species: the leggiest rolls are
+// the ones that perch furthest back.
+{
+  for (const id of speciesIds()) {
+    const kit = getSpecies(id);
+    let deepest = 0;
+    for (let i = 0; i < 1000; i++) {
+      const P = kit.randomise(structuredClone(kit.defaults));
+      deepest = Math.min(deepest, seatedHipsAlong(P, CHAIR_W) - P.torsoD / 2);
+    }
+    assert.ok(deepest > CHAIR_BACK_Z,
+      `${id}: a seated torso reaches ${deepest.toFixed(3)}, through the chair back at ${CHAIR_BACK_Z.toFixed(3)}`);
+  }
+}
+
+// --- a seated body rests ON the chair, merged or not ------------------------------------------
+// The shop places a sitter by lowestResting: root - lowest point of the body that rests on a seat.
+// It walked `spine` for mesh boxes, so once mergeCharacter hung the whole body on the hips as one
+// skinned mesh it found nothing, read 0, and every sitter hovered 80-420mm over the cushion. The
+// truth here is the UNMERGED twin's exact vertices (no limbs), which the merged measure must match.
+{
+  const box = new THREE.Box3();
+  const truth = (built) => {
+    built.root.updateMatrixWorld(true);
+    const limbs = new Set();
+    for (const j of [...built.joints.upperArm, ...built.joints.upperLeg, ...built.joints.tail.slice(0, 1)]) {
+      j.node.traverse((n) => limbs.add(n));
+    }
+    let lowest = Infinity;
+    built.root.traverse((m) => { if (m.isMesh && !limbs.has(m)) lowest = Math.min(lowest, box.setFromObject(m, true).min.y); });
+    return lowest;
+  };
+  for (const id of speciesIds()) {
+    const kit = getSpecies(id);
+    for (let i = 0; i < 5; i++) {
+      const P = kit.randomise(structuredClone(kit.defaults));
+      const merged = createCharacter({ ...P, mergeMeshes: true }, id), apart = createCharacter({ ...P, mergeMeshes: false }, id);
+      applyPose(merged, POSES.sit);
+      applyPose(apart, POSES.sit);
+      const gap = lowestResting(merged) - truth(apart);
+      assert.ok(Math.abs(gap) < 1e-3, `${id}: merged, the seated rump measures ${(gap * 1000).toFixed(1)}mm off where it is -- it hovers over the chair by that much`);
+    }
   }
 }
 

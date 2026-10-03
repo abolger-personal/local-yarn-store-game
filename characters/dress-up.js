@@ -71,10 +71,9 @@ function usedOf(type) {
 const madeOf = (type) => madeItem(state.patterns[type], usedOf(type));
 const madeOutfit = () => Object.fromEntries(Object.keys(GARMENTS).map((t) => [t, madeOf(t)]));
 
-// Characters start bare-necked (VISUAL-DESIGN-FINISHED-OBJ.md §4c): the rig's placeholder scarf is
-// off here so the neck slot is only ever an FO. Un-merged, because garments.js dresses an un-merged
-// rig -- see the ponytail note at the top of garments.js.
-const freshParams = (id) => Object.assign(structuredClone(getSpecies(id).defaults), { mergeMeshes: false, scarf: false });
+// Un-merged, because garments.js dresses an un-merged rig -- see the ponytail note at the top of
+// garments.js.
+const freshParams = (id) => Object.assign(structuredClone(getSpecies(id).defaults), { mergeMeshes: false });
 
 
 // ---------------------------------------------------------------- renderer
@@ -274,7 +273,6 @@ const refreshGui = () => gui?.controllersRecursive().forEach((c) => c.updateDisp
 
 function randomiseSlot(id) {
   getSpecies(id).randomise(state.params[id]);
-  state.params[id].scarf = false;
   slotState[id].opts = null;
   slotState[id].base = null;
   buildSlot(id);

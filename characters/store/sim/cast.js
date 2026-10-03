@@ -6,7 +6,7 @@ import { cast, seats } from '../core/state.js';
 import { cellRect } from '../../../inventory/notions.js';
 import { BANDS, TAILS, bandMatrix, familyExtent, tailMatrix, yarnFit }
   from '../../../inventory/yarn-geometry.js';
-import { POSES, applyPose, femurOf, phaseStep, stepMotion, valueOf, walkPhase, walkLayer,
+import { POSES, applyPose, lowestResting, seatedHipsAlong, phaseStep, stepMotion, valueOf, walkPhase, walkLayer,
   walkGain } from '../../npc.js';
 import { ACTION, STATE } from '../../visit.js';
 import * as THREE from 'three';
@@ -423,8 +423,6 @@ function stepWalk(rec, n, dt) {
   rec.speed = dt > 0 ? rec.moved / dt : 0;
 }
 
-const _seatBox = new THREE.Box3();
-
 /**
  * How far BELOW the root this character's backside is, in the sit pose. Measured once per body.
  *
@@ -440,21 +438,13 @@ const _seatBox = new THREE.Box3();
  * geometry does not change, and chasing it per frame would only make the idle's breathing push
  * the character through the chair.
  *
- * The legs are excluded because they hang far below the seat and are not what rests on it, and
- * the arms because they swing past it. Everything under `spine` minus the arm subtrees is the
- * torso, the head and whatever the kit bolted to them.
+ * The legs and tail are excluded because they hang below the seat and are not what rests on it,
+ * and the arms because they swing past it. See lowestResting in npc.js, which is also why this
+ * must not walk the joint tree: merged, the whole body is one skinned mesh on the hips.
  */
 export function measureSeatDrop(built) {
-  const skip = new Set(built.joints.upperArm.map((a) => a.node));
   applyPose(built, POSES.sit);
-  built.root.updateMatrixWorld(true);
-  let lowest = Infinity;
-  const visit = (n) => {
-    if (skip.has(n)) return;
-    if (n.isMesh) lowest = Math.min(lowest, _seatBox.setFromObject(n).min.y);
-    n.children.forEach(visit);
-  };
-  visit(built.joints.spine);
+  const lowest = lowestResting(built);
   const drop = Number.isFinite(lowest) ? built.root.position.y - lowest : 0;
   applyPose(built, POSES.rest);
   return drop;
@@ -474,15 +464,7 @@ function calibrateSeat(rec, sat) {
   if (rec.seatCal || sat < 0.99) return;
   rec.seatCal = true;
   const b = rec.built;
-  b.root.updateMatrixWorld(true);
-  const skip = new Set(b.joints.upperArm.map((a) => a.node));
-  let lowest = Infinity;
-  const visit = (n) => {
-    if (skip.has(n)) return;
-    if (n.isMesh) lowest = Math.min(lowest, _seatBox.setFromObject(n).min.y);
-    n.children.forEach(visit);
-  };
-  visit(b.joints.spine);
+  const lowest = lowestResting(b);
   if (Number.isFinite(lowest)) b.seatDrop -= lowest - (SEAT_H - S.seatLift);
 }
 
@@ -494,27 +476,8 @@ const angleLerp = (from, to, t) => from + Math.atan2(Math.sin(to - from), Math.c
  */
 const STAND_CLEAR = 0.06;
 
-/**
- * Where along the chair a seated character's HIPS go, measured from its centre.
- *
- * FROM THE FEMUR, not from a fraction of the chair. When you sit, your thighs lie along the
- * cushion: your knees are at the front edge and your hips are one thigh-length behind them. So
- * the offset is half the chair's depth minus the femur, and it falls out of the body rather than
- * being tuned.
- *
- * It was a flat 26% of the chair's depth for everyone, which is the same mistake as every other
- * constant in this file has turned out to be: this cast's leg lengths vary 3.7x, so a llama's
- * thigh is longer than the whole seat while a stumpy owl's is half of it. The constant sat the
- * llama with its knees hanging in mid-air and the owl perched on the back edge; the femur seats
- * both of them with their knees over the front edge, which is what sitting looks like.
- *
- * Clamped at the back edge, because a thigh longer than the seat is a real case -- the leggiest
- * llamas have one -- and the answer there is to perch on the back of the cushion rather than to
- * hover off the end of it.
- */
-function sitAlong(P) {
-  return Math.max(-CHAIR_W * 0.45, CHAIR_W / 2 - femurOf(P));
-}
+/** Where along the chair a seated character's hips go. See seatedHipsAlong in npc.js. */
+const sitAlong = (P) => seatedHipsAlong(P, CHAIR_W);
 
 /** Seconds allowed for getting up, before the round's walk is allowed to start. */
 export const STAND_TIME = 0.5;

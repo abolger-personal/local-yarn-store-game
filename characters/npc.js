@@ -149,10 +149,6 @@ export const BASE_PARAMS = Object.freeze({
   tailStiff:     260,     // spring stiffness; natural frequency is sqrt(stiff) rad/s
   tailZeta:      0.35,    // under-damped on purpose: a tail that settles without swinging is a stick
 
-  // garment
-  scarf:         true,
-  scarfColor:    '#b8443f',
-
   // scene
   view:          'felted',
   exposure:      0.40,
@@ -975,6 +971,58 @@ const swingKnee = (pose, side) => Math.max(0, side * (pose.kneeSwing ?? 0));
 // three times, which is how the first two came to hold the same magic number separately.
 export const femurOf = (P) => (P.legHeight + P.hipInset) * 0.55;
 
+/**
+ * Where along a chair a seated body's HIPS go, from the chair's centre toward its front (+).
+ *
+ * FROM THE FEMUR, not from a fraction of the chair. When you sit, your thighs lie along the
+ * cushion: your knees are at the front edge and your hips are one thigh-length behind them. So the
+ * offset is half the chair's depth minus the femur, and it falls out of the body rather than being
+ * tuned — a flat fraction sat the llama with its knees in mid-air and the owl on the back edge.
+ *
+ * Clamped at the back edge, because a thigh longer than the seat is a real case -- the leggiest
+ * llamas have one -- and the answer there is to perch on the back of the cushion rather than to
+ * hover off the end of it.
+ */
+export const seatedHipsAlong = (P, chairW) => Math.max(-chairW * 0.45, chairW / 2 - femurOf(P));
+
+/** Every node inside a limb -- arms, legs, tail -- which hang past a seat rather than rest on it. */
+function limbNodes(joints) {
+  const limbs = new Set();
+  for (const j of [...joints.upperArm, ...joints.upperLeg, ...joints.tail.slice(0, 1)]) {
+    j.node.traverse((n) => limbs.add(n));
+  }
+  return limbs;
+}
+
+const _rest = new THREE.Vector3();
+
+/**
+ * World y of the lowest point of the body that RESTS on a seat, in whatever pose it is in now.
+ *
+ * Per VERTEX, through the skin, and that is the whole fix for the shop's hovering sitters. This
+ * used to be a walk of `spine`'s subtree taking each mesh's bounding box, written before
+ * mergeCharacter skinned every joint into one mesh per material hung on the HIPS: merged -- which
+ * the shop always is -- there was not one mesh left under the spine, the walk found nothing, the
+ * drop came out 0, and the seat put the FEET on the cushion. Measured: every species 80-410mm in
+ * the air. A merged mesh holds the legs too, so limbs can only be told apart vertex by vertex, by
+ * the bone each one rides. It also retires the bounding boxes, whose corners hang below a tilted
+ * ellipsoid and sat even the unmerged rig ~20mm proud.
+ */
+export function lowestResting(built) {
+  built.root.updateMatrixWorld(true);
+  const limbs = limbNodes(built.joints);
+  let lowest = Infinity;
+  built.root.traverse((m) => {
+    if (!m.isMesh || limbs.has(m)) return;
+    const skin = m.isSkinnedMesh ? m.geometry.attributes.skinIndex : null;
+    for (let i = 0; i < m.geometry.attributes.position.count; i++) {
+      if (skin && limbs.has(m.skeleton.bones[skin.getX(i)])) continue;
+      lowest = Math.min(lowest, m.getVertexPosition(i, _rest).applyMatrix4(m.matrixWorld).y);
+    }
+  });
+  return lowest;
+}
+
 export const tibiaOf = (P) => (P.legHeight + P.hipInset) * 0.45;
 
 function buildLeg(side, P, mat, joints) {
@@ -1089,16 +1137,6 @@ function buildHeadNode(P) {
   return head;
 }
 
-// length-aware so a long-necked species wears the same scarf
-function buildScarf(P, addMaterial) {
-  const radius = Math.max(P.neckThick * 1.9, P.headRadius * 0.92);
-  return part(GEO.torus, addMaterial(knitMaterial(P.scarfColor)), {
-    pos: [0, P.neckLength * 0.35, 0],
-    scale: [radius, radius, radius * 0.67],
-    rot: [Math.PI * 0.5, 0, 0],
-  });
-}
-
 // spine pivots at the waist plane, so a lean folds the whole upper body rather than shearing it
 function buildUpperBody(P, mat, joints, addMaterial, bulge) {
   const spine = joint(new THREE.Group(), 'spine');
@@ -1170,7 +1208,6 @@ export function createCharacter(P, species) {
                 // root itself, which is what a viewer with no chairs wants.
                 motion: makeMotion(POSES.rest), groundOffset: 0, seatDrop: 0 };
   kit.buildKit(ctx, P);
-  if (P.scarf) body.neck.add(buildScarf(P, addMaterial));
   if (!P.partShadows) disableShadowCasting(body.root);
   if (P.mergeMeshes !== false) mergeCharacter(ctx);
   // Seed the pose through applyPose rather than leaving each build function to set its own
@@ -1640,15 +1677,13 @@ export function applyRanges(P, ranges) {
 export function randomiseBase(P, ranges = BASE_RANDOM_RANGES) {
   applyRanges(P, ranges);
   P.bodyColor = randomFur();
-  P.scarf = Math.random() < 0.7;
-  P.scarfColor = randHex(ACCENT_SAT, ACCENT_LIGHT);
   P.heldColor = randHex(ACCENT_SAT, ACCENT_LIGHT);
   P.name = pick(NAMES);
   return P;
 }
 
 // randomised outside the range table, so they have to be listed explicitly
-export const SHARED_RANDOM_KEYS = ['bodyColor', 'scarf', 'scarfColor', 'heldColor'];
+export const SHARED_RANDOM_KEYS = ['bodyColor', 'heldColor'];
 
 const sameRange = (a, b) => Boolean(a) && Boolean(b) && a[0] === b[0] && a[1] === b[1];
 
@@ -1725,8 +1760,5 @@ export const BASE_GUI = Object.freeze({
     ['tailLength', 0.04, 0.50], ['tailThick', 0.006, 0.06],
     ['tailDroop', -1.6, 1.2], ['tailCurl', -0.8, 0.8],
     ['tailStiff', 60, 800], ['tailZeta', 0.1, 1.2],
-  ],
-  garment: [
-    ['scarf', 'bool'], ['scarfColor', 'color'],
   ],
 });

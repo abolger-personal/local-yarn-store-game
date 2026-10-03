@@ -78,9 +78,8 @@ function photoOf(entry, npc) {
   if (photos.has(entry)) return photos.get(entry);
   studio ??= buildStudio();
   const outfit = outfitFor(npc, entry.wip);
-  // Un-merged, so it can be dressed; the rig's placeholder scarf gives way to a real one.
-  const built = createCharacter({ ...npc.body, mergeMeshes: false, scarf: npc.body.scarf && !outfit.scarf },
-                                getSpecies(npc.speciesId));
+  // Un-merged, so it can be dressed.
+  const built = createCharacter({ ...npc.body, mergeMeshes: false }, getSpecies(npc.speciesId));
   const { viewPx } = LOOK;
   LOOK.viewPx = 0;     // a close-up: build every stitch's relief, not the crowd's cut
   try { dress(built, outfit); } finally { LOOK.viewPx = viewPx; }

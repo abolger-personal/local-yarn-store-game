@@ -208,7 +208,6 @@ function spawn(speciesId) {
   // Dressed, the merge waits until the clothes are on: the fit is measured off the unmerged body,
   // and the clothes then merge into the character's meshes like any other part.
   P.mergeMeshes = S.mergeMeshes && !S.dressed;
-  if (S.dressed) P.scarf = false;   // the old knitted ring would be a second scarf
   const built = createCharacter(P, kit);
   if (S.dressed) {
     dress(built, worstOutfit());

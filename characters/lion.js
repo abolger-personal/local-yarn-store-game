@@ -7,9 +7,7 @@
 //
 //   1. The mane is a scallop shell on `ctx.head`, not `ctx.neck`. Two reasons, both structural.
 //      The base neck is 0.100 long against the llama's 0.380, so there is barely any neck to
-//      hang fleece from; and `buildScarf` already puts a torus at neckLength * 0.35 with radius
-//      max(neckThick * 1.9, headRadius * 0.92), so the neck ring is occupied. Every character in
-//      this shop wears a scarf.
+//      hang fleece from; and the neck is the slot a knitted scarf or cowl (garments.js) wears.
 //   2. `skipFront` does the framing. It is the same face-gap mechanism the owl already uses for
 //      its head plumage (owl.js headShell) -- the mane is that shell, wider, hung lower, and with
 //      a much bigger gap.

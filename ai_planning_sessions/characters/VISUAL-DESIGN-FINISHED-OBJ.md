@@ -23,17 +23,21 @@ Marks used below:
 ### Wearable, one per slot
 
 An NPC wears at most one FO per slot. The slot table (head, neck, shoulders, torso, bag, feet) lives
-in `WEARABLE-FINISHED-OBJ.md`. **There are no mittens**, worn or decor: the characters have no
-rendered fingers.
+in `WEARABLE-FINISHED-OBJ.md`. **Nobody wears mittens**: the characters have no rendered fingers.
+Mittens are still knitted, as decor (below).
 
-| Type | Slot | Spec'd silhouettes | Proposed additions to reach 5–10 |
+All six wearables are built, with every silhouette below, by `characters/garments.js`
+(`GARMENTS[type].silhouettes`, which is the source of truth; `garments.test.mjs` asserts the
+catalog's pattern names cover exactly these). Try any of them on in `characters/dress-up.html`.
+
+| Type | Slot | Silhouettes (built) | Notes |
 | --- | --- | --- | --- |
-| **Hat** | head | traditional knit hat, fisherman's hat, beret, hood, headband; pom-pom or not (an accessory) | slouch beanie, earflap/trapper, bucket hat (crochet), cloche, pixie hat with a long tip **(proposed)** |
-| **Scarf** | neck | cowl, ascot, long scarf; one so long it trails on the ground | infinity (double-wrapped loop), skinny scarf, kerchief/bandana triangle, chunky fringed wrap **(proposed)** |
-| **Sweater** | torso | vest, short sleeve, long sleeve × cardigan (open front) or pullover (closed front) | turtleneck, cropped, oversized tunic, raglan with a colour yoke **(proposed)** |
-| **Shawl** | shoulders | triangle, half circle, rectangular wrap; closes or knots at the front; alone or over a sweater | crescent, capelet, shrug **(proposed)** |
-| **Bag** | bag | shoulder bag, market bag, backpack; at least 3 sizes | drawstring bag, tote, bucket bag, crossbody pouch **(proposed)** |
-| **Socks** | feet | a pair of socks | ankle, crew, knee-high, slouch, leg warmers (open foot), slipper socks with a pom **(proposed)** |
+| **Hat** | head | beanie, slouch, fisherman, beret, earflap, hood, headband, bucket, cloche, pixie | pom-pom or not is an accessory, not a silhouette |
+| **Scarf** | neck | cowl, infinity, ascot, long, trailing, skinny, kerchief, chunky wrap | "trailing" is the one so long it trails on the ground; cowl is a scarf silhouette, not its own type |
+| **Sweater** | torso | pullover, cardigan, vest, turtleneck, cropped, tunic, raglan | sleeve length is not a silhouette |
+| **Shawl** | shoulders | triangle, half circle, rectangular wrap, crescent, capelet, shrug | worn draped or tied (a form); alone or over a sweater |
+| **Bag** | bag | shoulder bag, market bag, backpack, tote, bucket bag, crossbody pouch, drawstring bag | |
+| **Socks** | feet | crew, knee-high, over-knee, slouch, leg warmers, slipper socks | slipper socks cover the foot and carry a pom; leg warmers are open-footed. An ankle sock was dropped: too like a crew sock to tell apart |
 
 "5–10 visually distinct types" means **5–10 distinct silhouettes per type**. Texture, colour,
 accessory and size multiply on top of those; they are not what makes a silhouette distinct.
@@ -62,13 +66,24 @@ These are placed in the shop by the player as decoration.
 | **Chair cover** | sits over a stool like a doily; can also go on the shop counter; any symmetric shape | beginner–intermediate **(proposed)** | round doily, square, hexagon, octagon, star/flower, scalloped circle **(proposed)** |
 | **Cozy** | a cover for a teapot, lamp and so on. Placed anywhere, it **always shows on a teapot** | intermediate | dome, bell, tall with a pom, pumpkin segments, cottage shape, "hat" with a bobble **(proposed)** |
 | **Amigurumi** | a crocheted or knitted stuffy, ¼–⅓ an NPC's height, in the cast's species (llama, owl, lion); simplified, mostly spherical, with a head and a texture | intermediate+ **(proposed)** | per species: ball, pear, bean; sitting or standing **(proposed)** |
+| **Mittens** | a pair, never worn: laid on a table, pinned to the bulletin board or clipped to a line **(proposed)** | intermediate **(proposed)** | plain, thumbless, convertible flip-top, colourwork cuff, joined by a string **(proposed)** |
+| **Blanket** | a throw that drapes: over a chair back, folded on a display table, or across the counter **(proposed)** | intermediate **(proposed)** | granny-square throw, striped, chunky cable, ripple/chevron, fringed, folded vs draped **(proposed)** |
 | **Swatch** | a 1x1x1 flat square: the smallest thing in the shop. **Not a pattern type.** See §4 | any | one square; variety comes from texture and colour only |
 
-The **cozy ships with its own teapot mesh**, since the shop has no teapots for it to sit on. The
-cozy and teapot are one placeable object. **(proposed)**
+**Where decor goes.** The shop's plain furniture is built for it: every piece records the surface a
+finished object fits in `userData.cozy` (`store/scene/seating.js`, `props.js`), so decor is fitted to
+real dimensions rather than guessed. The furniture itself stays bare on purpose — the shop is cosy by
+its light and building, and decor comes from finished objects.
 
-The **chair cover** is sized to the shop's cube chair top (`CHAIR_W` 0.34 in `store/scene/seating.js`)
-and to the counter. When it is placed on a chair, it caps the cube. **(proposed)**
+- The **cozy** fits any of the shop's cylinders: a floor or table lamp's ceramic base or its drum
+  shade, or a flower pot (`cozy.base`, `cozy.shade`, `cozy.pot`: radii top and bottom, height). On its
+  own it still ships with a teapot mesh, so a cozy placed anywhere else always shows on a teapot; the
+  cozy and teapot are then one placeable object. **(proposed)**
+- The **chair cover** is a doily or seat pad on a chair seat (`cozy.seat`, `CHAIR_W` 0.34 square at
+  `SEAT_H`) or on the counter. **(proposed)**
+- The **blanket** drapes over a chair's raked back (`cozy.back`: width, height, rake) or lies folded
+  on a display table top. **(proposed)**
+- **Mittens** lie flat as a pair, or pin to the bulletin board. **(proposed)**
 
 ---
 
@@ -356,20 +371,31 @@ payoff. This supersedes P1-SPIKE-PLAN.md's "species + fur + signature accessory"
 - **Who swatches, and what a swatch changes:** the swatch as a step.
 - **Skill levels** per texture, accessory and type, on the 1–5 crafter scale. Proposed default:
   - 1–2: plain, stripes, potholder, scarf
-  - 3: rib, seed, waffle, colour-block, pom-pom, fringe, hat, socks, bag, cozy, chair cover
+  - 3: rib, seed, waffle, colour-block, pom-pom, fringe, hat, socks, bag, cozy, chair cover, mittens,
+    blanket
   - 4–5: cable, lace, puff, fair isle, motif, sweater, shawl, amigurumi
 - Every **(proposed)** mark above.
 
 ## 6. Code that will need to follow this spec
 
-Not changed yet; listed so nothing is missed.
+Listed so nothing is missed; struck through where done.
 
-- **`characters/wip.js`** `WEAR_SLOTS` / `WEAR_SLOT_FOR`: drop hands and mittens; add shoulders (shawl),
-  bag and feet (socks); scarf replaces cowl.
+- ~~**`characters/wip.js`** `WEAR_SLOTS` / `WEAR_SLOT_FOR`: drop hands and mittens; add shoulders (shawl),
+  bag and feet (socks); scarf replaces cowl.~~ Done 2026-10-03; `garments.test.mjs` asserts the
+  slots match `GARMENTS[type].slot`.
 - **`inventory/catalog.js`**:
-  - `PATTERN_TYPES`: cowl → scarf, add the new types, and replace `hints` with texture, colourwork
-    and accessory.
-  - `yarnUnits`: **1 per yarn item**, not footprint. Pattern costs are 1–8 items of the pattern's weight (PATTERNS.md), and a wrong-weight item is a near-miss, not a conversion.
-- **`characters/npc.js`** `scarf` default off: characters start bare-necked, and the neck slot is an FO.
+  - `PATTERN_TYPES`: ~~cowl → scarf~~, ~~add the new types~~, ~~replace `hints`~~. Done 2026-10-03
+    for the six wearables, at PATTERNS.md's costs; `hints` is gone. Each named design carries its
+    **silhouette** (`PATTERN_TITLES` is keyed by type and silhouette), and `wornAs` in
+    `garments.js` builds the finished object as it. Still open:
+    - the **decor types** (blanket, potholder, cozy, chair cover, amigurumi, mittens). The sim
+      copes (no slot, so always lent), but nothing draws a decor FO, in the shop or in the
+      Guestbook photo, and they have no cover icon.
+    - a design's **texture, colourwork, edge, form and accessory**. A shop FO is still the
+      silhouette's defaults, with stripes when it is knitted in more than one colour.
+  - ~~`yarnUnits`: **1 per yarn item**, not footprint.~~ Done 2026-10-03. Pattern costs are 1–8 items of the pattern's weight (PATTERNS.md), and a wrong-weight item is a near-miss, not a conversion.
+- ~~**`characters/npc.js`** `scarf` default off~~ Done 2026-10-02, further: the rig's placeholder
+  torus scarf (`buildScarf`, `scarf` / `scarfColor`) is deleted. Characters are bare-necked, and the
+  neck slot is only ever an FO.
 - **`P1-SPIKE-PLAN.md`**'s `WearableAppearance` sketch should be reconciled with §2's vocabulary.
 - Implementation to-dos from tuning on the dress-up page are in `FINISHED-OBJ-TODO.md`.

@@ -70,4 +70,5 @@ Strike items through when they're done, with the date.
   (`LOOK.viewPx`) rather than tier: relief under 1.5px a stitch isn't built.
 - [ ] **The game sets `LOOK.viewPx`** to its real crowd size (150 is assumed), and to 0 for any
   close-up view.
-- [ ] The rest of the spec's §6 (wear slots, catalogue types and costs, `scarf` default off).
+- [ ] The rest of the spec's §6 (wear slots, catalogue types and costs). The rig's placeholder
+  `scarf` is deleted outright (2026-10-02).

@@ -12,16 +12,17 @@ Every type in VISUAL-DESIGN-FINISHED-OBJ.md §1 except the swatch, which is a cr
 | Type | Cover icon | Yarn cost, in balls (proposed) |
 | --- | --- | --- |
 | sweater | sweater | 8 |
+| blanket | folded blanket (proposed) | 6 |
 | shawl | triangle | 5 |
 | scarf (cowl, ascot, long …) | droopy donut | 4 |
 | bag | bag | 4 |
 | hat | hat with pom | 3 |
 | amigurumi | species head (proposed) | 3 |
-| socks | sock (proposed) | 2 |
+| socks (incl. slipper socks, leg warmers) | sock | 2 |
 | cozy | teapot (proposed) | 2 |
 | chair cover | doily (proposed) | 2 |
-| potholder | square (proposed) | 1 |
 | mittens | mittens (proposed) | 2 |
+| potholder | square (proposed) | 1 |
 
 **A pattern's yarn cost is a count of yarn ITEMS (balls, cones, skeins) of the pattern's own recommended weight, never more than 8.** One item is one unit, whatever its weight.
 
@@ -32,6 +33,7 @@ Every type in VISUAL-DESIGN-FINISHED-OBJ.md §1 except the swatch, which is a cr
 
 ## Pattern attributes
 
+- name: a punny title such as "the OwlyCowly", one of a finite set that the shop re-stocks, so a name identifies one design (in code as `title`; see WEARABLE-FINISHED-OBJ.md, "Pattern names")
 - units of yarn required: the table above
 - recommended number of yarn colors
 - recommended material(s) 
@@ -58,3 +60,7 @@ The visual spec asks for these to be kept here as they come up.
     - units: first set to volume, then replaced the same day. A pattern costs 1–8 items of its own weight, because volume's 27x spread meant 54-ball sweaters
     - the 2D image is an offscreen render
     - tool size and yarn weight decide an FO's fit, so the recommended tool size and weight are what the player can match to get a good fit
+- 2026-10-02:
+    - mittens are a pattern and a DECOR finished object: knitted, never worn (no rendered fingers). VISUAL-DESIGN-FINISHED-OBJ.md §1 lists them under decor
+    - blanket added as a decor type (6 balls, proposed): it drapes over the shop's chair backs and display tables, which record where it fits
+    - ~~the code lags this table~~ Done 2026-10-03 for the wearables: `PATTERN_TYPES` in `inventory/catalog.js` makes sweater, shawl, scarf, bag, hat and socks at this table's costs, and `yarnUnits` counts one per item. Each named design carries the silhouette it makes (`silhouette`, garments.js's own words), and the finished object is built as that silhouette. The decor types are still not patterns: nothing draws a decor FO yet, so one would finish invisible; see VISUAL-DESIGN-FINISHED-OBJ.md §6

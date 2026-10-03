@@ -4,14 +4,15 @@
 
 import { activeDisplay, hoverTarget, raycaster, setRayFromEvent } from './pointer.js';
 import { FLAT_Q, dropMarker } from './glow.js';
-import { cast, seats, displays, aim, shop, touchView, touchHud, mover } from '../core/state.js';
+import { cast, seats, props, displays, aim, shop, touchView, touchHud, mover } from '../core/state.js';
 import { gridSize, remask, usableAt } from '../../../inventory/grid.js';
 import { seatById } from '../../visit.js';
 import * as THREE from 'three';
-import { CELL, GHOST_ALPHA, GHOST_NO, GHOST_OK, S, SEAT_H } from '../core/config.js';
+import { CELL, GHOST_ALPHA, GHOST_NO, GHOST_OK, S } from '../core/config.js';
 
 import { HALF_D, HALF_W, UP, clearGroup } from '../scene/room.js';
 import { CHAIR_W, chairGroup } from '../scene/seating.js';
+import { applyProp, propGroup } from '../scene/props.js';
 import { WALL_INSET, applyTransform, boxIsClear, buildFurniture, cellIsClear, roomObstacles } from '../scene/displays.js';
 import { refreshAll } from '../goods/paint.js';
 
@@ -41,12 +42,16 @@ const WALL_LINES = [
   { yaw: -Math.PI / 2, axis: 'x', at:  HALF_W },
 ];
 
-// A movable is a display or a chair. A display owns a slot grid and a chair does not, which is the
-// only question the four functions below ever need to ask — so it is the discriminator, rather than
-// a `type` field that could disagree with the object it is on.
-const isSeat = (m) => !m.g;
+// A movable is a display, a chair, or a prop (a pot, side table or lamp). A display owns a slot grid
+// and the other two do not, so `!m.g` is the "small free-standing thing" test; a prop says so.
+const isFree = (m) => !m.g;
+const isProp = (m) => m.prop === true;
+const isSeat = (m) => isFree(m) && !isProp(m);
 
-const moveSize = (m) => (isSeat(m) ? { w: CHAIR_W, d: CHAIR_W } : gridSize(m.g));
+const moveSize = (m) => {
+  if (isProp(m)) return { w: m.w, d: m.d };
+  return isSeat(m) ? { w: CHAIR_W, d: CHAIR_W } : gridSize(m.g);
+};
 
 export const movePose = (m) => ({ x: m.x, z: m.z, yaw: isSeat(m) ? m.facing : m.yaw });
 
@@ -70,13 +75,18 @@ export function floorPoint(event) {
  *  occupancy lives in the sim and not in the scene), so both have to be told. */
 export function applySeat(s, x, z, yaw) {
   s.x = x; s.z = z; s.facing = yaw;
-  s.mesh.position.set(x, SEAT_H / 2, z);
+  s.mesh.position.set(x, 0, z);
   s.mesh.rotation.y = yaw;
   const live = shop.world && seatById(shop.world, s.id);
   if (live) { live.x = x; live.z = z; live.facing = yaw; }
 }
 
-export const moveApply = (m, x, z, yaw) => (isSeat(m) ? applySeat : applyTransform)(m, x, z, yaw);
+const applierOf = (m) => {
+  if (isProp(m)) return applyProp;
+  return isSeat(m) ? applySeat : applyTransform;
+};
+
+export const moveApply = (m, x, z, yaw) => applierOf(m)(m, x, z, yaw);
 
 /**
  * Rule 10's per-type restrictions, as a pose filter:
@@ -96,8 +106,8 @@ export function constrainPose(m, x, z, yaw) {
   yaw = Math.round(yaw / YAW_STEP) * YAW_STEP;
   const clamp = (v, limit) => Math.max(-limit, Math.min(limit, v));
 
-  if (isSeat(m)) {
-    const edge = CHAIR_W * Math.SQRT1_2 + WALL_INSET;   // a turned chair needs its diagonal
+  if (isFree(m)) {
+    const edge = moveSize(m).w * Math.SQRT1_2 + WALL_INSET;   // a turned one needs its diagonal
     return { x: clamp(x, HALF_W - edge), z: clamp(z, HALF_D - edge), yaw };
   }
   if (m.form !== 'wall-shelf') return { x, z, yaw };
@@ -127,9 +137,9 @@ export function constrainPose(m, x, z, yaw) {
  * they are the ones that come out funny shapes.
  */
 export function canPlaceAt(m, pose) {
-  if (isSeat(m)) {
-    return boxIsClear(pose.x, pose.z, CHAIR_W * Math.SQRT1_2,
-      roomObstacles(displays, seats.filter((s) => s !== m)));
+  if (isFree(m)) {
+    return boxIsClear(pose.x, pose.z, moveSize(m).w * Math.SQRT1_2,
+      roomObstacles(displays, seats.filter((s) => s !== m), props.filter((p) => p !== m)));
   }
   const probe = { ...pose, cols: m.g.cols, rows: m.g.rows, tilt: m.tilt ?? 0 };
   const others = roomObstacles(displays.filter((o) => o !== m));
@@ -233,24 +243,30 @@ function followSeat(s) {
   }
 }
 
-/** The chair under the pointer, if any. Tried before displays: a chair is small, exact to raycast,
- *  and usually sitting on top of some display's slot plane. */
-function chairAt(event) {
+/** The chair or prop under the pointer, if any. Tried before displays: they are small, exact to
+ *  raycast, and usually standing on top of some display's slot plane (the floor's). */
+function freeAt(event) {
   setRayFromEvent(event);
-  return raycaster.intersectObjects(chairGroup.children, false)[0]?.object.userData.seat ?? null;
+  // Recursive: each is a group of parts, and the record is on the group.
+  const hit = raycaster.intersectObjects([...chairGroup.children, ...propGroup.children], true)[0];
+  for (let n = hit?.object; n; n = n.parent) {
+    const found = n.userData.seat ?? n.userData.prop;
+    if (found) return found;
+  }
+  return null;
 }
 
 export function grabMovable(event) {
   const p = floorPoint(event);
   // You cannot pick up the floor. Everything else in the room is fair game (DISPLAYS.md rule 10).
   const under = hoverTarget(event)?.disp;
-  const m = p ? (chairAt(event) ?? (under?.solid === false ? null : under)) : null;
+  const m = p ? (freeAt(event) ?? (under?.solid === false ? null : under)) : null;
   if (!m) { clearSelection(); return false; }   // a press on bare floor deselects and orbits
   mover.m = m;
   mover.from = movePose(m);
   mover.ox = m.x - p.x;   // grab offset, so the thing does not snap its centre to the cursor
   mover.oz = m.z - p.z;
-  if (!isSeat(m)) { aim.active = aim.hovered = m.id; touchView(); }
+  if (!isFree(m)) { aim.active = aim.hovered = m.id; touchView(); }
   const pose = movePose(m);
   proposeMove(m, pose.x, pose.z, pose.yaw);
   return true;
@@ -265,11 +281,11 @@ export function dropMovable() {
   if (!mover.ok) {
     moveApply(m, mover.from.x, mover.from.z, mover.from.yaw);
     mover.ok = canPlaceAt(m, mover.from);
-  } else if (isSeat(m)) {
-    followSeat(m);
-    // A chair that has moved away frees the slots it was masking out of every display near it.
-    // Safe in this direction only: canPlaceAt refused to let the chair land on a display at all,
-    // so this can add slots back but never revoke one.
+  } else if (isFree(m)) {
+    if (isSeat(m)) followSeat(m);
+    // A chair or prop that has moved away frees the slots it was masking out of every display near
+    // it. Safe in this direction only: canPlaceAt refused to let it land on a display at all, so
+    // this can add slots back but never revoke one.
     for (const d of displays) remaskDisplay(d);
   } else {
     remaskMoved(m);
@@ -307,7 +323,8 @@ export function rotateMovable(step) {
     return;
   }
   if (proposeMove(m, from.x, from.z, from.yaw + step)) {
-    if (!isSeat(m)) remaskMoved(m);
+    if (isFree(m)) for (const d of displays) remaskDisplay(d);
+    else remaskMoved(m);
   } else {
     moveApply(m, from.x, from.z, from.yaw);
     mover.ok = canPlaceAt(m, from);

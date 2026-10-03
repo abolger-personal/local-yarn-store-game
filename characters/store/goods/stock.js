@@ -27,8 +27,8 @@ export function cellNameFor(item) {
 // instance — a random shape per box would invent a property the product does not have.
 //
 // Yarn and patterns do NOT appear here: their footprints are not packaging choices but real
-// attributes the sim reads. A yarn's size comes from its weight and decides how many units it is
-// worth (PATTERNS.md), and a pattern is always 2x2. Both come from catalog.js instead.
+// attributes the sim reads. A yarn's size comes from its weight (PATTERNS.md: shelf space, while
+// every ball is one unit toward a pattern), and a pattern is always 2x2. Both come from catalog.js instead.
 const PACKAGES = {
   'crochet-hook':     [[1, 1], [2, 1]],   // single hook, or a set in a long case
   'knitting-needles': [[1, 1], [1, 2]],   // a pair, or a long circular set
@@ -121,9 +121,10 @@ function cellOrder(display, { c, r, avoidWall }) {
  * @param {any} display
  * @param {number} shelf
  * @param {any} spec
- * @param {{c?: number, r?: number, avoidWall?: boolean, shape?: number[]}} [where]
+ * @param {{c?: number, r?: number, avoidWall?: boolean, shape?: number[], reserve?: number}} [where]
+ *   `reserve` is layers that must stay free ABOVE the item — room for what goes on it next.
  */
-export function addItem(display, shelf, spec, { c, r, avoidWall = false, shape } = {}) {
+export function addItem(display, shelf, spec, { c, r, avoidWall = false, shape, reserve = 0 } = {}) {
   if (items.length >= CAPACITY) return -1;   // the instanced buffers cannot grow past this
   const { g } = display;
   // Yarn and patterns bring their own footprint; a notion gets one of its packagings.
@@ -134,7 +135,7 @@ export function addItem(display, shelf, spec, { c, r, avoidWall = false, shape }
     // footprint() returns null the moment any covered cell runs off the grid or hits a mask, and
     // fits() treats null as "no" — so an oversized package simply fails over to the next cell.
     const keys = footprint(g, shelf, [cell.c, cell.r], [w, h]);
-    if (!fits(g, keys, layers)) continue;
+    if (!fits(g, keys, layers + reserve)) continue;
     const index = items.length;
     items.push({
       ...spec,

@@ -2,16 +2,16 @@
 //
 // Extracted from the single 3,200-line module that used to live inline in store.html.
 
-import { cast, seats, displays, items, shop } from './core/state.js';
+import { cast, seats, props, displays, items, shop } from './core/state.js';
 import { SHOP_RANGE, SIZED_NOTIONS, YARN_SHAPES, yarnWeight } from '../../inventory/catalog.js';
 import { usableAt } from '../../inventory/grid.js';
 import { familyExtent, yarnFit } from '../../inventory/yarn-geometry.js';
 import { createCharacter, disposeCharacter, getSpecies, speciesIds } from '../npc.js';
-import { labelOf, seatById } from '../visit.js';
+import { labelOf, obstacles, seatById } from '../visit.js';
 import * as THREE from 'three';
-import { BOX_H, CELL } from './core/config.js';
-import { camera, controls } from './scene/stage.js';
-import { COUNTER, HALF_D, HALF_W, cullWalls, walls } from './scene/room.js';
+import { BOX_H, CELL, S } from './core/config.js';
+import { applyDaylight, camera, controls, key as sun } from './scene/stage.js';
+import { COUNTER, HALF_D, HALF_W, SHADOW_LAYER, cullWalls, shadowCasters, walls } from './scene/room.js';
 import { ROOM_FLOOR, applyTransform } from './scene/displays.js';
 import { atlas, boxes } from './goods/items.js';
 import { YARN, YARN_FIT, yarnMeshes } from './goods/yarn.js';
@@ -137,6 +137,10 @@ export function checkItemSizes() {
   checkYarnUnits();
   checkYarnHeights();
   checkStockable();
+  // The shop is MEANT to be cluttered (config.js): a stock count that quietly does not land is
+  // a sparse shop nobody asked for. stockTheShop logs the shortfall; this makes it fail.
+  console.assert(items.length >= S.stockCount,
+    `stock: asked for ${S.stockCount} boxes, only ${items.length} landed`);
   const kinds = {};
   for (const it of items) kinds[it.name] = (kinds[it.name] ?? 0) + 1;
   console.info(`stock: ${items.length} items —`,
@@ -258,7 +262,9 @@ function checkDetents(pile, fails) {
  * display shifted by. This is the claim the whole mechanic rests on.
  */
 function checkStockTravels(pile, fails) {
-  const index = items.findIndex((it) => it.display === pile.id && !it.gone && !it.held);
+  // A box: yarn is drawn by the yarn meshes and its box instance is parked hidden, so a ball's box
+  // matrix never moves and the check failed whenever the table's first item happened to be yarn.
+  const index = items.findIndex((it) => it.display === pile.id && !it.gone && !it.held && it.name !== 'yarn');
   if (index === -1 || !boxes) return;
   const m = new THREE.Matrix4(), before = new THREE.Vector3(), after = new THREE.Vector3();
   boxes.getMatrixAt(index, m); before.setFromMatrixPosition(m);
@@ -294,13 +300,32 @@ function checkChair(chair, pile, fails) {
 }
 
 /**
+ * Every pot and lamp stands somewhere legal, is refused on the counter and on a
+ * display, follows a move with its mesh — and the SIM routes round it where it now stands, since
+ * NPCs walking through a lamp is exactly the bug a scene-only move would make.
+ */
+function checkProps(pile, fails) {
+  for (const p of props) {
+    if (!canPlaceAt(p, constrainPose(p, p.x, p.z, p.yaw))) fails.push(`${p.id} is illegal where it stands`);
+  }
+  const p = props[0];
+  if (!p) return;
+  if (canPlaceAt(p, { x: COUNTER.x, z: COUNTER.z, yaw: 0 })) fails.push('a prop inside the counter was allowed');
+  if (pile && canPlaceAt(p, { x: pile.x, z: pile.z, yaw: 0 })) fails.push('a prop on top of a display was allowed');
+  moveApply(p, p.x, p.z - 0.3, p.yaw);
+  if (Math.abs(p.mesh.position.z - p.z) > 1e-9) fails.push('prop mesh did not follow the move');
+  if (shop.world && !obstacles(shop.world).some((o) => o.x === p.x && o.z === p.z))
+    fails.push('the sim does not route round a moved prop');
+}
+
+/**
  * Self-check: DISPLAYS.md rule 10. Everything the player can move can be moved and turned, stock
  * comes with it, and the per-type restrictions hold. Runs against the live layout and restores
  * every pose afterwards.
  */
 export function checkDisplayMoves() {
   const fails = [];
-  const saved = [...displays, ...seats].map((m) => ({ m, ...movePose(m) }));
+  const saved = [...displays, ...seats, ...props].map((m) => ({ m, ...movePose(m) }));
   const shelf = displays.find((d) => d.form === 'wall-shelf');
   // `solid !== false` as well as 'pile': the floor tiles are piles too, and at displayCount 1
   // there is no table, so this would otherwise pick a floor tile and start dragging the floor.
@@ -310,6 +335,7 @@ export function checkDisplayMoves() {
   if (shelf) { checkShelfSnap(shelf, fails); checkShelfPlaceable(shelf, fails); }
   if (pile) { checkDetents(pile, fails); checkStockTravels(pile, fails); checkPileRefusals(pile, fails); }
   if (chair) checkChair(chair, pile, fails);
+  checkProps(pile, fails);
 
   for (const s of saved) moveApply(s.m, s.x, s.z, s.yaw);
   refreshAll();
@@ -389,4 +415,37 @@ export function checkHeldItem() {
   console.assert(fails.length === 0, 'held item:', fails);
   console.info(`held item: ${fails.length
     ? `${fails.length} FAILED` : `ok (${meshes} mesh in hand, hideable)`}`);
+}
+
+/**
+ * Self-check: the sun comes in through the windows. Rays from a grid of floor points toward the
+ * sun, against the walls' shadow stand-ins — the same geometry the shadow map sees. The morning
+ * must light most of the floor; the afternoon must shade most of it and still land SOME sun on it,
+ * which is only possible through a window. A window moved behind solid wall, or a sun angle that
+ * misses every opening, fails here rather than as a vaguely gloomy afternoon.
+ */
+/** The share of a grid over the floor that can see the sun at time-of-day `t`. */
+function floorInSun(t) {
+  const ray = new THREE.Raycaster();
+  ray.layers.set(SHADOW_LAYER);   // the stand-in lives where only the shadow camera looks
+  applyDaylight(t);
+  const toSun = sun.position.clone().normalize();
+  let n = 0, total = 0;
+  for (let x = -HALF_W + 0.2; x < HALF_W; x += 0.2)
+    for (let z = -HALF_D + 0.2; z < HALF_D; z += 0.2) {
+      ray.set(new THREE.Vector3(x, 0.01, z), toSun);
+      total++;
+      if (!ray.intersectObjects(shadowCasters, false).length) n++;
+    }
+  return n / total;
+}
+
+export function checkSunPools() {
+  const morning = floorInSun(0), afternoon = floorInSun(1);
+  applyDaylight(S.followDay ? shop.dayT : S.timeOfDay);
+  const pct = (v) => `${(v * 100).toFixed(0)}%`;
+  console.assert(morning > 0.7, `sun: the morning lights only ${pct(morning)} of the floor`);
+  console.assert(afternoon < 0.3 && afternoon > 0.03,
+    `sun: the afternoon lights ${pct(afternoon)} of the floor — want a few window pools`);
+  console.info(`sun: morning lights ${pct(morning)} of the floor, afternoon ${pct(afternoon)} (window pools)`);
 }

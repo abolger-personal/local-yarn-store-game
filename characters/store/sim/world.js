@@ -5,8 +5,8 @@
 import { abortDrag } from '../interact/pick.js';
 import { rnd } from '../core/util.js';
 import { clearSelection } from '../interact/move.js';
-import { cast, seats, displays, items, touchHud, shop, clocks } from '../core/state.js';
-import { makeStockNotion, makeStockPattern, makeStockYarn, yarnWeight } from '../../../inventory/catalog.js';
+import { cast, seats, props, displays, items, touchHud, shop, clocks } from '../core/state.js';
+import { makeStockNotion, makeStockPattern, makeStockYarn, stockPatternFor, yarnWeight } from '../../../inventory/catalog.js';
 import {
   NAMES,
   POSES,
@@ -20,7 +20,7 @@ import {
   MOTION_DEFAULTS,
   motionOf,
 } from '../../npc.js';
-import { STATE, advanceRound, makeNpc, makeWorld, rejoin } from '../../visit.js';
+import { STATE, advanceRound, dayProgress, makeNpc, makeWorld, rejoin } from '../../visit.js';
 import { satisfies, wantsOf } from '../../wip.js';
 import * as THREE from 'three';
 import { S } from '../core/config.js';
@@ -48,13 +48,15 @@ export const room = {
   door:      { x: 0, z: HALF_D - 0.35 },
   outside:   { x: 0, z: HALF_D + 1.4 },
   queueAt:   { x: 0, z: HALF_D + 0.8 },
-  guestbook: { x: -2.1, z: 1.15 },
-  dropOff:   { x: 2.2, z: 1.7 },
+  guestbook: { x: -3.0, z: 1.55 },
+  dropOff:   { x: 3.85, z: 1.9 },
   personalSpace: 0.62,
   doorClearance: 0.8,   // nobody may loiter this close to the door — it is the only way through
   // Solid things the sim must route around that are not displays or chairs. Displays and seats it
-  // already knows about; the counter it does not, so it is handed over here rather than duplicated.
-  solids: [{ x: COUNTER.x, z: COUNTER.z, w: COUNTER.w, d: COUNTER.d }],
+  // already knows about; the counter and the pots, tables and lamps it does not, so they are handed
+  // over here rather than duplicated. A getter, because the player moves the props: the sim reads
+  // the live records every time it routes.
+  get solids() { return [{ x: COUNTER.x, z: COUNTER.z, w: COUNTER.w, d: COUNTER.d }, ...props]; },
   bounds: { minX: -HALF_W + 0.6, maxX: HALF_W - 0.6, minZ: -HALF_D + 1.4, maxZ: HALF_D - 0.9 },
 };
 
@@ -64,7 +66,7 @@ export const castGroup = new THREE.Group();
 // this only has to place items — a shelf gets more because it has three levels to fill.
 // What a shop actually sells, weighted. Yarn dominates because YARN.md calls it "a centerpiece of
 // this game" and because it is what the WIP mechanic consumes most of — a pattern needs one tool
-// but up to twenty units of wool.
+// but up to eight balls of wool.
 function randomStock() {
   const roll = Math.random();
   if (roll < 0.55) return makeStockYarn();
@@ -137,16 +139,36 @@ function fillStock(n) {
  * for MAX_ROUNDS and leaving empty-handed — which reads as the browse logic being broken rather
  * than the shop having nowhere to put their hook. So refusals are collected, not ignored.
  */
+/**
+ * The first place, from `start` round, that takes `spec`. A wall shelf is two rows deep and a seed
+ * keeps off its wall row to stay noticeable, so it has ONE row for anything — and refuses every 2x2
+ * pattern and 2- or 3-deep ball in an empty shop. Trying only that place lost the seed; trying the
+ * next is the honest answer, and spreads seeds over the shop all the same.
+ */
+function placeFrom(spots, start, spec, where) {
+  for (let k = 0; k < spots.length; k++) {
+    // Every member of a group, from a random one: the floor is ONE place in the rota but a hundred
+    // tiles, and a single random tile — a thin edge one, or one half under a table — turned away a
+    // bulky ball and its lid while the rest of the floor sat empty.
+    const group = spots[(start + k) % spots.length], from = rnd(group.length);
+    for (let j = 0; j < group.length; j++) {
+      const display = group[(from + j) % group.length];
+      const index = addItem(display, 0, spec, where);
+      if (index >= 0) return { index, display };
+    }
+  }
+  return { index: -1, display: null };
+}
+
 function seedOne(npc, i, unseeded) {
   const wants = wantsOf(npc);
   const spots = stockSpots();
   let placed = 0;
   wants.forEach((want, k) => {
-    const open = pick(spots[(i + k) % spots.length]);
     const spec = specFor(want);
     console.assert(satisfies(spec, want), 'seeded item does not satisfy its own want', spec, want);
-    if (addItem(open, 0, spec, { avoidWall: true }) >= 0) placed++;
-    else unseeded.push(`${npc.name} wants ${want.kind} (no room on ${open.id})`);
+    if (placeFrom(spots, i + k, spec, { avoidWall: true }).index >= 0) placed++;
+    else unseeded.push(`${npc.name} wants ${want.kind} (no room anywhere)`);
   });
   return { wants, placed };
 }
@@ -164,18 +186,19 @@ function buryOne(npc, i, want, unburied) {
   // burial that silently does not happen is the dig-out branch quietly going untested. One random
   // tile stands in for the floor rather than all of them: a tile is sixteen cells twelve layers
   // deep, so unlike a shelf it has no realistic way to say no.
-  for (let k = 0; k < spots.length; k++) {
-    const hidden = pick(spots[(i + 1 + k) % spots.length]);
-    const buried = addItem(hidden, 0, spec, { avoidWall: true, shape: [1, 1] });
-    if (buried < 0) continue;
-    const it = items[buried];
-    const lid = addItem(hidden, 0, makeStockNotion(Math.random, 'darning-needle'),
-                        { c: it.c, r: it.r, shape: [it.w, it.h] });
-    if (lid < 0) unburied.push(`${npc.name}'s ${want.kind} landed on ${hidden.id} with no lid`);
-    return 1 + (lid >= 0 ? 1 : 0);
-  }
-  unburied.push(`${npc.name}'s ${want.kind} fits under nothing in the room`);
-  return 0;
+  // A notion is boxed 1x1 so it fits under any lid; yarn and patterns keep their OWN footprint.
+  // Forcing 1x1 on everything squeezed a worsted or bulky ball into one cell — a ball the wrong
+  // size for its weight, which checkItemSizes caught on about two boots in three.
+  // `reserve: 1` keeps a layer free for the lid, or a full-size ball lands on a stack already near
+  // the display's headroom and nothing fits on top to hide it.
+  const { index: buried, display: hidden } = placeFrom(spots, i + 1, spec,
+    { avoidWall: true, reserve: 1, ...(spec.w ? {} : { shape: [1, 1] }) });
+  if (buried < 0) return 0;   // seedWants tries their next want
+  const it = items[buried];
+  const lid = addItem(hidden, 0, makeStockNotion(Math.random, 'darning-needle'),
+                      { c: it.c, r: it.r, shape: [it.w, it.h] });
+  if (lid < 0) unburied.push(`${npc.name}'s ${want.kind} landed on ${hidden.id} with no lid`);
+  return 1 + (lid >= 0 ? 1 : 0);
 }
 
 function seedWants(npcs) {
@@ -184,7 +207,12 @@ function seedWants(npcs) {
   npcs.forEach((npc, i) => {
     const { wants, placed } = seedOne(npc, i, unseeded);
     placedCount += placed;
-    if (wants.length) placedCount += buryOne(npc, i, wants[0], unseeded);
+    // The first want that CAN be buried. A bulky cone is twelve layers, a pile's whole headroom,
+    // so nothing can lid it; skipping it costs nothing (its noticeable copy is already out — seedOne)
+    // but the dig-out branch still wants one buried thing per customer where there is one.
+    const buried = wants.reduce((n, want) => n || buryOne(npc, i, want, unseeded), 0);
+    if (wants.length && !buried) console.info(`${npc.name}: nothing they want fits under a lid; none buried`);
+    placedCount += buried;
   });
   console.assert(unseeded.length === 0, 'want seeding failed:', unseeded);
   return placedCount;
@@ -200,10 +228,10 @@ function seedWants(npcs) {
  */
 function specFor(want) {
   if (want.kind === 'pattern') {
-    const p = makeStockPattern();
-    // A WIP already holding yarn only matches patterns that suit THAT yarn.
-    if (want.forYarn) { p.weight = want.forYarn.weight; p.materials = [want.forYarn.material]; }
-    return p;
+    // A WIP already holding yarn only matches patterns that suit THAT yarn — and it is still one of
+    // the shop's named designs, not a stock pattern with its yarn edited (which would leave its
+    // title naming a different spec).
+    return want.forYarn ? stockPatternFor(want.forYarn) : makeStockPattern();
   }
   if (want.kind === 'yarn') {
     const y = makeStockYarn();
@@ -375,8 +403,8 @@ function spawnCast() {
 function stockTheShop(npcs) {
   // Seeds go down FIRST and count against the budget. What the customers in the shop actually
   // need is the inventory that matters — filling up with random stock and then discovering there
-  // is no room left for anybody's yarn is the wrong way round, and at a stock count of 10 it
-  // would happen constantly.
+  // is no room left for anybody's yarn is the wrong way round, and in a cluttered shop it would
+  // happen constantly.
   const seeded = seedWants(npcs);
   const filled = fillStock(S.stockCount - seeded);
   const short = items.length < S.stockCount ? ` (asked for ${S.stockCount}; the shop had no room for more)` : '';
@@ -410,8 +438,7 @@ export function restart({ keepRegulars = true } = {}) {
   // resets the calendar too, so the day counter never claims a history the customers do not have.
   fileGuestbook(keepRegulars);
   shop.day = keepRegulars ? shop.day + 1 : 1;
-  clocks.day = 0;
-  clocks.auto = 0;
+  Object.assign(clocks, { day: 0, auto: 0 });
   // Any move-mode selection refers to furniture that is about to be replaced. seating.js used to
   // clear it itself, which meant a leaf module importing the interaction layer — one of the
   // twenty-four cycles. The caller that knows the furniture is going does it instead.
@@ -425,6 +452,7 @@ export function restart({ keepRegulars = true } = {}) {
   stockTheShop(npcs);
   shop.world = makeWorld({ displays, items, room, seats });
   shop.world.npcs = npcs;
+  shop.dayT = 0;
   sizeInstanceBuffers();
   refreshAll();
   buildBlobs();
@@ -491,6 +519,9 @@ export function doAdvanceRound() {
   if (!shop.world) return;
   if (!shop.world.npcs.some((n) => n.state !== STATE.GONE)) return;   // shop is empty, stop the clock
   advanceRound(shop.world);
+  // Clamped so the light and the clock never wind back when a customer's visit runs longer than
+  // estimated — see dayProgress.
+  shop.dayT = Math.max(shop.dayT, dayProgress(shop.world));
   collectRegulars();
   clocks.auto = 0;
   // Shuffled, so the same NPC is not first out of the door every single round -- the slot

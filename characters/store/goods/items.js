@@ -18,8 +18,10 @@ export let sideField = null, sideEdge = null, fieldTop = null, edgeTop = null;
 export let shadows = null, boxes = null, sizeSide = null, sizeTop = null;
 
 
-// Sized for the largest layout the dropdowns allow (6 displays plus every NPC's seeded targets),
-// with headroom. An InstancedMesh cannot grow after allocation, so this is a hard ceiling.
+// Sized for the most stock the GUI allows (200 boxes; customer seeds count against that budget,
+// so a full shop is ~200 items however many NPCs come in), with headroom. An InstancedMesh cannot
+// grow after allocation, so this is a hard ceiling: addItem refuses past it. Draw calls do not
+// grow with it — every item shares these meshes — only the instance count does.
 export const CAPACITY = 256;
 export const FILL = 0.9;
 

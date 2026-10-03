@@ -21,9 +21,10 @@ import '../llama.js';
 import { STATE } from '../visit.js';
 
 import { S } from './core/config.js';
-import { installStage, renderer, scene, camera, controls } from './scene/stage.js';
+import { installStage, renderer, scene, camera, controls, tickDaylight } from './scene/stage.js';
 import { buildRoomShell, cullWalls } from './scene/room.js';
 import { installSeating } from './scene/seating.js';
+import { installProps } from './scene/props.js';
 import { installDisplays } from './scene/displays.js';
 import { buildItemMeshes } from './goods/items.js';
 import { buildYarnMeshes } from './goods/yarn.js';
@@ -37,7 +38,7 @@ import { installBook } from './ui/book.js';
 import { installBoard } from './ui/board.js';
 import { frameRoom } from './ui/framing.js';
 import { buildGui } from './ui/gui.js';
-import { checkWallCulling, checkItemSizes, checkSlotMasking, checkFloorTiling, checkDisplayMoves, checkHeldItem } from './checks.js';
+import { checkWallCulling, checkItemSizes, checkSlotMasking, checkFloorTiling, checkDisplayMoves, checkHeldItem, checkSunPools } from './checks.js';
 
 const ATLAS_URL = '../../ai_planning_sessions/inventory/illustrations/build';
 
@@ -79,7 +80,7 @@ function restoreFolds() {
 function buildShop() {
   /** @type {[string, () => void][]} */
   const steps = [
-    ['stage', installStage], ['room', buildRoomShell], ['seating', installSeating],
+    ['stage', installStage], ['room', buildRoomShell], ['props', installProps], ['seating', installSeating],
     ['displays', installDisplays], ['placeholder art', installPlaceholderArt],
     ['feedback', installFeedback], ['move mode', installMove], ['input', installInput],
     ['world', installWorld], ['hud', installHud], ['book', installBook], ['board', installBoard],
@@ -101,6 +102,7 @@ function runChecks() {
   checkFloorTiling();
   checkDisplayMoves();
   checkHeldItem();
+  checkSunPools();
 }
 
 /**
@@ -150,6 +152,7 @@ function startLoop() {
     tickGlow(clocks.elapsed);
     syncFurnitureButtons();
     tickClocks(dt);
+    tickDaylight(dt);
     repaintIfDirty();
     controls.update();
     cullWalls();        // after controls.update(), so it sees where the camera actually ended up

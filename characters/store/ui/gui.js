@@ -74,7 +74,7 @@ function shopRows() {
   gui.add({ f: doAdvanceRound }, 'f').name('advance round  (Space)');
   gui.add({ f: () => restart() }, 'f').name('next shop.day — regulars return  (R)');
   gui.add({ f: () => restart({ keepRegulars: false }) }, 'f').name('all new customers');
-  gui.add(S, 'stockCount', 2, 120, 1).name('total inventory').onChange(restart);
+  gui.add(S, 'stockCount', 2, 200, 1).name('total inventory').onChange(restart);
   gui.add(S, 'autoSeconds', 1, 60, 0.5).name('round interval (s)');
   gui.add(S, 'dayGap', 0, 20, 0.5).name('pause between days (s)');
 }
@@ -111,6 +111,9 @@ function lookRows() {
   gLook.addColor(S, 'glowColor').name('held glow').onChange((v) => glow.material.color.set(v));
   gLook.add(S, 'glowSpeed', 0.2, 2.5, 0.1).name('glow pulse (Hz)');
   gLook.add(S, 'glowPad', 0.005, 0.15, 0.005).name('glow thickness');
+  gLook.add(S, 'followDay').name('light follows the day');
+  gLook.add(S, 'timeOfDay', 0, 1, 0.01).name('time of day (morning → afternoon)')
+    .onChange(() => { S.followDay = false; gui.controllersRecursive().forEach((c) => c.updateDisplay()); });
   gLook.add(S, 'exposure', 0.1, 2, 0.01).onChange((v) => (renderer.toneMappingExposure = v));
   gLook.add(S, 'toneMapping', ['AgX', 'ACES', 'None'])
     .onChange((v) => (renderer.toneMapping = TONE_MAPPING[v]));
@@ -173,7 +176,9 @@ const isTyping = (t) => t instanceof HTMLElement
   && (t.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(t.tagName));
 
 function onKeyDown(e) {
-  if (isTyping(e.target)) return;
+  // One press, one action. A held key auto-repeats ~30 times a second, so holding Space ran a full
+  // round on every repeat — days went by in seconds — and holding R restarted the shop as fast.
+  if (e.repeat || isTyping(e.target)) return;
   const k = e.key.toLowerCase();
   const action = KEYS[k];
   if (!action) return;

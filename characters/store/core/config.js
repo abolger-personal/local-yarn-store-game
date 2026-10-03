@@ -70,9 +70,16 @@ export const SHELF_HEADROOM = Math.floor(SHELF_CLEAR / BOX_H);
 
 // doorH is generous on purpose: a 1.0-tall NPC needs the opening to read as a shop door, not a
 // hatch, and the tallest species (llama, per P1-SPIKE-PLAN) is ~1.33 before any hat.
-export const ROOM = { w: 6.4, d: 6.4, wallH: 2.6, doorW: 1.2, doorH: 2.0 };
+export const ROOM = { w: 9.6, d: 7.2, wallH: 2.6, doorW: 1.2, doorH: 2.0 };
 
 export const SEAT_H = 0.22;   // chair seat height — roughly one chibi leg
+
+export const CHAIR_W = 0.34;  // seat width and depth
+
+// The chair back stands BEHIND the seat, raked, like a real one: seated bodies reach past the
+// cushion's back edge (a llama's torso by ~5cm, because a long thigh perches it at the back), and a
+// back on the edge would run through them. rig.test.mjs holds every species in front of it.
+export const CHAIR_BACK_Z = -(CHAIR_W / 2) - 0.065;
 
 export const S = {
   quality:     'high',
@@ -99,9 +106,13 @@ export const S = {
   liftHeight: 0.30,
   // How far a drop reaches for a slot it actually fits in, in SLOTS. See nearestSlot.
   snapCells: 1.6,
-  // How many boxes the shop puts out in total, customer seeds included. Small on purpose: a
-  // sparse shop is the readable one, and it is the arrangement the player is meant to be fixing.
-  stockCount: 10,
+  // How many boxes the shop puts out in total, customer seeds included. Big on purpose: a
+  // cluttered shop IS the look — a real yarn shop is crammed — and it is the planned gameplay,
+  // since a heap is what the player sorts and what a customer has to dig through. 100 lands in
+  // full at the default two displays: the floor piles take about half (checkItemSizes asserts it
+  // lands). The GUI tops out at 200, which also lands at that layout; CAPACITY (items.js) is the
+  // hard ceiling above that.
+  stockCount: 100,
   // Round pacing defaults to CONTINUOUS. A round is 15 in-game minutes (CHARACTER-VISIT.md), but
   // that says nothing about real seconds — and at the old 30s the cast walked for ~1.5s and then
   // stood frozen for 28. This is just over the longest a staggered walk can take
@@ -136,7 +147,11 @@ export const S = {
   glowColor:   GHOST_OK,
   glowSpeed:   0.8,         // pulses per second
   glowPad:     0.055,       // world units the halo extends past the box at its widest
-  exposure:    BASE_PARAMS.exposure,
+  // The light follows the day (shop.dayT) unless this is off, when `timeOfDay` holds it: 0 is the
+  // bright morning, 1 the cosy late afternoon. See applyDaylight in stage.js.
+  followDay:   true,
+  timeOfDay:   0,
+  exposure:    0.6,   // brighter than the character pages' BASE_PARAMS 0.4: the shop is a lit room, not a studio
   toneMapping: BASE_PARAMS.toneMapping,
 };
 

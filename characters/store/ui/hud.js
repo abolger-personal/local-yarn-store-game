@@ -108,8 +108,9 @@ const advanceBtn = /** @type {HTMLButtonElement} */ (document.getElementById('ad
 export function drawTimer() {
   if (!shop.world) return;
   roundLabel.textContent = `shop.day ${shop.day} · round ${shop.world.round}`;
-  // CHARACTER-VISIT.md: one round is 15 minutes of in-game time.
-  const minutes = shop.world.round * 15;
+  // Stretched to the day, not 15 minutes a round: opening is 10:00 and the last customer out is
+  // 17:00 however many rounds that took, so the clock always agrees with the light (shop.dayT).
+  const minutes = Math.round(shop.dayT * 7 * 4) * 15;
   const hh = String(10 + Math.floor(minutes / 60)).padStart(2, '0');
   const mm = String(minutes % 60).padStart(2, '0');
   const live = shop.world.npcs.filter((n) => n.state !== STATE.GONE).length;

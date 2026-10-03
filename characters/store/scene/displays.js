@@ -2,7 +2,7 @@
 //
 // Extracted from the single 3,200-line module that used to live inline in store.html.
 
-import { touchView, seats, aim, mover, displays } from '../core/state.js';
+import { touchView, seats, props, aim, mover, displays } from '../core/state.js';
 import { gridSize, makeDisplay } from '../../../inventory/grid.js';
 import { makeGridLines } from '../../../inventory/notions.js';
 import * as THREE from 'three';
@@ -10,6 +10,7 @@ import { BOX_H, CELL, PILE_HEADROOM, ROOM, SHELF_GAP, SHELF_HEADROOM, SHELF_ROWS
 import { scene } from './stage.js';
 import { COUNTER, GLASS_T, HALF_D, HALF_W, UP, clearGroup, glassMat, woodMat } from './room.js';
 import { CHAIR_W } from './seating.js';
+import { board, panel, turned, woodMesh } from './wood.js';
 
 // ---------------------------------------------------------------- displays
 //
@@ -38,12 +39,12 @@ const STAND_OFF = 0.65;      // how far in front of a display an NPC stands to r
 // (Not to be confused with LYS.md §5b's "floor pile", the unslotted delivery inbox. This is
 // DISPLAYS.md type A, "Floor or Table Pile" — a real slotted display that sits on the ground.)
 export const DISPLAY_SLOTS = [
-  { id: 'shelf-n', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: SHELF_ROWS, shelves: 3, headroom: SHELF_HEADROOM, x: 0,    z: -HALF_D + 0.5, yaw: 0 },
-  { id: 'table-a', kind: 'pile',  form: 'table',      cols: 5, rows: 5, shelves: 1, headroom: PILE_HEADROOM, x: 1.5,  z: -0.2,          yaw: 0 },
-  { id: 'shelf-e', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: SHELF_ROWS, shelves: 3, headroom: SHELF_HEADROOM, x: HALF_W - 0.5, z: -1.1,  yaw: -Math.PI / 2 },
-  { id: 'shelf-w', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: SHELF_ROWS, shelves: 3, headroom: SHELF_HEADROOM, x: -HALF_W + 0.5, z: -1.6, yaw: Math.PI / 2 },
-  { id: 'table-b', kind: 'pile',  form: 'table',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: 1.45, z: 1.75,          yaw: 0 },
-  { id: 'table-c', kind: 'pile',  form: 'table',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: -0.35, z: -1.75,        yaw: 0 },
+  { id: 'shelf-n', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: SHELF_ROWS, shelves: 3, headroom: SHELF_HEADROOM, x: -1.5, z: -HALF_D + 0.5, yaw: 0 },
+  { id: 'table-a', kind: 'pile',  form: 'table',      cols: 5, rows: 5, shelves: 1, headroom: PILE_HEADROOM, x: 0.6,  z: -0.3,          yaw: 0 },
+  { id: 'shelf-e', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: SHELF_ROWS, shelves: 3, headroom: SHELF_HEADROOM, x: HALF_W - 0.5, z: -1.3,  yaw: -Math.PI / 2 },
+  { id: 'shelf-w', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: SHELF_ROWS, shelves: 3, headroom: SHELF_HEADROOM, x: -HALF_W + 0.5, z: -2.0, yaw: Math.PI / 2 },
+  { id: 'table-b', kind: 'pile',  form: 'table',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: 2.4,  z: 1.9,           yaw: 0 },
+  { id: 'table-c', kind: 'pile',  form: 'table',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: 2.6,  z: -2.2,          yaw: 0 },
 ];
 
 /**
@@ -179,12 +180,13 @@ export function cellIsClear(slot, c, r, obstacles) {
  * the build; both lists are parameters because a thing being MOVED must not be an obstacle to
  * itself — it would then be blocked by the very spot it is standing in.
  */
-export function roomObstacles(dispList, seatList = seats) {
+export function roomObstacles(dispList, seatList = seats, propList = props) {
   // The doorway is the only way in, so nothing may be parked across it — the same thing
   // room.doorClearance says for NPCs, in the form the grids are masked against. Every authored
   // slot already sits well clear of this, so it only ever bites on something the player moved.
   const out = [{ ...COUNTER, pad: 0.05 }, { x: 0, z: HALF_D - 0.45, w: ROOM.doorW + 0.4, d: 0.9, pad: 0 }];
   for (const s of seatList) out.push({ x: s.x, z: s.z, w: CHAIR_W, d: CHAIR_W, pad: 0.10 });
+  for (const p of propList) out.push({ x: p.x, z: p.z, w: p.w, d: p.d, pad: 0.05 });
   // A display you walk ON is not something to walk around — see ROOM_FLOOR. Without this the
   // floor masks every other display out of existence, itself included.
   for (const d of dispList) {
@@ -350,14 +352,10 @@ function addSurface(d, w, depth) {
  * stock reads as resting against something rather than sliding off.
  */
 function addTiltedBoard(node, w, depth) {
-  const board = new THREE.Mesh(new THREE.BoxGeometry(w * 1.04, GLASS_T * 2, depth * 1.04), woodMat);
-  board.position.y = -GLASS_T;
-  board.receiveShadow = true;
-  node.add(board);
-  const lip = new THREE.Mesh(new THREE.BoxGeometry(w * 1.04, BOX_H * 0.7, GLASS_T * 2), woodMat);
-  lip.position.set(0, BOX_H * 0.3, depth / 2);
-  lip.castShadow = true;
-  node.add(lip);
+  node.add(woodMesh([
+    [board(w * 1.04, GLASS_T * 2, depth * 1.04, 0.008), [0, -GLASS_T, 0]],
+    [board(w * 1.04, BOX_H * 0.7, GLASS_T * 2, 0.008), [0, BOX_H * 0.3, depth / 2]],
+  ], woodMat));
 }
 
 /**
@@ -381,10 +379,10 @@ function addLevel(d, s, w, depth) {
     return;
   }
   if (s === 0) return;
-  const panel = new THREE.Mesh(new THREE.BoxGeometry(w * 1.06, GLASS_T, depth * 1.06), glassMat);
-  panel.position.y = -GLASS_T / 2;
-  d.panels.push(panel);
-  node.add(panel);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(w * 1.06, GLASS_T, depth * 1.06), glassMat);
+  glass.position.y = -GLASS_T / 2;
+  d.panels.push(glass);
+  node.add(glass);
 }
 
 /**
@@ -408,28 +406,73 @@ function addPlinth(d, w, depth) {
 }
 
 /**
- * The back panel, so "wall-facing row" is visible as well as modelled. It has to clear the tilted
- * levels, whose wall edges rise above the level's own origin.
+ * The back of a wall shelf, so "wall-facing row" is visible as well as modelled: tongue-and-groove
+ * planks with a real gap between each (the grooves), a moulded cap along the top, and a curved
+ * side panel at each end. It has to clear the tilted levels, whose wall edges rise above the
+ * level's own origin. With no plinth it is the whole support, so it runs from the floor up.
  */
 function addBackPanel(d, w, depth) {
   if (d.kind !== 'shelf') return;
   const rise = (depth / 2) * Math.sin(d.tilt);
-  // With no plinth this panel is the whole support, so it runs from the floor to the top level.
   const tall = d.g.shelves * d.gap + rise + (d.tilt ? d.plinthY : 0);
-  const back = new THREE.Mesh(new THREE.BoxGeometry(w * 1.06, tall, 0.03), woodMat);
-  back.position.set(0, tall / 2 - (d.tilt ? d.plinthY : 0),
-                    -(depth / 2) * Math.cos(d.tilt) - 0.02);
-  back.castShadow = true;
-  back.receiveShadow = true;
-  d.group.add(back);
+  const floorY = d.tilt ? -d.plinthY : 0, backZ = -(depth / 2) * Math.cos(d.tilt) - 0.02;
+  const span = w * 1.06, planks = Math.max(3, Math.round(span / 0.16)), pw = span / planks;
+  d.group.add(woodMesh([
+    ...Array.from({ length: planks }, (_, i) =>
+      [board(pw - 0.006, tall, 0.022, 0.004), [-span / 2 + pw * (i + 0.5), floorY + tall / 2, backZ]]),
+    [board(span + 0.1, 0.03, 0.09, 0.01), [0, floorY + tall + 0.015, backZ + 0.02]],
+    [board(span + 0.06, 0.018, 0.06, 0.006), [0, floorY + tall - 0.01, backZ + 0.02]],
+    ...[-1, 1].map((sx) => [gable(d, depth, { floorY, tall, backZ }), [sx * (span / 2 + 0.014), 0, 0], [0, Math.PI / 2, 0]]),
+  ], woodMat));
+}
+
+/**
+ * A shelf's end panel: full height at the wall, sweeping down in a curve to the front of the top
+ * level, and square to the floor. Outline in (−z, y) so that turned a quarter it faces sideways.
+ */
+function gable(d, depth, { floorY, tall, backZ }) {
+  const frontZ = (depth / 2) * Math.cos(d.tilt) + 0.03;
+  const topFront = (d.g.shelves - 1) * d.gap - (depth / 2) * Math.sin(d.tilt) + 0.12;
+  const top = floorY + tall;
+  const curve = Array.from({ length: 13 }, (_, i) => {
+    const t = i / 12;
+    return [-(backZ + (frontZ - backZ) * t), topFront + (top - topFront) * Math.cos(t * Math.PI / 2)];
+  });
+  // The router bevel grows the outline by its own radius, so the foot is drawn that far up or the
+  // panel sinks through the floor.
+  return panel([[-frontZ, floorY + 0.007], [-backZ, floorY + 0.007], ...curve], 0.026, 0.007);
+}
+
+/**
+ * A farmhouse display table: a thick top with its edge rounded over and a step milled under it,
+ * an apron with a bead along the bottom, and four turned legs. Replaces the slab-on-a-block, so
+ * there is floor visible under it again. The top's surface is the display's y = 0, as before.
+ */
+function addTable(d, w, depth) {
+  if (d.form !== 'table') return;
+  const W = w * 1.06 + 0.04, D = depth * 1.06 + 0.04, inset = 0.06, legH = d.plinthY - 0.035;
+  const ax = W / 2 - inset, az = D / 2 - inset;
+  const apron = (len, at, turn) => [
+    [board(len, 0.075, 0.022, 0.005), [at[0], -0.075, at[1]], [0, turn, 0]],
+    [board(len + 0.01, 0.014, 0.03, 0.006), [at[0], -0.118, at[1]], [0, turn, 0]],   // the bead
+  ];
+  d.group.add(woodMesh([
+    [board(W, 0.035, D, 0.014), [0, -0.0175, 0]],
+    [board(W - 0.03, 0.014, D - 0.03, 0.006), [0, -0.042, 0]],
+    ...apron(ax * 2, [0, az], 0), ...apron(ax * 2, [0, -az], 0),
+    ...apron(az * 2, [ax, 0], Math.PI / 2), ...apron(az * 2, [-ax, 0], Math.PI / 2),
+    ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) =>
+      [turned('leg', legH, 0.032), [sx * ax, -d.plinthY, sz * az]]),
+  ], woodMat));
 }
 
 /** Physical furniture under the grids, so displays read as shop fittings and not floating slots. */
 export function buildFurniture(d) {
   const { w, d: depth } = gridSize(d.g);
-  addSurface(d, w, depth);
+  if (d.form !== 'table') addSurface(d, w, depth);
   for (let s = 0; s < d.g.shelves; s++) addLevel(d, s, w, depth);
-  addPlinth(d, w, depth);
+  if (d.form !== 'table') addPlinth(d, w, depth);
+  addTable(d, w, depth);
   addBackPanel(d, w, depth);
 }
 

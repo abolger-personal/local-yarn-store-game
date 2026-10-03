@@ -17,6 +17,9 @@ export const items = [];
 export const displays = [];
 export const seats = [];
 
+/** The movable pots and lamps. Built once and kept across days — see props.js. */
+export const props = [];
+
 /** The render-side record per NPC: body, pose blend, walk route. Parallel to world.npcs. */
 export const cast = [];
 
@@ -56,8 +59,11 @@ export const clocks = {
  * lives one day, and its guestbook used to go with it. `press` is a press on the book on the
  * counter ({ on: 'book' }) or on the bulletin board ({ on: 'board', uv }), handed to the view the
  * same way the dirty flags are: the pointer layer does not import the view.
+ *
+ * `dayT` is how far through today the shop is, 0 at opening to 1 at closing (see dayProgress in
+ * visit.js). The light and the HUD clock both read it, so they cannot disagree about the hour.
  */
-export const shop = { world: null, day: 0, hudDirty: true, viewDirty: true, pastBooks: [],
+export const shop = { world: null, day: 0, dayT: 0, hudDirty: true, viewDirty: true, pastBooks: [],
   press: null };
 
 /**

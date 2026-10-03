@@ -10,24 +10,26 @@ import {
   TRAITS, randomTraits, maxWips, maxRounds, ACTION, STATE, CLOSEOUT_SEQUENCE,
   makeNpc, makeWorld, advanceRound, browseActionSet, DetermineNextBrowseAction,
   interact, noticeable, buyableTargets, visibleTo, labelOf, inDoorway, seatById, fullyExposed,
-  findPath, obstacles, closeoutFor, rejoin, regulars,
+  findPath, obstacles, closeoutFor, rejoin, regulars, dayProgress,
 } from './visit.js';
 import { WIP_STATE, wantsOf, canStart, workRound, returnToNpc } from './wip.js';
 
 // A WIP built by hand rather than rolled, so a test asserts behaviour and not luck. Defaults to a
 // crochet hat that already has its yarn and is short only a hook — which makes `crochet-hook` the
 // NPC's one and only want, and keeps the buy tests below reading the way they did before WIPs.
+// A hat costs 3 balls (PATTERNS.md, 2026-10-02), and the WIP below holds three: a ball is one unit
+// whatever its weight. It was 5 units and one bulky ball when a 3x3 ball counted 9.
 const PATTERN = (over = {}) => ({
-  name: 'pattern', patternType: 'hat', craft: 'crochet', yarnUnits: 5, minColors: 1,
+  name: 'pattern', patternType: 'hat', craft: 'crochet', yarnUnits: 3, minColors: 1,
   // toolSize and weight are what the strict match compares against — a pattern without them
   // matches nothing, which shows up as an NPC who wants nothing rather than as an error.
-  toolSize: 4.5, weight: 'bulky', materials: ['wool'], hints: [], w: 2, h: 2, ...over,
+  toolSize: 4.5, weight: 'bulky', materials: ['wool'], w: 2, h: 2, ...over,
 });
 const YARN = (over = {}) => ({
   name: 'yarn', material: 'wool', weight: 'bulky', shape: 'ball', colorIndex: 0, w: 3, h: 3, ...over,
 });
 const WIP = (over = {}) => ({
-  id: 'WIP 1', state: WIP_STATE.UNSTARTED, pattern: PATTERN(), yarn: [YARN()], tool: null,
+  id: 'WIP 1', state: WIP_STATE.UNSTARTED, pattern: PATTERN(), yarn: [YARN(), YARN(), YARN()], tool: null,
   progress: 0, ...over,
 });
 const PREFS = { skill: 3, crafts: ['crochet'], materials: ['wool'], weights: ['bulky'] };
@@ -469,7 +471,7 @@ const runCloseout = (world, npc) => {
 {
   // "1/(number of units of yarn called for by pattern) * characterWeight", characterWeight =
   // (skill/3) * (Industriousness/3). At skill 3 and Industriousness 3 that is exactly 1, so a
-  // 5-unit hat is a 5-round job.
+  // 3-ball hat is a 3-round job (5 rounds when it cost 5 units).
   const { npc } = fixture();
   const wip = npc.wips[0];
   wip.tool = { name: 'crochet-hook', size: 4.5 };
@@ -477,11 +479,11 @@ const runCloseout = (world, npc) => {
   npc.prefs.skill = 3;
   npc.traits.Industriousness = 3;
 
-  for (let i = 1; i <= 4; i++) {
-    assert.equal(workRound(npc, wip), false, `round ${i} does not finish a 5-unit hat`);
-    assert.equal(Math.round(wip.progress), i * 20, `and it is ${i * 20}% done`);
+  for (let i = 1; i <= 2; i++) {
+    assert.equal(workRound(npc, wip), false, `round ${i} does not finish a 3-ball hat`);
+    assert.equal(Math.round(wip.progress), Math.round(i * 100 / 3), `and it is ${i}/3 done`);
   }
-  assert.equal(workRound(npc, wip), true, 'the fifth round finishes it');
+  assert.equal(workRound(npc, wip), true, 'the third round finishes it');
   assert.equal(wip.state, WIP_STATE.FINISHED, 'which makes it a finished object');
   assert.equal(npc.prefs.skill, 4, 'and permanently raises their crafter skill');
 
@@ -500,7 +502,7 @@ const runCloseout = (world, npc) => {
   npc.traits.Industriousness = 5;
   let rounds = 0;
   while (!workRound(npc, wip) && rounds < 20) rounds++;
-  assert.ok(rounds < 4, `skill 5 and Industriousness 5 should beat 5 rounds, took ${rounds + 1}`);
+  assert.ok(rounds < 2, `skill 5 and Industriousness 5 should beat 3 rounds, took ${rounds + 1}`);
 }
 
 {
@@ -614,7 +616,7 @@ const runCloseout = (world, npc) => {
   npc.prefs.skill = 3;
   npc.traits.Industriousness = 3;
   const wip = WIP({ id: 'cowl', state: WIP_STATE.IN_PROGRESS, progress: 0,
-                    pattern: PATTERN({ patternType: 'cowl', yarnUnits: 5 }),
+                    pattern: PATTERN({ patternType: 'scarf', yarnUnits: 5 }),
                     tool: { name: 'crochet-hook', size: 4.5 } });
   npc.wips = [wip];
   npc.state = STATE.BROWSE;
@@ -841,6 +843,25 @@ const runCloseout = (world, npc) => {
   assert.equal(labelOf({ name: 'crochet-hook', size: 4.5 }), 'crochet-hook 4.5mm');
   assert.equal(labelOf({ name: 'stitch-markers', size: null }), 'stitch-markers',
     'a stitch marker has no size attribute to show');
+}
+
+// --- the day's light ------------------------------------------------------------
+// dayProgress runs the light and the clock, so whatever the cast does it must start dark-to-light
+// at 0, only ever climb while the rounds play out, and land on exactly 1 when the shop empties.
+{
+  const world = makeWorld({ displays: [], items: [], room: ROOM, seats: [] });
+  world.npcs = [0, 1, 2].map((i) => makeNpc({ id: `d${i}`, name: `D${i}`, species: 'Owl' }));
+  assert.equal(dayProgress(world), 0, 'a day starts at opening');
+  let last = 0;
+  for (let r = 0; r < 200 && world.npcs.some((n) => n.state !== STATE.GONE); r++) {
+    advanceRound(world);
+    const t = dayProgress(world);
+    assert.ok(t > 0 && t <= 1, `day progress ${t} out of range`);
+    // Not monotone by construction (see dayProgress), but never backward by more than a round.
+    assert.ok(t >= last - 1 / world.round, `day progress fell from ${last} to ${t}`);
+    last = Math.max(last, t);
+  }
+  assert.equal(dayProgress(world), 1, 'an empty shop has finished its day');
 }
 
 console.log('visit.js self-check: all assertions passed');

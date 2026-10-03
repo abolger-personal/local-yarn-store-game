@@ -6,7 +6,7 @@ import { PATTERN_NAMES } from '../../../inventory/catalog.js';
 
 /**
  * Stand-in silhouettes for the things that have no illustration yet: yarn in its three shapes, the
- * four pattern covers, and knitting needles. Drawn white on transparent, because the atlas carries
+ * pattern covers, and knitting needles. Drawn white on transparent, because the atlas carries
  * shape in alpha and colour per instance — see extendAtlas.
  *
  * TODO(YARN.md, PATTERNS.md): these are silhouettes, not the art. YARN.md wants ball bands,
@@ -78,7 +78,7 @@ const PATTERN_COVER = {
     ctx.arc(s * 0.5, s * 0.34, s * 0.06, 0, Math.PI * 2);
     ctx.fill();
   },
-  cowl: (ctx, s) => {      // a droopy donut
+  scarf: (ctx, s) => {     // a droopy donut: every scarf, cowl or not (PATTERNS.md)
     ctx.beginPath();
     ctx.ellipse(s * 0.5, s * 0.52, s * 0.19, s * 0.15, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -87,6 +87,17 @@ const PATTERN_COVER = {
     ctx.ellipse(s * 0.5, s * 0.52, s * 0.09, s * 0.06, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalCompositeOperation = 'source-over';
+  },
+  bag: (ctx, s) => {       // a body with a strap loop over it
+    ctx.fillRect(s * 0.32, s * 0.46, s * 0.36, s * 0.24);
+    ctx.lineWidth = s * 0.05;
+    ctx.beginPath();
+    ctx.arc(s * 0.5, s * 0.46, s * 0.12, Math.PI, 0);
+    ctx.stroke();
+  },
+  socks: (ctx, s) => {     // one sock: a leg, and a foot pointing off to the side
+    ctx.fillRect(s * 0.40, s * 0.30, s * 0.14, s * 0.30);
+    ctx.fillRect(s * 0.40, s * 0.56, s * 0.26, s * 0.12);
   },
   shawl: (ctx, s) => {     // a triangle
     ctx.beginPath();

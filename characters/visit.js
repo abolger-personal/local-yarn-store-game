@@ -874,6 +874,29 @@ export function advanceRound(world) {
 }
 
 /**
+ * How far through today the shop is, 0 at opening to 1 once the last customer has gone.
+ *
+ * A day has no fixed length: it ends when the last visit does, and a visit is 3-30 rounds. So this
+ * ESTIMATES closing from what is left of each visit — rounds of patience remaining, plus the walk
+ * out, plus for a queue the one-at-a-time door ahead of them. It drives the light and the clock,
+ * which is why every day runs morning to afternoon however short it is.
+ *
+ * ponytail: closeout is guessed at 2 rounds, and a volatile NPC can cut their own visit short, so
+ * the estimate can jump forward. Never backward past what the caller already showed — it clamps.
+ */
+export function dayProgress(world) {
+  let queued = 0, left = 0;
+  for (const n of world.npcs) {
+    const visit = Math.max(0, n.maxRounds - n.roundsInStore) + 2;   // + closeout and the walk out
+    if (n.state === STATE.QUEUED) left = Math.max(left, ++queued + visit);
+    else if (n.state === STATE.ENTERING) left = Math.max(left, 1 + visit);
+    else if (n.state === STATE.LEAVING) left = Math.max(left, 1);
+    else if (n.state !== STATE.GONE) left = Math.max(left, visit);
+  }
+  return left === 0 ? 1 : world.round / (world.round + left);
+}
+
+/**
  * Push apart any two NPCs who chose end positions on top of each other.
  *
  * Rounds are resolved as teleports and the scene interpolates, so an NPC spends nearly all of its
@@ -1254,10 +1277,9 @@ function headForDoor(npc, world) {
 // preferences, same crafter skill level (including any +1 earned by finishing something), same WIP
 // slots at the progress they left them at, and still wearing whatever they were wearing."
 //
-// This is the mechanic that makes long projects possible at all. A sweater is twenty units, which
-// at an average crafter is twenty rounds of SITTING — more than one visit's worth of rounds even
-// before browsing. Without carrying progress across visits, nothing but a cowl would ever be
-// finished, and CHARACTER-ATTRIBUTES.md's promise that knowing your customers yields more Finished
+// This is the mechanic that makes long projects possible at all. A sweater is eight balls, which
+// is eight rounds of SITTING at an average crafter and seventy-two at the slowest, on top of
+// browsing. Without carrying progress across visits, little but socks would ever be finished, and CHARACTER-ATTRIBUTES.md's promise that knowing your customers yields more Finished
 // Objects would have no way to come true.
 
 /**

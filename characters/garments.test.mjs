@@ -17,6 +17,8 @@ import {
   formsOf, accessoriesOf, wornAs,
 } from './garments.js';
 import { seenShare, takeSelfie } from './selfie.js';
+import { PATTERN_DESIGNS, PATTERN_TITLES, PATTERN_TYPES } from '../inventory/catalog.js';
+import { WEAR_SLOTS, WEAR_SLOT_FOR } from './wip.js';
 
 // Judge the look close up, as the dress-up page does; the game's 150px cull has its own check.
 LOOK.viewPx = 0;
@@ -1735,13 +1737,14 @@ for (const id of speciesIds()) for (const silhouette of GARMENTS.sweater.silhoue
   }
 }
 
-// A shop WIP becomes the garment it was made as: a cowl is a scarf, its yarn its colours, decor nothing.
+// A shop WIP becomes the garment it was made as: the design's silhouette (the OwlyCowly is a scarf
+// worn as a cowl), its yarn its colours, decor nothing.
 {
-  const wip = (patternType, colours) => ({
-    pattern: { patternType, craft: 'knitting', weight: 'dk', materials: ['alpaca'], toolSize: 4 },
+  const wip = (patternType, colours, silhouette) => ({
+    pattern: { patternType, silhouette, craft: 'knitting', weight: 'dk', materials: ['alpaca'], toolSize: 4 },
     yarn: colours.map((c) => ({ c })),
   });
-  const cowl = wornAs(wip('cowl', ['#112233', '#112233']), (y) => y.c);
+  const cowl = wornAs(wip('scarf', ['#112233', '#112233'], 'cowl'), (y) => y.c);
   assert.equal(cowl.type, 'scarf');
   assert.equal(cowl.item.silhouette, 'cowl');
   assert.equal(cowl.item.craft, 'knit');
@@ -1752,10 +1755,30 @@ for (const id of speciesIds()) for (const silhouette of GARMENTS.sweater.silhoue
   assert.equal(shawl.item.colourwork, 'stripes');
   assert.equal(shawl.item.colorCount, 2);
   assert.equal(wornAs(wip('potholder', ['#000000']), (y) => y.c), null);
+  assert.equal(wornAs(wip('hat', ['#000000'], 'beret'), (y) => y.c).item.silhouette, 'beret');
+  assert.equal(wornAs(wip('hat', ['#000000']), (y) => y.c).item.silhouette, 'beanie', 'a one-off pattern makes the first');
+  assert.equal(wornAs(wip('toString', ['#000000']), (y) => y.c), null, 'only GARMENTS\' own types');
   // it dresses: the sim's numbers are numbers garments.js can build from
   const built = build('owl');
   dress(built, { [shawl.type]: shawl.item });
   assert.ok(built.garments.length > 0, 'a shop shawl puts something on');
+}
+
+// The shop and the generator share one vocabulary: catalog.js's pattern types are GARMENTS' types,
+// each named design makes one of garments.js's silhouettes and every silhouette has named designs,
+// and wip.js wears each in GARMENTS' slot. catalog.js and wip.js are pure and cannot import this.
+{
+  const sorted = (list) => [...list].sort();
+  assert.deepEqual(sorted(Object.keys(PATTERN_TYPES)), sorted(Object.keys(GARMENTS)), 'a pattern type per garment');
+  for (const [type, g] of Object.entries(GARMENTS)) {
+    assert.deepEqual(sorted(Object.keys(PATTERN_TITLES[type])), sorted(g.silhouettes), `${type}: named designs for every silhouette`);
+    assert.equal(WEAR_SLOT_FOR[type], g.slot, `${type} is worn in its garment slot`);
+  }
+  assert.deepEqual(sorted(WEAR_SLOTS), sorted(Object.values(GARMENTS).map((g) => g.slot)), 'the same slots');
+  for (const d of PATTERN_DESIGNS) {
+    const worn = wornAs({ pattern: d, yarn: [{ c: '#123456' }] }, (y) => y.c);
+    assert.ok(worn.type === d.patternType && worn.item.silhouette === d.silhouette, `"${d.title}" is worn as a ${d.silhouette}`);
+  }
 }
 
 // The Guestbook selfie: the lens is up, out on the raised arm's side, tilted, and close enough that

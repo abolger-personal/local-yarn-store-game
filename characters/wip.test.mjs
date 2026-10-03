@@ -4,9 +4,11 @@
 // state as arithmetic — the ones where a plausible-looking wrong number would never crash.
 
 import assert from 'node:assert/strict';
+import { mulberry32 } from './store/core/util.js';
 import {
   PATTERN_TYPES, YARN_WEIGHTS, yarnUnits, makeYarn, makePattern, makeNotion, labelOf,
-  SIZED_NOTIONS, NOTION_NAMES,
+  SIZED_NOTIONS, NOTION_NAMES, PATTERN_TITLES, PATTERN_DESIGNS, SHOP_RANGE, makeStockPattern,
+  stockPatternFor, CRAFTS, CRAFT_TERMS,
 } from '../inventory/catalog.js';
 import {
   WIP_STATE, WEAR_SLOTS, makeCraftPrefs, makeWip, heldUnits, unitsShort, toolFits, canStart,
@@ -29,17 +31,16 @@ const npcWith = (wips, over = {}) => ({
   worn: Object.fromEntries(WEAR_SLOTS.map((s) => [s, null])), wips, ...over,
 });
 
-// --- PATTERNS.md: yarn units per type, and units from footprint --------------
+// --- PATTERNS.md: yarn cost per type, counted in items -----------------------
 {
-  assert.equal(PATTERN_TYPES.sweater.yarnUnits, 20, 'a sweater takes 20 units');
-  assert.equal(PATTERN_TYPES.hat.yarnUnits, 5, 'a hat takes 5');
-  assert.equal(PATTERN_TYPES.cowl.yarnUnits, 2, 'a cowl takes 2');
-  assert.equal(PATTERN_TYPES.shawl.yarnUnits, 10, 'a shawl takes 10');
+  // The type table, in balls (2026-10-02). The wearables only: decor waits for a renderer.
+  const cost = Object.fromEntries(Object.entries(PATTERN_TYPES).map(([t, p]) => [t, p.yarnUnits]));
+  assert.deepEqual(cost, { sweater: 8, shawl: 5, scarf: 4, bag: 4, hat: 3, socks: 2 });
+  assert.ok(Object.values(cost).every((n) => n >= 1 && n <= 8), '"never more than 8"');
 
-  // "1x1x1 yarn item = 1 unit yarn. 3x3x3 yarn item = 9 units." Nine, so it is the FOOTPRINT that
-  // counts and not the cubed volume — the one place this is easy to get wrong by a factor of three.
+  // "One item is one unit, whatever its weight." Footprint (a 3x3 ball worth 9) was the old rule.
   assert.equal(yarnUnits({ name: 'yarn', w: 1, h: 1 }), 1);
-  assert.equal(yarnUnits({ name: 'yarn', w: 3, h: 3 }), 9);
+  assert.equal(yarnUnits({ name: 'yarn', w: 3, h: 3 }), 1, 'a bulky ball is still one item');
   assert.equal(yarnUnits({ name: 'crochet-hook', w: 3, h: 3 }), 0, 'a hook is not yarn');
 
   // YARN.md: "anywhere from 1x1x1 (thread, lace weight) to 3x3x3 (super bulky)".
@@ -58,7 +59,7 @@ const npcWith = (wips, over = {}) => ({
   const yarn = makeYarn(seq(0.5), 'bulky');
   assert.equal(yarn.w, 3, 'a bulky ball is 3x3');
   assert.equal(labelOf(yarn), `bulky ${yarn.material} yarn`, 'yarn is named by weight and material');
-  const pat = makePattern(seq(0.5), 'cowl');
+  const pat = makePattern(seq(0.5), 'scarf');
   assert.deepEqual([pat.w, pat.h], [2, 2], 'a pattern is always 2x2');
 }
 
@@ -84,31 +85,32 @@ const npcWith = (wips, over = {}) => ({
 
 // --- what a WIP still needs ---------------------------------------------------
 {
-  const pattern = { ...makePattern(seq(0.5), 'hat'), craft: 'crochet', yarnUnits: 5,
+  const pattern = { ...makePattern(seq(0.5), 'hat'), craft: 'crochet',
                     toolSize: 4.0, weight: 'worsted', materials: ['wool'] };
   const wip = { id: 'w', state: WIP_STATE.UNSTARTED, pattern, yarn: [], tool: null, progress: 0 };
   const npc = npcWith([wip]);
+  const ball = { name: 'yarn', w: 2, h: 2, weight: 'worsted', material: 'wool' };
 
-  assert.equal(unitsShort(wip), 5, 'a hat with no yarn is five units short');
+  assert.equal(unitsShort(wip), 3, 'a hat with no yarn is three balls short');
   assert.deepEqual(wantsOf(npc).map((w) => w.kind).sort(), ['tool', 'yarn'],
     'it wants yarn and a tool, but not another pattern');
 
-  wip.yarn.push({ name: 'yarn', w: 2, h: 2, weight: 'worsted', material: 'wool' });   // 4 units
-  assert.equal(heldUnits(wip), 4);
-  assert.equal(unitsShort(wip), 1, 'still one short');
+  wip.yarn.push(ball);
+  assert.equal(heldUnits(wip), 1, 'a 2x2 ball is one unit, not four');
+  assert.equal(unitsShort(wip), 2, 'still two short');
   // "1 or more YARN units exist" is the threshold for STARTING, not the full requirement — you
   // cast on with what you have.
   wip.tool = { name: 'crochet-hook', size: 4.0 };
   assert.ok(canStart(wip), 'one unit and the right tool is enough to begin');
 
-  wip.yarn.push({ name: 'yarn', w: 1, h: 1, weight: 'worsted', material: 'wool' });
-  assert.equal(unitsShort(wip), 0, 'five units is the whole hat');
+  wip.yarn.push({ ...ball }, { ...ball });
+  assert.equal(unitsShort(wip), 0, 'three balls is the whole hat');
   assert.deepEqual(wantsOf(npc), [], 'and nothing is wanted any more');
 }
 
 // --- the yarn match is on material AND weight --------------------------------
 {
-  const pattern = { ...makePattern(seq(0.5), 'cowl'), craft: 'crochet', yarnUnits: 2,
+  const pattern = { ...makePattern(seq(0.5), 'scarf'), craft: 'crochet', yarnUnits: 2,
                     toolSize: 5.0, weight: 'worsted', materials: ['wool', 'alpaca'] };
   const wip = { id: 'w', state: WIP_STATE.UNSTARTED, pattern, yarn: [], tool: null, progress: 0 };
   const npc = npcWith([wip]);
@@ -165,7 +167,7 @@ const npcWith = (wips, over = {}) => ({
     'and more yarn is not the answer either');
 
   // "any pattern with the same yarn attributes (weight, material) will match"
-  const pat = (over) => ({ ...makePattern(seq(0.5), 'cowl'), weight: 'worsted',
+  const pat = (over) => ({ ...makePattern(seq(0.5), 'scarf'), weight: 'worsted',
                            materials: ['alpaca'], ...over });
   assert.ok(wantFor(npc, pat()), 'a pattern matching the yarn they hold matches');
   assert.ok(!wantFor(npc, pat({ weight: 'lace' })), 'a pattern for a different weight does not');
@@ -179,7 +181,7 @@ const npcWith = (wips, over = {}) => ({
 
 // --- MatchObservedInventory: a whole shelf at once ---------------------------
 {
-  const pattern = { ...makePattern(seq(0.5), 'cowl'), craft: 'crochet', yarnUnits: 6,
+  const pattern = { ...makePattern(seq(0.5), 'scarf'), craft: 'crochet', yarnUnits: 6,
                     toolSize: 4.5, weight: 'worsted', materials: ['wool'] };
   const npc = npcWith([{ id: 'w', state: WIP_STATE.UNSTARTED, pattern, yarn: [], tool: null, progress: 0 }]);
 
@@ -213,14 +215,14 @@ const npcWith = (wips, over = {}) => ({
 
 // --- buying files the item into the WIP that wanted it -----------------------
 {
-  const pattern = { ...makePattern(seq(0.5), 'cowl'), craft: 'crochet', yarnUnits: 2,
+  const pattern = { ...makePattern(seq(0.5), 'scarf'), craft: 'crochet', yarnUnits: 2,
                     toolSize: 4.5, weight: 'worsted', materials: ['wool'] };
   const wip = { id: 'w', state: WIP_STATE.UNSTARTED, pattern, yarn: [], tool: null, progress: 0 };
   const npc = npcWith([wip]);
 
   const yarn = { name: 'yarn', w: 2, h: 2, weight: 'worsted', material: 'wool' };
   stow(npc, yarn, wantFor(npc, yarn));
-  assert.equal(heldUnits(wip), 4, 'the yarn goes into the WIP that wanted it');
+  assert.equal(heldUnits(wip), 1, 'the yarn goes into the WIP that wanted it');
   assert.equal(wip.state, WIP_STATE.UNSTARTED, 'still no tool, so it cannot start');
 
   const hook = { name: 'crochet-hook', size: 4.5 };
@@ -246,35 +248,40 @@ const npcWith = (wips, over = {}) => ({
     return { npc: npcWith([wip], { prefs: PREFS({ skill }), traits: TRAITS({ Industriousness: ind }) }), wip };
   };
 
-  // Weight exactly 1: a 5-unit hat is a 5-round job.
-  const a = mk(3, 3, 5);
+  // Costs from the catalog, so these follow PATTERNS.md (2026-10-02: hat 3, sweater 8; they were 5
+  // and 20 when costs counted footprint).
+  const { hat, sweater } = PATTERN_TYPES;
+
+  // Weight exactly 1: a 3-ball hat is a 3-round job.
+  const a = mk(3, 3, hat.yarnUnits);
   let rounds = 0;
   while (!workRound(a.npc, a.wip)) { rounds++; assert.ok(rounds < 50, 'runaway'); }
-  assert.equal(rounds + 1, 5, 'skill 3 / Industriousness 3 finishes a 5-unit hat in 5 rounds');
+  assert.equal(rounds + 1, 3, 'skill 3 / Industriousness 3 finishes a 3-ball hat in 3 rounds');
 
-  // A 20-unit sweater at the same speed is a 20-round job — the pattern sets the pace.
-  const b = mk(3, 3, 20);
+  // An 8-ball sweater at the same speed is an 8-round job — the pattern sets the pace.
+  const b = mk(3, 3, sweater.yarnUnits);
   rounds = 0;
   while (!workRound(b.npc, b.wip)) { rounds++; assert.ok(rounds < 100, 'runaway'); }
-  assert.equal(rounds + 1, 20, 'and a 20-unit sweater takes 20');
+  assert.equal(rounds + 1, 8, 'and an 8-ball sweater takes 8');
 
-  // Skill and Industriousness both multiply, so the best crafter is (5/3)^2 = ~2.8x the baseline.
-  const c = mk(5, 5, 20);
+  // Skill and Industriousness both multiply, so the best crafter is (5/3)^2 = ~2.8x the baseline:
+  // 8 / 2.78 rounds, so 3.
+  const c = mk(5, 5, sweater.yarnUnits);
   rounds = 0;
   while (!workRound(c.npc, c.wip)) { rounds++; assert.ok(rounds < 100, 'runaway'); }
-  assert.ok(rounds + 1 <= 8, `skill 5 / Industriousness 5 should be far faster, took ${rounds + 1}`);
+  assert.ok(rounds + 1 <= 3, `skill 5 / Industriousness 5 should be far faster, took ${rounds + 1}`);
 
-  // The slowest crafter must still finish rather than stalling forever.
-  const d = mk(1, 1, 20);
+  // The slowest crafter must still finish rather than stalling forever: weight 1/9, so 72 rounds.
+  const d = mk(1, 1, sweater.yarnUnits);
   rounds = 0;
   while (!workRound(d.npc, d.wip)) { rounds++; assert.ok(rounds < 1000, 'a slow crafter never finishes'); }
-  assert.ok(rounds > 100, 'skill 1 / Industriousness 1 on a sweater is genuinely a slog');
+  assert.ok(rounds > 50, 'skill 1 / Industriousness 1 on a sweater is genuinely a slog');
 }
 
 // --- finishing raises crafter skill, capped at five --------------------------
 {
   const mk = (skill) => {
-    const pattern = { ...makePattern(seq(0.5), 'cowl'), yarnUnits: 2, craft: 'crochet' };
+    const pattern = { ...makePattern(seq(0.5), 'scarf'), yarnUnits: 2, craft: 'crochet' };
     const wip = { id: 'w', state: WIP_STATE.IN_PROGRESS, pattern, yarn: [], tool: null, progress: 99 };
     return { npc: npcWith([wip], { prefs: PREFS({ skill }) }), wip };
   };
@@ -302,13 +309,16 @@ const npcWith = (wips, over = {}) => ({
                               yarn: [], tool: null });
   assert.equal(slotFor(fo('a', 'hat')), 'head');
   assert.equal(slotFor(fo('a', 'sweater')), 'torso');
-  assert.equal(slotFor(fo('a', 'cowl')), 'neck');
-  assert.equal(slotFor(fo('a', 'shawl')), 'torso', 'a shawl shares the torso slot with a sweater');
+  assert.equal(slotFor(fo('a', 'scarf')), 'neck', 'a cowl is a scarf, so the neck');
+  assert.equal(slotFor(fo('a', 'shawl')), 'shoulders', 'a shawl has its own layer, over a sweater');
+  assert.equal(slotFor(fo('a', 'bag')), 'bag');
+  assert.equal(slotFor(fo('a', 'socks')), 'feet');
+  assert.equal(slotFor({ pattern: { patternType: 'mittens' } }), null, 'mittens are decor: nobody wears them');
 
   // One unfinished project alongside three finished ones, to prove only the finished leave.
   const wip = { id: 'live', state: WIP_STATE.IN_PROGRESS, progress: 40, yarn: [], tool: null,
                 pattern: makePattern(seq(0.5), 'hat') };
-  const npc = npcWith([fo('hat1', 'hat'), wip, fo('hat2', 'hat'), fo('cowl1', 'cowl')]);
+  const npc = npcWith([fo('hat1', 'hat'), wip, fo('hat2', 'hat'), fo('cowl1', 'scarf')]);
   const offered = wearOrOffer(npc);
 
   assert.equal(npc.worn.head.id, 'hat1', 'the first hat is worn');
@@ -335,7 +345,7 @@ const npcWith = (wips, over = {}) => ({
 
 {
   // A finished object that is NOT wearable still leaves the slots — it just has nowhere to go but
-  // the shop. Nothing in PATTERNS.md's MVP list is unwearable, so this guards a future type.
+  // the shop. PATTERNS.md's decor types are not in PATTERN_TYPES yet, so this guards their arrival.
   const odd = { id: 'blanket', state: WIP_STATE.FINISHED, progress: 100, yarn: [], tool: null,
                 pattern: { ...makePattern(seq(0.5), 'hat'), patternType: 'blanket' } };
   const npc = npcWith([odd]);
@@ -362,22 +372,22 @@ const npcWith = (wips, over = {}) => ({
     'but the photo is of the newest thing they made, not of what they happen to have on');
 
   // Different slots, so both are worn: still the newest.
-  const two = npcWith([fo('hat', 'hat', 2), fo('cowl', 'cowl', 7)]);
+  const two = npcWith([fo('hat', 'hat', 2), fo('cowl', 'scarf', 7)]);
   wearOrOffer(two);
   assert.equal(photoSubject(two).id, 'cowl', 'newest wins among worn objects too');
 
   // Order in the slots must not decide it — the stamp must.
-  const shuffled = npcWith([fo('newest', 'hat', 12), fo('oldest', 'cowl', 1)]);
+  const shuffled = npcWith([fo('newest', 'hat', 12), fo('oldest', 'scarf', 1)]);
   wearOrOffer(shuffled);
   assert.equal(photoSubject(shuffled).id, 'newest', 'slot order does not decide the photo');
 
   // Something brought from home has no stamp and loses to anything made during the visit.
-  const home = npcWith([fo('from home', 'cowl', undefined), fo('made today', 'hat', 4)]);
+  const home = npcWith([fo('from home', 'scarf', undefined), fo('made today', 'hat', 4)]);
   wearOrOffer(home);
   assert.equal(photoSubject(home).id, 'made today', 'an unstamped object sorts oldest');
 
   // ...but is still the subject when it is all they have.
-  const onlyHome = npcWith([fo('from home', 'cowl', undefined)]);
+  const onlyHome = npcWith([fo('from home', 'scarf', undefined)]);
   wearOrOffer(onlyHome);
   assert.equal(photoSubject(onlyHome).id, 'from home', 'and is photographed when nothing beats it');
 
@@ -388,13 +398,13 @@ const npcWith = (wips, over = {}) => ({
   wearOrOffer(regular);
   regular.worn.head.photographed = true;
   assert.equal(photoSubject(regular), null, 'something already photographed is not news');
-  regular.wips.push(fo('cowl', 'cowl', 2));
+  regular.wips.push(fo('cowl', 'scarf', 2));
   assert.equal(photoSubject(regular).id, 'cowl', 'even an older stamp beats a photographed object');
 }
 
 // --- workRound stamps the round it finished on ------------------------------
 {
-  const pattern = { ...makePattern(seq(0.5), 'cowl'), yarnUnits: 2, craft: 'crochet' };
+  const pattern = { ...makePattern(seq(0.5), 'scarf'), yarnUnits: 2, craft: 'crochet' };
   const wip = { id: 'w', state: WIP_STATE.IN_PROGRESS, pattern, yarn: [], tool: null, progress: 99 };
   const npc = npcWith([wip]);
   assert.ok(workRound(npc, wip, 17), 'it finishes');
@@ -406,7 +416,8 @@ const npcWith = (wips, over = {}) => ({
   const fo = (id) => ({ id, state: WIP_STATE.FINISHED, progress: 100, yarn: [], tool: null,
                         pattern: { ...makePattern(seq(0.5), 'hat'), patternType: 'hat' } });
   const old = fo('old'), lent = fo('lent');
-  const npc = npcWith([old, lent], { worn: { head: old, torso: null, hands: null, neck: null } });
+  const npc = npcWith([old, lent]);
+  npc.worn.head = old;
   const world = { dropOff: [{ npc: 'Test', npcId: 'n1', wip: lent }], backPile: [] };
 
   assert.ok(returnToNpc(world, npc, lent), 'the shop can hand it back');
@@ -466,6 +477,68 @@ const npcWith = (wips, over = {}) => ({
   for (const bit of ['5 units', 'aran', 'wool', 'alpaca']) assert.ok(line.includes(bit), `"${line}" names ${bit}`);
   assert.ok(labelWant({ ...yarnWant, units: 1 }).includes('1 unit of'), 'singular unit reads correctly');
   assert.ok(labelWant({ kind: 'tool', tool: 'crochet-hook', size: 4 }).includes('4.0'), 'a tool want names its size');
+}
+
+// --- Pattern names: a finite, re-used set, and a name IS a design ------------
+// The future "matchies" mechanic (WEARABLE-FINISHED-OBJ.md, "Pattern names") groups finished
+// objects by the pattern they were made from, so a title has to identify exactly one spec and has
+// to survive all the way onto the finished object.
+{
+  // Every type x silhouette has several names (that the silhouettes are garments.js's own is
+  // asserted in garments.test.mjs, beside wornAs), and every design names its silhouette.
+  assert.deepEqual(Object.keys(PATTERN_TITLES).sort(), Object.keys(PATTERN_TYPES).sort(), 'names for every type');
+  for (const [type, looks] of Object.entries(PATTERN_TITLES)) {
+    for (const [silhouette, titles] of Object.entries(looks)) {
+      assert.ok(titles.length >= 6, `${type} / ${silhouette} has at least 6 names, has ${titles.length}`);
+      for (const title of titles) {
+        const d = PATTERN_DESIGNS.find((p) => p.title === title);
+        assert.ok(d.patternType === type && d.silhouette === silhouette, `"${title}" makes a ${silhouette} ${type}`);
+      }
+    }
+  }
+  const titles = PATTERN_DESIGNS.map((d) => d.title);
+  assert.equal(new Set(titles).size, titles.length, 'no title is used by two designs');
+  // A craft pun is a design of that craft: no crocheted Purl-ican Pullover. Both crafts' puns exist.
+  for (const craft of CRAFTS) {
+    const puns = PATTERN_DESIGNS.filter((d) => CRAFT_TERMS[craft].test(d.title));
+    assert.ok(puns.length > 0, `some title puns on ${craft}`);
+    for (const d of puns) assert.equal(d.craft, craft, `"${d.title}" puns on ${craft}, so it is ${craft}`);
+  }
+  for (let i = 0; i < 200; i++) {
+    const p = makeStockPattern();
+    const named = PATTERN_DESIGNS.find((d) => d.title === p.title);
+    assert.ok(named, 'stock patterns come from the named set');
+    assert.deepEqual(p, named, `"${p.title}" always means the same spec`);
+  }
+  // Silhouettes are evenly spread on the shelf, however many names each has: the cowl has ten names
+  // and the ascot six, and the shop must not carry cowls nearly twice as often for it.
+  const rng = mulberry32(7);
+  for (const [type, looks] of Object.entries(PATTERN_TITLES)) {
+    const kinds = Object.keys(looks), draws = 300 * kinds.length, seen = {};
+    for (let i = 0; i < draws; i++) {
+      const { silhouette } = makeStockPattern(rng, type);
+      seen[silhouette] = (seen[silhouette] ?? 0) + 1;
+    }
+    for (const k of kinds) {
+      assert.ok(Math.abs(seen[k] / 300 - 1) < 0.25, `${type} / ${k}: ${seen[k]} of ${draws}, want about 300`);
+    }
+  }
+  // Every stock yarn has a named pattern written for it, so a yarn-first customer is never stuck.
+  for (const weight of SHOP_RANGE.weights) {
+    for (const material of SHOP_RANGE.materials) {
+      const p = stockPatternFor({ name: 'yarn', weight, material });
+      assert.ok(p.title && yarnSuitsPattern({ weight, material }, p), `${weight} ${material} has a design`);
+    }
+  }
+  assert.ok(labelOf(makeStockPattern(seq(0), 'scarf')).startsWith('the OwlyCowly'), 'labels lead with the name');
+
+  // Knit it, finish it, wear it: the finished object still says what pattern it was.
+  const pattern = makeStockPattern(seq(0), 'scarf');
+  const wip = { id: 'w', state: WIP_STATE.IN_PROGRESS, progress: 99, yarn: [], tool: null, pattern };
+  const npc = npcWith([wip]);
+  workRound(npc, wip);
+  wearOrOffer(npc);
+  assert.equal(npc.worn.neck?.pattern.title, 'the OwlyCowly', 'the finished object keeps its pattern name');
 }
 
 console.log('wip.js self-check: all assertions passed');

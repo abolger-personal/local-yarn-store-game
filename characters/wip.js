@@ -18,16 +18,19 @@ export const WIP_STATE = Object.freeze({
   // FROGGED is post-MVP and deliberately absent: an unreachable state is worse than a missing one.
 });
 
-/** WEARABLE-FINISHED-OBJ.md: "4 slots: head, torso, hands, neck". */
-export const WEAR_SLOTS = Object.freeze(['head', 'torso', 'hands', 'neck']);
+/**
+ * WEARABLE-FINISHED-OBJ.md's worn slots. No hands: mittens are decor, never worn. The shawl has a
+ * layer of its own, so it can be worn over a sweater.
+ */
+export const WEAR_SLOTS = Object.freeze(['head', 'neck', 'shoulders', 'torso', 'bag', 'feet']);
 
 /**
- * Which body slot a finished pattern occupies. The spec lists mittens against `hands` but
- * PATTERNS.md's MVP type list has no mitten pattern, so nothing can currently fill that slot —
- * it is here because the slot exists, not because it is reachable.
+ * Which body slot a finished pattern occupies; a type not here (decor) has none and is always lent.
+ * The same table as garments.js's GARMENTS[type].slot, which this pure module cannot import --
+ * garments.test.mjs asserts the two agree.
  */
 export const WEAR_SLOT_FOR = Object.freeze({
-  hat: 'head', sweater: 'torso', shawl: 'torso', cowl: 'neck', mittens: 'hands',
+  hat: 'head', scarf: 'neck', shawl: 'shoulders', sweater: 'torso', bag: 'bag', socks: 'feet',
 });
 
 const pickFrom = (list, rng) => list[Math.floor(rng() * list.length)];
@@ -74,7 +77,7 @@ export function makeWip(id, traits, prefs, rng = Math.random) {
     id,
     state: WIP_STATE.UNSTARTED,
     pattern: null,
-    yarn: [],          // items of yarn, NOT units — one bulky ball is worth several units
+    yarn: [],          // items of yarn; each is one unit toward the pattern, whatever its weight
     tool: null,
     progress: 0,       // percent toward completion
   };
@@ -98,7 +101,7 @@ export function makeWip(id, traits, prefs, rng = Math.random) {
 
 // ---------------------------------------------------------------- what a WIP still needs
 
-/** Units of yarn this WIP has, summed over its items. A 3x3 ball is worth 9. */
+/** Units of yarn this WIP has, summed over its items: one each (catalog.js yarnUnits). */
 export const heldUnits = (wip) => wip.yarn.reduce((n, y) => n + yarnUnits(y), 0);
 
 /** Units still to buy, or 0. Without a pattern there is no number to be short of. */
@@ -260,8 +263,8 @@ export function stow(npc, item, want) {
  *
  * NOTE(spec): the increment is written as a FRACTION (1/units) but the threshold as a percentage
  * ("progress is incremented over 100"). Read as a fraction of completion — so at characterWeight 1
- * a project takes exactly its yarn-unit count in rounds, which is clearly the intent: a 2-unit cowl
- * is a two-round job, a 20-unit sweater is a day's work. Stored as a percent for the debug panel.
+ * a project takes exactly its yarn-unit count in rounds, which is clearly the intent: 2-unit socks
+ * are a two-round job, an 8-unit sweater is a visit or two of work. Stored as a percent for the debug panel.
  */
 export function workRound(npc, wip, round = null) {
   if (wip.state !== WIP_STATE.IN_PROGRESS) return false;

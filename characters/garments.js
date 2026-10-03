@@ -242,21 +242,20 @@ export function madeItem(pattern, used = {}) {
   return made;
 }
 
-// The shop's pattern types (catalog.js PATTERN_TYPES) as wearables: a cowl is a scarf silhouette.
-const WORN_AS = Object.freeze({ hat: ['hat'], sweater: ['sweater'], shawl: ['shawl'], cowl: ['scarf', 'cowl'] });
-
 /**
  * A finished WIP as the shop's sim holds it, as { type, item } for dress(), or null if it is not
- * worn (decor). `colourOf` turns one ball of its yarn into a hex. More than one colour is stripes:
- * every multi-colour pattern in the shop hints stripes but the shawl, and stripes read on all four.
+ * worn (decor). The shop's pattern types (catalog.js PATTERN_TYPES) are GARMENTS' types, and a
+ * named design says which silhouette it makes (`pattern.silhouette`); a one-off pattern with none,
+ * or one this file has no builder for, makes the type's first. `colourOf` turns one ball of its
+ * yarn into a hex. More than one colour is stripes, the purchase fallback (resolveColourwork).
  */
 export function wornAs(wip, colourOf) {
-  const p = wip.pattern;
-  const [type, silhouette] = WORN_AS[p?.patternType] ?? [];
-  if (!type) return null;
+  const p = wip.pattern, type = p?.patternType;
+  if (!Object.hasOwn(GARMENTS, type)) return null;
+  const { silhouettes } = GARMENTS[type];
   const colours = [...new Set(wip.yarn.map(colourOf))].slice(0, MAX_COLOURS);
   const item = {
-    ...defaultItem(type), on: true, silhouette: silhouette ?? GARMENTS[type].silhouettes[0],
+    ...defaultItem(type), on: true, silhouette: silhouettes.includes(p.silhouette) ? p.silhouette : silhouettes[0],
     craft: p.craft === 'crochet' ? 'crochet' : 'knit',    // catalog.js says 'knitting'
     weight: p.weight, fibre: p.materials[0], tool: p.toolSize,
     colorCount: Math.max(1, colours.length), colourwork: colours.length > 1 ? 'stripes' : 'solid',

@@ -223,7 +223,7 @@ function syncPalette() {
  * The thing the form describes, built by catalog.js and then overridden.
  *
  * Rolled first and overwritten rather than composed by hand, deliberately: makeYarn is what knows
- * that a weight decides a footprint and a footprint decides how many units a ball is worth. A
+ * that a weight decides a footprint (shelf space; every ball is one unit toward a pattern). A
  * literal typed out here would be a second, quietly wrong, copy of that rule.
  */
 function specOf() {

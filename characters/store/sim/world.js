@@ -20,7 +20,7 @@ import {
   MOTION_DEFAULTS,
   motionOf,
 } from '../../npc.js';
-import { STATE, advanceRound, dayProgress, makeNpc, makeWorld, rejoin } from '../../visit.js';
+import { STATE, advanceRound, dayProgress, makeNpc, makeWorld, rejoin, tidyShop } from '../../visit.js';
 import { satisfies, wantsOf } from '../../wip.js';
 import * as THREE from 'three';
 import { S } from '../core/config.js';
@@ -28,9 +28,10 @@ import { scene } from '../scene/stage.js';
 import { COUNTER, HALF_D, HALF_W } from '../scene/room.js';
 import { buildChairs } from '../scene/seating.js';
 import { buildDisplays } from '../scene/displays.js';
-import { boxes, edgeTop, fieldTop, shadows, sideEdge, sideField, sizeSide, sizeTop } from '../goods/items.js';
+import { CAPACITY, boxes, edgeTop, fieldTop, shadows, sideEdge, sideField, sizeSide, sizeTop } from '../goods/items.js';
 import { refreshAll } from '../goods/paint.js';
 import { addItem } from '../goods/stock.js';
+import { buildOrder, carryOver, resolveOrder } from '../../../inventory/supply.js';
 import { STAND_TIME, buildBlobs, measureSeatDrop, rollCheer, routeLength } from './cast.js';
 
 // Ids have to be unique across days too — a regular is matched to the roster by id, so a new
@@ -342,7 +343,7 @@ const castRecord = (npc, built, color) => ({
   // settling onto a cushion is not mistaken for ground covered.
   moveT: 1, travelled: 0, fromX: npc.x, fromZ: npc.z,
   baseX: npc.x, baseZ: npc.z, faceTo: npc.facing ?? 0, seatRef: null, seatCal: false,
-  wait: 0, dur: S.travel,
+  wait: 0, dur: S.travel, pace: 1,
   carriedName: null, carriedMesh: null,
   // Their own reaction to good news: a pause, then a duration, hop count and height of their
   // own. The BUY is lockstep -- advanceRound resolves every customer in one call -- so
@@ -416,6 +417,36 @@ function stockTheShop(npcs) {
   console.info(`stock: ${items.length} boxes — ${seeded} seeded for customers, ${filled} general${short}`);
 }
 
+/**
+ * The morning delivery: today's order, resolved against the catalog and put on the FLOOR, which
+ * DESIGN-DECISIONS.md §6 makes the shop's one inbox. Floor tiles only — sorting it onto the
+ * furniture is the player's job. Returns the morning log line; whatever had no room is counted in
+ * it rather than dropped quietly, or a full floor would read as a delivery that never came.
+ *
+ * `order` is one planTomorrow() made at closing and showed the player (game.html's between-days
+ * screen), so what was on the clipboard is what lands; without one it is built here, as before.
+ */
+function deliver(order = buildOrder(shop.day, { occupancy: items.length / CAPACITY })) {
+  const goods = resolveOrder(order);
+  const floor = [displays.filter((d) => d.solid === false)];   // one place: placeFrom tries every tile
+  let landed = 0;
+  for (const spec of goods) if (placeFrom(floor, 0, spec).index >= 0) landed++;
+  const short = goods.length - landed;
+  const line = `delivery: ${landed} boxes${short ? ` — ${short} did not fit on the floor` : ''}`;
+  console.info(`day ${shop.day} ${line}`);
+  return line;
+}
+
+/**
+ * Tomorrow's order, built at closing: what deliver() will put on the floor if it is handed back to
+ * restart({ order }). The occupancy is what tomorrow opens with — today's stock minus what sold,
+ * which is what carryOver will leave — so the supplier's throttle reads the same either way.
+ */
+export function planTomorrow() {
+  const kept = items.filter((it) => !it.gone).length;
+  return buildOrder(shop.day + 1, { occupancy: kept / CAPACITY });
+}
+
 /** Point every instanced mesh at the stock that now exists. */
 export function sizeInstanceBuffers() {
   for (const m of [fieldTop, edgeTop, shadows, boxes, sizeTop]) m.count = items.length;
@@ -437,26 +468,52 @@ function fileGuestbook(keepRegulars) {
   shop.pastBooks.push({ day: shop.day, entries: shop.world.guestbook });
 }
 
-/** Start a new day. Regulars from the last one come back first, with everything they had. */
-export function restart({ keepRegulars = true } = {}) {
+/** The furniture and stock a new day opens with: built fresh, or yesterday's carried over. */
+function setUpShop(fresh) {
+  // Any move-mode selection refers to furniture that may be about to be replaced. seating.js used
+  // to clear it itself, which meant a leaf module importing the interaction layer — one of the
+  // twenty-four cycles. The caller that knows the furniture is going does it instead.
+  clearSelection();
+  abortDrag();                    // back in a slot, so the carry-over keeps it and re-indexes it
+  // Moved furniture needs nothing to persist: move mode edits these same records in place.
+  if (!fresh) { carryOver(items, displays); return; }
+  buildChairs(S.chairCount);      // before the displays: their slots get masked against the chairs
+  buildDisplays(S.displayCount);
+  items.length = 0;
+}
+
+/**
+ * Start a new day. Regulars from the last one come back first, with everything they had — and so
+ * does the shop: the stock, its slots, the displays and the chairs stay as the player left them,
+ * minus what sold, plus the morning delivery.
+ *
+ * It is built from scratch only when there is nothing to keep (first boot), when the game starts
+ * over (`keepRegulars: false`), or when `rebuild` says the furniture itself has changed — the
+ * display and chair counts, total inventory and geometry detail pass it. A fresh shop is stocked
+ * the old way, seeded for today's customers and filled to S.stockCount; a carried-over one is only
+ * seeded when S.seedWants is on, because seeding hands the customers what they need and takes the
+ * planning out of stocking.
+ *
+ * `order` is tomorrow's order from planTomorrow(), when the page showed it before opening.
+ *
+ * @param {{ keepRegulars?: boolean, rebuild?: boolean, order?: ReturnType<typeof buildOrder> }} [opts]
+ */
+export function restart({ keepRegulars = true, rebuild = false, order } = {}) {
   // Keeping the regulars IS what makes it the next day rather than a fresh game; wiping them
   // resets the calendar too, so the day counter never claims a history the customers do not have.
   fileGuestbook(keepRegulars);
   shop.day = keepRegulars ? shop.day + 1 : 1;
   Object.assign(clocks, { day: 0, auto: 0 });
-  // Any move-mode selection refers to furniture that is about to be replaced. seating.js used to
-  // clear it itself, which meant a leaf module importing the interaction layer — one of the
-  // twenty-four cycles. The caller that knows the furniture is going does it instead.
-  clearSelection();
-  abortDrag();                    // the displays it indexes into are about to be replaced
-  buildChairs(S.chairCount);      // before the displays: their slots get masked against the chairs
-  buildDisplays(S.displayCount);
-  items.length = 0;
+  const fresh = rebuild || !keepRegulars || !displays.length;
+  setUpShop(fresh);
   if (!keepRegulars) roster = [];
   const npcs = spawnCast();
-  stockTheShop(npcs);
+  if (fresh) stockTheShop(npcs);
+  else if (S.seedWants) seedWants(npcs);
+  const delivered = deliver(order);
   shop.world = makeWorld({ displays, items, room, seats });
   shop.world.npcs = npcs;
+  shop.world.log.push(`r0 ${delivered}`);
   shop.dayT = 0;
   sizeInstanceBuffers();
   refreshAll();
@@ -507,7 +564,10 @@ function retarget(rec, slot = 0, total = 1) {
     // Getting out of a chair takes a moment, and the walk must not start underneath it --
     // the route would drag them off the seat while they were still folded into it.
     + (rec.seatRef ? STAND_TIME : 0);
-  rec.dur = Math.max(S.travel * (1 + (Math.random() * 2 - 1) * S.paceJitter), 0.05);
+  // Their own pace, kept: with S.walkSpeed set the duration is worked out per frame from the route
+  // (stepWalk), so a press of the speed button reaches a walk already under way.
+  rec.pace = 1 + (Math.random() * 2 - 1) * S.paceJitter;
+  rec.dur = Math.max(S.travel * rec.pace, 0.05);
 }
 
 /**
@@ -540,6 +600,20 @@ export function doAdvanceRound() {
   }
   order.forEach((castIndex, slot) => retarget(cast[castIndex], slot, cast.length));
   refreshAll();       // an interaction may have bought, tidied or restacked a display
+  touchHud();
+}
+
+/**
+ * The tidy button. A shortcut for now, there to find out whether tidying should be a mechanic —
+ * see tidyShop in visit.js for what it moves and what it leaves alone. Logged like an NPC's tidy,
+ * so the log shows the player did it.
+ */
+export function doTidy() {
+  if (!shop.world) return;
+  const stacked = tidyShop(shop.world);
+  shop.world.log.push(`r${shop.world.round} you: tidied the shop${
+    stacked ? ` — no flat room for ${stacked}, stacked on the floor` : ''}`);
+  refreshAll();
   touchHud();
 }
 

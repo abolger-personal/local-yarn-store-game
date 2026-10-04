@@ -386,7 +386,10 @@ function stepWalk(rec, n, dt) {
     // and for someone still standing up that is a spot they are in the middle of leaving.
     if (rec.route[0]) { rec.route[0].x = rec.baseX; rec.route[0].z = rec.baseZ; }
   } else if (rec.moveT < 1) {
-    rec.moveT = Math.min(1, rec.moveT + dt / (rec.dur ?? S.travel));
+    // A walking speed makes the time the route's: rec.travelled is its live length, so a long
+    // walk takes longer instead of going faster. Without one (the playground) it is S.travel.
+    const dur = S.walkSpeed ? Math.max(rec.travelled * rec.pace / S.walkSpeed, 0.05) : rec.dur;
+    rec.moveT = Math.min(1, rec.moveT + dt / dur);
     const e = rec.moveT * rec.moveT * (3 - 2 * rec.moveT);
     const at = walkRoute(rec, n, e);
     // BASE coordinates, not the root's. The root is the base plus the seat shift below, and

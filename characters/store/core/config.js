@@ -124,6 +124,10 @@ export const S = {
   // lands). The GUI tops out at 200, which also lands at that layout; CAPACITY (items.js) is the
   // hard ceiling above that.
   stockCount: 100,
+  // Seed every day with what that day's customers want, as a fresh shop is. Off: after day one the
+  // shop holds what was delivered and what the player kept, and planning stock IS the game —
+  // seeding guarantees every visit succeeds and takes that away. A testing switch.
+  seedWants: false,
   // Round pacing defaults to CONTINUOUS. A round is 15 in-game minutes (CHARACTER-VISIT.md), but
   // that says nothing about real seconds — and at the old 30s the cast walked for ~1.5s and then
   // stood frozen for 28. This is just over the longest a staggered walk can take
@@ -141,6 +145,10 @@ export const S = {
   // autoSeconds, or a round ends before the walk it started does. 1.6 + 1.4*1.25 = 3.35.
   travelJitter: 1.6,
   paceJitter:  0.25,    // +/- fraction on each NPC's own travel time, so arrivals stagger too
+  // A WALKING SPEED in units per second, or 0 for the fixed `travel` time above. 0 is the
+  // playground; the game sets it from its speed button (gameSpeed, below). With a speed, a walk
+  // takes as long as its route needs and the round waits for the last walker (tickClocks).
+  walkSpeed:   0,
   // How far a seated NPC's backside SINKS into the cushion. Small and soft-bodied: the rest of
   // the placement is measured, not guessed. cast.js measures where each body's bottom actually
   // is in the sit pose (measureSeatDrop) and puts that on the cushion, which is the only thing
@@ -165,6 +173,28 @@ export const S = {
   exposure:    0.6,   // brighter than the character pages' BASE_PARAMS 0.4: the shop is a lit room, not a studio
   toneMapping: BASE_PARAMS.toneMapping,
 };
+
+/**
+ * The game's speed button (game.js): k = 1, 2, 3 for ▶, ▶▶, ▶▶▶, and 0 for ⏸.
+ *
+ * WHY A SPEED, NOT A TIME. A fixed `travel` of 1.4s per round means speed = route / 1.4s, and the
+ * routes are long: measured over 3,282 sim walks in this room, median 2.85 units, p90 5.76, max
+ * 8.66. Through the smoothstep ease (peak 1.5x the mean) that is 3 units/s for the median walk and
+ * up to 12 for the longest, against an honest top walk of 0.5-1.8 units/s for these legs (topSpeed
+ * in motion.js). The cadence caps at 3.4 steps/s, so past that the feet skate: that is the
+ * running, and 8 units in a second is the teleport.
+ *
+ * At ▶ the mean is 0.24 units/s, so even the quickest-paced NPC's peak (x1.5 ease, /0.75 pace) stays
+ * under the shortest legs' top speed: everyone walks, nobody skates. ▶▶ and ▶▶▶ scale walking up
+ * and the round and stagger down by k, so the stagger keeps the playground's 1.6 : 4 share of a
+ * round at every speed; paceJitter is a fraction and needs no scaling. ⏸ only stops the rounds:
+ * the walk settings stay, so a walk in progress finishes at the pace it set off at.
+ * speed.test.mjs holds these to that.
+ */
+export function gameSpeed(k) {
+  if (!k) return { autoRounds: false };
+  return { autoRounds: true, walkSpeed: 0.24 * k, autoSeconds: 12 / k, travelJitter: 4.8 / k };
+}
 
 export const QUALITY = {
   low:    { detail: 'low',  renderScale: 0.75, blobShadows: true,  partShadows: false },

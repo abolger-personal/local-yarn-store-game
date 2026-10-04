@@ -10,7 +10,7 @@ import {
   TRAITS, randomTraits, maxWips, maxRounds, ACTION, STATE, CLOSEOUT_SEQUENCE,
   makeNpc, makeWorld, advanceRound, browseActionSet, DetermineNextBrowseAction,
   interact, noticeable, buyableTargets, visibleTo, labelOf, inDoorway, seatById, fullyExposed,
-  findPath, obstacles, closeoutFor, rejoin, regulars, dayProgress,
+  findPath, obstacles, closeoutFor, rejoin, regulars, dayProgress, tidyShop,
 } from './visit.js';
 import { WIP_STATE, wantsOf, canStart, workRound, returnToNpc } from './wip.js';
 
@@ -862,6 +862,56 @@ const runCloseout = (world, npc) => {
     last = Math.max(last, t);
   }
   assert.equal(dayProgress(world), 1, 'an empty shop has finished its day');
+}
+
+// --- tidy the shop ------------------------------------------------------------------
+// The player's tidy button: the floor emptied onto displays with room, every item noticeable,
+// each plane in category order, and nothing created or lost on the way.
+{
+  const { world, pile, shelf, items, add, npc } = fixture();
+  const floor = { id: 'floor-0-0', kind: 'pile', solid: false, x: 1, z: 1, w: 0.6, d: 0.6, wallRow: -1,
+    standAt: { x: 1, z: 1.5 }, g: makeDisplay(3, 3, { shelves: 1, headroom: 6, cell: 0.2 }) };
+  world.displays.push(floor);
+  // Six items for six flat noticeable slots (four on the pile, the front row of the shelf): a tower
+  // of three, one beside it, one in the shelf's wall row, one on the floor.
+  for (const name of ['yarn', 'crochet-hook', 'pattern']) add(pile, [0, 0, 0], name);
+  add(pile, [0, 1, 1], 'stitch-markers');
+  add(shelf, [0, 0, 0], 'darning-needle');
+  add(floor, [0, 1, 1], 'button');
+  const live = () => items.filter((it) => !it.gone && !it.held).length;
+  const before = live();
+  const byName = (d) => items.filter((it) => it.display === d.id).sort((a, b) => a.r - b.r || a.c - b.c)
+    .map((it) => it.name);
+
+  assert.equal(tidyShop(world), 0, 'everything fitted flat');
+  assert.equal(live(), before, 'a tidy neither makes nor loses stock');
+  assert.equal(items.filter((it) => it.display === floor.id).length, 0, 'the displays had room, so the floor is clear');
+  items.forEach((it, i) => assert.ok(noticeable(world.displays.find((d) => d.id === it.display), items, i),
+    `${it.name} is buried or against the wall after a tidy`));
+  for (const d of [pile, shelf]) {
+    const names = byName(d);
+    assert.deepEqual(names, [...names].sort((a, b) => a.localeCompare(b)), `${d.id} is not in category order`);
+  }
+
+  // Full shop: two more on the floor have nowhere flat to go on furniture, so they stay down —
+  // flat, so still findable.
+  add(floor, [0, 0, 0], 'yarn');
+  add(floor, [0, 0, 0], 'pattern');
+  assert.equal(tidyShop(world), 0);
+  assert.equal(items.filter((it) => it.display === floor.id).length, 2, 'overflow stays on the floor');
+  items.forEach((it, i) => assert.ok(fullyExposed(world.displays.find((d) => d.id === it.display), items, i)));
+
+  // An item someone is turning over pins its plane, and a held one is not touched at all.
+  const onPile = items.findIndex((it) => it.display === pile.id);
+  npc.considering = { displayId: pile.id, index: onPile, round: world.round };
+  const pileWas = items.map((it) => it.display === pile.id && `${it.c},${it.r},${it.layer}`);
+  const held = items.findIndex((it) => it.display === floor.id);
+  items[held].held = true;
+  const heldWas = { ...items[held] };
+  tidyShop(world);
+  assert.deepEqual(items.map((it) => it.display === pile.id && `${it.c},${it.r},${it.layer}`), pileWas,
+    'the considered item\'s plane moved under the NPC');
+  assert.deepEqual(items[held], heldWas, 'the item in the player\'s hand was moved');
 }
 
 console.log('visit.js self-check: all assertions passed');

@@ -11,7 +11,7 @@ import { renderer } from '../scene/stage.js';
 import { guestbookLine, redrawBook } from './book.js';
 import { drawBoard } from './board.js';
 
-import { doAdvanceRound, restart } from '../sim/world.js';
+import { doAdvanceRound, doTidy, restart } from '../sim/world.js';
 
 // ---------------------------------------------------------------- debug window
 const npcStateEl = document.getElementById('npcState');
@@ -166,6 +166,7 @@ export function installHud() {
     if (shop.world && shop.world.npcs.every((n) => n.state === STATE.GONE)) restart();
     else doAdvanceRound();
   });
+  document.getElementById('tidy').addEventListener('click', doTidy);
   autoBox.addEventListener('change', () => { clocks.auto = 0; });
   autoDayBox.addEventListener('change', () => { clocks.day = 0; drawTimer(); });
 }

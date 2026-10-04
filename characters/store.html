@@ -133,6 +133,7 @@
     border-radius: 7px; cursor: pointer;
   }
   #timer button:hover { background: #ad6234; }
+  #timer #tidy { margin-top: 6px; }
   #timer button:disabled { background: #bbb; border-color: #bbb; cursor: default; }
   #timer label { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11px; opacity: .8; }
   #timer .bar { height: 3px; background: rgba(0,0,0,.09); border-radius: 2px; margin-top: 7px; overflow: hidden; }
@@ -220,6 +221,9 @@
   <summary><span class="round" id="roundLabel">round 0</span></summary>
   <div class="sub" id="clockLabel">shop is opening</div>
   <button id="advance">Advance round &rarr;</button>
+  <!-- A trial shortcut: one press lays every display out flat and by category. Kept or turned into
+       a mechanic depending on how it plays — see tidyShop in visit.js. -->
+  <button id="tidy" title="lay every display out flat, by category, and clear the floor">Tidy the shop</button>
   <!-- Both default ON: the shop should be alive the moment the page loads, not waiting to be
        clicked through a round at a time. -->
   <label><input type="checkbox" id="auto" checked /> auto-advance rounds</label>

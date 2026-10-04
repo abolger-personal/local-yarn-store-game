@@ -29,7 +29,7 @@ function applyQuality(name) {
   Object.assign(S, q);
   setGeometryDetail(q.detail);
   applyRenderScale();
-  restart();
+  restart({ rebuild: true });
   gui.controllersRecursive().forEach((c) => c.updateDisplay());
 }
 
@@ -67,14 +67,15 @@ function setCameraLock(on) {
 /** The shop itself: how much of everything, and how fast a round runs. */
 function shopRows() {
   gui.add(S, 'npcCount', counts(MAX_NPCS)).name('NPCs').onChange(restart);
-  gui.add(S, 'displayCount', counts(DISPLAY_SLOTS.length)).name('displays').onChange(restart);
+  gui.add(S, 'displayCount', counts(DISPLAY_SLOTS.length)).name('displays').onChange(() => restart({ rebuild: true }));
   // 0 chairs is a legitimate case to test, not a mistake: it exercises the "went looking for a
   // seat, all taken" fallback, which is otherwise hard to reach.
-  gui.add(S, 'chairCount', { 0: 0, ...counts(SEAT_SLOTS.length) }).name('chairs').onChange(restart);
+  gui.add(S, 'chairCount', { 0: 0, ...counts(SEAT_SLOTS.length) }).name('chairs').onChange(() => restart({ rebuild: true }));
   gui.add({ f: doAdvanceRound }, 'f').name('advance round  (Space)');
   gui.add({ f: () => restart() }, 'f').name('next shop.day — regulars return  (R)');
   gui.add({ f: () => restart({ keepRegulars: false }) }, 'f').name('all new customers');
-  gui.add(S, 'stockCount', 2, 200, 1).name('total inventory').onChange(restart);
+  gui.add(S, 'stockCount', 2, 200, 1).name('total inventory').onChange(() => restart({ rebuild: true }));
+  gui.add(S, 'seedWants').name('seed customer wants daily (test)');
   gui.add(S, 'autoSeconds', 1, 60, 0.5).name('round interval (s)');
   gui.add(S, 'dayGap', 0, 20, 0.5).name('pause between days (s)');
 }
@@ -92,7 +93,7 @@ function pacingRows() {
 function perfRows() {
   gPerf.add(S, 'quality', Object.keys(QUALITY)).name('graphics quality').onChange(applyQuality);
   gPerf.add(S, 'detail', Object.keys(GEO_DETAIL)).name('geometry detail')
-    .onChange((v) => { setGeometryDetail(v); restart(); });
+    .onChange((v) => { setGeometryDetail(v); restart({ rebuild: true }); });
   gPerf.add(S, 'renderScale', 0.5, 3, 0.25).name('render scale (GPU load)')
     .onFinishChange(applyRenderScale);
   gPerf.add(S, 'partShadows').name('characters cast shadow').onChange(restart);

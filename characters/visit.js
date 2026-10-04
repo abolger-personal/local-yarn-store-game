@@ -13,7 +13,7 @@
 // Where a spec section is blank or undefined, the placeholder is marked `TODO(spec)` and listed in
 // VISIT-POC-TODO.md rather than being quietly invented and forgotten.
 
-import { EMPTY, footprint, fits, place, clearShelf, usableAt, fullyExposed }
+import { EMPTY, footprint, fits, place, clearShelf, usableAt, fullyExposed, dropLayer }
   from '../inventory/grid.js';
 import {
   WIP_STATE, WEAR_SLOTS, makeCraftPrefs, makeWip, wantFor, stow, workRound,
@@ -689,34 +689,100 @@ const cellsOf = (display, shelf) => {
  * Rebuild one plane from scratch in a given order. All three of DISPLAYS.md's interaction outcomes
  * — spread, tidy, rearrange — are this function with a different order, which is why there is one
  * of it and not three. Whatever is placed LAST ends up on top of its column, i.e. noticeable.
+ *
+ * `flat` is the shop-wide tidy (tidyShop): nothing may rest on anything, so every item ends up
+ * noticeable. What does not fit flat is NOT forced on — it is handed back for the next plane.
  */
-function rebuildPlane(display, items, shelf, order, { spread = false } = {}) {
+function rebuildPlane(display, items, shelf, order, { spread = false, flat = false } = {}) {
   const { g } = display;
   clearShelf(g, shelf);
   const cells = cellsOf(display, shelf)
     .filter((cell) => !(display.kind === 'shelf' && cell.r === display.wallRow) || !spread);
+  const left = [];
   let cursor = 0;
   for (const index of order) {
     const item = items[index];
-    const attempt = firstFit({ g, shelf, cells }, cursor, item, index);
+    const attempt = firstFit({ display, shelf, cells, flat }, cursor, item, index);
     if (attempt >= 0 && spread) cursor = (cursor + attempt + 1) % cells.length;   // one per column: flatten
+    if (attempt < 0 && flat) left.push(index);
     // ponytail: a plane with no room left keeps the item's old slot record, which the renderer
     // still draws. Only reachable if headroom is set absurdly low; revisit if it shows up.
-    if (attempt < 0) item.layer = place(g, item.keys, index, item.layers ?? 1);
+    else if (attempt < 0) item.layer = place(g, item.keys, index, item.layers ?? 1);
   }
+  return left;
 }
 
-/** Places item `index` in the first cell from `cursor` on that it fits: how many it tried past the cursor, or -1. */
-function firstFit({ g, shelf, cells }, cursor, item, index) {
+/**
+ * Places item `index` in the first cell from `cursor` on that it fits: how many it tried past the cursor, or -1.
+ *
+ * `flat` only takes bare ground, and never a slot wholly in a shelf's wall row — noticeable() says
+ * nothing there can be seen, and a tidy that hides things is not one. The wall row is skipped per
+ * item rather than filtered out of `cells`, because a two-deep package can only stand on a two-row
+ * shelf by starting in it.
+ */
+function firstFit({ display, shelf, cells, flat = false }, cursor, item, index) {
+  const { g } = display;
   for (let attempt = 0; attempt < cells.length; attempt++) {
     const cell = cells[(cursor + attempt) % cells.length];
     const keys = footprint(g, shelf, [cell.c, cell.r], [item.w, item.h]);
     if (!fits(g, keys, item.layers ?? 1)) continue;
+    if (flat && (dropLayer(g, keys) > 0 ||
+        (display.kind === 'shelf' && cell.r === display.wallRow && (item.h ?? 1) === 1))) continue;
+    // display/shelf too: a tidy can move an item from one display to another.
+    item.display = display.id; item.shelf = shelf;
     item.c = cell.c; item.r = cell.r; item.keys = keys;
     item.layer = place(g, keys, index, item.layers ?? 1);
     return attempt;
   }
   return -1;
+}
+
+/** The Orderliness-5 sort, shared with tidyShop: grouped by what the thing IS. */
+const byCategory = (items) => (a, b) => items[a].name.localeCompare(items[b].name);
+
+/**
+ * The player's "tidy the shop" button: every item visible, nothing left on the floor that has a
+ * home on a display, and each plane grouped by category.
+ *
+ * It is the Orderliness-5 tidy (rebuildPlane + byCategory) run over every plane at once, flat.
+ * Furniture first, in display order, each taking its own stock plus whatever is still waiting —
+ * the floor's stock to begin with, then anything an earlier plane had no flat room for. The
+ * stable sort keeps a plane's own items ahead of newcomers in each category, so stock only moves
+ * display when it has to. Whatever is left at the end goes back on the floor, flat if it can.
+ *
+ * Left alone: anything held (`available` already excludes it, and its slot is in the player's
+ * hand), and every plane with an item an NPC is considering — buyConsidered needs that item still
+ * on that display and noticeable next round, so its whole plane is not touched.
+ *
+ * Returns how many items it could not lay flat anywhere and had to stack on the floor.
+ */
+export function tidyShop(world) {
+  const { items, displays } = world;
+  const floor = (d) => d.solid === false;
+  const busy = new Set(world.npcs.filter((n) => n.considering)
+    .map((n) => `${n.considering.displayId}/${items[n.considering.index]?.shelf}`));
+  const planes = [...displays.filter((d) => !floor(d)), ...displays.filter(floor)]
+    .flatMap((d) => Array.from({ length: d.g.shelves }, (_, s) => [d, s]))
+    .filter(([d, s]) => !busy.has(`${d.id}/${s}`));
+  // The floor is the inbox: its stock is all up for grabs before any display is laid out.
+  let waiting = planes.filter(([d]) => floor(d)).flatMap(([d, s]) => onPlane(d, items, s));
+  for (const [d, s] of planes) {
+    const own = floor(d) ? [] : onPlane(d, items, s);
+    waiting = rebuildPlane(d, items, s, [...own, ...waiting].sort(byCategory(items)), { flat: true });
+  }
+  stackOnFloor(world, planes.filter(([d]) => floor(d)), waiting);
+  return waiting.length;
+}
+
+/** Out of flat room everywhere: stack what is left on the floor rather than lose it. */
+function stackOnFloor({ items, displays }, floorPlanes, waiting) {
+  for (const index of waiting) {
+    const item = items[index];
+    const placed = floorPlanes.some(([d, s]) =>
+      firstFit({ display: d, shelf: s, cells: cellsOf(d, s) }, 0, item, index) >= 0);
+    // ponytail: same ceiling as rebuildPlane — a shop with no room at all keeps the old slot record.
+    if (!placed) item.layer = place(displays.find((d) => d.id === item.display).g, item.keys, index, item.layers ?? 1);
+  }
 }
 
 /**
@@ -811,7 +877,7 @@ function restructurePlan(npc, display, items, present) {
     return { order: present, spread: true, note: 'Orderliness 1 — spread the pile out into a mess' };
   }
   if (pile && t.Orderliness === 5) {
-    const sorted = [...present].sort((a, b) => items[a].name.localeCompare(items[b].name));
+    const sorted = [...present].sort(byCategory(items));
     return { order: sorted, spread: false, note: 'Orderliness 5 — tidied the pile by category' };
   }
   const mine = present.filter((i) => matchesAnyWant(npc, items[i]));

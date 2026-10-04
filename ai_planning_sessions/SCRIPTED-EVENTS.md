@@ -120,7 +120,7 @@ world state, so no system has to know it was scripted.
   function, `scriptEvent(kind, detail)`. No script logic lives in `visit.js` or `world.js`
   beyond that call.
 - **The playground** (`store.html`) runs no scripts by default; a debug option can start one at
-  any day, which is how a script gets tested without playing ten days.
+  any day, which is how a script gets tested without playing through the days before it.
 
 ---
 

@@ -6,6 +6,8 @@ This document records **what was decided and why**. Where a decision closes off 
 the rejected alternative and the reason are recorded too — those are the notes that stop a
 decision being silently re-litigated later.
 
+What to build next, in order, across all the specs: [ROADMAP.md](ROADMAP.md).
+
 ---
 
 ## Glossary
@@ -584,6 +586,10 @@ Build it once, in P2.
   lessons, both required.
 
 ### Delivery — scripted progression, 10 days
+
+> **Revised 2026-10-03:** the tutorial is three days (TUTORIAL.md). The player owns one order line
+> on night 2 and every line from night 3; the authored days 4–10 below now only decide what fills a
+> line the player leaves blank.
 
 > **Updated 2026-10-03:** a delivery is now the resolution of an **order**, and the scripted days
 > 1–10 below are an order form gradually handed to the player as the ordering tutorial. Blank

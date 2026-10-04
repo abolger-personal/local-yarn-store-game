@@ -29,12 +29,14 @@ Trait names are the exact ten from `CHARACTER-ATTRIBUTES.md`.
 ## 1. One bag, one project
 
 - A customer has **one project bag per visit**: the bag for the one project they are shopping for
-  today (NEAR-MISS §7, cap 1). Their other WIP slots, stash included, stay at home.
+  today (NEAR-MISS §7, cap 1), **plus whatever of their stash they brought along**. Their other
+  WIPs, and the rest of the stash pile, stay at home (HOW-THEY-SHOP.md §2, "Stash is one slot").
+- **Only what is in today's bag can be swapped away** (HOW-THEY-SHOP.md §2b step 2).
 - The bag is a **drawstring bag** silhouette, tinted per customer (a colour from their own
   palette), so a regular's bag is recognisable on sight, like their handwriting
   (VISUAL-DESIGN-2D.md, "Customers' hands").
-- **What is in it** is exactly the WIP: its yarn, its tool, its notions, and the WIP itself once
-  started. No new inventory: the bag is a view of the WIP (`characters/wip.js`), not a container
+- **What is in it** is exactly today's WIP (its yarn, its tool, its notions, the WIP itself once
+  started) and the stash yarn brought along. No new inventory: the bag is a view of the WIP (`characters/wip.js`), not a container
   with its own contents.
 - A yarn-first customer with no pattern yet carries a bag of stash: yarn and nothing tied to the
   handle. A pattern-first customer with nothing yet carries the pattern tied on and an empty bag.
@@ -136,7 +138,8 @@ Trait names are the exact ten from `CHARACTER-ATTRIBUTES.md`.
   VISUAL-DESIGN-FINISHED-OBJ.md) is a finished object a customer knits. A customer may one day
   carry a project bag they knitted from a bag pattern; that is a nice touch, not a rule.
 - **"Hold shelf"** is the display; **"bag slot"** is one place on it.
-- **"Stash"** is yarn in a WIP with no pattern; a **stash bag** is a project bag holding it.
+- **"Stash"** is a customer's pile of extra yarn, one WIP slot's worth, mostly at home; a **stash
+  bag** is a project bag whose project today is choosing a pattern for some of it.
 
 ---
 

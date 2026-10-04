@@ -110,9 +110,17 @@ First guesses, for playtesting; the shape matters more than the numbers: sales a
 regular slowly, attention makes a friend.
 
 **2. Bond: between two customers, counted, not stored.** A bond is the pair's shared history, so
-it is **counted from the Guestbook's record of the two of them** (TUTORIAL.md §7.3) rather than
-kept as its own number. The book and the bond can never disagree, and the relationship is exactly
-the transactions tracked over time.
+it is **counted from the shop's full record of the two of them** (the Guestbook's event log,
+TUTORIAL.md §7.3) rather than kept as its own number, and the relationship is exactly the
+transactions tracked over time.
+
+- **Friendships grow whether or not the player is watching.** The bond counts every event in the
+  log, witnessed or not; "witnessed" only changes how much detail the player's page shows.
+- **But much slower without the player's help.** An event the player **fostered** counts **×3**:
+  the pair was seated together by a player verb (save a seat, offer a seat), introduced by the
+  player, ate from a treat tin the player set out, swapped over a pattern the player put on the
+  circle's table, or danced at a finish the player helped happen (their gap closed). Everything
+  else, the chats and seats that just happened, counts ×1. (Decided 2026-10-03.)
 
 | Shared event | Weight |
 | --- | --- |
@@ -123,7 +131,8 @@ the transactions tracked over time.
 | treats brought back for a gift (PLAYING-AT-YOUR-PACE.md §5) | 3 |
 
 Sitting in company counts **every round** they spend together, so a long afternoon side by side is
-worth more than a quick chat, and seating people together is how the player grows a bond fastest.
+worth more than a quick chat, and seating people together on purpose (×3) is how the player grows a
+bond fastest.
 
 | Band | Bond | Means |
 | --- | --- | --- |

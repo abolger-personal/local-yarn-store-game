@@ -114,7 +114,7 @@ still parts from the needles on the flat plate. Full opacity; the old wraps were
     game* with the open-source JavaScript. One `@font-face` stylesheet, `fonts/hands.css`.
   - **Canvas waits for the font:** the board awaits `document.fonts.load()` for a hand before
     painting a polaroid with it, so the first card never comes out in a fallback face.
-  - **Only customers.** The shop's own writing (the Needle Tips note, the order clipboard) stays
+  - **Only customers.** The shop's own writing (the Needle Tips note, the packing slip) stays
     the house lettering or the note's system hand, so a customer's hand never reads as the
     shop's.
 - **The house lettering.** The Massachusetts "bookleaf" town line signs' highway sans (Mass. DPW,
@@ -152,7 +152,7 @@ still parts from the needles on the flat plate. Full opacity; the old wraps were
     "Customers' hands"), replacing the design's title, which moves to the label and the
     Guestbook with the needle size and fibres. NO PHOTOS YET in black on an empty board.
   - **The info button:** a gold `i` (cap 20 in a 24 box), lettered by `game.js`.
-  - **The night clipboard:** all black — ORDER FOR DAY N (cap 20), each slot (cap 18) with its
+  - **The night clipboard** (built; being replaced by the packing slip, decision 25): all black — ORDER FOR DAY N (cap 20), each slot (cap 18) with its
     limits under it (cap 11), and the day line at the foot (cap 11). See "The night".
 - **Earlier wordmark, removed:** `L.Y.S` over a rule over italic *localyarnstore*, on the glass.
   It said the name twice and, with the emblem and the note, made the door too busy.
@@ -262,7 +262,7 @@ advances it but the player opening the door.
 - **Opening tomorrow is the door.** Click it, or Enter (it is a real link, and focused when the
   screen opens): it swings as on the front door (`swingOpen`), the next day starts, and the screen
   fades into the shop. No other button. Escape does nothing.
-- **The clipboard,** hung on a nail on the clapboard to the right of the door, tilted 1.5°, the
+- **The clipboard** (*superseded by the packing slip, decision 25; this describes what is built*), hung on a nail on the clapboard to the right of the door, tilted 1.5°, the
   door's drop shadow. A 360x540 drawing: board in wood shadow `#a87c4c` under the worn wood at 70%,
   a sheet of `#fbf8ef` paper with the note's shadow, a brass clip (`#brass`, raised with the
   two-lip emboss) with a dark hole `#3b2408` and a grey nail head `#6b6f73` in it.
@@ -470,3 +470,10 @@ Customers' handwriting, 2026-10-03:
     read anyway.
 24. **Fonts are self-hosted with their OFL licences and credited in About,** five families, latin
     subset, no runtime dependency on Google.
+
+The night order, 2026-10-03:
+
+25. **A packing slip, not a clipboard.** Supersedes 19. Tomorrow's order is a packing slip taped to
+    the parcels on the step (TUTORIAL.md §7.2): supplier's name, FOR: LOCAL YARN STORE, ARRIVES:
+    DAY N, quantity × item lines, no checkboxes. A clipboard feels like you are supposed to do
+    something with it; a packing slip says what is coming.

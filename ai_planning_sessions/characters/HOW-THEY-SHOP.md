@@ -87,21 +87,29 @@ Extends `wantsFor` (`characters/wip.js`). Pattern first is unchanged.
 - **Then wants a pattern for that yarn**: the existing branch, any pattern whose weight and
   material suit it (`yarnSuitsPattern`), preferring one their units already cover. If a suitable
   pattern is in the shop and they pass it, they buy it now and the WIP can start.
-- **If not, the yarn goes home as stash.** The slot stays UNSTARTED, holding yarn and no pattern.
-  On a later visit they arrive carrying it and wanting a pattern for it.
+- **If not, the yarn goes home as stash:** onto their stash pile (below). On a later visit they may
+  bring some of it, wanting a pattern for it.
 - **Topping up:** with a pattern that wants more units than they hold, they now shop like pattern
   first, for more of the same yarn. Another dye lot or colour is a near-miss (NEAR-MISS §5): a
   stripe they did not plan.
 
-### Stash fills slots
+### Stash is one slot: a pile of extra yarn
 
-A stash slot is a WIP slot. A volatile, enthusiastic customer with every slot full of stash stops
-impulse buying until one starts (their slot count is already Enthusiasm + Openness + Volatility,
-WIP-AND-FINISHED-OBJ-FORMATION.md). That is the natural limit, and a truthful joke about knitters.
+A customer's **stash** is **one WIP slot holding a pile of extra yarn**: everything they own that
+is not committed to a project. Their **other slots are actual WIPs**, with patterns, in progress
+or waiting to start. (Decided 2026-10-03.)
+
+- Yarn-first buys with no pattern go onto the pile. Choosing a pattern for some of it moves that
+  yarn out of the pile into a WIP slot, which then shops like pattern first.
+- **The stash is not all in the bag.** It lives at home. On a visit, the bag carries today's one
+  project (PROJECT-BAGS.md §1) and **whatever stash yarn they brought along**, which is some, all
+  or none of the pile.
+- The impulse limit is the slots: a customer whose every other slot is a WIP still in progress has
+  no free slot to start something new from the pile, however big it is.
 
 ### Stash is forever, unless it is swapped
 
-Stash never expires and is never thrown out. The one way it leaves a bag without becoming a project
+Stash never expires and is never thrown out. The one way it leaves a customer without becoming a project
 is **to a friend**, in the shop, while chatting or knitting together. This is SPIKE-FUN.md D1
 ("chat with a consequence") made concrete. The player becomes the matchmaker.
 
@@ -115,7 +123,7 @@ either passes or ends the check; nothing here is a menu or a number the player s
 | Step | Passes if… | Otherwise |
 | --- | --- | --- |
 | **1. Together** | they are **in company** (both seated, §2c) or **chatting** (standing within `personalSpace`, the existing `WAIT` chat in `visit.js`) this round | no swap |
-| **2. Something to give** | the giver has a **stash slot** (yarn, no pattern, UNSTARTED) | no swap |
+| **2. Something to give** | the giver's **bag today** holds stash yarn: only the stash they brought along can be given, never the pile at home (PROJECT-BAGS.md §1) | no swap |
 | **3. It moves toward a project** | the stash suits a **requirement** the receiver has: a pattern short of that weight and material (`yarnSuitsPattern`), or a project's worth for their object type (§3). A yarn-first receiver with no pattern does not count: stash only moves toward a project, never from one bag of stash to another | no swap |
 | **4. They know each other** | they have chatted on an earlier visit, **or** both are regulars (REGULARS §2), **or** they are in the same **circle** right now (§2c), **or** they have given, swapped or repaid before (a 🎁 history: and each past exchange makes the step-10 roll a little likelier, so a relationship snowballs) | only a **stranger's gift** is possible: giver Compassion 5 |
 | **5. Someone speaks up** | Assertiveness or Enthusiasm 4+ in either of them, **or** in anyone in their circle | no swap: two quiet people never bring it up, however good the match |
@@ -125,9 +133,9 @@ either passes or ends the check; nothing here is a menu or a number the player s
 | **9. Politeness** | a Politeness 4+ receiver takes a one-way gift because they can repay it: they bring a tin of treats on their next visit (PLAYING-AT-YOUR-PACE.md §5, "Treats") | — (never ends the check) |
 | **10. The roll** | one roll, chance by **setting** (§2c): chatting 0.2, side by side 0.4, circle 0.6 | try again on their next day together |
 
-**What moves:** from the giver's stash slot, as many matching units as the receiver is short,
-never more. An Orderliness 4+ giver never splits a dye lot: all of it, or none. A giver's slot that
-empties is free again, so they go back to impulse buying (§2).
+**What moves:** from the stash yarn in the giver's bag today, as many matching units as the receiver is short,
+never more. An Orderliness 4+ giver never splits a dye lot: all of it, or none. What leaves their bag
+leaves their stash pile (§2, "Stash is one slot").
 
 **Afterwards:** the receiver's yarn records where it came from (the giver), for the Guestbook (a 🎁 row on both pages, TUTORIAL.md §7.3) and
 the thank-you line (PROJECTS-AND-AUTHORSHIP.md §4b: *"Mira's blues, from her stash. I owe her

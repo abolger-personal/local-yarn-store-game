@@ -179,8 +179,9 @@ the swap back for a gift, so kindness in the circle comes back to the shop as th
 
 When the last customer leaves, the shop closes for the night: the screen fades from the shop to its
 exterior (the front door's entry, shared from `characters/store/ui/exterior.js`), the door shut,
-the sticky note reading *"Closed — back tomorrow"*, and **tomorrow's order on a clipboard hung on a
-nail beside the door**. Opening the door (click it, or Enter, since it is a real link) swings it
+the sticky note reading *"Closed — back tomorrow"*, and **tomorrow's order as a packing slip taped to
+the parcels waiting on the step** (TUTORIAL.md §7.2). Not a clipboard: a clipboard reads as a list of
+jobs to act on, and the order is something arriving, not a task (decided 2026-10-03). Opening the door (click it, or Enter, since it is a real link) swings it
 open, starts the next day, and fades back into the shop.
 
 - **It waits.** The screen never advances by itself and nothing happens while it is up, so it is
@@ -188,17 +189,16 @@ open, starts the next day, and fades back into the shop.
   never whether they progress. The playground (`store.html`) keeps its auto-day timer and has no
   night.
 - **What is shown is what arrives.** The order is built once, at closing (`planTomorrow()` in
-  `store/sim/world.js`), drawn on the clipboard, and that same order is handed to
+  `store/sim/world.js`), written on the packing slip, and that same order is handed to
   `restart({ order })`; `deliver()` builds its own only when none is passed (the playground).
-- **Today it is read-only:** one row per slot in plain words (*4 balls of yarn — worsted or dk*,
+- **Built today, to be replaced by the slip:** a read-only clipboard: one row per slot in plain words (*4 balls of yarn — worsted or dk*,
   *2 patterns — for worsted or dk*, *a kit*), from `describeSlot()` in `inventory/supply.js`, with an
   empty box against each slot that will be the player's (`playerChoosable`). Choosing is not built;
   this is the screen it will happen on. Under the slots, one line about the day that ended
   (*Day 3: 5 signed the Guestbook*). No stats and no money.
 - **Schedule:** the tutorial is three days. Night 1 shows the order read-only; **the first player
-  line is handed over on night 2.** *Mismatch, not yet fixed:* `SCRIPT` in `supply.js` still marks
-  its first choosable slot on day 4 (the ten-day schedule below), and that is what draws the empty
-  boxes today.
+  line is handed over on night 2**, and from night 3 every line is the player's (`SCRIPT` in
+  `supply.js`, commit 078670b).
 
 ### The scripted delivery is the tutorial
 
@@ -206,15 +206,15 @@ DESIGN-DECISIONS.md §6's authored days 1–10 become an order form that is grad
 The form looks the same on day 1 and day 50; the tutorial is the real mechanic with the script's
 choices already filled in.
 
-| Days | Order form | What it teaches |
-| --- | --- | --- |
-| 1–3 | fully filled by the script; the player watches it arrive | deliveries land on the floor, and sorting them opens the day |
-| 4–6 | one slot left for the player, the rest scripted | you can choose part of the order |
-| 7–10 | half the slots are the player's | a good order means the stock is there when the customer is |
-| 11+ | the player chooses what they want; the supplier fills the rest | ordering is up to you from here |
+| Order for | Set on | Order form | What it teaches |
+| --- | --- | --- | --- |
+| days 1–2 | (start), night 1 | filled by the script; the player watches it arrive | deliveries land on the floor, and sorting them opens the day |
+| day 3 | night 2 | one line is the player's | you can choose part of the order |
+| day 4 on | night 3 on | every line is the player's; a blank line is the supplier's choice | ordering is up to you from here |
 
-*Superseded in part:* the tutorial is now three days, and the first player line is handed over on
-night 2 (above). This table is still what `SCRIPT` in `supply.js` encodes.
+The tutorial is three days. What fills a blank line still follows §6's authored curve for days
+4–10 (new weights and notions arriving gradually), then the supplier's procedural tail: pacing,
+not tutorial.
 
 The script uses the same templates the player will, so reading its orders is how a planner learns
 what a good order looks like. §6's other promises survive unchanged: notions are withheld early

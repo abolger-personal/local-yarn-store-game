@@ -88,8 +88,8 @@ a finding (§6), not a reason to add a popup.
 | **Speech bubbles** | a word or two, trait-flavoured (SPIKE-FUN.md D6) | the rare thing behaviour cannot say: *"Ooh, all the blues together!"* |
 | **The Guestbook** | real entries with mood icons, selfies of finished objects | the record of what happened, consulted on the player's own time |
 | **The counter** | the break card, the Guestbook, the note | where customers come to the player, and where new tools appear |
-| **The night** | the shop's exterior between days: the door shut, *"Closed — back tomorrow"* on the note, tomorrow's order on a clipboard by the door (PLAYING-AT-YOUR-PACE.md §5) | what tomorrow brings, and the order. It waits; opening the door starts the day |
-| **New objects** | something that was not in the shop yesterday | a discovery arriving: a line of your own on the clipboard, the hold shelf |
+| **The night** | the shop's exterior between days: the door shut, *"Closed — back tomorrow"* on the note, tomorrow's order on a packing slip taped to the parcels on the step (§7.2) | what tomorrow brings, and the order. It waits; opening the door starts the day |
+| **New objects** | something that was not in the shop yesterday | a discovery arriving: a line of your own on the packing slip, the hold shelf |
 
 **The counter note is the tutorial's voice.** The shopkeeper's own reminder to themselves,
 rewritten each morning. It never explains controls; it states one shop truth. If the player never
@@ -180,7 +180,7 @@ and SCRIPTED-EVENTS.md §4.
 
 ### Night 1: what comes tomorrow
 
-- **Arrives as:** the night screen: the shop shut, tomorrow's order on the clipboard, read-only.
+- **Arrives as:** the night screen: the shop shut, tomorrow's order on the packing slip, read-only.
 - **Teaches:** deliveries come from an order, and the screen waits for you.
 
 ### Day 2: what goes together
@@ -197,13 +197,13 @@ and SCRIPTED-EVENTS.md §4.
 
 ### Night 2: a line of your own
 
-- **Arrives as:** one line on the clipboard is blank and the player's.
-- **Door note:** *"Tomorrow's order is on the clipboard. One line is yours."*
+- **Arrives as:** one line on the packing slip is blank and the player's.
+- **Door note:** *"Tomorrow's order is on the packing slip. One line is yours."*
 - **Success:** the player's choice is in tomorrow's pile.
 - **Fallback:** a blank line is filled by the supplier. Never empty.
-- **Needs:** choosing on the clipboard (build step 7). The read-only screen is built. **Code
-  mismatch:** `SCRIPT` in `inventory/supply.js` still hands over the first choosable slot on
-  day 4; it moves to night 2 when the script moves into the tutorial (SCRIPTED-EVENTS.md §4).
+- **Needs:** choosing on the packing slip (build step 7). The read-only screen is built, and
+  `SCRIPT` in `inventory/supply.js` marks day 3's order (set on night 2) with the player's first
+  line, then every line from day 4 (commit 078670b).
 
 ### Day 3: they come back
 
@@ -223,8 +223,9 @@ and SCRIPTED-EVENTS.md §4.
   decor object in hand.
 
 **After day 3** the tutorial is over without announcing it. The friend keeps visiting as a
-regular. The deliveries keep DESIGN-DECISIONS.md §6's gentler curve for the first ten days (new
-weights and notions trickling in), which is pacing the player never notices, not tutorial.
+regular. From night 3 the whole packing slip is the player's; what the supplier fills blank lines
+with still introduces new weights and notions gradually (DESIGN-DECISIONS.md §6), which is pacing
+the player never notices, not tutorial.
 
 ---
 
@@ -260,7 +261,7 @@ a diegetic answer to try first:
 | **Starting over** | a "closed for renovation" option, maybe on the break card's back | open: genuinely needs a decision |
 | **Graphics quality** | DESIGN-DECISIONS.md §4 makes it a player-facing setting | the About panel is the natural home: it is already the one "outside the game" surface |
 | **Sound volume** | a radio on the counter: tap to change station or turn it off | — |
-| **Ordering** | **decided:** the clipboard by the door on the night screen; first line yours on night 2 | — |
+| **Ordering** | **decided:** the packing slip on the parcels on the night screen (§7.2); first line yours on night 2 | — |
 | **Help and re-reading tips** | the counter note keeps the last few tips as a small pad, flippable | a page at the back of the Guestbook |
 | **Who is this customer?** | recognition, not lookup: what they wear, their Guestbook page | tapping a customer to see their page, i.e. the Guestbook again |
 | **Keyboard shortcuts** | F, L, M, Q, E, P, Escape and the arrows keep working, untaught | listed in the About panel |

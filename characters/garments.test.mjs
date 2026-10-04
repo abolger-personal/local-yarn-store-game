@@ -1474,6 +1474,12 @@ for (const silhouette of GARMENTS.sweater.silhouettes) {
   assert.ok(Math.min(...hsl.map((h) => h.s)) < 0.2, 'no random pattern is in a natural, undyed or heathered colour');
   assert.ok(Math.min(...hsl.map((h) => h.l)) < 0.5, 'no random pattern is in a muted mid tone');
   assert.ok(Math.max(...hsl.map((h) => h.l)) > 0.8, 'no random pattern is in a pastel');
+  // The mix, by family: mostly bold and muted, pastels a minority (yarn-look.js YARN_FAMILIES).
+  // OKLCH-ish proxy from HSL: bold is saturated and mid, pastel is light.
+  const bold = hsl.filter((h) => h.s > 0.45 && h.l < 0.7).length / hsl.length;
+  const pastel = hsl.filter((h) => h.l > 0.78).length / hsl.length;
+  assert.ok(bold > 0.3, `only ${(bold * 100).toFixed(0)}% of random patterns are bold -- the shop reads as Easter`);
+  assert.ok(pastel < 0.35, `${(pastel * 100).toFixed(0)}% of random patterns are pastel -- the shop reads as Easter`);
 }
 
 // --- an open shawl's long edge has no corner at the collarbone --------------------------------

@@ -99,12 +99,24 @@ export const YARN_ANCHORS = Object.freeze([12, 38, 74, 128, 172, 208, 262, 318])
 export const CHARACTER_RANGE = Object.freeze({ lMin: 0.44, lMax: 0.64, cMax: 0.055 });
 
 /**
- * The widest lightness and chroma the shop's yarn spans: muted through bright to pastel, pale to
- * jewel. The floor was 0.30 (charcoal) and a quarter of the palette read as dark; a shop wall is
- * mostly mid-to-light colour, so the floor is now a muted mid tone. Below the characters' band
- * edge (0.44) only for low-chroma greys nudged out of it.
+ * The shop's yarn at full spread, as three FAMILIES rather than one box: bold, muted and neutral,
+ * pastel. One box (lightness 0.52-0.93 and chroma 0-0.20, rolled independently) made any light
+ * colour with a little chroma a pastel: measured, 20% bold against 57% pastel or light candy, and
+ * the wall read as Easter. A real shop is mostly saturated mid tones and heathers, pastels a
+ * minority. `share`s sum to 1; scratchpad/yarnmix.mjs measured the mix, and garments.test.mjs holds
+ * the bold and pastel shares.
  */
-const FULL = Object.freeze({ lMin: 0.52, lMax: 0.93, cMin: 0.0, cMax: 0.20 });
+export const YARN_FAMILIES = Object.freeze([
+  { name: 'bold',   share: 0.45, lMin: 0.52, lMax: 0.72, cMin: 0.13, cMax: 0.20 },
+  { name: 'muted',  share: 0.40, lMin: 0.52, lMax: 0.78, cMin: 0.00, cMax: 0.07 },
+  { name: 'pastel', share: 0.15, lMin: 0.80, lMax: 0.93, cMin: 0.04, cMax: 0.11 },
+]);
+
+/** Pick a family by share. */
+function familyOf(r) {
+  for (const f of YARN_FAMILIES) if ((r -= f.share) < 0) return f;
+  return YARN_FAMILIES[YARN_FAMILIES.length - 1];
+}
 /** The original pastel point — where `spread: 0` lands, so the old look is still reachable. */
 const TIGHT = Object.freeze({ lMin: 0.69, lMax: 0.79, cMin: 0.085, cMax: 0.14 });
 
@@ -141,8 +153,9 @@ const lerp = (a, b, t) => a + (b - a) * t;
 export function yarnColor(rng = Math.random, target = new THREE.Color(),
                           { spread = 1, hue = null } = {}) {
   const t = Math.min(1, Math.max(0, spread));
-  const lMin = lerp(TIGHT.lMin, FULL.lMin, t), lMax = lerp(TIGHT.lMax, FULL.lMax, t);
-  const cMin = lerp(TIGHT.cMin, FULL.cMin, t), cMax = lerp(TIGHT.cMax, FULL.cMax, t);
+  const full = familyOf(rng());
+  const lMin = lerp(TIGHT.lMin, full.lMin, t), lMax = lerp(TIGHT.lMax, full.lMax, t);
+  const cMin = lerp(TIGHT.cMin, full.cMin, t), cMax = lerp(TIGHT.cMax, full.cMax, t);
 
   // 18 degrees of arc per anchor closes to a curated palette; the wide end has to TILE the circle.
   //

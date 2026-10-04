@@ -54,7 +54,7 @@ These come from the original concept and should be re-read before any design cha
 | Post FX | `@react-three/postprocessing` |
 | State | `zustand` (UI only); plain TypeScript for simulation |
 | Build | Vite + TypeScript |
-| Storage | `idb` (IndexedDB) — localStorage is too small |
+| Storage | `idb-keyval` (IndexedDB, one autosave slot) — see "Saving" in §5. Revised 2026-10-03 from `idb`, which is more than one slot needs |
 | Tests | Vitest (headless) |
 
 **Deliberately not used:**
@@ -526,6 +526,32 @@ feels arbitrary in play.
 > before P5 builds the craft loop**, since that is where finished objects begin being generated from
 > real purchases.
 
+### Saving: autosave, plain data
+
+TUTORIAL.md's rule stands: **autosave every round, no save button, ever.** Revised 2026-10-03
+after reading a coworker's three.js game (terra-nova), which saves this way by hand.
+
+- **Storage:** one slot in IndexedDB through **`idb-keyval`** (Apache-2.0, about 0.6 KB, no build
+  step: `https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm`). A save is one `set('save', world)`
+  of a structured-clone value: no JSON step and no 5 MB `localStorage` cap. If the save turns out
+  to stay well under 1 MB, `localStorage` + JSON (already used for prefs) is the zero-dependency
+  fallback. Decide when the save is built, not before.
+- **The world is plain data, so it can be saved at all.** `structuredClone(world)` must work:
+  - **The random generator is a seed, not a function.** `makeWorld` stores `rng` as a function
+    (`world.rng`, default `Math.random`), which cannot be saved and makes runs unrepeatable. Switch
+    to a seeded generator whose whole state is a number: `mulberry32`, already in
+    `characters/store/core/util.js`. The saved number restores the exact sequence.
+  - **No closures and no three.js objects in sim state.** NPCs, WIPs, displays, the Guestbook and
+    the order hold ids and numbers; meshes, materials and the scene are rebuilt from them on load.
+  - **Load settles the world:** anything that only made sense mid-round (a walk in progress, a held
+    item, a reservation) is released on load, so a restored shop starts at a clean round boundary.
+  - **Versioned:** a `version` field and migrations, as §3's `save.ts` already says.
+- **When to save:** at every round boundary, **and when the page is hidden or closed**
+  (`visibilitychange` to hidden, and `pagehide`), so closing the tab mid-round loses at most the
+  round in progress. A handful of lines.
+- **Checks** (§10): a `structuredClone` round trip of a mid-game world compares equal (in
+  `visit.test.mjs`, the moment the rng is a seed), plus `test:determinism` and `test:save`.
+
 ---
 
 ## 6. Supply system
@@ -681,10 +707,17 @@ more expensive to change later, and "cosy" is the entire product thesis.
 1. `test:sim` — formation matcher: given a slot grid, assert exactly the expected rule IDs fire.
    **Include negative cases** — near-miss arrangements must *not* fire.
 2. `test:determinism` — run 500 simulated days twice from the same `worldSeed`, assert identical
-   world hashes. This is the regression net for the entire simulation.
+   world hashes. This is the regression net for the entire simulation. **Not built yet; build it
+   with the seeded rng** ("Saving" in §5). Concretely: a node self-check that runs the pure sim
+   (`visit.js`, `wip.js`, `inventory/supply.js`) for N days headless, no rendering, hashes the
+   world (a stable stringify of the plain-data world, then a small string hash) and asserts two
+   runs from one seed match, and a different seed does not. It catches any stray `Math.random` or
+   iteration-order dependence cheaply. Terra-nova does the same with a per-turn state hash.
 3. `test:loop` — place a known formation, assert purchase, assert the slot is empty, advance N days,
    assert the NPC returns with the correct finished object.
-4. `test:save` — write a v1 save, migrate, assert v2 loads without data loss.
+4. `test:save` — write a v1 save, migrate, assert v2 loads without data loss. Before migrations
+   exist: a `structuredClone` round trip of a mid-game world compares equal, and continuing both
+   copies for a day gives the same hash (test 2's hash).
 5. Performance overlay (`P` key): 1000 items plus ~10 concurrent NPCs, measured under **20x CPU
    throttle** (see "Verification standard" in section 4). Target 60fps. The old "draw calls under 30"
    budget is retired — it was never achievable for un-batched characters, and draw call count turned

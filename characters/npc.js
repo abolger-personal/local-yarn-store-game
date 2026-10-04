@@ -1007,13 +1007,16 @@ const _rest = new THREE.Vector3();
  * the air. A merged mesh holds the legs too, so limbs can only be told apart vertex by vertex, by
  * the bone each one rides. It also retires the bounding boxes, whose corners hang below a tilted
  * ellipsoid and sat even the unmerged rig ~20mm proud.
+ *
+ * `userData.prop` meshes are skipped: things hung off the root that are not worn -- craft-anim.js's
+ * ball of yarn sits on the FLOOR, and counting it put the seat there.
  */
 export function lowestResting(built) {
   built.root.updateMatrixWorld(true);
   const limbs = limbNodes(built.joints);
   let lowest = Infinity;
   built.root.traverse((m) => {
-    if (!m.isMesh || limbs.has(m)) return;
+    if (!m.isMesh || limbs.has(m) || m.userData.prop) return;
     const skin = m.isSkinnedMesh ? m.geometry.attributes.skinIndex : null;
     for (let i = 0; i < m.geometry.attributes.position.count; i++) {
       if (skin && limbs.has(m.skeleton.bones[skin.getX(i)])) continue;

@@ -182,11 +182,21 @@ function addBeak(ctx, P) {
   }));
 }
 
+const WING_ROLL = 0.08;
+
+/**
+ * The wing's blob in its upper arm's frame, as addWing builds it: pos.x and roll are multiplied by
+ * the arm's side.
+ * The wing encloses the whole arm, paw included, so anything held has to be gripped at its
+ * surface -- craft-anim.js uses this to keep a needle from being drawn through it.
+ */
+export const wingShape = (P) => ({ pos: [WING_OFFSET, -P.wingLength * 0.42, 0], scale: wingScale(P), roll: WING_ROLL });
+
 // a blob on the upper arm plus its own scallop shell, both parented to the shoulder
 function addWing(shoulder, side, ctx, P) {
   const scale = wingScale(P);
   const pos = [side * WING_OFFSET, -P.wingLength * 0.42, 0];
-  const rot = [0, 0, side * 0.08];
+  const rot = [0, 0, side * WING_ROLL];
   shoulder.add(part(GEO.sphere, ctx.mat.body, { pos, scale, rot }));
   if (!P.feathers || !P.featherWings) return;
 
@@ -296,6 +306,7 @@ export const owl = registerSpecies({
   gui: { ...BASE_GUI, ...OWL_GUI },
   buildKit,
   coatBulge,
+  wingShape,
   coatColorKey: 'featherColor',
   randomise: randomiseInto,
   onPresetChange: applyFeatherPreset,

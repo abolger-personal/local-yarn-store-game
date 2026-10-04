@@ -501,11 +501,11 @@ function buildBench() {
   }
 }
 
-const clock = new THREE.Clock();
+const clock = new THREE.Timer();
 
 function startLoop() {
   renderer.setAnimationLoop(() => {
-    const dt = Math.min(clock.getDelta(), 0.1);
+    const dt = Math.min(clock.update().getDelta(), 0.1);
     clocks.elapsed += dt;
     tickGlow(clocks.elapsed);
     if (takeViewDirty()) { paintActivePlane(); updateHeldReadout(); renderReadout(); }

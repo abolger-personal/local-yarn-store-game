@@ -230,7 +230,7 @@ export function applyTransform(d, x, z, yaw) {
   // Local +Z is the display's front (local -Z, row 0, is the wall side), rotated into world space.
   d.standAt = { x: x + Math.sin(yaw) * STAND_OFF, z: z + Math.cos(yaw) * STAND_OFF };
   buildLevelFrames(d);
-  if (d.group) d.group.matrix.copy(d.frame);
+  if (d.group) { d.group.matrix.copy(d.frame); d.group.matrixWorldNeedsUpdate = true; }
 }
 
 /**
@@ -326,6 +326,7 @@ export function buildDisplays(n) {
     d.group = new THREE.Group();
     d.group.matrixAutoUpdate = false;
     d.group.matrix.copy(d.frame);
+    d.group.matrixWorldNeedsUpdate = true;   // three r185+: a hand-set matrix must say so
     displayGroup.add(d.group);
     buildFurniture(d);
   }
@@ -375,6 +376,7 @@ function addLevel(d, s, w, depth) {
   const node = new THREE.Group();
   node.matrixAutoUpdate = false;
   node.matrix.copy(d.levels[s].local);
+  node.matrixWorldNeedsUpdate = true;
   d.group.add(node);
 
   const lines = makeGridLines(d.g, s);

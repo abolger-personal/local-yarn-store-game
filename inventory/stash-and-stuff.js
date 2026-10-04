@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { roomEnvironment } from './room-environment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
   loadAtlas, cellRect, makeGridLines, makeField, makeEdge, makeShadows, makeBoxes, makeSizeAtlas,
@@ -147,6 +147,7 @@ for (const d of Object.values(displays)) {
   d.group = new THREE.Group();
   d.group.matrixAutoUpdate = false;
   d.group.matrix.copy(d.frame);
+  d.group.matrixWorldNeedsUpdate = true;   // three r185+: a hand-set matrix must say so
 }
 
 // ---------------------------------------------------------------- scene
@@ -173,7 +174,7 @@ controls.enableDamping = true;
 controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
 
 const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environment = pmrem.fromScene(roomEnvironment(), 0.04).texture;
 scene.add(new THREE.HemisphereLight('#ffffff', '#8b7a68', 1.1));
 const key = new THREE.DirectionalLight('#ffe6c4', 1.6);
 key.position.set(2, 4, 2);
@@ -1339,7 +1340,7 @@ function closestFamilies() {
 }
 
 // ---------------------------------------------------------------- go
-const clock = new THREE.Clock();
+const clock = new THREE.Timer();
 
 /** The notion meshes, built on the loaded atlas: labels, outlines, boxes, size tags, shadows. */
 function buildNotionMeshes(loaded) {
@@ -1383,7 +1384,7 @@ loadAtlas(ATLAS_URL, S.theme).then((loaded) => {
   renderer.setAnimationLoop(() => {
     controls.update();
     renderer.render(scene, camera);
-    updatePerf(Math.min(clock.getDelta(), 0.1));
+    updatePerf(Math.min(clock.update().getDelta(), 0.1));
   });
 }).catch((err) => {
   document.getElementById('hud').innerHTML =

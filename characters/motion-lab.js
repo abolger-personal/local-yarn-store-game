@@ -17,7 +17,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { roomEnvironment } from '../inventory/room-environment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
   BASE_PARAMS, BASE_MOTION_RANGES, MOTION_DEFAULTS, POSES, POSE_KEYS, BUILD, TONE_MAPPING,
@@ -135,7 +135,7 @@ controls.enableDamping = true;
 controls.target.set(0, 0.5, 0);
 
 const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environment = pmrem.fromScene(roomEnvironment(), 0.04).texture;
 const key = new THREE.DirectionalLight('#fff6e8', 1.5);
 key.position.set(2.2, 3.4, 2.0);
 scene.add(key, new THREE.AmbientLight('#cfd6e2', 0.35));
@@ -489,7 +489,7 @@ function stepRun(dt) {
 
 // ---------------------------------------------------------------- per-frame
 
-const clock = new THREE.Clock();
+const clock = new THREE.Timer();
 let stepOnce = false;
 let paused = false;
 
@@ -540,7 +540,7 @@ function tickOne(a, dt) {
 }
 
 function frame() {
-  let dt = Math.min(clock.getDelta(), 0.1) * S.dtScale;
+  let dt = Math.min(clock.update().getDelta(), 0.1) * S.dtScale;
   if (paused && !stepOnce) dt = 0;
   if (stepOnce) { dt = (1 / 60) * S.dtScale; stepOnce = false; }
 

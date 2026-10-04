@@ -5,7 +5,7 @@
 import { TONE_MAPPING } from '../../npc.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { roomEnvironment } from '../../../inventory/room-environment.js';
 import { ROOM, S } from '../core/config.js';
 import { shop } from '../core/state.js';
 
@@ -33,12 +33,12 @@ function setUpRenderer() {
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(innerWidth, innerHeight);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = TONE_MAPPING[S.toneMapping];
   renderer.toneMappingExposure = S.exposure;
   app.appendChild(renderer.domElement);
   scene.background = new THREE.Color('#e8e2d9');
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environment = pmrem.fromScene(roomEnvironment(), 0.04).texture;
 }
 
 /**
@@ -101,7 +101,7 @@ function setUpLights() {
   const r = Math.hypot(ROOM.w, ROOM.d) / 2 + 0.8;
   Object.assign(key.shadow.camera, { left: -r, right: r, top: r, bottom: -r });
   key.shadow.bias = -0.0012;
-  key.shadow.radius = 3;
+  key.shadow.radius = 1;   // three 0.160 ignored this under PCFSoft; 1 keeps that edge now PCF is soft
   rim.position.set(-4, 2.5, -5);
   scene.add(key, hemi, rim);
   applyDaylight(0);

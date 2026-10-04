@@ -146,13 +146,13 @@ function repaintIfDirty(page) {
   if (takeHudDirty()) { redrawBook(); drawBoard(); page.onHud?.(); }
 }
 
-const clock = new THREE.Clock();
+const clock = new THREE.Timer();
 
 function startLoop(page) {
   renderer.setAnimationLoop(() => {
-    const dt = Math.min(clock.getDelta(), 0.1);
-    // Accumulated here rather than via clock.getElapsedTime(), which would call getDelta() a
-    // second time and halve every dt the rest of the loop sees.
+    const dt = Math.min(clock.update().getDelta(), 0.1);
+    // Accumulated here from the capped dt rather than read off the timer, so a long stall (a
+    // hidden tab) cannot jump the shop forward.
     clocks.elapsed += dt;
     tickCast(dt);
     tickGlow(clocks.elapsed);

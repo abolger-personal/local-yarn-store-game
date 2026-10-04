@@ -3,7 +3,7 @@
 // crochet can be judged close up and at shop distance.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { roomEnvironment } from '../inventory/room-environment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
   TONE_MAPPING, POSES, MOTION_DEFAULTS, BUILD, createCharacter, disposeCharacter, applyPose, getSpecies,
@@ -36,7 +36,7 @@ document.getElementById('app').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#e8e2d9');
-scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(roomEnvironment(), 0.04).texture;
 const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 100);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -139,11 +139,11 @@ function buildGui() {
 }
 
 // ---------------------------------------------------------------- loop
-const clock = new THREE.Clock();
+const clock = new THREE.Timer();
 const stats = document.getElementById('stats');
 
 function tick() {
-  const dt = Math.min(clock.getDelta(), 0.1);
+  const dt = Math.min(clock.update().getDelta(), 0.1);
   stepCraft(craft, dt);
   stepMotion(built, POSES.sit, dt, opts, craft.add);
   built.root.position.y = seatY;   // weight on the seat, not the feet (cast.js does the same)

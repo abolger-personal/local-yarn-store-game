@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { roomEnvironment } from '../inventory/room-environment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
   BASE_PARAMS, TONE_MAPPING, POSES, BUILD, MOTION_DEFAULTS,
@@ -68,7 +68,7 @@ function applyRenderScale() {
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2) * S.renderScale);
 }
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = TONE_MAPPING[S.toneMapping];
 renderer.toneMappingExposure = S.exposure;
 app.appendChild(renderer.domElement);
@@ -83,7 +83,7 @@ controls.minDistance = 0.5;
 controls.maxDistance = 80;
 
 const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environment = pmrem.fromScene(roomEnvironment(), 0.04).texture;
 
 const key = new THREE.DirectionalLight('#ffe6c4', 2.6);
 key.position.set(4, 6, 3);
@@ -96,7 +96,7 @@ key.shadow.camera.right = 5;
 key.shadow.camera.top = 5;
 key.shadow.camera.bottom = -5;
 key.shadow.bias = -0.0012;
-key.shadow.radius = 3;
+key.shadow.radius = 1;   // three 0.160 ignored this under PCFSoft; 1 keeps that edge now PCF is soft
 scene.add(key);
 scene.add(new THREE.HemisphereLight('#cfe0ff', '#8b7a68', 0.55));
 const rim = new THREE.DirectionalLight('#bcd4ff', 1.1);
@@ -514,9 +514,9 @@ function applyQuality(name) {
 // ---------------------------------------------------------------- go
 applyQuality(S.quality);
 
-const clock = new THREE.Clock();
+const clock = new THREE.Timer();
 renderer.setAnimationLoop(() => {
-  const dt = Math.min(clock.getDelta(), 0.1);
+  const dt = Math.min(clock.update().getDelta(), 0.1);
   tickMotion(dt);
   controls.update();
   renderer.render(scene, camera);

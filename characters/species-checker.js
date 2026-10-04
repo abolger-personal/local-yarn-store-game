@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { roomEnvironment } from '../inventory/room-environment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
   TONE_MAPPING, POSES, GEO_DETAIL, BUILD, MOTION_DEFAULTS,
@@ -71,7 +71,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -86,7 +86,7 @@ controls.autoRotateSpeed = 1.5;   // a slow turntable: one turn in ~40s, slow en
 
 // sheen needs image-based light to read at all
 const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environment = pmrem.fromScene(roomEnvironment(), 0.04).texture;
 
 function addLights() {
   const key = new THREE.DirectionalLight('#ffe6c4', 2.6);
@@ -95,7 +95,7 @@ function addLights() {
   key.shadow.mapSize.set(1024, 1024);
   Object.assign(key.shadow.camera, { near: 0.5, far: 14, left: -2, right: 2, top: 2, bottom: -2 });
   key.shadow.bias = -0.0012;
-  key.shadow.radius = 3;
+  key.shadow.radius = 1;   // three 0.160 ignored this under PCFSoft; 1 keeps that edge now PCF is soft
   const rim = new THREE.DirectionalLight('#bcd4ff', 1.1);
   rim.position.set(-2.4, 1.6, -2.4);
   scene.add(key, rim, new THREE.HemisphereLight('#cfe0ff', '#8b7a68', 0.55));
@@ -459,7 +459,7 @@ function exportActive() {
 // running total divided by a speed-dependent stride, which is the bug that made legs spin on
 // deceleration. The root is never moved, so the feet skate by construction -- skate is measured
 // in the motion lab; this page is for judging the SHAPE of a stride against another species.
-const clock = new THREE.Clock();
+const clock = new THREE.Timer();
 
 /**
  * Advance the dance, if one is running, and report what it wants of this character.
@@ -742,7 +742,7 @@ renderer.setAnimationLoop(() => {
   // Capped exactly as the game caps it (store/main.js): a backgrounded tab hands back one
   // enormous frame, and a spring integrated over it diverges to NaN -- which reaches the bounding
   // sphere and culls the whole character, presenting as "they popped out of existence".
-  const dt = Math.min(clock.getDelta(), 0.1);
+  const dt = Math.min(clock.update().getDelta(), 0.1);
   if (state.play) stepAll(dt);
   controls.update();
   renderer.render(scene, camera);

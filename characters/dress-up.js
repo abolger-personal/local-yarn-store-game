@@ -3,7 +3,7 @@
 // controls to change them, so that one silhouette at one fit can be judged on every species at once.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { roomEnvironment } from '../inventory/room-environment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
   TONE_MAPPING, POSES, GEO_DETAIL, BUILD, MOTION_DEFAULTS,
@@ -82,7 +82,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -95,7 +95,7 @@ controls.maxDistance = 40;
 controls.autoRotateSpeed = 1.5;
 
 const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environment = pmrem.fromScene(roomEnvironment(), 0.04).texture;
 
 function addLights() {
   const key = new THREE.DirectionalLight('#ffe6c4', 2.6);
@@ -104,7 +104,7 @@ function addLights() {
   key.shadow.mapSize.set(1024, 1024);
   Object.assign(key.shadow.camera, { near: 0.5, far: 14, left: -2.4, right: 2.4, top: 2, bottom: -2 });
   key.shadow.bias = -0.0012;
-  key.shadow.radius = 3;
+  key.shadow.radius = 1;   // three 0.160 ignored this under PCFSoft; 1 keeps that edge now PCF is soft
   const rim = new THREE.DirectionalLight('#bcd4ff', 1.1);
   rim.position.set(-2.4, 1.6, -2.4);
   scene.add(key, rim, new THREE.HemisphereLight('#cfe0ff', '#8b7a68', 0.55));
@@ -329,7 +329,7 @@ function setView(mode) {
 }
 
 // ---------------------------------------------------------------- motion (as species-checker)
-const clock = new THREE.Clock();
+const clock = new THREE.Timer();
 
 function stepDanceFor(id, character, slot, dt) {
   if (!slot.perf) return null;
@@ -468,8 +468,8 @@ function addItemFolder(type) {
   addPatternFolder(folder.addFolder('pattern (as designed)'), type, redress);
   addUsedFolder(folder.addFolder('made with (overrides)'), type, redress);
   // The item last touched is the one O randomises. A DOM listener, not lil-gui's onOpenClose: three
-  // 0.160 bundles lil-gui 0.17.0, which does not have it -- calling it threw inside buildGui, before
-  // the render loop started, and the page drew nothing at all.
+  // (0.160 through 0.186) bundles lil-gui 0.17.0, which does not have it -- calling it threw
+  // inside buildGui, before the render loop started, and the page drew nothing at all.
   folder.domElement.addEventListener('pointerdown', () => { openItem = type; });
   if (type !== openItem) folder.close();
 }
@@ -602,7 +602,7 @@ const stats = document.getElementById('stats');
 let statsAt = 0;
 
 renderer.setAnimationLoop((now) => {
-  const dt = Math.min(clock.getDelta(), 0.1);
+  const dt = Math.min(clock.update().getDelta(), 0.1);
   if (state.play) SLOTS.forEach((id) => stepSlot(id, dt));
   controls.update();
   renderer.render(scene, camera);

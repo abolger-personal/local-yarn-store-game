@@ -7,7 +7,7 @@
 // rendered once over a backdrop, and thrown away. Only the picture is kept.
 
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { roomEnvironment } from '../../../inventory/room-environment.js';
 import { TONE_MAPPING, createCharacter, disposeCharacter, getSpecies } from '../../npc.js';
 import { LOOK, dress, undress, wornAs } from '../../garments.js';
 import { YARN_COLORS } from '../goods/stock.js';
@@ -30,7 +30,7 @@ function buildStudio() {
   renderer.toneMapping = TONE_MAPPING[S.toneMapping];
   renderer.toneMappingExposure = S.exposure;
   const scene = new THREE.Scene();
-  scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environment = new THREE.PMREMGenerator(renderer).fromScene(roomEnvironment(), 0.04).texture;
   const key = new THREE.DirectionalLight('#ffe6c4', 2.4);
   key.position.set(1.5, 3, 2.5);
   const rim = new THREE.DirectionalLight('#bcd4ff', 0.9);

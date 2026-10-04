@@ -29,10 +29,10 @@ assert.ok(buildOrder(5).every((s) => s.source === 'script'), 'days 1-10 are scri
 assert.deepEqual(buildOrder(5)[0].template.weights, ['bulky'], 'day 5 introduces bulky');
 assert.ok(!buildOrder(4).some((s) => s.template.weights?.includes('bulky')), 'and nothing has it before');
 
-// --- the order form's slots: none, then one, then half --------------------------------------
+// --- the order's lines: the script's for two days, one of yours on night 2, then all yours ----
 SCRIPT.forEach((row, i) => {
   const day = i + 1;
-  const want = day <= 3 ? 0 : day <= 6 ? 1 : Math.floor(row.length / 2);
+  const want = day <= 2 ? 0 : day === 3 ? 1 : row.length;
   assert.equal(buildOrder(day).filter((s) => s.playerChoosable).length, want, `day ${day} choosable slots`);
 });
 const mine = { kind: 'notion', count: 3 };
@@ -79,14 +79,14 @@ for (let seed = 1; seed <= 20; seed++) {
 
 // --- the clipboard: tomorrow's order in words, the player's slots marked ------------------
 // The night screen shows the order built at closing and delivers that same object, so the words
-// only have to be true to the slots: the day-4 script, in plain words, with its one choosable slot.
-assert.deepEqual(buildOrder(4).map(describeSlot), [
-  { line: '4 balls of yarn', detail: 'worsted or dk', yours: true },
+// only have to be true to the slots: day 3's order (set on night 2), with its one line that is yours.
+assert.deepEqual(buildOrder(3).map(describeSlot), [
+  { line: '5 balls of yarn', detail: 'worsted or dk', yours: true },
   { line: '2 patterns', detail: 'for worsted or dk', yours: false },
-  { line: '2 notions', detail: 'tools and accessories', yours: false },
+  { line: 'a kit', detail: 'a pattern and its yarn, worsted or dk, one colour family', yours: false },
 ]);
 assert.deepEqual(describeSlot(buildOrder(5)[0]),
-  { line: '5 balls of yarn', detail: 'bulky, one colour family', yours: false }, "day 5's new weight, alone");
+  { line: '5 balls of yarn', detail: 'bulky, one colour family', yours: true }, "day 5's new weight, alone");
 assert.equal(describeSlot(buildOrder(1)[0]).detail, 'a pattern and its yarn, worsted or dk, one colour family');
 for (let day = 1; day <= 30; day++)
   for (const slot of buildOrder(day, { occupancy: 0.4, rng: mulberry32(day) }))

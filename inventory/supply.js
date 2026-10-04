@@ -72,8 +72,10 @@ const knownBy = (day) => Object.keys(WEIGHT_INTRO).filter((w) => WEIGHT_INTRO[w]
 const newOn = (day) => Object.keys(WEIGHT_INTRO).filter((w) => WEIGHT_INTRO[w] === day);
 
 // One row per day. `weight: 'new'` is that day's newly introduced weight; everything else draws on
-// every weight introduced so far. `choosable` marks the slots the order form will hand over: none
-// for days 1-3, one for days 4-6, half from day 7. Notions are held back until day 4, so the first
+// every weight introduced so far. The tutorial is three days (TUTORIAL.md): days 1-2 are the
+// script's alone, day 3's order (set on night 2) has one line that is the player's (`pick`), and
+// from day 4 every line is the player's, the script's choice standing in for a blank one, as the
+// supplier's choice will on the packing slip. Notions are held back until day 4, so the first
 // formations the player learns are yarn and pattern only (§6, "tutorial pacing").
 //
 // Day 1 is the starting pile: 24-30 things, sized to fill a display or two, with one kit in it so
@@ -83,6 +85,8 @@ const p = (count, more = {}) => ({ kind: 'pattern', count, ...more });
 const n = (count, more = {}) => ({ kind: 'notion', count, ...more });
 const kit = (more = {}) => ({ kind: 'kit', ...more });
 const pick = { choosable: true };
+/** The tutorial's length (TUTORIAL.md). After it, the whole order is the player's. */
+export const TUTORIAL_DAYS = 3;
 
 /**
  * @typedef {{ kind: string, count?: number, weights?: string[], family?: boolean,
@@ -92,14 +96,14 @@ const pick = { choosable: true };
 export const SCRIPT = Object.freeze([
   /* 1 */ [kit(), y(15), p(6)],
   /* 2 */ [y(6, { family: true }), p(2)],
-  /* 3 */ [y(5), p(2), kit()],
-  /* 4 */ [y(4, pick), p(2), n(2)],
-  /* 5 */ [y(5, { weight: 'new', family: true }), p(2, pick), n(2)],
-  /* 6 */ [y(4), kit(), n(2, pick)],
-  /* 7 */ [y(6, pick), p(2), n(2, pick), kit()],
-  /* 8 */ [y(6, { weight: 'new', family: true }), p(2, pick), n(2, pick), y(3)],
-  /* 9 */ [y(5, pick), p(3, pick), n(2), y(4, { family: true })],
-  /* 10 */ [y(6, pick), p(2), n(2, pick), y(2, { family: true })],
+  /* 3 */ [y(5, pick), p(2), kit()],
+  /* 4 */ [y(4), p(2), n(2)],
+  /* 5 */ [y(5, { weight: 'new', family: true }), p(2), n(2)],
+  /* 6 */ [y(4), kit(), n(2)],
+  /* 7 */ [y(6), p(2), n(2), kit()],
+  /* 8 */ [y(6, { weight: 'new', family: true }), p(2), n(2), y(3)],
+  /* 9 */ [y(5), p(3), n(2), y(4, { family: true })],
+  /* 10 */ [y(6), p(2), n(2), y(2, { family: true })],
 ]);
 
 // ---------------------------------------------------------------- the supplier, day 11 on
@@ -140,10 +144,10 @@ export function buildOrder(day, { occupancy = 0, chosen = [], rng = Math.random 
   const slots = row
     ? row.map(({ choosable, weight, ...t }) => ({
       template: { ...t, weights: weight === 'new' ? newOn(day) : weights },
-      source: 'script', playerChoosable: Boolean(choosable),
+      source: 'script', playerChoosable: day > TUTORIAL_DAYS || Boolean(choosable),
     }))
     : supplierSlots(supplyFor(occupancy), rng)
-      .map((t) => ({ template: { ...t, weights }, source: 'supplier', playerChoosable: false }));
+      .map((t) => ({ template: { ...t, weights }, source: 'supplier', playerChoosable: true }));
   let next = 0;
   return slots.map((s) => (s.playerChoosable && next < chosen.length
     ? { ...s, template: chosen[next++], source: 'player' } : s));

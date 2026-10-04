@@ -101,7 +101,7 @@ export function entryRows(g) {
     ...(g.note ? [{ icon: '✎', text: `“${g.note.full}”` }] : []),
     ...(g.bought ?? []).map((it) => ({ icon: BOUGHT_ICON[it.name] ?? '🪡', text: `bought a ${bandOf(it)}` })),
     ...(g.did ?? []).filter((d) => DID[d.what]).map((d) => DID[d.what](d)),
-    ...(g.lent ?? []).map((object) => ({ icon: '🎁', text: `lent the shop their ${object}` })),
+    ...(g.lent ?? []).map((object) => ({ icon: '✨', text: `lent the shop their ${object}` })),
     ...(g.tags ?? []).filter((t) => TAG_ROW[t]).map((t) => TAG_ROW[t]),
   ];
 }

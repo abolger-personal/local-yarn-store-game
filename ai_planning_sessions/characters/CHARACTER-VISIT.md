@@ -26,7 +26,7 @@ GUESTBOOK ENTRY ICONS (MVP: the entry is one line with a leading icon, so a page
 - 🧶 they bought yarn
 - 📖 they bought a pattern
 - 🪡 they bought a tool notion (hook or needles)
-- 🎁 they lent a finished object to the shop
+- ✨ they lent a finished object to the shop (🎁 is kept for gifts between customers, TUTORIAL.md §7.3)
 - 🧑‍🤝‍🧑 they chatted with another customer during the visit
 - 🪑 they sat and worked on a WIP in the shop
 - ⏳ they ran out of MAX_ROUNDS before finding anything

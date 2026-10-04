@@ -7,15 +7,19 @@ import { cellRect } from '../../../inventory/notions.js';
 import { BANDS, TAILS, bandMatrix, familyExtent, tailMatrix, yarnFit }
   from '../../../inventory/yarn-geometry.js';
 import { POSES, applyPose, lowestResting, seatedHipsAlong, phaseStep, stepMotion, valueOf, walkPhase, walkLayer,
-  walkGain } from '../../npc.js';
+  walkGain, createCharacter, mergeCharacter, disposeCharacter, setViewMode } from '../../npc.js';
 import { ACTION, STATE } from '../../visit.js';
+import { WIP_STATE, runningOut, wantsOf, wearOrOffer } from '../../wip.js';
+import { dress, undress, wornAs } from '../../garments.js';
+import { makeCraft, stepCraft, poseCraft, disposeCraft } from '../../craft-anim.js';
+import { makeSparkle, playSparkle, stepSparkle } from '../../sparkle.js';
 import * as THREE from 'three';
 import { BOX_H, CELL, S, SEAT_H } from '../core/config.js';
 import { key, scene } from '../scene/stage.js';
 import { CHAIR_W } from '../scene/seating.js';
 import { FILL, atlas, sizeAtlas } from '../goods/items.js';
 import { YARN, YARN_FIT, bandMesh, tailMesh, yarnMeshes } from '../goods/yarn.js';
-import { cellNameFor } from '../goods/stock.js';
+import { YARN_COLORS, cellNameFor } from '../goods/stock.js';
 
 // ---------------------------------------------------------------- carried notions
 //
@@ -135,6 +139,127 @@ export function makeHeldNotion(item) {
   else heldBox(item, group);
   group.position.set(0, -0.02, 0.02);
   return group;
+}
+
+// ---------------------------------------------------------------- what they made, worn
+//
+// WEARABLE-FINISHED-OBJ.md: a customer wears what they made, one per slot. The body is merged for
+// draw calls, and a merged body cannot be measured for a garment, so the clothes go on BEFORE the
+// merge (as crowd.js does): built un-merged, dressed, then merged. Measured in node at the shop's
+// 150px cut: +1 draw per dressed NPC (the garment family), and 6-7ms a body plain against 7-29ms
+// dressed (1 to 6 items). Done at spawn and when what they wear changes -- never per frame, and at
+// most one body a frame (tickCast), so a round where two customers finish is not one long hitch.
+
+const colourOf = (yarn) => YARN_COLORS[yarn.colorIndex % YARN_COLORS.length];
+
+/**
+ * What they have on, as dress() takes it: what the sim has them wearing, plus anything finished
+ * that wearOrOffer will put on them at closeout -- run on a copy, so a finish shows on them the
+ * round it happens, and the sim's own move still happens when the sim makes it.
+ */
+export function outfitOf(npc) {
+  const look = { worn: { ...npc.worn }, wips: npc.wips };
+  wearOrOffer(look);
+  const made = Object.values(look.worn).filter(Boolean).map((w) => wornAs(w, colourOf)).filter(Boolean);
+  return Object.fromEntries(made.map(({ type, item }) => [type, item]));
+}
+
+/** A body for these params, wearing `outfit`, merged if the params say so. */
+export function dressedCharacter(P, kit, outfit) {
+  if (!Object.keys(outfit).length) return createCharacter(P, kit);
+  const built = createCharacter({ ...P, mergeMeshes: false }, kit);
+  if (Object.keys(outfit).length) dress(built, outfit);
+  if (P.mergeMeshes) mergeCharacter(built);
+  return built;
+}
+
+/** Everything one cast record owns on the GPU. */
+export function disposeRecord(rec) {
+  if (rec.craft) disposeCraft(rec.craft);
+  rec.craft = null;
+  rec.built.root.removeFromParent();
+  undress(rec.built);   // an un-merged dressed body's garments are geometry of their own
+  disposeCharacter(rec.built);
+}
+
+/** Put a new body on a record, in the old one's place and mid-motion: the clothes changed. */
+function redress(rec) {
+  rec.redress = false;
+  const old = rec.built;
+  const built = dressedCharacter(rec.npc.body, old.species, rec.outfit);
+  for (const k of ['motion', 'groundOffset', 'seatDrop', 'tailTrack']) built[k] = old[k];
+  built.root.position.copy(old.root.position);
+  built.root.rotation.copy(old.root.rotation);
+  built.root.visible = old.root.visible;
+  setViewMode(built.root, S.view);
+  old.root.parent?.add(built.root);
+  if (rec.carriedMesh) built.holds[0].add(rec.carriedMesh);
+  if (rec.sparkle) { built.root.add(rec.sparkle.mesh); rec.sparkle.built = built; }
+  disposeRecord(rec);     // the craft too: it is measured off the body, and comes back next frame
+  rec.built = built;
+}
+
+/** Once a round (world.js): has what they are wearing changed? Rebuilt in tickCast, one a frame. */
+export function checkOutfit(rec) {
+  const outfit = outfitOf(rec.npc);
+  const sig = JSON.stringify(outfit);
+  if (sig === rec.outfitKey) return;
+  rec.outfit = outfit;
+  rec.outfitKey = sig;
+  rec.redress = true;
+}
+
+// ---------------------------------------------------------------- sit and knit
+//
+// craft-anim.js on a customer working on a WIP in a chair: needles or a hook from the pattern, the
+// piece sized by its type, pace by their skill, the running-out tell from the yarn they hold, and
+// the ball on the floor beside the chair. A WIP with no pattern (or not started) has nothing to
+// knit, so no craft. Built when they have sat down, and put away -- hands back, then disposed --
+// when the round is something else, so standing up is not a snap.
+
+/** The WIP this round has them knitting, or null. IN_PROGRESS implies a pattern, yarn and tool. */
+function craftingWip(n) {
+  if (n.action?.type !== ACTION.WORK_ON_WIP || n.seat === null) return null;
+  const wip = n.wips.find((w) => w.id === n.action.params.wip);
+  return wip?.state === WIP_STATE.IN_PROGRESS ? wip : null;
+}
+
+/** Needles or a hook, the piece and the ball, for this WIP in this body. */
+function craftFor(rec, wip) {
+  const c = makeCraft(rec.built, {
+    mode: wip.pattern.craft === 'crochet' ? 'crochet' : 'knit', color: colourOf(wip.yarn[0]),
+    pattern: wip.pattern.patternType, skill: rec.npc.prefs.skill, progress: wip.progress / 100, perStitch: 0,
+  });
+  c.wip = wip;
+  return c;
+}
+
+/** Per frame; allocates only on a round change and when a craft is built. */
+function stepKnitting(rec, dt) {
+  const n = rec.npc;
+  if (n.action !== rec.craftFor) { rec.craftFor = n.action; rec.craftWip = craftingWip(n); }
+  const wip = rec.craftWip;
+  let c = rec.craft;
+  if (c && c.wip !== wip) {
+    c.mode = 'idle';
+    if (c.hands < 0.02) { disposeCraft(c); rec.craft = c = null; }
+  }
+  if (!c && wip && seatedness(rec) > 0.9) c = rec.craft = craftFor(rec, wip);
+  if (!c) return;
+  if (c.wip === wip) {
+    c.progress = wip.progress / 100;      // the sim's to set; it grows a round at a time
+    c.skill = n.prefs.skill;
+    c.tell = runningOut(wip) ? 'out' : 'none';
+  }
+  stepCraft(c, dt);
+}
+
+/** READY: the buy that leaves nothing on their list (PROJECTS-AND-AUTHORSHIP.md §1). */
+function checkReady(rec) {
+  const n = rec.npc;
+  if (n.bought.length === rec.boughtN) return;
+  rec.boughtN = n.bought.length;
+  if (rec.boughtN && !wantsOf(n).length) playSparkle(rec.sparkle ??= makeSparkle(rec.built));
 }
 
 // Finding the thing you came for is the payoff of the whole visit, and until now the only sign of
@@ -652,6 +777,7 @@ function stepGait(rec, out, dt) {
   // Accumulated rather than divided out of total distance -- see phaseStep, and note this is
   // the code path where that mattered: the store's speed changes every frame.
   rec.phase = (rec.phase + phaseStep(rec.moved, speed, L, rec.opts)) % 1;
+  rec.craft?.add(out);
 }
 
 function tickOne(rec, dt) {
@@ -659,13 +785,21 @@ function tickOne(rec, dt) {
   // The buy lands in syncCarried, so read it BEFORE choosing this frame's pose or the celebration
   // starts a frame late — visible at 60fps on a beat this short.
   syncCarried(rec);
+  checkReady(rec);
   stepWalk(rec, n, dt);
   stepHop(rec, dt);
   // Every contribution to root height is known before applyPose runs, because applyPose is the
   // only thing that writes it.
   placeSeated(rec);
   rec.built.groundOffset = groundOffsetFor(rec);
+  // After the ground offset and before the motion: makeCraft poses the rig to measure the lap,
+  // and stepMotion re-poses all of it.
+  stepKnitting(rec, dt);
   stepMotion(rec.built, wantedPose(rec, n), dt, rec.opts, (out) => stepGait(rec, out, dt));
+  if (rec.craft) poseCraft(rec.craft);
+  if (rec.sparkle) stepSparkle(rec.sparkle, dt);
+  // The package goes down while they knit: the right paw has a needle in it.
+  if (rec.carriedMesh) rec.carriedMesh.visible = !(rec.craft?.hands > 0.5);
   // The rig's placeholder skein is never correct in this game: a customer is either carrying the
   // real package or carrying nothing at all. So it is forced off every frame, unconditionally,
   // rather than only when a real notion has replaced it — applyPose turns it back on for any pose
@@ -675,7 +809,11 @@ function tickOne(rec, dt) {
   rec.built.root.visible = n.state !== STATE.GONE;
 }
 
+const wantsRedress = (r) => r.redress;
+
 export function tickCast(dt) {
+  const next = cast.find(wantsRedress);
+  if (next) redress(next);
   for (const rec of cast) tickOne(rec, dt);
   updateBlobs();
 }

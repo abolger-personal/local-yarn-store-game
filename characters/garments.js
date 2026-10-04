@@ -16,10 +16,9 @@
 //   3. ONE MESH PER JOINT, whatever is worn there, in one shared material with colour in the
 //      vertices. A shawl, a sweater and a bag on the chest cost one draw between them.
 //
-// ponytail: garments are dressed AFTER createCharacter, onto an un-merged rig. The shop merges, and
-// the merge pass repaints every mesh from its material colour (npc.js paintGeometry), which would
-// wipe the colourwork. Dressing before the merge, and teaching paintGeometry to keep an existing
-// colour attribute, is the upgrade -- both are small, and neither is needed by the dress-up page.
+// Garments are dressed AFTER createCharacter, onto an un-merged rig, and the merge comes after
+// (npc.js mergeCharacter keeps their vertex colours): crowd.js and the shop (store/sim/cast.js
+// dressedCharacter) do exactly that. A merged body cannot be re-dressed -- it is rebuilt.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';

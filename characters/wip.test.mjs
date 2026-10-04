@@ -14,7 +14,7 @@ import {
   WIP_STATE, WEAR_SLOTS, makeCraftPrefs, makeWip, heldUnits, unitsShort, toolFits, canStart,
   wantsOf, satisfies, wantFor, stow, workRound, wearOrOffer, finishedOf, everythingMade, slotFor,
   returnToNpc, lend, photoSubject, MatchObservedInventory, yarnSuitsPattern, toolSuitsPattern,
-  labelWant,
+  labelWant, runningOut,
 } from './wip.js';
 
 // Deterministic stand-in for Math.random, so a test asserts behaviour and not luck.
@@ -561,6 +561,18 @@ const npcWith = (wips, over = {}) => ({
   workRound(npc, wip);
   wearOrOffer(npc);
   assert.equal(npc.worn.neck?.pattern.title, 'the OwlyCowly', 'the finished object keeps its pattern name');
+}
+
+// Running out: the work has used up the yarn it holds, and the pattern wants more.
+{
+  const pattern = { yarnUnits: 4 };
+  const ball = makeYarn(seq(0));
+  const per = yarnUnits(ball);
+  const wip = (progress, balls) => ({ pattern, progress, yarn: Array.from({ length: balls }, () => ball) });
+  assert.equal(runningOut(wip(0, 1)), false, 'just cast on, yarn in hand');
+  assert.equal(runningOut(wip(100 * per / 4, 1)), true, 'knitted up to the end of the ball');
+  assert.equal(runningOut(wip(99, Math.ceil(4 / per))), false, 'all the yarn the pattern wants: never short');
+  assert.equal(runningOut({ pattern: null, progress: 50, yarn: [] }), false, 'no pattern, nothing to run out of');
 }
 
 console.log('wip.js self-check: all assertions passed');

@@ -11,8 +11,6 @@ import {
   NAMES,
   POSES,
   applyPose,
-  createCharacter,
-  disposeCharacter,
   getSpecies,
   pick,
   setViewMode,
@@ -32,7 +30,8 @@ import { CAPACITY, boxes, edgeTop, fieldTop, shadows, sideEdge, sideField, sizeS
 import { refreshAll } from '../goods/paint.js';
 import { addItem } from '../goods/stock.js';
 import { buildOrder, carryOver, resolveOrder } from '../../../inventory/supply.js';
-import { STAND_TIME, buildBlobs, measureSeatDrop, rollCheer, routeLength } from './cast.js';
+import { STAND_TIME, buildBlobs, checkOutfit, disposeRecord, dressedCharacter, measureSeatDrop, outfitOf, rollCheer,
+  routeLength } from './cast.js';
 
 // Ids have to be unique across days too — a regular is matched to the roster by id, so a new
 // customer reusing "npc0" would be mistaken for one.
@@ -292,8 +291,11 @@ export const bodyParams = (kit, saved, quality) => ({
   mergeMeshes: quality.mergeMeshes,
 });
 
-/** A body for one customer: the one they had yesterday if they are a regular, or a new roll. */
-function buildBody(speciesId, saved) {
+/**
+ * A body for one customer: the one they had yesterday if they are a regular, or a new roll --
+ * wearing what they made (`outfit`, cast.js outfitOf).
+ */
+function buildBody(speciesId, saved, outfit) {
   const kit = getSpecies(speciesId);
   // Named plainly, because the symptom is not: with no species registered this used to surface
   // as "Cannot read properties of undefined (reading 'randomise')" from inside the boot chain.
@@ -301,7 +303,7 @@ function buildBody(speciesId, saved) {
   // the kind of import that gets dropped when files move — nothing references it by name.
   if (!kit) throw new Error(`no species kit for "${speciesId}" — is owl.js/llama.js/lion.js imported?`);
   const P = bodyParams(kit, saved, S);
-  return { kit, P, built: createCharacter(P, kit) };
+  return { kit, P, built: dressedCharacter(P, kit, outfit) };
 }
 
 /**
@@ -345,6 +347,9 @@ const castRecord = (npc, built, color) => ({
   baseX: npc.x, baseZ: npc.z, faceTo: npc.facing ?? 0, seatRef: null, seatCal: false,
   wait: 0, dur: S.travel, pace: 1,
   carriedName: null, carriedMesh: null,
+  // What they wear (cast.js checkOutfit), the craft in their hands while seated (stepKnitting), and
+  // the READY sparkle with the buy count it watches (checkReady).
+  outfit: {}, outfitKey: '{}', redress: false, craft: null, craftFor: null, craftWip: null, sparkle: null, boughtN: 0,
   // Their own reaction to good news: a pause, then a duration, hop count and height of their
   // own. The BUY is lockstep -- advanceRound resolves every customer in one call -- so
   // without this the whole shop cheers on the same frame with the same three hops.
@@ -375,8 +380,9 @@ const castRecord = (npc, built, color) => ({
  * recognisable tomorrow. rejoin() clears only per-visit fields, so it lives across days untouched.
  */
 function spawnOne(returning, i) {
+  const outfit = returning ? outfitOf(returning) : {};
   const { kit, P, built } = buildBody(returning ? returning.speciesId : pick(speciesIds()),
-                                      returning?.body);
+                                      returning?.body, outfit);
   const npc = buildMind(returning, kit);
   npc.body = P;
   queueOutside(npc, i);
@@ -386,12 +392,12 @@ function spawnOne(returning, i) {
   // below the hips on any two characters. See measureSeatDrop.
   built.seatDrop = measureSeatDrop(built);
   applyPose(built, POSES.rest);
-  cast.push(castRecord(npc, built, P.bodyColor));
+  cast.push({ ...castRecord(npc, built, P.bodyColor), outfit, outfitKey: JSON.stringify(outfit) });
   return npc;
 }
 
 function spawnCast() {
-  for (const rec of cast) { castGroup.remove(rec.built.root); disposeCharacter(rec.built); }
+  for (const rec of cast) disposeRecord(rec);
   cast.length = 0;
   // Regulars fill the queue first, then new faces make up the numbers.
   const coming = roster.slice(0, S.npcCount);
@@ -588,6 +594,7 @@ export function doAdvanceRound() {
   // estimated — see dayProgress.
   shop.dayT = Math.max(shop.dayT, dayProgress(shop.world));
   collectRegulars();
+  for (const rec of cast) checkOutfit(rec);   // a finish this round goes on now
   clocks.auto = 0;
   // Shuffled, so the same NPC is not first out of the door every single round -- the slot
   // index is what spaces them, and a fixed order would turn spacing into a pecking order.

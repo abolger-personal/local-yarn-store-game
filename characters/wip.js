@@ -110,6 +110,13 @@ export const unitsShort = (wip) =>
   (wip.pattern ? Math.max(0, wip.pattern.yarnUnits - heldUnits(wip)) : 0);
 
 /**
+ * PROJECTS-AND-AUTHORSHIP.md §1, the running-out tell: the work has caught up with the yarn the WIP
+ * holds, and the pattern still wants more.
+ */
+export const runningOut = (wip) =>
+  unitsShort(wip) > 0 && wip.progress >= (100 * heldUnits(wip)) / wip.pattern.yarnUnits;
+
+/**
  * Does this yarn suit this pattern? "the yarn shares all attributes the pattern specifies" — which
  * is its material and its weight.
  *

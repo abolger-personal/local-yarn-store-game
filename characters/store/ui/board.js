@@ -67,6 +67,8 @@ function polaroid(img, g, x, tilt) {
  * for the Guestbook, and lettered at this size they would shrink past reading.
  */
 function caption(g, cw, ch) {
+  // TODO(spec): PROJECTS-AND-AUTHORSHIP.md §4b puts g.note.short here, in the customer's own hand;
+  // waits on the per-personality handwriting fonts (VISUAL-DESIGN-2D.md, "Customers' hands").
   drawLettering(ctx, g.npc.toUpperCase(), 0, ch / 2 - 28, { cap: 15, maxWidth: cw - 16 });
   drawLettering(ctx, (g.object ?? '').split(' — ')[0].toUpperCase(), 0, ch / 2 - 9, { cap: 10, maxWidth: cw - 16 });
   ctx.fillStyle = '#c0392b';

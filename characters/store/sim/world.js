@@ -22,8 +22,8 @@ import { STATE, advanceRound, dayProgress, makeNpc, makeWorld, rejoin, tidyShop 
 import { satisfies, wantsOf } from '../../wip.js';
 import * as THREE from 'three';
 import { S } from '../core/config.js';
-import { scene } from '../scene/stage.js';
-import { COUNTER, HALF_D, HALF_W } from '../scene/room.js';
+import { camera, scene } from '../scene/stage.js';
+import { COUNTER, HALF_D, HALF_W, WINDOW_SPOTS } from '../scene/room.js';
 import { buildChairs } from '../scene/seating.js';
 import { buildDisplays } from '../scene/displays.js';
 import { CAPACITY, boxes, edgeTop, fieldTop, shadows, sideEdge, sideField, sizeSide, sizeTop } from '../goods/items.js';
@@ -50,6 +50,7 @@ export const room = {
   queueAt:   { x: 0, z: HALF_D + 0.8 },
   guestbook: { x: -3.0, z: 1.55 },
   dropOff:   { x: 3.85, z: 1.9 },
+  windows:   WINDOW_SPOTS,
   personalSpace: 0.62,
   doorClearance: 0.8,   // nobody may loiter this close to the door — it is the only way through
   // Solid things the sim must route around that are not displays or chairs. Displays and seats it
@@ -589,6 +590,7 @@ function collectRegulars() {
 export function doAdvanceRound() {
   if (!shop.world) return;
   if (!shop.world.npcs.some((n) => n.state !== STATE.GONE)) return;   // shop is empty, stop the clock
+  markInView(shop.world.npcs);
   advanceRound(shop.world);
   // Clamped so the light and the clock never wind back when a customer's visit runs longer than
   // estimated — see dayProgress.
@@ -608,6 +610,21 @@ export function doAdvanceRound() {
   order.forEach((castIndex, slot) => retarget(cast[castIndex], slot, cast.length));
   refreshAll();       // an interaction may have bought, tidied or restacked a display
   touchHud();
+}
+
+// TUTORIAL.md §7.3 "witnessed": on screen and reasonably close to the camera. Read by the sim as it
+// records what a customer does, so the Guestbook keeps detail only for what the player could see.
+// ponytail: sampled once a round, at the round's start, and WITNESS_DIST is the knob for "close".
+// TODO(spec): hovering or clicking a customer should count too; there is no customer pick yet.
+const WITNESS_DIST = 12;
+const _eye = new THREE.Vector3();
+function markInView(npcs) {
+  for (const n of npcs) {
+    _eye.set(n.x, 0.6, n.z);
+    const d = _eye.distanceTo(camera.position);
+    _eye.project(camera);
+    n.inView = d < WITNESS_DIST && Math.abs(_eye.x) <= 1 && Math.abs(_eye.y) <= 1 && _eye.z < 1;
+  }
 }
 
 /**

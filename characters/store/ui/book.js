@@ -7,6 +7,7 @@
 import { shop } from '../core/state.js';
 import { esc } from '../core/util.js';
 import { photoFor } from './photo.js';
+import { entryRows } from '../../guestbook.js';
 
 // CHARACTER-VISIT.md's guestbook icon list. One mood icon — the photo if they made something,
 // otherwise happy or disappointed — plus a tag per thing that happened on the visit, so a page of
@@ -18,14 +19,21 @@ const TAG_ICONS = {
   lent: ['🎁', 'lent a finished object to the shop'],
   chatted: ['🧑‍🤝‍🧑', 'chatted with another customer'],
   sat: ['🪑', 'sat and worked on a WIP'],
-  ranOut: ['⏳', 'ran out of rounds before finding anything'],
+  ranOut: ['⏳', 'ran out of time before finding anything'],
   huff: ['💨', 'gave up and left in a huff'],
 };
 
 /** Every day's page, oldest first. The last is today's, still being written. */
 const pages = () => [...shop.pastBooks, { day: shop.day, entries: shop.world?.guestbook ?? [] }];
 
-/** One entry as a line. `page` is its day's index in pages(); today's by default. */
+// Which rows are open, by "page/entry", so a row stays open while today's page redraws each round.
+const open = new Set();
+
+/**
+ * One entry as a line, and (TUTORIAL.md §7.3) clicking it expands the row into what they did:
+ * purchases with their ball bands, put-backs, the project they sat with, chats, the selfie's note.
+ * A native <details>, so it opens from the keyboard too. `page` is its day's index in pages().
+ */
 export function guestbookLine(g, i, page = shop.pastBooks.length) {
   const mood = g.kind === 'photo'
     ? `<button class="snap" data-page="${page}" data-entry="${i}" title="see the photo">📷 photo</button> ${esc(g.npc)} in ${esc(g.object)}`
@@ -34,7 +42,12 @@ export function guestbookLine(g, i, page = shop.pastBooks.length) {
     .filter((k) => TAG_ICONS[k])
     .map((k) => `<span title="${esc(TAG_ICONS[k][1])}">${TAG_ICONS[k][0]}</span>`)
     .join('');
-  return `<div>${mood}${tags ? ` <span class="tags">${tags}</span>` : ''}</div>`;
+  const line = `${mood}${tags ? ` <span class="tags">${tags}</span>` : ''}`;
+  const rows = entryRows(g);
+  if (!rows.length) return `<div>${line}</div>`;
+  const key = `${page}/${i}`;
+  return `<details class="entry" data-key="${key}"${open.has(key) ? ' open' : ''}><summary>${line}</summary>${
+    rows.map((r) => `<div class="row">${r.icon} ${esc(r.text)}</div>`).join('')}</details>`;
 }
 
 const bookEl = /** @type {HTMLElement} */ (document.getElementById('book'));
@@ -78,7 +91,7 @@ export function showPhoto(g) {
   if (!url) return;
   const { day } = pages().find((p) => p.entries.includes(g));
   /** @type {HTMLImageElement} */ (photoEl.querySelector('img')).src = url;
-  photoEl.querySelector('figcaption').textContent = `${g.npc} in ${g.object} · day ${day}`;
+  photoEl.querySelector('figcaption').textContent = `${g.npc} in ${g.object} · day ${day}${g.note ? ` · “${g.note.full}”` : ''}`;
   photoEl.hidden = false;
 }
 
@@ -89,9 +102,15 @@ export function installBook() {
     const el = /** @type {HTMLElement} */ (e.target);
     const snap = el.closest?.('.snap');
     const g = snap instanceof HTMLElement && pages()[Number(snap.dataset.page)]?.entries[Number(snap.dataset.entry)];
-    if (g) showPhoto(g);
+    if (g) { e.preventDefault(); showPhoto(g); }   // the photo, not the row: do not toggle it
     if (el.closest?.('.open-book')) openBook();
   });
+  // toggle does not bubble, so it is caught on the way down.
+  document.addEventListener('toggle', (e) => {
+    const el = e.target;
+    if (!(el instanceof HTMLDetailsElement) || !el.dataset.key) return;
+    if (el.open) open.add(el.dataset.key); else open.delete(el.dataset.key);
+  }, true);
   olderBtn.addEventListener('click', () => { showing -= 1; drawBook(); });
   newerBtn.addEventListener('click', () => { showing += 1; drawBook(); });
   bookEl.querySelector('.close').addEventListener('click', () => { bookEl.hidden = true; });

@@ -20,6 +20,7 @@ import {
   wearOrOffer, photoSubject, lend, labelWant,
 } from './wip.js';
 import { labelOf as labelItem, TOOL_NOTIONS } from '../inventory/catalog.js';
+import { placeWord, thankYou } from './guestbook.js';
 
 // One label function for the whole game, in catalog.js — it is the only place that knows a yarn
 // is named by its weight and material rather than by the word "yarn". Re-exported here because
@@ -177,6 +178,11 @@ function leavingState() {
     chatted: false,
     satAndWorked: false,
     stormedOut: false,
+    // TUTORIAL.md §7.3: what the book can expand on (put-backs, sitting, chats), each kept with
+    // whether the player saw it. `inView` is written by the view (world.js markInView) before each
+    // round: on screen and near the camera. Nothing sets it headless, so a test reads gists.
+    did: [],
+    inView: false,
     // Set the moment they buy anything or get some crafting done; read when they walk out.
     willReturn: false,
   };
@@ -793,6 +799,8 @@ export function interact(npc, display, world) {
   const { items } = world;
   if (buyConsidered(npc, display, world)) return 'complete';
   // Whatever they were holding is no longer wanted, or has gone. Put it down.
+  const held = npc.considering && items[npc.considering.index];
+  if (held && available(held)) remember(npc, `put ${npc.considering.index}`, { what: 'putBack', item: { ...held } });
   npc.considering = null;
 
   // --- "If (Rules for display result in Consideration)" -------------------------------------
@@ -828,6 +836,16 @@ export function interact(npc, display, world) {
 const stillThere = (pending, display, items) => pending && pending.displayId === display.id &&
   available(items[pending.index]) && noticeable(display, items, pending.index);
 
+/**
+ * PROJECTS-AND-AUTHORSHIP.md §4b: what was true at the buy, for the thank-you line — the place word,
+ * a pattern on the same plane, and somebody else browsing. Called once the item has gone.
+ */
+function provenance(npc, display, world, shelf) {
+  const beside = onPlane(display, world.items, shelf).map((i) => world.items[i]).find((it) => it.name === 'pattern');
+  return { place: placeWord(display, world.room, world.seats), beside: beside?.patternType ?? null,
+           alsoIn: world.npcs.find((o) => o !== npc && o.state === STATE.BROWSE)?.name ?? null };
+}
+
 /** Buys what this NPC considered here last round, if it is still here and still wanted: whether they did. */
 function buyConsidered(npc, display, world) {
   const { items } = world;
@@ -837,10 +855,10 @@ function buyConsidered(npc, display, world) {
   const item = items[index];
   const want = wantFor(npc, item);
   npc.considering = null;
-  if (!want) return false;
+  if (!want) { remember(npc, `put ${index}`, { what: 'putBack', item: { ...item } }); return false; }
   item.gone = true;                      // "Inventory removed from display"
   rebuildPlane(display, items, item.shelf, onPlane(display, items, item.shelf));
-  const bought = { ...item };
+  const bought = { ...item, ...provenance(npc, display, world, item.shelf) };
   npc.bought.push(bought);
   npc.carrying = bought;
   const wip = stow(npc, bought, want);
@@ -1176,6 +1194,7 @@ const BROWSE = {
     // "work on a WIP" means actually working on it — sitting down with something you cannot
     // start yet, handled above, is not the same thing and does not earn a return.
     npc.satAndWorked = true;
+    remember(npc, `sat ${wip.id}`, { what: 'sat', wip: wip.id, pattern: wip.pattern });
     npc.willReturn = true;
     const done = workRound(npc, wip, world.round);
     say(world, npc, done
@@ -1184,9 +1203,12 @@ const BROWSE = {
   },
 
   [ACTION.WAIT](npc, world) {
-    const near = world.npcs.some((o) => o.id !== npc.id && o.state === STATE.BROWSE &&
+    const near = world.npcs.find((o) => o.id !== npc.id && o.state === STATE.BROWSE &&
                                         dist2(npc, o) < world.room.personalSpace ** 2);
-    if (near) npc.chatted = true;
+    if (near) {
+      npc.chatted = true;
+      remember(npc, `chat ${near.id}`, { what: 'chat', with: near.name });
+    }
     npc.prescribed = near && world.rng() < keepChattingChance(npc.traits)
       ? { type: ACTION.WAIT, params: {} }
       : null;
@@ -1223,11 +1245,21 @@ function stepBrowse(npc, world, snapshot) {
 }
 
 /**
+ * Keep one record per thing done this visit (TUTORIAL.md §7.3), upgraded to witnessed the first
+ * time the player sees it happen. Plain data, so it saves.
+ */
+function remember(npc, key, fact) {
+  const had = npc.did.find((d) => d.key === key);
+  if (had) had.witnessed ||= npc.inView;
+  else npc.did.push({ key, ...fact, witnessed: npc.inView });
+}
+
+/**
  * CHARACTER-VISIT.md: signing ALWAYS produces an entry. What goes in it depends on whether they
  * have a finished object — one they brought in or one they completed here.
  *
- * TODO(spec): CHARACTER-ATTRIBUTES.md wants these written by a generator that makes an NPC sound
- * like themselves. This records WHAT the entry is; the prose is P5's job.
+ * The wording lives in guestbook.js: the expanded rows, and the photo's thank-you line in the
+ * customer's own voice (PROJECTS-AND-AUTHORSHIP.md §4b), built from the facts recorded here.
  */
 /**
  * The tags on one entry, per CHARACTER-VISIT.md's icon list. Everything here is read off state the
@@ -1255,16 +1287,20 @@ export function signGuestbook(world, npc) {
   const made = photoSubject(npc);
   if (made) made.photographed = true;     // and never again: see photoSubject
   const object = made ? labelOf(made.pattern) : null;
+  // What the expanded row reads from (book.js, guestbook.js entryRows): purchases always, the rest
+  // as remembered. Lent is still in their hands here; the Drop Off is the next step.
+  const record = { bought: [...npc.bought], did: [...npc.did], lent: npc.toLend.map((w) => w.pattern.title ?? w.pattern.patternType) };
   const entry = object
     // `wornInPhoto` is what tells the renderer to put the object ON them for the picture even
     // though it is about to leave: the photo is the payoff, and the shop's copy is the leftover.
     ? { npc: npc.name, npcId: npc.id, kind: 'photo', object, mood: null, round: world.round,
-        wip: made, wornInPhoto: !Object.values(npc.worn).includes(made), tags: guestbookTags(npc) }
+        wip: made, wornInPhoto: !Object.values(npc.worn).includes(made), tags: guestbookTags(npc), ...record,
+        note: thankYou(made, npc.traits, { workedHere: npc.did.some((d) => d.what === 'sat' && d.wip === made.id) }) }
     // "happy (found what they are looking for) or disappointed (did not find what they needed)" —
     // buying something IS having found it, which is what the buy branch of interact() records.
     : { npc: npc.name, kind: 'note', object: null,
         mood: npc.bought.length ? 'happy' : 'disappointed', round: world.round,
-        tags: guestbookTags(npc) };
+        tags: guestbookTags(npc), ...record };
   world.guestbook.push(entry);
   return entry;
 }

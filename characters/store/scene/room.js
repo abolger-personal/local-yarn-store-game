@@ -312,6 +312,10 @@ const RUNS = {
   ] },
 };
 
+/** Every window's middle on the floor plan, for the sim's place words (guestbook.js placeWord). */
+export const WINDOW_SPOTS = Object.values(RUNS).flatMap((r) => r.openings.filter((o) => o.window)
+  .map((o) => (r.ry ? { x: r.at[0], z: -o.at } : { x: o.at, z: r.at[1] })));
+
 const trimMat = new THREE.MeshStandardMaterial({ color: '#f3ead8', roughness: 0.7 });
 
 /** One run's solid pieces, as [from, to, bottom, top] in run-local X and height. */

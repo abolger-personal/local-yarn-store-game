@@ -122,11 +122,12 @@ function setUpLights() {
 // 0.9/0.30 is 7.8 of shade against a 7.2-deep room. Any higher (0.34 gave 6.9) and a strip of sun
 // slides over the back wall onto the floor by the door, which no window explains.
 //
-// `lamp` is how bright the lamps are, 0-1: off in the morning, on by the afternoon.
+// `lamp` is how bright the lamps are, 0-1. They stay off through the morning and come on from
+// midday (LAMPS_ON), full by late afternoon.
 const LOOKS = {
   morning: {
     sunDir: [-0.4, 1.1, -0.2], sun: '#fff4e4', sunI: 2.6,
-    sky: '#e4eeff', ground: '#9a8a74', hemiI: 0.8, rimI: 0.7, bg: '#e6ecee', lamp: 0.15,
+    sky: '#e4eeff', ground: '#9a8a74', hemiI: 0.8, rimI: 0.7, bg: '#e6ecee', lamp: 0,
   },
   afternoon: {
     sunDir: [0.25, 0.30, -0.9], sun: '#ffb46e', sunI: 3.2,
@@ -136,6 +137,9 @@ const LOOKS = {
 
 /** Lamps register here — `{ light, shade, power }`, light may be null — so the day can turn them up. */
 export const lamps = [];
+
+/** The day's span, 0-1, over which the lamps come up: off before, full after. */
+const LAMPS_ON = [0.45, 0.8];
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3();
 const _ca = new THREE.Color(), _cb = new THREE.Color();
@@ -154,7 +158,7 @@ export function applyDaylight(t) {
   hemi.intensity = mix(m.hemiI, a.hemiI, t);
   rim.intensity = mix(m.rimI, a.rimI, t);
   if (scene.background instanceof THREE.Color) mixColor(scene.background, m.bg, a.bg, t);
-  const glow = mix(m.lamp, a.lamp, t);
+  const glow = mix(m.lamp, a.lamp, THREE.MathUtils.smoothstep(t, LAMPS_ON[0], LAMPS_ON[1]));
   for (const l of lamps) {
     if (l.light) l.light.intensity = glow * l.power;
     l.shade.emissiveIntensity = 0.15 + glow * 0.85;

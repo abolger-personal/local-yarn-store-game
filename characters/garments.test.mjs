@@ -1467,11 +1467,13 @@ for (const silhouette of GARMENTS.sweater.silhouettes) {
 // --- a pattern's random colours are the shop's yarn, not an Easter parade -----------------------
 //
 // They came from one HSL band, at least a third saturated and never dark: every pattern pastel-ish.
-// Undyed and heathered yarns are low in chroma, and the shop goes down to charcoal.
+// Undyed and heathered yarns are low in chroma, and the shop runs from muted mid tones up to pastel
+// (inventory/yarn-look.js FULL: the floor was charcoal until the yarn read as sitting in a basement).
 {
   const hsl = Array.from({ length: 300 }, () => new THREE.Color(randomItem('scarf').color1).getHSL({}, THREE.SRGBColorSpace));
   assert.ok(Math.min(...hsl.map((h) => h.s)) < 0.2, 'no random pattern is in a natural, undyed or heathered colour');
-  assert.ok(Math.min(...hsl.map((h) => h.l)) < 0.25, 'no random pattern is in a dark colour');
+  assert.ok(Math.min(...hsl.map((h) => h.l)) < 0.5, 'no random pattern is in a muted mid tone');
+  assert.ok(Math.max(...hsl.map((h) => h.l)) > 0.8, 'no random pattern is in a pastel');
 }
 
 // --- an open shawl's long edge has no corner at the collarbone --------------------------------

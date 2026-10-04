@@ -96,6 +96,13 @@ function yarnMat({ paper = false, hatch = false } = {}) {
   // A second matcap texture is the ENTIRE cost of giving paper its own surface: no extra draw
   // call, no extra material slot, no shader variant.
   const m = yarnMaterial('matcap', { matcap: paper ? yarnPaper : yarnMatcap });
+  // Out of the tone mapper, like the UI colours (config.js). A matcap is UNLIT: its shading is
+  // painted in, so it never receives the shop's bright lights that let lit materials survive ACES.
+  // Through ACES at the shop's exposure the palette's mean lightness fell from 0.48 to 0.34 and its
+  // darks to near black (0.19 -> 0.06): the yarn sat in a basement while the lit room and cast
+  // around it were bright. Measured in scratchpad/yarn-tone.mjs. The cost: yarn does not dim with
+  // the evening light, since it never took the light in the first place.
+  m.toneMapped = false;
   if (hatch) applyHatching(m, YARN.hatch);
   return m;
 }

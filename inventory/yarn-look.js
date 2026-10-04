@@ -98,8 +98,13 @@ export const YARN_ANCHORS = Object.freeze([12, 38, 74, 128, 172, 208, 262, 318])
  */
 export const CHARACTER_RANGE = Object.freeze({ lMin: 0.44, lMax: 0.64, cMax: 0.055 });
 
-/** The widest lightness and chroma real yarn spans: undyed cream through charcoal, pale to jewel. */
-const FULL = Object.freeze({ lMin: 0.30, lMax: 0.93, cMin: 0.0, cMax: 0.20 });
+/**
+ * The widest lightness and chroma the shop's yarn spans: muted through bright to pastel, pale to
+ * jewel. The floor was 0.30 (charcoal) and a quarter of the palette read as dark; a shop wall is
+ * mostly mid-to-light colour, so the floor is now a muted mid tone. Below the characters' band
+ * edge (0.44) only for low-chroma greys nudged out of it.
+ */
+const FULL = Object.freeze({ lMin: 0.52, lMax: 0.93, cMin: 0.0, cMax: 0.20 });
 /** The original pastel point — where `spread: 0` lands, so the old look is still reachable. */
 const TIGHT = Object.freeze({ lMin: 0.69, lMax: 0.79, cMin: 0.085, cMax: 0.14 });
 

@@ -33,9 +33,9 @@ const npcWith = (wips, over = {}) => ({
 
 // --- PATTERNS.md: yarn cost per type, counted in items -----------------------
 {
-  // The type table, in balls (2026-10-02). The wearables only: decor waits for a renderer.
+  // The type table, in balls (2026-10-02). The wearables, and the pot holder, the tutorial's first project.
   const cost = Object.fromEntries(Object.entries(PATTERN_TYPES).map(([t, p]) => [t, p.yarnUnits]));
-  assert.deepEqual(cost, { sweater: 8, shawl: 5, scarf: 4, bag: 4, hat: 3, socks: 2 });
+  assert.deepEqual(cost, { sweater: 8, shawl: 5, scarf: 4, bag: 4, hat: 3, socks: 2, potholder: 1 });
   assert.ok(Object.values(cost).every((n) => n >= 1 && n <= 8), '"never more than 8"');
 
   // "One item is one unit, whatever its weight." Footprint (a 3x3 ball worth 9) was the old rule.
@@ -337,6 +337,7 @@ const npcWith = (wips, over = {}) => ({
   assert.equal(slotFor(fo('a', 'bag')), 'bag');
   assert.equal(slotFor(fo('a', 'socks')), 'feet');
   assert.equal(slotFor({ pattern: { patternType: 'mittens' } }), null, 'mittens are decor: nobody wears them');
+  assert.equal(slotFor(fo('a', 'potholder')), null, 'a pot holder is decor: always lent');
 
   // One unfinished project alongside three finished ones, to prove only the finished leave.
   const wip = { id: 'live', state: WIP_STATE.IN_PROGRESS, progress: 40, yarn: [], tool: null,

@@ -1777,7 +1777,8 @@ for (const id of speciesIds()) for (const silhouette of GARMENTS.sweater.silhoue
 // and wip.js wears each in GARMENTS' slot. catalog.js and wip.js are pure and cannot import this.
 {
   const sorted = (list) => [...list].sort();
-  assert.deepEqual(sorted(Object.keys(PATTERN_TYPES)), sorted(Object.keys(GARMENTS)), 'a pattern type per garment');
+  const decor = (type) => PATTERN_TYPES[type].decor === true;
+  assert.deepEqual(sorted(Object.keys(PATTERN_TYPES).filter((t) => !decor(t))), sorted(Object.keys(GARMENTS)), 'a pattern type per garment');
   for (const [type, g] of Object.entries(GARMENTS)) {
     assert.deepEqual(sorted(Object.keys(PATTERN_TITLES[type])), sorted(g.silhouettes), `${type}: named designs for every silhouette`);
     assert.equal(WEAR_SLOT_FOR[type], g.slot, `${type} is worn in its garment slot`);
@@ -1785,6 +1786,7 @@ for (const id of speciesIds()) for (const silhouette of GARMENTS.sweater.silhoue
   assert.deepEqual(sorted(WEAR_SLOTS), sorted(Object.values(GARMENTS).map((g) => g.slot)), 'the same slots');
   for (const d of PATTERN_DESIGNS) {
     const worn = wornAs({ pattern: d, yarn: [{ c: '#123456' }] }, (y) => y.c);
+    if (decor(d.patternType)) { assert.equal(worn, null, `"${d.title}" is decor: not worn`); continue; }
     assert.ok(worn.type === d.patternType && worn.item.silhouette === d.silhouette, `"${d.title}" is worn as a ${d.silhouette}`);
   }
 }

@@ -6,7 +6,8 @@
 // Source: ai_planning_sessions/DESIGN-DECISIONS.md §6 "Supply system".
 
 import { anySlot, fits, place } from './grid.js';
-import { SHOP_RANGE, YARN_COLOR_COUNT, makeStockNotion, makeYarn, stockPatternFor } from './catalog.js';
+import { SHOP_RANGE, TOOL_FOR_CRAFT, YARN_COLOR_COUNT, makeStockNotion, makeStockPattern, makeYarn, stockPatternFor }
+  from './catalog.js';
 
 const pickFrom = (list, rng) => list[Math.floor(rng() * list.length)];
 
@@ -105,6 +106,19 @@ export const SCRIPT = Object.freeze([
   /* 9 */ [y(5), p(3), n(2), y(4, { family: true })],
   /* 10 */ [y(6), p(2), n(2), y(2, { family: true })],
 ]);
+
+/**
+ * Tutorial day 1 (TUTORIAL.md §4): the whole shop is three things. A pot holder pattern for the
+ * table, and the crochet hook and the one ball it calls for as the morning's delivery, on the
+ * floor -- so this replaces SCRIPT[0] and the stockCount fill. game.html only (S.tutorial).
+ * TODO(SCRIPTED-EVENTS.md): these become the tutorial script's day-1 `seed` actions.
+ */
+export function tutorialDay1(rng = Math.random) {
+  const pattern = makeStockPattern(rng, 'potholder');
+  const ball = { ...yarnOf(rng, [pattern.weight]), material: pattern.materials[0] };
+  const hook = { name: TOOL_FOR_CRAFT[pattern.craft], size: pattern.toolSize };
+  return { table: pattern, floor: [hook, ball] };
+}
 
 // ---------------------------------------------------------------- the supplier, day 11 on
 //

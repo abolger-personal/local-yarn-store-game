@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import { mulberry32 } from '../characters/store/core/util.js';
 import { makeDisplay, footprint, place, topAt } from './grid.js';
-import { MIN_DELIVERY, SCRIPT, buildOrder, carryOver, describeSlot, resolveOrder, supplyFor } from './supply.js';
+import { MIN_DELIVERY, SCRIPT, buildOrder, carryOver, describeSlot, resolveOrder, supplyFor, tutorialDay1 } from './supply.js';
+import { toolSuitsPattern, yarnSuitsPattern } from '../characters/wip.js';
 
 const isGoods = (it) => it.name === 'yarn' || it.name === 'pattern';
 
@@ -91,5 +92,20 @@ assert.equal(describeSlot(buildOrder(1)[0]).detail, 'a pattern and its yarn, wor
 for (let day = 1; day <= 30; day++)
   for (const slot of buildOrder(day, { occupancy: 0.4, rng: mulberry32(day) }))
     assert.equal(describeSlot(slot).yours, slot.playerChoosable, `day ${day}: a choosable slot is marked`);
+
+// --- tutorial day 1 (game.html): exactly a pot holder pattern, its hook and one ball ------------
+// The playground's day 1 is the pile above, and random stock never holds the tutorial's pot holder.
+for (let seed = 1; seed <= 50; seed++) {
+  const { table, floor } = tutorialDay1(mulberry32(seed));
+  assert.equal(table.patternType, 'potholder');
+  assert.equal(table.craft, 'crochet', 'a pot holder is a hook project');
+  assert.equal(table.yarnUnits, 1, 'and one ball');
+  assert.equal(floor.length, 2, 'the delivery is the hook and the ball, nothing else');
+  const [hook, ball] = floor;
+  assert.ok(toolSuitsPattern(hook, table), `${hook.name} ${hook.size}mm makes "${table.title}"`);
+  assert.ok(yarnSuitsPattern(ball, table), `${ball.weight} ${ball.material} makes "${table.title}"`);
+  assert.ok(!resolveOrder(buildOrder(1), mulberry32(seed)).some((it) => it.patternType === 'potholder'),
+    'no pot holder in the playground pile');
+}
 
 console.log('supply.test.mjs: all checks passed');

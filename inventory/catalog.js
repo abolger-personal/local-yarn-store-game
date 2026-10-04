@@ -32,15 +32,15 @@ export const NOTION_NAMES = Object.freeze([
 
 /**
  * PATTERNS.md's type table: every WEARABLE type, the ones characters/garments.js can build (a cowl
- * is a scarf silhouette, not a type). `yarnUnits` is the headline number, a count of yarn ITEMS of
+ * is a scarf silhouette, not a type), and the pot holder, the one decor type so far. `yarnUnits` is the headline number, a count of yarn ITEMS of
  * the pattern's own weight: it sets how much yarn the NPC has to buy AND, via the progress formula
  * in WIP-AND-FINISHED-OBJ-FORMATION.md, how many rounds the project takes. Socks are a quick win; a
  * sweater is a project you watch across a visit or two.
  *
  * Which silhouette a pattern makes is per DESIGN (`silhouette`, from PATTERN_TITLES' keys), not per
- * type. TODO(VISUAL-DESIGN-FINISHED-OBJ.md §6): the decor types (blanket, potholder, cozy, chair
- * cover, amigurumi, mittens) wait for something that draws them -- as patterns today they would
- * finish into objects nobody can see, in the shop or in the Guestbook photo.
+ * type. TODO(VISUAL-DESIGN-FINISHED-OBJ.md §6): the decor types (the pot holder, then blanket, cozy,
+ * chair cover, amigurumi, mittens) wait for something that draws them -- today they finish into
+ * objects nobody can see, in the shop or in the Guestbook photo.
  */
 export const PATTERN_TYPES = Object.freeze({
   sweater: { yarnUnits: 8, minColors: 2 },
@@ -49,8 +49,14 @@ export const PATTERN_TYPES = Object.freeze({
   bag:     { yarnUnits: 4, minColors: 1 },
   hat:     { yarnUnits: 3, minColors: 1 },
   socks:   { yarnUnits: 2, minColors: 1 },
+  // Decor: no wear slot (wip.js WEAR_SLOT_FOR), so it is always lent, and nothing draws it yet --
+  // the selfie shows its maker without it. TUTORIAL.md's first project, put out by the tutorial
+  // alone (supply.js tutorialDay1): `decor` keeps it off random stock until it can be drawn.
+  potholder: { yarnUnits: 1, minColors: 1, decor: true },
 });
 export const PATTERN_NAMES = Object.freeze(Object.keys(PATTERN_TYPES));
+/** The types random stock and customers' patterns are drawn from: everything but decor. */
+const STOCKED = PATTERN_NAMES.filter((t) => !PATTERN_TYPES[t].decor);
 
 /** "Physical grid wise it is always 2x2x1." */
 export const PATTERN_FOOTPRINT = Object.freeze([2, 2]);
@@ -120,7 +126,7 @@ const pickFrom = (list, rng) => list[Math.floor(rng() * list.length)];
  * the NPC already owns "with the same yarn attributes (weight, material)", which needs the pattern
  * to name a weight. Adding it to PATTERNS.md's attribute list would make both explicit.
  */
-export function makePattern(rng = Math.random, type = pickFrom(PATTERN_NAMES, rng)) {
+export function makePattern(rng = Math.random, type = pickFrom(STOCKED, rng)) {
   const spec = PATTERN_TYPES[type];
   return {
     name: 'pattern',
@@ -307,6 +313,12 @@ export const PATTERN_TITLES = Object.freeze({
     'slipper socks': ['Toasty Talons Slippers', 'Llama Pajama Slippers', 'Paws and Relax Slippers',
       'Snug as a Bug Slippers', 'Toasty Toes Toucan', 'Cozy Claws Cub Slippers'],
   }),
+  // Every title puns on crochet, so every pot holder is crocheted (craftOfTitle): TUTORIAL.md's
+  // first project is a hook and one ball.
+  potholder: Object.freeze({
+    square: ['Hot Off the Hook Pot Holder', 'Granny Owl Pot Holder', 'Chain Reaction Lion Pot Holder',
+      'Hooked on Hot Pots', 'Granny Llama Oven Square', 'Hot Chain Chickadee'],
+  }),
 });
 
 /**
@@ -380,7 +392,7 @@ function evenly(designs, rng) {
 }
 
 /** A pattern this shop sells: a named design of that type, its silhouettes evenly spread. */
-export const makeStockPattern = (rng = Math.random, type = pickFrom(PATTERN_NAMES, rng)) =>
+export const makeStockPattern = (rng = Math.random, type = pickFrom(STOCKED, rng)) =>
   evenly(PATTERN_DESIGNS.filter((d) => d.patternType === type), rng);
 
 /**
@@ -389,7 +401,7 @@ export const makeStockPattern = (rng = Math.random, type = pickFrom(PATTERN_NAME
  * wip.test.mjs). The comparison is wip.js's yarnSuitsPattern, inlined because wip.js imports this.
  */
 export const stockPatternFor = (yarn, rng = Math.random) => evenly(PATTERN_DESIGNS.filter(
-  (d) => d.weight === yarn.weight && d.materials.includes(yarn.material)), rng);
+  (d) => STOCKED.includes(d.patternType) && d.weight === yarn.weight && d.materials.includes(yarn.material)), rng);
 
 /** A ball from the shop's range. */
 export const makeStockYarn = (rng = Math.random) => {

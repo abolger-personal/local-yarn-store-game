@@ -29,7 +29,7 @@ import { buildDisplays } from '../scene/displays.js';
 import { CAPACITY, boxes, edgeTop, fieldTop, shadows, sideEdge, sideField, sizeSide, sizeTop } from '../goods/items.js';
 import { refreshAll } from '../goods/paint.js';
 import { addItem } from '../goods/stock.js';
-import { buildOrder, carryOver, resolveOrder } from '../../../inventory/supply.js';
+import { buildOrder, carryOver, resolveOrder, tutorialDay1 } from '../../../inventory/supply.js';
 import { STAND_TIME, buildBlobs, checkOutfit, disposeRecord, dressedCharacter, measureSeatDrop, outfitOf, rollCheer,
   routeLength } from './cast.js';
 
@@ -397,12 +397,12 @@ function spawnOne(returning, i) {
   return npc;
 }
 
-function spawnCast() {
+function spawnCast(count = S.npcCount) {
   for (const rec of cast) disposeRecord(rec);
   cast.length = 0;
   // Regulars fill the queue first, then new faces make up the numbers.
-  const coming = roster.slice(0, S.npcCount);
-  const npcs = Array.from({ length: S.npcCount }, (_, i) => spawnOne(coming[i] ?? null, i));
+  const coming = roster.slice(0, count);
+  const npcs = Array.from({ length: count }, (_, i) => spawnOne(coming[i] ?? null, i));
   setViewMode(castGroup, S.view);
   return npcs;
 }
@@ -433,8 +433,7 @@ function stockTheShop(npcs) {
  * `order` is one planTomorrow() made at closing and showed the player (game.html's between-days
  * screen), so what was on the clipboard is what lands; without one it is built here, as before.
  */
-function deliver(order = buildOrder(shop.day, { occupancy: items.length / CAPACITY })) {
-  const goods = resolveOrder(order);
+function deliver(order = buildOrder(shop.day, { occupancy: items.length / CAPACITY }), goods = resolveOrder(order)) {
   const floor = [displays.filter((d) => d.solid === false)];   // one place: placeFrom tries every tile
   let landed = 0;
   for (const spec of goods) if (placeFrom(floor, 0, spec).index >= 0) landed++;
@@ -490,6 +489,30 @@ function setUpShop(fresh) {
 }
 
 /**
+ * Tutorial day 1: the customer's one project is blank, so the first thing they want is a pattern,
+ * and the pattern lies on the table nearest the door, the first one they pass.
+ * TODO(spec): SCRIPTED-EVENTS.md `seed ... facing: 'friend'` -- the table the tutorial friend
+ * faces, once the friend role (a `keep` NPC, first in the queue) exists.
+ */
+function openTutorial(npc, pattern) {
+  npc.wips = [{ ...npc.wips[0], pattern: null, yarn: [], tool: null, notions: [] }];
+  const near = (d) => Math.hypot(d.x - room.door.x, d.z - room.door.z);
+  const tables = displays.filter((d) => d.form === 'table').sort((a, b) => near(a) - near(b));
+  const { index } = placeFrom([...tables.map((d) => [d]), ...stockSpots()], 0, pattern, { avoidWall: true });
+  console.assert(index >= 0, 'tutorial: the pot holder pattern found no room');
+}
+
+/** Today's customers and stock: the tutorial's day 1, a fresh shop, or yesterday's carried over. */
+function castAndStock(fresh, order) {
+  const tutorial = S.tutorial && fresh && shop.day === 1 ? tutorialDay1() : null;
+  const npcs = spawnCast(tutorial ? 1 : S.npcCount);
+  if (tutorial) openTutorial(npcs[0], tutorial.table);
+  else if (fresh) stockTheShop(npcs);
+  else if (S.seedWants) seedWants(npcs);
+  return { npcs, delivered: deliver(order, tutorial?.floor) };
+}
+
+/**
  * Start a new day. Regulars from the last one come back first, with everything they had — and so
  * does the shop: the stock, its slots, the displays and the chairs stay as the player left them,
  * minus what sold, plus the morning delivery.
@@ -503,6 +526,9 @@ function setUpShop(fresh) {
  *
  * `order` is tomorrow's order from planTomorrow(), when the page showed it before opening.
  *
+ * With S.tutorial (game.html), a fresh day 1 is TUTORIAL.md's instead: one customer, who comes in
+ * with nothing and wants a pattern, and a shop holding only tutorialDay1()'s three things.
+ *
  * @param {{ keepRegulars?: boolean, rebuild?: boolean, order?: ReturnType<typeof buildOrder> }} [opts]
  */
 export function restart({ keepRegulars = true, rebuild = false, order } = {}) {
@@ -514,10 +540,7 @@ export function restart({ keepRegulars = true, rebuild = false, order } = {}) {
   const fresh = rebuild || !keepRegulars || !displays.length;
   setUpShop(fresh);
   if (!keepRegulars) roster = [];
-  const npcs = spawnCast();
-  if (fresh) stockTheShop(npcs);
-  else if (S.seedWants) seedWants(npcs);
-  const delivered = deliver(order);
+  const { npcs, delivered } = castAndStock(fresh, order);
   shop.world = makeWorld({ displays, items, room, seats });
   shop.world.npcs = npcs;
   shop.world.log.push(`r0 ${delivered}`);

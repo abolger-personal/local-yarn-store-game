@@ -15,6 +15,7 @@ import { camera, controls } from './scene/stage.js';
 import { closeForTheNight, installNight } from './ui/night.js';
 
 S.floorGrid = false;   // no lattice across the floor in the game; the drop ghost is enough
+S.tutorial = true;     // day 1 is the tutorial's: a pot holder pattern, a hook and one ball
 
 const emblem = document.getElementById('emblem');
 const infoBtn = document.getElementById('infoBtn');

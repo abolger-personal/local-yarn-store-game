@@ -132,6 +132,9 @@ export const S = {
   // shop holds what was delivered and what the player kept, and planning stock IS the game —
   // seeding guarantees every visit succeeds and takes that away. A testing switch.
   seedWants: false,
+  // A fresh game's day 1 is TUTORIAL.md's three-item shop (world.js restart) rather than the
+  // stockCount fill and SCRIPT's day-1 pile. game.js turns it on; the playground keeps its full shop.
+  tutorial: false,
   // Round pacing defaults to CONTINUOUS. A round is 15 in-game minutes (CHARACTER-VISIT.md), but
   // that says nothing about real seconds — and at the old 30s the cast walked for ~1.5s and then
   // stood frozen for 28. This is just over the longest a staggered walk can take

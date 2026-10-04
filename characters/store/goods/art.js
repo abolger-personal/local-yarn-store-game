@@ -130,6 +130,13 @@ const PATTERN_COVER = {
     ctx.closePath();
     ctx.fill();
   },
+  potholder: (ctx, s) => { // a small square on a hanging loop
+    ctx.fillRect(s * 0.38, s * 0.44, s * 0.24, s * 0.24);
+    ctx.lineWidth = s * 0.04;
+    ctx.beginPath();
+    ctx.arc(s * 0.38, s * 0.40, s * 0.05, 0, Math.PI * 2);
+    ctx.stroke();
+  },
 };
 
 /** Everything this module does ONCE, at boot. Called from main.js, in order. */

@@ -350,7 +350,7 @@ const castRecord = (npc, built, color) => ({
   carriedName: null, carriedMesh: null,
   // What they wear (cast.js checkOutfit), the craft in their hands while seated (stepKnitting), and
   // the READY sparkle with the buy count it watches (checkReady).
-  outfit: {}, outfitKey: '{}', redress: false, craft: null, craftFor: null, craftWip: null, sparkle: null, boughtN: 0,
+  outfit: {}, outfitKey: '{}', redress: false, craft: null, craftFor: null, craftWip: null, sparkle: null, boughtN: 0, ready: null,
   // Their own reaction to good news: a pause, then a duration, hop count and height of their
   // own. The BUY is lockstep -- advanceRound resolves every customer in one call -- so
   // without this the whole shop cheers on the same frame with the same three hops.

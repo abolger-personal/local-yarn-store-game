@@ -192,6 +192,14 @@ function wantsFor(wip) {
 export const wantsOf = (npc) => npc.wips.flatMap(wantsFor);
 
 /**
+ * The projects that have everything they need: a pattern, not finished, nothing left to buy.
+ * READY is per project (PROJECTS-AND-AUTHORSHIP.md §1), not the whole list -- a customer has
+ * about two WIP slots, and the other one wanting something must not hide this one closing.
+ */
+export const readyWips = (npc) =>
+  npc.wips.filter((w) => w.pattern && w.state !== WIP_STATE.FINISHED && !wantsFor(w).length).map((w) => w.id);
+
+/**
  * One line for a WANT — what an NPC is still shopping FOR.
  *
  * Deliberately not `labelOf`. That names a thing that EXISTS, and reads fields off it that a want

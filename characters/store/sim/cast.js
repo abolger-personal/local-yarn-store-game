@@ -9,7 +9,7 @@ import { BANDS, TAILS, bandMatrix, familyExtent, tailMatrix, yarnFit }
 import { POSES, applyPose, lowestResting, seatedHipsAlong, phaseStep, stepMotion, valueOf, walkPhase, walkLayer,
   walkGain, createCharacter, mergeCharacter, disposeCharacter, setViewMode } from '../../npc.js';
 import { ACTION, STATE } from '../../visit.js';
-import { WIP_STATE, runningOut, wantsOf, wearOrOffer } from '../../wip.js';
+import { WIP_STATE, readyWips, runningOut, wearOrOffer } from '../../wip.js';
 import { dress, undress, wornAs } from '../../garments.js';
 import { makeCraft, stepCraft, poseCraft, disposeCraft } from '../../craft-anim.js';
 import { makeSparkle, playSparkle, stepSparkle } from '../../sparkle.js';
@@ -254,12 +254,15 @@ function stepKnitting(rec, dt) {
   stepCraft(c, dt);
 }
 
-/** READY: the buy that leaves nothing on their list (PROJECTS-AND-AUTHORSHIP.md §1). */
+/** READY: the buy that gives one of their projects everything it needs (PROJECTS-AND-AUTHORSHIP.md §1). */
 function checkReady(rec) {
   const n = rec.npc;
+  rec.ready ??= readyWips(n);   // already ready when they walked in: no sparkle for that
   if (n.bought.length === rec.boughtN) return;
   rec.boughtN = n.bought.length;
-  if (rec.boughtN && !wantsOf(n).length) playSparkle(rec.sparkle ??= makeSparkle(rec.built));
+  const ready = readyWips(n);
+  if (ready.some((id) => !rec.ready.includes(id))) playSparkle(rec.sparkle ??= makeSparkle(rec.built));
+  rec.ready = ready;
 }
 
 // Finding the thing you came for is the payoff of the whole visit, and until now the only sign of

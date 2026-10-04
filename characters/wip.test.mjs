@@ -14,7 +14,7 @@ import {
   WIP_STATE, WEAR_SLOTS, makeCraftPrefs, makeWip, heldUnits, unitsShort, toolFits, canStart,
   wantsOf, satisfies, wantFor, stow, workRound, wearOrOffer, finishedOf, everythingMade, slotFor,
   returnToNpc, lend, photoSubject, MatchObservedInventory, yarnSuitsPattern, toolSuitsPattern,
-  labelWant, runningOut,
+  labelWant, runningOut, readyWips,
 } from './wip.js';
 
 // Deterministic stand-in for Math.random, so a test asserts behaviour and not luck.
@@ -573,6 +573,18 @@ const npcWith = (wips, over = {}) => ({
   assert.equal(runningOut(wip(100 * per / 4, 1)), true, 'knitted up to the end of the ball');
   assert.equal(runningOut(wip(99, Math.ceil(4 / per))), false, 'all the yarn the pattern wants: never short');
   assert.equal(runningOut({ pattern: null, progress: 50, yarn: [] }), false, 'no pattern, nothing to run out of');
+}
+
+// Ready is per project: one closed gap sparkles even while another project still wants things.
+{
+  const pattern = { yarnUnits: 1, materials: ['wool'], weight: 'dk', craft: 'knitting', toolSize: 4 };
+  const done = { id: 'a', state: WIP_STATE.UNSTARTED, pattern, progress: 0,
+    yarn: [{ name: 'yarn', material: 'wool', weight: 'dk' }], tool: { name: 'knitting-needles', size: 4 }, notions: [] };
+  const short = { ...done, id: 'b', yarn: [] };
+  const npc = { wips: [done, short] };
+  assert.ok(wantsOf(npc).length > 0, 'the other project still wants yarn');
+  assert.deepEqual(readyWips(npc), ['a'], 'yet the first one is ready');
+  assert.deepEqual(readyWips({ wips: [{ ...short, pattern: null }] }), [], 'no pattern, not ready');
 }
 
 console.log('wip.js self-check: all assertions passed');

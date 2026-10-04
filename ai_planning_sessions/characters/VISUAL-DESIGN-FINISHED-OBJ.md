@@ -353,8 +353,20 @@ grows with progress**. It starts as a swatch-sized piece and builds toward the f
 It is the same generator as the FO, clipped by progress, in the WIP's yarn colours. Holding it needs
 the two-handed knitting pose that NOTIONS.md flags.
 
-"Project bag" names the NEAR-MISS hold-shelf display form, not a bag silhouette; the bag silhouette
-is the "drawstring bag".
+- [ ] **TODO(spec): the full sit-and-knit piece.** The draft (`characters/craft-anim.js`, test page
+  `characters/sit-and-knit.html`, commit 94be68a) draws the work as a plain one-colour rectangle,
+  sized by pattern type, hanging from the needles. Still to specify:
+  - **Colourwork:** the piece in the WIP's yarn colours, in order (`wornAs`), showing the
+    arrangement recipe as it grows: stripes appearing row by row, colour block, fair isle, marled
+    and held double (ARRANGEMENT-RECIPES.md).
+  - **Piece shape:** the finished silhouette's own generator clipped by progress (the paragraph
+    above), not a rectangle: a hat's tube or crown, a sock's heel turning, a sweater's body then
+    sleeves, a shawl's triangle widening. Which part is on the needles at what progress.
+  - **Where it rests** once it is that shape, given the draft's finding that the piece cannot lie
+    on a chibi lap (the belly reaches past the knees): hanging, pooling on the floor, or folded.
+
+"Project bag" names a customer's bag holding one project, carried or on the hold shelf
+(PROJECT-BAGS.md §5), not a bag silhouette; the bag pattern's silhouette is the "drawstring bag".
 
 ## 4c. Identity before the first FO
 

@@ -429,7 +429,7 @@ At any one moment the player should face:
 Any change that pushes past that has to earn it. The count is deliberately checkable on
 `characters/puzzle.html`, which is where a want-set can be read at the size the player will meet it.
 
-TODO(spec): the project bag needs the same treatment the swatch wall does in Section 5b — it is a
+~~TODO(spec)~~ **Answered in PROJECT-BAGS.md** (§3, the hold shelf and its bag slots). The original note: the project bag needs the same treatment the swatch wall does in Section 5b — it is a
 new display form in DISPLAYS.md terms, holding items reserved out of general stock. Reserving is
 also the first mechanic that lets the player say "this is spoken for", which SPIKE-FUN.md's A6 asks
 for and nothing currently provides.

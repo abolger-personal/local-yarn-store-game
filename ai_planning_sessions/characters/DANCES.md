@@ -67,3 +67,118 @@ than a foot articulation, and the ballet reads as a stylised nod at ballet rathe
 line. Judge them at the `D` (150px) distance and under `B` (squint), because that is how the shop
 actually shows them. If they need to read better than that, the upgrade is an ankle joint — not
 more key poses.
+
+### To do
+
+- [ ] **Clap** — not built. Needed by the finishing dance (everyone who does not dance turns to
+  face the finisher and claps). A small looping arms-only entry in `DANCES` in
+  `characters/motion.js`: paws meet in front of the chest and part, feet planted, no root extras.
+  Watch the short-arm limit found by the sit-and-knit work (`craft-anim.js`): the paws may not
+  reach each other in front of a deep belly, so the clap may need to meet higher, at the chest.
+- [ ] **Wiggle** — not built. The Withdrawal 4+ finisher's dance: a small happy shimmy, upper
+  body only, feet planted, looping.
+
+---
+
+## Finishing in the shop: the dance
+
+A finished object usually happens at home (NEAR-MISS §7, cap 2: they knit at home), and comes back
+as a selfie. **Finishing it in the shop**, in front of everyone, is the rare, earned version, and
+it is celebrated with a dance.
+
+### When it happens
+
+- **The finish itself is built:** a seated customer's "Work on a WIP" round that takes progress
+  past 100% (`workRound` in `characters/visit.js`, which already raises their crafter skill).
+- **The finishing push (new):** a customer who is **ready** (PROJECTS-AND-AUTHORSHIP.md §1, their
+  wants empty) and **close enough to finish in the rounds they have left** (the progress formula in
+  WIP-AND-FINISHED-OBJ-FORMATION.md against their remaining visit) sits down to finish here rather
+  than at home: *"just a few rows left!"*. A prescription (`WALK_TO_SEAT`, then work), as
+  CHARACTER-VISIT.md uses them.
+- **So the player earns it** by noticing someone is nearly done, closing their gap, and keeping
+  them in the shop long enough (HOW-THEY-SHOP.md §2d, "Keeping someone in the shop"). Nobody is
+  told; the evidence is the work itself, which grows toward the finished size as they knit
+  (`characters/craft-anim.js`, the piece scaled by pattern type), and the Guestbook if their
+  knitting was witnessed.
+- It is naturally rare (most knitting is at home), so no cap. If two finish in the same round,
+  the second waits for the first dance to end.
+
+### The moment
+
+1. **Cast off:** the last stitch, the work held up, and a bigger cousin of the ready sparkle
+   (`characters/sparkle.js`).
+2. **Wearable** (WEARABLE-FINISHED-OBJ.md): if the slot is free they **put it on**, and dance in
+   it: the new hat bounces. If the slot is taken, they hold it up and dance with it, and it is lent
+   as usual.
+3. **Decor** (pot holder, blanket): held aloft through the dance, then lent to the shop at the
+   drop-off as usual.
+
+### The finisher's dance: personality
+
+The finisher's strongest of these traits picks the dance (a pure function of traits, like their
+handwriting, VISUAL-DESIGN-2D.md):
+
+| Strongest trait | Dance |
+| --- | --- |
+| Enthusiasm | floss |
+| Assertiveness | uptown-funk |
+| Openness | pirouette (attitude for a second finish, so it varies) |
+| Orderliness | riverdance |
+| Withdrawal | **wiggle** (new: a small happy shimmy, upper body only, feet planted) |
+| none 4+ | floss |
+
+A finisher's dance is recognisable, like their hand: a regular who always riverdances is part of
+who they are.
+
+### Everyone joins: a unison group dance
+
+- **Everyone in company with the finisher** (HOW-THEY-SHOP.md §2c: side by side, or the whole
+  circle) **stands up and does the finisher's dance in unison**, starting on the same beat. A
+  circle finishing together is the big version of this reward, and a shy finisher's tiny wiggle
+  done by the whole circle is the sweetest.
+- **The group's size is the player's to grow.** Every seat in company with the finisher is one
+  more dancer, so a player who gets **many people sitting at once** (enough chairs in company,
+  saved seats, tea and armchairs keeping them there: HOW-THEY-SHOP.md §2d) makes the dance
+  bigger. A full circle at the moment someone finishes is the best version of this reward.
+- **Friends dance from across the room.** Anyone with a **Friends** bond or closer with the
+  finisher (REGULARS §2, "Measuring it") joins wherever they are in the shop, in unison, even if
+  they are not in the circle: browsing, at the counter, in the quiet nook. A **Close** friend
+  also walks over to dance beside them. So **the more friends the finisher has, the more of the
+  shop dances**: a regular with a web of friends turns a finish into a shop-wide number, and the
+  player's matchmaking over many visits is what built that web.
+- **Elsewhere in the shop:** Enthusiasm 4+ customers join where they stand, in unison too.
+  Everyone else turns to face the finisher and **claps** (a small looping clap: new, arms only).
+- **Room to dance:** a dance that travels or turns (uptown-funk, pirouette) needs clear floor. A
+  joiner without room does it on the spot (the dance's steps with `travel` zeroed); the finisher
+  always gets the full dance.
+- **Length:** about 4 seconds. Looping dances (floss, riverdance, wiggle) loop for that long;
+  one-shot dances (pirouette, attitude, uptown-funk) play once, then they clap until the end.
+  Seated joiners sit back down after.
+
+### What it leaves behind
+
+- **A group selfie** on the board: the finisher in the middle wearing or holding it, the dancers
+  around them. Rarer than an ordinary selfie and recognisable as one, the trophy of an in-shop
+  finish. (Needs `store/ui/photo.js` to frame more than one character.)
+- **Affinity** (REGULARS §2, "Measuring it"): +5 for the finisher, +1 for every dancer, and dancing together adds to each dancer's bond with the finisher; every dancer becomes acquainted
+  with the finisher (HOW-THEY-SHOP.md §2b step 4), which feeds swapping.
+- **A Guestbook row** with a dance mark, and the thank-you line remembers it: *"Finished it right
+  there in the shop! Everyone danced."*
+- The existing +1 crafter skill.
+
+### Pace
+
+- The dance is animation, not rounds: it plays at any speed setting, and through pause (pause
+  stops rounds, not animation, TUTORIAL.md rule 8). In the sim, the finish round is the
+  finisher's, and joining is each dancer's action for that round.
+- **The camera never moves itself.** The dance is there to be noticed, not shown.
+
+### Build order
+
+1. **The finishing push** (pure sim, with a test): ready + can finish in the remaining rounds →
+   sits and finishes.
+2. **Dance by personality** (pure) and **wiggle** and **clap** as two new entries in `DANCES`.
+3. **Unison:** joiners chosen from in company (needs HOW-THEY-SHOP.md §2c) and Enthusiasm 4+,
+   started together; travel zeroed for joiners without room.
+4. **Put it on, then dance;** the cast-off sparkle.
+5. **The group selfie** and the Guestbook mark.

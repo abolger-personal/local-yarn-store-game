@@ -19,7 +19,7 @@ The following Character attributes affect WIP initialization as hard coded rules
 The following Character attributes *probabalistically* determine slot initialization:
 - (Intellect + Orderliness)/10 determine how likely the WIP is to be initialized with a pattern in the first place (e.g. NPCs with 5 in both will always start with a pattern first approach)
 
-- todo add more here later. 
+- Without a pattern, a slot starts **object first** ("I want a hat") or **yarn first** (buys what catches the eye, then looks for a pattern): see HOW-THEY-SHOP.md for the weights and what each wants.
 
 After a "Buy" in the game mechanic, WIPs can be moved from UNSTARTED to IN PROGRESS if: 
 - 1 pattern exists

@@ -81,11 +81,71 @@ the scarce resource, exactly as it should be.
 
 ---
 
+### Measuring it: shop affinity and bonds
+
+Two measures, both hidden from the player, both shown only through behaviour. Every other spec
+that says "affinity" or "acquainted" means one of these.
+
+**1. Shop affinity: one number per customer, stored.** It is how they feel about the shop, and it
+is banded into the four tiers above. It **never goes down**: neglect only means they visit less
+often (§2), so there is no negative state to repair.
+
+| Event | Gain |
+| --- | --- |
+| a sale | +1 |
+| a near miss solved for them (NEAR-MISS §3) | +3 |
+| their project bag kept and collected (PROJECT-BAGS.md §3c) | +3 |
+| something they made displayed, or a lent object handed back (§3) | +3 |
+| an in-shop finish, with its dance (DANCES.md) | +5 |
+| dancing at someone else's finish | +1 |
+
+| Tier | Affinity |
+| --- | --- |
+| Stranger | 0–4 |
+| Regular | 5–19 |
+| Friend | 20–49 |
+| Fixture | 50+ |
+
+First guesses, for playtesting; the shape matters more than the numbers: sales alone make a
+regular slowly, attention makes a friend.
+
+**2. Bond: between two customers, counted, not stored.** A bond is the pair's shared history, so
+it is **counted from the Guestbook's record of the two of them** (TUTORIAL.md §7.3) rather than
+kept as its own number. The book and the bond can never disagree, and the relationship is exactly
+the transactions tracked over time.
+
+| Shared event | Weight |
+| --- | --- |
+| chatted (standing, the `WAIT` chat) | 1 per visit |
+| **sat in company** (HOW-THEY-SHOP.md §2c) | **1 per round** |
+| danced together (DANCES.md) | 2 |
+| a stash swap or gift (HOW-THEY-SHOP.md §2b) | 3 |
+| treats brought back for a gift (PLAYING-AT-YOUR-PACE.md §5) | 3 |
+
+Sitting in company counts **every round** they spend together, so a long afternoon side by side is
+worth more than a quick chat, and seating people together is how the player grows a bond fastest.
+
+| Band | Bond | Means |
+| --- | --- | --- |
+| Strangers | 0 | — |
+| **Acquainted** | 1–9 | passes the swap's "know each other" step (HOW-THEY-SHOP.md §2b step 4) |
+| **Friends** | 10–29 | choose seats in company with each other; the swap roll (step 10) is likelier; **join each other's finishing dance from anywhere in the shop** (DANCES.md) |
+| **Close** | 30+ | arrive together sometimes (the group, §4b); walk over to dance beside each other |
+
+- **Referral** (§4a) starts a pair at Friends: the friend who brought them.
+- **Rivals** (§4b) are a relationship type, not a bond level: their bond can grow, but they never
+  pass the swap's step 4.
+- **The player reads bonds, never numbers:** who sits with whom, who arrives together, and the
+  Guestbook page that lists who a customer gives to, swaps with and bakes for, most often first.
+
+---
+
 ## 3. How the player chooses — with verbs that already exist
 
 - **Solve their puzzle.** The core one. Arrange so that what they need is findable, in a form their
   personality will accept (`NEAR-MISS-AND-SUBSTITUTION.md` §3), and they leave with it.
-- **Give them a hold-shelf slot.** Scarce, explicit, reversible: "I am keeping this for you."
+- **Give them a hold-shelf slot.** Scarce, explicit, reversible: "I am keeping this for you." The
+  regular leaves their project bag on the counter; shelving it is accepting (PROJECT-BAGS.md §3a).
 - **Display what they made, prominently.** The best of the three. A lent object placed by the door
   is an honour; the same object in a back corner is not. **The arrangement verb becomes the
   relationship verb** — it needs no new interface, no menu and no dialogue, and it is exactly the
@@ -415,7 +475,9 @@ If a shop identity is wanted later, it should be:
 
 ## 9. Build order
 
-1. **Affinity as a number per NPC**, banded into the four tiers of §2, raised by the verbs in §3.
+1. **Affinity as a number per NPC**, banded into the four tiers of §2 ("Measuring it"), raised by
+   the events in its table. **Bond** as a count over the Guestbook's shared events for a pair:
+   a pure function, with one test.
    Replaces the boolean `willReturn` as what decides who comes back and how often.
 2. **Return frequency and patience keyed to the tier.** This is also the pacing fix from
    SPIKE-FUN.md: strangers cannot be helped in time, friends will wait.
@@ -437,7 +499,7 @@ Steps 1–3 are pure sim and testable in node, as `visit.test.mjs` already tests
 
 ## Open questions
 
-- **Does affinity ever go DOWN?** Failing somebody repeatedly probably should cool them off, but a
+- ~~**Does affinity ever go DOWN?**~~ **No** (§2, "Measuring it"): they visit less, nothing worse. The original question: Failing somebody repeatedly probably should cool them off, but a
   cozy game should not punish neglect — "they visit less" may be enough, with no negative state.
 - **How does the player see a tier?** Nothing should say "REGULAR" in a panel. Candidates: how they
   greet you, whether they have a bag on the hold shelf, how many pages they have in the Guestbook.

@@ -1,3 +1,7 @@
+> **Superseded in part, 2026-10-03.** The pacing and patience ideas below (deliberation window,
+> hold-to-pause, the out-to-lunch card, patience by affinity, staggered arrivals) are consolidated
+> into [PLAYING-AT-YOUR-PACE.md](PLAYING-AT-YOUR-PACE.md), which wins where the two disagree. This
+> file stays as the brainstorm record. The rejected ideas at the bottom are still rejected.
 
   Prompt for AI: 
 

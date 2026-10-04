@@ -12,13 +12,17 @@ Gameplay mechanics:
 
 9. An NPC may RESTRUCTURE a given display (Spread, Tidy or Rearrange - see the per-type scoring rules below) at most ONCE per visit. After that, further interactions with the same display can only Buy or Look.
 
-10. The Player may MOVE entire displays whereever they want as long as it follows the rules of: peg boards stay on the wall, floor piles stay on the floor, and wall shelves stay against the wall. All Inventory will stay with the move. Displays may be rotated as well. For MVP, rotations may be every 45 degrees. 
+10. The Player may MOVE entire displays whereever they want inside the shop as long as it follows the rules of: peg boards stay on the wall, and floor piles stay on the floor. All Inventory will stay with the move. Displays may be rotated as well. For MVP, rotations may be every 45 degrees.
 
    This is the rule that makes "Interaction Not Complete" terminate. The restructure happens, the NEXT round's interaction resolves into a Buy or a Look, and the NPC moves on. Without it, an NPC with an Orderliness of 1 or 5 re-tidies the same display every single round forever, because "Interaction Not Complete" prescribes another interaction with that same display.
 
    The budget is per NPC per display: a second NPC can still restructure a display the first one has already touched, and an NPC who leaves and comes back on a later visit starts fresh.
 
-10. The Player may MOVE entire displays whereever they want as long as it follows the rules of: peg boards stay on the wall, floor piles stay on the floor, and wall shelves stay against the wall. All Inventory will stay with the move. Displays may be rotated as well. For MVP, rotations may be every 45 degrees.
+10. The Player may MOVE entire displays whereever they want inside the shop as long as it follows the rules of: peg boards stay on the wall, and floor piles stay on the floor. All Inventory will stay with the move. Displays may be rotated as well. For MVP, rotations may be every 45 degrees.
+
+   Furniture moves the way stock does: click a piece to pick it up, it follows the pointer showing green where it may stand and red where it may not, and a second click sets it down (on touch: tap it, then tap where it goes — or press there and slide before lifting). Escape, or leaving furniture mode, puts a piece in hand back where it was picked up. Nothing may leave the room: a piece in hand is clamped to the floor inside the walls, and setting one down where it does not fit (into the counter, a chair, the doorway, another display) puts it back where it was picked up, as a box clicked down where it has no room goes home. Somebody must be able to stand in front of a display to browse it, so one may not be turned to face a wall closer than that.
+
+   Wall shelves do NOT have to stand against a wall (changed from "wall shelves stay against the wall"). Two shelves back to back in the middle of the room is a fine shop, and the old snap-to-wall made it impossible. They may touch back to back but not overlap. A shelf carries its own back panel, so its "wall facing" X- edge (type B below) is the row against that panel wherever the shelf stands — against a wall, against another shelf, or with open floor behind it — and stays unnoticeable to NPCs either way. Sightlines and walking routes already treat any shelf as a solid box, so a free-standing one blocks the view across the room and is walked around like any other display.
 
 11. Interaction psuedocode routine for action inside a round:  
 if (can Buy from pile): 

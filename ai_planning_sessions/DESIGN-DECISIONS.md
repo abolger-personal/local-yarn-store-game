@@ -491,6 +491,10 @@ diegetic — no tutorial overlay needed.
 **Customer of the Week selection:** most recent signature, rotating. Cheap, and revisit only if it
 feels arbitrary in play.
 
+> **RESOLVED 2026-10-03** (TUTORIAL.md §7.3): the first reading. An entry records observed
+> behaviour only: what was bought, what was picked up and put back, and the pattern a customer was
+> knitting in the shop. Never hidden state. The original question, kept for the reasoning:
+>
 > **OPEN — decide before P5.** "Hints in Guestbook entries" is underspecified, and the two readings
 > pull in opposite directions:
 > - *"Marguerite has been eyeing the aran weight"* — a tell the player **observed**. Respects the
@@ -554,6 +558,11 @@ Build it once, in P2.
   lessons, both required.
 
 ### Delivery — scripted progression, 10 days
+
+> **Updated 2026-10-03:** a delivery is now the resolution of an **order**, and the scripted days
+> 1–10 below are an order form gradually handed to the player as the ordering tutorial. Blank
+> slots are always filled by the supplier, so a player who never orders still gets everything
+> described here. See [PLAYING-AT-YOUR-PACE.md](PLAYING-AT-YOUR-PACE.md) §5.
 
 - Days 1–10 are authored. Day 11 onward is a procedural tail (weighted-random, using the day-10
   template as the steady-state shape). **Script exhaustion must be handled or day 11 is empty.**

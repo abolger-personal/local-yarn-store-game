@@ -237,6 +237,28 @@ const npcWith = (wips, over = {}) => ({
   assert.equal(JSON.stringify(wip), before, 'and changes nothing');
 }
 
+// --- pattern notions: a cabled design wants a cable needle, a cardigan buttons -------------------
+{
+  for (const name of ['cable-needle', 'buttons']) assert.ok(NOTION_NAMES.includes(name), `${name} is stocked`);
+  const cabled = PATTERN_DESIGNS.find((d) => d.title === 'Cable Car Llama');
+  assert.deepEqual(cabled.notions, ['cable-needle'], 'a cable design calls for a cable needle');
+  const cardi = PATTERN_DESIGNS.find((d) => d.silhouette === 'cardigan');
+  assert.ok(cardi.notions.includes('buttons'), 'a cardigan calls for buttons');
+  assert.ok(PATTERN_DESIGNS.filter((d) => d.notions.length).length < PATTERN_DESIGNS.length / 4,
+    'most designs need no extra notion');
+
+  const wip = { id: 'w', state: WIP_STATE.UNSTARTED, pattern: cardi, yarn: [], tool: null, notions: [], progress: 0 };
+  const npc = npcWith([wip]);
+  const card = { name: 'buttons', size: null };
+  const want = wantFor(npc, card);
+  assert.equal(want?.kind, 'notion', 'buttons satisfy the cardigan\'s notion want');
+  assert.equal(labelWant(want), 'buttons', 'and the want names itself');
+  assert.equal(wantFor(npc, { name: 'cable-needle', size: null }), null, 'a cardigan has no use for a cable needle');
+  stow(npc, card, want);
+  assert.equal(wip.tool, null, 'buttons do not take the tool slot');
+  assert.ok(!wantsOf(npc).some((w) => w.kind === 'notion'), 'held buttons are no longer wanted');
+}
+
 // --- the progress formula -----------------------------------------------------
 {
   // "1/(units called for) * characterWeight", characterWeight = (skill/3) * (Industriousness/3).
@@ -465,7 +487,7 @@ const npcWith = (wips, over = {}) => ({
       assert.ok(!/undefined|null|NaN|\[object/.test(line), `want (${want.kind}) rendered "${line}"`);
     }
   }
-  assert.deepEqual([...kinds].sort(), ['pattern', 'tool', 'yarn'], 'all three want kinds exercised');
+  assert.deepEqual([...kinds].sort(), ['notion', 'pattern', 'tool', 'yarn'], 'all four want kinds exercised');
 
   // The empty case is a sentence too — an NPC with nothing outstanding still has to read.
   assert.ok(!/undefined/.test(labelWant(null)), 'no want at all still renders');

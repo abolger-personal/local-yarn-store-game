@@ -20,9 +20,12 @@ export const TOOL_NOTIONS = Object.freeze(['crochet-hook', 'knitting-needles']);
 export const SIZED_NOTIONS = new Set(['crochet-hook', 'knitting-needles']);
 export const HOOK_SIZES_MM = Object.freeze([2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 8.0]);
 
-/** Every kind of thing that can sit in a display slot. */
+/**
+ * Every kind of thing that can sit in a display slot. The last two are pattern notions: only a
+ * pattern that calls for them wants them (a design's `notions`, see `design`).
+ */
 export const NOTION_NAMES = Object.freeze([
-  'crochet-hook', 'knitting-needles', 'darning-needle', 'stitch-markers',
+  'crochet-hook', 'knitting-needles', 'darning-needle', 'stitch-markers', 'cable-needle', 'buttons',
 ]);
 
 // ---------------------------------------------------------------- patterns
@@ -342,6 +345,12 @@ function design({ type, silhouette, title }, g) {
     toolSize: pickFrom(toolSizes, rng),
     weight: weights[g % weights.length],
     materials: Object.freeze([materials[(g + Math.floor(g / weights.length)) % materials.length]]),
+    // ARRANGEMENT-RECIPES.md §3: a cabled design needs a cable needle, a buttoned one buttons.
+    // ponytail: read off the title and silhouette; a real per-design field once recipes exist.
+    notions: Object.freeze([
+      ...(/cable/i.test(title) ? ['cable-needle'] : []),
+      ...(silhouette === 'cardigan' ? ['buttons'] : []),
+    ]),
   });
 }
 

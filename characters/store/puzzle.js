@@ -29,7 +29,7 @@ import '../lion.js';
 import { STATE, TRAITS, consideredHere, interact, labelOf, makeNpc, makeWorld, noticeable,
          signGuestbook } from '../visit.js';
 import { describeWip, labelWant, wantFor, wantsOf, stow, WIP_STATE } from '../wip.js';
-import { HOOK_SIZES_MM, NOTION_NAMES, PATTERN_NAMES, SIZED_NOTIONS, YARN_COLOR_COUNT,
+import { HOOK_SIZES_MM, NOTION_NAMES, PATTERN_NAMES, SIZED_NOTIONS, TOOL_NOTIONS, YARN_COLOR_COUNT,
          YARN_MATERIALS, YARN_SHAPES, YARN_WEIGHT_NAMES, CRAFTS, makeNotion, makePattern,
          makeYarn } from '../../inventory/catalog.js';
 import { EMPTY, topAt } from '../../inventory/grid.js';
@@ -260,7 +260,8 @@ function putOut() {
 /** Hand it straight to the customer, into the first WIP slot that has room for it. */
 function giveToNpc() {
   const spec = specOf();
-  const kind = { yarn: 'yarn', pattern: 'pattern' }[spec.name] ?? 'tool';
+  const kind = { yarn: 'yarn', pattern: 'pattern' }[spec.name]
+    ?? (TOOL_NOTIONS.includes(spec.name) ? 'tool' : 'notion');
   // stow() owns what filing an item into a project means, including starting the project when it
   // finally has everything. A want is the shape it takes, so one is made for it.
   const slot = bench.npc.wips.find((w) => w.state !== WIP_STATE.FINISHED

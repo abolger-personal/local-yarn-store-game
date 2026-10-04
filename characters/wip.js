@@ -79,6 +79,7 @@ export function makeWip(id, traits, prefs, rng = Math.random) {
     pattern: null,
     yarn: [],          // items of yarn; each is one unit toward the pattern, whatever its weight
     tool: null,
+    notions: [],       // pattern notions bought for it (cable needle, buttons): see wantsFor
     progress: 0,       // percent toward completion
   };
 
@@ -151,6 +152,7 @@ export const canStart = (wip) =>
  *     the pattern has to suit THAT yarn.
  *   - Pattern, short of yarn: yarn matching the pattern's material and weight.
  *   - Pattern, wrong or no tool: the right tool at the right millimetres.
+ *   - Pattern that calls for notions (catalog.js `design`): each one not yet held.
  *
  * Returns null for a slot that needs nothing.
  */
@@ -171,6 +173,10 @@ function wantsFor(wip) {
   if (!toolFits(wip.tool, wip)) {
     out.push({ kind: 'tool', wip: wip.id,
                tool: TOOL_FOR_CRAFT[wip.pattern.craft], size: wip.pattern.toolSize });
+  }
+  // A `notion` want reuses the tool want's fields, so satisfies/labelWant/seeding need no branch.
+  for (const name of wip.pattern.notions ?? []) {
+    if (!wip.notions?.some((n) => n.name === name)) out.push({ kind: 'notion', wip: wip.id, tool: name, size: null });
   }
   return out;
 }
@@ -250,6 +256,7 @@ export function stow(npc, item, want) {
   if (!wip) return null;
   if (want.kind === 'pattern') wip.pattern = item;
   else if (want.kind === 'yarn') wip.yarn.push(item);
+  else if (want.kind === 'notion') (wip.notions ??= []).push(item);
   else wip.tool = item;
   if (wip.state === WIP_STATE.UNSTARTED && canStart(wip)) {
     wip.state = WIP_STATE.IN_PROGRESS;

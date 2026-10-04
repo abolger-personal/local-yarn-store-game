@@ -6,7 +6,7 @@ import { PATTERN_NAMES } from '../../../inventory/catalog.js';
 
 /**
  * Stand-in silhouettes for the things that have no illustration yet: yarn in its three shapes, the
- * pattern covers, and knitting needles. Drawn white on transparent, because the atlas carries
+ * pattern covers, knitting needles and the pattern notions. Drawn white on transparent, because the atlas carries
  * shape in alpha and colour per instance — see extendAtlas.
  *
  * TODO(YARN.md, PATTERNS.md): these are silhouettes, not the art. YARN.md wants ball bands,
@@ -59,6 +59,29 @@ export const PLACEHOLDER_ART = {
       ctx.lineTo(s * 0.5 + k * s * 0.30, s * 0.16);
       ctx.stroke();
     }
+  },
+  'cable-needle': (ctx, s) => {   // a short needle with a U bent into its middle
+    ctx.lineWidth = s * 0.07;
+    ctx.beginPath();
+    ctx.moveTo(s * 0.16, s * 0.40);
+    ctx.arc(s * 0.5, s * 0.40, s * 0.14, Math.PI, 0, true);
+    ctx.lineTo(s * 0.84, s * 0.40);
+    ctx.stroke();
+  },
+  buttons: (ctx, s) => {          // a card of four buttons: ring-cut so each reads, two holes each
+    ctx.fillRect(s * 0.16, s * 0.16, s * 0.68, s * 0.68);
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.lineWidth = s * 0.03;
+    for (const x of [0.35, 0.65]) {
+      for (const y of [0.35, 0.65]) {
+        ctx.beginPath();
+        ctx.arc(s * x, s * y, s * 0.11, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillRect(s * (x - 0.045), s * (y - 0.015), s * 0.03, s * 0.03);
+        ctx.fillRect(s * (x + 0.015), s * (y - 0.015), s * 0.03, s * 0.03);
+      }
+    }
+    ctx.globalCompositeOperation = 'source-over';
   },
 };
 

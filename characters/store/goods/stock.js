@@ -34,6 +34,8 @@ const PACKAGES = {
   'knitting-needles': [[1, 1], [1, 2]],   // a pair, or a long circular set
   'darning-needle':   [[1, 1], [1, 2]],   // a packet, or a deep sleeve of assorted sizes
   'stitch-markers':   [[1, 1], [2, 2]],   // a little bag, or a big assorted tin
+  'cable-needle':     [[1, 1]],           // one bent needle on a card
+  'buttons':          [[1, 1], [2, 1]],   // a card of buttons, or a long card of a set
 };
 
 const packageFor = (name) => pick(PACKAGES[name] ?? [[1, 1]]);

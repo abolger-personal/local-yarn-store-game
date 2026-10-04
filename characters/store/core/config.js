@@ -105,6 +105,10 @@ export const S = {
   displayCount: 2,
   chairCount:   2,
   showGrid:    true,
+  // The floor's lattice, separately: a grid across open floor reads as a tiled bathroom, not a
+  // shop. The playground keeps it (on hover and drop); game.js turns it off, and the drop ghost
+  // alone says where a box will land.
+  floorGrid:   true,
   moveMode:    false,   // DISPLAYS.md rule 10: dragging rearranges the SHOP, not the stock
   lockCamera:  false,   // freeze the view so arranging cannot knock it askew
   // Screen-space slack on a grab, in CSS pixels, for a coarse pointer. Halved for a mouse. 44 is
@@ -133,6 +137,11 @@ export const S = {
   // stood frozen for 28. This is just over the longest a staggered walk can take
   // (travelJitter + travel * (1 + paceJitter)), so a round ends about when the motion does.
   autoSeconds: 4,
+  // The shop's two clocks (tickClocks, boot.js): rounds advance every autoSeconds, and an emptied
+  // shop opens tomorrow after dayGap. On by default so a page with no timer panel — the game,
+  // characters/game.html — runs itself; the playground's checkboxes write these.
+  autoRounds:  true,
+  autoDay:     true,
   dayGap: 0,            // seconds the shop sits empty between closing and the next day's queue
   travel:      1.4,     // seconds of animation per round of movement
   // The window departures are spread across. Raised from 0.5 because it is shared between the

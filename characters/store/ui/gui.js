@@ -8,14 +8,14 @@ import { displays, aim } from '../core/state.js';
 import { GEO_DETAIL, TONE_MAPPING, setGeometryDetail, setViewMode } from '../../npc.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import { QUALITY, S } from '../core/config.js';
-import { applyRenderScale, camera, controls, renderer } from '../scene/stage.js';
+import { applyRenderScale, renderer } from '../scene/stage.js';
 import { SEAT_SLOTS } from '../scene/seating.js';
 import { DISPLAY_SLOTS } from '../scene/displays.js';
-import { YAW_STEP, rotateMovable } from '../interact/move.js';
 import { paintActivePlane, glow, setPlane, updateHeldReadout } from '../interact/glow.js';
 import { castGroup, doAdvanceRound, restart } from '../sim/world.js';
 import { buildBlobs } from '../sim/cast.js';
 import { frameRoom } from './framing.js';
+import { installControls, setCameraLock } from './controls.js';
 
 // ---------------------------------------------------------------- gui
 
@@ -44,25 +44,6 @@ const MAX_NPCS = 8;
 const gPerf = gui.addFolder('performance');
 
 const gLook = gui.addFolder('look');
-
-/**
- * Lock the camera. On a tablet the shop is easy to knock askew while reaching for a box — every
- * stray drag on empty floor is an orbit — and a locked view makes arranging safe. It disables
- * OrbitControls outright rather than only rotation, because a pinch that dollies the view mid-drag
- * is the same problem in a different axis.
- *
- * The player's verb is untouched: picking up and placing never went through the camera.
- */
-const lockBtn = document.getElementById('lockBtn');
-
-function setCameraLock(on) {
-  S.lockCamera = on;
-  controls.enabled = !on;
-  lockBtn.setAttribute('aria-pressed', String(on));
-  lockBtn.textContent = on ? '🔒' : '🔓';
-  lockBtn.title = on ? 'unlock the camera' : 'lock the camera';
-  gui.controllersRecursive().forEach((c) => c.updateDisplay());
-}
 
 /** The shop itself: how much of everything, and how fast a round runs. */
 function shopRows() {
@@ -123,12 +104,6 @@ function lookRows() {
 function cameraRows() {
   gui.add({ f: () => frameRoom() }, 'f').name('frame room  (F)');
   gui.add(S, 'lockCamera').name('lock camera  (L)').onChange(setCameraLock);
-  // The same call as the key and the GUI row, so the three can never drift apart.
-  // Wrapped, not passed by reference: frameRoom takes a place to stand in front of, and an
-  // event listener would hand it the MouseEvent — which has an `x` but no `z`, so the camera
-  // would be positioned at NaN and the shop would vanish.
-  document.getElementById('frameBtn').addEventListener('click', () => frameRoom());
-  lockBtn.addEventListener('click', () => setCameraLock(!S.lockCamera));
 }
 
 /** Cycle which display the player is arranging — for the ones the pointer struggles to hit.
@@ -144,7 +119,7 @@ function cycleDisplay() {
 }
 
 /**
- * Every shortcut, as a table.
+ * The debug shortcuts, as a table, merged over the player's (F, M, L, Q, E — controls.js).
  *
  * A table rather than a run of ifs because the set is the thing worth reading: this is the only
  * place that answers "what does B do", and a reader should not have to trace a branch to find out.
@@ -155,44 +130,15 @@ const KEYS = {
   2: () => setView('grey'),
   3: () => setView('silhouette'),
   r: () => restart(),
-  f: () => frameRoom(),
   g: () => { S.showGrid = !S.showGrid; paintActivePlane(); },
-  m: () => setMoveMode(!S.moveMode),
-  l: () => setCameraLock(!S.lockCamera),
-  q: () => S.moveMode && rotateMovable(-YAW_STEP),
-  e: () => S.moveMode && rotateMovable(YAW_STEP),
   '[': () => setPlane(activeDisplay().plane - 1),
   ']': () => setPlane(activeDisplay().plane + 1),
   tab: cycleDisplay,
   b: () => renderer.domElement.classList.toggle('squint'),
   ' ': doAdvanceRound,
 };
-// Keys whose browser default would fight the shortcut: Tab moves focus, Space scrolls.
-const SWALLOW = new Set(['tab', ' ']);
 
 function setView(v) { S.view = v; setViewMode(castGroup, v); }
-
-/** Typing in a panel field is typing, not a shortcut. */
-const isTyping = (t) => t instanceof HTMLElement
-  && (t.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(t.tagName));
-
-function onKeyDown(e) {
-  // One press, one action. A held key auto-repeats ~30 times a second, so holding Space ran a full
-  // round on every repeat — days went by in seconds — and holding R restarted the shop as fast.
-  if (e.repeat || isTyping(e.target)) return;
-  const k = e.key.toLowerCase();
-  const action = KEYS[k];
-  if (!action) return;
-  if (SWALLOW.has(k)) e.preventDefault();
-  action();
-  gui.controllersRecursive().forEach((c) => c.updateDisplay());
-}
-
-function onResize() {
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-}
 
 /** Everything this module does ONCE, at boot. Called from main.js, in order. */
 export function buildGui() {
@@ -201,6 +147,5 @@ export function buildGui() {
   perfRows();
   lookRows();
   cameraRows();
-  addEventListener('keydown', onKeyDown, true);
-  addEventListener('resize', onResize);
+  installControls(KEYS, () => gui.controllersRecursive().forEach((c) => c.updateDisplay()));
 }

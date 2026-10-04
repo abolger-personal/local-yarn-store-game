@@ -8,8 +8,7 @@ import { S } from '../core/config.js';
 import { labelOf, maxWips, STATE, TRAITS, labelWant } from '../../visit.js';
 import { WIP_STATE, describeWip, WEAR_SLOTS } from '../../wip.js';
 import { renderer } from '../scene/stage.js';
-import { guestbookLine, redrawBook } from './book.js';
-import { drawBoard } from './board.js';
+import { guestbookLine } from './book.js';
 
 import { doAdvanceRound, doTidy, restart } from '../sim/world.js';
 
@@ -87,8 +86,6 @@ export function drawDebug() {
   if (!shop.world) return;
   npcStateEl.innerHTML = shop.world.npcs.map((n, i) => npcCard(n, cast[i])).join('')
     + guestbookBlock() + logBlock();
-  redrawBook();
-  drawBoard();
 }
 
 // ---------------------------------------------------------------- timer window
@@ -98,9 +95,9 @@ const clockLabel = document.getElementById('clockLabel');
 
 export const autoBar = document.getElementById('autoBar');
 
-export const autoBox = /** @type {HTMLInputElement} */ (document.getElementById('auto'));
+const autoBox = /** @type {HTMLInputElement} */ (document.getElementById('auto'));
 
-export const autoDayBox =
+const autoDayBox =
   /** @type {HTMLInputElement} */ (document.getElementById('autoDay'));
 
 const advanceBtn = /** @type {HTMLButtonElement} */ (document.getElementById('advance'));
@@ -116,14 +113,14 @@ export function drawTimer() {
   const live = shop.world.npcs.filter((n) => n.state !== STATE.GONE).length;
   const inDoor = shop.world.npcs.find((n) => n.id === shop.world.door.busy);
   clockLabel.textContent = `${hh}:${mm} · ${live}/${shop.world.npcs.length} visiting${inDoor ? ` · door: ${inDoor.name}` : ' · door clear'}`;
-  advanceBtn.disabled = live === 0 && !autoDayBox.checked;
+  advanceBtn.disabled = live === 0 && !S.autoDay;
   advanceBtn.textContent = advanceLabel(live);
 }
 
 /** The advance button's label: a round to play, or a shop that has emptied. */
 function advanceLabel(live) {
   if (live > 0) return 'Advance round →';
-  return autoDayBox.checked ? 'closing up…' : 'everyone has gone home — start next shop.day';
+  return S.autoDay ? 'closing up…' : 'everyone has gone home — start next shop.day';
 }
 
 // ---------------------------------------------------------------- perf overlay
@@ -167,6 +164,11 @@ export function installHud() {
     else doAdvanceRound();
   });
   document.getElementById('tidy').addEventListener('click', doTidy);
-  autoBox.addEventListener('change', () => { clocks.auto = 0; });
-  autoDayBox.addEventListener('change', () => { clocks.day = 0; drawTimer(); });
+  // The boxes drive S.autoRounds / S.autoDay, which is what the clocks read (boot.js) — so the
+  // game page, which has no boxes, runs the same clocks off the defaults. Read once at install as
+  // well, because a browser restores a checkbox's state across a reload.
+  const syncAuto = () => { S.autoRounds = autoBox.checked; S.autoDay = autoDayBox.checked; };
+  syncAuto();
+  autoBox.addEventListener('change', () => { syncAuto(); clocks.auto = 0; });
+  autoDayBox.addEventListener('change', () => { syncAuto(); clocks.day = 0; drawTimer(); });
 }

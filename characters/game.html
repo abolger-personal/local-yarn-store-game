@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>L.Y.S — Local Yarn Store</title>
+<!-- The game: the shop full screen, no debug panels (those stay on store.html, the playground).
+     The only menus are the in-world Guestbook and bulletin board, plus the corner stack below.
+     Every colour and size here is recorded, with the reasons, in
+     ai_planning_sessions/VISUAL-DESIGN-2D.md ("The corner stack"). Change one, change the other. -->
+<link rel="stylesheet" href="./store/ui/exterior.css" />
+<style>
+  :root {
+    color-scheme: light;
+    --wall: #4a5d73;          /* the front door's slate: icons, and the dimmed world behind About */
+    --trim: #f7f5ef;          /* white-painted trim: every button face */
+    --glow: #ffcf86;          /* lamplight: focus ring, and a latched mode */
+    --brass: linear-gradient(#fbe9a3, #e0b64d 35%, #b8862b 65%, #7d5517);
+  }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  /* touch-action: none or the browser claims one-finger drags for scroll/pinch and pointermove
+     never reaches the page. */
+  canvas { display: block; touch-action: none; }
+  /* The UA's `[hidden] { display: none }` loses to any rule that sets display, and the buttons
+     below set it. move.js hides the turn buttons with `hidden`, so that has to win. */
+  [hidden] { display: none !important; }
+
+  /* ---- the corner stack: emblem on top, the menu folding out below it */
+  #corner {
+    position: fixed; left: 16px; top: 16px; z-index: 11;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+    pointer-events: none;     /* the gaps stay part of the shop, so an orbit drag there still works */
+  }
+  #corner button { pointer-events: auto; }
+  #menu, #furnBtns, #viewBtns { display: flex; gap: 10px; }
+  #menu { flex-direction: column; align-items: flex-start; }
+  .round {
+    width: 48px; height: 48px; border-radius: 50%; padding: 0; cursor: pointer;
+    display: grid; place-items: center; color: var(--wall);
+    /* A brass rim: the gradient painted under a transparent border, the face painted inside it. */
+    border: 3px solid transparent;
+    background: radial-gradient(circle at 40% 30%, #fff, var(--trim) 60%, #e6e2d8) padding-box,
+                var(--brass) border-box;
+    box-shadow: 0 3px 8px rgb(59 36 8 / .35);
+    transition: transform 120ms ease;
+  }
+  .round svg { width: 26px; height: 26px; }
+  .round:hover:not(:disabled) { transform: translateY(-1px); }
+  .round:active:not(:disabled) { transform: scale(.94); }
+  .round:focus-visible { outline: 3px solid var(--glow); outline-offset: 3px; }
+  /* A MODE latches: the face lights up like the shop behind the door. */
+  .round[aria-pressed="true"] {
+    color: #4a2f0c;
+    background: radial-gradient(circle at 40% 30%, #fff1d6, var(--glow) 60%, #e2a85f) padding-box,
+                var(--brass) border-box;
+  }
+  /* Nothing selected means nothing to turn. Dimmed rather than hidden, so the row does not change
+     width under the finger reaching for it. */
+  .round:disabled { opacity: .45; cursor: default; box-shadow: none; }
+  /* The speed button draws one state at a time: data-speed is the state, and game.js writes it. */
+  #speedBtn g { display: none; }
+  #speedBtn[data-speed="1"] .s1, #speedBtn[data-speed="2"] .s2,
+  #speedBtn[data-speed="3"] .s3, #speedBtn[data-speed="0"] .s0 { display: inline; }
+  .lock-shut { display: none; }
+  #lockBtn[aria-pressed="true"] .lock-shut { display: inline; }
+  #lockBtn[aria-pressed="true"] .lock-open { display: none; }
+  /* The emblem is the door's glass, a size up, so it reads as the thing the others come out of. */
+  #emblem {
+    width: 58px; height: 58px;
+    background: radial-gradient(circle at 40% 30%, #fbe7c0, #f6dcae 45%, #e2a85f) padding-box,
+                var(--brass) border-box;
+  }
+  #emblem svg { width: 46px; height: 46px; }
+
+  /* ---- the view cube: the frame button's icon is a little shop-box that turns with the camera,
+     so which way the player faces is always on screen. game.js copies the camera's azimuth and
+     elevation onto .cube each frame. Front (+z) is the door's side, lit like the door's glass. */
+  #frameBtn { perspective: 140px; }
+  .cube { position: relative; width: 18px; height: 18px; transform-style: preserve-3d;
+          transform: rotateX(-35deg) rotateY(-20deg); }
+  .cube i { position: absolute; inset: 0; box-sizing: border-box; border: 1.5px solid var(--wall);
+            backface-visibility: hidden; }
+  .cube .front  { transform: translateZ(9px); background: var(--glow); }
+  .cube .front::after { content: ''; position: absolute; left: 6px; bottom: 0; width: 4px; height: 8px;
+                        background: var(--wall); }   /* the door, so the front reads as the front */
+  .cube .back   { transform: rotateY(180deg) translateZ(9px); background: #8c9bb0; }
+  .cube .right  { transform: rotateY(90deg) translateZ(9px); background: #b7c2cf; }
+  .cube .left   { transform: rotateY(-90deg) translateZ(9px); background: #a3b0bf; }
+  .cube .top    { transform: rotateX(90deg) translateZ(9px); background: var(--trim); }
+  .cube .bottom { transform: rotateX(-90deg) translateZ(9px); background: #6b7a8c; }
+  /* The two views fan out beside the frame button while it is open, like the turn buttons beside
+     the furniture button. */
+  #frameBtn[aria-expanded="false"] ~ .view { display: none; }
+
+  /* Folded: each button slides back up into the emblem and fades, staggered by its place (--i).
+     visibility flips after the fade, so a folded button is out of the tab order and the a11y tree. */
+  #menu > * {
+    transition: opacity 180ms ease calc(var(--i) * 30ms), transform 240ms cubic-bezier(.3, 1.3, .5, 1) calc(var(--i) * 30ms),
+                visibility 0s;
+  }
+  #emblem[aria-expanded="false"] + #menu > * {
+    opacity: 0; visibility: hidden;
+    transform: translateY(calc(var(--i) * -58px)) scale(.4);
+    transition: opacity 160ms ease, transform 200ms ease, visibility 0s 200ms;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #menu > *, #emblem[aria-expanded="false"] + #menu > *, .round { transition: none; }
+  }
+
+  /* ---- About this game: a native modal dialog on trim, rimmed in brass */
+  #about {
+    width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 48px); box-sizing: border-box;
+    padding: 20px 22px; border: 3px solid transparent; border-radius: 14px; color: #3b2a1c;
+    background: linear-gradient(var(--trim), var(--trim)) padding-box, var(--brass) border-box;
+    box-shadow: 0 10px 30px rgb(59 36 8 / .45);
+    font: 14px/1.5 ui-sans-serif, system-ui, sans-serif;
+  }
+  #about[open] { display: flex; flex-direction: column; gap: 12px; }
+  #about::backdrop { background: rgb(74 93 115 / .55); }
+  #about h2 { margin: 0; font: italic 700 24px Georgia, serif; }
+  #about h3 { margin: 4px 0 0; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: #6a5f55; }
+  #about .credit { margin: 0; }
+  #about ul {
+    margin: 0; padding: 0 6px 0 0; list-style: none; min-height: 0; flex: 1 1 auto;
+    overflow-y: auto; overscroll-behavior: contain; max-height: 50vh;
+    border-top: 1px solid #dcd7cb; border-bottom: 1px solid #dcd7cb;
+  }
+  #about li { padding: 8px 0; border-top: 1px solid #ebe7dd; }
+  #about li:first-child { border-top: 0; }
+  #about li b { color: #111; }
+  #about .lic { font-size: 12px; color: #6a5f55; }
+  #about a { color: #2f4a7a; word-break: break-all; }
+  #about a:focus-visible, #about button:focus-visible { outline: 3px solid var(--glow); outline-offset: 2px; }
+  #about form { margin: 0; text-align: right; }
+  #about form button {
+    font: 600 14px ui-sans-serif, system-ui, sans-serif; padding: 8px 18px; cursor: pointer;
+    border: 2px solid transparent; border-radius: 999px; color: #3b2408;
+    background: radial-gradient(circle at 50% 30%, #fff3c4, #e2b650 60%, #a06d1e) padding-box, var(--brass) border-box;
+  }
+
+  /* ---- the in-world menus, as on store.html: the Guestbook and the bulletin board's photo */
+  .panel {
+    position: fixed; z-index: 10;
+    background: rgba(255,255,255,.86); backdrop-filter: blur(6px);
+    border: 1px solid rgba(0,0,0,.08); border-radius: 10px;
+    padding: 10px 12px; font-size: 12px; line-height: 1.5; color: #333;
+  }
+  .snap {
+    font: 600 10px/1.5 ui-sans-serif, system-ui, sans-serif; color: #8a4a22; cursor: pointer;
+    background: #fbeee4; border: 1px solid #c2703f; border-radius: 9px; padding: 0 6px; margin-right: 2px;
+  }
+  .snap:hover { background: #c2703f; color: #fff; }
+  #book { right: 12px; top: 12px; width: 280px; max-height: calc(100vh - 24px); overflow-y: auto;
+          overscroll-behavior: contain; font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; color: #4a3f35; }
+  #book .head { display: flex; align-items: center; justify-content: space-between; gap: 6px;
+                margin: 0 18px 6px 0; font-weight: 700; color: #111; }
+  #book .head button { border: 1px solid rgba(0,0,0,.15); background: #fff; border-radius: 6px; cursor: pointer; padding: 1px 8px; }
+  #book .head button:disabled { opacity: .35; cursor: default; }
+  #book .tags { letter-spacing: 1px; }
+  #book .k { opacity: .55; }
+  #book .close, #photo .close { position: absolute; top: 4px; right: 6px; border: 0; background: none; font-size: 16px; cursor: pointer; color: #5c5349; }
+  #photo { right: 12px; top: 12px; margin: 0; padding: 10px 10px 6px; text-align: center; }
+  #book:not([hidden]) ~ #photo { right: 304px; }   /* beside the open book, not on top of it */
+  #photo img { display: block; width: 240px; height: 300px; border-radius: 4px; }
+  #photo figcaption { font-size: 11px; color: #4a3f35; padding-top: 6px; }
+  #bootFail { left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: 360px; }
+
+  /* ---- between days: the exterior at night (ui/night.js; the entry is exterior.css). A modal
+     <dialog>, so the shop behind is inert and its shortcut keys are ignored while it is up. */
+  #night {
+    width: 100vw; height: 100vh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
+    /* Night over the clapboard: an inset shade paints above the background, under the entry, so
+       the doorway stays lit like a porch. */
+    box-shadow: inset 0 0 0 100vmax rgb(16 24 44 / .38);
+    transition: opacity .9s ease;
+  }
+  #night:not([open]) { display: none; }   /* .exterior sets display, and an author rule beats the UA's */
+  #night::backdrop { background: transparent; }
+  #night.leaving { opacity: 0; }
+  @starting-style { #night[open] { opacity: 0; } }   /* fades in over the emptied shop */
+  /* The entry and the clipboard share the screen: the door's box is sized for 600 units of entry,
+     40 of wall and 360 of clipboard side by side, or stacked on a tall narrow screen. */
+  .night-scene {
+    --door-h: min(86vh, calc(94vw * 1110 / 1000));
+    display: flex; align-items: center; gap: calc(var(--door-h) * 40 / 1110);
+  }
+  #clipboard {
+    width: calc(var(--door-h) * 360 / 1110); aspect-ratio: 360 / 540;
+    transform: rotate(1.5deg); filter: drop-shadow(0 6px 10px rgb(0 0 0 / .35));
+  }
+  @media (max-aspect-ratio: 4 / 5) {
+    .night-scene { --door-h: min(56vh, calc(94vw * 1110 / 600)); flex-direction: column; }
+    #clipboard { width: min(80vw, calc(34vh * 360 / 540)); }
+  }
+  @media (prefers-reduced-motion: reduce) { #night { transition: none; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- The brass, defined once for every button's SVG: the front door's #brass, #plate and
+     #keyline (index.html), copied exactly, plus the emblem's heavier keyline. Not display:none,
+     which would drop the gradients. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="brass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbe9a3" />
+      <stop offset=".35" stop-color="#e0b64d" />
+      <stop offset=".65" stop-color="#b8862b" />
+      <stop offset="1" stop-color="#7d5517" />
+    </linearGradient>
+    <!-- The emblem's flat brass plate: one gentle sheen across the whole emblem, in the
+         drawing's own units (its bounds, x 113-302, y 551-718), so it does not restart per
+         shape and nothing reads as a lit ball. -->
+    <linearGradient id="plate" gradientUnits="userSpaceOnUse" x1="113" y1="551" x2="302" y2="718">
+      <stop offset="0" stop-color="#ecc764" />
+      <stop offset=".5" stop-color="#e0b64d" />
+      <stop offset="1" stop-color="#cc9d3a" />
+    </linearGradient>
+    <filter id="keyline" x="-10%" y="-10%" width="120%" height="120%">
+      <feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="grown" />
+      <feFlood flood-color="#4a2f0c" />
+      <feComposite in2="grown" operator="in" />
+      <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+    <!-- The emblem's keyline, heavier than #keyline (which the info glyph shares): 3.5 units
+         is ~0.63px at 46px (viewBox 254), where 1.2 would vanish. -->
+    <filter id="emblemKeyline" x="-10%" y="-10%" width="120%" height="120%">
+      <feMorphology in="SourceAlpha" operator="dilate" radius="3.5" result="grown" />
+      <feFlood flood-color="#4a2f0c" />
+      <feComposite in2="grown" operator="in" />
+      <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+    <clipPath id="ball"><circle cx="180" cy="660" r="58" /></clipPath>
+  </defs>
+</svg>
+
+<!-- The corner stack. Real buttons, so the browser does the hit-testing and the keyboard works;
+     input.js ignores any press whose target is not the canvas. -->
+<nav id="corner" aria-label="Shop controls">
+  <button id="emblem" class="round" aria-expanded="false" aria-controls="menu" aria-label="Menu" title="menu">
+    <!-- The door's gold-leaf emblem (index.html, "Gold-leaf emblem, alone on the glass"), at full
+         size, framed by the viewBox instead of the door's translate/scale. The viewBox is a
+         square centred on the BALL (180,660), not the drawing's bounds: the tail is left out of
+         the centring, so the ball sits dead centre in the round button. The square is just big
+         enough that nothing clips: the tail reaches x 305 with its keyline, 125 right of the
+         ball's centre, so half is 127 (the needle ends need only 112 above).
+         One deliberate difference from the door, for 46px: the engraving is heavier (cuts 6
+         units, lit edge 1.4 below, keyline 3.5; the door has 2.5, .6 and 1.2). -->
+    <svg viewBox="53 533 254 254" aria-hidden="true" focusable="false">
+      <g filter="url(#emblemKeyline)">
+        <g stroke="url(#plate)" stroke-linecap="round" stroke-width="7">
+          <line x1="205" y1="670" x2="122" y2="560" />
+          <line x1="155" y1="670" x2="238" y2="560" />
+        </g>
+        <circle cx="122" cy="560" r="9" fill="url(#plate)" />
+        <circle cx="238" cy="560" r="9" fill="url(#plate)" />
+        <path d="M222 700 C 250 730, 275 712, 262 692 S 285 676, 300 700" fill="none"
+              stroke="url(#plate)" stroke-width="4" stroke-linecap="round" />
+        <circle cx="180" cy="660" r="58" fill="url(#plate)" />
+        <!-- Engraved: each cut is a dark line with its lower wall catching the light, a pale copy
+             of the same line showing just below it. The rim is cut too, so the ball still parts
+             from the needles on a flat plate. -->
+        <g clip-path="url(#ball)" fill="none" stroke-width="6" stroke-linecap="round">
+          <use href="#wraps" stroke="#fbe9a3" transform="translate(0 1.4)" />
+          <g id="wraps" stroke="#6a450f">
+            <circle cx="180" cy="660" r="57" />
+            <path d="M128 618 Q180 578 232 618" />
+            <path d="M118 640 Q180 595 242 640" />
+            <path d="M116 668 Q180 622 246 674" />
+            <path d="M124 700 Q180 655 238 708" />
+            <path d="M130 728 Q180 690 232 736" />
+            <path d="M128 616 Q190 668 168 720" />
+            <path d="M150 606 Q222 650 200 722" />
+            <path d="M176 602 Q246 646 232 712" />
+            <path d="M202 604 Q262 640 254 696" />
+          </g>
+        </g>
+      </g>
+    </svg>
+  </button>
+  <div id="menu">
+    <!-- Camera: the frame button (its icon a view cube that turns with the camera) reframes the
+         shop AND fans out the two arranging views beside it: straight down, and level from a side
+         (each press a quarter turn). Arrow keys do the same: up frames, down, left/right. -->
+    <div id="viewBtns" style="--i:1">
+      <button id="frameBtn" class="round" title="reset the camera (F, up arrow)" aria-label="Reset the camera"
+              aria-expanded="false" aria-controls="viewTopBtn viewSideBtn">
+        <span class="cube" aria-hidden="true"><i class="front"></i><i class="back"></i><i class="right"></i><i class="left"></i><i class="top"></i><i class="bottom"></i></span>
+      </button>
+      <button id="viewTopBtn" class="round view" title="look straight down (down arrow)" aria-label="Look straight down on the shop">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /><path d="M12 7v9M8.5 12.5 12 16l3.5-3.5" />
+        </svg>
+      </button>
+      <button id="viewSideBtn" class="round view" title="look from the side, a quarter turn each press (left/right arrows)" aria-label="Look at the shop from the side">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /><path d="M16 12H8M11.5 8.5 8 12l3.5 3.5" />
+        </svg>
+      </button>
+    </div>
+    <button id="lockBtn" class="round" style="--i:2" title="lock the camera (L)" aria-label="Lock the camera" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <rect x="5" y="11" width="14" height="10" rx="2" />
+        <path class="lock-open" d="M8 11V7.5a4 4 0 0 1 7.6-1.8" />
+        <path class="lock-shut" d="M8 11V7.5a4 4 0 0 1 8 0V11" />
+      </svg>
+    </button>
+    <!-- move.js finds the turn buttons as `#furnBtns .turn`, and shows them only in furniture mode. -->
+    <div id="furnBtns" style="--i:3">
+      <button id="moveBtn" class="round" title="move the furniture (M)" aria-label="Move the furniture" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M7 3v18M7 13h10v8M7 3h2v10" />
+        </svg>
+      </button>
+      <button class="turn round" data-step="-1" title="turn 45&deg; anticlockwise (Q)" aria-label="Turn anticlockwise" hidden disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <g transform="matrix(-1 0 0 1 24 0)"><path d="M12 5A7 7 0 1 1 5 12M2 15l3-3 3 3" /></g>
+        </svg>
+      </button>
+      <button class="turn round" data-step="1" title="turn 45&deg; clockwise (E)" aria-label="Turn clockwise" hidden disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="M12 5A7 7 0 1 1 5 12M2 15l3-3 3 3" />
+        </svg>
+      </button>
+    </div>
+    <!-- Game speed: one button, four states, each press the next: ▶ → ▶▶ → ▶▶▶ → ⏸ → ▶. ⏸ stops the
+         rounds, never the animation. game.js keeps data-speed, the label and the title. Space
+         cycles, P pauses and resumes. -->
+    <button id="speedBtn" class="round" style="--i:4" data-speed="1" title="strolling: press for double speed (Space; P pauses)"
+            aria-label="Strolling. Press for double speed">
+      <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <g class="s1"><path d="M8.5 6v12l8-6z" /></g>
+        <g class="s2"><path d="M4 7v10l7-5zM13 7v10l7-5z" /></g>
+        <g class="s3"><path d="M2 8v8l5.5-4zM9.25 8v8l5.5-4zM16.5 8v8l5.5-4z" /></g>
+        <g class="s0"><rect x="6.5" y="5.5" width="3" height="13" rx=".5" /><rect x="14.5" y="5.5" width="3" height="13" rx=".5" /></g>
+      </svg>
+    </button>
+    <button id="infoBtn" class="round" style="--i:5" title="about this game" aria-label="About this game" aria-haspopup="dialog">
+      <!-- The "i" in the house lettering, gold: game.js letters it from lettering.js. -->
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><g id="infoGlyph" filter="url(#keyline)"></g></svg>
+    </button>
+  </div>
+</nav>
+
+<dialog id="about" aria-labelledby="aboutTitle">
+  <h2 id="aboutTitle">About this game</h2>
+  <p class="credit">Adrienne Bolger<br />&copy; 2026<br />All rights reserved.</p>
+  <h3>Open-source software</h3>
+  <!-- Versions and licences read from node_modules/*/package.json and the files' own headers.
+       Runtime: the import map below. Development: package.json devDependencies. -->
+  <ul>
+    <li><b>three.js</b> 0.160.0 <span class="lic">· MIT · in the game, loaded from unpkg</span><br />
+      <a href="https://threejs.org/">threejs.org</a> · <a href="https://github.com/mrdoob/three.js">github.com/mrdoob/three.js</a></li>
+    <li><b>OrbitControls</b> <span class="lic">· three.js addon 0.160.0 · MIT · the camera</span><br />
+      <a href="https://github.com/mrdoob/three.js/blob/r160/examples/jsm/controls/OrbitControls.js">three.js/examples/jsm/controls/OrbitControls.js</a></li>
+    <li><b>RoomEnvironment</b> <span class="lic">· three.js addon 0.160.0 · MIT · the lighting</span><br />
+      <a href="https://github.com/mrdoob/three.js/blob/r160/examples/jsm/environments/RoomEnvironment.js">three.js/examples/jsm/environments/RoomEnvironment.js</a></li>
+    <li><b>RoundedBoxGeometry</b> <span class="lic">· three.js addon 0.160.0 · MIT · the furniture</span><br />
+      <a href="https://github.com/mrdoob/three.js/blob/r160/examples/jsm/geometries/RoundedBoxGeometry.js">three.js/examples/jsm/geometries/RoundedBoxGeometry.js</a></li>
+    <li><b>BufferGeometryUtils</b> <span class="lic">· three.js addon 0.160.0 · MIT · merged meshes</span><br />
+      <a href="https://github.com/mrdoob/three.js/blob/r160/examples/jsm/utils/BufferGeometryUtils.js">three.js/examples/jsm/utils/BufferGeometryUtils.js</a></li>
+    <li><b>lil-gui</b> 0.17.0 <span class="lic">· MIT · George Michael Brower · bundled with three.js, used by the development pages</span><br />
+      <a href="https://lil-gui.georgealways.com">lil-gui.georgealways.com</a> · <a href="https://github.com/georgealways/lil-gui">github.com/georgealways/lil-gui</a></li>
+    <li><b>ESLint</b> 10.10.0 <span class="lic">· MIT · development</span><br />
+      <a href="https://eslint.org">eslint.org</a> · <a href="https://github.com/eslint/eslint">github.com/eslint/eslint</a></li>
+    <li><b>@eslint/js</b> 10.0.1 <span class="lic">· MIT · development</span><br />
+      <a href="https://github.com/eslint/eslint">github.com/eslint/eslint</a></li>
+    <li><b>eslint-plugin-import-x</b> 4.17.1 <span class="lic">· MIT · development</span><br />
+      <a href="https://github.com/un-ts/eslint-plugin-import-x">github.com/un-ts/eslint-plugin-import-x</a></li>
+    <li><b>eslint-import-resolver-node</b> 0.4.0 <span class="lic">· MIT · development</span><br />
+      <a href="https://github.com/import-js/eslint-plugin-import">github.com/import-js/eslint-plugin-import</a></li>
+    <li><b>eslint-plugin-unicorn</b> 74.0.0 <span class="lic">· MIT · development</span><br />
+      <a href="https://github.com/sindresorhus/eslint-plugin-unicorn">github.com/sindresorhus/eslint-plugin-unicorn</a></li>
+    <li><b>globals</b> 17.12.0 <span class="lic">· MIT · development</span><br />
+      <a href="https://github.com/sindresorhus/globals">github.com/sindresorhus/globals</a></li>
+    <li><b>TypeScript</b> 7.0.2 <span class="lic">· Apache-2.0 · development, type-checks the JavaScript</span><br />
+      <a href="https://www.typescriptlang.org/">typescriptlang.org</a> · <a href="https://github.com/microsoft/TypeScript">github.com/microsoft/TypeScript</a></li>
+    <li><b>three</b> 0.160.0 <span class="lic">· MIT · development, for its type definitions only</span><br />
+      <a href="https://github.com/mrdoob/three.js">github.com/mrdoob/three.js</a></li>
+  </ul>
+  <form method="dialog"><button autofocus>Close</button></form>
+</dialog>
+
+<!-- The in-world menus. Markup as on store.html: book.js and board.js look these up by id. -->
+<section id="book" class="panel" hidden aria-label="Guestbook">
+  <button class="close" aria-label="Close the guestbook">&times;</button>
+  <div class="head">
+    <button id="bookOlder" aria-label="Earlier day">&#9664;</button>
+    <span id="bookDay"></span>
+    <button id="bookNewer" aria-label="Later day">&#9654;</button>
+  </div>
+  <div id="bookEntries"></div>
+</section>
+
+<figure id="photo" class="panel" hidden>
+  <button class="close" aria-label="Close the photo">&times;</button>
+  <img alt="The customer, wearing what they made" />
+  <figcaption></figcaption>
+</figure>
+
+<p id="bootFail" class="panel" role="alert" hidden></p>
+
+<!-- Between days: the shop shut for the night, tomorrow's order on a clipboard on a nail beside the
+     door. night.js draws the entry into .doorway (ui/exterior.js, shared with the front door) and
+     letters the sheet into #orderLines; opening the door opens tomorrow. -->
+<dialog id="night" class="exterior" aria-label="The shop, closed for the night">
+  <div class="night-scene">
+    <div class="doorway"></div>
+    <svg id="clipboard" viewBox="0 0 360 540" role="img" aria-label="Tomorrow's order">
+      <rect x="12" y="34" width="336" height="496" rx="14" fill="#a87c4c" />
+      <rect class="worn" x="12" y="34" width="336" height="496" rx="14" fill="url(#worn)" opacity=".7" />
+      <rect x="36" y="74" width="288" height="436" fill="#fbf8ef" filter="url(#note)" />
+      <g filter="url(#emboss)">
+        <rect x="122" y="40" width="116" height="46" rx="9" fill="url(#brass)" />
+        <circle cx="180" cy="57" r="8" fill="#3b2408" />
+      </g>
+      <circle cx="180" cy="55" r="4" fill="#6b6f73" />   <!-- the nail it hangs on -->
+      <g id="orderLines"></g>
+    </svg>
+  </div>
+</dialog>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module" src="./store/game.js"></script>
+</body>
+</html>

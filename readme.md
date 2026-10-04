@@ -33,7 +33,8 @@ If that value looks old, the browser is running cached code and nothing you chan
 | `characters/crowd.html` | Does the randomiser make a cast or a zoo? Performance instrumentation lives here. |
 | `characters/puzzle.html` | Is the arrangement a PUZZLE? One customer, one display, and a switch on every hint. |
 | `characters/motion-lab.html` | Does motion survive being interrupted, and does personality read in how a character moves? See `characters/MOTION-TODO.md`. |
-| `characters/store.html` | The game. Visit loop, displays, the full sim. |
+| `characters/game.html` | The game, as a player sees it: the shop full screen, no debug panels, the corner button stack and the in-world Guestbook. Where the front door leads. |
+| `characters/store.html` | The playground: the same game with every debug panel. Visit loop, displays, the full sim. |
 | `inventory/stash-and-stuff.html` | Does the placement mechanic feel good? Notion look and drag behaviour. |
 
 ## Layout

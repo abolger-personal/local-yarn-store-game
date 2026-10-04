@@ -299,7 +299,7 @@ function buildBody(speciesId, saved) {
   // as "Cannot read properties of undefined (reading 'randomise')" from inside the boot chain.
   // Species register themselves via the bare `import '../../owl.js'` in main.js, which is exactly
   // the kind of import that gets dropped when files move — nothing references it by name.
-  if (!kit) throw new Error(`no species kit for "${speciesId}" — is owl.js/llama.js imported?`);
+  if (!kit) throw new Error(`no species kit for "${speciesId}" — is owl.js/llama.js/lion.js imported?`);
   const P = bodyParams(kit, saved, S);
   return { kit, P, built: createCharacter(P, kit) };
 }

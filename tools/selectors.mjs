@@ -1,4 +1,4 @@
-// Every element the shop looks up must exist in store.html.
+// Every element the shop looks up must exist in store.html, game.html or puzzle.html.
 //
 // The markup and the code that drives it are in different files, so renaming an element is a
 // silent break: `getElementById` returns null and the failure lands later, somewhere else. It
@@ -7,11 +7,11 @@
 import { readFileSync } from 'node:fs';
 import { storeFiles } from './modules.mjs';
 
-// Both pages, as one pool of ids. The store modules drive the shop AND the puzzle bench, and a
+// All three pages, as one pool of ids. The store modules drive the shop AND the puzzle bench, and a
 // module cannot say which page it was loaded by — so this can no longer tell you an element is on
-// the WRONG page, only that it exists on neither, which is the failure that actually happened.
+// the WRONG page, only that it exists on none of them, which is the failure that actually happened.
 // exterior.js is markup too: the entry and the door, drawn into the front door and the night screen.
-const html = ['characters/store.html', 'characters/puzzle.html', 'characters/store/ui/exterior.js']
+const html = ['characters/store.html', 'characters/game.html', 'characters/puzzle.html', 'characters/store/ui/exterior.js']
   .map((f) => readFileSync(f, 'utf8')).join('\n');
 const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]));
 const classes = new Set([...html.matchAll(/class="([^"]+)"/g)].flatMap((m) => m[1].split(/\s+/)));

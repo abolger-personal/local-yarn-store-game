@@ -25,6 +25,7 @@ import { BUILD, NAMES, POSES, applyPose, createCharacter, disposeCharacter, getS
 // first spawn, where getSpecies() returns undefined.
 import '../owl.js';
 import '../llama.js';
+import '../lion.js';
 import { STATE, TRAITS, consideredHere, interact, labelOf, makeNpc, makeWorld, noticeable,
          signGuestbook } from '../visit.js';
 import { describeWip, labelWant, wantFor, wantsOf, stow, WIP_STATE } from '../wip.js';

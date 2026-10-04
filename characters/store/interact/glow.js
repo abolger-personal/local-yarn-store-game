@@ -166,8 +166,8 @@ export function paintActivePlane() {
     // lines. It shows only while the pointer is over it — or while it is the drop target of
     // something being carried, which is exactly when the player needs to see the slots.
     // Shelves and tables keep their grids on: they are small and read as furniture detail.
-    const revealed = disp.form !== 'floor' || disp.id === aim.hovered ||
-                     (carrying && disp.id === aim.active) || noRoom;
+    const revealed = disp.form !== 'floor' || (S.floorGrid && (disp.id === aim.hovered ||
+                     (carrying && disp.id === aim.active) || noRoom));
     disp.lines.forEach((lines, s) => {
       const isActive = disp === activeDisplay() && s === disp.plane;
       lines.visible = S.showGrid && revealed;

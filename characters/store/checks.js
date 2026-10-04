@@ -2,7 +2,7 @@
 //
 // Extracted from the single 3,200-line module that used to live inline in store.html.
 
-import { cast, seats, props, displays, items, shop } from './core/state.js';
+import { cast, seats, props, displays, items, shop, mover } from './core/state.js';
 import { SHOP_RANGE, SIZED_NOTIONS, YARN_SHAPES, yarnWeight } from '../../inventory/catalog.js';
 import { fits, footprint, makeDisplay, place, usableAt } from '../../inventory/grid.js';
 import { familyExtent, yarnFit } from '../../inventory/yarn-geometry.js';
@@ -10,14 +10,15 @@ import { createCharacter, disposeCharacter, getSpecies, speciesIds } from '../np
 import { labelOf, obstacles, seatById } from '../visit.js';
 import * as THREE from 'three';
 import { BOX_H, CELL, S, TALLEST_LAYERS } from './core/config.js';
-import { applyDaylight, camera, controls, key as sun } from './scene/stage.js';
+import { applyDaylight, camera, controls, renderer, scene, key as sun } from './scene/stage.js';
 import { COUNTER, HALF_D, HALF_W, SHADOW_LAYER, cullWalls, shadowCasters, walls } from './scene/room.js';
 import { ROOM_FLOOR, applyTransform } from './scene/displays.js';
 import { atlas, boxes } from './goods/items.js';
 import { YARN, YARN_FIT, yarnMeshes } from './goods/yarn.js';
 import { refresh, refreshAll } from './goods/paint.js';
 import { cellNameFor } from './goods/stock.js';
-import { movePose, YAW_STEP, applySeat, canPlaceAt, constrainPose, moveApply } from './interact/move.js';
+import { movePose, YAW_STEP, applySeat, canPlaceAt, cancelMove, clearSelection, constrainPose, moveApply } from './interact/move.js';
+import { onPointerDown, onPointerMove, onPointerUp } from './interact/input.js';
 import { isUnder } from './ui/framing.js';
 import { makeHeldNotion } from './sim/cast.js';
 
@@ -234,30 +235,40 @@ export function checkFloorTiling() {
  * every pose afterwards.
  */
 /**
- * "Wall shelves stay against the wall": dropped anywhere at all, one ends up on a wall, facing in.
+ * Nothing leaves the room, however far it is dragged. The bug this exists to catch: a display
+ * followed the pointer straight through the wall, and a release that never came (a pointercancel,
+ * or the next grab) left it out there — out of sight, and carried over to every day after with
+ * its stock still on it. A NaN pose used to pass the slot test too, every comparison being false.
  */
-function checkShelfSnap(shelf, fails) {
-  for (const [x, z] of [[0, 0], [3, 0], [-3, 0], [0, 3], [0, -3], [2.5, 2.5], [-2.9, -1]]) {
-    const q = constrainPose(shelf, x, z, 0.3);
-    // Front (local +Z) must point back toward the middle of the room, not out through the wall.
-    if (Math.sin(q.yaw) * -q.x + Math.cos(q.yaw) * -q.z <= 0) fails.push(`shelf from ${x},${z} faces out`);
-    if (Math.abs(q.x) > HALF_W || Math.abs(q.z) > HALF_D) fails.push(`shelf from ${x},${z} left the room`);
+function checkStaysInRoom(m, fails) {
+  for (const [x, z] of [[99, 0], [-99, 0], [0, 99], [0, -99], [99, -99], [-99, 99]]) {
+    for (const yaw of [0, YAW_STEP, 2 * YAW_STEP]) {
+      const q = constrainPose(m, x, z, yaw);
+      if (Math.abs(q.x) > HALF_W || Math.abs(q.z) > HALF_D) fails.push(`${m.id} dragged to ${x},${z} left the room`);
+    }
   }
+  if (canPlaceAt(m, { x: NaN, z: 0, yaw: 0 })) fails.push(`${m.id} was allowed a NaN pose`);
 }
 
 /**
- * The bug this exists to catch: the snap put the shelf's back row inside the very wall clearance
- * the placement test enforces, so a wall shelf was refused on EVERY wall — it snapped nicely into
- * place and then went red, with nowhere in the shop it could be dropped.
+ * Shelves stand free (DISPLAYS.md rule 10): somewhere in the middle of the shop, two can stand back
+ * to back — touching, but never one through the other. The gap is the slots' own overhang past the
+ * tilted depth plus the back panel's pad (roomObstacles); a hair over it must fit.
  */
-function checkShelfPlaceable(shelf, fails) {
-  let legal = 0, tried = 0;
-  for (const along of [-2, -1, 0, 1, 2])
-    for (const [x, z] of [[along, -9], [along, 9], [-9, along], [9, along]]) {
-      tried++;
-      if (canPlaceAt(shelf, constrainPose(shelf, x, z, 0))) legal++;
+function checkBackToBack(fails) {
+  const [a, b] = displays.filter((d) => d.kind === 'shelf');
+  if (!b) return;
+  let pairs = 0;
+  for (let x = -4; x <= 4; x += 0.25)
+    for (let z = -3; z <= 3; z += 0.25) {
+      if (!canPlaceAt(a, { x, z, yaw: 0 })) continue;
+      moveApply(a, x, z, 0);
+      if (canPlaceAt(b, { x, z: z - a.d, yaw: Math.PI })) fails.push(`shelves overlapped back to back at ${x},${z}`);
+      // Through constrainPose, as a drag goes: it must leave a free-standing shelf where it was put.
+      const q = constrainPose(b, x, z - a.d - 0.07, Math.PI);
+      if (q.x === x && q.z === z - a.d - 0.07 && canPlaceAt(b, q)) pairs++;
     }
-  if (legal < tried * 0.5) fails.push(`wall shelf legal at only ${legal}/${tried} wall positions`);
+  if (!pairs) fails.push('nowhere in the shop can two shelves stand back to back');
 }
 
 /** Rotation lands on 45° detents, whatever angle it is asked for. */
@@ -330,6 +341,86 @@ function checkProps(pile, fails) {
     fails.push('the sim does not route round a moved prop');
 }
 
+/** A legal spot for `m` a step away from where it stands, or null. */
+function nearbySpot(m) {
+  const from = movePose(m);
+  for (const step of [0.5, 0.8, 1.2])
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const q = constrainPose(m, from.x + dx * step, from.z + dz * step, from.yaw);
+      if (Math.hypot(q.x - from.x, q.z - from.z) > 0.2 && canPlaceAt(m, q)) return q;
+    }
+  return null;
+}
+
+/** Look straight down on the shop, in move mode, so every piece is clickable. Returns the undo. */
+function overheadInMoveMode() {
+  const was = { at: camera.position.clone(), q: camera.quaternion.clone(), mode: S.moveMode };
+  camera.position.set(0, 14, 0.01);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  S.moveMode = true;
+  return () => {
+    clearSelection();
+    S.moveMode = was.mode;
+    camera.position.copy(was.at);
+    camera.quaternion.copy(was.q);
+    camera.updateMatrixWorld();
+  };
+}
+
+/** A mouse event on the canvas, over floor point x, z. */
+function floorEvent(type, x, z) {
+  const v = new THREE.Vector3(x, 0, z).project(camera);
+  return { type, clientX: (v.x + 1) / 2 * innerWidth, clientY: (1 - v.y) / 2 * innerHeight,
+    target: renderer.domElement, button: 0, pointerId: 99, pointerType: 'mouse', stopPropagation() {} };
+}
+
+function clickFloor(x, z) {
+  scene.updateMatrixWorld();   // chairs are raycast, and nothing renders between these clicks
+  onPointerDown(floorEvent('pointerdown', x, z));
+  onPointerUp(floorEvent('pointerup', x, z));
+}
+
+/** Click `m` up at `from` and down at `to` — hovering there in between, or not, as a tap has no
+ *  hover. Whether the first click picked it up. */
+function clickCarry(m, from, to, hover) {
+  clickFloor(from.x, from.z);
+  if (mover.m !== m) return false;
+  if (hover) onPointerMove(floorEvent('pointermove', to.x, to.z));
+  clickFloor(to.x, to.z);
+  return true;
+}
+
+const near = (m, q) => Math.hypot(m.x - q.x, m.z - q.z) < 0.02;
+
+/**
+ * Furniture is click-to-pick, like the stock, through the REAL pointer handlers: a click lifts the
+ * piece and leaves it in hand, a move with no button down carries it, a second click sets it down
+ * — and Escape puts a piece in hand back exactly where it was picked up. Then it is clicked home,
+ * so the slot masks are re-cut where it started.
+ */
+function checkClickMoves(m, hover, fails) {
+  const from = movePose(m), to = nearbySpot(m);
+  if (!to) { fails.push(`${m.id} has nowhere legal to go`); return; }
+  if (!clickCarry(m, from, to, hover)) { fails.push(`a click did not pick up ${m.id}`); return; }
+  if (mover.m) fails.push(`the second click did not set ${m.id} down`);
+  if (!near(m, to)) fails.push(`${m.id} was clicked to ${to.x.toFixed(2)},${to.z.toFixed(2)}, is at ${m.x.toFixed(2)},${m.z.toFixed(2)}`);
+  if (!(Math.abs(m.x) <= HALF_W && Math.abs(m.z) <= HALF_D)) fails.push(`${m.id} was set down outside the room`);
+  clickFloor(to.x, to.z);
+  onPointerMove(floorEvent('pointermove', from.x, from.z));
+  cancelMove();
+  if (mover.m || !near(m, to) || movePose(m).yaw !== to.yaw) fails.push(`Escape did not put ${m.id} back`);
+  clickCarry(m, to, from, true);
+}
+
+/** The chair is carried the mouse way (hover, then click), the shelf the touch way (tap it, tap
+ *  where it goes). */
+function checkClickToMove(pieces, fails) {
+  const undo = overheadInMoveMode();
+  for (const [m, hover] of pieces) checkClickMoves(m, hover, fails);
+  undo();
+}
+
 /**
  * Self-check: DISPLAYS.md rule 10. Everything the player can move can be moved and turned, stock
  * comes with it, and the per-type restrictions hold. Runs against the live layout and restores
@@ -344,7 +435,9 @@ export function checkDisplayMoves() {
   const pile = displays.find((d) => d.kind === 'pile' && d.solid !== false);
   const chair = seats[0];
 
-  if (shelf) { checkShelfSnap(shelf, fails); checkShelfPlaceable(shelf, fails); }
+  checkClickToMove([[chair, true], [shelf, false]].filter(([m]) => m), fails);
+  for (const m of [shelf, pile]) if (m) checkStaysInRoom(m, fails);
+  checkBackToBack(fails);
   if (pile) { checkDetents(pile, fails); checkStockTravels(pile, fails); checkPileRefusals(pile, fails); }
   if (chair) checkChair(chair, pile, fails);
   checkProps(pile, fails);

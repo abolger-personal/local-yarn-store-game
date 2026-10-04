@@ -71,6 +71,17 @@ function claimGesture(event) {
   event.stopPropagation();
 }
 
+/**
+ * Move mode takes the whole gesture, by stock's rules: empty-handed, a press on a piece picks it up
+ * and a press on bare floor orbits; with a piece in hand EVERY press is an aiming press — it jumps
+ * to the pointer (a finger has no hover to bring it there) and the release sets it down.
+ */
+function movePress(event) {
+  mover.fresh = !mover.m;
+  if (mover.m) dragDisplay(event);
+  if (mover.m || grabMovable(event)) claimGesture(event);
+}
+
 export function onPointerDown(event) {
   if (event.target !== renderer.domElement) return;   // a press on the HUD or GUI is not a shop press
   if (event.button !== 0) return;                     // right/middle belong to the camera
@@ -89,10 +100,8 @@ export function onPointerDown(event) {
 
   gestureOwner = 'camera';
 
-  // Move mode takes the whole gesture: one finger moves a display if there is one under it, and
-  // orbits the camera if there is not — the same "verb or camera" split the stock drag uses.
   if (S.moveMode) {
-    if (grabMovable(event)) claimGesture(event);
+    movePress(event);
     return;
   }
   const { found, mine } = stockPress(event);
@@ -103,8 +112,16 @@ export function onPointerDown(event) {
 export function onPointerUp(event) {
   const wasFirst = livePointers.size === 1 && livePointers.has(event.pointerId);
   endPointer(event);
+  // Furniture is settled before the button test: a pointercancel reports button -1, and returning
+  // on it left the display in hand, wherever the pointer had dragged it, until the next grab.
+  // Except the release of the press that picked it up, if that press stayed put: that is the first
+  // click of click-to-pick, and the piece stays in hand. One that travelled was a drag and drop.
+  if (mover.m && wasFirst) {
+    const tap = Math.hypot(event.clientX - drag.downX, event.clientY - drag.downY) <= TAP_SLOP;
+    if (!(mover.fresh && tap && event.type === 'pointerup')) dropMovable();
+    return;
+  }
   if (event.button !== 0 || !wasFirst) return;   // only the finger that started the verb commits it
-  if (mover.m) { dropMovable(); return; }
   if (drag.index === EMPTY) return;
   // A press that went somewhere is a completed drag; a press that stayed put while already
   // carrying is a tap on the target. Either way the release is the commit. Only a stationary
@@ -123,8 +140,11 @@ export function onPointerUp(event) {
  * lower one.
  */
 export function onPointerMove(event) {
+  // Over the canvas only: a held piece waits where it was while the pointer goes to the turn
+  // buttons, rather than following it to the floor underneath them. A touch drag is captured by the
+  // canvas it started on, so it always passes.
   if (mover.m) {
-    dragDisplay(event);
+    if (event.target === renderer.domElement) dragDisplay(event);
     return;
   }
   if (pastSlop(event)) drag.moved = true;
@@ -132,7 +152,7 @@ export function onPointerMove(event) {
   if (drag.index !== EMPTY) carryItem(event);
 }
 
-/** In move mode the pointer drags the FURNITURE, and nothing else happens. */
+/** In move mode the pointer carries the FURNITURE in hand, and nothing else happens. */
 function dragDisplay(event) {
   const p = floorPoint(event);
   if (p) proposeMove(mover.m, p.x + mover.ox, p.z + mover.oz, movePose(mover.m).yaw);
@@ -159,9 +179,8 @@ export function setMoveMode(on) {
   // Latched, like the camera lock: furniture mode is a MODE, and a button that only changes what
   // it does without changing how it looks is how you end up dragging a shelf by accident.
   moveBtn.setAttribute('aria-pressed', String(on));
-  if (mover.m) dropMovable();
   if (on) abortDrag();          // you cannot carry a notion and the shelf it came off at once
-  clearSelection();
+  clearSelection();             // which puts a piece still in hand back where it was picked up
   touchView();
 }
 

@@ -1,4 +1,4 @@
-// Move mode: dragging the SHOP around rather than the stock.
+// Move mode: picking up the SHOP and setting it down elsewhere, rather than the stock.
 //
 // Extracted from the single 3,200-line module that used to live inline in store.html.
 
@@ -13,7 +13,7 @@ import { CELL, GHOST_ALPHA, GHOST_NO, GHOST_OK, S } from '../core/config.js';
 import { HALF_D, HALF_W, UP, clearGroup } from '../scene/room.js';
 import { CHAIR_W, chairGroup } from '../scene/seating.js';
 import { applyProp, propGroup } from '../scene/props.js';
-import { WALL_INSET, applyTransform, boxIsClear, buildFurniture, cellIsClear, roomObstacles } from '../scene/displays.js';
+import { STAND_HALF, STAND_OFF, WALL_INSET, applyTransform, boxIsClear, buildFurniture, cellHalf, cellIsClear, roomObstacles } from '../scene/displays.js';
 import { refreshAll } from '../goods/paint.js';
 
 // ---------------------------------------------------------------- moving the shop
@@ -24,23 +24,12 @@ import { refreshAll } from '../goods/paint.js';
 //
 // This is the SHOP-LAYOUT verb, as opposed to the stock-arranging verb above, and the two share a
 // pointer, so they are separated by a mode (M) rather than by a modifier key — holding a chord down
-// while dragging furniture around is exactly the hand strain DESIGN-DECISIONS.md §7 already
-// rejected.
+// while moving furniture around is exactly the hand strain DESIGN-DECISIONS.md §7 already
+// rejected. And the same CLICK-to-pick, click-to-place as the stock, for the same reason: a
+// press-drag-release held the button down for the whole move.
 //
 // Inventory needs no special handling at all: see applyTransform.
 export const YAW_STEP = Math.PI / 4;   // MVP detent, per rule 10
-
-// At least WALL_INSET, or a shelf snaps flush to a wall and is then refused for being too close to
-// it — which leaves the display red everywhere and undroppable. Derived, never a loose number.
-const WALL_GAP = WALL_INSET + 0.02;
-
-// The four walls as lines, each with the yaw that turns a display's front (local +Z) into the room.
-const WALL_LINES = [
-  { yaw: 0,            axis: 'z', at: -HALF_D },
-  { yaw: Math.PI,      axis: 'z', at:  HALF_D },
-  { yaw: Math.PI / 2,  axis: 'x', at: -HALF_W },
-  { yaw: -Math.PI / 2, axis: 'x', at:  HALF_W },
-];
 
 // A movable is a display, a chair, or a prop (a pot, side table or lamp). A display owns a slot grid
 // and the other two do not, so `!m.g` is the "small free-standing thing" test; a prop says so.
@@ -55,9 +44,10 @@ const moveSize = (m) => {
 
 export const movePose = (m) => ({ x: m.x, z: m.z, yaw: isSeat(m) ? m.facing : m.yaw });
 
-// `m` is what is being dragged RIGHT NOW; `sel` is what stays chosen after the release. Same shape
-// as picking up a box — the press previews and the release commits — except that furniture set down
-// stays selected, which is what gives the on-screen rotate handles something to point at.
+// `m` is what is in hand RIGHT NOW; `sel` is what stays chosen after it is set down. Same verb as
+// picking up a box — click to lift, it follows the pointer, click again to set it down — except that
+// furniture set down stays selected, which is what gives the on-screen rotate handles something to
+// point at.
 export 
 const _floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
@@ -90,13 +80,19 @@ export const moveApply = (m, x, z, yaw) => applierOf(m)(m, x, z, yaw);
 
 /**
  * Rule 10's per-type restrictions, as a pose filter:
- *   - a WALL SHELF stays against a wall. It snaps to the nearest one and takes that wall's facing,
- *     so the only freedom it has is sliding along — which is what "stays against the wall" means.
+ *   - EVERYTHING stays inside the room. The pose is clamped, not merely refused, because
+ *     proposeMove puts the real record wherever this says and only setting it down puts it back: a
+ *     display followed the pointer straight through the wall, and a release that never arrived (a
+ *     pointercancel, a second grab) left it outside — out of sight, and carried over every night
+ *     after, stock and all. Clamped, there is no "outside" for it to be stranded in.
+ *   - a SHELF stands anywhere it fits, wall or no wall: two back to back in the middle of the room
+ *     is a fine shop. Its back panel is its "wall", so its wall row means the same thing wherever it
+ *     stands (DISPLAYS.md rule 10).
  *   - a FLOOR PILE stays on the floor, which it does by construction: its plinth height is 0 and
  *     nothing in the move path touches Y at all.
- *   - everything else is free in XZ, with yaw on 45° detents.
- * A peg board would clamp to a wall the same way a shelf does, at wall height. Deferred with the
- * rest of DISPLAYS.md type C.
+ *   - yaw is on 45° detents.
+ * A peg board would have to snap to a wall, at wall height. Deferred with the rest of DISPLAYS.md
+ * type C.
  *
  * One rule for every movable: whatever the player has turned sits on a detent. A chair therefore
  * snaps out of its authored decorative angle the first time it is touched, which is the honest
@@ -110,17 +106,13 @@ export function constrainPose(m, x, z, yaw) {
     const edge = moveSize(m).w * Math.SQRT1_2 + WALL_INSET;   // a turned one needs its diagonal
     return { x: clamp(x, HALF_W - edge), z: clamp(z, HALF_D - edge), yaw };
   }
-  if (m.form !== 'wall-shelf') return { x, z, yaw };
-
-  const gap = (w) => Math.abs((w.axis === 'x' ? x : z) - w.at);
-  const wall = WALL_LINES.reduce((a, b) => (gap(b) < gap(a) ? b : a));
-  const back = (m.g.rows * CELL) / 2 + WALL_GAP;       // centre stands off by half its own depth
-  const inward = wall.at < 0 ? 1 : -1;
-  // Slide freely, but not so far that an end pokes through the wall it is running along.
-  const halfRun = (m.g.cols * CELL) / 2 + WALL_INSET;
-  return wall.axis === 'x'
-    ? { x: wall.at + inward * back, z: clamp(z, HALF_D - halfRun), yaw: wall.yaw }
-    : { x: clamp(x, HALF_W - halfRun), z: wall.at + inward * back, yaw: wall.yaw };
+  // A display is clamped by its SLOTS' reach — the very boxes canPlaceAt tests against the walls —
+  // so it can be pushed flush to a wall and still be green there. Any other footprint either leaves
+  // it red against every wall (the old wall-snap bug) or lets the outer slots through the wall.
+  const half = cellHalf(yaw) + WALL_INSET + 1e-6;
+  const lx = ((m.g.cols - 1) / 2) * CELL, lz = ((m.g.rows - 1) / 2) * CELL * Math.cos(m.tilt ?? 0);
+  const sin = Math.abs(Math.sin(yaw)), cos = Math.abs(Math.cos(yaw));
+  return { x: clamp(x, HALF_W - half - (lx * cos + lz * sin)), z: clamp(z, HALF_D - half - (lx * sin + lz * cos)), yaw };
 }
 
 /**
@@ -141,6 +133,10 @@ export function canPlaceAt(m, pose) {
     return boxIsClear(pose.x, pose.z, moveSize(m).w * Math.SQRT1_2,
       roomObstacles(displays, seats.filter((s) => s !== m), props.filter((p) => p !== m)));
   }
+  // Somebody has to be able to stand in front of it to browse. Only a wall can take that spot away
+  // outright, and only now that a shelf may be turned to face one.
+  if (!boxIsClear(pose.x + Math.sin(pose.yaw) * STAND_OFF, pose.z + Math.cos(pose.yaw) * STAND_OFF, STAND_HALF, []))
+    return false;
   const probe = { ...pose, cols: m.g.cols, rows: m.g.rows, tilt: m.tilt ?? 0 };
   const others = roomObstacles(displays.filter((o) => o !== m));
   for (let r = 0; r < m.g.rows; r++)
@@ -166,7 +162,7 @@ function paintMoveGhost(m) {
 /**
  * Move it there and say whether that was legal. It goes to the pose either way, so a blocked spot
  * is something the player can SEE their shelf sitting in rather than an invisible wall that stops
- * the drag dead; dropMovable() is what refuses it.
+ * the piece dead; dropMovable() is what refuses it.
  */
 export function proposeMove(m, x, z, yaw) {
   const pose = constrainPose(m, x, z, yaw);
@@ -257,6 +253,9 @@ function freeAt(event) {
 }
 
 export function grabMovable(event) {
+  // Anything still in hand from a gesture whose release never came is settled first — committed or
+  // put back by the same rule as any drop — rather than abandoned wherever the pointer left it.
+  if (mover.m) dropMovable();
   const p = floorPoint(event);
   // You cannot pick up the floor. Everything else in the room is fair game (DISPLAYS.md rule 10).
   const under = hoverTarget(event)?.disp;
@@ -272,8 +271,9 @@ export function grabMovable(event) {
   return true;
 }
 
-/** Release: a legal pose sticks, an illegal one goes back where it came from. Either way the piece
- *  stays selected, so the rotate handles are still on it. */
+/** Set down: a legal pose sticks, an illegal one goes back where it came from — as a box clicked
+ *  down where it has no room goes home. Either way the piece stays selected, so the rotate handles
+ *  are still on it. */
 export function dropMovable() {
   const { m } = mover;
   mover.m = null;
@@ -298,26 +298,33 @@ export function dropMovable() {
   touchView();
 }
 
+/** Put what is in hand back where it was picked up, wherever it is now (Escape, leaving move mode). */
+export function cancelMove() {
+  if (!mover.m) return;
+  mover.ok = false;
+  dropMovable();
+}
+
+/** Deselect. A piece still in hand is put back first: it can be anywhere, red, by now — and every
+ *  caller (leaving move mode, a new day's restart) is about to forget it. */
 export function clearSelection() {
+  cancelMove();
   mover.sel = null;
   dropMarker.visible = false;
   touchView();
 }
 
 /**
- * Turn by one detent. Mid-drag it just turns the thing in hand; otherwise it is its own little
+ * Turn by one detent. In hand it just turns the thing in hand, to be set down later; otherwise it is its own little
  * move, committed or reverted on the spot. Driven by Q/E and by the on-screen handles, which are
  * the same call — so the touch path cannot drift from the keyboard one.
- *
- * A wall shelf will not budge: its yaw belongs to the wall it is on, which is rule 10 working
- * rather than the button failing.
  */
 export function rotateMovable(step) {
   const m = mover.m ?? mover.sel ?? activeDisplay();
   if (!m) return;
   const from = movePose(m);
-  // Proposed before the early exit on purpose: a drag in progress still turns, it just is not
-  // settled here.
+  // Proposed before the early exit on purpose: a piece in hand still turns, it just is not settled
+  // here.
   if (mover.m) {
     proposeMove(m, from.x, from.z, from.yaw + step);
     return;

@@ -27,7 +27,7 @@ const SHELF_BASE_Y = 0.34;   // the plinth: puts the top shelf at roughly NPC he
 
 const TABLE_TOP_Y = 0.44;
 
-const STAND_OFF = 0.65;      // how far in front of a display an NPC stands to reach it
+export const STAND_OFF = 0.65;   // how far in front of a display an NPC stands to reach it
 
 // Authored positions, taken from the front as the count goes up. Shelves carry a yaw so they can
 // sit against a side wall; a pile is a free-standing table and always reads the same way round.
@@ -71,8 +71,8 @@ export const DISPLAY_SLOTS = [
  * up is a footprint straddling a tile boundary, which now has to fit inside one tile.
  */
 // How close to a wall anything may stand: the panel is 0.08 thick and centred on the boundary, so
-// 0.04 of it is inside the room, plus 0.02 of slack. Named because the wall-shelf snap has to stand
-// a display off by AT LEAST this much — a snap that lands inside its own clearance makes the
+// 0.04 of it is inside the room, plus 0.02 of slack. Named because move mode's clamp has to stand
+// a display off by AT LEAST this much — a clamp that lands inside its own clearance makes the
 // display red against every wall in the shop, which is exactly the bug this constant prevents.
 export const WALL_INSET = 0.04 + 0.02;
 
@@ -108,7 +108,7 @@ function floorTiles() {
 
 // A shoulder. Matches visit.js's BODY_RADIUS, which is the sim's and cannot be imported here
 // without the scene depending on the simulation.
-const STAND_HALF = 0.12;
+export const STAND_HALF = 0.12;
 
 /**
  * Where an NPC stands to browse a floor pile.
@@ -162,17 +162,21 @@ function slotCellWorld(slot, c, r) {
 
 /** An axis-aligned box on the floor, clear of the room shell and of everything else solid in it. */
 export function boxIsClear(x, z, half, obstacles) {
-  if (Math.abs(x) + half > HALF_W - WALL_INSET) return false;
-  if (Math.abs(z) + half > HALF_D - WALL_INSET) return false;
+  // Written as "not inside" rather than "outside": every comparison with NaN is false, so the
+  // `>` form called a NaN pose clear of the walls AND of everything else, and accepted it.
+  if (!(Math.abs(x) + half <= HALF_W - WALL_INSET)) return false;
+  if (!(Math.abs(z) + half <= HALF_D - WALL_INSET)) return false;
   return !obstacles.some((o) =>
     Math.abs(x - o.x) < half + o.w / 2 + o.pad &&
     Math.abs(z - o.z) < half + o.d / 2 + o.pad);
 }
 
+/** Half the box one slot is tested as: its own half-width square on, its circumradius at 45°. */
+export const cellHalf = (yaw) => (Math.abs(Math.sin(2 * yaw)) < 1e-6 ? CELL / 2 : CELL * Math.SQRT1_2);
+
 export function cellIsClear(slot, c, r, obstacles) {
   const p = slotCellWorld(slot, c, r);
-  return boxIsClear(p.x, p.z,
-    Math.abs(Math.sin(2 * slot.yaw)) < 1e-6 ? CELL / 2 : CELL * Math.SQRT1_2, obstacles);
+  return boxIsClear(p.x, p.z, cellHalf(slot.yaw), obstacles);
 }
 
 /**
@@ -191,7 +195,9 @@ export function roomObstacles(dispList, seatList = seats, propList = props) {
   // floor masks every other display out of existence, itself included.
   for (const d of dispList) {
     if (d.solid === false) continue;
-    out.push({ x: d.x, z: d.z, w: d.w, d: d.d, pad: 0.02 });
+    // A shelf's back panel stands 0.031 behind its tilted levels (addBackPanel), so two shelves pushed
+    // back to back meet panel to panel rather than through each other.
+    out.push({ x: d.x, z: d.z, w: d.w, d: d.d, pad: d.kind === 'shelf' ? 0.035 : 0.02 });
   }
   return out;
 }

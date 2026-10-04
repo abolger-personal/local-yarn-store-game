@@ -97,10 +97,10 @@ function movingReadout(disp) {
   const m = mover.m ?? disp;
   const verdict = mover.m
     ? `<br /><span class="${mover.ok ? 'ok' : 'no'}">${mover.ok
-        ? 'fits here' : 'blocked — releasing puts it back'}</span>`
+        ? 'fits here — click to set it down' : 'blocked — clicking here puts it back · Esc too'}</span>`
     : '';
   return `<span class="k">moving the shop</span> <b>${esc(m ? m.id : '—')}</b>`
-    + `<br /><span class="k">drag a display or a chair · ↺ ↻ or Q/E turn 45° · M to arrange stock again</span>${verdict}`;
+    + `<br /><span class="k">click a display or a chair to pick it up · ↺ ↻ or Q/E turn 45° · M to arrange stock again</span>${verdict}`;
 }
 
 /**

@@ -38,8 +38,9 @@ export const drag = {
   downX: 0, downY: 0, moved: false, pickedThisPress: false,
 };
 
-/** Move mode's selection: which display or chair is being dragged, and whether it fits. */
-export const mover = { m: null, sel: null, ox: 0, oz: 0, from: null, ok: true };
+/** Move mode's selection: which display or chair is in hand, and whether it fits. `fresh` marks the
+ *  press that picked it up, whose release keeps it in hand — see onPointerUp. */
+export const mover = { m: null, sel: null, ox: 0, oz: 0, from: null, ok: true, fresh: false };
 
 /** The shop's three clocks. */
 export const clocks = {

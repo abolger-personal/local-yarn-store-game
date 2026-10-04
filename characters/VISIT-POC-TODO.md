@@ -91,10 +91,19 @@ nobody in the doorway, no seat double-booked or leaked:
 ## Moving the shop — DISPLAYS.md rule 10
 
 Press **M** (or the `move displays` checkbox) to switch the pointer from arranging *stock* to
-arranging the *shop*. Drag a display **or a chair** to move it. Release commits and leaves the piece
-selected, with two curved-arrow handles floating over it — click either to turn 45°, or use **Q/E**.
-A footprint shows green where it may land and red where it may not; a blocked release puts it back.
-Pressing bare floor deselects.
+arranging the *shop*. Furniture moves the way stock does — click to pick, click to place, not
+press-drag-release (DESIGN-DECISIONS.md §7: holding the button down the whole move is hard on the
+hands). Click a display **or a chair** to pick it up; it follows the pointer, and a second click
+sets it down and leaves it selected. The turn buttons or **Q/E** turn it 45°, in hand or selected.
+A footprint shows green where it may land and red where it may not; a blocked click puts it back
+where it was picked up, as stock goes home. **Escape**, leaving furniture mode, or a new day put a
+piece in hand back too. Pressing bare floor empty-handed deselects (and orbits).
+
+On touch there is no hover between taps, so it follows stock's aiming press: tap the piece, then
+press where it should go — it jumps there, slide to adjust, lift to set it down. Every press while a
+piece is in hand is the player's, so a one-finger orbit cannot steal it; a press-drag-release
+still works too, as a drag and drop. A mouse leaving the canvas (for the turn buttons) leaves the
+piece where it was rather than carrying it to the floor underneath them.
 
 Chairs move by the same verb as displays. Rule 10 only names displays, but having one of the two
 things standing on the shop floor be immovable reads as a bug rather than as a rule.
@@ -108,11 +117,12 @@ The restrictions are enforced in `constrainPose`:
 
 | Type | Constraint |
 | --- | --- |
-| Wall shelf | Snaps to the nearest wall and takes that wall's facing. Slides along it, never off it. |
+| Every display | Clamped inside the room by its slots' reach, so it can never be carried through a wall. |
+| Wall shelf | Free in XZ, 45° detents — against a wall or free-standing, back to back with another. Its back panel is its wall. |
 | Floor pile | Stays on the floor — its plinth height is 0 and the move path never touches Y. |
 | Table pile | Free in XZ, 45° detents. |
 | Chair | Free in XZ, 45° detents, clamped inside the room. |
-| Peg board | Would clamp to a wall like a shelf, at wall height. Deferred with the rest of type C. |
+| Peg board | Would have to snap to a wall, at wall height. Deferred with the rest of type C. |
 
 "All Inventory will stay with the move" needed no code: an item's world matrix is composed against
 its display's `frame` every time it is painted, so moving the frame carries the stock.

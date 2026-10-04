@@ -49,6 +49,7 @@ import { refreshAll } from './goods/paint.js';
 import { installFeedback, paintActivePlane, tickGlow, updateHeldReadout } from './interact/glow.js';
 import { installInput } from './interact/input.js';
 import { abortDrag } from './interact/pick.js';
+import { clearSelection } from './interact/move.js';
 import { castGroup, bodyParams, installWorld, room, sizeInstanceBuffers } from './sim/world.js';
 import { frameRoom } from './ui/framing.js';
 
@@ -274,6 +275,7 @@ function giveToNpc() {
 
 /** Empty the shop: fresh grids, no stock, nothing in hand. */
 function clearShop() {
+  clearSelection();   // a held piece of furniture goes home before the displays it belongs to are rebuilt
   abortDrag();
   buildDisplays(S.displayCount);
   items.length = 0;

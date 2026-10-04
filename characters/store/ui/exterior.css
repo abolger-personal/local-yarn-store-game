@@ -1,0 +1,39 @@
+/* The shop's exterior: the entry, the door and the clapboard round them. Shared by the front door
+   (index.html) and the between-days screen (game.html, #night); the drawing is exterior.js.
+   Every value, with its reason, is in ai_planning_sessions/VISUAL-DESIGN-2D.md. Change one,
+   change the other. */
+.exterior {
+  --wall: #4a5d73;          /* clapboard, New England slate blue: cool, so the warm door pops */
+  --trim: #f7f5ef;          /* white-painted trim, a touch warm so it is paint, not paper */
+  --reveal: #cfc2a6;        /* the jamb, seen when the door swings */
+  --glow: #ffcf86;          /* the lit shop behind the door */
+  display: grid; place-items: center; overflow: hidden;
+  /* Clapboard: a shadow line under each board, over a gentle light falloff. */
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 26px, rgb(0 0 0 / .16) 26px 28px, rgb(255 255 255 / .05) 28px 29px),
+    radial-gradient(ellipse at 50% 40%, #5a6f86, var(--wall) 70%);
+}
+/* One box with the entry's own proportions, as tall as the screen allows and never wider than
+   it: every layer inside is positioned in percentages of the same 600x1110 drawing — the
+   frame's viewBox, which starts at y=70, just above the pediment. A page that shares the screen
+   with something else (the clipboard at night) sets --door-h. */
+.doorway {
+  position: relative;
+  height: var(--door-h, min(90vh, calc(96vw * 1110 / 600)));
+  aspect-ratio: 600 / 1110;
+  perspective: 1800px;
+}
+.doorway > * { position: absolute; }
+.frame { inset: 0; width: 100%; height: 100%; }
+/* The shop, seen through the opening once the door swings. Sits exactly where the leaf does. */
+.inside, #door {
+  left: calc(120 / 600 * 100%); top: calc(230 / 1110 * 100%);
+  width: calc(360 / 600 * 100%); height: calc(830 / 1110 * 100%);
+}
+.inside { background: radial-gradient(ellipse at 50% 35%, #fff1d6, var(--glow) 55%, #c98a3e); }
+#door { display: block; transform-origin: left center; transition: transform 1.1s cubic-bezier(.5, 0, .3, 1); }
+#door svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 6px 10px rgb(0 0 0 / .35)); }
+#door:focus-visible { outline: 3px solid var(--glow); outline-offset: 6px; }
+#door.open { transform: rotateY(-78deg); }
+.worn { mix-blend-mode: multiply; }
+@media (prefers-reduced-motion: reduce) { #door { transition: none; } }

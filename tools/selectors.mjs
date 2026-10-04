@@ -10,7 +10,8 @@ import { storeFiles } from './modules.mjs';
 // Both pages, as one pool of ids. The store modules drive the shop AND the puzzle bench, and a
 // module cannot say which page it was loaded by — so this can no longer tell you an element is on
 // the WRONG page, only that it exists on neither, which is the failure that actually happened.
-const html = ['characters/store.html', 'characters/puzzle.html']
+// exterior.js is markup too: the entry and the door, drawn into the front door and the night screen.
+const html = ['characters/store.html', 'characters/puzzle.html', 'characters/store/ui/exterior.js']
   .map((f) => readFileSync(f, 'utf8')).join('\n');
 const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]));
 const classes = new Set([...html.matchAll(/class="([^"]+)"/g)].flatMap((m) => m[1].split(/\s+/)));

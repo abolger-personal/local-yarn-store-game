@@ -8,6 +8,7 @@ import { shop } from '../core/state.js';
 import { boardFace } from '../scene/room.js';
 import { photoFor } from './photo.js';
 import { openBook, showPhoto } from './book.js';
+import { drawLettering } from './lettering.js';
 
 const W = 880, H = 560;          // 800px a metre, the board's 1.1 x 0.7
 const PINNED = 4;
@@ -41,10 +42,8 @@ function cork() {
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = 'rgba(90, 55, 25, .18)';
   for (let i = 0; i < 900; i++) ctx.fillRect(((i * 7919) % W), ((i * 104729) % H), 3, 3);   // flecks
-  ctx.fillStyle = '#3b2a1c';
-  ctx.font = 'italic 700 40px Georgia, serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('Customer of the Week', W / 2, 54);
+  // The house lettering, gold because it is the board's headline (VISUAL-DESIGN-2D.md, "Type").
+  drawLettering(ctx, 'CUSTOMER OF THE WEEK', W / 2, 62, { cap: 34, gold: true, maxWidth: W - 60 });
 }
 
 /** One polaroid, pinned, tilted a little: the photo above, who and what below. */
@@ -62,13 +61,14 @@ function polaroid(img, g, x, tilt) {
   ctx.restore();
 }
 
-/** Who and what under the photo, and the pin through the top. */
+/**
+ * Who and what under the photo, and the pin through the top. Small, so black house lettering. The
+ * object line is the design's title alone: the full label's needle size and fibres (labelOf) are
+ * for the Guestbook, and lettered at this size they would shrink past reading.
+ */
 function caption(g, cw, ch) {
-  ctx.fillStyle = '#3b2a1c';
-  ctx.font = '20px Georgia, serif';
-  ctx.fillText(g.npc, 0, ch / 2 - 30, cw - 16);
-  ctx.font = 'italic 15px Georgia, serif';
-  ctx.fillText(g.object, 0, ch / 2 - 10, cw - 16);
+  drawLettering(ctx, g.npc.toUpperCase(), 0, ch / 2 - 28, { cap: 15, maxWidth: cw - 16 });
+  drawLettering(ctx, (g.object ?? '').split(' — ')[0].toUpperCase(), 0, ch / 2 - 9, { cap: 10, maxWidth: cw - 16 });
   ctx.fillStyle = '#c0392b';
   ctx.beginPath();
   ctx.arc(0, -ch / 2 + 4, 8, 0, Math.PI * 2);
@@ -78,8 +78,7 @@ function caption(g, cw, ch) {
 function paint(entries, imgs) {
   cork();
   if (!entries.length) {
-    ctx.font = 'italic 26px Georgia, serif';
-    ctx.fillText('no photos yet', W / 2, H / 2 + 20);
+    drawLettering(ctx, 'NO PHOTOS YET', W / 2, H / 2 + 20, { cap: 20 });
   }
   entries.forEach((g, i) => polaroid(imgs[i], g, cardX(i), ((i % 2) * 2 - 1) * 0.045));
   texture.needsUpdate = true;

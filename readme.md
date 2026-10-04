@@ -28,6 +28,7 @@ If that value looks old, the browser is running cached code and nothing you chan
 
 | Page | Question it answers |
 | --- | --- |
+| `index.html` | The front door: the game's entrance and loading screen. See `ai_planning_sessions/VISUAL-DESIGN-2D.md`. |
 | `characters/species-checker.html` | Do two species read as different animals? Tuning surface, one character at a time. |
 | `characters/crowd.html` | Does the randomiser make a cast or a zoo? Performance instrumentation lives here. |
 | `characters/puzzle.html` | Is the arrangement a PUZZLE? One customer, one display, and a switch on every hint. |

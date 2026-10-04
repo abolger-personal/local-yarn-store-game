@@ -291,7 +291,11 @@ export function stow(npc, item, want) {
 export function workRound(npc, wip, round = null) {
   if (wip.state !== WIP_STATE.IN_PROGRESS) return false;
   const weight = (npc.prefs.skill / 3) * (npc.traits.Industriousness / 3);
-  wip.progress += (100 / wip.pattern.yarnUnits) * weight;
+  // No stitches without yarn: progress stops where the yarn they hold runs out (runningOut), and
+  // waits there until they buy more. Short of yarn, the limit is under 100, so they cannot finish.
+  const limit = unitsShort(wip) > 0 ? (100 * heldUnits(wip)) / wip.pattern.yarnUnits : 100;
+  if (wip.progress >= limit) return false;
+  wip.progress = Math.min(limit, wip.progress + (100 / wip.pattern.yarnUnits) * weight);
   if (wip.progress < 100) return false;
 
   wip.progress = 100;

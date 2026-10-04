@@ -17,7 +17,7 @@ import { EMPTY, footprint, fits, place, clearShelf, usableAt, fullyExposed, drop
   from '../inventory/grid.js';
 import {
   WIP_STATE, WEAR_SLOTS, makeCraftPrefs, makeWip, wantFor, stow, workRound,
-  wearOrOffer, photoSubject, lend, labelWant,
+  wearOrOffer, photoSubject, lend, labelWant, runningOut,
 } from './wip.js';
 import { labelOf as labelItem, TOOL_NOTIONS } from '../inventory/catalog.js';
 import { placeWord, thankYou } from './guestbook.js';
@@ -1197,6 +1197,7 @@ const BROWSE = {
     remember(npc, `sat ${wip.id}`, { what: 'sat', wip: wip.id, pattern: wip.pattern });
     npc.willReturn = true;
     const done = workRound(npc, wip, world.round);
+    if (runningOut(wip)) { say(world, npc, `ran out of yarn on ${labelOf(wip.pattern)}`); return; }
     say(world, npc, done
       ? `finished ${labelOf(wip.pattern)}! (crafter skill now ${npc.prefs.skill})`
       : `worked on ${labelOf(wip.pattern)} — ${Math.round(wip.progress)}%`);

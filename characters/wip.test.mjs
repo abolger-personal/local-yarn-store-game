@@ -265,7 +265,8 @@ const npcWith = (wips, over = {}) => ({
   const mk = (skill, ind, units) => {
     const pattern = { ...makePattern(seq(0.5), 'hat'), yarnUnits: units, craft: 'crochet' };
     const wip = { id: 'w', state: WIP_STATE.IN_PROGRESS, pattern,
-                  yarn: [{ name: 'yarn', w: 3, h: 3 }], tool: { name: 'crochet-hook', size: 4 },
+                  // all the yarn it calls for: this is about pace, and short of yarn the work stops
+                  yarn: Array.from({ length: units }, () => ({ name: 'yarn', w: 3, h: 3 })), tool: { name: 'crochet-hook', size: 4 },
                   progress: 0 };
     return { npc: npcWith([wip], { prefs: PREFS({ skill }), traits: TRAITS({ Industriousness: ind }) }), wip };
   };
@@ -304,7 +305,7 @@ const npcWith = (wips, over = {}) => ({
 {
   const mk = (skill) => {
     const pattern = { ...makePattern(seq(0.5), 'scarf'), yarnUnits: 2, craft: 'crochet' };
-    const wip = { id: 'w', state: WIP_STATE.IN_PROGRESS, pattern, yarn: [], tool: null, progress: 99 };
+    const wip = { id: 'w', state: WIP_STATE.IN_PROGRESS, pattern, yarn: [{ name: 'yarn' }, { name: 'yarn' }], tool: null, progress: 99 };
     return { npc: npcWith([wip], { prefs: PREFS({ skill }) }), wip };
   };
   const up = mk(2);
@@ -427,7 +428,7 @@ const npcWith = (wips, over = {}) => ({
 // --- workRound stamps the round it finished on ------------------------------
 {
   const pattern = { ...makePattern(seq(0.5), 'scarf'), yarnUnits: 2, craft: 'crochet' };
-  const wip = { id: 'w', state: WIP_STATE.IN_PROGRESS, pattern, yarn: [], tool: null, progress: 99 };
+  const wip = { id: 'w', state: WIP_STATE.IN_PROGRESS, pattern, yarn: [{ name: 'yarn' }, { name: 'yarn' }], tool: null, progress: 99 };
   const npc = npcWith([wip]);
   assert.ok(workRound(npc, wip, 17), 'it finishes');
   assert.equal(wip.finishedRound, 17, 'and records which round it finished on');
@@ -556,7 +557,8 @@ const npcWith = (wips, over = {}) => ({
 
   // Knit it, finish it, wear it: the finished object still says what pattern it was.
   const pattern = makeStockPattern(seq(0), 'scarf');
-  const wip = { id: 'w', state: WIP_STATE.IN_PROGRESS, progress: 99, yarn: [], tool: null, pattern };
+  const wip = { id: 'w', state: WIP_STATE.IN_PROGRESS, progress: 99, tool: null, pattern,
+                yarn: Array.from({ length: pattern.yarnUnits }, () => ({ name: 'yarn' })) };
   const npc = npcWith([wip]);
   workRound(npc, wip);
   wearOrOffer(npc);
@@ -573,6 +575,13 @@ const npcWith = (wips, over = {}) => ({
   assert.equal(runningOut(wip(100 * per / 4, 1)), true, 'knitted up to the end of the ball');
   assert.equal(runningOut(wip(99, Math.ceil(4 / per))), false, 'all the yarn the pattern wants: never short');
   assert.equal(runningOut({ pattern: null, progress: 50, yarn: [] }), false, 'no pattern, nothing to run out of');
+
+  // ...and running out STOPS the work: no progress past the yarn they hold, so no finish.
+  const knitter = npcWith([]);
+  const short = { ...wip(0, 1), state: WIP_STATE.IN_PROGRESS };
+  for (let r = 0; r < 50; r++) workRound(knitter, short);
+  assert.equal(short.state, WIP_STATE.IN_PROGRESS, 'out of yarn, they cannot finish');
+  assert.ok(Math.abs(short.progress - (100 * per) / 4) < 1e-9, `progress stops where the yarn runs out (${short.progress})`);
 }
 
 // Ready is per project: one closed gap sparkles even while another project still wants things.

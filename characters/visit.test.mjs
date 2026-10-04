@@ -617,6 +617,7 @@ const runCloseout = (world, npc) => {
   npc.traits.Industriousness = 3;
   const wip = WIP({ id: 'cowl', state: WIP_STATE.IN_PROGRESS, progress: 0,
                     pattern: PATTERN({ patternType: 'scarf', yarnUnits: 5 }),
+                    yarn: Array.from({ length: 5 }, () => YARN()),   // all of it: short, the work would stop
                     tool: { name: 'crochet-hook', size: 4.5 } });
   npc.wips = [wip];
   npc.state = STATE.BROWSE;

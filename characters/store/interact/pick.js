@@ -3,7 +3,8 @@
 // Extracted from the single 3,200-line module that used to live inline in store.html.
 
 import { ghost, dropMarker } from './glow.js';
-import { pickCandidate, displayPoint, activeDisplay, hoverTarget, snapTo } from './pointer.js';
+import { pickCandidate, displayPoint, activeDisplay, hoverTarget, snapTo, castAt } from './pointer.js';
+import { layerY } from '../core/config.js';
 import { items, touchView, aim, drag } from '../core/state.js';
 import { EMPTY, anySlot, lift } from '../../../inventory/grid.js';
 import { placeItem, settleYaw } from '../../../inventory/pick-place.js';
@@ -39,14 +40,13 @@ export function pickUp(event, found = pickCandidate(event)) {
   aim.active = disp.id;
   disp.plane = found.shelf;      // arranging follows what you just grabbed, so it drops back easily
   touchView();
-  const point = displayPoint(disp, event) ?? { x: 0, z: 0 };
   drag.index = index;
   drag.displayId = disp.id;
   // Out of the grid AND out of the simulation: see `available()` in visit.js. An NPC must not tidy
   // around it, stack onto its column, or buy it out of the player's hand.
   lift(disp.g, items[index].keys);
   items[index].held = true;
-  refreshFloating(disp, index, point.x, point.z);
+  carryItem(event);   // after the lift, so the aim no longer meets the item's own column
   touchView();
 }
 
@@ -127,6 +127,9 @@ export function trackHover(event) {
   return changed;
 }
 
+/** How far over its drop a mouse-held item hovers: clear of the ghost, not so far it detaches. */
+const MOUSE_HOVER = 0.03;
+
 /** Float the held item under the pointer and preview where it would land. */
 export function carryItem(event) {
   const disp = activeDisplay();
@@ -135,7 +138,15 @@ export function carryItem(event) {
   const item = items[drag.index];
   drag.target = snapTo(disp, disp.plane, item, point.x, point.z);
   ghost(item);
-  refreshFloating(disp, drag.index, point.x, point.z);
+  // A mouse is precise and hides nothing, so the held item hovers just over its drop with its
+  // bottom under the pointer — cast at that height, so it does not slide off the pointer as the
+  // stack under it grows. A finger hides what it is on: touch and pen keep the S.liftHeight lift
+  // (refreshFloating), which exists for exactly that and is not wanted on a laptop.
+  if (event.pointerType === 'mouse') {
+    const base = (drag.target ? layerY(drag.target.layer) : 0) + MOUSE_HOVER;
+    const at = castAt(disp, base) ?? point;
+    refreshFloating(disp, drag.index, at.x, at.z, base);
+  } else refreshFloating(disp, drag.index, point.x, point.z);
   touchView();
 }
 

@@ -77,6 +77,14 @@ const INK = '#241e22';
  * cannot invent a yarn weight or a pattern that catalog.js would not have produced.
  */
 /**
+ * The anchor cell that puts a w x h footprint's centre on `over`'s centre, or half a cell off it
+ * where their sizes differ in parity — a 3x3 base's centre cell is covered either way, which is
+ * what restsOnCentres asks. Off the grid is fine: footprint() refuses it and addItem moves on.
+ */
+const centredOn = (over, w, h) =>
+  ({ c: over.c + Math.floor((over.w - w) / 2), r: over.r + Math.floor((over.h - h) / 2) });
+
+/**
  * How many 2.5D layers tall this item reserves. Takes the RESOLVED footprint, forced or not.
  *
  * Yarn derives it from its SHAPE rather than taking catalog.js's `layers`, because the mesh is
@@ -121,17 +129,18 @@ function cellOrder(display, { c, r, avoidWall }) {
  * @param {any} display
  * @param {number} shelf
  * @param {any} spec
- * @param {{c?: number, r?: number, avoidWall?: boolean, shape?: number[], reserve?: number}} [where]
+ * @param {{c?: number, r?: number, over?: any, avoidWall?: boolean, shape?: number[], reserve?: number}} [where]
  *   `reserve` is layers that must stay free ABOVE the item — room for what goes on it next.
+ *   `over` is an item to try first to stack on, centre on centre (see centredOn).
  */
-export function addItem(display, shelf, spec, { c, r, avoidWall = false, shape, reserve = 0 } = {}) {
+export function addItem(display, shelf, spec, { c, r, over, avoidWall = false, shape, reserve = 0 } = {}) {
   if (items.length >= CAPACITY) return -1;   // the instanced buffers cannot grow past this
   const { g } = display;
   // Yarn and patterns bring their own footprint; a notion gets one of its packagings.
   const [w, h] = shape ?? (spec.w ? [spec.w, spec.h] : packageFor(spec.name));
   const layers = layersFor(spec, w, h);
 
-  for (const cell of cellOrder(display, { c, r, avoidWall })) {
+  for (const cell of cellOrder(display, over ? { ...centredOn(over, w, h), avoidWall } : { c, r, avoidWall })) {
     // footprint() returns null the moment any covered cell runs off the grid or hits a mask, and
     // fits() treats null as "no" — so an oversized package simply fails over to the next cell.
     const keys = footprint(g, shelf, [cell.c, cell.r], [w, h]);

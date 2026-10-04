@@ -4,12 +4,12 @@
 
 import { cast, seats, props, displays, items, shop } from './core/state.js';
 import { SHOP_RANGE, SIZED_NOTIONS, YARN_SHAPES, yarnWeight } from '../../inventory/catalog.js';
-import { usableAt } from '../../inventory/grid.js';
+import { fits, footprint, makeDisplay, place, usableAt } from '../../inventory/grid.js';
 import { familyExtent, yarnFit } from '../../inventory/yarn-geometry.js';
 import { createCharacter, disposeCharacter, getSpecies, speciesIds } from '../npc.js';
 import { labelOf, obstacles, seatById } from '../visit.js';
 import * as THREE from 'three';
-import { BOX_H, CELL, S } from './core/config.js';
+import { BOX_H, CELL, S, TALLEST_LAYERS } from './core/config.js';
 import { applyDaylight, camera, controls, key as sun } from './scene/stage.js';
 import { COUNTER, HALF_D, HALF_W, SHADOW_LAYER, cullWalls, shadowCasters, walls } from './scene/room.js';
 import { ROOM_FLOOR, applyTransform } from './scene/displays.js';
@@ -124,12 +124,24 @@ function checkYarnHeights() {
  */
 function checkStockable() {
   const tallest = Math.max(...displays.map((d) => d.g.headroom));
-  const unstockable = YARN_SHAPES.flatMap((sh) => SHOP_RANGE.weights
+  const rolls = YARN_SHAPES.flatMap((sh) => SHOP_RANGE.weights
     .map((wn) => /** @type {[string, string, number]} */
-      ([sh, wn, yarnFit(sh, yarnWeight(wn).size, yarnWeight(wn).size, YARN_FIT).layers]))
-    .filter((row) => row[2] > tallest));
+      ([sh, wn, yarnFit(sh, yarnWeight(wn).size, yarnWeight(wn).size, YARN_FIT).layers])));
+  const unstockable = rolls.filter((row) => row[2] > tallest);
   console.assert(unstockable.length === 0, 'yarn the shop can roll but nothing can hold:',
     unstockable.map(([sh, wn, L]) => `${sh}/${wn}=${L} layers > ${tallest}`));
+  // config.js cannot build geometry, so TALLEST_LAYERS is written down; this is what keeps it true.
+  const biggest = Math.max(...rolls.map((row) => row[2]));
+  console.assert(biggest === TALLEST_LAYERS,
+    `tallest yarn is ${biggest} layers, config.js TALLEST_LAYERS says ${TALLEST_LAYERS}`);
+  // Two of the biggest, one on the other, on a scratch grid as tall as a real floor tile. Not the
+  // tile itself: placing into it would leave a phantom stack in the shop's stock.
+  const tile = displays.find((d) => d.solid === false);
+  const g = makeDisplay(1, 1, { headroom: tile?.g.headroom ?? 0 });
+  const keys = footprint(g, 0, [0, 0], [1, 1]);
+  place(g, keys, 0, biggest);
+  console.assert(fits(g, keys, biggest),
+    `floor: two ${biggest}-layer items do not stack under its ${g.headroom}-layer headroom`);
 }
 
 export function checkItemSizes() {

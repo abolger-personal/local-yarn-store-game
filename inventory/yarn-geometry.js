@@ -428,3 +428,101 @@ export const aspectDistance = (a, b, tier = 1) => {
   const [p, q] = [familyAspect(a, tier), familyAspect(b, tier)];
   return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
 };
+
+const _relief = new Map();
+
+const DOWN = new THREE.Vector3(0, -1, 0);
+
+/** Grid nodes per side of a family's relief map. 48 puts a node every ~2% of the family's width. */
+const RELIEF_N = 48;
+
+/**
+ * A family's real top and bottom surfaces, as heights over its footprint — in unit space, measured
+ * from the bottom of its bounding box. NaN where there is no yarn at that point.
+ *
+ * Read off the mesh with one vertical ray per node, because the bounding box is the wrong answer
+ * for anything round: a ball's top is that high only at its very middle, and its bottom touches
+ * down only there. Stacking at the box height is what drew a ball perched off-centre on another
+ * hovering over its shoulder. Interpolated bilinearly where all four nodes hit; at the rim, where
+ * some miss, the highest top and lowest bottom of those that hit, which errs towards a hair of air
+ * rather than overlap.
+ *
+ * @param {string} name @param {number|string} [tier]
+ * @returns {{top: (x: number, z: number) => number, bottom: (x: number, z: number) => number}}
+ */
+export function familyRelief(name, tier = 1) {
+  const cacheKey = `${name}@${tier}`;
+  if (_relief.has(cacheKey)) return _relief.get(cacheKey);
+  const geo = buildFamily(name, tier);
+  const b = geo.boundingBox.clone();
+  const { top, bottom } = castRelief(geo, b);
+  geo.dispose();
+  const out = {
+    top: (x, z) => sampleRelief(top, b, x, z, Math.max),
+    bottom: (x, z) => sampleRelief(bottom, b, x, z, Math.min),
+  };
+  _relief.set(cacheKey, out);
+  return out;
+}
+
+
+/** One vertical ray per node of the relief grid: the highest and lowest yarn under it, or NaN. */
+function castRelief(geo, b) {
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  const ray = new THREE.Raycaster();
+  const N = RELIEF_N, size = (N + 1) * (N + 1);
+  const top = new Float32Array(size).fill(NaN), bottom = new Float32Array(size).fill(NaN);
+  // Nudged off the exact node: a ray straight through a pole vertex can report one hit, not two.
+  const at = (i, lo, hi) => lo + ((hi - lo) * i) / N + 1e-5;
+  for (let j = 0; j <= N; j++)
+    for (let i = 0; i <= N; i++) {
+      ray.set(new THREE.Vector3(at(i, b.min.x, b.max.x), b.max.y + 1, at(j, b.min.z, b.max.z)), DOWN);
+      const ys = ray.intersectObject(mesh).map((h) => h.point.y - b.min.y);
+      if (ys.length) { top[j * (N + 1) + i] = Math.max(...ys); bottom[j * (N + 1) + i] = Math.min(...ys); }
+    }
+  return { top, bottom };
+}
+
+/** One relief map at (x, z): bilinear inside the yarn, `edge` of the nodes that hit at its rim. */
+function sampleRelief(map, b, x, z, edge) {
+  const N = RELIEF_N;
+  const fx = ((x - b.min.x) / (b.max.x - b.min.x)) * N, fz = ((z - b.min.z) / (b.max.z - b.min.z)) * N;
+  if (!(fx >= 0 && fx <= N && fz >= 0 && fz <= N)) return NaN;
+  const i = Math.min(N - 1, Math.floor(fx)), j = Math.min(N - 1, Math.floor(fz));
+  const tx = fx - i, tz = fz - j, row = N + 1;
+  const v = [map[j * row + i], map[j * row + i + 1], map[(j + 1) * row + i], map[(j + 1) * row + i + 1]];
+  if (v.every(Number.isFinite))
+    return (v[0] * (1 - tx) + v[1] * tx) * (1 - tz) + (v[2] * (1 - tx) + v[3] * tx) * tz;
+  const hit = v.filter(Number.isFinite);
+  return hit.length ? edge(...hit) : NaN;
+}
+
+/**
+ * An item's solid, for settling one thing onto another (pick-place.js settledBase): its top and
+ * bottom as heights above its own base at an offset (dx, dz) from its centre, NaN off it, and a
+ * radius that bounds it. `family` null is a box — a notion or a pattern — filling its footprint to
+ * `fill` and `boxHeight` per layer, flat top and bottom. Yarn is drawn the way yarn.js draws it:
+ * one horizontal scale from yarnFit, settled vertically, turned by the item's yaw.
+ *
+ * @param {string|null} family
+ * @param {{w: number, h: number, layers?: number, yaw?: number}} item
+ * @param {{cell: number, boxHeight: number, fill?: number, tier?: number|string}} grid
+ */
+export function restingSolid(family, item, grid) {
+  const { cell, boxHeight, fill = 0.9, tier = 1 } = grid;
+  const cos = Math.cos(item.yaw ?? 0), sin = Math.sin(item.yaw ?? 0);
+  // World offset into the item's own frame: the inverse of the yaw yarn.js draws it with.
+  const local = (dx, dz) => [dx * cos - dz * sin, dx * sin + dz * cos];
+  if (!family) {
+    const hw = (item.w * cell * fill) / 2, hd = (item.h * cell * fill) / 2;
+    const tall = boxHeight * (item.layers ?? 1);
+    const inside = (dx, dz) => { const [x, z] = local(dx, dz); return Math.abs(x) <= hw && Math.abs(z) <= hd; };
+    return { top: (dx, dz) => (inside(dx, dz) ? tall : NaN), bottom: (dx, dz) => (inside(dx, dz) ? 0 : NaN),
+             r: Math.hypot(hw, hd) };
+  }
+  const { k, ky } = yarnFit(family, item.w, item.h, { cell, boxHeight, fill, tier });
+  const relief = familyRelief(family, tier);
+  const [uw, , ud] = familyExtent(family, tier);
+  const at = (fn) => (dx, dz) => { const [x, z] = local(dx, dz); return fn(x / k, z / k) * ky; };
+  return { top: at(relief.top), bottom: at(relief.bottom), r: (k * Math.hypot(uw, ud)) / 2 };
+}

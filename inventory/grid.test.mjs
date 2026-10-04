@@ -199,4 +199,35 @@ import { makeDisplay, footprint, fits, place, lift, topAt, dropLayer, columnAt, 
   assert.equal(anySlot(t, { w: 1, h: 1, layers: 3 }), null, 'a three-layer one does not');
 }
 
+// --- anything resting on round yarn covers its CENTRE --------------------------------
+// A ball or cone is round: a box set on the rim of a 3x3 ball is drawn hanging in the air. The
+// rule is the grid's, so the snap, the NPCs' rearranging and stock seeding all get it from fits().
+// Off-centre is otherwise fine — precarious stacks are wanted, only the rim of a 3x3 is not.
+{
+  const ROUND = 5;
+  const g = makeDisplay(5, 5, { headroom: 10, cell: 0.2, round: (i) => i === ROUND });
+  const at = (c, r, w = 1, h = 1) => footprint(g, 0, [c, r], [w, h]);
+  place(g, at(1, 1, 3, 3), ROUND, 3);                  // a 3x3 ball, centre cell (2,2)
+  assert.ok(!fits(g, at(1, 1)), 'a 1x1 on the rim of a 3x3 ball does not fit');
+  assert.ok(fits(g, at(2, 2)), 'a 1x1 on its centre does');
+  assert.ok(fits(g, at(2, 1, 1, 2)), 'a 1x2 reaching its centre does');
+  assert.ok(!fits(g, at(3, 3, 2, 2)), 'a 2x2 overhanging one corner does not');
+  assert.equal(nearestSlot(g, 0, { w: 1, h: 1, layers: 1 }, [-0.2, -0.2], { reach: 0.3 })?.layer, 0,
+               'a drop aimed at the rim snaps off the ball, not onto its edge');
+
+  // A 2x2 round thing has its centre on a corner every cell touches: any overlap rests on it.
+  const h = makeDisplay(4, 4, { headroom: 10, cell: 0.2, round: () => true });
+  place(h, footprint(h, 0, [0, 0], [2, 2]), 1, 2);
+  assert.ok(fits(h, footprint(h, 0, [1, 1], [1, 1])), 'any cell of a 2x2 ball is its centre');
+  assert.ok(fits(h, footprint(h, 0, [1, 1], [2, 2])), 'so a 2x2 shifted one cell along it perches');
+
+  // Several supports: each round one is checked. Half on a flat box, half on a ball's rim, hangs.
+  const m = makeDisplay(6, 3, { headroom: 10, cell: 0.2, round: (i) => i === ROUND });
+  place(m, footprint(m, 0, [0, 0], [3, 3]), ROUND, 3);
+  place(m, footprint(m, 0, [3, 0], [1, 3]), 9, 3);     // a flat stack level with the ball
+  assert.ok(fits(m, footprint(m, 0, [3, 0], [1, 1])), 'flat supports are unrestricted');
+  assert.ok(!fits(m, footprint(m, 0, [2, 0], [2, 1])), 'one foot on a rim is one foot in the air');
+  assert.ok(fits(m, footprint(m, 0, [1, 1], [3, 1])), 'centre plus a flat neighbour is fine');
+}
+
 console.log('grid.js self-check: all assertions passed');

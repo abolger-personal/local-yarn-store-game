@@ -39,6 +39,9 @@ export const { pickCandidate, hoverTarget, snapTo, raycaster, setRay: setRayFrom
 /** Where on a display's ACTIVE plane the pointer is — used to float a carried item, not to pick. */
 export const displayPoint = (disp, event) => picker.displayPoint(disp, disp.plane, event);
 
+/** Where the ray last aimed meets a height on the active level, in level-local x, z — or null. */
+export const castAt = (disp, height) => picker.castLocal(disp, disp.plane, height);
+
 /** Anywhere on this display at all, or null — the last resort when an item's own slot filled up. */
 export const firstFreeSlot = (disp, item) => anySlot(disp.g, item);
 

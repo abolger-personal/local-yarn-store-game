@@ -112,9 +112,14 @@ function fillStock(n) {
       continue;
     }
     // Two or three onto one anchor column, so a pile reads as a pile even at a small stock count.
-    const c = rnd(d.g.cols), r = rnd(d.g.rows);
+    // Each next one is aimed centre-on-centre at the last: anchoring them all on one CELL put
+    // everything after a 3x3 ball on its corner, which round yarn refuses (grid.js restsOnCentres).
     const tall = Math.min(n - placed, 1 + rnd(3));
-    for (let k = 0; k < tall; k++) if (addItem(d, 0, randomStock(), { c, r }) >= 0) placed++;
+    let top = { c: rnd(d.g.cols), r: rnd(d.g.rows) };
+    for (let k = 0; k < tall; k++) {
+      const index = addItem(d, 0, randomStock(), k ? { over: top } : top);
+      if (index >= 0) { placed++; top = items[index]; }
+    }
   }
   return placed;
 }
@@ -184,8 +189,8 @@ function buryOne(npc, i, want, unburied) {
   // Every PLACE in turn, not just the next one. A 1x1 cone still reserves four layers and a wall
   // shelf only clears three, so the one display this used to try can legitimately refuse — and a
   // burial that silently does not happen is the dig-out branch quietly going untested. One random
-  // tile stands in for the floor rather than all of them: a tile is sixteen cells twelve layers
-  // deep, so unlike a shelf it has no realistic way to say no.
+  // tile stands in for the floor rather than all of them: a tile is sixteen cells forty-eight
+  // layers deep, so unlike a shelf it has no realistic way to say no.
   // A notion is boxed 1x1 so it fits under any lid; yarn and patterns keep their OWN footprint.
   // Forcing 1x1 on everything squeezed a worsted or bulky ball into one cell — a ball the wrong
   // size for its weight, which checkItemSizes caught on about two boots in three.
@@ -207,9 +212,9 @@ function seedWants(npcs) {
   npcs.forEach((npc, i) => {
     const { wants, placed } = seedOne(npc, i, unseeded);
     placedCount += placed;
-    // The first want that CAN be buried. A bulky cone is twelve layers, a pile's whole headroom,
-    // so nothing can lid it; skipping it costs nothing (its noticeable copy is already out — seedOne)
-    // but the dig-out branch still wants one buried thing per customer where there is one.
+    // The first want that CAN be buried. A bulky cone is twelve layers, a table's whole headroom,
+    // so only the floor (twice that) can lid it; skipping it costs nothing (its noticeable copy is
+    // already out — seedOne) but the dig-out branch still wants one buried thing per customer where there is one.
     const buried = wants.reduce((n, want) => n || buryOne(npc, i, want, unseeded), 0);
     if (wants.length && !buried) console.info(`${npc.name}: nothing they want fits under a lid; none buried`);
     placedCount += buried;

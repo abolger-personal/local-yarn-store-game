@@ -13,10 +13,12 @@ const key = (g, s, c, r) => (s * g.rows + r) * g.cols + c;
 
 /**
  * @param mask (shelf,col,row) => boolean — false makes that slot a hole. Omit for a full lattice.
+ * @param round (item index) => boolean — is that item round (a yarn ball or cone)? Anything resting
+ *   on a round item has to cover its centre; see restsOnCentres. Omit and everything is flat.
  */
 export function makeDisplay(cols, rows, opts = {}) {
-  const { shelves = 1, headroom = 4, cell = 0.26, mask = null } = opts;
-  const g = { cols, rows, cell, shelves, headroom, usable: null, piles: null };
+  const { shelves = 1, headroom = 4, cell = 0.26, mask = null, round = null } = opts;
+  const g = { cols, rows, cell, shelves, headroom, round, usable: null, piles: null };
   const n = shelves * cols * rows;
   g.usable = new Uint8Array(n);
   for (let s = 0; s < shelves; s++)
@@ -54,7 +56,48 @@ export const dropLayer = (g, keys) => keys.reduce((m, k) => Math.max(m, g.piles[
  * super-bulky ball that is three cells wide is three layers high as well.
  */
 export const fits = (g, keys, layers = 1) =>
-  keys !== null && dropLayer(g, keys) + layers <= g.headroom;
+  keys !== null && dropLayer(g, keys) + layers <= g.headroom && restsOnCentres(g, keys);
+
+/**
+ * Does every ROUND item this footprint would rest on have a centre cell under it?
+ *
+ * A ball or cone is round, so only the middle of its top is a surface. A box laid wide across
+ * three cells is still on it as long as one of them is that middle; one set on the rim of a 3x3
+ * ball is drawn hanging in the air. Each round support is checked, so a box half on a flat box
+ * and half on a ball's rim hangs too. Flat supports are unrestricted.
+ *
+ * The support's extent is read off the grid itself — its own index fills a rectangle at its top
+ * layer — so there is no per-item bookkeeping here to fall out of step with the piles.
+ */
+export function restsOnCentres(g, keys) {
+  if (!g.round) return true;
+  const L = dropLayer(g, keys);
+  if (L === 0) return true;
+  const under = new Set(keys);
+  const seen = new Set();
+  for (const k of keys) {
+    const index = g.piles[k].length === L ? g.piles[k][L - 1] : EMPTY;   // shorter = bridged over
+    if (index === EMPTY || seen.has(index) || !g.round(index)) continue;
+    seen.add(index);
+    if (!centreKeys(g, k, L - 1, index).some((ck) => under.has(ck))) return false;
+  }
+  return true;
+}
+
+/**
+ * The cell(s) holding the centre of the item `index`, which tops column `k` at `layer`: the middle
+ * one along an odd side, both middle ones along an even side — a 2x2's centre is a corner all
+ * four of its cells touch, so any overlap with one rests on it.
+ */
+function centreKeys(g, k, layer, index) {
+  const s = Math.floor(k / (g.cols * g.rows)), c = k % g.cols, r = Math.floor(k / g.cols) % g.rows;
+  const same = (cc, rr) => usableAt(g, s, cc, rr) && g.piles[key(g, s, cc, rr)][layer] === index;
+  const reach = (dc, dr) => { let n = 0; while (same(c + dc * (n + 1), r + dr * (n + 1))) n++; return n; };
+  const c0 = c - reach(-1, 0), c1 = c + reach(1, 0), r0 = r - reach(0, -1), r1 = r + reach(0, 1);
+  const mid = (a, b) => [Math.floor((a + b) / 2), Math.ceil((a + b) / 2)];
+  const [ca, cb] = mid(c0, c1), [ra, rb] = mid(r0, r1);
+  return [key(g, s, ca, ra), key(g, s, cb, ra), key(g, s, ca, rb), key(g, s, cb, rb)];
+}
 
 /** Place item into its columns; returns the layer it landed on. Assumes fits() is true. */
 export function place(g, keys, index, layers = 1) {
@@ -126,6 +169,14 @@ export function fullyExposed(display, items, index) {
   return true;
 }
 
+/** How far (x, z) lies outside a slot rect — 0 anywhere on it. */
+const outside = (rect, x, z) => Math.hypot(Math.max(0, Math.abs(rect.x - x) - rect.w / 2),
+                                           Math.max(0, Math.abs(rect.z - z) - rect.d / 2));
+
+/** Nearer the footprint first; equally near (both under the point, usually), more centred. */
+const beats = (gap, score, best) =>
+  gap < best.gap - 1e-9 || (gap <= best.gap + 1e-9 && score < best.score);
+
 /**
  * The slot a drop should land in: the nearest one on this shelf that `item` ACTUALLY FITS IN,
  * within `reach` (in the display's own units) of the point (x,z). Null if nothing fits in range.
@@ -139,8 +190,13 @@ export function fullyExposed(display, items, index) {
  * Reach is measured in the display's plane rather than on screen deliberately: it is then a fixed
  * number of SLOTS, which is what the player is reasoning about, and it does not drift with zoom.
  *
- * Anchored on the footprint CENTRE, so a 2x2 package centres on the pointer rather than hanging
- * off one corner of it.
+ * UNDER the point first: a footprint that covers it beats one that does not, however centred, and
+ * `reach` is how far outside a footprint's edge the point may be. Ranking by centre distance alone
+ * put the drop wherever the nearest legal CENTRE was — for a 3x3 aimed at a corner cell, more than
+ * 1.6 slots off and so nowhere at all, though a 3x3 covering that cell was free — and the player
+ * could not predict where a click would land. Among the footprints that do cover it, the most
+ * CENTRED wins, so a 3x3 centres on the pointer's cell and a 2x2 takes the side of the cell the
+ * pointer is nearer.
  */
 export function nearestSlot(g, s, item, [x, z], { reach, turn = true, turnPenalty = 0.6 }) {
   let best = null;
@@ -150,13 +206,14 @@ export function nearestSlot(g, s, item, [x, z], { reach, turn = true, turnPenalt
         const keys = footprint(g, s, [c, r], [o.w, o.h]);
         if (!fits(g, keys, item.layers ?? 1)) continue;
         const rect = slotRect(g, c, r, o.w, o.h);
+        const gap = outside(rect, x, z);
+        if (gap > reach) continue;
         const d = Math.hypot(rect.x - x, rect.z - z);
-        if (d > reach) continue;
-        // Rank by distance PLUS the turn's bias, so a turn has to actually earn itself. Report the
+        // Then by distance PLUS the turn's bias, so a turn has to actually earn itself. Report the
         // plain distance, since that is what a caller means by "how close was this".
         const score = d + o.bias;
-        if (best && score >= best.score) continue;
-        best = { c, r, keys, layer: dropLayer(g, keys), d, score, turned: o.turned, w: o.w, h: o.h };
+        if (best && !beats(gap, score, best)) continue;
+        best = { c, r, keys, layer: dropLayer(g, keys), d, gap, score, turned: o.turned, w: o.w, h: o.h };
       }
   return best;
 }

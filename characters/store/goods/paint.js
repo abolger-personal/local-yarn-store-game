@@ -30,7 +30,9 @@ import {
   sizeSide,
   sizeTop,
 } from './items.js';
-import { hideYarn, paintYarn } from './yarn.js';
+import { YARN_FIT, hideYarn, paintYarn } from './yarn.js';
+import { settledBase } from '../../../inventory/pick-place.js';
+import { restingSolid } from '../../../inventory/yarn-geometry.js';
 import { cellNameFor } from './stock.js';
 
 /** Blank an item's notion box, its four side labels and both size stickers. */
@@ -180,8 +182,20 @@ export function hideItem(index) {
   shadows.instanceMatrix.needsUpdate = true;
 }
 
-/** Draw an item at rest in its slot — or nowhere at all, once an NPC has bought it. */
-export function refresh(index) {
+// How settledBase sees an item: yarn by its real mesh, everything else as the box it is drawn as.
+const SETTLE = {
+  layerY,
+  solid: (item) => restingSolid(item.name === 'yarn' ? item.shape : null, item, YARN_FIT),
+};
+
+/**
+ * Draw an item at rest in its slot — or nowhere at all, once an NPC has bought it.
+ *
+ * Its height is where it actually touches down on what is under it (settledBase), not its grid
+ * layer: drawn at the layer, anything perched off-centre on a ball hovered over the ball's curve.
+ * `memo` is shared across one repaint so each support is settled once.
+ */
+export function refresh(index, memo = new Map()) {
   const item = items[index];
   if (item.gone) {
     hideItem(index);
@@ -189,7 +203,7 @@ export function refresh(index) {
   }
   const disp = byId(item.display);
   const rect = slotRect(disp.g, item.c, item.r, item.w, item.h);
-  const base = layerY(item.layer);
+  const base = settledBase(disp.g, items, index, SETTLE, memo);
   paintInstance(disp, index, {
     cx: rect.x, cz: rect.z, base, shadowBase: base,
     footW: rect.w * FILL, footD: rect.d * FILL, yaw: item.yaw, shelf: item.shelf,
@@ -200,11 +214,22 @@ export function refresh(index) {
  * Draw an item floating under the pointer, lifted off whichever display is currently targeted —
  * which may not be the one it was picked up from, if the player has moved the pointer across.
  * Slightly enlarged, so a held item reads as picked-up rather than just badly placed.
+ *
+ * `base`, when given, is the level-local height to draw it at, right where (x, z) says, with no
+ * lift: a mouse hides nothing, so the held item hovers just over its drop, under the pointer.
  */
 const _lift = new THREE.Vector3();
 
-export function refreshFloating(disp, index, x, z) {
+export function refreshFloating(disp, index, x, z, base = null) {
   const item = items[index];
+  if (base !== null) {
+    paintInstance(disp, index, {
+      cx: x, cz: z, base, shadowBase: base,
+      footW: item.w * CELL * FILL, footD: item.h * CELL * FILL,
+      yaw: item.yaw, shelf: disp.plane, grow: 1.08,
+    });
+    return;
+  }
   // Lifted along SCREEN up, not the level's own up, because the job is to get the box out from
   // under a finger and a finger covers PIXELS. The level's up buys almost none of them on the one
   // display that needs it most: a 45° shelf tilts its up axis toward the camera, so at a 35°
@@ -223,9 +248,10 @@ export function refreshFloating(disp, index, x, z) {
 }
 
 export const refreshAll = () => {
+  const memo = new Map();
   items.forEach((_, i) => {
     // A held item follows the pointer; it has no resting slot to be drawn in until it is dropped.
-    if (!items[i].held) refresh(i);
+    if (!items[i].held) refresh(i, memo);
   });
   // Then blank every slot ABOVE the stock that exists.
   //

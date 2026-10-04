@@ -244,15 +244,56 @@ function hoverTarget(k, event) {
   return best;
 }
 
-/** Where on a display's plane the pointer is — used to float a carried item, not to pick. */
+/**
+ * Where on a display's plane the pointer is — used to float a carried item AND to aim its drop.
+ *
+ * The ray is tested against every occupied column as a solid block, floor to stack top, and the
+ * first one it meets wins. It used to cast the bare floor first and only then ask what stood on
+ * the column it hit — but at a diorama angle the floor under the pointer is BEHIND whatever the
+ * player is pointing at, by its height over the tangent of the camera's elevation. For a one-layer
+ * box that is a sliver; for a four-layer cone it is a slot or two, so pointing at the top of any
+ * tall yarn read as the empty floor behind it and nothing could ever be stacked onto yarn.
+ *
+ * A block rather than only its lid, because a tall item's FRONT is most of what is on screen —
+ * the same reason the pick measures to an item's whole axis. A side hit is pulled a quarter slot
+ * into its column, so the snap ranks that column over the neighbour sharing its edge.
+ */
 function displayPoint(k, disp, shelf, event) {
   setRay(k, event);
   const guess = castLocal(k, disp, shelf);
   if (!guess) return null;
-  const col = columnAt(disp.g, guess.x, guess.z);
-  const topIndex = col ? topAt(disp.g, shelf, col.c, col.r) : EMPTY;
-  if (topIndex === EMPTY) return guess;
-  return castLocal(k, disp, shelf, k.itemHeight(disp, k.items()[topIndex])) ?? guess;
+  return stackHit(k, disp, shelf) ?? guess;
+}
+
+const _box = new THREE.Box3(), _ray = new THREE.Ray(), _boxHit = new THREE.Vector3();
+
+/** The nearest occupied column the ray runs into, as a point inside it on its level, or null. */
+function stackHit(k, disp, shelf) {
+  const { g } = disp;
+  _ray.copy(k.raycaster.ray).applyMatrix4(k._inv.copy(k.levelFrame(disp, shelf)).invert());
+  let best = null;
+  for (let r = 0; r < g.rows; r++)
+    for (let c = 0; c < g.cols; c++) {
+      const index = topAt(g, shelf, c, r);
+      const hit = index === EMPTY ? null : columnHit(g, c, r, k.itemHeight(disp, k.items()[index]));
+      if (hit && (!best || hit.distSq < best.distSq)) best = hit;
+    }
+  return best;
+}
+
+/** Where the level-local ray enters one column's block, pulled into the column; or null. */
+function columnHit(g, c, r, top) {
+  const { x, z } = slotRect(g, c, r, 1, 1);
+  const half = g.cell / 2, pad = g.cell / 4;
+  _box.min.set(x - half, 0, z - half);
+  _box.max.set(x + half, top, z + half);
+  if (!_ray.intersectBox(_box, _boxHit)) return null;
+  return {
+    x: THREE.MathUtils.clamp(_boxHit.x, x - pad, x + pad),
+    z: THREE.MathUtils.clamp(_boxHit.z, z - pad, z + pad),
+    // Level-local: a level's frame is rigid, so this ranks exactly as a world distance would.
+    distSq: _ray.origin.distanceToSquared(_boxHit),
+  };
 }
 
 // ---------------------------------------------------------------- hand-arranged jitter
@@ -324,6 +365,81 @@ export function placeItem(item, index, target, { home, homeShelf, layers = () =>
   }
   item.layer = place(home.g, item.keys, index, tall);
   return item.layer;
+}
+
+// ---------------------------------------------------------------- resting height
+//
+// The grid stacks in whole layers on the tallest column under a footprint, and that is the right
+// bookkeeping — but drawn literally it hovers. A ball's top is that high only at its middle, so a
+// box perched on its shoulder, or a 2x2 ball shifted a cell along another, sat on a flat plane at
+// the peak with clear air over the curve beneath it. The fix is visual only: the layer stays what
+// the grid says, and the item is DRAWN lowered until it touches the real surface under it.
+
+/** Contact samples per side of the overlap. Odd, so two aligned centres are sampled exactly. */
+const REST_SAMPLES = 21;
+
+/**
+ * Where item `index` is drawn resting, in level-local y: lowered from its grid layer until its
+ * real bottom touches the real top of something under it. Never above the grid's height, never
+ * below the level.
+ *
+ * Supports are what the grid says is under each column it covers — including a shorter column it
+ * bridges, since lowering can bring it down onto that. Their own drawn height comes first, so a
+ * whole stack settles together. Items with nothing sampled beneath keep the grid's height.
+ *
+ * `solid(item)` is the scene's say on shape: `top`/`bottom` give heights above the item's own
+ * base at an offset from its centre (NaN off it), and `r` bounds how far it reaches.
+ *
+ * @param {any} g
+ * @param {any[]} items
+ * @param {number} index
+ * @param {{layerY: (layer: number) => number, solid: (item: any) => {top: Function, bottom: Function, r: number}}} opts
+ * @param {Map<number, number>} [memo]  shared across one repaint so a support is settled once
+ */
+export function settledBase(g, items, index, opts, memo = new Map()) {
+  if (memo.has(index)) return memo.get(index);
+  const item = items[index];
+  const grid = opts.layerY(item.layer);
+  let base = grid;
+  if (item.layer > 0) {
+    const ctx = { g, items, opts, memo };
+    const touches = supportsOf(g, item, index).map((j) => contactBase(ctx, index, j));
+    base = Math.max(-Infinity, ...touches);
+    if (base === -Infinity) base = grid;
+  }
+  base = Math.max(0, Math.min(grid, base));
+  memo.set(index, base);
+  return base;
+}
+
+/** The items directly under each of this item's columns, bridged-over columns included. */
+function supportsOf(g, item, index) {
+  const out = new Set();
+  for (const k of item.keys ?? []) {
+    const pile = g.piles[k];
+    for (let l = Math.min(item.layer, pile.length) - 1; l >= 0; l--)
+      if (pile[l] !== EMPTY && pile[l] !== index) { out.add(pile[l]); break; }
+  }
+  return [...out];
+}
+
+/** The lowest base at which `index` clears support `j`: the highest contact over their overlap. */
+function contactBase({ g, items, opts, memo }, index, j) {
+  const [a, b] = [items[index], items[j]];
+  const [sa, sb] = [opts.solid(a), opts.solid(b)];
+  const ra = slotRect(g, a.c, a.r, a.w, a.h), rb = slotRect(g, b.c, b.r, b.w, b.h);
+  const x0 = Math.max(ra.x - sa.r, rb.x - sb.r), x1 = Math.min(ra.x + sa.r, rb.x + sb.r);
+  const z0 = Math.max(ra.z - sa.r, rb.z - sb.r), z1 = Math.min(ra.z + sa.r, rb.z + sb.r);
+  if (x0 > x1 || z0 > z1) return -Infinity;
+  const below = settledBase(g, items, j, opts, memo);
+  let best = -Infinity;
+  for (let u = 0; u < REST_SAMPLES; u++)
+    for (let v = 0; v < REST_SAMPLES; v++) {
+      const x = x0 + ((x1 - x0) * u) / (REST_SAMPLES - 1), z = z0 + ((z1 - z0) * v) / (REST_SAMPLES - 1);
+      const lift = below + sb.top(x - rb.x, z - rb.z) - sa.bottom(x - ra.x, z - ra.z);
+      if (lift > best) best = lift;             // NaN (off either shape) never wins a comparison
+    }
+  return best;
 }
 
 // Re-exported so a scene needs one import for the whole mechanic rather than reaching past this

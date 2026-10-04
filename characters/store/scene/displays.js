@@ -2,11 +2,11 @@
 //
 // Extracted from the single 3,200-line module that used to live inline in store.html.
 
-import { touchView, seats, props, aim, mover, displays } from '../core/state.js';
+import { touchView, seats, props, aim, mover, displays, items } from '../core/state.js';
 import { gridSize, makeDisplay } from '../../../inventory/grid.js';
 import { makeGridLines } from '../../../inventory/notions.js';
 import * as THREE from 'three';
-import { BOX_H, CELL, PILE_HEADROOM, ROOM, SHELF_GAP, SHELF_HEADROOM, SHELF_ROWS, SHELF_TILT } from '../core/config.js';
+import { BOX_H, CELL, FLOOR_HEADROOM, PILE_HEADROOM, ROOM, SHELF_GAP, SHELF_HEADROOM, SHELF_ROWS, SHELF_TILT } from '../core/config.js';
 import { scene } from './stage.js';
 import { COUNTER, GLASS_T, HALF_D, HALF_W, UP, clearGroup, glassMat, woodMat } from './room.js';
 import { CHAIR_W } from './seating.js';
@@ -81,7 +81,7 @@ const FLOOR_ROWS = Math.floor((ROOM.d - WALL_INSET * 2) / CELL);
 
 export const ROOM_FLOOR = Object.freeze({
   id: 'floor', kind: 'pile', form: 'floor', solid: false,
-  cols: FLOOR_COLS, rows: FLOOR_ROWS, shelves: 1, headroom: PILE_HEADROOM,
+  cols: FLOOR_COLS, rows: FLOOR_ROWS, shelves: 1, headroom: FLOOR_HEADROOM,
   x: 0, z: 0, yaw: 0,
 });
 
@@ -268,6 +268,8 @@ function makeDisplayFromSlot(slot, builtSoFar = []) {
       // Same holes on every level: what is blocked is blocked in plan, whatever the height.
       mask: (s, c, r) => cellIsClear({ ...slot, tilt: slot.kind === 'shelf' ? SHELF_TILT : 0 },
                                       c, r, roomObstacles(builtSoFar)),
+      // Balls and cones are round: whatever rests on one must cover its centre (restsOnCentres).
+      round: (i) => items[i]?.name === 'yarn' && items[i].shape !== 'skein',
     }),
     // Named plinthY, not baseY: baseY() is the function for an item's height WITHIN a display, and
     // two different heights called the same thing is a bug waiting to happen.

@@ -10,7 +10,8 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { makeDisplay, footprint, place, slotRect } from './grid.js';
-import { makePicker } from './pick-place.js';
+import { makePicker, settledBase } from './pick-place.js';
+import { restingSolid, yarnFit } from './yarn-geometry.js';
 
 // A browser-ish enough global for the projection: CSS pixels, and a mouse (the HALF radius, which
 // is the harder case).
@@ -117,6 +118,113 @@ function screenOf(g, frame, camera, it, t) {
     const found = picker.pickCandidate(screenOf(g, frame, camera, items[over], t));
     assert.equal(found?.index, over, 'a click on the stack picked the buried item');
   }
+}
+
+// --- a drop aimed at a tall item stacks ONTO it ------------------------------
+//
+// The drop used to cast the bare table first and only then ask what stood on the column it hit.
+// At a diorama angle the table under a cone's top is a slot or more BEHIND the cone, so every
+// drop aimed at yarn snapped to the empty cell behind it: notions and patterns stacked, yarn
+// could never be stacked onto. Its front face counts too — that is most of what is on screen.
+{
+  const { g, items, put, picker, frame, camera, disp } = table();
+  const cone = put({ name: 'cone', w: 1, h: 1, layers: 4 }, 2, 2);
+  for (const t of [1, 0.5]) {
+    const p = picker.displayPoint(disp, 0, screenOf(g, frame, camera, items[cone], t));
+    const slot = picker.snapTo(disp, 0, { name: 'hook', w: 1, h: 1, layers: 1 }, p.x, p.z);
+    assert.deepEqual([slot?.c, slot?.r, slot?.layer], [2, 2, 4],
+      `a drop aimed ${t * 100}% up the cone landed at ${JSON.stringify(slot && [slot.c, slot.r, slot.layer])}`);
+  }
+}
+
+// --- with a mouse, the drop lands UNDER the pointer -----------------------------------
+//
+// The green ghost has to cover the slot the pointer is on, or where a click puts things is a guess.
+// It used to rank slots by how near their CENTRE was, within 1.6 slots: a 3x3 aimed at a corner
+// cell, or at a cell whose centred spot was taken, snapped somewhere not under the pointer at all,
+// or nowhere, though a 3x3 covering that cell was free. Every legal footprint over the pointer's
+// cell must be found, and the most centred of them taken.
+{
+  // A hole rather than a box in the way of the centred spots: a box would also hide the cells
+  // behind it from the camera, and aiming at a box's face rightly means stacking on it.
+  const camera = shopCamera();
+  const g = makeDisplay(7, 7, { shelves: 1, headroom: 12, cell: CELL, mask: (_s, c, r) => !(c === 3 && r === 3) });
+  const frame = new THREE.Matrix4().makeTranslation(0, TABLE_Y, 0);
+  const disp = { g };
+  const picker = makePicker({ camera, displays: () => [disp], items: () => [], levelFrame: () => frame,
+                              itemHeight: () => 0 });
+  const screen = (x, z) => {
+    const v = new THREE.Vector3(x, 0, z).applyMatrix4(frame).project(camera);
+    return { clientX: (v.x * 0.5 + 0.5) * W, clientY: (-v.y * 0.5 + 0.5) * H };
+  };
+  for (const n of [1, 2, 3])
+    for (let r = 0; r < g.rows; r++)
+      for (let c = 0; c < g.cols; c++) {
+        if (c === 3 && r === 3) continue;                // the hole itself
+        for (const [fx, fz] of [[0.5, 0.5], [0.15, 0.15], [0.85, 0.85], [0.15, 0.85], [0.85, 0.15]]) {
+          const ev = screen((c + fx) * CELL - g.cols * CELL / 2, (r + fz) * CELL - g.rows * CELL / 2);
+          const p = picker.displayPoint(disp, 0, ev);
+          const t = picker.snapTo(disp, 0, { w: n, h: n, layers: 1 }, p.x, p.z);
+          const legal = [...Array(n * n).keys()].some((k) => {
+            const keys = footprint(g, 0, [c - (k % n), r - Math.floor(k / n)], [n, n]);
+            return keys !== null;
+          });
+          if (!legal) continue;
+          assert.ok(t && c >= t.c && c < t.c + t.w && r >= t.r && r < t.r + t.h,
+            `${n}x${n} aimed at cell (${c},${r}) +(${fx},${fz}) dropped at ${t ? `(${t.c},${t.r})` : 'nowhere'}`);
+        }
+      }
+}
+
+// --- a stacked item is DRAWN touching what it rests on ------------------------------
+//
+// The grid stacks in whole layers on the tallest column, and drawn at that height anything
+// perched off-centre on a ball hovered over the ball's curve: a 2x2 ball shifted one cell along
+// another floated 0.124 — over two layers — clear of it. settledBase lowers it onto the real mesh
+// surfaces; the clearance below is measured far finer than settledBase samples, over the meshes
+// the shop draws, so a hover OR a sink shows up.
+{
+  const G = { cell: CELL, boxHeight: BOX_H, fill: FILL, tier: 'low' };
+  const solid = (it) => restingSolid(it.family, it, G);
+  const opts = { layerY: (l) => l * BOX_H, solid };
+  const stack = (spec) => {
+    const g = makeDisplay(5, 5, { headroom: 99, cell: CELL });
+    const items = spec.map(([family, n, c, r]) => ({ family, w: n, h: n, c, r, yaw: 0.3 }));
+    items.forEach((it, i) => {
+      it.layers = it.family ? yarnFit(it.family, it.w, it.h, G).layers : 1;
+      it.keys = footprint(g, 0, [it.c, it.r], [it.w, it.h]);
+      it.layer = place(g, it.keys, i, it.layers);
+    });
+    const memo = new Map();
+    return { g, items, base: (i) => settledBase(g, items, i, opts, memo) };
+  };
+  /** Smallest vertical clearance from item i's bottom to item j's top: 0 touching, < 0 inside. */
+  const clearance = ({ g, items, base }, i, j) => {
+    const [a, b] = [items[i], items[j]], [sa, sb] = [solid(a), solid(b)];
+    const ra = slotRect(g, a.c, a.r, a.w, a.h), rb = slotRect(g, b.c, b.r, b.w, b.h);
+    let min = Infinity;
+    for (let u = 0; u <= 80; u++)
+      for (let v = 0; v <= 80; v++) {
+        const x = ra.x + sa.r * (u / 40 - 1), z = ra.z + sa.r * (v / 40 - 1);
+        const d = base(i) + sa.bottom(x - ra.x, z - ra.z) - base(j) - sb.top(x - rb.x, z - rb.z);
+        if (d < min) min = d;
+      }
+    return min;
+  };
+  const cases = [
+    ['a 2x2 ball one cell diagonally along a 2x2 ball', [['ball', 2, 1, 1], ['ball', 2, 2, 2]]],
+    ['a 1x1 box on the shoulder of a 2x2 ball', [['ball', 2, 1, 1], [null, 1, 1, 1]]],
+    ['a 1x1 ball on a cone', [['cone', 1, 2, 2], ['ball', 1, 2, 2]]],
+    ['a 3x3 ball on a 2x2 ball', [['ball', 2, 2, 2], ['ball', 3, 1, 1]]],
+  ];
+  for (const [label, spec] of cases) {
+    const gap = clearance(stack(spec), 1, 0);
+    assert.ok(Math.abs(gap) < 0.003, `${label}: drawn ${gap.toFixed(4)} from touching`);
+  }
+  // A stack settles together: a box on the perched ball follows it down and still touches it.
+  const tower = stack([['ball', 2, 1, 1], ['ball', 2, 2, 2], [null, 1, 3, 3]]);
+  assert.ok(tower.base(2) < tower.items[2].layer * BOX_H - 0.1, 'the box came down with the ball under it');
+  assert.ok(Math.abs(clearance(tower, 2, 1)) < 0.003, 'and still sits on it');
 }
 
 console.log('pick-place.js self-check: all assertions passed');

@@ -63,8 +63,19 @@ export const SHELF_GAP = SHELF_ROWS * CELL * Math.sin(SHELF_TILT) + SHELF_CLEAR;
 // 12, not 10: a super-bulky CONE is the tallest thing the shop can roll, at 0.66 units, and a
 // pile is the fallback for everything a shelf cannot take. At 10 the shop could generate a cone
 // nothing in the room could hold — fillStock would keep re-rolling it and the stock would come up
-// quietly short. checkItemSizes asserts this rather than trusting the number.
-export const PILE_HEADROOM = 12;
+// quietly short. TALLEST_LAYERS is that cone, in layers; it is the one yarn number that needs
+// geometry to compute, and this module is pure data, so it is written down here and checkStockable
+// asserts it EQUALS what yarnFit says — a bigger or a smaller cone fails the boot, not the stock.
+export const TALLEST_LAYERS = 12;
+
+export const PILE_HEADROOM = TALLEST_LAYERS;
+
+// The floor is where yarn HEAPS: tall, precarious towers of it, where a table's single tower is a
+// display. Six of the biggest BALLS (8 layers each, the bulky 3x3) or four of the tallest cones:
+// 48 layers, 2.64 units — the height of the 2.6 wall, more than twice a 1.0 customer. Was two
+// cones (24); raised because a floor heap of five or six big balls is the look wanted. Derived from
+// the cone, so a retuned cone moves the floor with it; checkStockable still proves two stack.
+export const FLOOR_HEADROOM = TALLEST_LAYERS * 4;
 
 export const SHELF_HEADROOM = Math.floor(SHELF_CLEAR / BOX_H);
 

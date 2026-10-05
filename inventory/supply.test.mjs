@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { mulberry32 } from '../characters/store/core/util.js';
 import { makeDisplay, footprint, place, topAt } from './grid.js';
-import { MIN_DELIVERY, SCRIPT, buildOrder, carryOver, describeSlot, resolveOrder, supplyFor, tutorialDay1 } from './supply.js';
+import { MIN_DELIVERY, SCRIPT, buildOrder, carryOver, choicesFor, describeSlot, resolveOrder, supplyFor, tutorialDay1 } from './supply.js';
 import { toolSuitsPattern, yarnSuitsPattern } from '../characters/wip.js';
 
 const isGoods = (it) => it.name === 'yarn' || it.name === 'pattern';
@@ -106,6 +106,17 @@ for (let seed = 1; seed <= 50; seed++) {
   assert.ok(yarnSuitsPattern(ball, table), `${ball.weight} ${ball.material} makes "${table.title}"`);
   assert.ok(!resolveOrder(buildOrder(1), mulberry32(seed)).some((it) => it.patternType === 'potholder'),
     'no pot holder in the playground pile');
+}
+
+// --- the player's line (night 2 on): every choice resolves to that line's count, in its weights --
+{
+  const line = buildOrder(3).find((s) => s.playerChoosable);
+  assert.ok(line, 'day 3 has a line of the player\'s');
+  for (const template of choicesFor(line)) {
+    const got = resolveOrder([{ ...line, template, source: 'player' }], mulberry32(7));
+    assert.equal(got.length, line.template.count, `${describeSlot({ template }).item}: ${got.length}`);
+    assert.ok(got.every((it) => !it.weight || line.template.weights.includes(it.weight)), 'in the line\'s weights');
+  }
 }
 
 console.log('supply.test.mjs: all checks passed');

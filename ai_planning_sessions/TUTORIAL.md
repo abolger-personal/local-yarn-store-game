@@ -201,9 +201,10 @@ and SCRIPTED-EVENTS.md §4.
 - **Door note:** *"Tomorrow's order is on the packing slip. One line is yours."*
 - **Success:** the player's choice is in tomorrow's pile.
 - **Fallback:** a blank line is filled by the supplier. Never empty.
-- **Needs:** choosing on the packing slip (build step 7). The read-only screen is built, and
-  `SCRIPT` in `inventory/supply.js` marks day 3's order (set on night 2) with the player's first
-  line, then every line from day 4 (commit 078670b).
+- **Built:** a dropdown over the blank line on the slip (`store/ui/night.js`, `choicesFor()` in
+  `inventory/supply.js`); `SCRIPT` marks day 3's order (set on night 2) with the player's first
+  line, then every line from day 4. Not yet: §7.2's budget of 6 + sold as free lines, the
+  "supplier's choice" button for the whole slip, and the supplier sample.
 
 ### Day 3: they come back
 
@@ -286,8 +287,9 @@ Found by playing `game.html`. Each answer is an object, not a panel.
   or touch). It stays after the item is set down, until something else is hovered, picked up or
   clicked, so it can be read while arranging.
 - **Shows only what a shopper could read off the real object:**
-  - yarn: weight, fibre, colour family, shape (ball, cone, skein);
-  - pattern: title, what it makes, craft, needle or hook size, the yarn weight and amount it asks for;
+  - yarn: weight, fibre, colour family, shape (ball, cone, skein), and its units (1 UNIT, the word
+    a pattern counts in);
+  - pattern: title, what it makes, craft, needle or hook size, the yarn weight and how many units it takes;
   - notion: what it is, and its size.
 - **Clicking a customer** swaps it for their **tag: their name and the items they have bought.**
   Never their hidden wants: inferring those is the puzzle.

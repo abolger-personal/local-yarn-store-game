@@ -261,7 +261,8 @@ Each step is playable on its own.
 6. **"Hand it to them":** click item, click customer, settles a hesitation in their favour.
 7. **The order form** on the between-days screen, filling the slots the tutorial hands over.
    *Started 2026-10-03:* the screen exists on `game.html` (`store/ui/night.js`) and shows
-   tomorrow's order read-only; choosing is next.
+   tomorrow's order. *2026-10-04:* the player's lines are chosen from a dropdown on the packing
+   slip; the budget of free lines (TUTORIAL.md §7.2) is next.
 8. **Affinity as a number,** controlling hesitation length and how often someone returns.
 9. **Project bags, standing orders, the request board, suggestions.** Content, once 1–8 exist.
 

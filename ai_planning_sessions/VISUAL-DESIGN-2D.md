@@ -275,8 +275,11 @@ advances it but the player opening the door.
     ONE COLOUR FAMILY*). **No checkboxes.** Words from `describeSlot()` in `inventory/supply.js`;
     the template's words, never an item's. The `×` is its own glyph in `lettering.js`.
   - **A slot that will be the player's** (`playerChoosable`) is a blank write-in line after its
-    quantity (*5 × ____*), its limits still under it. Choosing is not built: the supplier fills
-    it, and the blank is where the player's choice will be written.
+    quantity (*5 × ____*), its limits still under it. A native `<select>` lies see-through over
+    the blank (pointer cursor, a faint wash on hover, a focus ring): *supplier's choice* (the
+    default, the planned slot arrives) or that count of yarn, one-family yarn or patterns in a
+    weight the line allows, or notions (`choicesFor()`). The choice is lettered onto the line,
+    underlined as the player's.
   - The slip has an `aria-label` reading the same lines, since the lettering is paths.
   - The clipboard's foot line (*DAY N: 5 SIGNED THE GUESTBOOK*) went with it: a supplier's slip
     does not know who signed the book, which is the Guestbook's to say.

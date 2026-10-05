@@ -15,8 +15,8 @@ const pickFrom = (list, rng) => list[Math.floor(rng() * list.length)];
 //
 // An order is an array of SLOTS, each { template, source, playerChoosable }:
 //   source           'script' (days 1-10), 'supplier' (day 11+), or 'player' (the order form, later)
-//   playerChoosable  a slot the order form will hand to the player. No form yet, so it stays filled
-//                    by the script — the flag is there so the form has nothing to work out.
+//   playerChoosable  a slot the player may fill on the night's packing slip (ui/night.js); left
+//                    blank, it keeps what the script or supplier put there.
 //
 // A template is a KIND of thing, never an item id (§6: ids make dead deliveries, all lace-weight
 // for a player who has never met a lace knitter). It is resolved against the catalog on the day:
@@ -191,6 +191,20 @@ export function describeSlot({ template: { kind, count = 1, weights, family }, p
   }[kind];
   if (!words) throw new Error(`unknown template kind "${kind}"`);
   return { count, item: words[0], detail: words[1], yours: Boolean(playerChoosable) };
+}
+
+/**
+ * What the player can write on a blank line (TUTORIAL.md §7.2: the limit is how many, never which
+ * kinds): the line's count of balls, one-family balls or patterns in each weight the line allows,
+ * or notions. Kits are left out: a kit is one pattern and its yarn, not `count` of anything.
+ */
+export function choicesFor({ template: { count = 1, weights = SHOP_RANGE.weights } }) {
+  return [
+    ...weights.map((w) => ({ kind: 'yarn', count, weights: [w] })),
+    ...weights.map((w) => ({ kind: 'yarn', count, weights: [w], family: true })),
+    ...weights.map((w) => ({ kind: 'pattern', count, weights: [w] })),
+    { kind: 'notion', count },
+  ];
 }
 
 // ---------------------------------------------------------------- overnight

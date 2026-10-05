@@ -62,7 +62,7 @@ function drawBook() {
   showing = Math.min(showing, all.length - 1);   // a wiped roster wipes the history with it
   const { day, entries } = all[showing];
   const today = showing === all.length - 1;
-  document.getElementById('bookDay').textContent = today ? `day ${day} · today` : `day ${day}`;
+  document.getElementById('bookDay').textContent = `Guestbook, day ${day}${today ? ' · today' : ''}`;
   olderBtn.disabled = showing === 0;
   newerBtn.disabled = today;
   document.getElementById('bookEntries').innerHTML = entries.length

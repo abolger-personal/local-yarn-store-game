@@ -2,9 +2,9 @@
 //
 // Passive: it listens to the pointer beside input.js rather than inside it, and only ever reads
 // the shop. Hovering an item (mouse) or picking one up (any pointer) puts its band up; it stays
-// after the item is set down, until something else is hovered, picked up or clicked, so it can be
-// read while arranging. Clicking a customer swaps it for their tag (guestbook.js tagLines), and
-// pointing at a customer counts as watching them (shop.watched, read by world.js markInView).
+// after the item is set down, until something else is hovered or picked up, or bare floor is
+// clicked, so it can be read while arranging. Only clicking a customer swaps it for their tag
+// (guestbook.js tagLines); pointing at one without a click counts as watching them (shop.watched, read by world.js markInView).
 
 import * as THREE from 'three';
 import { EMPTY } from '../../../inventory/grid.js';
@@ -106,14 +106,30 @@ function onMove(event) {
   else customerAt(event);   // pointing at a customer is watching them; the click shows the tag
 }
 
+const TAP_SLOP = 8;   // px: a press that moves further is an orbit drag, not a click
+let bare = null;     // where a press on nothing landed, until it lifts
+
 /** Press: input.js has already run (it captures first), so a pick-up is in hand by now. */
 function onDown(event) {
+  bare = null;
   if (!onCanvas(event) || event.button !== 0) return;
-  if (drag.index !== EMPTY) show(items[drag.index]);
-  else show(customerAt(event));
+  if (drag.index !== EMPTY) { show(items[drag.index]); return; }
+  const npc = customerAt(event);
+  if (npc) show(npc);
+  else if (!pickCandidate(event)) bare = { x: event.clientX, y: event.clientY };
+}
+
+/** A click (not a drag) on bare floor puts the label away. */
+function onUp(event) {
+  if (bare && Math.hypot(event.clientX - bare.x, event.clientY - bare.y) < TAP_SLOP && drag.index === EMPTY) {
+    shown = null;
+    band.hidden = true;
+  }
+  bare = null;
 }
 
 export function installLabel() {
   addEventListener('pointerdown', onDown, true);
   addEventListener('pointermove', onMove);
+  addEventListener('pointerup', onUp);
 }

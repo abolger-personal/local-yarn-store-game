@@ -55,6 +55,8 @@ assert.equal(rows([{ what: 'sat', pattern, witnessed: false }])[1], 'sat and wor
 assert.deepEqual(bandLines(yarn({ weight: 'super-bulky', shape: 'cone' })), ['SUPER BULKY WEIGHT', 'WOOL', 'BLUE', 'CONE']);
 assert.deepEqual(bandLines({ ...pattern, title: 'Bird Brain Beanie', silhouette: 'beanie' }),
   ['BIRD BRAIN BEANIE', 'MAKES BEANIE HAT', '4.5MM KNITTING NEEDLES', '3 × WORSTED WOOL']);
+assert.deepEqual(bandLines({ ...pattern, minColors: 3 }).at(-1), 'SUGGESTS 3 COLOURS');
+assert.deepEqual(bandLines({ ...pattern, minColors: 1 }).at(-1), 'SUGGESTS 1 COLOUR');
 assert.deepEqual(bandLines({ name: 'crochet-hook', size: 5 }), ['CROCHET HOOK', '5.0MM']);
 assert.deepEqual(bandLines({ name: 'stitch-markers', size: null }), ['STITCH MARKERS']);
 

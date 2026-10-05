@@ -52,7 +52,8 @@ export function bandLines(item) {
     return [...(item.title ? [caps(item.title)] : []),
       `MAKES ${caps([item.silhouette, item.patternType].filter(Boolean).join(' '))}`,
       `${mm(item.toolSize)} ${caps(TOOL_FOR_CRAFT[item.craft] ?? item.craft)}`,
-      `${item.yarnUnits ?? '?'} × ${caps(item.weight)} ${caps((item.materials ?? []).join('/'))}`];
+      `${item.yarnUnits ?? '?'} × ${caps(item.weight)} ${caps((item.materials ?? []).join('/'))}`,
+      ...(item.minColors ? [`SUGGESTS ${item.minColors} ${item.minColors === 1 ? 'COLOUR' : 'COLOURS'}`] : [])];
   }
   return [caps(item.name), ...(item.size == null ? [] : [mm(item.size)])];
 }

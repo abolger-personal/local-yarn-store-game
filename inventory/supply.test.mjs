@@ -78,16 +78,16 @@ for (let seed = 1; seed <= 20; seed++) {
   assert.equal(items.length, 4 + delivery.length, 'carried stock plus the delivery');
 }
 
-// --- the clipboard: tomorrow's order in words, the player's slots marked ------------------
+// --- the packing slip: tomorrow's order in words, the player's slots marked ------------------
 // The night screen shows the order built at closing and delivers that same object, so the words
 // only have to be true to the slots: day 3's order (set on night 2), with its one line that is yours.
 assert.deepEqual(buildOrder(3).map(describeSlot), [
-  { line: '5 balls of yarn', detail: 'worsted or dk', yours: true },
-  { line: '2 patterns', detail: 'for worsted or dk', yours: false },
-  { line: 'a kit', detail: 'a pattern and its yarn, worsted or dk, one colour family', yours: false },
+  { count: 5, item: 'ball of yarn', detail: 'worsted or dk', yours: true },
+  { count: 2, item: 'pattern', detail: 'for worsted or dk', yours: false },
+  { count: 1, item: 'kit', detail: 'a pattern and its yarn, worsted or dk, one colour family', yours: false },
 ]);
 assert.deepEqual(describeSlot(buildOrder(5)[0]),
-  { line: '5 balls of yarn', detail: 'bulky, one colour family', yours: true }, "day 5's new weight, alone");
+  { count: 5, item: 'ball of yarn', detail: 'bulky, one colour family', yours: true }, "day 5's new weight, alone");
 assert.equal(describeSlot(buildOrder(1)[0]).detail, 'a pattern and its yarn, worsted or dk, one colour family');
 for (let day = 1; day <= 30; day++)
   for (const slot of buildOrder(day, { occupancy: 0.4, rng: mulberry32(day) }))

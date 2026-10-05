@@ -1,46 +1,63 @@
 // Between days (game.html's #night): the shop's exterior at night, the door shut, and tomorrow's
-// order on a clipboard hung beside it. It will grow into the ORDER SCREEN, where the player sets
-// tomorrow's order; today the clipboard is read-only.
+// order as parcels on the step with a packing slip taped to the top one (TUTORIAL.md §7.2). It will
+// grow into the ORDER SCREEN, where the player fills the slip's blank lines; today it is read-only.
 //
 // It WAITS. Opening the door is the only way on, and nothing happens while it is shut: the player's
 // pace changes how many chances they catch, never whether they can progress
 // (ai_planning_sessions/PLAYING-AT-YOUR-PACE.md). The playground has no night; its clock opens
 // tomorrow by itself (boot.js, tickClocks).
 //
-// What the clipboard shows IS what arrives: the order is built once, here at closing, and the
+// What the slip shows IS what arrives: the order is built once, here at closing, and the
 // same object is handed to restart({ order }), so deliver() never builds its own.
 
 import { shop } from '../core/state.js';
 import { planTomorrow, restart } from '../sim/world.js';
 import { describeSlot } from '../../../inventory/supply.js';
 import { dressExterior, exteriorMarkup, swingOpen } from './exterior.js';
-import { INK, svgLettering } from './lettering.js';
+import { CELL, INK, layout, svgLettering } from './lettering.js';
 
 const night = /** @type {HTMLDialogElement} */ (document.getElementById('night'));
 const lines = document.getElementById('orderLines');
-const board = document.getElementById('clipboard');
+const slip = document.getElementById('parcels');
 let order = null;   // tomorrow's, from closing until the door opens
 
-const ROW = 70, TOP = 170, LEFT = 66, WIDE = 258;   // the clipboard's 360x540 drawing
+const ROW = 60, TOP = 268, LEFT = 74, WIDE = 244, MID = LEFT + WIDE / 2;   // the slip, in the parcels' 420x660
+const SUPPLIER = 'WOOL & CO. SUPPLY';
+const DETAIL = 11;   // cap of a line's limits
+const rule = (y, from = LEFT) => `<path d="M${from} ${y} H${LEFT + WIDE}" stroke="${INK}" stroke-width="1.5" />`;
 
-/** One slot as a clipboard row: an empty box for a slot that will be the player's, a dot otherwise. */
+/**
+ * One slot as a slip line, quantity × item over its limits. A slot that will be the player's is a
+ * blank write-in line after its quantity: choosing is not built yet, so the supplier fills it.
+ */
 function rowMarkup(slot, i) {
-  const { line, detail, yours } = describeSlot(slot);
+  const { count, item, detail, yours } = describeSlot(slot);
   const y = TOP + i * ROW;
-  const mark = yours
-    ? `<rect x="38" y="${y - 19}" width="18" height="18" fill="none" stroke="${INK}" stroke-width="2.5" />`
-    : `<circle cx="47" cy="${y - 10}" r="4" fill="${INK}" />`;
-  return mark
-    + svgLettering(line.toUpperCase(), LEFT, y, { cap: 18, align: 'left', maxWidth: WIDE })
-    + svgLettering(detail.toUpperCase(), LEFT, y + 24, { cap: 11, align: 'left', maxWidth: WIDE });
+  const qty = `${count} ×`;
+  const what = yours
+    ? svgLettering(qty, LEFT, y, { cap: 18, align: 'left' })
+      + rule(y, LEFT + layout(qty).width * 18 / CELL + 8)
+    : svgLettering(`${qty} ${item}`.toUpperCase(), LEFT, y, { cap: 18, align: 'left', maxWidth: WIDE });
+  return what + wrap(detail.toUpperCase()).map((t, j) =>
+    svgLettering(t, LEFT, y + 20 + j * 14, { cap: DETAIL, align: 'left', maxWidth: WIDE })).join('');
 }
 
-/** The sheet: whose order it is, a row per slot, and a line about the day that just ended. */
-function sheetMarkup(day, signed) {
-  const book = signed ? `${signed} SIGNED THE GUESTBOOK` : 'NO ONE SIGNED THE GUESTBOOK';
-  return svgLettering(`ORDER FOR DAY ${day + 1}`, 180, 128, { cap: 20, maxWidth: 270 })
-    + order.map(rowMarkup).join('')
-    + svgLettering(`DAY ${day}: ${book}`, 180, 494, { cap: 11, maxWidth: 270 });
+/** A line's limits on at most two lines, broken at a comma, so a kit's long one stays legible. */
+function wrap(text) {
+  const fits = (t) => layout(t).width * DETAIL / CELL <= WIDE;
+  if (fits(text)) return [text];
+  const parts = text.split(', ');
+  let cut = parts.length - 1;
+  while (cut > 1 && !fits(parts.slice(0, cut).join(', '))) cut--;
+  return [`${parts.slice(0, cut).join(', ')},`, parts.slice(cut).join(', ')];
+}
+
+/** The slip: who sends it, to whom, when it comes, and a line per slot. */
+function slipMarkup(day) {
+  return svgLettering(SUPPLIER, MID, 160, { cap: 20, maxWidth: WIDE }) + rule(174)
+    + svgLettering('FOR: LOCAL YARN STORE', LEFT, 202, { cap: 12, align: 'left', maxWidth: WIDE })
+    + svgLettering(`ARRIVES: DAY ${day + 1}, MORNING`, LEFT, 224, { cap: 12, align: 'left', maxWidth: WIDE })
+    + rule(238) + order.map(rowMarkup).join('');
 }
 
 function openTomorrow() {
@@ -72,14 +89,12 @@ export function installNight() {
   night.addEventListener('close', () => { if (order) night.showModal(); });
 }
 
-/** The shop has emptied: plan tomorrow, show it on the clipboard, and wait at the door. */
+/** The shop has emptied: plan tomorrow, show it on the packing slip, and wait at the door. */
 export function closeForTheNight() {
   order = planTomorrow();
-  const signed = shop.world?.guestbook.length ?? 0;
-  lines.innerHTML = sheetMarkup(shop.day, signed);
-  board.setAttribute('aria-label', [`Order for day ${shop.day + 1}:`,
-    ...order.map((s) => { const d = describeSlot(s); return `${d.line}, ${d.detail}${d.yours ? ' (yours to choose)' : ''}`; }),
-    `Day ${shop.day}: ${signed} signed the Guestbook.`].join(' '));
+  lines.innerHTML = slipMarkup(shop.day);
+  slip.setAttribute('aria-label', [`Packing slip from ${SUPPLIER}, for Local Yarn Store, arrives day ${shop.day + 1}, morning:`,
+    ...order.map((s) => { const d = describeSlot(s); return `${d.count} × ${d.yours ? 'blank, yours to choose' : d.item}, ${d.detail}.`; })].join(' '));
   const door = document.getElementById('door');
   door.setAttribute('aria-label', `Open the shop for day ${shop.day + 1}`);
   door.classList.remove('open');

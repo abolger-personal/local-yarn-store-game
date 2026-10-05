@@ -152,8 +152,9 @@ still parts from the needles on the flat plate. Full opacity; the old wraps were
     "Customers' hands"), replacing the design's title, which moves to the label and the
     Guestbook with the needle size and fibres. NO PHOTOS YET in black on an empty board.
   - **The info button:** a gold `i` (cap 20 in a 24 box), lettered by `game.js`.
-  - **The night clipboard** (built; being replaced by the packing slip, decision 25): all black — ORDER FOR DAY N (cap 20), each slot (cap 18) with its
-    limits under it (cap 11), and the day line at the foot (cap 11). See "The night".
+  - **The night's packing slip** (decision 25): all black — the supplier (cap 20), FOR and
+    ARRIVES (cap 12), each line as quantity × item (cap 18) with its limits under it (cap 11, on
+    two lines broken at a comma when long). See "The night".
 - **Earlier wordmark, removed:** `L.Y.S` over a rule over italic *localyarnstore*, on the glass.
   It said the name twice and, with the emblem and the note, made the door too busy.
 
@@ -248,7 +249,7 @@ and open when they are ready.
 
 When the last customer leaves, the game closes for the night and shows the shop's **exterior**: the
 front door's entry, drawn from the same module (`ui/exterior.js`), full screen over the shop. It
-will grow into the order screen; today it shows tomorrow's order read-only. It **waits**: nothing
+will grow into the order screen; today it shows tomorrow's order read-only, on a packing slip. It **waits**: nothing
 advances it but the player opening the door.
 
 - **Arrival:** the screen fades in over the emptied shop, 0.9s ease (`@starting-style` on the open
@@ -262,26 +263,31 @@ advances it but the player opening the door.
 - **Opening tomorrow is the door.** Click it, or Enter (it is a real link, and focused when the
   screen opens): it swings as on the front door (`swingOpen`), the next day starts, and the screen
   fades into the shop. No other button. Escape does nothing.
-- **The clipboard** (*superseded by the packing slip, decision 25; this describes what is built*), hung on a nail on the clapboard to the right of the door, tilted 1.5°, the
-  door's drop shadow. A 360x540 drawing: board in wood shadow `#a87c4c` under the worn wood at 70%,
-  a sheet of `#fbf8ef` paper with the note's shadow, a brass clip (`#brass`, raised with the
-  two-lip emboss) with a dark hole `#3b2408` and a grey nail head `#6b6f73` in it.
-  - **On the sheet, in the house lettering, black:** ORDER FOR DAY N; then one row per slot, its
-    what-and-how-many (*4 BALLS OF YARN*) over its limits (*WORSTED OR DK, ONE COLOUR FAMILY*);
-    then *DAY N: 5 SIGNED THE GUESTBOOK* at the foot. Words from `describeSlot()` in
-    `inventory/supply.js`; the template's words, never an item's.
-  - **A slot that will be the player's** (`playerChoosable`) has an empty box, 18 units, 2.5 stroke;
-    the others a round ink dot. Choosing is not built: the box is where the tick will go.
-  - The sheet has an `aria-label` reading the same rows, since the lettering is paths.
+- **The parcels on the step** (decision 25; TUTORIAL.md §7.2): tomorrow's delivery waits on the
+  ground to the right of the door, standing on the same line as the granite step. A 420x660
+  drawing (`#parcels`): a tall carton on a flat one, each a front in kraft `#c89f6a`, a lit top
+  `#ddb886` and a shaded side `#a9804f`, with a strip of parcel tape `#d9bb84` and a soft shadow
+  where the top one sits; the door's drop shadow. Things are coming before a word is read.
+  - **The packing slip,** `#fbf8ef` paper with the note's shadow (`#note`), taped to the top
+    carton by four strips of yellowed clear tape `#efe4c4` at its corners. In the house lettering,
+    black: *WOOL & CO. SUPPLY*, a rule, *FOR: LOCAL YARN STORE*, *ARRIVES: DAY N, MORNING*, a rule,
+    then one line per slot as quantity × item (*6 × BALL OF YARN*) over its limits (*WORSTED OR DK,
+    ONE COLOUR FAMILY*). **No checkboxes.** Words from `describeSlot()` in `inventory/supply.js`;
+    the template's words, never an item's. The `×` is its own glyph in `lettering.js`.
+  - **A slot that will be the player's** (`playerChoosable`) is a blank write-in line after its
+    quantity (*5 × ____*), its limits still under it. Choosing is not built: the supplier fills
+    it, and the blank is where the player's choice will be written.
+  - The slip has an `aria-label` reading the same lines, since the lettering is paths.
+  - The clipboard's foot line (*DAY N: 5 SIGNED THE GUESTBOOK*) went with it: a supplier's slip
+    does not know who signed the book, which is the Guestbook's to say.
 - **Why beside the door, not on it:** the lower panel already holds the note, and the window the
-  emblem ("say a thing once"). A clipboard on the door would also be small, a third of the leaf.
-  On the wall it can be a third the entry's width and still be read.
-- **Layout:** the entry and clipboard side by side, sized as 600 + 40 + 360 units of drawing:
-  `--door-h: min(86vh, 94vw * 1110 / 1000)`. On a tall narrow screen (aspect under 4:5) they stack,
-  the entry at 56vh and the clipboard under it.
+  emblem ("say a thing once"). Parcels are left on the step, by the door, not hung on it.
+- **Layout:** the entry and parcels side by side, bottoms aligned, sized as 600 + 20 + 420 units
+  of drawing: `--door-h: min(86vh, 94vw * 1110 / 1040)`. On a tall narrow screen (aspect under
+  4:5) they stack, the entry at 56vh and the parcels under it.
 - **A modal `<dialog>`:** the shop behind it is inert and its shortcut keys are ignored, with no
   script for either.
-- *Unverified in a browser* at the time of writing: the fade, the clipboard's legibility at phone
+- *Unverified in a browser* at the time of writing: the fade, the slip's legibility at phone
   size, and the porch shade's strength.
 
 ---

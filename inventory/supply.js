@@ -169,7 +169,6 @@ export function buildOrder(day, { occupancy = 0, chosen = [], rng = Math.random 
 
 // ---------------------------------------------------------------- the order, in words
 
-const plural = (count, one, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
 /** "worsted or dk", "fingering, dk or bulky"; every weight the shop stocks is "any weight". */
 function weightWords(weights = SHOP_RANGE.weights) {
   if (weights.length >= SHOP_RANGE.weights.length) return 'any weight';
@@ -177,20 +176,21 @@ function weightWords(weights = SHOP_RANGE.weights) {
 }
 
 /**
- * One slot in plain words, for the clipboard: `line` is what and how many, `detail` the template's
- * limits, `yours` a slot the order form will hand to the player (playerChoosable). The template's
- * words, never an item's: the catalog only picks the items on the day.
+ * One slot in plain words, for the night's packing slip: `count` × `item` is how many of what (a
+ * slip's own singular, "5 × ball of yarn"), `detail` the template's limits, `yours` a slot the
+ * order form will hand to the player (playerChoosable). The template's words, never an item's:
+ * the catalog only picks the items on the day.
  */
 export function describeSlot({ template: { kind, count = 1, weights, family }, playerChoosable }) {
   const fam = family ? ', one colour family' : '';
   const words = {
-    yarn: [plural(count, 'ball of yarn', 'balls of yarn'), `${weightWords(weights)}${fam}`],
-    pattern: [plural(count, 'pattern'), `for ${weightWords(weights)}`],
-    notion: [plural(count, 'notion'), 'tools and accessories'],
-    kit: ['a kit', `a pattern and its yarn, ${weightWords(weights)}, one colour family`],
+    yarn: ['ball of yarn', `${weightWords(weights)}${fam}`],
+    pattern: ['pattern', `for ${weightWords(weights)}`],
+    notion: ['notion', 'tools and accessories'],
+    kit: ['kit', `a pattern and its yarn, ${weightWords(weights)}, one colour family`],
   }[kind];
   if (!words) throw new Error(`unknown template kind "${kind}"`);
-  return { line: words[0], detail: words[1], yours: Boolean(playerChoosable) };
+  return { count, item: words[0], detail: words[1], yours: Boolean(playerChoosable) };
 }
 
 // ---------------------------------------------------------------- overnight

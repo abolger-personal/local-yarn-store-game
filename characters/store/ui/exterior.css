@@ -16,7 +16,7 @@
 /* One box with the entry's own proportions, as tall as the screen allows and never wider than
    it: every layer inside is positioned in percentages of the same 600x1110 drawing — the
    frame's viewBox, which starts at y=70, just above the pediment. A page that shares the screen
-   with something else (the clipboard at night) sets --door-h. */
+   with something else (the parcels at night) sets --door-h. */
 .doorway {
   position: relative;
   height: var(--door-h, min(90vh, calc(96vw * 1110 / 600)));

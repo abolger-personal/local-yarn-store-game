@@ -85,6 +85,7 @@ export const GLYPHS = {
   '—': [20, 'M2 15 H18'],
   "'": [6, 'M3 0 V8'],
   '/': [12, 'M1 28 L11 0'],
+  '×': [14, 'M2.5 10 L11.5 21 M11.5 10 L2.5 21'],   // the packing slip's "6 × ball of yarn"
   '&': [18, 'M15.5 28 L4.6 11.2 C3.6 9.6 3.2 8.4 3.2 7 C3.2 4.2 5.2 2.2 8 2.2 C10.6 2.2 12.4 4 12.4 6.4 ' +
           'C12.4 9.2 10 10.8 7.2 12.6 C4.2 14.6 2.2 16.6 2.2 20 C2.2 23.4 4.8 25.8 8.4 25.8 C12 25.8 14.6 23.6 16.2 19.4'],
   // The dot sits clear of the stem: at the info button's cap 20 the two keylines would touch.

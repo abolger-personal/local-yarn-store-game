@@ -182,19 +182,20 @@
   #night::backdrop { background: transparent; }
   #night.leaving { opacity: 0; }
   @starting-style { #night[open] { opacity: 0; } }   /* fades in over the emptied shop */
-  /* The entry and the clipboard share the screen: the door's box is sized for 600 units of entry,
-     40 of wall and 360 of clipboard side by side, or stacked on a tall narrow screen. */
+  /* The entry and the parcels share the screen: the door's box is sized for 600 units of entry,
+     20 of wall and 420 of parcels side by side, both standing on the same ground line, or stacked
+     on a tall narrow screen. */
   .night-scene {
-    --door-h: min(86vh, calc(94vw * 1110 / 1000));
-    display: flex; align-items: center; gap: calc(var(--door-h) * 40 / 1110);
+    --door-h: min(86vh, calc(94vw * 1110 / 1040));
+    display: flex; align-items: flex-end; gap: calc(var(--door-h) * 20 / 1110);
   }
-  #clipboard {
-    width: calc(var(--door-h) * 360 / 1110); aspect-ratio: 360 / 540;
-    transform: rotate(1.5deg); filter: drop-shadow(0 6px 10px rgb(0 0 0 / .35));
+  #parcels {
+    width: calc(var(--door-h) * 420 / 1110); aspect-ratio: 420 / 660;
+    filter: drop-shadow(0 6px 10px rgb(0 0 0 / .35));
   }
   @media (max-aspect-ratio: 4 / 5) {
-    .night-scene { --door-h: min(56vh, calc(94vw * 1110 / 600)); flex-direction: column; }
-    #clipboard { width: min(80vw, calc(34vh * 360 / 540)); }
+    .night-scene { --door-h: min(56vh, calc(94vw * 1110 / 600)); flex-direction: column; align-items: center; }
+    #parcels { width: min(80vw, calc(34vh * 420 / 660)); }
   }
   @media (prefers-reduced-motion: reduce) { #night { transition: none; } }
 </style>
@@ -405,21 +406,31 @@
 
 <p id="bootFail" class="panel" role="alert" hidden></p>
 
-<!-- Between days: the shop shut for the night, tomorrow's order on a clipboard on a nail beside the
-     door. night.js draws the entry into .doorway (ui/exterior.js, shared with the front door) and
-     letters the sheet into #orderLines; opening the door opens tomorrow. -->
+<!-- Between days: the shop shut for the night, tomorrow's order as parcels on the step with a
+     packing slip taped on. night.js draws the entry into .doorway (ui/exterior.js, shared with the
+     front door) and letters the slip into #orderLines; opening the door opens tomorrow. -->
 <dialog id="night" class="exterior" aria-label="The shop, closed for the night">
   <div class="night-scene">
     <div class="doorway"></div>
-    <svg id="clipboard" viewBox="0 0 360 540" role="img" aria-label="Tomorrow's order">
-      <rect x="12" y="34" width="336" height="496" rx="14" fill="#a87c4c" />
-      <rect class="worn" x="12" y="34" width="336" height="496" rx="14" fill="url(#worn)" opacity=".7" />
-      <rect x="36" y="74" width="288" height="436" fill="#fbf8ef" filter="url(#note)" />
-      <g filter="url(#emboss)">
-        <rect x="122" y="40" width="116" height="46" rx="9" fill="url(#brass)" />
-        <circle cx="180" cy="57" r="8" fill="#3b2408" />
+    <!-- Tomorrow's delivery, waiting on the step: a tall carton on a flat one, kraft brown, each a
+         front, a lit top and a shaded side; parcel tape; the packing slip taped to the top one. -->
+    <svg id="parcels" viewBox="0 0 420 660" role="img" aria-label="Tomorrow's delivery">
+      <polygon points="8,516 380,516 404,496 32,496" fill="#ddb886" />
+      <rect x="8" y="516" width="372" height="136" fill="#c89f6a" />
+      <polygon points="380,516 404,496 404,632 380,652" fill="#a9804f" />
+      <rect x="176" y="516" width="36" height="136" fill="#d9bb84" />
+      <rect x="36" y="502" width="320" height="10" fill="rgb(0 0 0 / .14)" />
+      <polygon points="36,96 356,96 380,72 60,72" fill="#ddb886" />
+      <rect x="36" y="96" width="320" height="412" fill="#c89f6a" />
+      <polygon points="356,96 380,72 380,484 356,508" fill="#a9804f" />
+      <polygon points="180,96 212,96 236,72 204,72" fill="#d9bb84" />
+      <rect x="56" y="118" width="280" height="378" fill="#fbf8ef" filter="url(#note)" />
+      <g fill="#efe4c4" opacity=".85">   <!-- clear tape, yellowed, over the slip's corners -->
+        <rect x="38" y="110" width="56" height="18" transform="rotate(-35 66 119)" />
+        <rect x="298" y="110" width="56" height="18" transform="rotate(35 326 119)" />
+        <rect x="38" y="486" width="56" height="18" transform="rotate(35 66 495)" />
+        <rect x="298" y="486" width="56" height="18" transform="rotate(-35 326 495)" />
       </g>
-      <circle cx="180" cy="55" r="4" fill="#6b6f73" />   <!-- the nail it hangs on -->
       <g id="orderLines"></g>
     </svg>
   </div>

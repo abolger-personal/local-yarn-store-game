@@ -45,4 +45,3 @@ export const castAt = (disp, height) => picker.castLocal(disp, disp.plane, heigh
 /** Anywhere on this display at all, or null — the last resort when an item's own slot filled up. */
 export const firstFreeSlot = (disp, item) => anySlot(disp.g, item);
 
-/** Is there anywhere at all on this display that the item fits? Drives the red "no room" wash. */

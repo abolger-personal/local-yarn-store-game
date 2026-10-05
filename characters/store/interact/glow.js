@@ -12,7 +12,7 @@ import { gridSize, slotRect, EMPTY } from '../../../inventory/grid.js';
 import * as THREE from 'three';
 import { GHOST_OK, layerY, GHOST_ALPHA, GHOST_NO, S } from '../core/config.js';
 import { scene } from '../scene/stage.js';
-import { levelFrame } from '../scene/displays.js';
+import { byId, levelFrame } from '../scene/displays.js';
 import { boxes } from '../goods/items.js';
 
 // ---------------------------------------------------------------- held-item glow
@@ -106,8 +106,8 @@ function movingReadout(disp) {
 /**
  * Where the held item lands, or why it does not.
  *
- * Three outcomes, not two: a slot it fits, a display with no room for it ANYWHERE (which is the
- * red-wash case, and needs saying in words too), and simply not over a slot.
+ * Three outcomes, not two: a slot it fits, a display with no room for it ANYWHERE (said in words
+ * and washed red while hovering it), and simply not over a slot.
  */
 function dropVerdict(disp, item) {
   if (drag.target)
@@ -155,19 +155,15 @@ export function setPlane(p) {
  */
 export function paintActivePlane() {
   const carrying = drag.index !== EMPTY;
-  const held = carrying ? items[drag.index] : null;
   for (const disp of displays) {
-    // Full FOR WHAT IS IN HAND — a 3x3 bulky ball and a 1x1 hook get different answers about the
-    // same shelf. Whole-display, so the warning is there before the pointer arrives, which is the
-    // point: the display the player is about to drag across the room to is the one that has to
-    // say no. Recomputed rather than cached because an NPC restructures displays between rounds.
-    const noRoom = held && !firstFreeSlot(disp, held);
+    // No red here: a display lit red the moment something is picked up, far from the pointer, read
+    // as an error with no cause. "No room" is shown only under the pointer (ghost).
     // A floor grid lies flat across open floor, so leaving it on litters the whole room with
     // lines. It shows only while the pointer is over it — or while it is the drop target of
     // something being carried, which is exactly when the player needs to see the slots.
     // Shelves and tables keep their grids on: they are small and read as furniture detail.
     const revealed = disp.form !== 'floor' || (S.floorGrid && (disp.id === aim.hovered ||
-                     (carrying && disp.id === aim.active) || noRoom));
+                     (carrying && disp.id === aim.active)));
     disp.lines.forEach((lines, s) => {
       const isActive = disp === activeDisplay() && s === disp.plane;
       lines.visible = S.showGrid && revealed;
@@ -176,15 +172,9 @@ export function paintActivePlane() {
       // darker ink at full opacity against the pale floor. If genuinely fat lines are wanted,
       // that needs three's Line2/LineMaterial addon, which is a real dependency on a fat-line
       // shader rather than a settings change.
-      lines.material.color.set(latticeInk(noRoom, isActive));
-      lines.material.opacity = noRoom || isActive ? 1 : 0.6;
-      lines.material.transparent = !(noRoom || isActive);
-      // A full lattice is drawn through its own stock, for the same reason the wash is: the boxes
-      // that make it full are sitting on top of the lines saying so — and it opts out of the tone
-      // mapper, without which the alarm red arrives as maroon. The ordinary lattice keeps its tone
-      // mapping: it is furniture detail and belongs in the shop's own light.
-      lines.material.depthTest = !noRoom;
-      lines.material.toneMapped = !noRoom;
+      lines.material.color.set(isActive ? '#5e2408' : '#6f6456');   // dark on the level aimed at
+      lines.material.opacity = isActive ? 1 : 0.6;
+      lines.material.transparent = !isActive;
     });
   }
 }
@@ -199,12 +189,9 @@ export const dropMarker = new THREE.Mesh(
 );
 
 /**
- * The negative answer, which said nothing at all before.
- *
- * In a 3D room a far display reads as having room it does not have: perspective hides how full a
- * level is, and the absence of a green ghost is indistinguishable from "you aimed badly". So a
- * display that cannot take this item ANYWHERE washes its whole level red — an answer about the
- * display, not about the aim.
+ * The negative answer: a display that cannot take this item ANYWHERE washes its whole level red,
+ * an answer about the display, not about the aim. Only while the pointer is over it, holding the
+ * item: a warning before the drop, never red far from the pointer with no cause.
  */
 function ghostNoRoom(disp) {
   const { w, d } = gridSize(disp.g);
@@ -238,23 +225,20 @@ function ghostSlot(disp, item, t) {
   dropMarker.scale.set(rect.w * 0.96, rect.d * 0.96, 1);
 }
 
-/** Where this item would land — the green slot, or the red "nowhere on this display". */
+/** Where this item would land: the green slot, the red "nowhere on the display you're over", or nothing. */
 export function ghost(item) {
-  const disp = activeDisplay();
-  const t = drag.target;
-  dropMarker.visible = Boolean(t);
-  if (t) {
-    ghostSlot(disp, item, t);
-    return;
-  }
-  if (!firstFreeSlot(disp, item)) ghostNoRoom(disp);
+  const full = drag.target ? null : fullUnderPointer();
+  dropMarker.visible = Boolean(drag.target || full);
+  if (drag.target) ghostSlot(activeDisplay(), item, drag.target);
+  else if (full) ghostNoRoom(full);
 }
 
-/** A lattice's ink: alarm red when full, dark on the level being aimed at, pale otherwise. */
-function latticeInk(noRoom, isActive) {
-  if (noRoom) return GHOST_NO;
-  return isActive ? '#5e2408' : '#6f6456';
+/** The display under the pointer when it has no room anywhere for what is held, else null. */
+export function fullUnderPointer() {
+  const disp = byId(aim.hovered);
+  return disp && drag.index !== EMPTY && !firstFreeSlot(disp, items[drag.index]) ? disp : null;
 }
+
 
 /** Everything this module does ONCE, at boot. Called from main.js, in order. */
 export function installFeedback() {

@@ -17,7 +17,7 @@ import { EMPTY, footprint, fits, place, clearShelf, usableAt, fullyExposed, drop
   from '../inventory/grid.js';
 import {
   WIP_STATE, WEAR_SLOTS, makeCraftPrefs, makeWip, wantFor, stow, workRound,
-  wearOrOffer, photoSubject, lend, labelWant, runningOut,
+  wearOrOffer, photoSubject, lend, labelWant, runningOut, wantsOf,
 } from './wip.js';
 import { labelOf as labelItem, TOOL_NOTIONS } from '../inventory/catalog.js';
 import { placeWord, thankYou } from './guestbook.js';
@@ -1298,9 +1298,12 @@ export function signGuestbook(world, npc) {
         wip: made, wornInPhoto: !Object.values(npc.worn).includes(made), tags: guestbookTags(npc), ...record,
         note: thankYou(made, npc.traits, { workedHere: npc.did.some((d) => d.what === 'sat' && d.wip === made.id) }) }
     // "happy (found what they are looking for) or disappointed (did not find what they needed)" —
-    // buying something IS having found it, which is what the buy branch of interact() records.
+    // buying something IS having found it, which is what the buy branch of interact() records. But
+    // a customer who needed nothing, or sat and got their knitting done, did not fail to find
+    // anything: a regular back with everything for their project used to sign "disappointed".
     : { npc: npc.name, kind: 'note', object: null,
-        mood: npc.bought.length ? 'happy' : 'disappointed', round: world.round,
+        mood: npc.bought.length || npc.satAndWorked || !wantsOf(npc).length ? 'happy' : 'disappointed',
+        round: world.round,
         tags: guestbookTags(npc), ...record };
   world.guestbook.push(entry);
   return entry;

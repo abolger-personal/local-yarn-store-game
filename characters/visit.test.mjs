@@ -693,6 +693,21 @@ const runCloseout = (world, npc) => {
 }
 
 {
+  // Disappointed means they needed something and left without it. A regular who came back with
+  // everything for their project and sat knitting bought nothing -- and is not disappointed.
+  for (const [what, set] of [['sat and worked', (n) => { n.satAndWorked = true; }],
+                             ['needed nothing', (n) => { n.wips = []; }]]) {
+    const { world, npc } = fixture();
+    npc.state = STATE.CLOSEOUT;
+    npc.closeoutStep = 0;
+    npc.wips = [WIP()];
+    set(npc);
+    runCloseout(world, npc);
+    assert.equal(world.guestbook[0].mood, 'happy', `bought nothing but ${what}: happy`);
+  }
+}
+
+{
   // A finished object gives the photo AND the lend tag, since the spare goes to the shop.
   const { world, npc } = fixture();
   npc.state = STATE.CLOSEOUT;

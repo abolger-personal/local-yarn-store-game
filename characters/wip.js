@@ -280,6 +280,22 @@ export function stow(npc, item, want) {
 }
 
 /**
+ * How far this WIP can get before it has to wait. No stitches without yarn: progress stops where
+ * the yarn they hold runs out (runningOut), and short of yarn the limit is under 100, so they
+ * cannot finish. `holdAt` is a script's hold (the tutorial's pot holder: world.js openTutorial).
+ */
+export const progressLimit = (wip) => Math.min(wip.holdAt ?? 100,
+  unitsShort(wip) > 0 ? (100 * heldUnits(wip)) / wip.pattern.yarnUnits : 100);
+
+/** Percent one round of work adds: see workRound. */
+const workStep = (npc, wip) =>
+  (100 / wip.pattern.yarnUnits) * (npc.prefs.skill / 3) * (npc.traits.Industriousness / 3);
+
+/** Rounds of work left to finish this WIP, or Infinity when it cannot finish yet. */
+export const roundsToFinish = (npc, wip) => (progressLimit(wip) < 100 ? Infinity
+  : Math.max(0, Math.ceil((100 - wip.progress) / workStep(npc, wip) - 1e-9)));
+
+/**
  * One round of work. "1/(number of units of yarn called for by pattern) * characterWeight", with
  * "characterWeight = (NPC crafter skill level)/3 * Industriousness/3".
  *
@@ -290,13 +306,11 @@ export function stow(npc, item, want) {
  */
 export function workRound(npc, wip, round = null) {
   if (wip.state !== WIP_STATE.IN_PROGRESS) return false;
-  const weight = (npc.prefs.skill / 3) * (npc.traits.Industriousness / 3);
-  // No stitches without yarn: progress stops where the yarn they hold runs out (runningOut), and
-  // waits there until they buy more. Short of yarn, the limit is under 100, so they cannot finish.
-  const limit = unitsShort(wip) > 0 ? (100 * heldUnits(wip)) / wip.pattern.yarnUnits : 100;
+  const limit = progressLimit(wip);
   if (wip.progress >= limit) return false;
-  wip.progress = Math.min(limit, wip.progress + (100 / wip.pattern.yarnUnits) * weight);
-  if (wip.progress < 100) return false;
+  wip.progress = Math.min(limit, wip.progress + workStep(npc, wip));
+  // The epsilon: nine steps of 100/9 sum to 99.999..., which used to need a tenth round.
+  if (wip.progress < 100 - 1e-9) return false;
 
   wip.progress = 100;
   wip.state = WIP_STATE.FINISHED;

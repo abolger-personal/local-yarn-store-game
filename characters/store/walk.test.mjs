@@ -149,4 +149,42 @@ for (const k of [1, 2, 3]) {
   assert.ok(longTurn < 0.5, `${k}x: turned to the display before reaching (longest turn ${longTurn.toFixed(2)}s)`);
 }
 
+// ---------------------------------------------------------------- 6. the tutorial friend's pot holder
+// TUTORIAL.md: bought on day 1, finished in the shop on day 3 -- never at home or before day 3, and
+// early on day 3, whatever the friend's traits. The kit is handed over as they walk in on day 1, the
+// most knitting time days 1-2 can give. Seeded, every seed must pass.
+{
+  const { items } = await import('./core/state.js');
+  const { WIP_STATE, wantFor, stow } = await import('../wip.js');
+  const random = Math.random, rounds = [];
+  for (let seed = 1; seed <= 50; seed++) {
+    let a = seed;   // mulberry32
+    Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    open({ k: 1, tutorial: true });
+    const friend = shop.world.npcs[0];
+    for (const kind of ['pattern', 'yarn', 'crochet-hook']) {
+      const it = items.find((x) => x.name === kind && !x.gone);
+      it.gone = true;
+      stow(friend, it, wantFor(friend, it));
+    }
+    friend.willReturn = true;   // as a purchase would
+    const potHolder = friend.wips[0];
+    assert.equal(potHolder.state, WIP_STATE.IN_PROGRESS, `seed ${seed}: the kit starts the pot holder`);
+    for (let day = 1; day <= 3; day++) {
+      if (day > 1) try { restart(); } catch (err) { assert.match(err.stack, /sizeInstanceBuffers/); }
+      assert.ok(shop.world.npcs.includes(friend), `seed ${seed}: the friend comes in on day ${day}`);
+      for (let r = 0; r < 200 && shop.world.npcs.some((n) => n.state !== STATE.GONE); r++) doAdvanceRound();
+      if (day < 3) assert.equal(potHolder.state, WIP_STATE.IN_PROGRESS, `seed ${seed}: not finished on day ${day} (${potHolder.progress}%)`);
+    }
+    assert.equal(potHolder.state, WIP_STATE.FINISHED, `seed ${seed}: finished on day 3 (${potHolder.progress}%)`);
+    assert.ok(shop.world.guestbook.some((g) => g.npcId === friend.id && g.kind === 'photo' && g.wip === potHolder),
+      `seed ${seed}: and photographed with it in day 3's Guestbook`);
+    rounds.push(potHolder.finishedRound);
+  }
+  Math.random = random;
+  rounds.sort((x, y) => x - y);
+  assert.ok(rounds.at(-1) <= 5, `the finish comes early on day 3 (rounds ${rounds.join(',')})`);
+  console.log(`tutorial: the pot holder is finished in the shop on day 3, round ${rounds[25]} (median), ${rounds.at(-1)} (worst)`);
+}
+
 console.log('walk: prompt door, real pause, full strides at every speed, no jumps, faces the display');

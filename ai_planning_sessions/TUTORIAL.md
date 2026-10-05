@@ -43,8 +43,8 @@ nothing is separate from playing. It teaches the core loop and ends on its payof
 
 1. **Day 1:** your first customer wants a pot holder; you put the yarn by the pattern; they buy it.
 2. **Day 2:** what you put together sells together.
-3. **Day 3:** your first customer comes back with the pot holder they made, and their selfie is
-   the first photo on the board.
+3. **Day 3:** your first customer comes back, sits down and finishes the pot holder in the shop,
+   and their selfie is the first photo on the board.
 
 **Everything after that is a discovery**, not a lesson: each system arrives the first time it
 makes sense (§5), at most one a day.
@@ -209,8 +209,9 @@ and SCRIPTED-EVENTS.md §4.
 ### Day 3: they come back
 
 - **Teaches:** helping someone pays off later.
-- **Arrives as:** the friend returns with **the pot holder** they made from day 1's kit, and
-  **their selfie holding it goes up on the bulletin board**: the board's first card is the
+- **Arrives as:** the friend returns with **the pot holder** from day 1's kit a few rows from done,
+  **sits down and finishes it in the shop** (decided 2026-10-04: the player has to see it happen),
+  and **their selfie holding it goes up on the bulletin board**: the board's first card is the
   player's first success. Its thank-you line (PROJECTS-AND-AUTHORSHIP.md §4b) remembers day 1
   truthfully, e.g. *"First thing I ever made! The red one was right there on the floor."*, which
   quietly echoes the note. A pot holder has no wear slot (WEARABLE-FINISHED-OBJ.md: decor is
@@ -219,7 +220,11 @@ and SCRIPTED-EVENTS.md §4.
 - **Success:** the player sees the selfie, and places the lent pot holder somewhere they will see
   it: the arrangement verb used as the relationship verb (REGULARS §3). Small on purpose.
 - **Fallback:** the selfie stays on the board; the pot holder waits at the drop-off.
-- **Needs:** a pot holder that takes two days (bought day 1, back day 3); pot holder as a
+- **Built:** the pot holder is held short of done until day 3 (`holdAt` 90%, `wip.js`
+  `progressLimit`), day 3 lifts the hold as knitted at home, and the finishing push (`visit.js`,
+  ROADMAP I1) sits the friend down to finish it: round 3 of day 3, about half a minute at ▶
+  (`store/walk.test.mjs` §6).
+- **Needs:** pot holder as a
   renderable decor finished object; the selfie path (`store/ui/photo.js`, the board) taking a
   decor object in hand.
 

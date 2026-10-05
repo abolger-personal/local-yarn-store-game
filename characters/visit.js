@@ -17,7 +17,7 @@ import { EMPTY, footprint, fits, place, clearShelf, usableAt, fullyExposed, drop
   from '../inventory/grid.js';
 import {
   WIP_STATE, WEAR_SLOTS, makeCraftPrefs, makeWip, wantFor, stow, workRound,
-  wearOrOffer, photoSubject, lend, labelWant, runningOut, wantsOf,
+  wearOrOffer, photoSubject, lend, labelWant, runningOut, wantsOf, progressLimit, readyWips, roundsToFinish,
 } from './wip.js';
 import { labelOf as labelItem, TOOL_NOTIONS } from '../inventory/catalog.js';
 import { placeWord, thankYou } from './guestbook.js';
@@ -645,10 +645,10 @@ function npcWalks(npc, world, snapshot) {
 // A finished object is not something you sit down and work on, so only live slots weight the
 // draw. Params carry `wip.id`, not the object: an action travels through the debug panel and
 // through a prescription, and a whole WIP in there is a snapshot that can go stale.
-// Only a WIP that a round of work would move: in progress and not out of yarn (workRound stops at
-// runningOut). Anything else would sit them down to knit nothing. stow starts a WIP the moment it
-// canStart, so IN_PROGRESS already covers every startable one.
-const canProgress = (w) => w.state === WIP_STATE.IN_PROGRESS && !runningOut(w);
+// Only a WIP that a round of work would move: in progress and short of its limit (out of yarn, or a
+// script's hold: progressLimit). Anything else would sit them down to knit nothing. stow starts a
+// WIP the moment it canStart, so IN_PROGRESS already covers every startable one.
+const canProgress = (w) => w.state === WIP_STATE.IN_PROGRESS && w.progress < progressLimit(w);
 
 function wipActions(npc, world) {
   const workable = npc.wips.filter(canProgress);
@@ -659,6 +659,22 @@ function wipActions(npc, world) {
   if (!open.length) return [];
   const nearest = open.reduce((m, s) => (dist2(npc, s) < dist2(npc, m) ? s : m));
   return workable.map((wip) => ({ type: ACTION.WALK_TO_SEAT, params: { wip: wip.id, seatId: nearest.id } }));
+}
+
+/**
+ * DANCES.md's finishing push (ROADMAP I1): a project with nothing left to buy and only a few rounds
+ * of work left, which fit in the visit, is finished here: they sit down (WALK_TO_SEAT prescribes
+ * the work) and keep working until it is done. Without it a seated customer one round from done
+ * drew "work" against every display, wait and wander in the set, and often walked out instead.
+ * ponytail: "a few" is PUSH_ROUNDS; tea and armchairs keeping them longer (HOW-THEY-SHOP §2d) would
+ * widen it.
+ */
+const PUSH_ROUNDS = 2;
+function finishingPush(npc, world) {
+  const left = Math.min(PUSH_ROUNDS, npc.maxRounds - npc.roundsInStore + 1);
+  const ready = readyWips(npc);
+  const wip = npc.wips.find((w) => ready.includes(w.id) && canProgress(w) && roundsToFinish(npc, w) <= left);
+  return wip ? wipActions(npc, world).find((a) => a.params.wip === wip.id) ?? null : null;
 }
 
 /**
@@ -678,6 +694,8 @@ export function DetermineNextBrowseAction(npc, world, snapshot) {
     return forced;
   }
   if (npc.roundsInStore >= npc.maxRounds) return null;   // MAX_ROUNDS exceeded
+  const push = finishingPush(npc, world);
+  if (push) return push;
   const set = browseActionSet(npc, world, snapshot);
   if (!set.length) return null;                          // "no more items possible in the set"
   return set[Math.floor(world.rng() * set.length)];

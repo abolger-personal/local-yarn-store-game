@@ -29,7 +29,7 @@ import { buildDisplays } from '../scene/displays.js';
 import { CAPACITY, boxes, edgeTop, fieldTop, shadows, sideEdge, sideField, sizeSide, sizeTop } from '../goods/items.js';
 import { refreshAll } from '../goods/paint.js';
 import { addItem } from '../goods/stock.js';
-import { buildOrder, carryOver, resolveOrder, tutorialDay1 } from '../../../inventory/supply.js';
+import { TUTORIAL_DAYS, buildOrder, carryOver, resolveOrder, tutorialDay1 } from '../../../inventory/supply.js';
 import { STAND_TIME, buildBlobs, checkOutfit, disposeRecord, dressedCharacter, measureSeatDrop, outfitOf, rollCheer,
   routeLength } from './cast.js';
 
@@ -492,13 +492,31 @@ function setUpShop(fresh) {
 }
 
 /**
+ * Day 3 lifts the hold: knitted at home up to the hold, the pot holder is one round of work from
+ * done, and the finishing push (visit.js) sits the friend down to finish it here.
+ * TODO(SCRIPTED-EVENTS.md): the friend role and the day-3 script; B2 (knit at home) generally.
+ */
+const TUTORIAL_HOLD = 90;   // one beginner round is 100/9 % at the least, so 90 finishes in one
+function liftHolds(npcs) {
+  for (const w of npcs.flatMap((n) => n.wips).filter((x) => x.holdAt != null)) {
+    // Even when the kit is still short (a hook left on the floor): bought on day 3, it is one round.
+    w.progress = Math.max(w.progress, w.holdAt);
+    delete w.holdAt;
+  }
+}
+
+/**
  * Tutorial day 1: the customer's one project is blank, so the first thing they want is a pattern,
  * and the pattern lies on the table nearest the door, the first one they pass.
  * TODO(spec): SCRIPTED-EVENTS.md `seed ... facing: 'friend'` -- the table the tutorial friend
  * faces, once the friend role (a `keep` NPC, first in the queue) exists.
  */
 function openTutorial(npc, pattern) {
-  npc.wips = [{ ...npc.wips[0], pattern: null, yarn: [], tool: null, notions: [] }];
+  // TUTORIAL.md: the friend is a beginner, and the pot holder is finished in the shop on day 3.
+  // Held short of done until then (wip.js progressLimit); day 3 lifts the hold (castAndStock).
+  npc.prefs.skill = 1;
+  npc.wips = [{ ...npc.wips[0], pattern: null, yarn: [], tool: null, notions: [], holdAt: TUTORIAL_HOLD }];
+  npc.target = wantsOf(npc)[0] ?? null;
   const near = (d) => Math.hypot(d.x - room.door.x, d.z - room.door.z);
   const tables = displays.filter((d) => d.form === 'table').sort((a, b) => near(a) - near(b));
   const { index } = placeFrom([...tables.map((d) => [d]), ...stockSpots()], 0, pattern, { avoidWall: true });
@@ -512,6 +530,7 @@ function castAndStock(fresh, order) {
   if (tutorial) openTutorial(npcs[0], tutorial.table);
   else if (fresh) stockTheShop(npcs);
   else if (S.seedWants) seedWants(npcs);
+  if (shop.day >= TUTORIAL_DAYS) liftHolds(npcs);
   return { npcs, delivered: deliver(order, tutorial?.floor) };
 }
 

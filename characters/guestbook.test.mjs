@@ -52,9 +52,10 @@ assert.ok(rows([{ what: 'sat', pattern, witnessed: true }])[1].startsWith('sat a
 assert.equal(rows([{ what: 'sat', pattern, witnessed: false }])[1], 'sat and worked on a project');
 
 // The ball band (§7.1): only what the object says, in capitals the house lettering can draw.
-assert.deepEqual(bandLines(yarn({ weight: 'super-bulky', shape: 'cone' })), ['SUPER BULKY WEIGHT', 'WOOL', 'BLUE', 'CONE']);
+assert.deepEqual(bandLines(yarn({ weight: 'super-bulky', shape: 'cone' })), ['SUPER BULKY WEIGHT', 'WOOL', 'BLUE', 'CONE', '1 UNIT']);
 assert.deepEqual(bandLines({ ...pattern, title: 'Bird Brain Beanie', silhouette: 'beanie' }),
-  ['BIRD BRAIN BEANIE', 'MAKES BEANIE HAT', '4.5MM KNITTING NEEDLES', '3 × WORSTED WOOL']);
+  ['BIRD BRAIN BEANIE', 'MAKES BEANIE HAT', '4.5MM KNITTING NEEDLES', 'TAKES 3 UNITS WORSTED WOOL']);
+assert.ok(bandLines({ ...pattern, yarnUnits: 1 }).includes('TAKES 1 UNIT WORSTED WOOL'), 'one unit reads singular, like a yarn band');
 assert.deepEqual(bandLines({ ...pattern, minColors: 3 }).at(-1), 'SUGGESTS 3 COLOURS');
 assert.deepEqual(bandLines({ ...pattern, minColors: 1 }).at(-1), 'SUGGESTS 1 COLOUR');
 assert.deepEqual(bandLines({ name: 'crochet-hook', size: 5 }), ['CROCHET HOOK', '5.0MM']);

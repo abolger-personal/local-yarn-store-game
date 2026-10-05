@@ -7,7 +7,7 @@
 // Specs: ai_planning_sessions/TUTORIAL.md §7.1 (ball band), §7.3 (rows, witnessed vs gist),
 //        ai_planning_sessions/characters/PROJECTS-AND-AUTHORSHIP.md §4b (the thank-you line).
 
-import { labelOf, TOOL_FOR_CRAFT, YARN_COLOR_COUNT } from '../inventory/catalog.js';
+import { labelOf, TOOL_FOR_CRAFT, YARN_COLOR_COUNT, yarnUnits } from '../inventory/catalog.js';
 
 // ---------------------------------------------------------------- the ball band (§7.1)
 
@@ -38,6 +38,8 @@ export function bandOf(item) {
 /** Capitals for the house lettering, which has no lowercase: "super-bulky" reads SUPER BULKY. */
 const caps = (s) => String(s).replaceAll('-', ' ').toUpperCase();
 const mm = (n) => `${Number(n).toFixed(1)}MM`;
+// The same word on a yarn's band and a pattern's, so the player can match one to the other.
+const units = (n) => `${n} ${n === 1 ? 'UNIT' : 'UNITS'}`;
 
 /**
  * The paper ball band on screen, one printed line each: the same facts as bandOf, laid out as a
@@ -46,13 +48,13 @@ const mm = (n) => `${Number(n).toFixed(1)}MM`;
 export function bandLines(item) {
   if (item.name === 'yarn') {
     return [`${caps(item.weight)} WEIGHT`, caps(item.material),
-      ...(item.colorIndex == null ? [] : [caps(colourWord(item.colorIndex))]), caps(item.shape ?? 'ball')];
+      ...(item.colorIndex == null ? [] : [caps(colourWord(item.colorIndex))]), caps(item.shape ?? 'ball'), units(yarnUnits(item))];
   }
   if (item.name === 'pattern') {
     return [...(item.title ? [caps(item.title)] : []),
       `MAKES ${caps([item.silhouette, item.patternType].filter(Boolean).join(' '))}`,
       `${mm(item.toolSize)} ${caps(TOOL_FOR_CRAFT[item.craft] ?? item.craft)}`,
-      `${item.yarnUnits ?? '?'} × ${caps(item.weight)} ${caps((item.materials ?? []).join('/'))}`,
+      `TAKES ${units(item.yarnUnits ?? '?')} ${caps(item.weight)} ${caps((item.materials ?? []).join('/'))}`,
       ...(item.minColors ? [`SUGGESTS ${item.minColors} ${item.minColors === 1 ? 'COLOUR' : 'COLOURS'}`] : [])];
   }
   return [caps(item.name), ...(item.size == null ? [] : [mm(item.size)])];

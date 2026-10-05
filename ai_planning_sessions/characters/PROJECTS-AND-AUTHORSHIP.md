@@ -35,7 +35,7 @@ to buy. An attentive one gets projects completed. An organised one gets exactly 
 | Question | Evidence |
 | --- | --- |
 | **What are they making?** | The WIP in their hands: needles or a hook plus a partial object growing toward its finished silhouette (VISUAL-DESIGN-FINISHED-OBJ.md §4b). Their chat bubbles. The 🪑 Guestbook row, if the knitting was witnessed (TUTORIAL.md §7.3). |
-| **What does it need?** | The pattern's **ball band**. Clicking a knitting customer whose knitting the player has witnessed shows their pattern's requirements on the label (TUTORIAL.md §7.1): how many balls, what weight, how many colours, what tool. |
+| **What does it need?** | The pattern's **ball band**. Clicking a knitting customer whose knitting the player has witnessed shows their pattern's requirements on the label (TUTORIAL.md §7.1): how many units of yarn, what weight, how many colours, what tool. |
 | **What have they got?** | Their **project bag**, carried: the balls they own visibly poke out, countable, in their colours. Their purchases in the Guestbook. |
 | **The gap, live: running out** | Knitting stops at the end of the yarn. They hold up the tail and glance at the yarn wall. A chatty customer's bubble shows the missing ball; a quiet one only sighs (TUTORIAL.md §7.4: explicitness is personality). |
 | **The gap, closed: ready** | The moment they have everything the project needs (their wants empty, usually right after the buy that closes the gap), a **sparkle burst** pops on them, wherever they are: at a display, walking or seated. Not part of the knitting animation. Leaving like that means they will be back with the finished object. |

@@ -648,7 +648,7 @@ export function doAdvanceRound() {
 // TUTORIAL.md §7.3 "witnessed": on screen and reasonably close to the camera. Read by the sim as it
 // records what a customer does, so the Guestbook keeps detail only for what the player could see.
 // ponytail: sampled once a round, at the round's start, and WITNESS_DIST is the knob for "close".
-// TODO(spec): hovering or clicking a customer should count too; there is no customer pick yet.
+// Pointing at a customer counts too: ui/label.js collects them in shop.watched between rounds.
 const WITNESS_DIST = 12;
 const _eye = new THREE.Vector3();
 function markInView(npcs) {
@@ -656,8 +656,9 @@ function markInView(npcs) {
     _eye.set(n.x, 0.6, n.z);
     const d = _eye.distanceTo(camera.position);
     _eye.project(camera);
-    n.inView = d < WITNESS_DIST && Math.abs(_eye.x) <= 1 && Math.abs(_eye.y) <= 1 && _eye.z < 1;
+    n.inView = shop.watched.has(n.id) || (d < WITNESS_DIST && Math.abs(_eye.x) <= 1 && Math.abs(_eye.y) <= 1 && _eye.z < 1);
   }
+  shop.watched.clear();
 }
 
 /**

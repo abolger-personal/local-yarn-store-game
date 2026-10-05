@@ -198,6 +198,14 @@
     #parcels { width: min(80vw, calc(34vh * 420 / 660)); }
   }
   @media (prefers-reduced-motion: reduce) { #night { transition: none; } }
+  /* The label: a paper ball band on the right edge (TUTORIAL.md §7.1, ui/label.js). Passive,
+     so it never takes the pointer from the shop under it. Note paper, black house lettering. */
+  #band {
+    position: fixed; right: 0; top: 50%; translate: 0 -50%; z-index: 9; pointer-events: none;
+    width: min(150px, 34vw); padding: 4px 0; background: #fbf8ef; border-radius: 3px 0 0 3px;
+    box-shadow: 0 3px 10px rgb(0 0 0 / .28); border-left: 3px double #1c1712;
+  }
+  #band svg { display: block; width: 100%; height: auto; }
 </style>
 </head>
 <body>
@@ -403,6 +411,8 @@
   <img alt="The customer, wearing what they made" />
   <figcaption></figcaption>
 </figure>
+
+<aside id="band" aria-label="The label" hidden></aside>
 
 <p id="bootFail" class="panel" role="alert" hidden></p>
 

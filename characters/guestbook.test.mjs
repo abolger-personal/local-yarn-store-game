@@ -1,8 +1,11 @@
 // The Guestbook's words: every thank-you line names a recorded fact, and the short form fits a
 // polaroid. Run: node characters/guestbook.test.mjs
 import assert from 'node:assert/strict';
-import { TRAITS } from './visit.js';
-import { entryRows, placeWord, thankYou } from './guestbook.js';
+import { TRAITS, makeNpc } from './visit.js';
+import { wantsOf } from './wip.js';
+import { bandLines, entryRows, placeWord, tagLines, thankYou } from './guestbook.js';
+import { GLYPHS } from './store/ui/lettering.js';
+import { mulberry32 } from './store/core/util.js';
 
 const yarn = (extra) => ({ name: 'yarn', weight: 'worsted', material: 'wool', shape: 'ball', colorIndex: 32, ...extra });
 const pattern = { name: 'pattern', patternType: 'hat', craft: 'knitting', toolSize: 4.5, weight: 'worsted', materials: ['wool'], yarnUnits: 3 };
@@ -47,4 +50,26 @@ assert.deepEqual(rows([{ what: 'putBack', item: yarn({ weight: 'dk' }), witnesse
 assert.equal(rows([{ what: 'putBack', item: yarn(), witnessed: false }])[1], 'turned something over and put it back');
 assert.ok(rows([{ what: 'sat', pattern, witnessed: true }])[1].startsWith('sat and knitted on the hat pattern'));
 assert.equal(rows([{ what: 'sat', pattern, witnessed: false }])[1], 'sat and worked on a project');
+
+// The ball band (§7.1): only what the object says, in capitals the house lettering can draw.
+assert.deepEqual(bandLines(yarn({ weight: 'super-bulky', shape: 'cone' })), ['SUPER BULKY WEIGHT', 'WOOL', 'BLUE', 'CONE']);
+assert.deepEqual(bandLines({ ...pattern, title: 'Bird Brain Beanie', silhouette: 'beanie' }),
+  ['BIRD BRAIN BEANIE', 'MAKES BEANIE HAT', '4.5MM KNITTING NEEDLES', '3 × WORSTED WOOL']);
+assert.deepEqual(bandLines({ name: 'crochet-hook', size: 5 }), ['CROCHET HOOK', '5.0MM']);
+assert.deepEqual(bandLines({ name: 'stitch-markers', size: null }), ['STITCH MARKERS']);
+
+// A customer's tag: their name and what they bought, never what they still want. Their pattern's
+// needs only once their knitting was witnessed.
+for (let seed = 1; seed <= 40; seed++) {
+  const npc = makeNpc({ id: `n${seed}`, name: 'Marguerite', species: 'Owl', rng: mulberry32(seed) });
+  assert.ok(wantsOf(npc).length, 'a fresh customer has wants to hide');
+  assert.deepEqual(tagLines(npc), ['MARGUERITE', 'NOTHING BOUGHT YET'], 'an unwatched tag shows no wants');
+  npc.bought.push(yarn());
+  const onNeedles = npc.wips.find((w) => w.pattern)?.pattern ?? pattern;
+  npc.did.push({ what: 'sat', pattern: onNeedles, witnessed: false });
+  assert.deepEqual(tagLines(npc), ['MARGUERITE', 'WORSTED WOOL BALL, BLUE'], 'an unwitnessed sit stays hidden');
+  npc.did[0].witnessed = true;
+  assert.deepEqual(tagLines(npc).slice(2), ['MAKING:', ...bandLines(onNeedles)], 'a witnessed sit shows the pattern');
+  for (const line of tagLines(npc)) for (const ch of line) assert.ok(ch === ' ' || GLYPHS[ch], `the lettering draws "${ch}" in ${line}`);
+}
 console.log('guestbook: ok');

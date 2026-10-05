@@ -40,6 +40,7 @@ import { installWorld, restart, doAdvanceRound } from './sim/world.js';
 import { tickCast } from './sim/cast.js';
 import { installBook, redrawBook } from './ui/book.js';
 import { installBoard, drawBoard } from './ui/board.js';
+import { installLabel, redrawLabel } from './ui/label.js';
 import { frameRoom } from './ui/framing.js';
 import { checkWallCulling, checkItemSizes, checkSlotMasking, checkFloorTiling, checkDisplayMoves, checkHeldItem, checkSunPools } from './checks.js';
 
@@ -63,7 +64,7 @@ function buildShop(pageSteps) {
     ['stage', installStage], ['room', buildRoomShell], ['props', installProps], ['seating', installSeating],
     ['displays', installDisplays], ['placeholder art', installPlaceholderArt],
     ['feedback', installFeedback], ['move mode', installMove], ['input', installInput],
-    ['world', installWorld], ['book', installBook], ['board', installBoard],
+    ['world', installWorld], ['book', installBook], ['board', installBoard], ['label', installLabel],
     ...pageSteps,
   ];
   const broken = [];
@@ -143,7 +144,7 @@ function repaintIfDirty(page) {
   if (takeViewDirty()) { paintActivePlane(); updateHeldReadout(); }
   // The book and the board are the in-world menus, on every page: a press on either is answered
   // here (shop.press), so they cannot live in a page's own hook.
-  if (takeHudDirty()) { redrawBook(); drawBoard(); page.onHud?.(); }
+  if (takeHudDirty()) { redrawBook(); drawBoard(); redrawLabel(); page.onHud?.(); }
 }
 
 const clock = new THREE.Timer();

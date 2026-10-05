@@ -63,9 +63,12 @@ export const clocks = {
  *
  * `dayT` is how far through today the shop is, 0 at opening to 1 at closing (see dayProgress in
  * visit.js). The light and the HUD clock both read it, so they cannot disagree about the hour.
+ *
+ * `watched` is the ids of customers the player has pointed at since the last round (ui/label.js):
+ * markInView counts them as witnessed, then clears it.
  */
 export const shop = { world: null, day: 0, dayT: 0, hudDirty: true, viewDirty: true, pastBooks: [],
-  press: null };
+  press: null, watched: new Set() };
 
 /**
  * Mark the view stale rather than repainting from inside the mechanics.

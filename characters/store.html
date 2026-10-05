@@ -204,6 +204,14 @@
   #photo .close { position: absolute; top: 4px; right: 6px; border: 0; background: none; font-size: 16px; cursor: pointer; color: #5c5349; }
   #debug .log { margin-top: 8px; border-top: 1px solid rgba(0,0,0,.1); padding-top: 6px; font-size: 10px; color: #6a5f55; }
   #debug .log div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* The label: a paper ball band on the right edge (TUTORIAL.md §7.1, ui/label.js). Passive,
+     so it never takes the pointer from the shop under it. Note paper, black house lettering. */
+  #band {
+    position: fixed; right: 0; top: 50%; translate: 0 -50%; z-index: 9; pointer-events: none;
+    width: min(150px, 34vw); padding: 4px 0; background: #fbf8ef; border-radius: 3px 0 0 3px;
+    box-shadow: 0 3px 10px rgb(0 0 0 / .28); border-left: 3px double #1c1712;
+  }
+  #band svg { display: block; width: 100%; height: auto; }
 </style>
 </head>
 <body>
@@ -256,6 +264,8 @@
   <img alt="The customer, wearing what they made" />
   <figcaption></figcaption>
 </figure>
+
+<aside id="band" aria-label="The label" hidden></aside>
 
 <!-- Reset the camera. A corner button rather than only the F key, because a tablet has no F key
      and getting lost is the one state you cannot orbit your way out of. -->

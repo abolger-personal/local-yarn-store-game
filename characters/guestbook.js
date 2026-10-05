@@ -7,7 +7,7 @@
 // Specs: ai_planning_sessions/TUTORIAL.md §7.1 (ball band), §7.3 (rows, witnessed vs gist),
 //        ai_planning_sessions/characters/PROJECTS-AND-AUTHORSHIP.md §4b (the thank-you line).
 
-import { labelOf, YARN_COLOR_COUNT } from '../inventory/catalog.js';
+import { labelOf, TOOL_FOR_CRAFT, YARN_COLOR_COUNT } from '../inventory/catalog.js';
 
 // ---------------------------------------------------------------- the ball band (§7.1)
 
@@ -33,6 +33,41 @@ export function bandOf(item) {
            `${item.yarnUnits ?? '?'} × ${item.weight} ${(item.materials ?? []).join('/')}`;
   }
   return labelOf(item).replace('-', ' ');
+}
+
+/** Capitals for the house lettering, which has no lowercase: "super-bulky" reads SUPER BULKY. */
+const caps = (s) => String(s).replaceAll('-', ' ').toUpperCase();
+const mm = (n) => `${Number(n).toFixed(1)}MM`;
+
+/**
+ * The paper ball band on screen, one printed line each: the same facts as bandOf, laid out as a
+ * band prints them. A pattern's tool line names its craft too (CROCHET HOOK, KNITTING NEEDLES).
+ */
+export function bandLines(item) {
+  if (item.name === 'yarn') {
+    return [`${caps(item.weight)} WEIGHT`, caps(item.material),
+      ...(item.colorIndex == null ? [] : [caps(colourWord(item.colorIndex))]), caps(item.shape ?? 'ball')];
+  }
+  if (item.name === 'pattern') {
+    return [...(item.title ? [caps(item.title)] : []),
+      `MAKES ${caps([item.silhouette, item.patternType].filter(Boolean).join(' '))}`,
+      `${mm(item.toolSize)} ${caps(TOOL_FOR_CRAFT[item.craft] ?? item.craft)}`,
+      `${item.yarnUnits ?? '?'} × ${caps(item.weight)} ${caps((item.materials ?? []).join('/'))}`];
+  }
+  return [caps(item.name), ...(item.size == null ? [] : [mm(item.size)])];
+}
+
+/**
+ * A customer's tag (§7.1): their name and what they have bought this visit, never what they
+ * still want. PROJECTS-AND-AUTHORSHIP.md §1: once the player has seen them knit (a witnessed 🪑,
+ * or `knitting`, the pattern on their needles right now as the player looks), their pattern's band
+ * too, which is what the project needs.
+ */
+export function tagLines(npc, knitting = null) {
+  const pattern = npc.did?.find((d) => d.what === 'sat' && d.witnessed)?.pattern ?? knitting;
+  const bought = (npc.bought ?? []).map((it) => (it.name === 'pattern' ? caps(it.title ?? `${it.patternType} pattern`) : caps(bandOf(it))));
+  return [caps(npc.name), ...(bought.length ? bought : ['NOTHING BOUGHT YET']),
+    ...(pattern ? ['MAKING:', ...bandLines(pattern)] : [])];
 }
 
 /** What a yarn or pattern IS, in a customer's words: "the blue", "the hat pattern". */

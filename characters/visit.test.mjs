@@ -130,7 +130,8 @@ function fixture({ rng = seq(0.5), traits, seats = SEATS, wips } = {}) {
 // --- more WIPs really does weight the draw ----------------------------------
 {
   const { world, npc } = fixture({ rng: seq(0.99) });
-  npc.wips = ['a', 'b', 'c', 'd'];
+  const HOOK = { name: 'crochet-hook', size: 4.5 };
+  npc.wips = ['a', 'b', 'c', 'd'].map((id) => WIP({ id, state: WIP_STATE.IN_PROGRESS, tool: HOOK }));
   const set = browseActionSet(npc, world, []);
   assert.equal(set.filter((a) => a.type === ACTION.WALK_TO_SEAT).length, 4,
     'one entry per WIP, because duplication IS the weighting — as a walk, since they must sit first');
@@ -142,6 +143,16 @@ function fixture({ rng = seq(0.5), traits, seats = SEATS, wips } = {}) {
   assert.equal(seated.filter((a) => a.type === ACTION.WORK_ON_WIP).length, 4,
     'once seated, the WIP entries become the work itself');
   assert.ok(!seated.some((a) => a.type === ACTION.WALK_TO_SEAT), 'and they do not go find another chair');
+
+  // Only a WIP a round of work would move: not unstarted, not finished, not out of yarn
+  // (one ball of a three-ball hat, already worked to where that ball ends).
+  npc.wips = [WIP({ id: 'stuck' }), WIP({ id: 'done', state: WIP_STATE.FINISHED, tool: HOOK, progress: 100 }),
+    WIP({ id: 'dry', state: WIP_STATE.IN_PROGRESS, tool: HOOK, yarn: [YARN()], progress: 100 / 3 })];
+  for (const seat of ['chair-a', null]) {
+    npc.seat = seat;
+    assert.ok(!browseActionSet(npc, world, []).some((a) => a.type === ACTION.WORK_ON_WIP || a.type === ACTION.WALK_TO_SEAT),
+      `nobody sits to knit a project they cannot make progress on (seat ${seat})`);
+  }
 }
 
 // --- seats are exclusive, and released when the NPC does something else -----

@@ -508,6 +508,10 @@ export const MOTION_DEFAULTS = Object.freeze({
   // untouched, which is the walk the cap was strangling.
   swayRateMax: 1.25,
   cadenceMax: 3.4,   // steps/sec before stride stretches instead of cadence rising
+  // steps/sec below which stride SHORTENS instead of cadence falling. 0 is off: the lab walks at
+  // ~1.2 units/s where it never binds. The shop's slow ▶ stroll sets it (SHOP_GAIT, config.js), or
+  // a stilt llama at 0.24 units/s takes one step every 1.4 seconds.
+  cadenceMin: 0,
   sinMax:    0.5646, // sin(0.6 rad): the most scissor that still reads as walking
 });
 
@@ -1395,7 +1399,11 @@ const wrap01 = (x) => ((x % 1) + 1) % 1;
  * phaseStep can divide by the same number walkPhase reports.
  */
 export function strideFor(speed, L, opts) {
-  const natural = opts.stride * L;
+  // A slow walker shortens the stride rather than stepping in slow motion: below cadenceMin the
+  // stride is what keeps that cadence. Floored, so a standstill is a zero cadence and not 0/0.
+  const natural = opts.cadenceMin > 0
+    ? Math.min(opts.stride * L, Math.max((2 * speed) / opts.cadenceMin, 1e-6))
+    : opts.stride * L;
   const needed = opts.cadenceMax > 0 ? (2 * speed) / opts.cadenceMax : natural;
   return Math.max(natural, needed);
 }

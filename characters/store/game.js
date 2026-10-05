@@ -68,8 +68,8 @@ const SPEED_NAMES = { 1: 'strolling', 2: 'double speed', 3: 'triple speed', 0: '
 let speed = 1, resumeAt = 1;   // resumeAt: where P goes back to
 
 /**
- * The speed button: rounds and walking scale together (gameSpeed, config.js), and ⏸ stops only the
- * rounds. The state lives in data-speed for the CSS, and in S for the clocks; set once here, it
+ * The speed button: rounds and walking scale together (gameSpeed, config.js), and ⏸ stops the
+ * rounds and halts the walks; idles, knitting and chat carry on. The state lives in data-speed for the CSS, and in S for the clocks; set once here, it
  * outlasts the night screen and restart(), which never touch either.
  */
 function setSpeed(k) {

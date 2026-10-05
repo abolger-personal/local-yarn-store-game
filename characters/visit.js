@@ -645,8 +645,13 @@ function npcWalks(npc, world, snapshot) {
 // A finished object is not something you sit down and work on, so only live slots weight the
 // draw. Params carry `wip.id`, not the object: an action travels through the debug panel and
 // through a prescription, and a whole WIP in there is a snapshot that can go stale.
+// Only a WIP that a round of work would move: in progress and not out of yarn (workRound stops at
+// runningOut). Anything else would sit them down to knit nothing. stow starts a WIP the moment it
+// canStart, so IN_PROGRESS already covers every startable one.
+const canProgress = (w) => w.state === WIP_STATE.IN_PROGRESS && !runningOut(w);
+
 function wipActions(npc, world) {
-  const workable = npc.wips.filter((w) => w.state !== WIP_STATE.FINISHED);
+  const workable = npc.wips.filter(canProgress);
   if (npc.seat !== null) {
     return workable.map((wip) => ({ type: ACTION.WORK_ON_WIP, params: { wip: wip.id, seatId: npc.seat } }));
   }

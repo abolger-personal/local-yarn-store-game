@@ -2,12 +2,12 @@
 //
 // Extracted from the single 3,200-line module that used to live inline in store.html.
 
-import { cast, seats } from '../core/state.js';
+import { cast, displays, seats } from '../core/state.js';
 import { cellRect } from '../../../inventory/notions.js';
 import { BANDS, TAILS, bandMatrix, familyExtent, tailMatrix, yarnFit }
   from '../../../inventory/yarn-geometry.js';
 import { POSES, applyPose, lowestResting, seatedHipsAlong, phaseStep, stepMotion, valueOf, walkPhase, walkLayer,
-  walkGain, createCharacter, mergeCharacter, disposeCharacter, setViewMode } from '../../npc.js';
+  walkGain, topSpeed, createCharacter, mergeCharacter, disposeCharacter, setViewMode } from '../../npc.js';
 import { ACTION, STATE } from '../../visit.js';
 import { WIP_STATE, readyWips, runningOut, wearOrOffer } from '../../wip.js';
 import { dress, undress, wornAs } from '../../garments.js';
@@ -380,11 +380,42 @@ function alongPolyline(pts, want, fallbackFacing) {
   return null;
 }
 
+/** Shortest way round: blending 350 degrees toward 10 must not go the long way about. */
+const angleLerp = (from, to, t) => from + Math.atan2(Math.sin(to - from), Math.cos(to - from)) * t;
+
+/** smoothstep's peak speed over its mean: stepWalk eases every route through one. */
+const EASE_PEAK = 1.5;
+
+/** 1/s: how fast a body turns toward where it is going. 8 is a half turn in about 0.4s. */
+const TURN_RATE = 8;
+
+/** 1/s: how fast ⏸ brings a walk to a halt, and a resume back up to pace. */
+const PAUSE_EASE = 4;
+
+/** Radians off the display beyond which they are still turning, and do not reach yet. */
+const FACING_OK = 0.35;
+
+/**
+ * How far in front of the chair's front edge a standing character's feet end up.
+ */
+const STAND_CLEAR = 0.06;
+
+/** Where along the chair a seated character's hips go. See seatedHipsAlong in npc.js. */
+const sitAlong = (P) => seatedHipsAlong(P, CHAIR_W);
+
+/** The point `along` in front of a chair's centre (negative is behind it). */
+const standPoint = (seat, along) => ({ x: seat.x + Math.sin(seat.facing) * along, z: seat.z + Math.cos(seat.facing) * along });
+
 function walkRoute(rec, n, e) {
   const pts = rec.route;
   const last = pts[pts.length - 1];
-  last.x = n.x;   // the destination can move after the round begins: a display dragged out from
-  last.z = n.z;   // under them, or separation nudging them clear of a neighbour
+  // the destination can move after the round begins: a display dragged out from under them, or
+  // separation nudging them clear of a neighbour. A chair's is in FRONT of it, where placeSeated
+  // takes over at the start of sitting down: walking to its centroid ended in a snap back out.
+  const seat = n.action?.type === ACTION.WALK_TO_SEAT ? seats.find((s) => s.id === n.seat) : null;
+  const to = seat ? standPoint(seat, CHAIR_W / 2 + STAND_CLEAR) : n;
+  last.x = to.x;
+  last.z = to.z;
   const total = routeLength(pts);
   const at = alongPolyline(pts, total * e, n.facing);
   return at ? { ...at, total } : { x: n.x, z: n.z, facing: n.facing, total };
@@ -506,9 +537,10 @@ function groundOffsetFor(rec) {
 function stepWalk(rec, n, dt) {
   const wasX = rec.baseX, wasZ = rec.baseZ;
   let routed = false;
+  const t = walkClock(rec, dt);
 
   if (rec.wait > 0) {
-    rec.wait -= dt;
+    rec.wait -= t;
     // The walk starts from wherever getting up left them, not from the cushion they were on.
     // walkRoute only ever rewrites the LAST point, so the first one is pinned at retarget --
     // and for someone still standing up that is a spot they are in the middle of leaving.
@@ -516,17 +548,15 @@ function stepWalk(rec, n, dt) {
   } else if (rec.moveT < 1) {
     // A walking speed makes the time the route's: rec.travelled is its live length, so a long
     // walk takes longer instead of going faster. Without one (the playground) it is S.travel.
-    const dur = S.walkSpeed ? Math.max(rec.travelled * rec.pace / S.walkSpeed, 0.05) : rec.dur;
-    rec.moveT = Math.min(1, rec.moveT + dt / dur);
+    const dur = S.walkSpeed ? Math.max(rec.travelled * secondsPerUnit(rec), 0.05) : rec.dur;
+    rec.moveT = Math.min(1, rec.moveT + t / dur);
     const e = rec.moveT * rec.moveT * (3 - 2 * rec.moveT);
     const at = walkRoute(rec, n, e);
     // BASE coordinates, not the root's. The root is the base plus the seat shift below, and
     // feeding that back in would make settling onto a cushion read as ground covered -- the
     // legs would take a stride while sitting down. The route lives in base space; the shift is
     // a display offset on top of it.
-    rec.baseX = at.x;
-    rec.baseZ = at.z;
-    rec.travelled = at.total;
+    ({ x: rec.baseX, z: rec.baseZ, total: rec.travelled } = at);
     routed = true;
     // Facing comes from the LEG being walked, not from the start-to-end line: rounding a table
     // means turning, and an NPC who keeps facing their final destination crabs sideways.
@@ -552,6 +582,41 @@ function stepWalk(rec, n, dt) {
   rec.moved = routed ? Math.hypot(rec.baseX - wasX, rec.baseZ - wasZ) : 0;
   // dt is clamped to 0.1 upstream (main.js), so this cannot divide by something tiny.
   rec.speed = dt > 0 ? rec.moved / dt : 0;
+}
+
+/**
+ * The game's ⏸ (S.paused): the walk's own clock eases to a stop and back, so a walker slows over a
+ * step or two and halts where they are, and a resume carries on along the same route. Returns this
+ * frame's walk time.
+ */
+function walkClock(rec, dt) {
+  rec.go += ((S.paused ? 0 : 1) - rec.go) * (1 - Math.exp(-PAUSE_EASE * dt));
+  if (S.paused && rec.go < 1e-3) rec.go = 0;   // stopped, not creeping
+  return dt * rec.go;
+}
+
+/**
+ * TURNING TAKES TIME. faceTo snaps at every corner of a route, and at the first step out of the
+ * queue it snapped 180 degrees in one frame, which read as a teleport. The body turns after it.
+ *
+ * At a display they turn to IT before the reach (wantedPose waits), not along the last leg. Read
+ * live, from where they are drawn: separation nudges them and the player can move the display.
+ * INTERACT never walks (they are already there), so it turns from the round's start.
+ */
+function stepTurn(rec, n, dt) {
+  const type = n.action?.type;
+  const atDisplay = type === ACTION.INTERACT || (rec.moveT >= 1 && type === ACTION.WALK_TO_DISPLAY);
+  const display = atDisplay ? displays.find((d) => d.id === n.action.params.displayId) : null;
+  if (display) rec.faceTo = Math.atan2(display.x - rec.baseX, display.z - rec.baseZ);
+  rec.heading = angleLerp(rec.heading, rec.faceTo, 1 - Math.exp(-TURN_RATE * dt));
+}
+
+/** Seconds per unit of route: the game's walking speed and their own pace, but never faster than
+ * their legs can walk. Through the smoothstep the peak is EASE_PEAK times the mean, so the mean is
+ * capped at topSpeed / EASE_PEAK and nobody's feet skate, whatever the speed button says. */
+function secondsPerUnit(rec) {
+  const P = rec.built.params;
+  return Math.max(rec.pace / S.walkSpeed, EASE_PEAK / topSpeed(P.legHeight + P.hipInset, rec.opts));
 }
 
 /**
@@ -599,17 +664,6 @@ function calibrateSeat(rec, sat) {
   if (Number.isFinite(lowest)) b.seatDrop -= lowest - (SEAT_H - S.seatLift);
 }
 
-/** Shortest way round: blending 350 degrees toward 10 must not go the long way about. */
-const angleLerp = (from, to, t) => from + Math.atan2(Math.sin(to - from), Math.cos(to - from)) * t;
-
-/**
- * How far in front of the chair's front edge a standing character's feet end up.
- */
-const STAND_CLEAR = 0.06;
-
-/** Where along the chair a seated character's hips go. See seatedHipsAlong in npc.js. */
-const sitAlong = (P) => seatedHipsAlong(P, CHAIR_W);
-
 /** Seconds allowed for getting up, before the round's walk is allowed to start. */
 export const STAND_TIME = 0.5;
 
@@ -649,9 +703,12 @@ function placeSeated(rec) {
   //
   // Held until seatedness actually reaches zero, so the shift and the turn unwind with the legs.
   if (rec.npc.seat !== null) rec.seatRef = seats.find((s) => s.id === rec.npc.seat) ?? null;
-  else if (sat <= 0) rec.seatRef = null;
+  // Near zero, not zero: a critically damped spring only approaches 0, so `<= 0` never came for
+  // most of the cast, the chair was kept for good, and every walk they finished ended in a jump
+  // back to it (measured: 2.7 units, the moment they stopped at a display).
+  else if (sat < 0.01) rec.seatRef = null;
   const seat = rec.seatRef;
-  const face = seat ? angleLerp(rec.faceTo, seat.facing, sat) : rec.faceTo;
+  const face = seat ? angleLerp(rec.heading, seat.facing, sat) : rec.heading;
   root.rotation.y = face;
   root.position.x = rec.baseX;
   root.position.z = rec.baseZ;
@@ -686,13 +743,17 @@ function placeSeated(rec) {
   // nowhere to walk to, so it is a few millimetres long; a round that sends them across the shop
   // is not. Under the threshold the chair decides where they are, over it the route does, and
   // nothing writes the base twice.
+  //
+  // Someone still waiting to set off FOR this chair is not in it yet either: the seat is claimed at
+  // the round's start, and placing them by it through their stagger moved them across the shop
+  // into it in one frame (measured: a 2.95-unit jump). Only someone getting UP waits in the chair.
   if (!seat) return;
-  if (rec.wait <= 0 && rec.moveT < 1 && rec.travelled > 0.15) return;
+  if (rec.moveT < 1 && rec.travelled > 0.15 && (rec.wait <= 0 || rec.npc.seat === seat.id)) return;
   calibrateSeat(rec, sat);
   const stand = CHAIR_W / 2 + STAND_CLEAR;
-  const along = stand + (sitAlong(rec.built.params) - stand) * sat;
-  rec.baseX = seat.x + Math.sin(face) * along;
-  rec.baseZ = seat.z + Math.cos(face) * along;
+  // Along the CHAIR's facing, not the body's: the body is still turning as they sit, and the spot
+  // in front of the seat is where the walk there ended (walkRoute).
+  ({ x: rec.baseX, z: rec.baseZ } = standPoint(seat, stand + (sitAlong(rec.built.params) - stand) * sat));
   root.position.x = rec.baseX;
   root.position.z = rec.baseZ;
 }
@@ -727,6 +788,11 @@ function wantedPose(rec, n) {
   // moveT reaching 1 is arrival, and cast.js is the half of this that knows it.
   if (n.action?.type === ACTION.WALK_TO_SEAT && rec.moveT < 1) {
     return n.carrying ? POSES.carry : POSES.rest;
+  }
+  // Nor reach into a display you are not facing yet: turn first (stepWalk), then reach.
+  if (n.action?.type === ACTION.INTERACT &&
+      Math.abs(Math.atan2(Math.sin(rec.faceTo - rec.heading), Math.cos(rec.faceTo - rec.heading))) > FACING_OK) {
+    return POSES.browse;
   }
   return poseFor(n);
 }
@@ -790,6 +856,7 @@ function tickOne(rec, dt) {
   syncCarried(rec);
   checkReady(rec);
   stepWalk(rec, n, dt);
+  stepTurn(rec, n, dt);
   stepHop(rec, dt);
   // Every contribution to root height is known before applyPose runs, because applyPose is the
   // only thing that writes it.

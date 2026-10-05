@@ -18,10 +18,10 @@ import {
   MOTION_DEFAULTS,
   motionOf,
 } from '../../npc.js';
-import { STATE, advanceRound, dayProgress, makeNpc, makeWorld, rejoin, tidyShop } from '../../visit.js';
+import { ACTION, STATE, advanceRound, dayProgress, makeNpc, makeWorld, rejoin, tidyShop } from '../../visit.js';
 import { satisfies, wantsOf } from '../../wip.js';
 import * as THREE from 'three';
-import { S } from '../core/config.js';
+import { S, SHOP_GAIT } from '../core/config.js';
 import { camera, scene } from '../scene/stage.js';
 import { COUNTER, HALF_D, HALF_W, WINDOW_SPOTS } from '../scene/room.js';
 import { buildChairs } from '../scene/seating.js';
@@ -332,6 +332,7 @@ function queueOutside(npc, i) {
   npc.x = room.queueAt.x;
   npc.z = room.queueAt.z + i * 0.7;
   npc.from = { x: npc.x, z: npc.z };
+  npc.facing = Math.atan2(room.door.x - npc.x, room.door.z - npc.z);   // waiting to come in, not out
 }
 
 /** The render-side record: everything tickCast needs that the sim does not know about. */
@@ -345,8 +346,8 @@ const castRecord = (npc, built, color) => ({
   // baseX/baseZ are the ROUTE position; the root is this plus the seat shift (cast.js), so
   // settling onto a cushion is not mistaken for ground covered.
   moveT: 1, travelled: 0, fromX: npc.x, fromZ: npc.z,
-  baseX: npc.x, baseZ: npc.z, faceTo: npc.facing ?? 0, seatRef: null, seatCal: false,
-  wait: 0, dur: S.travel, pace: 1,
+  baseX: npc.x, baseZ: npc.z, faceTo: npc.facing ?? 0, heading: npc.facing ?? 0, seatRef: null, seatCal: false,
+  wait: 0, dur: S.travel, pace: 1, go: 1,
   carriedName: null, carriedMesh: null,
   // What they wear (cast.js checkOutfit), the craft in their hands while seated (stepKnitting), and
   // the READY sparkle with the buy count it watches (checkReady).
@@ -359,7 +360,9 @@ const castRecord = (npc, built, color) => ({
   // How this character moves, from who they are. Computed once: traits survive rejoin(), so a
   // regular walks like themselves tomorrow with nothing persisted. The species owns how WIDE
   // each span is, the traits pick where in it this individual lands.
-  opts: { ...MOTION_DEFAULTS, ...motionOf(npc.traits, built.species?.motionRanges) },
+  //
+  // The gate and the slowest cadence are the shop's own (SHOP_GAIT, config.js).
+  opts: { ...MOTION_DEFAULTS, ...motionOf(npc.traits, built.species?.motionRanges), ...SHOP_GAIT },
 
   // Where in the stride they are, 0..1. ACCUMULATED per frame from distance covered — never
   // derived from a running distance total, which is what made legs spin on deceleration (see
@@ -536,7 +539,9 @@ export function restart({ keepRegulars = true, rebuild = false, order } = {}) {
   // resets the calendar too, so the day counter never claims a history the customers do not have.
   fileGuestbook(keepRegulars);
   shop.day = keepRegulars ? shop.day + 1 : 1;
-  Object.assign(clocks, { day: 0, auto: 0 });
+  // The round clock starts full: the door opens with the day, so the first customer comes straight
+  // in instead of standing outside for a whole round (12s at ▶).
+  Object.assign(clocks, { day: 0, auto: S.autoSeconds });
   const fresh = rebuild || !keepRegulars || !displays.length;
   setUpShop(fresh);
   if (!keepRegulars) roster = [];
@@ -563,7 +568,10 @@ export function restart({ keepRegulars = true, rebuild = false, order } = {}) {
  */
 function retarget(rec, slot = 0, total = 1) {
   const n = rec.npc;
-  rec.moveT = 0;
+  // Working on a WIP is staying in the chair they walked to last round: no walk at all. A route
+  // from where they sit to the chair's centre either slid them through the seat or, under the
+  // chair's 0.15 threshold (placeSeated), read as ground covered and scissored the seated legs.
+  rec.moveT = n.action?.type === ACTION.WORK_ON_WIP ? 1 : 0;
   // The BASE, not the drawn root: a character still rising off a chair is drawn behind their
   // base, and starting the route there would walk them out of the seat shift as well.
   rec.fromX = rec.baseX;
@@ -590,7 +598,9 @@ function retarget(rec, slot = 0, total = 1) {
   //
   // One slot per NPC, shuffled, with a jittered position inside it. Gaps are then jitter/n by
   // construction and nobody can land on top of anyone.
-  rec.wait = ((slot + Math.random()) / Math.max(1, total)) * S.travelJitter
+  // Not for the one coming in: the door admits one a round, so there is nobody to stagger them
+  // against, and at ▶ the stagger alone kept them outside for up to 4.8s more.
+  rec.wait = n.action?.type === ACTION.ENTER ? 0 : ((slot + Math.random()) / Math.max(1, total)) * S.travelJitter
     // Getting out of a chair takes a moment, and the walk must not start underneath it --
     // the route would drag them off the seat while they were still folded into it.
     + (rec.seatRef ? STAND_TIME : 0);

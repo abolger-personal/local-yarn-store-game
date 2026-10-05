@@ -990,6 +990,9 @@ knob(fWalk, S.opts, 'swayRateMax', 'fastest the body will roll',
 knob(fWalk, S.opts, 'cadenceMax', 'fastest step rate',
   'Steps per second before the legs stop moving faster and start reaching further instead. Low '
   + 'values give a long striding walk, high values a quick scurry.', 0.5, 8).onChange(retune);
+knob(fWalk, S.opts, 'cadenceMin', 'slowest step rate',
+  'Steps per second below which a slow walk takes shorter steps instead of slower ones. 0 is off, '
+  + 'and a long-legged character strolling steps in slow motion; the shop uses 1.5.', 0, 3).onChange(retune);
 knob(fWalk, S.opts, 'gateSpeed', 'speed to reach a full walk',
   'How fast they must be moving before the walk is at full strength. Below it the cycle fades '
   + 'out, which is what brings the feet together when they stop. Raise it and they creep into '

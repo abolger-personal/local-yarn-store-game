@@ -161,6 +161,10 @@ export const S = {
   // playground; the game sets it from its speed button (gameSpeed, below). With a speed, a walk
   // takes as long as its route needs and the round waits for the last walker (tickClocks).
   walkSpeed:   0,
+  // The game's ⏸ (gameSpeed(0)): walks ease to a halt where they are and pick up again on resume.
+  // Separate from autoRounds because the playground turns that off to step rounds by hand, and its
+  // walks must still play out.
+  paused:      false,
   // How far a seated NPC's backside SINKS into the cushion. Small and soft-bodied: the rest of
   // the placement is measured, not guessed. cast.js measures where each body's bottom actually
   // is in the sit pose (measureSeatDrop) and puts that on the cushion, which is the only thing
@@ -199,14 +203,32 @@ export const S = {
  * At ▶ the mean is 0.24 units/s, so even the quickest-paced NPC's peak (x1.5 ease, /0.75 pace) stays
  * under the shortest legs' top speed: everyone walks, nobody skates. ▶▶ and ▶▶▶ scale walking up
  * and the round and stagger down by k, so the stagger keeps the playground's 1.6 : 4 share of a
- * round at every speed; paceJitter is a fraction and needs no scaling. ⏸ only stops the rounds:
- * the walk settings stay, so a walk in progress finishes at the pace it set off at.
- * speed.test.mjs holds these to that.
+ * round at every speed; paceJitter is a fraction and needs no scaling. Nobody walks faster than
+ * their own legs can (stepWalk caps each walker at topSpeed), so at ▶▶▶ the stumpiest owl is at
+ * its cadence cap while a llama strides out.
+ *
+ * ⏸ stops the rounds and halts the walks (S.paused, eased in stepWalk): a ▶ walk is 10-30 seconds
+ * long, so "finish the walk you are on" read as no pause at all. The walk settings stay, so a
+ * resumed walk carries on at the pace it set off at. speed.test.mjs holds these to that.
  */
 export function gameSpeed(k) {
-  if (!k) return { autoRounds: false };
-  return { autoRounds: true, walkSpeed: 0.24 * k, autoSeconds: 12 / k, travelJitter: 4.8 / k };
+  if (!k) return { autoRounds: false, paused: true };
+  return { autoRounds: true, paused: false, walkSpeed: 0.24 * k, autoSeconds: 12 / k, travelJitter: 4.8 / k };
 }
+
+/**
+ * The shop's gait, over MOTION_DEFAULTS (world.js spreads it into every customer's opts).
+ *
+ * gateSpeed: units/s at which the walk layer is at full weight (motion.js walkGain). That weight
+ * scales the leg SWING, so below the gate the feet swing short of the ground covered and skate.
+ * The default 0.86 was tuned against the motion lab's ~1.2 units/s; the game walks at a 0.24-0.72
+ * mean, where it held the legs at 30-40% swing: a llama at ▶ barely moved its legs and ▶▶▶ was the
+ * first speed that looked like walking. This low, the gate is only the start-and-stop ease.
+ *
+ * cadenceMin: a slow walk is short steps, not slow-motion strides. Without it a long-legged llama
+ * at ▶ stepped 0.7 times a second. speed.test.mjs holds both to the ▶ walk.
+ */
+export const SHOP_GAIT = Object.freeze({ gateSpeed: 0.1, cadenceMin: 1.5 });
 
 export const QUALITY = {
   low:    { detail: 'low',  renderScale: 0.75, blobShadows: true,  partShadows: false },

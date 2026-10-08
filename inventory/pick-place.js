@@ -34,12 +34,12 @@ import { EMPTY, gridSize, topAt, columnAt, slotRect, footprint, fits, place, nea
  * @param opts.items       () => the item array
  * @param opts.levelFrame  (disp, shelf) => Matrix4, that level's frame in world space
  * @param opts.itemHeight  (disp, item) => its TOP surface, measured above its level's origin
- * @param opts.itemTall    (disp, item) => how tall the item ITSELF is. Defaults to 0, which makes
+ * @param [opts.itemTall]  (disp, item) => how tall the item ITSELF is. Defaults to 0, which makes
  *                         a pick behave as it did when everything was one layer: tested against
  *                         its top face alone. Pass it and a tall thing is grabbable by its body.
- * @param opts.exposed     (disp, items, index) => may this item be lifted right now
- * @param opts.grabRadius  () => screen-space slack in CSS px
- * @param opts.snapCells   () => how far a drop reaches, in slots
+ * @param [opts.exposed]   (disp, items, index) => may this item be lifted right now
+ * @param [opts.grabRadius] () => screen-space slack in CSS px. Defaults to 44
+ * @param [opts.snapCells] () => how far a drop reaches, in slots. Defaults to 1.6
  */
 export function makePicker(opts) {
   const k = pickerState(opts);

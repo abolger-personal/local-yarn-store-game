@@ -423,9 +423,9 @@ function buildYarnMeshes() {
   // The band and the tail are the same structure as a family: one instanced mesh each, and the
   // per-family placement baked into the instance matrix, so neither needs a mesh per family.
   bandMesh?.removeFromParent();
-  bandMesh = makeDetailMesh(buildBand(S.tier));
+  bandMesh = yarnInstances(buildBand(S.tier));
   tailMesh?.removeFromParent();
-  tailMesh = makeDetailMesh(buildTail(S.tier));
+  tailMesh = yarnInstances(buildTail(S.tier));
   applyShading();
 }
 
@@ -433,22 +433,16 @@ function buildYarnMeshes() {
 function buildFamilyMesh(f) {
   yarnMeshes[f]?.removeFromParent();
   yarnHulls[f]?.removeFromParent();
-  const geo = bakeVertexAO(buildFamily(f, S.tier));
-  const mesh = new THREE.InstancedMesh(geo, currentYarnMaterial(), YARN_CAPACITY);
-  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(YARN_CAPACITY * 3).fill(1), 3);
-  mesh.frustumCulled = false;
-  mesh.count = 0;
+  const mesh = yarnInstances(bakeVertexAO(buildFamily(f, S.tier)));
   mesh.userData.owner = [];        // instance slot -> items[] index, for picking
   if (mesh.material.userData.hatch) addHatchScale(mesh, YARN_CAPACITY);
   yarnMeshes[f] = mesh;
-  scene.add(mesh);
-
-  const hull = makeHull(mesh, { color: S.edgeColor, width: S.outlineWidth });
-  yarnHulls[f] = hull;
-  scene.add(hull);
+  yarnHulls[f] = makeHull(mesh, { color: S.edgeColor, width: S.outlineWidth });
+  scene.add(yarnHulls[f]);
 }
 
-function makeDetailMesh(geometry) {
+/** An empty, white-tinted instanced yarn mesh in the scene. applyShading swaps its material. */
+function yarnInstances(geometry) {
   const mesh = new THREE.InstancedMesh(geometry, currentYarnMaterial(), YARN_CAPACITY);
   mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(YARN_CAPACITY * 3).fill(1), 3);
   mesh.frustumCulled = false;
@@ -712,7 +706,6 @@ function pushYarn(disp, family, bulk, { shelf, c, r, keys }) {
     layers: fit.layers,
     layer: place(disp.g, keys, index, fit.layers),
     color: yarnColor(Math.random, undefined, { spread: S.paletteSpread }),
-    // Booklets stand square to the shelf like books; everything round gets a nudge.
     // Booklets stand square to the shelf like books; everything round gets the same nudge a
     // notion gets, from the shared jitter rather than a third private number.
     yaw: family === 'booklet' ? 0 : scatterYaw(),
@@ -806,20 +799,16 @@ function scatter() {
 }
 
 /**
- * The layer height is DERIVED, not set: `boxHeight = (shelfGap / headroom) * boxFill`.
+ * The layer height is DERIVED, not set: `boxHeight = cell * layerRatio`, and headroom is how many
+ * of those fit under the next shelf.
  *
  * It used to be an independent slider that was merely clamped down when it exceeded the gap, and
  * that made "raise the shelf spacing to get chunkier yarn" quietly not work: raising the gap
- * raised the CEILING and left the height sitting exactly where it was. The two numbers describe
- * one physical thing — how tall a slot of the O axis is — so only one of them can be the input.
- *
- * `boxFill` is the knob that survives: what fraction of the available pitch a layer actually
- * occupies, for when a stack should have air in it. At 1 a full stack exactly fills the gap.
+ * raised the CEILING and left the height sitting exactly where it was. Gap, pitch and headroom
+ * describe one physical fact, so only two of them can be inputs.
  */
 function syncBoxHeight() {
   S.boxHeight = S.cell * S.layerRatio;
-  // Headroom is now DERIVED too: it is simply how many layer-pitches fit under the next shelf.
-  // Making it an input alongside the gap and the pitch was over-determining one physical fact.
   S.headroom = Math.max(1, Math.floor(S.shelfGap / S.boxHeight));
   boxHeightCtl?.updateDisplay();
   headroomCtl?.updateDisplay();
@@ -942,8 +931,9 @@ const picker = makePicker({
   itemHeight: (_disp, item) => item.layer * S.boxHeight + itemTall(item),
   itemTall: (_disp, item) => itemTall(item),
   exposed: fullyExposed,
-  grabRadius: () => S.grabRadius,
-  snapCells: () => S.snapCells,
+  // grabRadius / snapCells left to the picker's defaults (44px, 1.6 slots — the store's values).
+  // They were `() => S.grabRadius` once, but S has no such keys: undefined overrode the defaults,
+  // and `d > NaN` is never true, so every grab and every drop had unlimited reach.
 });
 // hoverTarget is deliberately NOT taken: see pickTarget below for why this scene resolves the
 // display by occlusion instead. store.html uses it because its levels are tilted apart.
@@ -1190,9 +1180,10 @@ gLook.addColor(S, 'tint').name('label ink').onChange(() => {
   items.forEach((item, i) => { item.color = S.tint; refresh(i); });
 });
 gLook.add(S, 'shade', 0, 0.8, 0.01).name('gradient').onChange((v) => {
-  field.material.userData.uniforms.uShade.value = v;
-  fieldTop.material.userData.uniforms.uShade.value = v;
+  for (const f of [field, fieldTop]) f.material.userData.uniforms.uShade.value = v;
 });
+gLook.add(S, 'exposure', 0.2, 2, 0.01).name('exposure')
+  .onChange((v) => { renderer.toneMappingExposure = v; });
 
 // ---------------------------------------------------------------- yarn spike controls
 const remakeMatcap = () => {
@@ -1219,19 +1210,16 @@ gYarn.add(S, 'tails').name('yarn ends').onChange(() => { restage(); applyShading
 
 const gHatch = gYarn.addFolder('strand hatching');
 gHatch.add(S, 'hatch').name('enabled').onChange(applyShading);
-gHatch.add(S, 'hatchFreq', 4, 90, 1).name('strands').onChange((v) => {
+/** Live-set one hatching uniform on every family's material. */
+const setHatch = (uniform) => (v) => {
   for (const f of YARN_FAMILIES) {
     const u = yarnMeshes[f].material.userData.hatch;
-    if (u) u.uHatchFreq.value = v;
+    if (u) u[uniform].value = v;
   }
-});
+};
+gHatch.add(S, 'hatchFreq', 4, 90, 1).name('strands').onChange(setHatch('uHatchFreq'));
 gHatch.add(S, 'perWeight').name('vary by weight').onChange(() => items.forEach((_, i) => refresh(i)));
-gHatch.add(S, 'hatchDepth', 0, 0.6, 0.01).name('depth').onChange((v) => {
-  for (const f of YARN_FAMILIES) {
-    const u = yarnMeshes[f].material.userData.hatch;
-    if (u) u.uHatchDepth.value = v;
-  }
-});
+gHatch.add(S, 'hatchDepth', 0, 0.6, 0.01).name('depth').onChange(setHatch('uHatchDepth'));
 gYarn.add({ f: () => frameSilhouette() }, 'f').name('zoom to 64px  (N)');
 
 const gMat = gYarn.addFolder('matcap');
@@ -1243,8 +1231,6 @@ gMat.add(S, 'mcWrap', 0, 1.2, 0.01).name('terminator wrap').onChange(remakeMatca
 gMat.add(S, 'toonSteps', 2, 6, 1).name('toon bands').onChange(remakeMatcap);
 gMat.add(S, 'paperRim', 0, 1, 0.01).name('band sheen (paper)').onChange(remakeMatcap);
 gMat.add(S, 'paperWrap', 0, 1.2, 0.01).name('band softness').onChange(remakeMatcap);
-gLook.add(S, 'exposure', 0.2, 2, 0.01).name('exposure')
-  .onChange((v) => { renderer.toneMappingExposure = v; });
 
 const gHull = gYarn.addFolder('ink outline');
 gHull.add(S, 'outline').name('enabled').onChange(applyShading);
@@ -1253,10 +1239,12 @@ gHull.add(S, 'outlineWidth', 0, 0.05, 0.001).name('width').onChange((v) => {
 });
 
 const gEdge = gui.addFolder('thickness / outline');
-gEdge.add(S, 'edge').name('enabled').onChange((v) => { edge.visible = v; edgeTop.visible = v; });
+// Both outlines at once: the front label's and the top label's. Getter, since they are built on atlas load.
+const edges = () => [edge, edgeTop];
+gEdge.add(S, 'edge').name('enabled').onChange((v) => edges().forEach((e) => { e.visible = v; }));
 gEdge.add(S, 'edgeGrow', 1.0, 1.30, 0.005).name('outline width')
-  .onChange((v) => { edge.material.userData.uniforms.uGrow.value = v; edgeTop.material.userData.uniforms.uGrow.value = v; });
-gEdge.addColor(S, 'edgeColor').name('colour').onChange((v) => { edge.material.color.set(v); edgeTop.material.color.set(v); });
+  .onChange((v) => edges().forEach((e) => { e.material.userData.uniforms.uGrow.value = v; }));
+gEdge.addColor(S, 'edgeColor').name('colour').onChange((v) => edges().forEach((e) => e.material.color.set(v)));
 
 // One action per key. A Map, not an object: `e.key` is the page's, and 'constructor' is a key too.
 const KEY_ACTIONS = new Map([
@@ -1312,7 +1300,7 @@ function updatePerf(dt) {
     `${fps.toFixed(0)} fps\ndraw calls ${r.calls}\ntriangles  ${r.triangles}\n` +
     `notions    ${field ? field.count : 0}\n` +
     `yarn       ${yarnN}  (${(yarnTris / 1000).toFixed(1)}k tris)\n` +
-    `per 1000   ${yarnN ? ((yarnTris / yarnN) * 1000 / 1000).toFixed(0) : 0}k tris\n` +
+    `per 1000   ${yarnN ? (yarnTris / yarnN).toFixed(0) : 0}k tris\n` +   // tris per item = k tris per 1000
     `${S.shading} / ${S.tier}   ${disp.id} plane ${disp.plane}${closest}${clash}`;
 }
 
@@ -1346,14 +1334,13 @@ const clock = new THREE.Timer();
 function buildNotionMeshes(loaded) {
   atlas = loaded;
   field = makeField(atlas.texture, CAPACITY, { unlit: S.unlit, shade: S.shade });
-  edge = makeEdge(field, S.edgeColor);
-  edge.material.userData.uniforms.uGrow.value = S.edgeGrow;
-  edge.visible = S.edge;
-
   fieldTop = makeField(atlas.texture, CAPACITY, { unlit: S.unlit, shade: S.shade });
+  edge = makeEdge(field, S.edgeColor);
   edgeTop = makeEdge(fieldTop, S.edgeColor);
-  edgeTop.material.userData.uniforms.uGrow.value = S.edgeGrow;
-  edgeTop.visible = S.edge;
+  for (const e of edges()) {
+    e.material.userData.uniforms.uGrow.value = S.edgeGrow;
+    e.visible = S.edge;
+  }
 
   // Shadows are shared by notions and yarn, so the mesh is sized for both at once.
   shadows = makeShadows(CAPACITY + YARN_CAPACITY);

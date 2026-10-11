@@ -8,7 +8,10 @@ import {
   setGeometryDetail, GEO_DETAIL, getSpecies, speciesIds, pick,
 } from './npc.js';
 import { randomTraits } from './visit.js';
-import { dress, undress, worstOutfit } from './garments.js';
+import { GARMENTS, dress, heldAs, pileAs, randomItem, undress, worstOutfit } from './garments.js';
+import { H, W, snap } from './selfie-studio.js';
+import { SHOTS, shotFor } from './selfie.js';
+import { PATTERN_DESIGNS } from '../inventory/catalog.js';
 
 console.info('LYS build', BUILD);
 
@@ -44,6 +47,7 @@ const S = {
   exposure:     BASE_PARAMS.exposure,
   toneMapping:  BASE_PARAMS.toneMapping,
   seedFacing:   true,
+  selfieOf:     'hat',
 };
 
 // One player-facing setting, not three technical switches. Each tier bundles every lever
@@ -209,11 +213,12 @@ function spawn(speciesId) {
   // and the clothes then merge into the character's meshes like any other part.
   P.mergeMeshes = S.mergeMeshes && !S.dressed;
   const built = createCharacter(P, kit);
+  const outfit = S.dressed ? worstOutfit() : {};
   if (S.dressed) {
-    dress(built, worstOutfit());
+    dress(built, outfit);
     if (S.mergeMeshes) mergeCharacter(built);
   }
-  return { kit, P, built };
+  return { kit, P, built, outfit };
 }
 
 /** Grid cell i of cols x rows, jittered, and facing anywhere if the crowd is not lined up. */
@@ -230,13 +235,13 @@ function setDown(root, i, cols, rows) {
 
 /** Crowd member i: spawned, set down in its grid cell with some jitter, and given a temperament. */
 function addMember(i, cols, rows) {
-  const { kit, P, built } = spawn(nextSpecies());
+  const { kit, P, built, outfit } = spawn(nextSpecies());
   setDown(built.root, i, cols, rows);
   crowdGroup.add(built.root);
 
   const start = pickPose();
   crowd.push({
-    built,
+    built, kit, P, outfit,   // the last three: what the selfie sheet rebuilds them from
     name: P.name,
     species: kit.label,
     color: P.bodyColor,
@@ -397,6 +402,127 @@ function updatePerf(dt) {
     `<span style="opacity:.65">${(r.calls / Math.max(S.count, 1)).toFixed(0)} calls/character</span>`;
 }
 
+// ---------------------------------------------------------------- selfies
+//
+// The Guestbook's selfie (selfie-studio.js, the same code the shop uses) of every member, of one
+// subject (`S.selfieOf`: a garment put on them, the pot holder or an armful in hand, or just what
+// they have on), captioned with the shot and its grades (selfie.js gradeSelfie). The tune folder
+// authors selfie.js SHOTS for one subject and species, live; "copy shot table" is what to paste back.
+
+const randomHex = () => `#${new THREE.Color().setHSL(Math.random(), 0.5, 0.55).getHexString()}`;
+const finished = (pattern) => ({ pattern, yarn: [{ c: randomHex() }] });
+const designsOf = (types) => PATTERN_DESIGNS.filter((d) => types.includes(d.patternType));
+const SUBJECTS = {
+  'as dressed': () => null,
+  ...Object.fromEntries(Object.keys(GARMENTS).map((type) => [type, () => ({ type, item: { ...randomItem(type), on: true } })])),
+  potholder: () => heldAs(finished(pick(designsOf(['potholder']))), (y) => y.c),
+  pile: () => pileAs(Array.from({ length: 3 + Math.floor(Math.random() * 5) },
+    () => finished(pick(designsOf(Object.keys(GARMENTS))))), (y) => y.c),
+};
+
+// Where the tune sliders start for a subject with no shot yet: guesses, graded poorly as they are
+// (the phone hand in most, and the eyes lost in the wide ones). Starting points, not answers.
+const STARTERS = {
+  hat: { headYaw: -0.2, headPitch: 0.2, fov: 40, up: 0.7, k: 1.1, drop: 0.15, off: 0.2 },
+  scarf: { headYaw: 0.3, headPitch: -0.45, fov: 40, up: 0.25, k: 1.3, drop: 0.55, off: 0.25 },
+  shawl: { headYaw: 2.6, headPitch: -0.1, fov: 40, up: 0.3, k: 2.2, drop: 0.35, off: 0, behind: true },
+  sweater: { headYaw: -0.25, headPitch: -0.2, fov: 40, up: 0.3, k: 1.9, drop: 1.0, off: 0.3 },
+  bag: { headYaw: -0.25, headPitch: -0.1, fov: 40, up: 0.25, k: 2.0, drop: 1.0, off: 0.45 },
+  socks: { headYaw: -0.3, headPitch: 0.1, fov: 45, up: -0.35, k: 2.8, drop: 2.2, off: 0.3 },
+  potholder: { headYaw: -0.35, headPitch: -0.3, fov: 55, up: 0.38, k: 1.3, drop: 0.5, off: 0.35 },
+  pile: { headYaw: -0.3, headPitch: -0.2, fov: 45, up: 0.4, k: 1.6, drop: 0.7, off: 0.35 },
+};
+const SHOT_KEYS = ['headYaw', 'headPitch', 'fov', 'up', 'k', 'drop', 'off', 'behind'];
+const tune = { use: false, species: 'all', behind: false, ...STARTERS.hat };
+
+const sheet = /** @type {HTMLElement} */ (document.getElementById('selfies'));
+const sheetGrid = sheet.querySelector('.grid');
+let sheetRun = 0;
+
+const pct = (x) => (x == null ? '—' : `${Math.round(x * 100)}%`);
+/** The caption's grade line, each failing number marked. */
+function gradeLine(g) {
+  const bad = (fail, text) => (fail ? `✗ ${text}` : text);
+  return [g.handOut === null ? 'no phone' : bad(!g.handOut, g.handOut ? 'hand cut' : 'hand WHOLE'), bad(g.made != null && g.made <= 0.15, `made ${pct(g.made)}`),
+    bad(g.eyes <= 0.3, `eyes ${pct(g.eyes)}`), `face ${g.face.toFixed(2)}`].join(' · ');
+}
+
+/** One member's selfie of the subject, captioned with who, what, which shot, and its grades. */
+function selfieOf(member) {
+  const subject = SUBJECTS[S.selfieOf]();
+  const outfit = { ...member.outfit, ...(subject && { [subject.type]: subject.item }) };
+  const { url, shot, grades } = snap({ body: member.P, kit: member.kit, outfit, type: subject?.type ?? null },
+    { toneMapping: TONE_MAPPING[S.toneMapping], exposure: S.exposure }, { grade: true });
+  const fig = document.createElement('figure');
+  const img = new Image(W, H);
+  img.src = url;
+  const cap = document.createElement('figcaption');
+  cap.innerText = `${member.name} · ${member.species}\n${S.selfieOf} · ${shotSource(member, shot)}\n${gradeLine(grades)}`;
+  if (grades.handOut === false || grades.eyes <= 0.3 || (grades.made != null && grades.made <= 0.15)) cap.classList.add('fails');
+  fig.append(img, cap);
+  return fig;
+}
+
+/** The tune sliders onto the subject's shot for the tuned species, or the starter where there is none. */
+function loadTune() {
+  const shot = SHOTS[S.selfieOf]?.[tune.species];
+  Object.assign(tune, { behind: false }, STARTERS[S.selfieOf] ?? STARTERS.hat, shot, { use: Boolean(shot) });
+}
+
+/** The sliders into SHOTS (or out of it, unticked), and the sheet again if it is open. */
+function applyTune() {
+  if (!STARTERS[S.selfieOf]) return;   // 'as dressed' has no one subject to shoot
+  const shots = (SHOTS[S.selfieOf] ??= {});
+  if (tune.use) shots[tune.species] = Object.fromEntries(SHOT_KEYS.map((k) => [k, tune[k]]));
+  else delete shots[tune.species];
+  // a species' own shot wins over `all` (selfie.js shotFor): say so, or `all` looks like it does nothing
+  const own = Object.keys(shots).filter((k) => k !== 'all');
+  if (tune.species === 'all' && own.length) toast(`${own.join(', ')} keep their own ${S.selfieOf} shot`);
+  if (!sheet.hidden) selfieSheet();
+}
+
+/** A slider moved: that is choosing to use the shot, so tick it rather than silently do nothing. */
+function slideTune() {
+  tune.use = true;
+  applyTune();
+}
+
+/** Which shot a member's selfie of the subject took: their species' own, the all-species one, or searched. */
+function shotSource(member, searched) {
+  const { id } = member.kit, shot = shotFor(S.selfieOf, id);
+  if (!shot) return `searched: ${searched}`;
+  return SHOTS[S.selfieOf][id] === shot ? `own ${id} shot` : 'all-species shot';
+}
+
+/** The tuned species takes no authored shot of this subject, not even `all`'s: searched (selfie.js shotFor). */
+function searchInstead() {
+  if (tune.species === 'all' || !STARTERS[S.selfieOf]) return;
+  (SHOTS[S.selfieOf] ??= {})[tune.species] = null;
+  tune.use = false;
+  toast(`${tune.species}: ${S.selfieOf} searched`);
+  if (!sheet.hidden) selfieSheet();
+}
+
+function copyShots() {
+  const text = `export const SHOTS = ${JSON.stringify(SHOTS, null, 2)};`;
+  console.info(text);
+  navigator.clipboard?.writeText(text).then(() => toast('shot table copied'), () => toast('shot table in the console'));
+}
+
+/** Every member's selfie, one a frame so the sheet fills in rather than freezing the page. */
+function selfieSheet() {
+  const run = ++sheetRun, members = [...crowd];
+  sheetGrid.replaceChildren();
+  sheet.hidden = false;
+  const next = (i) => {
+    if (run !== sheetRun || sheet.hidden || i >= members.length) return;
+    sheetGrid.append(selfieOf(members[i]));
+    requestAnimationFrame(() => next(i + 1));
+  };
+  next(0);
+}
+sheet.querySelector('.close').addEventListener('click', () => { sheet.hidden = true; });
+
 // ---------------------------------------------------------------- ui
 function updateRoster() {
   document.getElementById('roster').innerHTML =
@@ -459,6 +585,23 @@ gui.add({ f: () => renderer.domElement.classList.toggle('squint') }, 'f').name('
 gui.add(S, 'exposure', 0.1, 2, 0.01).onChange((v) => (renderer.toneMappingExposure = v));
 gui.add(S, 'toneMapping', ['AgX', 'ACES', 'None']).onChange((v) => (renderer.toneMapping = TONE_MAPPING[v]));
 
+const gSelfie = gui.addFolder('selfies');
+gSelfie.add(S, 'selfieOf', Object.keys(SUBJECTS)).name('of').onChange(() => { loadTune(); if (!sheet.hidden) selfieSheet(); });
+gSelfie.add({ f: selfieSheet }, 'f').name('selfie every character  (P)');
+const gTune = gSelfie.addFolder('tune the shot');
+gTune.add(tune, 'species', ['all', ...speciesIds()]).name('for species').listen().onChange(loadTune);
+gTune.add(tune, 'use').name('use this shot').listen().onChange(applyTune);
+gTune.add(tune, 'behind').name('from behind (no phone)').listen().onChange(slideTune);
+gTune.add(tune, 'headYaw', -4.7, 4.7, 0.01).name('head turn').listen().onFinishChange(slideTune);
+gTune.add(tune, 'headPitch', -1, 1, 0.01).name('head lift (− up)').listen().onFinishChange(slideTune);
+gTune.add(tune, 'fov', 20, 90, 1).name('lens fov').listen().onFinishChange(slideTune);
+gTune.add(tune, 'up', -1.5, 1.5, 0.01).name('lens height').listen().onFinishChange(slideTune);
+gTune.add(tune, 'k', 0.6, 4, 0.01).name('distance (×face)').listen().onFinishChange(slideTune);
+gTune.add(tune, 'drop', -1, 4, 0.01).name('aim down').listen().onFinishChange(slideTune);
+gTune.add(tune, 'off', -1, 1.5, 0.01).name('aim aside').listen().onFinishChange(slideTune);
+gTune.add({ f: searchInstead }, 'f').name('this species: search instead');
+gTune.add({ f: copyShots }, 'f').name('copy shot table');
+
 // Capture phase: lil-gui's own inputs handle keydown and can swallow it before it reaches
 // window. Bailing on form fields keeps typing in a GUI box from firing shortcuts.
 const typing = (t) => t instanceof HTMLElement
@@ -478,6 +621,8 @@ const KEYS = {
   f: frameCrowd,
   d: distanceTest,
   b: () => renderer.domElement.classList.toggle('squint'),
+  p: selfieSheet,
+  escape: () => { sheet.hidden = true; },
 };
 
 addEventListener('keydown', (e) => {

@@ -44,6 +44,20 @@
   #perf .warn { color: #ffb454; }
   #perf .bad { color: #ff6b6b; }
   #perf .ok { color: #8fd67a; }
+  #selfies {
+    position: fixed; inset: 0; z-index: 30; overflow: auto;
+    background: rgba(30,26,24,.92); padding: 48px 16px 16px;
+  }
+  #selfies[hidden] { display: none; }
+  #selfies .close {
+    position: fixed; right: 16px; top: 12px; font-size: 13px; padding: 4px 10px; border-radius: 6px;
+    border: 0; background: #f2e3c6; cursor: pointer;
+  }
+  #selfies .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+  #selfies figure { margin: 0; background: #fbf7ef; padding: 8px 8px 6px; border-radius: 4px; }
+  #selfies img { display: block; width: 100%; height: auto; }
+  #selfies figcaption { font-size: 11px; line-height: 1.45; color: #444; padding-top: 5px; }
+  #selfies figcaption.fails { color: #a3271d; }
 </style>
 </head>
 <body>
@@ -55,9 +69,11 @@
   Drag to orbit · scroll to zoom<br />
   <kbd>1</kbd> felted &nbsp; <kbd>2</kbd> grey &nbsp; <kbd>3</kbd> silhouette<br />
   <kbd>R</kbd> reroll crowd &nbsp; <kbd>F</kbd> frame &nbsp; <kbd>D</kbd> 150px test<br />
-  <kbd>B</kbd> squint/blur &nbsp; <kbd>Space</kbd> pause poses
+  <kbd>B</kbd> squint/blur &nbsp; <kbd>Space</kbd> pause poses<br />
+  <kbd>P</kbd> selfie every character &nbsp; <kbd>Esc</kbd> close
 </div>
 <div id="roster"></div>
+<div id="selfies" hidden><button class="close" type="button">close  (Esc)</button><div class="grid"></div></div>
 
 <script type="importmap">
 {

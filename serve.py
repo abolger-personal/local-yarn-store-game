@@ -15,11 +15,9 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store, must-revalidate")
         self.send_header("Pragma", "no-cache")
         self.send_header("Expires", "0")
-        # no-store stops NEW responses being cached but never evicts what a browser already
-        # holds. Purging on the document request clears modules cached before this server
-        # existed. Honoured on secure contexts only, which includes localhost.
-        if self.path.endswith((".html", "/")):
-            self.send_header("Clear-Site-Data", '"cache"')
+        # No Clear-Site-Data: '"cache"' on documents any more. It purged modules cached before
+        # this server existed, but the browser holds the page until the wipe finishes, on every
+        # load, and that stalled index.html. Stale modules from an older server: one Cmd-Shift-R.
         super().end_headers()
 
     def send_header(self, keyword, value):

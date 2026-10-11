@@ -28,7 +28,8 @@ let pinned = [];                  // the entries on the board now, newest first
 /** The newest photo entries from every day, newest first. */
 function newestPhotos() {
   const all = [...shop.pastBooks.flatMap((b) => b.entries), ...(shop.world?.guestbook ?? [])];
-  return all.filter((g) => g.kind === 'photo').slice(-PINNED).reverse();
+  // Not the Former Owner's farewell: the board's first card is the player's first success (TUTORIAL.md day 3).
+  return all.filter((g) => g.kind === 'photo' && !g.farewell).slice(-PINNED).reverse();
 }
 
 function load(url) {

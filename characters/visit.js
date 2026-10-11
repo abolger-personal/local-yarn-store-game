@@ -1303,7 +1303,21 @@ function guestbookTags(npc) {
   return tags;
 }
 
+/**
+ * The Former Owner's page (world.js spawnFormerOwner): a handover, not a visit. Their photo is in
+ * everything they ever made, captioned with their parting words; nothing bought, nothing to read.
+ * `farewell` keeps it off the bulletin board, whose first card is the player's first success.
+ */
+function signFarewell(world, npc) {
+  const entry = { npc: `${npc.name} (former owner)`, npcId: npc.id, kind: 'photo', object: 'a lifetime of knits',
+    farewell: true, mood: null, round: world.round, tags: [], bought: [], did: [], lent: [],
+    note: { short: npc.farewell, full: npc.farewell } };
+  world.guestbook.push(entry);
+  return entry;
+}
+
 export function signGuestbook(world, npc) {
+  if (npc.farewell) return signFarewell(world, npc);
   // "The item in the PHOTO should be the most recently finished object, and the NPC should be
   // pictured in/with it even if they are not currently wearing it." Signing is 3rd-to-last and the
   // Drop Off 2nd-to-last, so anything being lent is still in their hands here — they are

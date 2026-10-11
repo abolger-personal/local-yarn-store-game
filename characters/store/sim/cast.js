@@ -10,7 +10,7 @@ import { POSES, applyPose, lowestResting, seatedHipsAlong, phaseStep, stepMotion
   walkGain, topSpeed, createCharacter, mergeCharacter, disposeCharacter, setViewMode } from '../../npc.js';
 import { ACTION, STATE } from '../../visit.js';
 import { WIP_STATE, readyWips, runningOut, wearOrOffer } from '../../wip.js';
-import { dress, undress, wornAs } from '../../garments.js';
+import { dress, pileAs, undress, wornAs } from '../../garments.js';
 import { makeCraft, stepCraft, poseCraft, disposeCraft } from '../../craft-anim.js';
 import { makeSparkle, playSparkle, stepSparkle } from '../../sparkle.js';
 import * as THREE from 'three';
@@ -160,9 +160,12 @@ const colourOf = (yarn) => YARN_COLORS[yarn.colorIndex % YARN_COLORS.length];
 export function outfitOf(npc) {
   const look = { worn: { ...npc.worn }, wips: npc.wips };
   wearOrOffer(look);
-  const made = Object.values(look.worn).filter(Boolean).map((w) => wornAs(w, colourOf)).filter(Boolean);
-  return Object.fromEntries(made.map(({ type, item }) => [type, item]));
+  const made = [...Object.values(look.worn).filter(Boolean).map((w) => wornAs(w, colourOf)), pileAs(npc.carries ?? [], colourOf)];
+  return Object.fromEntries(made.filter(Boolean).map(({ type, item }) => [type, item]));
 }
+
+/** Arms full: a purchase, or the Former Owner's armful (`carries`). */
+const laden = (npc) => Boolean(npc.carrying || npc.carries?.length);
 
 /** A body for these params, wearing `outfit`, merged if the params say so. */
 export function dressedCharacter(P, kit, outfit) {
@@ -347,7 +350,7 @@ function poseFor(npc) {
     case ACTION.DROP_OFF:       return POSES.delighted;
     case ACTION.WALK_TO_NPC:
     case ACTION.WAIT:           return POSES.browse;
-    default:                    return npc.carrying ? POSES.carry : POSES.rest;
+    default:                    return laden(npc) ? POSES.carry : POSES.rest;
   }
 }
 
@@ -787,7 +790,7 @@ function wantedPose(rec, n) {
   //
   // moveT reaching 1 is arrival, and cast.js is the half of this that knows it.
   if (n.action?.type === ACTION.WALK_TO_SEAT && rec.moveT < 1) {
-    return n.carrying ? POSES.carry : POSES.rest;
+    return laden(n) ? POSES.carry : POSES.rest;
   }
   // Nor reach into a display you are not facing yet: turn first (stepWalk), then reach.
   if (n.action?.type === ACTION.INTERACT &&

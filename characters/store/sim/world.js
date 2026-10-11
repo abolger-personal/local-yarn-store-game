@@ -19,7 +19,7 @@ import {
   motionOf,
 } from '../../npc.js';
 import { ACTION, STATE, advanceRound, dayProgress, makeNpc, makeWorld, rejoin, tidyShop } from '../../visit.js';
-import { satisfies, wantsOf } from '../../wip.js';
+import { WEAR_SLOT_FOR, WIP_STATE, satisfies, wantsOf } from '../../wip.js';
 import * as THREE from 'three';
 import { S, SHOP_GAIT } from '../core/config.js';
 import { camera, scene } from '../scene/stage.js';
@@ -335,6 +335,31 @@ function queueOutside(npc, i) {
   npc.facing = Math.atan2(room.door.x - npc.x, room.door.z - npc.z);   // waiting to come in, not out
 }
 
+/** A finished piece of `type`: a design from the catalog, in as many random balls as it suggests colours. */
+const finished = (type) => {
+  const pattern = makeStockPattern(Math.random, type);
+  return { id: type, state: WIP_STATE.FINISHED, progress: 100, pattern, tool: null, notions: [],
+    yarn: Array.from({ length: pattern.minColors }, () => makeStockYarn()) };
+};
+
+/**
+ * The tutorial's opening: the Former Owner, in one of everything (all six wear slots) and an armful
+ * of pot holders, signs the book (visit.js signFarewell) on the way out. Spawned as a returning
+ * customer would be, so spawnOne builds them; a random species and look, as for any new face.
+ */
+function formerOwner() {
+  const speciesId = pick(speciesIds());
+  return Object.assign(makeNpc({ id: `npc-${nextNpcId++}`, name: claimName(), species: getSpecies(speciesId).label }), {
+    speciesId, wips: [], farewell: "Shop's all yours! Make some fun stuff!",
+    worn: Object.fromEntries(Object.entries(WEAR_SLOT_FOR).map(([type, slot]) => [slot, finished(type)])),
+    carries: Array.from({ length: 3 + rnd(3) }, () => finished('potholder')),
+  });
+}
+
+/** Already in, at the Guestbook, mid-closeout: their whole visit is sign, door, out (never `willReturn`). */
+const signingOut = (npc) => Object.assign(npc, { state: STATE.CLOSEOUT, maxRounds: 0, ...room.guestbook,
+  from: { ...room.guestbook }, facing: Math.atan2(room.door.x - room.guestbook.x, room.door.z - room.guestbook.z) });
+
 /** The render-side record: everything tickCast needs that the sim does not know about. */
 const castRecord = (npc, built, color) => ({
   npc, built, color,
@@ -383,13 +408,13 @@ const castRecord = (npc, built, color) => ({
  * `npc.body` is carried on the NPC so it survives into the roster — that is what makes a regular
  * recognisable tomorrow. rejoin() clears only per-visit fields, so it lives across days untouched.
  */
-function spawnOne(returning, i) {
+function spawnOne(returning, i, place = queueOutside) {
   const outfit = returning ? outfitOf(returning) : {};
   const { kit, P, built } = buildBody(returning ? returning.speciesId : pick(speciesIds()),
                                       returning?.body, outfit);
   const npc = buildMind(returning, kit);
   npc.body = P;
-  queueOutside(npc, i);
+  place(npc, i);
   built.root.position.set(npc.x, 0, npc.z);
   castGroup.add(built.root);
   // Where this body's backside is in the sit pose, measured once: it is not a fixed distance
@@ -400,12 +425,14 @@ function spawnOne(returning, i) {
   return npc;
 }
 
-function spawnCast(count = S.npcCount) {
+function spawnCast(count = S.npcCount, handover = false) {
   for (const rec of cast) disposeRecord(rec);
   cast.length = 0;
   // Regulars fill the queue first, then new faces make up the numbers.
   const coming = roster.slice(0, count);
   const npcs = Array.from({ length: count }, (_, i) => spawnOne(coming[i] ?? null, i));
+  // Last, so the tutorial friend is still npcs[0].
+  if (handover) npcs.push(spawnOne(formerOwner(), count, signingOut));
   setViewMode(castGroup, S.view);
   return npcs;
 }
@@ -472,7 +499,7 @@ function fileGuestbook(keepRegulars) {
   if (!shop.world?.guestbook.length) return;
   for (const g of shop.world.guestbook) {
     const npc = shop.world.npcs.find((n) => n.id === g.npcId);
-    if (g.kind === 'photo' && npc) g.who = { body: npc.body, speciesId: npc.speciesId, worn: { ...npc.worn } };
+    if (g.kind === 'photo' && npc) g.who = { body: npc.body, speciesId: npc.speciesId, worn: { ...npc.worn }, carries: npc.carries };
   }
   shop.pastBooks.push({ day: shop.day, entries: shop.world.guestbook });
 }
@@ -526,7 +553,7 @@ function openTutorial(npc, pattern) {
 /** Today's customers and stock: the tutorial's day 1, a fresh shop, or yesterday's carried over. */
 function castAndStock(fresh, order) {
   const tutorial = S.tutorial && fresh && shop.day === 1 ? tutorialDay1() : null;
-  const npcs = spawnCast(tutorial ? 1 : S.npcCount);
+  const npcs = spawnCast(tutorial ? 1 : S.npcCount, Boolean(tutorial));
   if (tutorial) openTutorial(npcs[0], tutorial.table);
   else if (fresh) stockTheShop(npcs);
   else if (S.seedWants) seedWants(npcs);
@@ -549,7 +576,8 @@ function castAndStock(fresh, order) {
  * `order` is tomorrow's order from planTomorrow(), when the page showed it before opening.
  *
  * With S.tutorial (game.html), a fresh day 1 is TUTORIAL.md's instead: one customer, who comes in
- * with nothing and wants a pattern, and a shop holding only tutorialDay1()'s three things.
+ * with nothing and wants a pattern, and a shop holding only tutorialDay1()'s three things,
+ * opened by the Former Owner signing the Guestbook on their way out (formerOwner).
  *
  * @param {{ keepRegulars?: boolean, rebuild?: boolean, order?: ReturnType<typeof buildOrder> }} [opts]
  */

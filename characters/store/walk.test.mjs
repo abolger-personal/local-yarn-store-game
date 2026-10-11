@@ -187,4 +187,27 @@ for (const k of [1, 2, 3]) {
   console.log(`tutorial: the pot holder is finished in the shop on day 3, round ${rounds[25]} (median), ${rounds.at(-1)} (worst)`);
 }
 
+// ---------------------------------------------------------------- 7. the Former Owner
+// Day 1 of the tutorial opens with them, once: in all six wear slots and an armful of pot holders,
+// they sign the farewell into the Guestbook and walk out -- no queue, no buying, no chair.
+{
+  const owners = () => shop.world.npcs.filter((n) => n.farewell);
+  open({ k: 1, tutorial: true });
+  assert.equal(owners().length, 1, 'the Former Owner is in on day 1, once');
+  const [owner] = owners(), rec = cast.find((r) => r.npc === owner);
+  assert.ok(Object.values(owner.worn).every(Boolean) && Object.keys(owner.worn).length === 6, 'wearing all six slots');
+  assert.deepEqual(Object.keys(rec.outfit).sort(), ['bag', 'hat', 'pile', 'scarf', 'shawl', 'socks', 'sweater'],
+    'drawn in all six and carrying a pile');
+  const states = new Set();
+  for (let r = 0; r < 200 && shop.world.npcs.some((n) => n.state !== STATE.GONE); r++) { doAdvanceRound(); states.add(owner.state); }
+  assert.ok(!states.has(STATE.QUEUED) && !states.has(STATE.BROWSE) && owner.bought.length === 0, 'not a customer');
+  const signed = shop.world.guestbook.filter((g) => g.farewell);
+  assert.equal(signed.length, 1, 'one farewell in the Guestbook');
+  assert.equal(signed[0].note.full, "Shop's all yours! Make some fun stuff!");
+  assert.equal(owner.state, STATE.GONE, 'and out of the door');
+  try { restart(); } catch (err) { assert.match(err.stack, /sizeInstanceBuffers/); }
+  assert.equal(owners().length, 0, 'never again');
+  assert.ok(shop.pastBooks[0].entries.find((g) => g.farewell).who.carries.length, 'the filed photo keeps the pile');
+}
+
 console.log('walk: prompt door, real pause, full strides at every speed, no jumps, faces the display');

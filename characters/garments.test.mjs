@@ -1464,6 +1464,26 @@ for (const silhouette of GARMENTS.sweater.silhouettes) {
   if (silhouette === 'cardigan') assert.ok(band.min.y < body.min.y + 0.02, `a cardigan's neckline band stops at ${band.min.y.toFixed(3)}, above its hem at ${body.min.y.toFixed(3)} -- no button band`);
 }
 
+// --- a sleeve is closed at the shoulder ------------------------------------------------------------
+//
+// Its top was an open ring, and the shoulder joint sits out where the body has narrowed, so the ring
+// stood outside the body by up to 1.6 arm radii: a hole down into the sleeve on every sweater but the
+// vest. An open edge -- one triangle's alone, matched by place, since the sheet's seam is a copy --
+// above the shoulder joint is that hole; the cuff, below it, is open on purpose.
+for (const id of speciesIds()) {
+  const built = build(id);
+  dress(built, { sweater: item('sweater', { silhouette: 'pullover', sleeves: 'long', edge: 'none', accessory: 'none' }) });
+  const sleeve = built.garments.find((m) => m.parent === built.joints.upperArm[0].node);
+  const pos = sleeve.geometry.attributes.position, index = sleeve.geometry.index, uses = new Map();
+  const at = (i) => `${pos.getX(i).toFixed(5)},${pos.getY(i).toFixed(5)},${pos.getZ(i).toFixed(5)}`;
+  for (let t = 0; t < index.count; t++) {
+    const a = index.getX(t), b = index.getX(t - (t % 3) + ((t + 1) % 3)), edge = [at(a), at(b)].sort().join('|');
+    if (at(a) !== at(b)) uses.set(edge, { n: (uses.get(edge)?.n ?? 0) + 1, y: Math.max(pos.getY(a), pos.getY(b)) });
+  }
+  const open = [...uses.values()].filter(({ n, y }) => n === 1 && y > 0).length;
+  assert.equal(open, 0, `${id}: a sleeve has ${open} open edges above the shoulder joint -- a hole at the shoulder`);
+}
+
 // --- a pattern's random colours are the shop's yarn, not an Easter parade -----------------------
 //
 // They came from one HSL band, at least a third saturated and never dark: every pattern pastel-ish.

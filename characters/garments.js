@@ -2588,6 +2588,12 @@ function necklinePath(spec, fn) {
  * Sleeves on the arm joints, sized to what the kit hung there -- the owl's wing included, so the
  * sleeve goes over the wing (spec §3). Fit sets length: a small sweater's sleeves stop short, a big
  * one's run down over the hands.
+ *
+ * Each is closed at the top by a cap, a dome over the shoulder, as a set-in sleeve is. The tube was
+ * open there, and the shoulder joint sits out where the body has narrowed -- wide of it by an owl's
+ * wing, a llama's fleece, a lion's splayed arm -- so the open end stood up to 1.6 arm radii outside
+ * the body on every sleeved sweater: from above, a hole down into the sleeve beside the neck. Inside
+ * the body, the cap is hidden; outside it, it is the shoulder.
  */
 function sleeves(fit, f, kind) {
   if (kind === 'none') return [];
@@ -2597,8 +2603,8 @@ function sleeves(fit, f, kind) {
   const upperR = (fit.arm.r + f.thick * 1.3) * loose;
   const upperLen = fit.arm.upper * (kind === 'short' ? 0.6 * s : 1);
   fit.joints.upperArm.forEach(({ node }, i) => {
-    const t = tube(upperR * 0.5, -Math.min(upperLen, fit.arm.upper), () => upperR, f);
-    out.push(piece(node, t.geo));
+    const top = upperR * 0.5, t = tube(top, -Math.min(upperLen, fit.arm.upper), () => upperR, f);
+    out.push(piece(node, t.geo), piece(node, sleeveCap(top, upperR, f)));
     if (kind === 'short' || upperLen < fit.arm.upper) out.push(...edgePieces(node, [ring(t.fn, 1)], f));
     if (kind !== 'long') return;
     const lower = fit.joints.lowerArm[i].node;
@@ -2608,6 +2614,18 @@ function sleeves(fit, f, kind) {
     out.push(piece(lower, lt.geo), ...edgePieces(lower, [ring(lt.fn, 1)], f));
   });
   return out;
+}
+
+/**
+ * A sleeve's cap: a low dome `r` round on the arm's axis, from the tube's top at `top` (see sleeves).
+ * Low: a round one stood the owl's well above the top of the sweater's body, like shoulder pads.
+ */
+function sleeveCap(top, r, f) {
+  const fn = (u, v, out) => {
+    const a = (v * Math.PI) / 2;
+    return out.set(r * Math.sin(a) * Math.sin(u * TAU), top + r * 0.4 * Math.cos(a), r * Math.sin(a) * Math.cos(u * TAU));
+  };
+  return panel(fn, f, { closedU: true, from: (p) => p.set(0, top, 0) });
 }
 
 // ---------------------------------------------------------------- BAG

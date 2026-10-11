@@ -207,7 +207,8 @@ const _p = new THREE.Vector3(), _p4 = new THREE.Vector4(), _vp = new THREE.Matri
  */
 export function idLook(built) {
   const meshes = [];
-  built.root.traverse((o) => { if (o.isMesh && o.visible) meshes.push(o); });
+  // what the renderer draws: an eye under a hat is hidden at its joint, not at its meshes
+  built.root.traverseVisible((o) => { if (o.isMesh) meshes.push(o); });
   const buf = { w: 0, h: 0, id: null, z: null, key: '' };
   return (camera, p, parts) => {
     const key = `${camera.matrixWorld.elements.join(',')},${camera.projectionMatrix.elements.join(',')}`;
@@ -304,8 +305,8 @@ export function seenShare(built, camera, parts, samples = 30, look = idLook(buil
   return n ? seen / n : 0;
 }
 
-/** Every eye's meshes: the white and the pupil. */
-const eyesOf = (built) => built.joints.eye.flatMap(({ node }) => node.children.filter((c) => c.isMesh));
+/** Every eye's meshes: the white and the pupil. An eye a hat hides (garments.js) is none of them. */
+const eyesOf = (built) => built.joints.eye.flatMap(({ node }) => (node.visible ? node.children.filter((c) => c.isMesh) : []));
 
 /** Frame one style: pose, lens, and the closest framing that keeps the hand out (see takeSelfie). */
 function frame(built, camera, style, subject) {

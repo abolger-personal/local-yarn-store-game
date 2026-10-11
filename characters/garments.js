@@ -1253,6 +1253,22 @@ function hatProfile(spec) {
 }
 
 /**
+ * Whether every point of `node`'s meshes is under the hat. A cloche's flared brim is solid to
+ * `under`, so a llama's eye centred just under it was dropped with half of it out below the brim,
+ * in plain view.
+ */
+function wholly(head, node, under) {
+  const q = new THREE.Vector3();
+  node.updateWorldMatrix(true, true);
+  return node.children.every(({ isMesh, geometry, matrixWorld }) => {
+    if (!isMesh) return true;
+    const { position } = geometry.attributes;
+    for (let i = 0; i < position.count; i++) if (!under(head.worldToLocal(q.fromBufferAttribute(position, i).applyMatrix4(matrixWorld)))) return false;
+    return true;
+  });
+}
+
+/**
  * Whatever the head carries that the hat should cover (spec §3: fit is measured, never per
  * species). Eyes and ears are joints: under the hat, not drawn at all -- fewer draws, not more.
  * A coat over the skull -- the lion's mane, the owl's feather shell -- is one mesh that cannot be
@@ -1262,6 +1278,7 @@ function hatProfile(spec) {
  *
  * Only coats: a coat is what goes over the crown. The face -- snout, beak, nose -- sits under a
  * bucket's brim, which the profile reads as solid, and pressing it put the face inside the skull.
+ * For the same reason an eye goes only when all of it is under the hat (wholly).
  */
 function coverUnderHat(built, f) {
   const fit = bodyFit(built);
@@ -1271,9 +1288,12 @@ function coverUnderHat(built, f) {
   // Ears are worn up through an open-top hat (a headband) and out of a fisherman's hat; a hood keeps
   // the eyes out.
   const spec = HAT[f.silhouette] ?? HAT.beanie;
-  const parts = [...(spec.eyesOut ? [] : built.joints.eye), ...(spec.open || spec.earsOut ? [] : built.joints.ear)];
+  const parts = [
+    ...(spec.eyesOut ? [] : built.joints.eye.filter(({ node }) => wholly(head, node, cover.under))),
+    ...(spec.open || spec.earsOut ? [] : built.joints.ear.filter(({ node }) => cover.under(head.worldToLocal(node.getWorldPosition(q))))),
+  ];
   for (const { node } of parts) {
-    if (!node.visible || !cover.under(head.worldToLocal(node.getWorldPosition(q)))) continue;
+    if (!node.visible) continue;
     node.visible = false;
     built.covered.push(() => { node.visible = true; });
   }

@@ -852,7 +852,9 @@ for (const id of speciesIds()) {
     while (j && !j.userData.joint) j = j.parent;
     return SKINNED.has(j?.name) ? 'body' : j?.name;
   };
-  // an oversized hat, so it hides the eyes too: they are skinned with the head, the case that can leak
+  // an oversized hat, so it hides the ears. A hidden eye is the case that can leak (it is skinned
+  // with the head), but a hat hides only an eye wholly under it, and none covers all of a llama's:
+  // one is hidden at its joint here, as the hat would.
   const outfit = Object.fromEntries(Object.keys(GARMENTS).map((type) => [type, item(type, {
     sleeves: 'long', colourwork: 'stripes', colorCount: 2, color1: '#ff0000', color2: '#0000ff', ...(type === 'hat' && { fit: FIT_RANGE[1] }),
   })]));
@@ -860,8 +862,8 @@ for (const id of speciesIds()) {
     const built = build(id);
     dress(built, outfit);
     const wearing = new Set(built.garments.map(groupOf));
+    built.joints.eye[0].node.visible = false;
     const hidden = [...built.joints.eye, ...built.joints.ear].map(({ node }) => node).filter((n) => !n.visible);
-    assert.ok(hidden.some((n) => built.joints.eye.some((e) => e.node === n)), `${id}: the hat hides no eye -- the check below would miss the skinned case`);
     mergeCharacter(built);
     const undressed = createCharacter({ ...BASE_PARAMS, ...getSpecies(id).defaults, scarf: false }, id);
     // drawn: visible all the way up. Hiding under the hat only ever takes draws away.
@@ -1898,6 +1900,14 @@ for (const id of speciesIds()) for (const silhouette of GARMENTS.sweater.silhoue
       assert.ok(off < 0.25, `${id} ${type}: a pupil looks ${THREE.MathUtils.radToDeg(off).toFixed(0)} degrees away from the lens`);
     }
   }
+}
+
+// A cloche's flared brim read as solid hid a llama's eye centred under it, half of it in plain view:
+// the selfie drew no eye while its grade, blind to the hidden joint, saw 40% of them.
+{
+  const built = build('llama');
+  dress(built, { hat: item('hat', { silhouette: 'cloche' }) });
+  assert.ok(built.joints.eye.every(({ node }) => node.visible), 'llama cloche: the eyes peeking out under the brim are drawn');
 }
 
 // In hand: decor is never worn, so its selfie shows it held up in the free paw -- the tutorial's pot

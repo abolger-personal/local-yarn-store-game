@@ -190,7 +190,7 @@ function openTheShop(loaded, page) {
   buildYarnMeshes();
   setGeometryDetail(S.detail);
   restart();
-  frameRoom();
+  (page.frame ?? frameRoom)();
   runChecks();
   startLoop(page);
 }
@@ -201,6 +201,7 @@ function openTheShop(loaded, page) {
  * @property {() => void} [onHud]   repaint its panels when the sim says something happened
  * @property {(dt: number, progress: number) => void} [onFrame]  after each render; progress is the running clock, 0..1
  * @property {(html: string) => void} [onFail]  show a boot failure (the console always gets it)
+ * @property {() => void} [frame]  where the camera opens (default frameRoom, close in on the middle)
  * @property {() => void} [onDayEnd]  the shop has emptied: the page opens tomorrow itself (restart)
  */
 

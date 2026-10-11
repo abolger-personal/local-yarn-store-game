@@ -83,6 +83,22 @@ export const SHELF_HEADROOM = Math.floor(SHELF_CLEAR / BOX_H);
 // hatch, and the tallest species (llama, per P1-SPIKE-PLAN) is ~1.33 before any hat.
 export const ROOM = { w: 9.6, d: 7.2, wallH: 2.6, doorW: 1.2, doorH: 2.0 };
 
+export const SHOP_ASPECT = 2000 / 1141;   // the screenshot shopView was solved from
+
+/**
+ * The establishing shot the game opens on, so day 1's Former Owner at the Guestbook can't be
+ * missed: from out past the right wall (cut away) looking 18 degrees down on the room's middle,
+ * the left wall's Customer of the Week board and the Guestbook's counter on the left, the back wall
+ * on the right. Solved from 14 landmarks in the user's own 2000 x 1141 screenshot of the view they
+ * wanted (11px rms; view.test.mjs). A narrower screen backs off along the same line, so the same
+ * width shows.
+ * @param {number} aspect
+ */
+export function shopView(aspect) {
+  const target = [0, 0.6, 0], eye = [5.67, 2.72, 3.01], back = Math.max(1, SHOP_ASPECT / aspect);
+  return { target, eye: eye.map((e, i) => target[i] + (e - target[i]) * back), dist: 6.85 * back };
+}
+
 export const SEAT_H = 0.22;   // chair seat height — roughly one chibi leg
 
 export const CHAIR_W = 0.34;  // seat width and depth

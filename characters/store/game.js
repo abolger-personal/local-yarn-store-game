@@ -10,7 +10,7 @@ import { bootShop } from './boot.js';
 import { installControls } from './ui/controls.js';
 import { S, gameSpeed } from './core/config.js';
 import { GOLD_DEFS, svgLettering } from './ui/lettering.js';
-import { viewSide, viewTop } from './ui/framing.js';
+import { viewShop, viewSide, viewTop } from './ui/framing.js';
 import { camera, controls } from './scene/stage.js';
 import { closeForTheNight, installNight } from './ui/night.js';
 
@@ -95,6 +95,9 @@ function installSpeed() {
 bootShop({
   steps: [['controls', () => installControls({ ' ': cycleSpeed, p: togglePause })], ['corner', installCorner],
     ['views', installViews], ['speed', installSpeed], ['night', installNight]],
+  // Open on the whole shop, not close in: day 1's Former Owner signs the Guestbook at the front
+  // left and walks out of the door, and the player must not miss them.
+  frame: viewShop,
   onFrame: turnCube,
   onDayEnd: closeForTheNight,
   onFail: (html) => {

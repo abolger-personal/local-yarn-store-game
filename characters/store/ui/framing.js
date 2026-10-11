@@ -3,7 +3,7 @@
 // Extracted from the single 3,200-line module that used to live inline in store.html.
 
 import * as THREE from 'three';
-import { CELL, ROOM } from '../core/config.js';
+import { CELL, ROOM, shopView } from '../core/config.js';
 import { camera, controls } from '../scene/stage.js';
 import { FILL } from '../goods/items.js';
 
@@ -98,6 +98,20 @@ export function viewTop() {
   // Not exactly overhead: looking dead down the up axis leaves lookAt no way to choose which way
   // is up, and the picture spins. A hair toward the door makes the door's side the bottom edge.
   camera.position.set(0, d, 1e-3);
+  controls.update();
+}
+
+/**
+ * The establishing shot (shopView, config.js): what the game opens on. Past maxDistance only on a
+ * narrow portrait screen, where the limits are lifted as for the plan view.
+ */
+export function viewShop() {
+  const { target, eye, dist } = shopView(camera.aspect);
+  if (dist > controls.maxDistance) liftLimits(dist);
+  else restoreLimits();
+  side = null;
+  controls.target.set(...target);
+  camera.position.set(...eye);
   controls.update();
 }
 

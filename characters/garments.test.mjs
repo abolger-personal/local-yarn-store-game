@@ -504,6 +504,26 @@ for (const id of speciesIds()) {
   assert.equal(risers, 0, `${risers} of the lace holes' ${edges} edges run straight up the fabric -- they are stair-stepped, not triangles`);
 }
 
+// --- a folded hat's lace holes are not stretched into stripes ------------------------------------
+//
+// The slouch's fold tore the bag off at the hinge, one row spanning the gap, and its rows were
+// counted down the bag's short back, so the long folded front stretched every hole: quads forty
+// times taller than wide, lace read as ribbons. Below the crown (where quads narrow to its point)
+// a quad stays within a few widths tall, as on a beanie.
+for (const id of speciesIds()) for (const silhouette of ['slouch', 'pixie']) {
+  const built = build(id);
+  dress(built, { hat: item('hat', { silhouette, stitch: 'lace', craft: 'crochet', edge: 'none' }) });
+  const g = built.garments[0].geometry, p = g.attributes.position, { uv } = g.attributes;
+  let cols = 0;
+  while (uv.getY(cols) === 0) cols++;
+  const at = (i) => new THREE.Vector3().fromBufferAttribute(p, i), tall = [];
+  for (let k = 0; k < p.count - cols; k++) {
+    if (k % cols < cols - 1 && uv.getY(k) > 0.15) tall.push(at(k).distanceTo(at(k + cols)) / at(k).distanceTo(at(k + 1)));
+  }
+  const p99 = tall.sort((a, b) => a - b)[Math.floor(tall.length * 0.99)];
+  assert.ok(p99 < 8, `${id}: a lace ${silhouette}'s quads are up to ${p99.toFixed(1)}x taller than wide -- its holes are stripes`);
+}
+
 // --- puff stitch is poofs, not spikes ---------------------------------------------------------
 //
 // Spikes, three ways: a sharpened sine sampled a couple of times a bump; crochet's bumps stacked on

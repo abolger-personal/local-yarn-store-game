@@ -446,6 +446,9 @@ function flip(geo) {
  * How long the sheet is along u and along v, sampled, so stitch counts come from real size. u is
  * measured halfway along, or with `widest` where it is widest: a scarf is knitted to its flat width
  * and bunched round the neck, and counted at the bunch, a lace scarf got a super-bulky's stitches.
+ * v is measured along its longest line: rows are shared across the sheet, so counted along a short
+ * line they stretch on a long one. A slouch's folded-over front is four times its back, and counted
+ * down the back its lace holes ran down the fold as stripes.
  */
 function spans(fn, widest = false) {
   const a = new THREE.Vector3(), b = new THREE.Vector3();
@@ -459,7 +462,7 @@ function spans(fn, widest = false) {
     }
     return len;
   };
-  if (!widest) return [walk((t) => [t, 0.5]), walk((t) => [0.5, t])];
+  if (!widest) return [walk((t) => [t, 0.5]), Math.max(...[0, 0.25, 0.5, 0.75].map((u) => walk((t) => [u, t])))];
   const across = Math.max(...[0.05, 0.15, 0.25, 0.35, 0.5, 0.65, 0.75, 0.85, 0.95].map((v) => walk((t) => [t, v])));
   return [across, walk((t) => [0.5, t], 96)];   // finely along: it winds round the neck
 }
@@ -1085,7 +1088,9 @@ function flop(p, { hinge: h, back, angle }, k, dy, v) {
   const hinge = h * k + dy, pivot = -back * k;
   const dh = p.y - hinge;
   if (dh <= 0) return;
-  const a = angle * (1 - v);
+  // Eased in over half a head above the hinge: folded at full angle from the hinge itself, the bag
+  // tore off there, and one row of quads -- forty rows long at the front -- spanned the gap.
+  const a = angle * (1 - v) * THREE.MathUtils.smoothstep(dh, 0, 0.5 * k);
   // Knit has no body: as it folds, the bag collapses flat against its own back instead of
   // staying a tube, whose front would swing a whole bag-width out behind the head.
   const dz = (p.z - pivot) * lerp(1, 0.3, a / angle);

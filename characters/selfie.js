@@ -184,7 +184,9 @@ function lookAtLens(built, camera) {
     const r = white.scale.x, ry = white.scale.y, depth = white.scale.z;
     const x = to.x * r * GAZE, y = to.y * ry * GAZE;
     const surface = depth * Math.sqrt(Math.max(0, 1 - (x / r) ** 2 - (y / ry) ** 2));
-    pupil.position.set(x, y, pupil.position.z - depth + surface);
+    // from where the rig put it, not from the last call's: from there, every call sank it deeper
+    const rest = (pupil.userData.restZ ??= pupil.position.z);
+    pupil.position.set(x, y, rest - depth + surface);
   }
 }
 

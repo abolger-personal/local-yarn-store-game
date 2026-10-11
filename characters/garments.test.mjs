@@ -1940,4 +1940,20 @@ for (const id of speciesIds()) for (const silhouette of GARMENTS.sweater.silhoue
   }
 }
 
+// The pupils turn to the lens from where the rig put them. They moved from where the last call left
+// them, so every selfie taken of one body sank them a little deeper into the eye: the search takes
+// several, and a search over hundreds left a shot showing none of the eyes it was scored on.
+{
+  const cam = new THREE.PerspectiveCamera(30, 240 / 300, 0.01, 50);
+  for (const id of speciesIds()) {
+    const built = build(id);
+    dress(built, { hat: item('hat') });
+    takeSelfie(built, cam, 'hat');
+    const pupils = () => built.joints.eye.map(({ node }) => node.children[1].position.z);
+    const once = pupils();
+    for (let i = 0; i < 20; i++) takeSelfie(built, cam, 'hat');
+    assert.deepEqual(pupils(), once, `${id}: the pupils move as more selfies are taken`);
+  }
+}
+
 console.log('garments.js self-check: all assertions passed');

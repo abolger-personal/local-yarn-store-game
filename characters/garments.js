@@ -252,15 +252,21 @@ export function wornAs(wip, colourOf) {
   const p = wip.pattern, type = p?.patternType;
   if (!Object.hasOwn(GARMENTS, type)) return null;
   const { silhouettes } = GARMENTS[type];
+  const item = { ...defaultItem(type), silhouette: silhouettes.includes(p.silhouette) ? p.silhouette : silhouettes[0], ...madeWith(wip, colourOf) };
+  // `wip.used`: whatever the maker did that the pattern did not say -- madeItem's `used`
+  return { type, item: madeItem(item, wip.used) };
+}
+
+/** The yarn, tool and colours a WIP was made with, as item attributes. */
+function madeWith(wip, colourOf) {
+  const p = wip.pattern;
   const colours = [...new Set(wip.yarn.map(colourOf))].slice(0, MAX_COLOURS);
-  const item = {
-    ...defaultItem(type), on: true, silhouette: silhouettes.includes(p.silhouette) ? p.silhouette : silhouettes[0],
-    craft: p.craft === 'crochet' ? 'crochet' : 'knit',    // catalog.js says 'knitting'
+  return {
+    on: true, craft: p.craft === 'crochet' ? 'crochet' : 'knit',    // catalog.js says 'knitting'
     weight: p.weight, fibre: p.materials[0], tool: p.toolSize,
     colorCount: Math.max(1, colours.length), colourwork: colours.length > 1 ? 'stripes' : 'solid',
     ...Object.fromEntries(colours.map((c, i) => [`color${i + 1}`, c])),
   };
-  return { type, item: madeItem(item) };
 }
 
 /**
@@ -349,7 +355,7 @@ export function bodyFit(built) {
   const floor = j.chest.worldToLocal(new THREE.Vector3(chestWorld.x, 0, chestWorld.z)).y;
   const armR = Math.max(extent(arm, 'x'), extent(arm, 'z'));
   return {
-    P, joints: j, floor, root: floorOf(built.root),   // what lies on the floor follows
+    P, joints: j, holds: built.holds, floor, root: floorOf(built.root),   // what lies on the floor follows
     height: new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3()).y,   // for forView
     head: [extent(head, 'x'), head.max.y, Math.max(-head.min.z, P.headRadius)],
     skull: skullRadii(j.head),
@@ -2733,7 +2739,30 @@ function packStraps(R, top, body, dims) {
   });
 }
 
+/**
+ * A bag held up to show it (`f.held`: its selfie, selfie-studio.js snap), on the free paw like the
+ * pot holder -- worn, a bag hangs at the hip or on the back, where no selfie reaches it. The body
+ * stands on the paw in the hold's frame (see buildPotholder), the strap hanging from its top corners
+ * down past the paw.
+ * ponytail: no edge, trim or accessory in hand; add them if a held bag's close-up needs them.
+ */
+function buildHeldBag(fit, f) {
+  const spec = BAG[f.silhouette] ?? BAG['shoulder bag'], paw = fit.holds[1];
+  const [w, h, d] = spec.size.map((k, i) => k * fit.torso[i === 1 ? 1 : 0] * 0.5 * f.fit);
+  const c = new THREE.Vector3(0, -d - 0.01, h * 0.8);
+  // bagBody's up is y; the hold's is z (and its y runs out along the arm): a quarter turn about x
+  const body = bagBody([w, h, d], spec.round ?? 0, new THREE.Vector3());
+  const fn = (u, v, out) => { body(u, v, out); return out.set(c.x + out.x, c.y - out.z, c.z + out.y); };
+  const netted = spec.net ? { ...f, stitch: 'lace', stitchW: f.stitchW * 2, rowH: f.rowH * 2 } : f;
+  const top = c.z + h * 0.9, low = -h * 0.9;
+  const strap = new THREE.CatmullRomCurve3([[-w * 0.7, top], [-w * 0.75, low * 0.3], [-w * 0.45, low], [0, low * 1.08],
+    [w * 0.45, low], [w * 0.75, low * 0.3], [w * 0.7, top]].map(([x, z]) => new THREE.Vector3(x, c.y, z))).getPoints(32);
+  return [piece(paw, panel(fn, netted, { closedU: true, minU: 32, minV: 20, from: () => c.clone() })),
+    piece(paw, flatColour(tubeAlong({ pts: strap, closed: false }, f.thick * 0.9, 6), trimColour(f)))];
+}
+
 function buildBag(fit, f) {
+  if (f.held) return buildHeldBag(fit, f);
   const spec = BAG[f.silhouette] ?? BAG['shoulder bag'];
   const { chest } = fit.joints;
   // Width and depth from torso width, height from torso height; fit is the bag's size (3+ sizes).
@@ -2849,9 +2878,93 @@ function sockFoot(fit, f, tib) {
   return panel(fn, f, { closedU: true, minU: 24, minV: 12, from: () => c.clone() });
 }
 
+// ---------------------------------------------------------------- held: in the free paw
+//
+// Built on holds[1] (holds[0] is the phone in a selfie, the purchase in the shop), in the hold's
+// frame as the carry pose leaves it (motion.js POSES.carry, elbows at 1.45): -y runs out along the
+// forearm, +z is up. A straight arm swung forward leaves it the same way: selfie.js SHOW.
+
+/**
+ * How high, in a hold's frame (up is +z), the arm it is on reaches over the rectangle x in `xs`, y in
+ * `ys`: the paw, and whatever the kit hung on the arm -- an owl's wing wraps its paw. Measured, as
+ * every fit here is, so a held piece rests on top of what is there rather than through it.
+ */
+function armTopOver(fit, hold, xs, ys) {
+  const arm = fit.joints.upperArm.find(({ node }) => node.getObjectById(hold.id))?.node;
+  const inv = hold.matrixWorld.clone().invert(), p = new THREE.Vector3();
+  let top = -Infinity;
+  arm?.traverse((m) => {
+    if (!m.isMesh || m.userData.garment) return;
+    const { position } = m.geometry.attributes;
+    for (let i = 0; i < position.count; i++) {
+      p.fromBufferAttribute(position, i).applyMatrix4(m.matrixWorld).applyMatrix4(inv);
+      if (p.x >= xs[0] && p.x <= xs[1] && p.y >= ys[0] && p.y <= ys[1]) top = Math.max(top, p.z);
+    }
+  });
+  return top;
+}
+
+/**
+ * A pot holder: a crocheted square lying flat on the upturned paw like a tray, parallel to the
+ * floor, its loop at the far corner. Stood up on the paw, it cut through the paw in the picture; laid
+ * just over the paw, it cut through an owl's wing. So it rests on whatever is highest under it
+ * (armTopOver), a fabric's thickness clear, and runs out ahead of the paw.
+ */
+function buildPotholder(fit, f) {
+  const s = fit.torso[0] * 0.75, paw = fit.holds[1];
+  const z = Math.max(0.016, armTopOver(fit, paw, [-s / 2, s / 2], [0.04 - s, 0.04]) + f.thick * 1.5);
+  const fn = (u, v, out) => out.set((u - 0.5) * s, 0.04 - v * s, z);
+  const face = panel(fn, f, { from: (p) => p.setZ(p.z - 1) });
+  const r = s * 0.08, far = 0.04 - s - r;
+  const pts = Array.from({ length: 16 }, (_, i) => new THREE.Vector3(Math.sin((i / 16) * TAU) * r, far + Math.cos((i / 16) * TAU) * r, z));
+  return [piece(paw, face), piece(paw, flatColour(tubeAlong({ pts, closed: true }, f.thick * 0.6, 6), f.colours[0]))];
+}
+
+/** A pile of folded knits carried on the forearm, bottom up: each fold a rounded slab of its own fabric. */
+function buildPile(fit, f) {
+  const w = fit.torso[0], paw = fit.holds[1];
+  let z = 0;
+  return f.folds.map((fold, i) => {
+    const ff = forView(fabric(fold), fit), h = w * 0.07 + ff.thick;
+    const c = new THREE.Vector3((i % 2 ? 1 : -1) * w * 0.05, -w * 0.4, z + h);
+    z += 2 * h;
+    // bagBody's up is y; the hold's is z (and its y runs out along the arm): a quarter turn about x
+    const slab = bagBody([w * (0.6 + 0.06 * ((i * 7) % 3)), h, w * 0.45], 0.15, new THREE.Vector3());
+    const fn = (u, v, out) => { slab(u, v, out); return out.set(c.x + out.x, c.y - out.z, c.z + out.y); };
+    return piece(paw, panel(fn, ff, { closedU: true, minU: 24, minV: 8, from: () => c.clone() }));
+  });
+}
+
+/** Decor types drawn in hand, by pattern type; and `pile`, an armful of folded knits. */
+const HELD_BUILDERS = { potholder: buildPotholder };
+
+/** What a held piece has that no pattern says: plain stitch, no edge, no trim. */
+const PLAIN = Object.freeze({ fit: 1, silhouette: null, stitch: 'stockinette', edge: 'none', accessory: 'none' });
+
+/**
+ * A finished piece of decor (catalog.js `decor`: the pot holder) as { type, item } for dress(),
+ * held in the free paw (HELD_BUILDERS), or null if nothing here can draw it. Decor is never worn
+ * (WEARABLE-FINISHED-OBJ.md), so its photo shows it in hand.
+ */
+export function heldAs(wip, colourOf) {
+  const type = wip.pattern?.patternType;
+  if (!Object.hasOwn(HELD_BUILDERS, type)) return null;
+  return { type, item: madeItem({ ...PLAIN, ...madeWith(wip, colourOf) }) };
+}
+
+/**
+ * An armful of finished pieces (`buildPile`), as { type: 'pile', item } for dress(), or null: each
+ * fold the fabric it would be worn or held in.
+ */
+export function pileAs(wips, colourOf) {
+  const folds = wips.map((w) => (wornAs(w, colourOf) ?? heldAs(w, colourOf))?.item).filter(Boolean);
+  return folds.length ? { type: 'pile', item: { ...folds[0], on: true, folds } } : null;
+}
+
 // ---------------------------------------------------------------- dressing
 
-const BUILDERS = { hat: buildHat, scarf: buildScarf, shawl: buildShawl, sweater: buildSweater, bag: buildBag, socks: buildSocks };
+const BUILDERS = { hat: buildHat, scarf: buildScarf, shawl: buildShawl, sweater: buildSweater, bag: buildBag, socks: buildSocks,
+  ...HELD_BUILDERS, pile: buildPile };
 
 let material = null;
 

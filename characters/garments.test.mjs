@@ -14,9 +14,9 @@ import './lion.js';
 import {
   GARMENTS, STITCHES, STITCHES_BY_CRAFT, EDGES, ACCESSORIES, COLOURWORKS, FORMS, SLEEVES, FIT_RANGE, MAX_COLOURS, fabric,
   LOOK, WEIGHTS, madeItem, usualTool, bodyFit, defaultItem, dress, undress, resolveColourwork, hasForm, garmentMaterial, randomItem, outfitPieces,
-  formsOf, accessoriesOf, wornAs,
+  formsOf, accessoriesOf, wornAs, heldAs, pileAs,
 } from './garments.js';
-import { seenShare, takeSelfie } from './selfie.js';
+import { gradeSelfie, seenShare, shotFor, takeSelfie } from './selfie.js';
 import { PATTERN_DESIGNS, PATTERN_TITLES, PATTERN_TYPES } from '../inventory/catalog.js';
 import { WEAR_SLOTS, WEAR_SLOT_FOR } from './wip.js';
 
@@ -1833,6 +1833,11 @@ for (const id of speciesIds()) for (const silhouette of GARMENTS.sweater.silhoue
 
 // The Guestbook selfie: the lens is up, out on the raised arm's side, tilted, and close enough that
 // the face fills the top of the frame while what they made is still in the picture.
+//
+// An AUTHORED shot (selfie.js SHOTS) was framed by eye: it may show part of the phone hand (never all of it: the phone would show) or crop the crown,
+// and its lens and zoom are its own. It still keeps what they made and the eyes visible, the pupils
+// on the lens. One taken from behind (`behind`) has no phone: both arms out, the horizon level. The
+// framing rules below hold for the searched shots only.
 {
   const cam = new THREE.PerspectiveCamera(30, 240 / 300, 0.01, 50);
   const onScreen = (v) => { const p = v.clone().project(cam); return Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1 && p.z < 1 ? p : null; };
@@ -1840,25 +1845,37 @@ for (const id of speciesIds()) for (const silhouette of GARMENTS.sweater.silhoue
     const built = build(id);
     dress(built, { [type]: item(type) });
     takeSelfie(built, cam, type);
+    const shot = shotFor(type, id);
     const head = built.joints.head.getWorldPosition(new THREE.Vector3());
     const top = onScreen(head.clone().add(new THREE.Vector3(0, built.params.headRadius, 0)));
-    assert.ok(top && top.y < 0.9, `${id} ${type}: the top of the head is in the selfie, with room above it`);
-    assert.ok(onScreen(head).y > -0.1, `${id} ${type}: the face is not low in the frame`);
-    const box = new THREE.Box3();
-    built.garments.forEach((g) => box.expandByObject(g));
-    const upperQuarter = box.getCenter(new THREE.Vector3()).setY(box.max.y - (box.max.y - box.min.y) * 0.25);
-    assert.ok(onScreen(upperQuarter), `${id} ${type}: what they made is in the picture, cropped no higher than its top quarter`);
-    // The face fills the picture: half its width across a head, whatever the neck below it.
-    const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0).multiplyScalar(built.params.headRadius);
-    const face = (head.clone().add(right).project(cam).x - head.clone().sub(right).project(cam).x) / 2;
-    assert.ok(face > 0.4, `${id} ${type}: the face spans ${face.toFixed(2)} of the frame, under 0.4`);
-    assert.ok(cam.position.y > head.y && cam.position.x < head.x && cam.position.z > head.z,
-      `${id} ${type}: the lens is above, in front, and out on the raised arm's side`);
     const holdingArm = built.holds[0].getWorldPosition(new THREE.Vector3());
-    assert.equal(onScreen(holdingArm), null, `${id} ${type}: the hand holding the phone is out of the picture`);
+    if (!shot) {
+      assert.ok(top && top.y < 0.9, `${id} ${type}: the top of the head is in the selfie, with room above it`);
+      assert.ok(onScreen(head).y > -0.1, `${id} ${type}: the face is not low in the frame`);
+      const box = new THREE.Box3();
+      built.garments.forEach((g) => box.expandByObject(g));
+      const upperQuarter = box.getCenter(new THREE.Vector3()).setY(box.max.y - (box.max.y - box.min.y) * 0.25);
+      assert.ok(onScreen(upperQuarter), `${id} ${type}: what they made is in the picture, cropped no higher than its top quarter`);
+      // The face fills the picture: half its width across a head, whatever the neck below it.
+      const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0).multiplyScalar(built.params.headRadius);
+      const face = (head.clone().add(right).project(cam).x - head.clone().sub(right).project(cam).x) / 2;
+      assert.ok(face > 0.4, `${id} ${type}: the face spans ${face.toFixed(2)} of the frame, under 0.4`);
+      assert.ok(cam.position.y > head.y && cam.position.x < head.x && cam.position.z > head.z,
+        `${id} ${type}: the lens is above, in front, and out on the raised arm's side`);
+      assert.equal(onScreen(holdingArm), null, `${id} ${type}: the hand holding the phone is out of the picture`);
+    }
+    // every shot with a phone, authored too: the hand may be in it, cut by the edge, never whole
+    if (!shot?.behind) assert.ok(gradeSelfie(built, cam, type).handOut, `${id} ${type}: the phone hand is wholly in the picture`);
     const hangingArm = built.holds[1].getWorldPosition(new THREE.Vector3());
-    assert.ok(holdingArm.y > hangingArm.y + 0.1, `${id}: one arm is up holding the phone, the other hangs`);
-    assert.ok(Math.abs(new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion).y) > 0.1, 'the horizon is off level');
+    const roll = Math.abs(new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion).y);
+    if (shot?.behind) {
+      assert.ok(Math.abs(holdingArm.y - hangingArm.y) < 0.05 && holdingArm.distanceTo(hangingArm) > 0.5,
+        `${id} ${type}: both arms are out to the sides, spreading it`);
+      assert.ok(roll < 0.01, `${id} ${type}: a photo from behind is taken level`);
+    } else {
+      assert.ok(holdingArm.y > hangingArm.y + 0.1, `${id}: one arm is up holding the phone, the other hangs`);
+      assert.ok(roll > 0.1, 'the horizon is off level');
+    }
     // Nothing of theirs is in the way: a llama's snout up close used to hide its hat and its eyes.
     // ...and what they made shows, whatever it is: the shot that showed a llama's hat hid its cowl
     // (0%), and the one before that hid the hat. A hat's back half faces away from any lens.
@@ -1866,13 +1883,50 @@ for (const id of speciesIds()) for (const silhouette of GARMENTS.sweater.silhoue
     const madeSeen = seenShare(built, cam, made, 120);
     assert.ok(madeSeen > 0.15, `${id}: ${(madeSeen * 100).toFixed(0)}% of the ${type} can be seen in its selfie`);
     const eyes = built.joints.eye.flatMap(({ node }) => node.children.filter((c) => c.isMesh));
-    assert.ok(seenShare(built, cam, eyes, 120) > 0.3, `${id} ${type}: the eyes can be seen in the selfie`);
-    // and they look into it: the pupil sits toward the lens, not wherever the head points
-    for (const { node } of built.joints.eye) {
+    // An authored shot may be a three-quarter view, where a llama's far eye is round the side of its
+    // head: most of one eye (25%) is its floor. A searched one shows both.
+    const eyesSeen = seenShare(built, cam, eyes, 120);
+    assert.ok(eyesSeen > (shotFor(type, id) ? 0.25 : 0.3), `${id} ${type}: ${(eyesSeen * 100).toFixed(0)}% of the eyes can be seen in the selfie`);
+    // and they look into it: the pupil sits toward the lens, not wherever the head points -- every
+    // eye the picture shows. One round the side of the head (a three-quarter shot) cannot turn that far.
+    // Not from behind: a head that stops short of straight back glances over the shoulder rather than
+    // into the lens -- a lion's turns 74 degrees, and its profile was judged fine.
+    for (const { node } of shot?.behind ? [] : built.joints.eye) {
+      if (seenShare(built, cam, node.children.filter((m) => m.isMesh), 60) < 0.2) continue;
       const c = node.getWorldPosition(new THREE.Vector3());
       const off = node.children[1].getWorldPosition(new THREE.Vector3()).sub(c).angleTo(cam.position.clone().sub(c));
       assert.ok(off < 0.25, `${id} ${type}: a pupil looks ${THREE.MathUtils.radToDeg(off).toFixed(0)} degrees away from the lens`);
     }
+  }
+}
+
+// In hand: decor is never worn, so its selfie shows it held up in the free paw -- the tutorial's pot
+// holder was missing from its own photo because wornAs drops decor. The armful is the Former Owner's;
+// a bag is held up in its own selfie (selfie-studio.js), since worn at the hip no lens finds it.
+{
+  const cam = new THREE.PerspectiveCamera(30, 240 / 300, 0.01, 50);
+  const potholder = PATTERN_DESIGNS.find((d) => d.patternType === 'potholder');
+  const hat = PATTERN_DESIGNS.find((d) => d.patternType === 'hat');
+  const held = {
+    potholder: heldAs({ pattern: potholder, yarn: [{ c: '#c0504d' }] }, (y) => y.c),
+    pile: pileAs([potholder, hat, hat].map((pattern, i) => ({ pattern, yarn: [{ c: ['#3d5a80', '#e0b04a', '#5b8c5a'][i] }] })), (y) => y.c),
+    ...Object.fromEntries(GARMENTS.bag.silhouettes.map((silhouette) => [`bag:${silhouette}`, { item: item('bag', { silhouette, held: true }) }])),
+  };
+  assert.equal(heldAs({ pattern: hat, yarn: [{ c: '#123456' }] }, (y) => y.c), null, 'a hat is worn, not held');
+  for (const id of speciesIds()) for (const [name, { item: it }] of Object.entries(held)) {
+    const type = name.split(':')[0], built = build(id);
+    dress(built, { [type]: it });
+    const mesh = built.garments.find((g) => g.userData.worn.includes(type));
+    assert.ok(mesh && mesh.parent === built.holds[1], `${id} ${name}: built on the free paw`);
+    assert.ok([...mesh.geometry.attributes.position.array].every(Number.isFinite), `${id} ${name}: finite geometry`);
+    takeSelfie(built, cam, type);
+    const seen = seenShare(built, cam, [mesh], 120);
+    assert.ok(seen > 0.3, `${id}: ${(seen * 100).toFixed(0)}% of the ${name} can be seen in its selfie`);
+    assert.ok(gradeSelfie(built, cam, type).handOut, `${id} ${name}: the phone hand is wholly in the picture`);
+    if (type !== 'potholder') continue;
+    // flat as a tray in the shot: stood up, it cut through the paw
+    const size = new THREE.Box3().setFromObject(mesh).getSize(new THREE.Vector3());
+    assert.ok(size.y < 0.3 * Math.max(size.x, size.z), `${id}: the pot holder lies flat, ${size.y.toFixed(3)} tall across ${Math.max(size.x, size.z).toFixed(3)}`);
   }
 }
 

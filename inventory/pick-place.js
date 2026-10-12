@@ -52,6 +52,7 @@ export function makePicker(opts) {
     castLocal: (disp, shelf, height) => castLocal(k, disp, shelf, height),
     slotScreenPos: (disp, shelf, item, height) => slotScreenPos(k, disp, shelf, item, height),
     pickCandidate: (event) => pickCandidate(k, event),
+    seenAt: (event) => seenAt(k, event),
     hoverTarget: (event) => hoverTarget(k, event),
     displayPoint: (disp, shelf, event) => displayPoint(k, disp, shelf, event),
     snapTo: (disp, shelf, item, x, z) => nearestSlot(disp.g, shelf, item, [x, z], { reach: k.snapCells() * disp.g.cell }),
@@ -215,6 +216,47 @@ function weighHit(k, { disp, s, px, py, radius }, { index, item, hit }, best) {
   if (!near || d < near.d - 1 || (Math.abs(d - near.d) <= 1 && hit.distSq < near.distSq)) best.near = { disp, shelf: s, index, distSq: hit.distSq, d };
 }
 
+const _box = new THREE.Box3(), _ray = new THREE.Ray(), _boxHit = new THREE.Vector3();
+
+/**
+ * What the pointer is LOOKING at, for reading rather than lifting: the nearest item whose box the
+ * ray meets, buried or not, or null. pickCandidate weighs only column tops because only a top can
+ * be lifted; but the edge of a lower item showing past the one stacked on it is still something
+ * the player can point at and read. Opaque boxes, nearest first, so a fully covered item never wins.
+ */
+function seenAt(k, event) {
+  setRay(k, event);
+  let best = null;
+  for (const disp of k.displays()) best = nearestItemBox(k, disp, best);
+  return best;
+}
+
+/** The nearest item box the ray meets on one display, or `best` if that is nearer. */
+function nearestItemBox(k, disp, best) {
+  const { g } = disp, all = k.items(), seen = new Set();
+  g.piles.forEach((pile, key) => {
+    const shelf = Math.floor(key / (g.cols * g.rows));
+    for (const index of pile) {
+      if (index === EMPTY || seen.has(index)) continue;
+      seen.add(index);
+      const distSq = itemBoxHit(k, disp, shelf, all[index]);
+      if (distSq !== null && (!best || distSq < best.distSq)) best = { disp, shelf, index, distSq };
+    }
+  });
+  return best;
+}
+
+/** Squared distance to where the ray enters one item's box, floor to top; or null on a miss. */
+function itemBoxHit(k, disp, shelf, item) {
+  _ray.copy(k.raycaster.ray).applyMatrix4(k._inv.copy(k.levelFrame(disp, shelf)).invert());
+  const { x, z, w, d } = slotRect(disp.g, item.c, item.r, item.w, item.h);
+  const top = k.itemHeight(disp, item);
+  _box.min.set(x - w / 2, top - k.itemTall(disp, item), z - d / 2);
+  _box.max.set(x + w / 2, top, z + d / 2);
+  // Level-local: a level's frame is rigid, so this ranks exactly as a world distance would.
+  return _ray.intersectBox(_box, _boxHit) ? _ray.origin.distanceToSquared(_boxHit) : null;
+}
+
 const nearGrid = (g, x, z, pad) => {
   const { w, d } = gridSize(g);
   return Math.abs(x) <= w / 2 + pad && Math.abs(z) <= d / 2 + pad;
@@ -264,8 +306,6 @@ function displayPoint(k, disp, shelf, event) {
   if (!guess) return null;
   return stackHit(k, disp, shelf) ?? guess;
 }
-
-const _box = new THREE.Box3(), _ray = new THREE.Ray(), _boxHit = new THREE.Vector3();
 
 /** The nearest occupied column the ray runs into, as a point inside it on its level, or null. */
 function stackHit(k, disp, shelf) {

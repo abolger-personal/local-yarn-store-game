@@ -120,6 +120,20 @@ function screenOf(g, frame, camera, it, t) {
   }
 }
 
+// --- hovering the visible edge of a buried item reads THAT item ---------------
+//
+// The band used pickCandidate, which weighs column tops only (right for a lift), so the edge of a
+// pattern showing past the cone on it read as the cone, or nothing. Fully covered stays the top's.
+{
+  const { g, items, put, picker, frame, camera } = table();
+  const under = put({ name: 'pattern', w: 2, h: 2, layers: 1 }, 1, 1);
+  const over = put({ name: 'cone', w: 1, h: 1, layers: 4 }, 1, 1);
+  const edge = screenOf(g, frame, camera, { ...items[under], c: 2, r: 2, w: 1, h: 1 }, 0.5);
+  assert.equal(picker.seenAt(edge)?.index, under, 'hovering the pattern past the cone read something else');
+  assert.equal(picker.seenAt(screenOf(g, frame, camera, items[over], 0.5))?.index, over,
+    'hovering the cone read the pattern under it');
+}
+
 // --- a drop aimed at a tall item stacks ONTO it ------------------------------
 //
 // The drop used to cast the bare table first and only then ask what stood on the column it hit.

@@ -34,7 +34,7 @@ export const picker = makePicker({
 
 // setRayFromEvent and the raycaster are taken from the picker so the whole file aims ONE ray:
 // floorPoint() and the chair pick below reuse it after the picker has set it from the event.
-export const { pickCandidate, hoverTarget, snapTo, raycaster, setRay: setRayFromEvent } = picker;
+export const { pickCandidate, seenAt, hoverTarget, snapTo, raycaster, setRay: setRayFromEvent } = picker;
 
 /** Where on a display's ACTIVE plane the pointer is — used to float a carried item, not to pick. */
 export const displayPoint = (disp, event) => picker.displayPoint(disp, disp.plane, event);

@@ -13,7 +13,7 @@ import { bandCard, tagCard } from '../../guestbook.js';
 import { S } from '../core/config.js';
 import { cast, drag, items, shop } from '../core/state.js';
 import { renderer } from '../scene/stage.js';
-import { pickCandidate, raycaster, setRayFromEvent } from '../interact/pointer.js';
+import { pickCandidate, raycaster, seenAt, setRayFromEvent } from '../interact/pointer.js';
 import { CELL, INK, layout, svgLettering } from './lettering.js';
 
 const band = document.getElementById('band');
@@ -101,7 +101,7 @@ function onMove(event) {
   if (!onCanvas(event)) return;
   if (drag.index !== EMPTY) { show(items[drag.index]); return; }
   if (event.pointerType !== 'mouse') return;
-  const found = pickCandidate(event);
+  const found = seenAt(event) ?? pickCandidate(event);   // a buried item showing is readable, if not liftable
   if (found) show(items[found.index]);
   else customerAt(event);   // pointing at a customer is watching them; the click shows the tag
 }

@@ -1,19 +1,7 @@
-// The shop's one worn-wood texture, as a 2D canvas painter. No three.js: room.js turns it into the
-// furniture's texture, and the front door (index.js) lays it over its SVG wood and trim, so the
-// door is the same battered wood as the shop behind it.
-//
-// Worn wood. The shop is not new: the furniture has been sat on, knitted at and had needles
-// dropped on it, so the one wood texture every piece shares carries the grain, a couple of knots,
-// rubbed-pale patches, dents, and the scratches crafting leaves. Painted near-white and TINTED by
-// each material's colour, so the honey tables, the darker chairs and the walnut counter are all
-// the same battered wood in different stains.
-
-/** A random number source seeded once, so the scratches are the same scratches every load. */
 function seeded(seed) {
   return () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 }
 
-/** Long wavy grain lines down the canvas — V is along the grain (see woodUVs). */
 function paintGrain(ctx, rnd, w, h) {
   ctx.strokeStyle = '#7a5a3c';
   for (let i = 0; i < 70; i++) {
@@ -26,7 +14,6 @@ function paintGrain(ctx, rnd, w, h) {
   }
 }
 
-/** Two knots, each a dark heart and a few rings the grain bends round. */
 function paintKnots(ctx, rnd, w, h) {
   for (let k = 0; k < 2; k++) {
     const x = rnd() * w, y = rnd() * h, r = 5 + rnd() * 6;
@@ -41,7 +28,6 @@ function paintKnots(ctx, rnd, w, h) {
   }
 }
 
-/** Use: pale rubbed patches and dents. */
 function paintWear(ctx, rnd, w, h) {
   for (let i = 0; i < 6; i++) {
     const x = rnd() * w, y = rnd() * h, r = 30 + rnd() * 60;
@@ -59,7 +45,6 @@ function paintWear(ctx, rnd, w, h) {
   }
 }
 
-/** Needle and scissor scratches: short, mostly across the grain, most of them pale fresh wood. */
 function paintScratches(ctx, rnd, w, h) {
   for (let i = 0; i < 90; i++) {
     const pale = rnd() < 0.65, x = rnd() * w, y = rnd() * h;

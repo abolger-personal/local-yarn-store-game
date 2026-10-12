@@ -94,3 +94,33 @@ C. Peg Board (NOT PART OF MVP, DEFER)
 A wall-display style for the user to use is an extension of the Table Pile, with a 90 degree orientation: it goes on a wall.  We can call this a "peg board".  It has additional restrictions for where items can be placed, as visually this wall display has an additional mechanic: there should be a "hook" that sticks out as far as the headroom allows in the top-center of some grid squares, indicating where a user can "hang" merchandise boxes or cylinders of yarn
 
 Hooks are column-sparse, not a checkerboard: a hook sits in one column of holes and items hang below it, spanning rows but never columns. Every other column is usable, so 1-wide items of any height hang and anything 2 columns wide cannot (the shared drop auto-turns a 2x1 to 1x2). How far a stack sticks out from the wall is a distance (the hook's reach), not a layer count.
+
+IN THE STORE (as built in characters/store/; code points here with `DISPLAYS.md §Section`)
+
+### Scale
+- Everything is sized against a customer about 1.0 tall. Notions are deliberately oversized (a 0.2 slot is a fifth of a person) so the player can see and grab them.
+
+### Wall shelves
+- Tilted 45° (type B), 2 rows deep; the gap between levels is derived from the tilt. The top shelf sits at about customer head height.
+- The air above a level (2 layers + 0.06) decides what yarn fits: fingering balls and skeins today. Bulkier yarn goes to a table or the floor. Each extra 0.055 of clearance adds one layer.
+- Yarn reserves the layers its mesh actually needs by shape (a skein fewer than a ball on the same footprint).
+
+### Piles and the floor
+- A pile's headroom is 12 layers, the tallest super-bulky cone (0.66), so every item has somewhere to go; a shelf is limited by the glass above it. A boot check asserts the cone is exactly 12 layers.
+- The shop floor is itself a row of type A piles: the room, not furniture. It can't be added, removed, moved or turned, and is masked last, so it is exactly the floor you can stand a box on. It is walked on, not around, and doesn't block sight.
+- It is cut into tiles of 4×4 cells (0.8 units, about a real heap of yarn), because an NPC chooses where to walk per display: one room-sized grid sent everyone to the same spot. Edge tiles take the remainder; a footprint must fit inside one tile. A tile with no cell left or nowhere to stand beside it (the floor under a table) is dropped.
+- Floor headroom is 4 cones (48 layers, 2.64 units): about wall height, enough for 5–6 big bulky balls. The floor is where yarn heaps.
+- A customer stands 0.65 in front of a display; a floor pile has no front, so they take its first side clear of walls and everything else.
+- Slots inside a wall, the counter, a chair, the doorway or an earlier display are masked out when the display is built, so a display can come out a funny shape (a 4×4 pile against the counter becomes a 3×2). Where two overlap the earlier keeps its cells.
+
+### Stock
+- By default the shop puts out 100 boxes; the GUI goes to 200 and CAPACITY is the hard ceiling. A crammed shop is both the look and the sorting game.
+- Random stock is 55% yarn, 20% patterns, 25% notions (yarn leads because WIPs use most of it), dealt round-robin over places (the whole floor counts as one place) and stacked 1–3 high, so piles read as piles and burying means something.
+- On a fresh shop each customer's wants are seeded first, against the same budget: one copy where it can be noticed (off the wall row, spread across places) and one buried under a lid, so the Assertiveness dig-out still happens. On later days seeding only runs with `S.seedWants`, a testing switch: planning stock is the game.
+- A held item is out of the simulation: NPCs can't tidy around it, stack on its column or buy it.
+
+### Moving displays (rule 10, as built)
+- Every rotation snaps to 45°, chairs and props included, so a chair loses its authored angle the first time it is touched.
+- A display may land only if every usable slot is clear of the walls, counter, chairs, doorway and other displays, and its standing spot is not inside a wall.
+- Customers at, or walking to, a moved display follow it; a customer sitting in a moved chair rides with it.
+- TODO: a peg board snapping to a wall at wall height is deferred with type C.

@@ -51,6 +51,10 @@ Being honest about the starting line, because most of this is not built:
 So today the cast is decided by **luck and array order**: whoever happened to buy something, in the
 order they bought it, trimmed to `npcCount` by `roster.slice()`. Everything below replaces that.
 
+Also built: regulars come back with the same body, and fill the queue before new faces. Quality
+settings are not part of a character. Names are claimed for the whole session and never freed;
+when they run out, a visible numbered fallback is used ("Hazel 2").
+
 ---
 
 ## 2. Affinity is frequency, not membership

@@ -118,3 +118,45 @@ Calculation of MAX_ROUNDS from Character attributes:
 
 
 NPC Visitors who manage to either *buy any items* or *work on a WIP* should be marked for *return* to the shop: they go on a list of returning NPCs. 
+
+## In the shop: how a visit looks (as built; code points here with `CHARACTER-VISIT.md §Section`)
+
+### Rounds and the door
+- Customers queue outside in single file and enter one at a time. Each day's round clock starts full, so the first customer comes straight in. Nobody loiters within 0.8 of the door. The day clock (`dayT`) never winds back.
+- A round lasts just over the longest staggered walk (`autoSeconds`); in the game each round also waits for its last walker, and the day ends at the door and waits for the player.
+
+### Staggered departures
+The sim is lockstep; the animation must not be.
+- Each customer starts at a random point in their gait.
+- Departures each get one shuffled slot inside `travelJitter` (stratified, not uniform), the order reshuffled every round. The customer coming in through the door is not staggered.
+- Each customer has their own pace (±25%) and their own cheer timing.
+- `travelJitter + travel·(1 + paceJitter)` must fit inside a round.
+
+### Walking
+- Speed is constant along the route, so corners don't stall; a longer route takes longer, not faster (PLAYING-AT-YOUR-PACE.md §3 for the speeds).
+- Speed is capped so the eased peak never exceeds the legs' top speed: no skating. The slowest walker clears the gait gate, and the longest legs (the stilt llama) still step at `cadenceMin`. In the shop `gateSpeed` is 0.1 and `cadenceMin` 1.5 steps/s, so a slow walk is short steps, not slow-motion strides (`speed.test.mjs`).
+- The gait phase follows distance, not time. Facing follows the leg of the route being walked.
+
+### Turning and pausing
+- Bodies turn at 8/s (a half turn in ~0.4s), never snapping. At a display they turn to face it and only reach once within 0.35 rad.
+- ⏸ eases the walk to a stop over a step or two (ease rate 4/s) and resumes along the same route at the same pace.
+
+### Sitting
+- They don't fold to sit until they've arrived. The walk ends 0.06 in front of the chair's front edge; sitting moves back onto the cushion, standing up is a step forward, not a rise straight up. Seated, they face the chair's facing.
+- Lift, fold, turn and slide are one motion, with a forward lean of 0.30 rad peaking halfway.
+- Seat height is measured per body (its lowest resting part) and calibrated on first sit, so leggy and stumpy characters sit flush on the same chair. `S.seatLift` is the gap between hip joint and cushion.
+
+### Knitting in a chair
+- A seated customer with an IN_PROGRESS WIP shows the craft: tool (needles or hook) from the pattern, the piece sized by its type, pace by skill, the running-out tell from their yarn, the ball on the floor by the chair. It starts only once they are seated (>90%). On a round change the hands go back before the craft is put away. A WIP not started, or with no pattern, shows no craft.
+
+### What they carry out
+- Nobody walks in carrying anything: "are they carrying something?" is how the player reads a successful visit.
+- The held item is the thing taken off the shelf. Yarn is a real ball at its shelf size. A notion is a shelf-sized box shrunk to one layer, labelled on the top and front only, with the mm sticker if it has a size, tipped toward the hand and never a camera billboard. ~10 customers means ~10 non-instanced meshes, which is fine.
+- A customer carries the real package or nothing; the rig's placeholder skein never shows in the shop. The package is hidden while they knit (the right paw holds a needle).
+- A finished piece shows on the wearer the same round it is finished. A dressed body costs +1 draw call; bodies are rebuilt only when the outfit changes, at most one per frame.
+
+### Celebration
+- Buying (nothing in hand to an item) plays `delighted` plus decaying hops; putting an item down never does. Delight outranks every other pose and the walk, so they stop and cheer.
+- Each customer rolls their own cheer at spawn: delay 0–0.55s, duration 0.8–1.25 × 1.6s, 2–4 whole hops (the last one lands), height 0.75–1.3 × 0.10, so customers who buy on the same frame don't cheer in unison.
+- A sparkle plays when a purchase makes one of their WIPs READY; none for a WIP already ready when they walked in.
+- TODO: the celebration is a placeholder (P1-SPIKE-PLAN): squash on landing, an ear perk at the top of the hop, and the cheer delay derived from Enthusiasm once the emotion layer exists.

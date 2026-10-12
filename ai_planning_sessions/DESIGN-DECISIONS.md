@@ -529,6 +529,13 @@ feels arbitrary in play.
 > before P5 builds the craft loop**, since that is where finished objects begin being generated from
 > real purchases.
 
+### The new day
+
+- A new day carries over stock, slots, displays and chairs as the player left them, minus what sold.
+  The morning delivery lands on the floor (§6); whatever doesn't fit is reported in the log.
+- The shop is rebuilt only on first boot, on a new game, or when the furniture or counts change.
+- Tomorrow's order is planned at closing and shown before the shop opens.
+
 ### Saving: autosave, plain data
 
 TUTORIAL.md's rule stands: **autosave every round, no save button, ever.** Revised 2026-10-03

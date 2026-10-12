@@ -1,17 +1,8 @@
-// The Guestbook, readable: every day's page, and the selfies on them.
-//
-// The NPC panel only shows the last few lines of today. Pressing the book on the counter opens it
-// at today, and the player can page back through every day the shop has been open (LYS.md 5c: the
-// Guestbook is the memory the player has earned, so it has to be there to look back on).
-
 import { shop } from '../core/state.js';
 import { esc } from '../core/util.js';
 import { photoFor } from './photo.js';
 import { entryRows } from '../../guestbook.js';
 
-// CHARACTER-VISIT.md's guestbook icon list. One mood icon — the photo if they made something,
-// otherwise happy or disappointed — plus a tag per thing that happened on the visit, so a page of
-// the book reads at a glance instead of as a paragraph.
 const TAG_ICONS = {
   yarn: ['🧶', 'bought yarn'],
   pattern: ['📖', 'bought a pattern'],
@@ -23,17 +14,10 @@ const TAG_ICONS = {
   huff: ['💨', 'gave up and left in a huff'],
 };
 
-/** Every day's page, oldest first. The last is today's, still being written. */
 const pages = () => [...shop.pastBooks, { day: shop.day, entries: shop.world?.guestbook ?? [] }];
 
-// Which rows are open, by "page/entry", so a row stays open while today's page redraws each round.
 const open = new Set();
 
-/**
- * One entry as a line, and (TUTORIAL.md §7.3) clicking it expands the row into what they did:
- * purchases with their ball bands, put-backs, the project they sat with, chats, the selfie's note.
- * A native <details>, so it opens from the keyboard too. `page` is its day's index in pages().
- */
 export function guestbookLine(g, i, page = shop.pastBooks.length) {
   const mood = g.kind === 'photo'
     ? `<button class="snap" data-page="${page}" data-entry="${i}" title="see the photo">📷 photo</button> ${esc(g.npc)} in ${esc(g.object)}`
@@ -55,13 +39,8 @@ const photoEl = /** @type {HTMLElement} */ (document.getElementById('photo'));
 const olderBtn = /** @type {HTMLButtonElement} */ (document.getElementById('bookOlder'));
 const newerBtn = /** @type {HTMLButtonElement} */ (document.getElementById('bookNewer'));
 
-let showing = 0;   // which page the book is open at, as an index into pages()
+let showing = 0;
 
-/**
- * A modal dialog (game.html's #night, between days) makes everything outside it inert, so the book
- * and its photo move into whichever is open, and back to the page when none is. Both, in order:
- * the photo sits beside an open book by a sibling selector.
- */
 function lift() {
   const host = document.querySelector('dialog:modal') ?? document.body;
   if (bookEl.parentElement !== host) host.append(bookEl, photoEl);
@@ -69,7 +48,7 @@ function lift() {
 
 function drawBook() {
   const all = pages();
-  showing = Math.min(showing, all.length - 1);   // a wiped roster wipes the history with it
+  showing = Math.min(showing, all.length - 1);
   const { day, entries } = all[showing];
   const today = showing === all.length - 1;
   document.getElementById('bookDay').textContent = `Guestbook, day ${day}${today ? ' · today' : ''}`;
@@ -80,7 +59,6 @@ function drawBook() {
     : `<div class="k">${today ? 'no one has signed yet' : 'no one signed'}</div>`;
 }
 
-/** Open the book at today's page. */
 export function openBook() {
   showing = pages().length - 1;
   drawBook();
@@ -88,12 +66,10 @@ export function openBook() {
   bookEl.hidden = false;
 }
 
-/** Shut the book and its photo: the × does, and so does the night screen when the shop opens. */
 export function closeBook() {
   bookEl.hidden = photoEl.hidden = true;
 }
 
-/** Today's page fills in as the day goes, so an open book follows it. Also opens it on request. */
 export function redrawBook() {
   if (shop.press?.on === 'book') {
     shop.press = null;
@@ -101,7 +77,6 @@ export function redrawBook() {
   } else if (!bookEl.hidden) drawBook();
 }
 
-/** Show one photo entry's picture, captioned with the day it was signed. */
 export function showPhoto(g) {
   const url = photoFor(g);
   if (!url) return;
@@ -112,17 +87,14 @@ export function showPhoto(g) {
   photoEl.hidden = false;
 }
 
-/** Everything this module does ONCE, at boot. Called from main.js, in order. */
 export function installBook() {
-  // One listener for every 📷, in the book and in the NPC panel: both are rebuilt as HTML.
   document.addEventListener('click', (e) => {
     const el = /** @type {HTMLElement} */ (e.target);
     const snap = el.closest?.('.snap');
     const g = snap instanceof HTMLElement && pages()[Number(snap.dataset.page)]?.entries[Number(snap.dataset.entry)];
-    if (g) { e.preventDefault(); showPhoto(g); }   // the photo, not the row: do not toggle it
+    if (g) { e.preventDefault(); showPhoto(g); }
     if (el.closest?.('.open-book')) openBook();
   });
-  // toggle does not bubble, so it is caught on the way down.
   document.addEventListener('toggle', (e) => {
     const el = e.target;
     if (!(el instanceof HTMLDetailsElement) || !el.dataset.key) return;

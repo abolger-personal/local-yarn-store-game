@@ -24,3 +24,23 @@ Every notion also needs a **held** design, and knitting needs **two hands**.
 
 - A rigging note here is that all notions should look "right" when held by the NPCs: knitting in particular is a 2 handed operation. It would be ok to have a specific visual design per notion of what it looks like being *held*, which could even come with a pose (sitting at a spinning wheel, holding up a drop spindle, sitting or standing knitting with 2 hands, crochet with 1 hand, etc.)
 
+
+## Packaging
+
+Packaging belongs to the kind (footprints in slots, one picked per box):
+
+| Notion | Packages |
+| --- | --- |
+| crochet hook | 1×1 single, or 2×1 set in a long case |
+| knitting needles | 1×1 pair, or 1×2 long circular set |
+| darning needle | 1×1 packet, or 1×2 sleeve of assorted sizes |
+| stitch markers | 1×1 bag, or 2×2 tin |
+| cable needle | 1×1 on a card |
+| buttons | 1×1 card, or 2×1 long card |
+
+Yarn's footprint comes from its weight; a pattern is always 2×2 (`catalog.js`). Only hooks and
+needles carry a mm size.
+
+TODO: yarn and pattern art are still placeholder silhouettes. YARN.md wants ball bands,
+gradients, sparkle and fuzziness; PATTERNS.md wants a labelled box that looks like a book, with a
+cover icon per type. That work belongs in `illustrations/notion_processing.py`.

@@ -1,14 +1,6 @@
-// Self-check for how customers walk in the game, headless. Run: node characters/store/walk.test.mjs
-//
-// The real sim and renderer (world.js, cast.js, visit.js) over whole days at every speed, with the
-// GPU (scene/stage.js) and the stock painting (goods/paint.js) stubbed out and just enough DOM to
-// import. Positions are read off the rigs every frame, so a teleport, a skate, a pause that does
-// not pause or a reach into thin air fails here rather than in a playtest.
-
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
 
-// ---------------------------------------------------------------- the stand-ins
 const mod = (src) => `data:text/javascript,${encodeURIComponent(src)}`;
 const STAGE = mod(`import * as THREE from ${JSON.stringify(import.meta.resolve('three'))};
   export const renderer = { domElement: {}, setAnimationLoop() {}, render() {} };
@@ -40,7 +32,6 @@ const el = () => new Proxy(function () {}, {
 Object.assign(globalThis, { document: el(), window: globalThis, innerWidth: 1280, innerHeight: 800,
   devicePixelRatio: 1, addEventListener() {}, HTMLElement: class {} });
 
-// ---------------------------------------------------------------- the shop
 const { S, gameSpeed } = await import('./core/config.js');
 const { shop, cast, clocks } = await import('./core/state.js');
 await import('../owl.js'); await import('../llama.js'); await import('../lion.js');
@@ -55,14 +46,14 @@ const { cellNameFor } = await import('./goods/stock.js');
 buildRoomShell(); installSeating(); installDisplays(); installWorld();
 S.blobShadows = false;
 
-/** A new day. The instanced stock meshes need the atlas, so the last steps of restart() fail. */
+/** A new day; without the atlas, restart() throws at sizeInstanceBuffers. */
 function open({ k, tutorial }) {
   Object.assign(S, gameSpeed(k), { tutorial });
   try { restart({ keepRegulars: false }); } catch (err) { assert.match(err.stack, /sizeInstanceBuffers/); }
   assert.ok(shop.world, 'the day opened');
 }
 
-/** boot.js tickClocks, the rounds half. `sit` sends a free customer to a chair half the time. */
+/** boot.js tickClocks, the rounds half. */
 function tickRounds(dt, sit) {
   if (!S.autoRounds || !shop.world.npcs.some((n) => n.state !== STATE.GONE)) return;
   clocks.auto += dt;
@@ -76,12 +67,12 @@ function tickRounds(dt, sit) {
 }
 
 const DT = 1 / 60;
-/** Run `seconds` of frames, calling `each(rec, t)` per customer per frame after the tick. */
+
 function run(seconds, { sit = false, each = () => {}, at = () => {} } = {}) {
   const last = new Map();
   for (let f = 0; f * DT < seconds; f++) {
     at(f * DT);
-    // The carried package is an atlas mesh; mark it made so syncCarried leaves it alone.
+    // no atlas: mark the carried package made so syncCarried leaves it alone
     for (const rec of cast) rec.carriedName = rec.npc.carrying ? cellNameFor(rec.npc.carrying) : null;
     tickCast(DT);
     tickRounds(DT, sit);
@@ -94,7 +85,6 @@ function run(seconds, { sit = false, each = () => {}, at = () => {} } = {}) {
 }
 const angleOff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 
-// ---------------------------------------------------------------- 3. day 1 comes straight in
 {
   open({ k: 1, tutorial: true });
   let set = null;
@@ -102,7 +92,6 @@ const angleOff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))
   assert.ok(set !== null && set < 0.1, `the first customer sets off at once, not a round later (${set})`);
 }
 
-// ---------------------------------------------------------------- 1. ⏸ halts the walk, ▶ resumes it
 {
   open({ k: 1, tutorial: true });
   const round = () => shop.world.round;
@@ -122,7 +111,6 @@ const angleOff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))
   assert.ok(r0 > 0 && r1 === r0, `no rounds while paused (round ${r0} at ⏸, ${r1} at ▶)`);
 }
 
-// ---------------------------------------------------------------- 2, 4, 5. every speed, whole days
 for (const k of [1, 2, 3]) {
   open({ k, tutorial: false });
   let step = 0, skate = 0, gain = 0, walking = 0, turning = new Map(), longTurn = 0;
@@ -133,7 +121,7 @@ for (const k of [1, 2, 3]) {
       step = Math.max(step, moved);
       skate = Math.max(skate, rec.speed / top);
       if (rec.speed > 0.15) { walking++; gain += rec.built.motion.walkGain; }
-      // Facing the display while at it, allowing the turn itself (TURN_RATE: a half turn ~0.4s).
+      // 0.35 rad / 0.5 s: TURN_RATE turns half way round in ~0.4 s
       const n = rec.npc, d = n.action?.type === ACTION.INTERACT && shop.world.displays.find((q) => q.id === n.action.params.displayId);
       const off = d && angleOff(rec.built.root.rotation.y, Math.atan2(d.x - rec.built.root.position.x, d.z - rec.built.root.position.z)) > 0.35;
       if (off) turning.set(rec, turning.get(rec) ?? t);
@@ -141,18 +129,13 @@ for (const k of [1, 2, 3]) {
       if (off) longTurn = Math.max(longTurn, t - turning.get(rec));
     },
   });
-  // A step of 0.06 a frame is 3.6 units/s: no walk or sit in the shop comes near it; a teleport does.
+  // 0.06 a frame is 3.6 units/s: only a teleport
   assert.ok(step < 0.06, `${k}x: nobody jumps (worst frame ${step.toFixed(3)})`);
   assert.ok(skate <= 1.05, `${k}x: nobody outwalks their legs (${(skate * 100).toFixed(0)}% of top speed)`);
-  // The swing is the walk layer's weight times what foot-lock needs: under 1, the feet skate.
   assert.ok(walking > 0 && gain / walking > 0.9, `${k}x: a walk is a full stride, not a glide (mean weight ${(gain / walking).toFixed(2)})`);
   assert.ok(longTurn < 0.5, `${k}x: turned to the display before reaching (longest turn ${longTurn.toFixed(2)}s)`);
 }
 
-// ---------------------------------------------------------------- 6. the tutorial friend's pot holder
-// TUTORIAL.md: bought on day 1, finished in the shop on day 3 -- never at home or before day 3, and
-// early on day 3, whatever the friend's traits. The kit is handed over as they walk in on day 1, the
-// most knitting time days 1-2 can give. Seeded, every seed must pass.
 {
   const { items } = await import('./core/state.js');
   const { WIP_STATE, wantFor, stow } = await import('../wip.js');
@@ -167,7 +150,7 @@ for (const k of [1, 2, 3]) {
       it.gone = true;
       stow(friend, it, wantFor(friend, it));
     }
-    friend.willReturn = true;   // as a purchase would
+    friend.willReturn = true;
     const potHolder = friend.wips[0];
     assert.equal(potHolder.state, WIP_STATE.IN_PROGRESS, `seed ${seed}: the kit starts the pot holder`);
     for (let day = 1; day <= 3; day++) {
@@ -187,9 +170,6 @@ for (const k of [1, 2, 3]) {
   console.log(`tutorial: the pot holder is finished in the shop on day 3, round ${rounds[25]} (median), ${rounds.at(-1)} (worst)`);
 }
 
-// ---------------------------------------------------------------- 7. the Former Owner
-// Day 1 of the tutorial opens with them, once: in all six wear slots and an armful of pot holders,
-// they sign the farewell into the Guestbook and walk out -- no queue, no buying, no chair.
 {
   const owners = () => shop.world.npcs.filter((n) => n.farewell);
   open({ k: 1, tutorial: true });
@@ -210,11 +190,6 @@ for (const k of [1, 2, 3]) {
   assert.ok(shop.pastBooks[0].entries.find((g) => g.farewell).who.carries.length, 'the filed photo keeps the pile');
 }
 
-// ---------------------------------------------------------------- 8. the friend waits for the player, and finds the floor
-// TUTORIAL.md: the friend has a friend's patience. They took only the pattern on day 1, and the
-// player puts the hook and the ball on the table for day 2, half the time under something: they
-// stay until they have found them, however few rounds their traits would give a stranger, and dig
-// out what is buried. Seeded, every seed must pass.
 {
   const { items } = await import('./core/state.js');
   const { wantFor, wantsOf, satisfies, stow } = await import('../wip.js');
@@ -223,8 +198,6 @@ for (const k of [1, 2, 3]) {
   const { makeStockNotion } = await import('../../inventory/catalog.js');
   const random = Math.random;
   const runDay = () => { for (let r = 0; r < 400 && shop.world.npcs.some((n) => n.state !== STATE.GONE); r++) doAdvanceRound(); };
-  // Day 1 as delivered, the player doing nothing: the kit's boxes are on the floor, which a friend
-  // finds by wandering the whole shop (visit.js randomSpot), so they take it home and the day ends.
   for (let seed = 1; seed <= 40; seed++) {
     let a = seed;   // mulberry32
     Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -244,7 +217,7 @@ for (const k of [1, 2, 3]) {
     stow(friend, pattern, wantFor(friend, pattern));
     friend.willReturn = true;
     const kit = items.filter((x) => !x.gone);
-    for (const x of kit) x.held = true;   // out of reach: the player has not got to them yet
+    for (const x of kit) x.held = true;
     runDay();
     for (const x of kit) x.held = false;
     try { restart({ order: planTomorrow() }); } catch (err) { assert.match(err.stack, /sizeInstanceBuffers/); }
@@ -253,8 +226,6 @@ for (const k of [1, 2, 3]) {
       const spec = { ...it };
       for (const k of ['display', 'shelf', 'c', 'r', 'keys', 'layer', 'layers']) delete spec[k];
       it.gone = true;
-      // Odd seeds bury it where there is headroom: the friend digs it out (Assertiveness 5) rather
-      // than going home past it.
       const roomy = seed % 2 ? addItem(table, 0, spec, { reserve: 1 }) : -1;
       const i = roomy >= 0 ? roomy : addItem(table, 0, spec);
       assert.ok(i >= 0, `seed ${seed}: room on the table`);

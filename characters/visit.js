@@ -281,12 +281,20 @@ function segmentHitsBox(a, b, box) {
   return true;
 }
 
+/** The point of a display's footprint nearest `p`. */
+const nearestPoint = ({ x, z, w, d }, p) => ({
+  x: clamp(p.x, x - w / 2, x + w / 2), z: clamp(p.z, z - d / 2, z + d / 2) });
+
 /** CHARACTER-VISIT.md: visible unless something intersects the line to the display's centroid. */
 export function visibleTo(world, from, display) {
   // `solid: false` is a display you walk ON rather than around — the shop floor. It blocks no
   // sightline, or a room-wide grid would make everything in the shop invisible from everywhere.
+  // NOTE(spec): and a floor tile is seen at its nearest point, not its centroid: a tile half under a
+  // shelf or the table has its centroid under it, so whatever was set down on its open half could
+  // never be seen from anywhere in the shop.
+  const to = display.solid === false ? nearestPoint(display, from) : display;
   return !world.displays.some((d) =>
-    d.id !== display.id && d.solid !== false && segmentHitsBox(from, display, d));
+    d.id !== display.id && d.solid !== false && segmentHitsBox(from, to, d));
 }
 
 // ---------------------------------------------------------------- getting there
@@ -1490,7 +1498,9 @@ function randomSpot(world) {
       z: minZ + world.rng() * (maxZ - minZ),
     };
     if (inDoorway(world, p)) continue;
-    const clearOfDisplays = world.displays.every((d) =>
+    // The floor grid (`solid: false`) is walked on, as in visibleTo: counting it, a room tiled wall
+    // to wall had no clear spot, and every wander fell through to the middle of the room.
+    const clearOfDisplays = world.displays.every((d) => d.solid === false ||
       Math.abs(p.x - d.x) > d.w / 2 + 0.25 || Math.abs(p.z - d.z) > d.d / 2 + 0.25);
     const clearOfSeats = world.seats.every((s) => Math.hypot(p.x - s.x, p.z - s.z) > 0.4);
     if (clearOfDisplays && clearOfSeats) return p;

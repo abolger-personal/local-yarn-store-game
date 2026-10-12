@@ -210,7 +210,7 @@ for (const k of [1, 2, 3]) {
   assert.ok(shop.pastBooks[0].entries.find((g) => g.farewell).who.carries.length, 'the filed photo keeps the pile');
 }
 
-// ---------------------------------------------------------------- 8. the friend waits for the player
+// ---------------------------------------------------------------- 8. the friend waits for the player, and finds the floor
 // TUTORIAL.md: the friend has a friend's patience. They took only the pattern on day 1, and the
 // player puts the hook and the ball on the table for day 2, half the time under something: they
 // stay until they have found them, however few rounds their traits would give a stranger, and dig
@@ -223,6 +223,17 @@ for (const k of [1, 2, 3]) {
   const { makeStockNotion } = await import('../../inventory/catalog.js');
   const random = Math.random;
   const runDay = () => { for (let r = 0; r < 400 && shop.world.npcs.some((n) => n.state !== STATE.GONE); r++) doAdvanceRound(); };
+  // Day 1 as delivered, the player doing nothing: the kit's boxes are on the floor, which a friend
+  // finds by wandering the whole shop (visit.js randomSpot), so they take it home and the day ends.
+  for (let seed = 1; seed <= 40; seed++) {
+    let a = seed;   // mulberry32
+    Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    open({ k: 1, tutorial: true });
+    const friend = shop.world.npcs[0];
+    runDay();
+    const page = shop.world.guestbook.find((g) => g.npc === friend.name);
+    assert.equal(page?.mood, 'happy', `seed ${seed}: day 1's friend takes the kit off the floor and goes home (${friend.state})`);
+  }
   let buried = 0;
   for (let seed = 1; seed <= 40; seed++) {
     let a = seed;   // mulberry32

@@ -242,6 +242,20 @@ all named `mode`.
 is indistinguishable. Two thirds of the old span sat in that dead zone, which is why the bounce
 read as flat across a cast.
 
+## How the lab measures an interrupt
+
+- **One event stream** drives every row, and the rows of one slot share params, traits, idle seed
+  and stride phase, so they differ by the interpolator alone.
+- **A cut is scripted, not clicked:** settle back to rest at real time (so every run starts from
+  the same place), reach, cut to browse, hold to see the arrival. Only the reach and cut run
+  slowed (`cutSlow`): velocity continuity is a sub-100 ms event. One press of Enter runs one cut;
+  looping is opt-in.
+- **The cut lands at a fraction of the move**, not a time, so the duration knob changes only the
+  move's speed and never where the cut lands.
+- The peak-|dv| readout resets on the setup pose, never on the interrupt (that is the frame
+  being measured). The skate readout shows the worst in the cast: skate is mostly leg length.
+- The floor is a grid: against a featureless floor even total skate looks like walking.
+
 ## What a species kit may tune, and what it may not
 
 Two tables in `motion.js`, and the split is enforced by the self-check rather than by

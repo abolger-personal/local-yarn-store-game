@@ -1,7 +1,3 @@
-// craft-anim.js and sparkle.js: the stitch clock is seamless and follows skill, running out stops
-// it, the tool tips go THROUGH the piece's working edge every stitch on every body and piece size,
-// nothing goes through the torso, the chair or the floor, and the "Ready!" sparkle is big enough to
-// see at shop distance. Run: node characters/craft-anim.test.mjs
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
@@ -16,11 +12,10 @@ import './llama.js';
 import './lion.js';
 import { mulberry32 } from './store/core/util.js';
 
-Math.random = mulberry32(7);   // kit.randomise draws from Math.random; the same individuals every run
+Math.random = mulberry32(7);
 const DT = 1 / 120;
 const v3 = () => new THREE.Vector3();
 
-// --- a loop of stitches has no seam, and every curve stays in 0..1
 for (const mode of ['knit', 'crochet']) {
   const a = stitchBeat(mode, 0, {}), z = stitchBeat(mode, 0.99999, {});
   for (const k of Object.keys(a)) assert.ok(Math.abs(a[k] - z[k]) < 1e-3, `${mode}.${k} jumps at the stitch seam`);
@@ -31,7 +26,6 @@ for (const mode of ['knit', 'crochet']) {
 assert.ok(glance(0) < 0.01 && glance(2.4) > 0.99, 'running out: first the tail, then the yarn wall');
 assert.ok(pieceScale('hat') === 2 && pieceScale('sweater') > 5 && pieceScale('sweater') < 6, 'hat 2x, sweater 5-6x');
 
-// --- running out stops the stitch clock; skill sets the pace and the hesitation
 const clock = (skill, outT = 0) => ({ mode: 'knit', speed: 1, skill, outT, wait: 0, phase: 0, count: 0, progress: 0, perStitch: 0 });
 {
   const c = { ...clock(3, 1), phase: 0.3 };
@@ -47,13 +41,11 @@ const clock = (skill, outT = 0) => ({ mode: 'knit', speed: 1, skill, outT, wait:
   assert.ok([...Array(50).keys()].some((n) => hesitation(1, n) > 0.3), 'a novice does');
 }
 
-// --- every body, every piece size, both crafts
 const rootLocal = (built, node) => built.root.worldToLocal(node.getWorldPosition(v3()));
 const ellipsoid = (built, ch, p) => {
   const P = built.params, s = 1 + (built.bulge ?? 0);
   return Math.sqrt(((p.x - ch.x) / (P.torsoW * s)) ** 2 + ((p.y - ch.y) / (P.torsoH * s)) ** 2 + ((p.z - ch.z) / (P.torsoD * s)) ** 2);
 };
-/** Distance from a root-local point to the piece's working (top) edge. */
 const toEdge = (c, p) => {
   const hw = c.pieceW / 2, dx = Math.max(0, Math.abs(p.x - c.work.x) - hw);
   return Math.hypot(dx, p.y - c.work.y, p.z - c.work.z);
@@ -65,7 +57,6 @@ function seated(id, P) {
   return { built, seatY: SEAT_H + built.root.position.y - lowestResting(built) - 0.01 };
 }
 
-/** Every vertex of the piece: clear of the torso, the floor and the chair. */
 function checkPiece(c, built, ch, tag) {
   const pos = c.piece.geometry.attributes.position, p = v3();
   const chairFront = CHAIR_W / 2 - seatedHipsAlong(built.params, CHAIR_W), seatTop = SEAT_H - built.root.position.y;
@@ -77,10 +68,6 @@ function checkPiece(c, built, ch, tag) {
   }
 }
 
-/**
- * How far outside a wing's blob (owl.js wingShape) a root-local point is, in units of the blob: the
- * feathers stand proud of it, by `k` measured off the wing's own vertices (unmerged rig).
- */
 function wingOf(built, side) {
   const shape = built.species.wingShape?.(built.params);
   if (!shape) return null;
@@ -99,13 +86,11 @@ function wingOf(built, side) {
   return { k, at: (p) => unit(built.root.localToWorld(p.clone())) };
 }
 
-/** Distance from p to segment a-b. */
 const toSegment = (p, a, b) => {
   const ab = b.clone().sub(a), t = Math.min(1, Math.max(0, p.clone().sub(a).dot(ab) / ab.lengthSq()));
   return p.distanceTo(a.clone().addScaledVector(ab, t));
 };
 
-/** The arm's two bones as root-local segments with their radii (npc.js buildArm / LIMB_TAPER). */
 function armBones(built, side) {
   const at = (part) => rootLocal(built, built.joints[part].find((j) => j.side === side).node);
   const [shoulder, elbow] = [at('upperArm'), at('lowerArm')];
@@ -116,19 +101,10 @@ function armBones(built, side) {
 
 let torsoMargin = Infinity;
 
-/**
- * Each tool is gripped near its MIDDLE (40-60% from butt to tip) and clears the torso, both wings
- * and both arms along its whole length. Torso: 0.94 of its (coat-bulged) radii, not 1 -- with the
- * edge 8 cm out, a deep-bellied owl or llama still grazes the front of its coat by up to 5%;
- * clearing it fully on every body measured needs the edge 12 cm out. Torso and arm samples skip the 30% of each half nearest the
- * grip: a paw can sit in a thick coat, and holding means touching the paw. The wing check does not
- * skip: an owl's wing encloses its paw, so the grip has to be on the wing's surface.
- */
 function checkTools(c, built, ch, tag) {
   const wings = [-1, 1].map((side) => wingOf(built, side)).filter(Boolean);
   const bones = [-1, 1].flatMap((side) => armBones(built, side));
   for (const t of c.mode === 'knit' ? c.needles : [c.hook]) {
-    // the drawn shaft's two ends: its geometry spans y = -1..1
     const tip = built.root.worldToLocal(t.shaft.localToWorld(v3().set(0, 1, 0)));
     const butt = built.root.worldToLocal(t.shaft.localToWorld(v3().set(0, -1, 0)));
     const grip = rootLocal(built, t.wrist), axis = tip.clone().sub(butt);
@@ -147,7 +123,6 @@ function checkTools(c, built, ch, tag) {
   }
 }
 
-// The minimum tip-to-edge distance over each whole stitch must be ~0: the tips go THROUGH the edge.
 function run(id, P, { mode, pattern }, tag) {
   const { built, seatY } = seated(id, P);
   const c = makeCraft(built, { mode, pattern, progress: 1, perStitch: 0 });
@@ -162,7 +137,6 @@ function run(id, P, { mode, pattern }, tag) {
     tips.forEach((t, i) => { mins[i] = Math.min(mins[i], toEdge(c, t.tip)); });
     if (f % 12 === 0) checkTools(c, built, rootLocal(built, built.joints.chest), tag);
     if (c.count === count) continue;
-    // the first window starts mid-stitch, so it is not a whole stitch
     if (stitches) mins.forEach((m, i) => assert.ok(m < 0.004, `${tag}: tip ${i} stayed ${(m * 1000).toFixed(1)}mm off the work this stitch`));
     mins = tips.map(() => Infinity);
     count = c.count;
@@ -182,7 +156,6 @@ for (const id of speciesIds()) {
   });
 }
 
-// --- the props are not the body: the ball on the floor must not become what sits on the chair
 {
   const built = createCharacter({ ...BASE_PARAMS, ...getSpecies('owl').defaults }, 'owl');
   applyPose(built, POSES.sit);
@@ -197,7 +170,6 @@ for (const id of speciesIds()) {
   assert.ok(Math.abs(lowestResting(built) - bare) < 1e-6, 'a prop changed where the seat is measured');
 }
 
-// --- Ready!: 3+ bits, and the biggest is >= 20px across at the shop camera (a ~150px-tall customer)
 {
   assert.ok(SPARKLE_BITS.length >= 3, 'at least three sparkle bits');
   assert.equal(sparkleScale(SPARKLE_TIME + 0.1), 0, 'the burst ends');

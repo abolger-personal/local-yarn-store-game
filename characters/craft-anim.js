@@ -1,19 +1,4 @@
-// Knitting and crochet on the shared rig: a seated character working on a WIP.
-//
-// DRAFT. Procedural, no assets: the tools hang off the rig's own hold joints (npc.js buildHand),
-// the hand motion is an ADDITIVE layer passed to stepMotion as `add` -- the same hook the walk uses,
-// summed after the springs, because a 1.5 Hz stitch rhythm pushed through a 0.35 s spring would come
-// out as mush. Intent: ai_planning_sessions/characters/VISUAL-DESIGN-FINISHED-OBJ.md §4b (needles or
-// a hook plus a piece that grows) and PROJECTS-AND-AUTHORSHIP.md §1 (the knitting is the progress
-// bar; the "running out" tell). "Ready" is not a craft tell: see sparkle.js.
-//
-// Per frame, in this order:
-//   stepCraft(c, dt)                                    clocks, blends, this frame's stitch beat
-//   stepMotion(built, POSES.sit, dt, opts, c.add)       the rig, with the craft layer on top
-//   (whoever owns the root places it -- the chair)
-//   poseCraft(c)                                        aims the tools, drapes the piece and yarn
-//
-// Nothing here allocates per frame: scratch vectors are module-level, every buffer is fixed.
+// CRAFT-ANIM.md; VISUAL-DESIGN-FINISHED-OBJ.md §4b; PROJECTS-AND-AUTHORSHIP.md §1
 import * as THREE from 'three';
 import { POSES, applyPose, knitMaterial } from './npc.js';
 import { PATTERN_TYPES } from '../inventory/catalog.js';
@@ -21,68 +6,40 @@ import { PATTERN_TYPES } from '../inventory/catalog.js';
 export const CRAFT_MODES = Object.freeze(['knit', 'crochet', 'idle']);
 export const TELLS = Object.freeze(['none', 'out']);
 
-/** Seconds per stitch for a middling (skill 3) crafter. */
 export const STITCH_TIME = Object.freeze({ knit: 0.7, crochet: 0.9 });
 
-const RIGHT = -1, LEFT = 1;    // npc.js sideName: side -1 is the character's right
-const HOLD_R = 0, HOLD_L = 1;  // built.holds is [right, left]
+const RIGHT = -1, LEFT = 1;
+const HOLD_R = 0, HOLD_L = 1;
 
-/**
- * Hands to the work, ADDED to POSES.sit: upper arms forward and in, paws reaching down toward the
- * lap, head down to look at it. Searched, not eyeballed: this is the pose that brings the paws
- * nearest the working edge over every species and individual (mean 0.26 m away).
- *
- * The arms on this rig are SHORT (upper arm + forearm 0.17) against shoulders 0.17-0.24 off the
- * midline and a belly 0.22 deep, so the paws cannot meet in front of the body at any pose. And a
- * full elbow bend makes it worse, not better: with the shoulder above the lap, folding the forearm
- * lifts the paw toward the shoulder, away from a lap-height edge (0.35 m mean at 1.5+ more bend).
- * The lion's and llama's clampArmOut also stops their upper arms coming in past the mane/fleece.
- */
 export const HOLD = Object.freeze({ armSwing: -0.60, armOut: -0.30, elbowBend: 0.20, headPitch: 0.45, spineBend: 0.08 });
 const HOLD_KEYS = Object.keys(HOLD);
 
-/** The piece at 1x: a hat is 2x this, a sweater 5.5x -- see pieceScale. */
 const PIECE = Object.freeze({ w: 0.10, h0: 0.02, h1: 0.13 });
-const WING_CLEAR = 1.2;         // see wingFrame
-const ABOVE_LAP = 0.03;        // the working edge, above the top of the thighs
+const WING_CLEAR = 1.2;
+const ABOVE_LAP = 0.03;
 const BALL_R = 0.04;
 const STRAND_N = 12, STRAND_R = 0.005;
-const ROWS = 18;               // the piece's ribbon
-const GLANCE_PERIOD = 4;       // seconds: look at the tail, then at the yarn wall, then back
-
-// ---------------------------------------------------------------- pure timing
+const ROWS = 18;
+const GLANCE_PERIOD = 4;
 
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const smooth = (a, b, x) => {
   const t = clamp01((x - a) / (b - a));
   return t * t * (3 - 2 * t);
 };
-/** 0 -> 1 -> 0 across [a, b]. */
 const bump = (a, b, x) => smooth(a, (a + b) / 2, x) - smooth((a + b) / 2, b, x);
 
-/** How big the finished piece is against PIECE, from how much yarn the pattern takes. Hat 2, sweater 5.5. */
 export const pieceScale = (type) => 2 + ((PATTERN_TYPES[type]?.yarnUnits ?? 3) - 3) * 0.7;
 
-/** Stitches per second against a skill-3 crafter: 0.55x at skill 1, 1.35x at skill 5. */
 export const skillRate = (skill) => 0.55 + 0.8 * clamp01((skill - 1) / 4);
 
-/**
- * A hesitation before the next stitch, in stitch-lengths: none at skill 5, up to 0.6 at skill 1,
- * different every stitch (a hash of the count, so it is reproducible and allocation-free).
- */
 export function hesitation(skill, count) {
   const h = Math.sin(count * 78.233 + 1.7) * 43758.5453;
   return clamp01((5 - skill) / 4) * 0.6 * (h - Math.floor(h));
 }
 
-/** How big the hand motions are: a novice's are big and effortful, an expert's small. */
 export const skillReach = (skill) => 1.2 - 0.1 * skill;
 
-/**
- * One stitch, as four 0..1 curves of `phase` (0..1). All four are 0 at both ends, so a loop of
- * stitches has no seam. Knit: insert, wrap, pull back, slip off. Crochet: hook in, yarn over (the
- * loop), back out, draw the loop up.
- */
 export function stitchBeat(mode, phase, out) {
   const p = phase - Math.floor(phase);
   if (mode === 'crochet') {
@@ -99,14 +56,6 @@ export function stitchBeat(mode, phase, out) {
   return out;
 }
 
-/**
- * Where each tool TIP goes, in metres in the root's frame, relative to the middle of the piece's
- * working edge. The tips are put exactly there (the tools are sized to reach), so the edge is
- * where they work: knit, the left tip rests ON the edge and the right one goes in from the front,
- * THROUGH the edge to behind it, wraps, and comes back through -- the tips cross every stitch.
- * Crochet: the hook goes through the edge, circles for the yarn-over behind it, comes back through,
- * then draws the loop up and out. Nothing moves off the edge's height while crossing it.
- */
 export function toolTargets(mode, b, k, right, left) {
   if (mode === 'crochet') {
     right.x = -0.008 * b.wrap * k - 0.03 * b.pull * k;
@@ -121,16 +70,11 @@ export function toolTargets(mode, b, k, right, left) {
   }
 }
 
-/** Running out: 0 while looking at the tail, 1 while looking at the yarn wall. */
 export const glance = (t) => {
   const u = (t / GLANCE_PERIOD) % 1;
   return smooth(0.3, 0.42, u) - smooth(0.8, 0.92, u);
 };
 
-/**
- * Advances the stitch clock. Knitting stops when they run out. Between stitches a less skilled
- * crafter hesitates -- the clock waits -- and every stitch is slower.
- */
 export function advanceStitch(c, dt) {
   const t = STITCH_TIME[c.mode];
   if (!t) return;
@@ -147,7 +91,6 @@ export function advanceStitch(c, dt) {
   }
 }
 
-/** Clocks, blends and this frame's beat. Pure on `c`'s numbers; no three.js. */
 export function stepCraft(c, dt) {
   const k = 1 - Math.exp(-dt * 5);
   c.hands += ((c.mode === 'idle' ? 0 : 1) - c.hands) * k;
@@ -158,14 +101,10 @@ export function stepCraft(c, dt) {
   toolTargets(c.mode, c.beat, skillReach(c.skill) * (1 - c.outT), c.offR, c.offL);
 }
 
-// ---------------------------------------------------------------- the pose layer
-
-/** One arm forward (negative) alone, from the symmetric + anti-symmetric channel pair. */
 function swingArm(out, side, a) {
   out.armSwing += a / 2;
   out.armSwingAlt -= (side * a) / 2;
 }
-/** One arm out from the body alone. */
 function spreadArm(out, side, a) {
   out.armOut += a / 2;
   out.armOutAlt += (side * a) / 2;
@@ -184,7 +123,6 @@ function rhythmLayer(c, out) {
   }
 }
 
-/** Running out: the head comes up off the work to the tail, then glances off at the yarn wall. */
 function tellLayer(c, out) {
   const o = c.outT * c.hands;
   if (o <= 0.001) return;
@@ -193,7 +131,6 @@ function tellLayer(c, out) {
   out.headYaw += c.wallYaw * g * o;
 }
 
-/** The additive layer. stepMotion's `add`; `c.add` is this, bound once. */
 export function craftLayer(c, out) {
   const h = c.hands;
   if (h <= 0.001) return;
@@ -202,20 +139,14 @@ export function craftLayer(c, out) {
   tellLayer(c, out);
 }
 
-// ---------------------------------------------------------------- shared look
-
 let woodMat = null;
 const yarnMats = new Map(), pieceMats = new Map();
-// Comic-chunky, held at the MIDDLE: every tool spans y = -1..1, scaled by the paw-to-tip reach, so
-// the tip is at +reach and as much again sticks out behind the paw. Needles taper to a point and
-// end in a knob; the hook is a straight rod with a barb.
 const NEEDLE_GEO = new THREE.CylinderGeometry(0.004, 0.012, 2, 8);
 const HOOK_GEO = new THREE.CylinderGeometry(0.009, 0.009, 2, 8);
 const KNOB_R = 0.017;
 const BARB_GEO = new THREE.TorusGeometry(0.013, 0.005, 5, 10, Math.PI);
 const BALL_GEO = new THREE.SphereGeometry(1, 12, 8);
 
-/** One material per yarn colour for the whole cast, so a crowd of knitters does not multiply them. */
 function cached(map, color, make) {
   if (!map.has(color)) map.set(color, make(color));
   return map.get(color);
@@ -223,27 +154,18 @@ function cached(map, color, make) {
 const yarnMat = (color) => cached(yarnMats, color, knitMaterial);
 const pieceMat = (color) => cached(pieceMats, color, (c) => Object.assign(knitMaterial(c), { side: THREE.DoubleSide }));
 
-// ---------------------------------------------------------------- measuring the body
-
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _g = new THREE.Vector3(), _e = new THREE.Vector3();
 const _q = new THREE.Quaternion(), _m1 = new THREE.Matrix4(), _m2 = new THREE.Matrix4();
 const UP = new THREE.Vector3(0, 1, 0), X = new THREE.Vector3(1, 0, 0);
 
-/** Root-local position of a node, in whatever pose the rig was last given. */
 const rootLocal = (c, node, out) => c.root.worldToLocal(node.getWorldPosition(out));
 
-/** Front of the (coat-bulged) torso ellipsoid at root-local height y; the chest is its centre. */
 function bellyFront(built, chest, y) {
   const P = built.params, s = 1 + (built.bulge ?? 0);
   const dy = (y - chest.y) / (P.torsoH * s);
   return chest.z + (Math.abs(dy) < 1 ? P.torsoD * s * Math.sqrt(1 - dy * dy) : 0);
 }
 
-/**
- * The lap and the working edge, measured ONCE, in the hold pose, per body -- leg length, belly
- * and arm length vary across every species and individual. The edge is just above the thighs,
- * clear in front of the belly; `kneeFront` is where the lap ends and a long piece goes over.
- */
 function measureLap(c) {
   const { built } = c, P = built.params;
   const pose = { ...POSES.sit };
@@ -259,14 +181,10 @@ function measureLap(c) {
   c.work.set(0, y, bellyFront(built, chest, y) + 0.08);
 }
 
-// ---------------------------------------------------------------- building
-
-/** A tool in one paw: a wrist group the aim turns, and the tool along its +Y, sized each frame. */
 function makeTool(c, hold, hook = false) {
   const side = hold === HOLD_R ? RIGHT : LEFT;
   const wrist = new THREE.Group();
   const shaft = new THREE.Mesh(hook ? HOOK_GEO : NEEDLE_GEO, woodMat);
-  // The hook's barb sits at the tip; a needle's knob at the butt.
   const end = new THREE.Mesh(hook ? BARB_GEO : BALL_GEO, woodMat);
   if (!hook) end.scale.setScalar(KNOB_R);
   wrist.add(shaft, end);
@@ -277,11 +195,6 @@ function makeTool(c, hold, hook = false) {
   };
 }
 
-/**
- * A wing that encloses the paw (the owl's: owl.js wingShape), as a matrix from the unit sphere to
- * the upper arm's frame, inflated past its feathers (measured up to 1.13 of the blob). Null for a
- * species whose paws are out in the open.
- */
 function wingFrame(built, side) {
   const shape = built.species.wingShape?.(built.params);
   if (!shape) return null;
@@ -293,7 +206,6 @@ function wingFrame(built, side) {
   );
 }
 
-/** A ribbon of ROWS quads, positions rewritten in place by drapePiece. */
 function makeRibbon(n, mat) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 2 * 3), 3));
@@ -302,11 +214,10 @@ function makeRibbon(n, mat) {
   for (let i = 0; i < n - 1; i++) index.push(2 * i, 2 * i + 2, 2 * i + 1, 2 * i + 1, 2 * i + 2, 2 * i + 3);
   geo.setIndex(index);
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.frustumCulled = false;   // the buffer moves; its bounding sphere would not
+  mesh.frustumCulled = false;
   return mesh;
 }
 
-/** The strand: a square tube, STRAND_N rings of 4, rewritten in place by drapeStrand. */
 function makeStrand(mat) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(STRAND_N * 4 * 3), 3));
@@ -334,21 +245,12 @@ function buildProps(c) {
   c.ball.scale.setScalar(BALL_R);
   c.ball.position.set(-(c.built.params.torsoW * (1 + (c.built.bulge ?? 0)) + 0.12), 0, 0.06);
   c.strand = makeStrand(mat);
-  // Not the body: npc.js lowestResting skips these, or the floor ball would become the seat.
   for (const m of [c.ball, c.piece, c.strand]) m.userData.prop = true;
   c.props.add(c.ball, c.strand, c.piece);
   for (const o of [c.props, c.hook.wrist, ...c.needles.map((n) => n.wrist)]) o.userData.noMerge = true;
   c.root.add(c.props);
 }
 
-/**
- * A craft for one built character. `mode` 'knit' | 'crochet' | 'idle'; `tell` 'none' | 'out';
- * `pattern` a PATTERN_TYPES key, which sizes the piece; `skill` 1..5 (npc.prefs.skill) sets pace
- * and steadiness; `progress` 0..1 is the piece's growth (the sim's to set); `wallYaw` is which way
- * the yarn wall is, as a head turn; `speed` multiplies the stitch rate (1.5 looks right).
- *
- * Leaves the rig in the hold pose it was measured in; the next stepMotion re-poses it.
- */
 export function makeCraft(built, { mode = 'knit', color = '#c8657a', pattern = 'hat', skill = 3, progress = 0.2, wallYaw = 0.9, speed = 1.5, perStitch = 1 / 400 } = {}) {
   const c = {
     built, root: built.root, mode, tell: 'none', color, pattern, skill, progress, wallYaw, speed, perStitch,
@@ -364,14 +266,7 @@ export function makeCraft(built, { mode = 'knit', color = '#c8657a', pattern = '
   return c;
 }
 
-// ---------------------------------------------------------------- per frame
-
-/**
- * Turn and size a tool so its tip lands exactly on the work edge's middle plus `off`.
- *
- * ponytail: the tool's length follows the paw, so it telescopes by the centimetre or so the hand
- * rhythm moves the paw. Invisible at shop distance; the upgrade is reaching with the arm (IK).
- */
+// ponytail: the tool telescopes ~1cm as the hand rhythm moves the paw; invisible at shop distance, upgrade is arm IK.
 function aim(c, tool, off, spin = 0) {
   tool.hold.updateWorldMatrix(true, false);
   tool.tip.set(c.work.x + off.x, c.work.y + off.y, c.work.z + off.z);
@@ -382,25 +277,18 @@ function aim(c, tool, off, spin = 0) {
   const len = _v.sub(_g).length();
   tool.wrist.quaternion.setFromUnitVectors(UP, _v.divideScalar(len || 1));
   if (spin) tool.wrist.quaternion.multiply(_q.setFromAxisAngle(UP, spin));
-  tool.shaft.scale.y = len;   // spans -len..len: the paw is at the middle
+  tool.shaft.scale.y = len;
   if (tool.hook) tool.end.position.set(0.01, len, 0);
   else tool.end.position.set(0, -len, 0);
 }
 
-/**
- * Where the tool is gripped, in world space: the paw -- or, when a wing encloses the paw, the point
- * on the wing where the line from the tip just touches it. That line is TANGENT to the wing, so
- * neither half of a middle-gripped tool goes through it: it is held against the wing's surface.
- * The tangent points from the tip form a circle on the (unit-sphere) wing; this takes the one
- * nearest the paw.
- */
 function gripAt(tool, tip, out) {
   tool.hold.getWorldPosition(out);
   if (!tool.wing) return out;
   _m1.multiplyMatrices(tool.arm.matrixWorld, tool.wing);
   _m2.copy(_m1).invert();
   const e = _e.copy(tip).applyMatrix4(_m2), d = e.length();
-  if (d <= 1.0001) return out;   // the tip inside the wing: nothing sensible to do
+  if (d <= 1.0001) return out;
   e.divideScalar(d);
   const paw = out.applyMatrix4(_m2);
   paw.addScaledVector(e, -paw.dot(e));
@@ -409,12 +297,6 @@ function gripAt(tool, tip, out) {
   return paw.applyMatrix4(_m1);
 }
 
-/**
- * The piece's path, as (y, z) at distance s down it from the working edge (`d.work`): straight
- * down onto the lap (`d.lapY`), forward along it to `d.kneeFront`, over the knees and down to
- * `d.floor`, and along the floor if it is longer than that. An edge already past the knees -- a
- * big belly over short thighs -- goes straight down. Pure, and allocation-free.
- */
 export function drapeAt(s, d, out) {
   const { y: y0, z: z0 } = d.work;
   const lap = Math.min(d.lapY, y0);
@@ -430,13 +312,12 @@ export function drapeAt(s, d, out) {
     y -= step(lap - d.floor);
   } else y -= step(y0 - d.floor);
   out.y = y;
-  out.z = z + left;   // what is left lies along the floor
+  out.z = z + left;
   return out;
 }
 
 const _p = { y: 0, z: 0 }, _p2 = { y: 0, z: 0 };
 
-/** One row of the ribbon: both corners at the path's point, facing out of the bend. */
 function ribbonRow(c, i, s) {
   const { position: pos, normal: nrm } = c.piece.geometry.attributes;
   drapeAt(s, c, _p);
@@ -448,7 +329,6 @@ function ribbonRow(c, i, s) {
   nrm.setXYZ(i * 2 + 1, 0, tz / tl, -ty / tl);
 }
 
-/** Rewrites the ribbon when its length or the floor moved; floor is the root's parent's y = 0. */
 function drapePiece(c) {
   const scale = pieceScale(c.pattern);
   const len = scale * (PIECE.h0 + (PIECE.h1 - PIECE.h0) * c.progress);
@@ -464,7 +344,6 @@ function drapePiece(c) {
 
 const _t = new THREE.Vector3(), _s1 = new THREE.Vector3(), _s2 = new THREE.Vector3(), _a = new THREE.Vector3();
 
-/** One ring of the strand tube at point `p`, facing along `t`. */
 function strandRing(pos, nrm, i, p, t) {
   _s1.crossVectors(t, Math.abs(t.y) > 0.9 ? X : UP).normalize();
   _s2.crossVectors(t, _s1).normalize();
@@ -475,7 +354,6 @@ function strandRing(pos, nrm, i, p, t) {
   }
 }
 
-/** A sagging strand from `a` to `b`, root-local, into the fixed tube. */
 function drapeStrand(c, a, b) {
   const { position: pos, normal: nrm } = c.strand.geometry.attributes;
   const sag = 0.25 * Math.hypot(b.x - a.x, b.z - a.z) + 0.01;
@@ -496,13 +374,7 @@ function showTools(c, on) {
   c.props.visible = on;
 }
 
-/**
- * The yarn: from the ball to the working tip. Out of yarn, the ball is gone and what is left is
- * the tail, dangling from the tip.
- *
- * ponytail: the ball sits on y = 0 in the ROOT's parent, i.e. assumes the root's parent is the
- * floor-level scene. A chair-top or lap ball needs the owner to set c.ball.position instead.
- */
+// ponytail: the ball sits on y = 0 of the root's parent (a floor-level scene); a chair-top or lap ball needs the owner to set c.ball.position.
 function poseYarn(c, tip) {
   c.ball.position.y = BALL_R - c.root.position.y;
   const gone = c.outT > 0.5;
@@ -511,7 +383,6 @@ function poseYarn(c, tip) {
   else drapeStrand(c, _w.set(c.ball.position.x, c.ball.position.y + BALL_R, c.ball.position.z), tip);
 }
 
-/** Aims the tools, drapes the piece and the yarn. After stepMotion and after the root is placed. */
 export function poseCraft(c) {
   const on = c.hands > 0.5 && c.mode !== 'idle';
   showTools(c, on);
@@ -524,7 +395,6 @@ export function poseCraft(c) {
   poseYarn(c, c.mode === 'knit' ? c.needles[0].tip : c.hook.tip);
 }
 
-/** Removes the props. Shared geometry and materials stay; the per-craft buffers go. */
 export function disposeCraft(c) {
   for (const t of [...c.needles, c.hook]) t.wrist.removeFromParent();
   c.props.removeFromParent();

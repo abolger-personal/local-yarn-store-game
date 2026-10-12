@@ -22,8 +22,6 @@
     background: #efefef; border: 1px solid #ddd; border-bottom-width: 2px;
     border-radius: 4px; padding: 0 4px; font-size: 11px; font-family: ui-monospace, monospace;
   }
-  /* clear of the lil-gui panel: at 13 columns the roster used to run underneath it and the
-     coefficients were simply not readable */
   #roster { right: 262px; bottom: 12px; font-size: 11px; max-height: 38vh; overflow: auto;
     max-width: calc(100vw - 290px); }
   #roster table { border-collapse: collapse; }
@@ -31,19 +29,14 @@
   #roster th:first-child, #roster td:first-child { text-align: left; }
   #roster th { color: #888; font-weight: 500; }
   #roster .shared { color: #555; margin-bottom: 4px; max-width: 330px; line-height: 1.4; }
-  /* traits are the cause, the coefficients the effect: rule between the two halves so the
-     row reads as "these traits produced these numbers" and not as twelve loose figures */
   #roster th.co, #roster td.co { color: #555; }
   #roster th:nth-child(6), #roster td:nth-child(6) { border-left: 1px solid #ddd; padding-left: 7px; }
   #roster th { cursor: help; }
   #readout .bad { color: #b3541e; font-weight: 600; }
-  /* the odd factor out is what the row is FOR, so it gets the only emphasis in the table */
   #roster td.odd { color: #b3541e; font-weight: 700; }
   #roster .corner { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .06em; }
-  /* the character's own colours, so a row can be matched to an animal at a glance */
   #roster .chip { display: inline-block; width: 9px; height: 9px; border-radius: 2px;
     vertical-align: -1px; margin-right: 1px; border: 1px solid rgba(0,0,0,.18); }
-  /* one dot per engine a control reaches; no dot at all means it reaches every engine */
   .lil-gui .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
     margin-left: 3px; vertical-align: middle; }
   .lil-gui .engine-key { padding: 4px 0 4px 6px; font-size: 10px; color: #9aa0a6; line-height: 1.5; }
@@ -102,8 +95,6 @@
 }
 </script>
 
-<!-- Every line of logic lives in the module: eslint covers **/*.js and jsconfig includes
-     characters/**/*.js, but neither looks inside an inline <script>. -->
 <script type="module" src="./motion-lab.js"></script>
 </body>
 </html>

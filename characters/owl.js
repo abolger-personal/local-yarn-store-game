@@ -1,9 +1,3 @@
-// Owl species kit.
-//
-// Everything here is owl-specific: head shape, ear tufts, beak, wings and plumage. The shared
-// body lives in npc.js. Kits may ADD or SCALE, never REPLACE -- wings are the clearest case,
-// since they bolt onto the shared upper arm rather than replacing the arm chain.
-
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
   addConeEars, addEyes, addTail, createCharacter, deriveCoatColor,
@@ -18,63 +12,48 @@ export {
   disposeCharacter as disposeOwl,
 } from './npc.js';
 
-// ---------------------------------------------------------------- params
-
 export const DEFAULT_PARAMS = {
   ...BASE_PARAMS,
   name:          'Hoot',
   footColor:     '#e0a53c',
 
-  // The swivel. A real owl clears about 270 degrees, and it is the single most recognisable
-  // thing an owl does -- so it is anatomy, set once here, and every system that turns a head
-  // gets it for free without knowing what an owl is. The neck takes its usual share, which is
-  // invisible on a cylinder and hidden under plumage anyway.
-  headYawMax:    4.60,    // ~264 degrees
+  headYawMax:    4.60,
 
-  // species kit
   tuftSize:      0.049,
   tuftSpread:    0.694,
   tuftTilt:      0.800,
   beakSize:      0.090,
   beakColor:     '#e0a53c',
   wingLength:    0.349,
-  wingWidth:     0.200,   // ratio of wingLength, so short wings shrink rather than go pancake
-  wingDepth:     0.360,   // ratio of wingLength
+  wingWidth:     0.200,
+  wingDepth:     0.360,
 
-  // feathers: LOW frequency on purpose. The removed felt normal map failed because
-  // high-frequency relief reads as grain; a handful of large scallops reads as plumage.
   feathers:      true,
   featherColor:  '#8d93a8',
   featherPreset: 2,
   featherRows:   3,
   featherPerRow: 9,
-  featherSize:   0.276,   // RATIO of body radius, not world units - keeps shells shareable
-  featherFlat:   0.40,    // how far each scallop sinks into the body
-  featherProud:  0.32,    // protrusion along the normal, as a fraction of size
-  featherTop:    0.40,    // start latitude, 0 = top of torso
+  featherSize:   0.276,
+  featherFlat:   0.40,
+  featherProud:  0.32,
+  featherTop:    0.40,
   featherBottom: 0.95,
-  featherStagger:true,    // offset alternate rows so they overlap like shingles
+  featherStagger:true,
 
   featherHead:   true,
   featherHeadScale: 0.74,
-  featherFaceGap: 1.25,   // radians of clear space at the front, so plumage misses the eyes
+  featherFaceGap: 1.25,
   featherWings:  true,
   featherWingScale: 0.62,
 
-  // A short fan of tail feathers poking out below the back, angled down. Stiff: a bird's tail
-  // flicks, it does not swing.
   tailLength:    0.110,
-  tailThick:     0.030,   // one feather's width
+  tailThick:     0.030,
   tailDroop:    -0.75,
   tailStiff:     380,
   tailZeta:      0.40,
 };
 
-// Quantised so feather geometry can be SHARED between characters. Per-character generated
-// geometry blocks instancing entirely, and the visual variety is carried by colour anyway.
-//
-// featherProud is protrusion along the surface normal. Kept well under 0.5: a wide scallop
-// that also stands proud stops reading as a shingle and starts reading as a ball stuck on.
+// BODIES.md §Owl
 export const FEATHER_PRESETS = Object.freeze([
   { featherRows: 2, featherPerRow: 7,  featherSize: 0.330, featherProud: 0.40, featherFlat: 0.34, featherStagger: true,  featherTop: 0.44, featherBottom: 0.94 },
   { featherRows: 2, featherPerRow: 11, featherSize: 0.245, featherProud: 0.34, featherFlat: 0.42, featherStagger: false, featherTop: 0.40, featherBottom: 0.92 },
@@ -93,7 +72,6 @@ export function applyFeatherPreset(P, index) {
   return P;
 }
 
-// tier 1 entries carry the silhouette; feather shape is quantised, not continuous
 export const RANDOM_RANGES = Object.freeze({
   ...BASE_RANDOM_RANGES,
   neckLength:  [0.050, 0.160],
@@ -101,7 +79,7 @@ export const RANDOM_RANGES = Object.freeze({
   headRadius:  [0.150, 0.195],
   tuftSize:    [0.024, 0.075],
   tuftSpread:  [0.350, 1.040],
-  tuftTilt:    [-0.150, 1.350],  // slight negative reads as upright tufts, not broken ones
+  tuftTilt:    [-0.150, 1.350],
   wingLength:  [0.300, 0.390],
   wingWidth:   [0.175, 0.260],
   wingDepth:   [0.280, 0.440],
@@ -109,15 +87,10 @@ export const RANDOM_RANGES = Object.freeze({
   tailLength:  [0.080, 0.140],
 });
 
-// ---------------------------------------------------------------- shell settings
-
 const headScale = (P) => [P.headRadius * 1.06, P.headRadius, P.headRadius * 0.98];
 
-// the wing sits slightly outboard of the arm, which also thins its inner coverage
 const WING_OFFSET = 0.012;
 
-// A wing has to enclose the upper arm it wraps, offset included, or the arm pokes out through
-// the inner edge. Thick limbs with narrow wings hit this often enough to need a floor.
 const wingScale = (P) => {
   const cover = P.limbThick * 1.05 + WING_OFFSET + 0.004;
   return [
@@ -150,9 +123,6 @@ const wingShell = (P) => ({
   top: 0.42, bottom: 0.96, stagger: P.featherStagger,
 });
 
-// ---------------------------------------------------------------- kit
-
-// Owl plumage sinks in more than it stands out, so it never pushes the shoulders.
 export const coatBulge = (P) => {
   if (!P.feathers) return 0;
   const { size, proud, flat } = torsoShell(P);
@@ -184,15 +154,8 @@ function addBeak(ctx, P) {
 
 const WING_ROLL = 0.08;
 
-/**
- * The wing's blob in its upper arm's frame, as addWing builds it: pos.x and roll are multiplied by
- * the arm's side.
- * The wing encloses the whole arm, paw included, so anything held has to be gripped at its
- * surface -- craft-anim.js uses this to keep a needle from being drawn through it.
- */
 export const wingShape = (P) => ({ pos: [WING_OFFSET, -P.wingLength * 0.42, 0], scale: wingScale(P), roll: WING_ROLL });
 
-// a blob on the upper arm plus its own scallop shell, both parented to the shoulder
 function addWing(shoulder, side, ctx, P) {
   const scale = wingScale(P);
   const pos = [side * WING_OFFSET, -P.wingLength * 0.42, 0];
@@ -215,7 +178,6 @@ function buildKit(ctx, P) {
   addEyes(ctx, P, { head: headScale(P) });
   addBeak(ctx, P);
   addTorsoPlumage(ctx, P);
-  // tufts fill the ears slot: not anatomically ears, but rigged as them so they can express
   addConeEars(ctx, P, {
     size: P.tuftSize, length: P.tuftSize * 2.4,
     spread: P.tuftSpread, tilt: P.tuftTilt, lift: 0.55, head: headScale(P),
@@ -224,8 +186,6 @@ function buildKit(ctx, P) {
   addTail(ctx, P, { dress: (node, i, len) => addTailFan(node, len, ctx, P) });
 }
 
-// Five flat feathers fanned about the tail's own axis, lying in its plane, so the fan spreads
-// sideways and tips down with the droop. In the plumage colour.
 const TAIL_FAN = [-0.55, -0.28, 0, 0.28, 0.55];
 
 function addTailFan(node, len, ctx, P) {
@@ -239,9 +199,6 @@ function addTailFan(node, len, ctx, P) {
   }
 }
 
-// ---------------------------------------------------------------- randomisation
-
-/** Applies randomised owl identity onto a params object, in place. */
 export function randomiseInto(P) {
   randomiseBase(P, RANDOM_RANGES);
   applyFeatherPreset(P, Math.floor(Math.random() * FEATHER_PRESETS.length));
@@ -249,12 +206,9 @@ export function randomiseInto(P) {
   return P;
 }
 
-/** A fresh randomised params object, with optional fixed overrides. */
 export function randomParams(overrides = {}) {
   return Object.assign(randomiseInto(structuredClone(DEFAULT_PARAMS)), overrides);
 }
-
-// ---------------------------------------------------------------- gui
 
 export const OWL_GUI = Object.freeze({
   'face & tufts': [
@@ -276,26 +230,15 @@ export const OWL_GUI = Object.freeze({
   ],
 });
 
-// ---------------------------------------------------------------- motion
-
-// How much motion variation ONE owl gets. The trait values decide where in a span a character
-// lands; this decides how wide the span is. Spread from the base the same way RANDOM_RANGES is,
-// so a key that is not a base key simply has no effect -- "ADD or SCALE, never REPLACE" holds
-// without any validation code.
-//
-// An owl is a snappy bird: it commits to a movement fast and it holds still between movements,
-// which is the opposite of a llama. The head arc is the species tell -- an owl's swivel is the
-// one piece of motion nobody will mistake for anything else, so it gets the widest span here.
+// BODIES.md §Owl
 export const MOTION_RANGES = Object.freeze({
   ...BASE_MOTION_RANGES,
   stiff:    [140, 300],
-  idleRate: [1.20, 3.00],   // a bird is twitchy: the top of the range, and never fully still
+  idleRate: [1.20, 3.00],
   idleAmp:  [0.30, 1.10],
   headArc:  [1.20, 2.20],
-  stride:   [1.30, 1.90],   // stumpier than a llama, so shorter steps for the same legs
+  stride:   [1.30, 1.90],
 });
-
-// ---------------------------------------------------------------- species
 
 export const owl = registerSpecies({
   id: 'owl',
@@ -313,5 +256,4 @@ export const owl = registerSpecies({
   presetKey: 'featherPreset',
 });
 
-// crowd.html and felted-owl.html import this name directly
 export const createOwl = (P) => createCharacter(P, owl);

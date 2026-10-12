@@ -210,4 +210,52 @@ for (const k of [1, 2, 3]) {
   assert.ok(shop.pastBooks[0].entries.find((g) => g.farewell).who.carries.length, 'the filed photo keeps the pile');
 }
 
+// ---------------------------------------------------------------- 8. the friend waits for the player
+// TUTORIAL.md: the friend has a friend's patience. They took only the pattern on day 1, and the
+// player puts the hook and the ball on the table for day 2, half the time under something: they
+// stay until they have found them, however few rounds their traits would give a stranger, and dig
+// out what is buried. Seeded, every seed must pass.
+{
+  const { items } = await import('./core/state.js');
+  const { wantFor, wantsOf, satisfies, stow } = await import('../wip.js');
+  const { addItem } = await import('./goods/stock.js');
+  const { planTomorrow } = await import('./sim/world.js');
+  const { makeStockNotion } = await import('../../inventory/catalog.js');
+  const random = Math.random;
+  const runDay = () => { for (let r = 0; r < 400 && shop.world.npcs.some((n) => n.state !== STATE.GONE); r++) doAdvanceRound(); };
+  let buried = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    let a = seed;   // mulberry32
+    Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    open({ k: 1, tutorial: true });
+    const friend = shop.world.npcs[0], pattern = items.find((x) => x.name === 'pattern');
+    pattern.gone = true;
+    stow(friend, pattern, wantFor(friend, pattern));
+    friend.willReturn = true;
+    const kit = items.filter((x) => !x.gone);
+    for (const x of kit) x.held = true;   // out of reach: the player has not got to them yet
+    runDay();
+    for (const x of kit) x.held = false;
+    try { restart({ order: planTomorrow() }); } catch (err) { assert.match(err.stack, /sizeInstanceBuffers/); }
+    const table = shop.world.displays.find((d) => d.form === 'table');
+    for (const it of wantsOf(friend).map((w) => items.find((x) => !x.gone && satisfies(x, w))).filter(Boolean)) {
+      const spec = { ...it };
+      for (const k of ['display', 'shelf', 'c', 'r', 'keys', 'layer', 'layers']) delete spec[k];
+      it.gone = true;
+      // Odd seeds bury it where there is headroom: the friend digs it out (Assertiveness 5) rather
+      // than going home past it.
+      const roomy = seed % 2 ? addItem(table, 0, spec, { reserve: 1 }) : -1;
+      const i = roomy >= 0 ? roomy : addItem(table, 0, spec);
+      assert.ok(i >= 0, `seed ${seed}: room on the table`);
+      if (roomy >= 0) buried += addItem(table, 0, makeStockNotion(Math.random, 'darning-needle'),
+        { c: items[i].c, r: items[i].r, shape: [items[i].w, items[i].h] }) >= 0;
+    }
+    runDay();
+    const page = shop.world.guestbook.find((g) => g.npc === friend.name);
+    assert.equal(page?.mood, 'happy', `seed ${seed}: the friend found the hook and ball on the table (${page?.tags})`);
+  }
+  Math.random = random;
+  assert.ok(buried >= 10, `only ${buried} wanted things were buried; the dig-out went untested`);
+}
+
 console.log('walk: prompt door, real pause, full strides at every speed, no jumps, faces the display');

@@ -542,6 +542,10 @@ function openTutorial(npc, pattern) {
   // TUTORIAL.md: the friend is a beginner, and the pot holder is finished in the shop on day 3.
   // Held short of done until then (wip.js progressLimit); day 3 lifts the hold (castAndStock).
   npc.prefs.skill = 1;
+  npc.patience = 'friend';   // SCRIPTED-EVENTS.md's friend role: they wait for the player (visit.js waitsForPlayer)
+  // A friend's temper: they dig what they want out from under a pile or a shelf (Assertiveness 5,
+  // visit.js restructurePlan), and are too even to tidy or spread instead (Orderliness 3) or storm out (Volatility 1).
+  Object.assign(npc.traits, { Assertiveness: 5, Orderliness: 3, Volatility: 1 });
   npc.wips = [{ ...npc.wips[0], pattern: null, yarn: [], tool: null, notions: [], holdAt: TUTORIAL_HOLD }];
   npc.target = wantsOf(npc)[0] ?? null;
   const near = (d) => Math.hypot(d.x - room.door.x, d.z - room.door.z);

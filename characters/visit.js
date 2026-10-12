@@ -678,6 +678,17 @@ function finishingPush(npc, world) {
 }
 
 /**
+ * PLAYING-AT-YOUR-PACE.md "Patience grows with affinity": a friend waits until you get to them. The
+ * tutorial friend (world.js openTutorial) does not run out of rounds while something they want is
+ * out where they can notice it, or buried where they can still dig (Assertiveness 5), so a
+ * stranger's patience cannot send them home past it. Bought by someone else, never put out, or
+ * still buried where they have already dug ends the wait as MAX_ROUNDS would, so a day cannot stall.
+ */
+const waitsForPlayer = (npc, { displays, items }) => npc.patience === 'friend' &&
+  displays.some((d) => consideredHere(npc, d, items).length ||
+    (!npc.restructured.includes(d.id) && items.some((it) => available(it) && it.display === d.id && matchesAnyWant(npc, it))));
+
+/**
  * The spec names this function, so it keeps the spec's casing rather than the file's.
  * Returns the action for this round, or null when the browse set is exhausted (which is the
  * signal to enter CLOSEOUT).
@@ -693,7 +704,7 @@ export function DetermineNextBrowseAction(npc, world, snapshot) {
     npc.prescribed = null;
     return forced;
   }
-  if (npc.roundsInStore >= npc.maxRounds) return null;   // MAX_ROUNDS exceeded
+  if (npc.roundsInStore >= npc.maxRounds && !waitsForPlayer(npc, world)) return null;   // MAX_ROUNDS exceeded
   const push = finishingPush(npc, world);
   if (push) return push;
   const set = browseActionSet(npc, world, snapshot);

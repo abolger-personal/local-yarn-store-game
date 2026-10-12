@@ -6,3 +6,6 @@ node_modules/
 
 # python server: 
 __pycache__/
+
+# local progress captures: not published (they show other work)
+ai_planning_sessions/progress_screenshots/

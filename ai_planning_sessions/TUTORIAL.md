@@ -150,12 +150,26 @@ and SCRIPTED-EVENTS.md §4.
 - **Visits every day,** first in the queue. On their own days they are the lesson; on others they
   browse, say hello and buy something small while another customer carries the lesson.
 - **Recognisable:** theirs is the first Guestbook page, and from day 3 the pot holder is with them.
+- **As built:** skill 1, patience `friend`, Assertiveness 5, Orderliness 3, Volatility 1 (they dig
+  things out, don't tidy, don't storm off). Their one WIP starts blank, so the first thing they
+  want is the pattern. They get the kit as they walk in; on day 2 they stay until they have found
+  the hook and the ball, digging them out if buried.
 
 ### Day 0: the front door
 
 - **Teaches:** the game is a place. Click the door and it opens.
 - **Arrives as:** the front door (`index.html`), the sticky note's *"Come in, we're open!"*
 - **Success:** the door swings and the shop is behind it.
+
+### Day 1 opens: the Former Owner
+
+- A random species, wearing a finished piece in all six wear slots and carrying 3–5 pot holders.
+  They start at the Guestbook signing out (*"Shop's all yours! Make some fun stuff!"*), leave by
+  the door and never come back: no queue, no purchase, no chair. The filed photo keeps the pile.
+- The Guestbook opens by itself, top right, as day 1 opens (and every night), so the farewell is
+  seen.
+- Their farewell photo never goes on the bulletin board, so the board's first card is the
+  player's first success (day 3).
 
 ### Day 1: put the yarn by the pattern
 
@@ -224,6 +238,8 @@ and SCRIPTED-EVENTS.md §4.
   `progressLimit`), day 3 lifts the hold as knitted at home, and the finishing push (`visit.js`,
   ROADMAP I1) sits the friend down to finish it: round 3 of day 3, about half a minute at ▶
   (`store/walk.test.mjs` §6).
+- **As built:** the hold is 90%, one beginner round from done. Day 3 lifts it even if the kit is
+  incomplete, and the friend finishes it for any traits.
 - **Needs:** pot holder as a
   renderable decor finished object; the selfie path (`store/ui/photo.js`, the board) taking a
   decor object in hand.
@@ -298,6 +314,8 @@ Found by playing `game.html`. Each answer is an object, not a panel.
   - notion: what it is, and its size.
 - **Clicking a customer** swaps it for their **tag: their name and the items they have bought.**
   Never their hidden wants: inferring those is the puzzle.
+- **As built:** a press that moves more than 8px is an orbit drag, not a click. The tag grows as
+  they buy. Pointing at a customer without clicking counts as watching them (§7.3).
 
 ### 7.2 The night order reads as a delivery, not a task
 
@@ -365,6 +383,8 @@ these off", a clipboard is what jobs come on, and "ORDER FOR DAY N" does not say
     knitted (🪑), what was said in a chat (§7.4). *Witnessed* = the customer was on screen and
     reasonably close to the camera when it happened, or the player was hovering or had clicked
     them.
+    As built: on screen and within 12 units of the camera at the start of the round, or pointed
+    at since the last round.
   - **Missed behaviour leaves a gist, without detail:** "chatted with Bramble about a project",
     "turned something over and put it back". The gist is what teaches the player what is worth
     watching; the detail is the reward for having watched.
@@ -372,6 +392,10 @@ these off", a clipboard is what jobs come on, and "ORDER FOR DAY N" does not say
     the regulars come back, so a missed clue comes round again.
 - This answers DESIGN-DECISIONS.md's open "hints in Guestbook entries" question: entries record
   observed behaviour (a memory aid), never hidden state (a solution).
+- **As built:** the counter book opens at today and pages back through every day (LYS.md 5c).
+  Entries expand as native `<details>`, so the keyboard works. Every finished day's page is kept; a
+  photo entry stores the signer as they looked that day. A new game wipes the pages and resets the
+  day counter.
 
 ### 7.4 Overheard chat: picture bubbles, like The Sims
 

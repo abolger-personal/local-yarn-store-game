@@ -76,6 +76,12 @@ wraps (five across, four diagonal) plus a cut rim at r 57 inside the ball's r 58
 still parts from the needles on the flat plate. Full opacity; the old wraps were `#7d5517` at
 75% over the shaded ball.
 
+### Signal colours
+
+The 3D shop's yes/no signals are `#25e06a` (fits) and `#ff2d16` (no room), at 0.85 alpha. They are
+UI, not paint, so their materials skip tone mapping (`toneMapped = false`). The held item's halo
+and the drop ghost share the green so the eye pairs them (STORE-SCENE.md §Drop feedback).
+
 ---
 
 ## Type
@@ -140,7 +146,10 @@ still parts from the needles on the flat plate. Full opacity; the old wraps were
   - 47 glyphs: A–Z, 0–9, `. , : ! ? - — ' / &`, and `i`. `lettering.test.mjs` checks every
     customer name and pattern title has its glyphs, and that LOCAL YARN STORE still measures the
     370 units the frieze was drawn at.
-  - No font file: no system font has these letterforms, and a loading screen must not wait on one.
+    - The first ten glyphs (L O C A Y R N S T E) are the frieze's originals, byte for byte, or the
+    door's lettering moves. The lowercase `i`'s dot clears its stem so the keylines don't touch at
+    the info button's cap 20.
+- No font file: no system font has these letterforms, and a loading screen must not wait on one.
   - *Unverified:* the reference image could not be loaded, so the letters follow the general
     highway-sans model of the era, not a tracing of the sign. Check against the real sign and
     correct the glyph paths if they differ.
@@ -404,6 +413,29 @@ the pacing (`gameSpeed` in `core/config.js`): rounds advance every `S.autoSecond
 walker has arrived, and `S.dayGap` after the last
 customer leaves the game hands the changeover to the night screen (`onDayEnd` in `bootShop`); the
 playground opens tomorrow by itself.
+
+---
+
+## The label
+
+The ball band (TUTORIAL.md §7.1), in the house lettering: the heading drawn 300 units wide (150px)
+at cap 26, ruled off like a printed ball band.
+
+## The bulletin board
+
+- Customer of the Week is the 4 newest selfies across all days, newest first, as tilted polaroids
+  under the gold headline: the one place a photo shows without opening anything.
+- Pressing a polaroid opens its photo; pressing anywhere else on the board opens the Guestbook.
+
+## The selfie backdrop
+
+- Every selfie rolls its own city skyline under a day, dusk or night sky, plus the ground they
+  stand on. It is painted in 2D under the render, because the studio's tone mapping (ACES, 0.4)
+  would mute a sky, and it uses the studio camera's horizon, so a lens tilted down shows mostly
+  ground.
+- The ground is quiet: low contrast, muted, fading out about 8 world units from their feet, and
+  tinted by the sky (dusk warms, night darkens). It never pulls the eye from what they made.
+- Skyline in frame: pavement. Looking down with no skyline: pavement, floorboards or lawn at random.
 
 ---
 

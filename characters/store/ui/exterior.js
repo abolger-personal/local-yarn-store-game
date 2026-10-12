@@ -1,17 +1,6 @@
-// The shop's exterior: the entry (pediment, frieze, pilasters, granite step) and the maple door,
-// drawn once and shared by the front door (index.html) and the between-days screen (game.html's
-// #night, ui/night.js). Its CSS is exterior.css, beside it; every value and the reason for it is
-// in ai_planning_sessions/VISUAL-DESIGN-2D.md.
-//
-// Markup, not a DOM builder: the drawing is the same SVG it was when it lived in index.html, with
-// three holes — where the door goes, what it says to a screen reader, and the note's two lines.
-// The ids in it (#door, #frieze, #tip, #brass, #keyline…) are page-wide, so a page shows ONE
-// exterior; game.html's own copies of #brass, #plate, #keyline and #ball are identical.
-
 import { paintWornWood } from '../scene/worn-wood.js';
 import { svgLettering } from './lettering.js';
 
-// The drawing, with its holes marked %HREF% %LABEL% %TIP1% %TIP2%; exteriorMarkup() fills them.
 const ENTRY = `
   <!-- The surround, after the Concord Museum's entry: a LOW pediment over a plain frieze, wide
        flat pilasters, and a recessed inner casing stepping in to the door. What keeps it charming
@@ -271,17 +260,12 @@ const ENTRY = `
     </svg>
   </a>`;
 
-/**
- * The entry and its door, to go inside a `.doorway` box. `href` and `label` are the door's link
- * and its accessible name; `tip` is the sticky note's two lines in ballpoint (plain text — it is
- * put in the markup as is, so callers pass their own words, never a player's).
- */
+/** `tip` is inserted unescaped: callers pass their own words, never a player's. */
 export function exteriorMarkup({ href, label, tip }) {
   const holes = { HREF: href, LABEL: label, TIP1: tip[0], TIP2: tip[1] };
   return ENTRY.replace(/%(HREF|LABEL|TIP1|TIP2)%/g, (_, k) => holes[k]);
 }
 
-/** The worn-wood texture as a data URL, painted once per page: it is the same every time. */
 let woodUrl = '';
 function wornWood() {
   if (woodUrl) return woodUrl;
@@ -291,11 +275,6 @@ function wornWood() {
   return (woodUrl = tex.toDataURL());
 }
 
-/**
- * What the markup cannot carry: the shop's name lettered on the frieze (baseline 222, centred on
- * the 600-wide entry) and the shop's own worn wood handed to every .worn-tex image — the door's
- * #worn and the trim's #grain* patterns. Without it the wood is plain and the frieze bare.
- */
 export function dressExterior(root) {
   root.querySelector('#frieze').innerHTML =
     svgLettering('LOCAL YARN STORE', 300, 222, { paint: 'url(#brassH)' });
@@ -303,11 +282,6 @@ export function dressExterior(root) {
   for (const img of root.querySelectorAll('.worn-tex')) img.setAttribute('href', url);
 }
 
-/**
- * Swing the leaf on its hinge, then `then()`. Under prefers-reduced-motion it does not swing at
- * all and `then` runs straight away. Only the door's own transition counts: a bubbling one from
- * inside it must not open the shop early.
- */
 export function swingOpen(door, then) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { then(); return; }
   door.classList.add('open');

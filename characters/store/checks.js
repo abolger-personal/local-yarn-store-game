@@ -1,7 +1,3 @@
-// Self-checks. Diagnostics only: nothing here is on the render path.
-//
-// Extracted from the single 3,200-line module that used to live inline in store.html.
-
 import { cast, seats, props, displays, items, shop, mover } from './core/state.js';
 import { SHOP_RANGE, SIZED_NOTIONS, YARN_SHAPES, yarnWeight } from '../../inventory/catalog.js';
 import { fits, footprint, makeDisplay, place, usableAt } from '../../inventory/grid.js';
@@ -22,17 +18,6 @@ import { onPointerDown, onPointerMove, onPointerUp } from './interact/input.js';
 import { isUnder } from './ui/framing.js';
 import { makeHeldNotion } from './sim/cast.js';
 
-// ---------------------------------------------------------------- framing
-/**
- * Self-check: sweep every camera position the controls allow and assert the two things that can
- * actually go wrong.
- *
- * Note what is NOT asserted: "no visible wall shows its outside face" is unfalsifiable here, since
- * cullWalls DEFINES visible as exactly that test. The failures worth catching are the ones on
- * either side of it — hiding so eagerly that the shop becomes an open plane again, and letting the
- * camera under the floor, where the cutaway would show you the underside of the whole set.
- */
-/** Every camera angle the controls allow, as {x,y,z} positions around the orbit target. */
 function* orbitSamples(target) {
   const radii = [controls.minDistance, 4, 8, controls.maxDistance];
   for (let a = 0; a < Math.PI * 2; a += Math.PI / 32)
@@ -64,16 +49,6 @@ export function checkWallCulling() {
   console.info(`wall culling: ${samples} angles swept, fewest walls visible ${fewest}, ${sunk} below floor`);
 }
 
-/**
- * Self-check: no item carries a size its kind cannot have, and every hook has one.
- * The failure this catches is silent — a number appears on a box that should have none, and the
- * only symptom is the player reading an attribute that does not exist.
- */
-/**
- * A millimetre size belongs to hooks and needles and to nothing else — a number on a ball of yarn
- * invents an attribute the product does not have, in the one channel the player reads. And every
- * item must resolve to a real atlas cell, or it silently draws the whole sheet.
- */
 function checkLabels() {
   const wrong = items.filter((it) => {
     const sized = it.size != null;
@@ -87,23 +62,13 @@ function checkLabels() {
   return { wrong: wrong.length, noArt: noArt.length };
 }
 
-/** A yarn's footprint has to match its weight, since that is what its unit value is read from. */
 function checkYarnUnits() {
   const bad = items.filter((it) => it.name === 'yarn' && it.w !== yarnWeight(it.weight).size);
   console.assert(bad.length === 0, 'yarn footprints that do not match their weight:',
     bad.slice(0, 5).map((it) => `${it.weight}=${it.w}`));
 }
 
-/**
- * Drawn height must EQUAL reserved height.
- *
- * Not a tautology while `layers` has two possible sources: catalog.js still carries its own
- * (weight-derived) value, and taking that one instead is what leaves flat skeins holding the next
- * item up in the air.
- */
 function checkYarnHeights() {
-  // Every shape the catalog can produce needs a mesh, or paintYarn dereferences undefined the
-  // first time one is stocked — a crash in the render loop, well away from the cause.
   const noMesh = YARN_SHAPES.filter((sh) => !yarnMeshes[sh]);
   console.assert(noMesh.length === 0, 'yarn shapes with no geometry family:', noMesh);
   const floats = items.filter((it) => {
@@ -116,13 +81,6 @@ function checkYarnHeights() {
     floats.slice(0, 5).map((it) => `${it.shape}/${it.weight}`));
 }
 
-/**
- * Nothing the shop can ROLL may be too tall for every display in the room.
- *
- * addItem fails over to the next cell and fillStock re-rolls, so an unplaceable shape is not a
- * crash — it is a shop that is quietly short of stock, which is exactly the kind of bug nobody
- * notices for a month.
- */
 function checkStockable() {
   const tallest = Math.max(...displays.map((d) => d.g.headroom));
   const rolls = YARN_SHAPES.flatMap((sh) => SHOP_RANGE.weights
@@ -131,12 +89,9 @@ function checkStockable() {
   const unstockable = rolls.filter((row) => row[2] > tallest);
   console.assert(unstockable.length === 0, 'yarn the shop can roll but nothing can hold:',
     unstockable.map(([sh, wn, L]) => `${sh}/${wn}=${L} layers > ${tallest}`));
-  // config.js cannot build geometry, so TALLEST_LAYERS is written down; this is what keeps it true.
   const biggest = Math.max(...rolls.map((row) => row[2]));
   console.assert(biggest === TALLEST_LAYERS,
     `tallest yarn is ${biggest} layers, config.js TALLEST_LAYERS says ${TALLEST_LAYERS}`);
-  // Two of the biggest, one on the other, on a scratch grid as tall as a real floor tile. Not the
-  // tile itself: placing into it would leave a phantom stack in the shop's stock.
   const tile = displays.find((d) => d.solid === false);
   const g = makeDisplay(1, 1, { headroom: tile?.g.headroom ?? 0 });
   const keys = footprint(g, 0, [0, 0], [1, 1]);
@@ -150,8 +105,6 @@ export function checkItemSizes() {
   checkYarnUnits();
   checkYarnHeights();
   checkStockable();
-  // The shop is MEANT to be cluttered (config.js): a stock count that quietly does not land is
-  // a sparse shop nobody asked for. stockTheShop logs the shortfall; this makes it fail.
   console.assert(items.length >= S.stockCount,
     `stock: asked for ${S.stockCount} boxes, only ${items.length} landed`);
   const kinds = {};
@@ -161,11 +114,6 @@ export function checkItemSizes() {
     `| ${wrong} wrong sizes, ${noArt} missing art`);
 }
 
-/**
- * Self-check: slot masking must carve displays, not delete them.
- * The failure it catches is silent — a display whose every slot overlapped something ends up with
- * nowhere to put anything, and simply never shows stock, which looks like a stocking bug.
- */
 export function checkSlotMasking() {
   const report = displays.map((d) => {
     let usable = 0, total = 0;
@@ -182,20 +130,6 @@ export function checkSlotMasking() {
   console.info(`slot masking: ${carved.length} of ${report.length} displays carved${which}`);
 }
 
-/**
- * Self-check: the floor tiles still tile the floor.
- *
- * The floor is cut into piles so that an NPC deciding where to walk has somewhere specific to walk
- * to, and the cut is pure arithmetic on the tile size. So the way it breaks is an off-by-one: a
- * seam of floor no tile owns, or an overlap where two tiles claim the same cell and an item
- * dropped onto one is found by the other. Neither raises anything — both just read as "that patch
- * of floor behaves oddly", which is the kind of bug nobody ever tracks down.
- *
- * Every tile cell must therefore land on the ONE floor lattice ROOM_FLOOR describes, and no cell
- * may be claimed twice. The tile count is asserted too: one tile IS the old room-sized floor, and
- * that is the regression this whole split exists to prevent.
- */
-/** Which cell of the one floor lattice a tile's own cell sits on, in whole cells from a corner. */
 function floorCellAt(d, c, r) {
   const x0 = -(ROOM_FLOOR.cols * CELL) / 2, z0 = -(ROOM_FLOOR.rows * CELL) / 2;
   return {
@@ -229,17 +163,6 @@ export function checkFloorTiling() {
     + `${ROOM_FLOOR.cols * ROOM_FLOOR.rows} floor cells`);
 }
 
-/**
- * Self-check: DISPLAYS.md rule 10. Everything the player can move can be moved and turned, stock
- * comes with it, and the per-type restrictions hold. Runs against the live layout and restores
- * every pose afterwards.
- */
-/**
- * Nothing leaves the room, however far it is dragged. The bug this exists to catch: a display
- * followed the pointer straight through the wall, and a release that never came (a pointercancel,
- * or the next grab) left it out there — out of sight, and carried over to every day after with
- * its stock still on it. A NaN pose used to pass the slot test too, every comparison being false.
- */
 function checkStaysInRoom(m, fails) {
   for (const [x, z] of [[99, 0], [-99, 0], [0, 99], [0, -99], [99, -99], [-99, 99]]) {
     for (const yaw of [0, YAW_STEP, 2 * YAW_STEP]) {
@@ -250,11 +173,6 @@ function checkStaysInRoom(m, fails) {
   if (canPlaceAt(m, { x: NaN, z: 0, yaw: 0 })) fails.push(`${m.id} was allowed a NaN pose`);
 }
 
-/**
- * Shelves stand free (DISPLAYS.md rule 10): somewhere in the middle of the shop, two can stand back
- * to back — touching, but never one through the other. The gap is the slots' own overhang past the
- * tilted depth plus the back panel's pad (roomObstacles); a hair over it must fit.
- */
 function checkBackToBack(fails) {
   const [a, b] = displays.filter((d) => d.kind === 'shelf');
   if (!b) return;
@@ -264,14 +182,12 @@ function checkBackToBack(fails) {
       if (!canPlaceAt(a, { x, z, yaw: 0 })) continue;
       moveApply(a, x, z, 0);
       if (canPlaceAt(b, { x, z: z - a.d, yaw: Math.PI })) fails.push(`shelves overlapped back to back at ${x},${z}`);
-      // Through constrainPose, as a drag goes: it must leave a free-standing shelf where it was put.
       const q = constrainPose(b, x, z - a.d - 0.07, Math.PI);
       if (q.x === x && q.z === z - a.d - 0.07 && canPlaceAt(b, q)) pairs++;
     }
   if (!pairs) fails.push('nowhere in the shop can two shelves stand back to back');
 }
 
-/** Rotation lands on 45° detents, whatever angle it is asked for. */
 function checkDetents(pile, fails) {
   for (const raw of [0.1, 0.9, -2.2, 3.9]) {
     const q = constrainPose(pile, pile.x, pile.z, raw);
@@ -280,13 +196,7 @@ function checkDetents(pile, fails) {
   }
 }
 
-/**
- * "All Inventory will stay with the move": a box on this display shifts by exactly what the
- * display shifted by. This is the claim the whole mechanic rests on.
- */
 function checkStockTravels(pile, fails) {
-  // A box: yarn is drawn by the yarn meshes and its box instance is parked hidden, so a ball's box
-  // matrix never moves and the check failed whenever the table's first item happened to be yarn.
   const index = items.findIndex((it) => it.display === pile.id && !it.gone && !it.held && it.name !== 'yarn');
   if (index === -1 || !boxes) return;
   const m = new THREE.Matrix4(), before = new THREE.Vector3(), after = new THREE.Vector3();
@@ -298,18 +208,12 @@ function checkStockTravels(pile, fails) {
     fails.push(`stock did not travel with ${pile.id}`);
 }
 
-/** Nowhere illegal may be accepted: outside the room, inside the counter, across the doorway. */
 function checkPileRefusals(pile, fails) {
   if (canPlaceAt(pile, { x: HALF_W + 1, z: 0, yaw: 0 })) fails.push('a display outside the room was allowed');
   if (canPlaceAt(pile, { x: COUNTER.x, z: COUNTER.z, yaw: 0 })) fails.push('a display inside the counter was allowed');
   if (canPlaceAt(pile, { x: 0, z: HALF_D - 0.45, yaw: 0 })) fails.push('a display across the doorway was allowed');
 }
 
-/**
- * A chair is free on the floor, so it must have somewhere to go — and must still be refused
- * inside the counter and on top of a display. Both the scene and the SIM's own copy of the seat
- * list have to follow it.
- */
 function checkChair(chair, pile, fails) {
   if (!canPlaceAt(chair, constrainPose(chair, chair.x, chair.z, chair.facing)))
     fails.push('a chair is illegal where it already stands');
@@ -322,11 +226,6 @@ function checkChair(chair, pile, fails) {
   if (live && Math.abs(live.x - chair.x) > 1e-9) fails.push('the sim did not learn the chair moved');
 }
 
-/**
- * Every pot and lamp stands somewhere legal, is refused on the counter and on a
- * display, follows a move with its mesh — and the SIM routes round it where it now stands, since
- * NPCs walking through a lamp is exactly the bug a scene-only move would make.
- */
 function checkProps(pile, fails) {
   for (const p of props) {
     if (!canPlaceAt(p, constrainPose(p, p.x, p.z, p.yaw))) fails.push(`${p.id} is illegal where it stands`);
@@ -341,7 +240,6 @@ function checkProps(pile, fails) {
     fails.push('the sim does not route round a moved prop');
 }
 
-/** A legal spot for `m` a step away from where it stands, or null. */
 function nearbySpot(m) {
   const from = movePose(m);
   for (const step of [0.5, 0.8, 1.2])
@@ -352,7 +250,6 @@ function nearbySpot(m) {
   return null;
 }
 
-/** Look straight down on the shop, in move mode, so every piece is clickable. Returns the undo. */
 function overheadInMoveMode() {
   const was = { at: camera.position.clone(), q: camera.quaternion.clone(), mode: S.moveMode };
   camera.position.set(0, 14, 0.01);
@@ -368,7 +265,6 @@ function overheadInMoveMode() {
   };
 }
 
-/** A mouse event on the canvas, over floor point x, z. */
 function floorEvent(type, x, z) {
   const v = new THREE.Vector3(x, 0, z).project(camera);
   return { type, clientX: (v.x + 1) / 2 * innerWidth, clientY: (1 - v.y) / 2 * innerHeight,
@@ -376,13 +272,11 @@ function floorEvent(type, x, z) {
 }
 
 function clickFloor(x, z) {
-  scene.updateMatrixWorld();   // chairs are raycast, and nothing renders between these clicks
+  scene.updateMatrixWorld();
   onPointerDown(floorEvent('pointerdown', x, z));
   onPointerUp(floorEvent('pointerup', x, z));
 }
 
-/** Click `m` up at `from` and down at `to` — hovering there in between, or not, as a tap has no
- *  hover. Whether the first click picked it up. */
 function clickCarry(m, from, to, hover) {
   clickFloor(from.x, from.z);
   if (mover.m !== m) return false;
@@ -393,12 +287,6 @@ function clickCarry(m, from, to, hover) {
 
 const near = (m, q) => Math.hypot(m.x - q.x, m.z - q.z) < 0.02;
 
-/**
- * Furniture is click-to-pick, like the stock, through the REAL pointer handlers: a click lifts the
- * piece and leaves it in hand, a move with no button down carries it, a second click sets it down
- * — and Escape puts a piece in hand back exactly where it was picked up. Then it is clicked home,
- * so the slot masks are re-cut where it started.
- */
 function checkClickMoves(m, hover, fails) {
   const from = movePose(m), to = nearbySpot(m);
   if (!to) { fails.push(`${m.id} has nowhere legal to go`); return; }
@@ -413,25 +301,17 @@ function checkClickMoves(m, hover, fails) {
   clickCarry(m, to, from, true);
 }
 
-/** The chair is carried the mouse way (hover, then click), the shelf the touch way (tap it, tap
- *  where it goes). */
 function checkClickToMove(pieces, fails) {
   const undo = overheadInMoveMode();
   for (const [m, hover] of pieces) checkClickMoves(m, hover, fails);
   undo();
 }
 
-/**
- * Self-check: DISPLAYS.md rule 10. Everything the player can move can be moved and turned, stock
- * comes with it, and the per-type restrictions hold. Runs against the live layout and restores
- * every pose afterwards.
- */
+// inventory/DISPLAYS.md rule 10
 export function checkDisplayMoves() {
   const fails = [];
   const saved = [...displays, ...seats, ...props].map((m) => ({ m, ...movePose(m) }));
   const shelf = displays.find((d) => d.form === 'wall-shelf');
-  // `solid !== false` as well as 'pile': the floor tiles are piles too, and at displayCount 1
-  // there is no table, so this would otherwise pick a floor tile and start dragging the floor.
   const pile = displays.find((d) => d.kind === 'pile' && d.solid !== false);
   const chair = seats[0];
 
@@ -448,16 +328,6 @@ export function checkDisplayMoves() {
   console.info(`display moves: ${fails.length ? `${fails.length} FAILED` : 'ok'}`);
 }
 
-/**
- * Self-check: nobody walks in holding anything, and the thing they DO hold can still be hidden.
- *
- * Not visible as a crash, and not visible as a wrong flag either: the rig hid its placeholder
- * skein exactly as intended (`held.visible = false`), and then mergeCharacter lifted that skein's
- * meshes OUT of the hidden group and re-parented them into the always-visible joint. Every NPC
- * walked in holding one, so "is this customer carrying something?" — the only read the player gets
- * on whether a visit succeeded — was stuck on yes.
- */
-/** Nobody starts a visit carrying, in the sim or on screen. */
 function checkNobodyStartsCarrying(fails) {
   for (const rec of cast) {
     if (rec.npc.carrying) fails.push(`${rec.npc.name} spawned carrying ${labelOf(rec.npc.carrying)}`);
@@ -466,12 +336,6 @@ function checkNobodyStartsCarrying(fails) {
   }
 }
 
-/**
- * The skein survives the merge as its own hideable subtree.
- *
- * At the quality setting that actually MERGES — testing with merging off would have passed
- * throughout the bug this exists to catch.
- */
 function checkHeldIsHideable(fails) {
   const kit = getSpecies(speciesIds()[0]);
   const probe = createCharacter(
@@ -487,17 +351,6 @@ function checkHeldIsHideable(fails) {
   return meshes;
 }
 
-/**
- * A ball leaves the shop the size it was on the shelf.
- *
- * A notion box SHOULD shrink to one layer in the fist — that is what it is on the shelf too. Yarn
- * should not: it is drawn at its own settled fit, and squashing every family into one layer made
- * a super-bulky ball leave at a third of the width it was picked up at, which reads as the
- * customer walking off with a different, smaller thing.
- *
- * Measured off the mesh that is actually built, not recomputed from the formula: the same
- * arithmetic on both sides of an assertion compares a value to itself and passes forever.
- */
 function checkHeldYarnSize(fails) {
   for (const shape of YARN_SHAPES) {
     const w = yarnWeight(SHOP_RANGE.weights[0]).size;
@@ -506,8 +359,6 @@ function checkHeldYarnSize(fails) {
     const want = yarnFit(shape, w, w, YARN_FIT);
     if (Math.abs(unit.scale.x - want.k) > 1e-9)
       fails.push(`held ${shape} is ${unit.scale.x.toFixed(4)} wide, shelf draws it ${want.k.toFixed(4)}`);
-    // Same split as syncCarried's teardown: the cloned materials are this probe's, the geometry
-    // belongs to the shelf's instanced meshes and disposing it would blank every shelf.
     held.traverse((n) => { if (n.userData.owned) n.material.dispose(); });
   }
 }
@@ -522,17 +373,9 @@ export function checkHeldItem() {
     ? `${fails.length} FAILED` : `ok (${meshes} mesh in hand, hideable)`}`);
 }
 
-/**
- * Self-check: the sun comes in through the windows. Rays from a grid of floor points toward the
- * sun, against the walls' shadow stand-ins — the same geometry the shadow map sees. The morning
- * must light most of the floor; the afternoon must shade most of it and still land SOME sun on it,
- * which is only possible through a window. A window moved behind solid wall, or a sun angle that
- * misses every opening, fails here rather than as a vaguely gloomy afternoon.
- */
-/** The share of a grid over the floor that can see the sun at time-of-day `t`. */
 function floorInSun(t) {
   const ray = new THREE.Raycaster();
-  ray.layers.set(SHADOW_LAYER);   // the stand-in lives where only the shadow camera looks
+  ray.layers.set(SHADOW_LAYER);
   applyDaylight(t);
   const toSun = sun.position.clone().normalize();
   let n = 0, total = 0;
@@ -545,6 +388,7 @@ function floorInSun(t) {
   return n / total;
 }
 
+// STORE-SCENE.md §Daylight
 export function checkSunPools() {
   const morning = floorInSun(0), afternoon = floorInSun(1);
   applyDaylight(S.followDay ? shop.dayT : S.timeOfDay);

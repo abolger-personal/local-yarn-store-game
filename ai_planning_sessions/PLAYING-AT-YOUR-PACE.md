@@ -72,6 +72,12 @@ every leg's top speed, and a round waits for its last walker (12s at the least);
 multiply walking and divide the round and the departure stagger by 2 and 3, so the stagger stays
 40% of a round as on store.html. See gameSpeed in characters/store/core/config.js.
 
+The rounds and the day changeover are two independent clocks. ⏸ stops only the rounds; while
+paused nobody decides, buys or leaves, so the day clock can't start either. When the shop empties
+there is a beat (`S.dayGap`) before the next day, so the player sees who left with what. The night
+screen waits: pace changes how many chances you catch, never whether you can progress. The
+playground has no night; it opens tomorrow by itself.
+
 ---
 
 ## 4. Three merges

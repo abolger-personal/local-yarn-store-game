@@ -44,7 +44,9 @@ import { installLabel, redrawLabel } from './ui/label.js';
 import { frameRoom } from './ui/framing.js';
 import { checkWallCulling, checkItemSizes, checkSlotMasking, checkFloorTiling, checkDisplayMoves, checkHeldItem, checkSunPools } from './checks.js';
 
-const ATLAS_URL = '../../ai_planning_sessions/inventory/illustrations/build';
+// From this module, not the page: fetch resolves against the page, and a page served below a site's
+// root (GitHub Pages' /local-yarn-store-game/) walked out of the repo.
+const ATLAS_URL = new URL('../../ai_planning_sessions/inventory/illustrations/build', import.meta.url).href;
 
 console.info('LYS build', BUILD);
 

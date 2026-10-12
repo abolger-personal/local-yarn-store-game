@@ -18,7 +18,9 @@ import {
 import { SHADING, makeMatcap, makePaperMatcap, makeToonRamp, yarnMaterial, bakeVertexAO, makeHull,
          yarnColor, applyHatching, addHatchScale } from './yarn-look.js';
 
-const ATLAS_URL = '../ai_planning_sessions/inventory/illustrations/build';
+// From this module, not the page: fetch resolves against the page, and a page served below a site's
+// root (GitHub Pages' /local-yarn-store-game/) walked out of the repo.
+const ATLAS_URL = new URL('../ai_planning_sessions/inventory/illustrations/build', import.meta.url).href;
 
 // EU/metric only for MVP — US/UK/manufacturer hook sizing varies too much to pin down yet.
 const HOOK_SIZES_MM = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 8.0, 9.0, 10.0, 12.0];

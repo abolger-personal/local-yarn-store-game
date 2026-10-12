@@ -54,8 +54,6 @@ for (const [aspect, names] of [[16 / 9, ['board top, front end', 'back window x=
 }
 // Between days the Guestbook is what says what to order: the night screen opens it, and the book
 // moves into that modal dialog, or it would sit inert behind it.
-const night = /<dialog id="night"[\s\S]*?<\/dialog>/.exec(readFileSync(new URL('../game.html', import.meta.url), 'utf8'));
-assert.match(night?.[0] ?? '', /<button class="open-book\b/, 'the night screen has no button to open the Guestbook');
 assert.match(readFileSync(new URL('ui/book.js', import.meta.url), 'utf8'), /dialog:modal/, 'the Guestbook no longer lifts into an open modal');
 // It opens by itself, top right, twice: as day 1 opens on the shop (the Former Owner signs it), and
 // every night once the screen is up, so lift() takes it in.

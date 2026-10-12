@@ -210,8 +210,6 @@
   .slip-pick:focus-visible { outline: 2px solid #1c1712; outline-offset: 1px; }
   .slip-pick option { color: #1c1712; background: #fbf8ef; }
   @media (prefers-reduced-motion: reduce) { #night { transition: none; } }
-  /* The Guestbook at night, where the corner stack sits by day: today's entries say what to order. */
-  #night .open-book { position: fixed; left: 16px; top: 16px; }
   /* The label: a paper ball band on the right edge (TUTORIAL.md §7.1, ui/label.js). Passive,
      so it never takes the pointer from the shop under it. Note paper, black house lettering. */
   #band {
@@ -473,13 +471,6 @@
       <g id="orderLines"></g>
     </svg>
   </div>
-  <!-- After the scene, so the door is still what the dialog focuses first. book.js opens any
-       .open-book, and lifts the book into this dialog so it is not inert behind it. -->
-  <button class="open-book round" title="read today's guestbook" aria-label="Read today's guestbook">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-      <path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
-    </svg>
-  </button>
 </dialog>
 
 <script type="importmap">

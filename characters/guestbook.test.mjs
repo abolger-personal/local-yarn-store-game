@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { TRAITS, makeNpc } from './visit.js';
 import { wantsOf } from './wip.js';
-import { bandLines, entryRows, placeWord, tagLines, thankYou } from './guestbook.js';
+import { bandCard, bandLines, entryRows, patternNeeds, placeWord, tagCard, thankYou } from './guestbook.js';
 import { GLYPHS } from './store/ui/lettering.js';
 import { mulberry32 } from './store/core/util.js';
 
@@ -66,13 +66,21 @@ assert.deepEqual(bandLines({ name: 'stitch-markers', size: null }), ['STITCH MAR
 for (let seed = 1; seed <= 40; seed++) {
   const npc = makeNpc({ id: `n${seed}`, name: 'Marguerite', species: 'Owl', rng: mulberry32(seed) });
   assert.ok(wantsOf(npc).length, 'a fresh customer has wants to hide');
-  assert.deepEqual(tagLines(npc), ['MARGUERITE', 'NOTHING BOUGHT YET'], 'an unwatched tag shows no wants');
-  npc.bought.push(yarn());
+  assert.deepEqual(tagCard(npc), { head: 'MARGUERITE', body: '<p class="status">Nothing bought yet</p>' }, 'an unwatched tag shows no wants');
+  npc.bought.push(yarn(), { name: 'crochet-hook', size: 5 });
   const onNeedles = npc.wips.find((w) => w.pattern)?.pattern ?? pattern;
   npc.did.push({ what: 'sat', pattern: onNeedles, witnessed: false });
-  assert.deepEqual(tagLines(npc), ['MARGUERITE', 'WORSTED WOOL BALL, BLUE'], 'an unwitnessed sit stays hidden');
+  assert.equal(tagCard(npc).body, '<ul class="items"><li>WORSTED WOOL BALL, BLUE</li><li>CROCHET HOOK 5.0MM</li></ul>',
+    'an unwitnessed sit stays hidden; each thing bought is one list entry');
   npc.did[0].witnessed = true;
-  assert.deepEqual(tagLines(npc).slice(2), ['MAKING:', ...bandLines(onNeedles)], 'a witnessed sit shows the pattern');
-  for (const line of tagLines(npc)) for (const ch of line) assert.ok(ch === ' ' || GLYPHS[ch], `the lettering draws "${ch}" in ${line}`);
+  const { head, body } = tagCard(npc);
+  const making = body.slice(body.indexOf('<section class="making">'));
+  assert.ok(body.indexOf('</ul>') < body.indexOf('<section class="making">'), 'what they bought, then what they make');
+  assert.match(making, /^<section class="making"><h3>Making<\/h3><p class="title">[^<]+<\/p><dl class="needs">/, 'a titled pattern section');
+  assert.deepEqual([...making.matchAll(/<dt>(\w+)<\/dt><dd>[^<]+<\/dd>/g)].map((m) => m[1]),
+    patternNeeds(onNeedles).map(([k]) => k), 'each need its own label/value row');
+  for (const ch of head) assert.ok(ch === ' ' || GLYPHS[ch], `the lettering draws "${ch}" in ${head}`);
 }
+assert.deepEqual(bandCard({ name: 'crochet-hook', size: 5 }), { head: 'CROCHET HOOK', body: '<ul class="facts"><li>5.0MM</li></ul>' });
+assert.equal(bandCard({ name: 'stitch-markers', size: null }).body, '', 'nothing more to say, no empty list');
 console.log('guestbook: ok');

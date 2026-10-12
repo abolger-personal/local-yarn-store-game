@@ -51,13 +51,36 @@ export function bandLines(item) {
       ...(item.colorIndex == null ? [] : [caps(colourWord(item.colorIndex))]), caps(item.shape ?? 'ball'), units(yarnUnits(item))];
   }
   if (item.name === 'pattern') {
-    return [...(item.title ? [caps(item.title)] : []),
-      `MAKES ${caps([item.silhouette, item.patternType].filter(Boolean).join(' '))}`,
-      `${mm(item.toolSize)} ${caps(TOOL_FOR_CRAFT[item.craft] ?? item.craft)}`,
-      `TAKES ${units(item.yarnUnits ?? '?')} ${caps(item.weight)} ${caps((item.materials ?? []).join('/'))}`,
-      ...(item.minColors ? [`SUGGESTS ${item.minColors} ${item.minColors === 1 ? 'COLOUR' : 'COLOURS'}`] : [])];
+    return [...(item.title ? [caps(item.title)] : []), ...patternNeeds(item).map(([k, v]) => (k === 'TOOL' ? v : `${k} ${v}`))];
   }
   return [caps(item.name), ...(item.size == null ? [] : [mm(item.size)])];
+}
+
+/** A pattern's needs as [label, value] rows, in its band's order. */
+export function patternNeeds(item) {
+  return [
+    ['MAKES', caps([item.silhouette, item.patternType].filter(Boolean).join(' '))],
+    ['TOOL', `${mm(item.toolSize)} ${caps(TOOL_FOR_CRAFT[item.craft] ?? item.craft)}`],
+    ['TAKES', `${units(item.yarnUnits ?? '?')} ${caps(item.weight)} ${caps((item.materials ?? []).join('/'))}`],
+    ...(item.minColors ? [['SUGGESTS', `${item.minColors} ${item.minColors === 1 ? 'COLOUR' : 'COLOURS'}`]] : []),
+  ];
+}
+
+// ---------------------------------------------------------------- the label's card (§7.1)
+
+// A card is { head, body }: `head` in the house lettering (ui/label.js draws and rules it off),
+// `body` HTML, so each bought thing is one list entry however it wraps, and a pattern's needs are
+// label/value rows under its title.
+const escape = (s) => String(s).replace(/[&<"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '"': '&quot;' })[c]);
+const list = (cls, xs) => (xs.length ? `<ul class="${cls}">${xs.map((x) => `<li>${escape(x)}</li>`).join('')}</ul>` : '');
+const needsHtml = (item) => `<dl class="needs">${patternNeeds(item).map(([k, v]) => `<dt>${k}</dt><dd>${escape(v)}</dd>`).join('')}</dl>`;
+const patternTitle = (item) => caps(item.title ?? `${item.patternType} pattern`);
+
+/** An item's card: its band's first line as the heading and the rest as facts; a pattern's, its needs. */
+export function bandCard(item) {
+  if (item.name === 'pattern') return { head: patternTitle(item), body: needsHtml(item) };
+  const [head, ...facts] = bandLines(item);
+  return { head, body: list('facts', facts) };
 }
 
 /**
@@ -66,11 +89,13 @@ export function bandLines(item) {
  * or `knitting`, the pattern on their needles right now as the player looks), their pattern's band
  * too, which is what the project needs.
  */
-export function tagLines(npc, knitting = null) {
+export function tagCard(npc, knitting = null) {
   const pattern = npc.did?.find((d) => d.what === 'sat' && d.witnessed)?.pattern ?? knitting;
-  const bought = (npc.bought ?? []).map((it) => (it.name === 'pattern' ? caps(it.title ?? `${it.patternType} pattern`) : caps(bandOf(it))));
-  return [caps(npc.name), ...(bought.length ? bought : ['NOTHING BOUGHT YET']),
-    ...(pattern ? ['MAKING:', ...bandLines(pattern)] : [])];
+  const bought = (npc.bought ?? []).map((it) => (it.name === 'pattern' ? patternTitle(it) : caps(bandOf(it))));
+  const making = pattern
+    ? `<section class="making"><h3>Making</h3><p class="title">${escape(patternTitle(pattern))}</p>${needsHtml(pattern)}</section>`
+    : '';
+  return { head: caps(npc.name), body: (list('items', bought) || '<p class="status">Nothing bought yet</p>') + making };
 }
 
 /** What a yarn or pattern IS, in a customer's words: "the blue", "the hat pattern". */

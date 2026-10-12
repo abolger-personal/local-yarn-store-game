@@ -7,6 +7,7 @@
 // lamp-a in props.js): those modules build meshes on a WebGL stage and cannot load in node.
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { SHOP_ASPECT, shopView } from './core/config.js';
 
@@ -51,4 +52,16 @@ for (const [aspect, names] of [[16 / 9, ['board top, front end', 'back window x=
     assert.ok(Math.abs(v.x) < 1 && Math.abs(v.y) < 1, `${name} is off screen at ${aspect.toFixed(2)}`);
   }
 }
+// Between days the Guestbook is what says what to order: the night screen opens it, and the book
+// moves into that modal dialog, or it would sit inert behind it.
+const night = /<dialog id="night"[\s\S]*?<\/dialog>/.exec(readFileSync(new URL('../game.html', import.meta.url), 'utf8'));
+assert.match(night?.[0] ?? '', /<button class="open-book\b/, 'the night screen has no button to open the Guestbook');
+assert.match(readFileSync(new URL('ui/book.js', import.meta.url), 'utf8'), /dialog:modal/, 'the Guestbook no longer lifts into an open modal');
+// It opens by itself, top right, twice: as day 1 opens on the shop (the Former Owner signs it), and
+// every night once the screen is up, so lift() takes it in.
+const src = (f) => readFileSync(new URL(f, import.meta.url), 'utf8');
+assert.match(src('game.js'), /frame: \(\) => \{[^}]*\bopenBook\(\)/, 'day 1 no longer opens on the Guestbook');
+assert.match(/function closeForTheNight\(\) \{[\s\S]*?\n\}/.exec(src('ui/night.js'))?.[0] ?? '', /showModal\(\);[\s\S]*\bopenBook\(\)/,
+  'the night screen no longer opens the Guestbook (after showModal, so it lifts into the dialog)');
+assert.match(/#book \{[^}]*\}/.exec(src('../game.html'))?.[0] ?? '', /var\(--brass\) border-box/, 'the Guestbook lost its brass rim');
 console.log('view: the game opens on the screenshot\'s shot of the shop');

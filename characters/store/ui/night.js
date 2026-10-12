@@ -16,6 +16,7 @@ import { planTomorrow, restart } from '../sim/world.js';
 import { choicesFor, describeSlot } from '../../../inventory/supply.js';
 import { dressExterior, exteriorMarkup, swingOpen } from './exterior.js';
 import { CELL, INK, layout, svgLettering } from './lettering.js';
+import { closeBook, openBook } from './book.js';
 
 const night = /** @type {HTMLDialogElement} */ (document.getElementById('night'));
 const lines = document.getElementById('orderLines');
@@ -125,8 +126,8 @@ export function installNight() {
   // A modal dialog shuts on Escape. Not this one: the door is the way out, and it opens the shop.
   night.addEventListener('cancel', (e) => e.preventDefault());
   // A browser may still force it shut (a second Escape with no click between). Then put it back,
-  // or the shop would sit empty with no door to open.
-  night.addEventListener('close', () => { if (order) night.showModal(); });
+  // or the shop would sit empty with no door to open. Opened, it takes the Guestbook with it.
+  night.addEventListener('close', () => { if (order) night.showModal(); else closeBook(); });
   lines.addEventListener('change', onPick);
 }
 
@@ -141,4 +142,5 @@ export function closeForTheNight() {
   door.classList.remove('open');
   night.classList.remove('leaving');
   night.showModal();   // focuses the door, its first focusable thing: Enter opens it
+  openBook();          // today's entries say what to order; after showModal, so it lifts into #night
 }

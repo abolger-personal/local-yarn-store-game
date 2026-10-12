@@ -57,6 +57,16 @@ const newerBtn = /** @type {HTMLButtonElement} */ (document.getElementById('book
 
 let showing = 0;   // which page the book is open at, as an index into pages()
 
+/**
+ * A modal dialog (game.html's #night, between days) makes everything outside it inert, so the book
+ * and its photo move into whichever is open, and back to the page when none is. Both, in order:
+ * the photo sits beside an open book by a sibling selector.
+ */
+function lift() {
+  const host = document.querySelector('dialog:modal') ?? document.body;
+  if (bookEl.parentElement !== host) host.append(bookEl, photoEl);
+}
+
 function drawBook() {
   const all = pages();
   showing = Math.min(showing, all.length - 1);   // a wiped roster wipes the history with it
@@ -74,7 +84,13 @@ function drawBook() {
 export function openBook() {
   showing = pages().length - 1;
   drawBook();
+  lift();
   bookEl.hidden = false;
+}
+
+/** Shut the book and its photo: the × does, and so does the night screen when the shop opens. */
+export function closeBook() {
+  bookEl.hidden = photoEl.hidden = true;
 }
 
 /** Today's page fills in as the day goes, so an open book follows it. Also opens it on request. */
@@ -91,6 +107,7 @@ export function showPhoto(g) {
   if (!url) return;
   const { day } = pages().find((p) => p.entries.includes(g));
   /** @type {HTMLImageElement} */ (photoEl.querySelector('img')).src = url;
+  lift();
   photoEl.querySelector('figcaption').textContent = `${g.npc} in ${g.object} · day ${day}${g.note ? ` · “${g.note.full}”` : ''}`;
   photoEl.hidden = false;
 }

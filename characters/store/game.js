@@ -13,6 +13,7 @@ import { GOLD_DEFS, svgLettering } from './ui/lettering.js';
 import { viewShop, viewSide, viewTop } from './ui/framing.js';
 import { camera, controls } from './scene/stage.js';
 import { closeForTheNight, installNight } from './ui/night.js';
+import { openBook } from './ui/book.js';
 
 S.floorGrid = false;   // no lattice across the floor in the game; the drop ghost is enough
 S.tutorial = true;     // day 1 is the tutorial's: a pot holder pattern, a hook and one ball
@@ -96,8 +97,9 @@ bootShop({
   steps: [['controls', () => installControls({ ' ': cycleSpeed, p: togglePause })], ['corner', installCorner],
     ['views', installViews], ['speed', installSpeed], ['night', installNight]],
   // Open on the whole shop, not close in: day 1's Former Owner signs the Guestbook at the front
-  // left and walks out of the door, and the player must not miss them.
-  frame: viewShop,
+  // left and walks out of the door, and the player must not miss them. The book opens with it, so
+  // their farewell lands on the page as they sign.
+  frame: () => { viewShop(); openBook(); },
   onFrame: turnCube,
   onDayEnd: closeForTheNight,
   onFail: (html) => {

@@ -28,8 +28,9 @@ function outfitFor(npc, wip) {
 const photos = new WeakMap();
 function photoOf(entry, npc) {
   if (!photos.has(entry)) {
+    const subject = subjectOf(entry.wip);
     photos.set(entry, snap(
-      { body: npc.body, kit: getSpecies(npc.speciesId), outfit: outfitFor(npc, entry.wip), type: subjectOf(entry.wip)?.type },
+      { body: npc.body, kit: getSpecies(npc.speciesId), outfit: outfitFor(npc, entry.wip), type: subject?.type, silhouette: subject?.item.silhouette },
       { toneMapping: TONE_MAPPING[S.toneMapping], exposure: S.exposure },
     ).url);
   }

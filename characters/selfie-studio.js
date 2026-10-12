@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { roomEnvironment } from '../inventory/room-environment.js';
 import { createCharacter, disposeCharacter } from './npc.js';
 import { LOOK, dress, undress } from './garments.js';
-import { gradeSelfie, idLook, takeSelfie } from './selfie.js';
+import { gradeSelfie, idLook, scoredSelfie, selfieScore, takeSelfie } from './selfie.js';
 import { paintBackdrop } from './store/ui/backdrop.js';
 
 export const W = 240, H = 300;
@@ -89,12 +89,14 @@ function develop(built) {
 
 /**
  * A selfie of a body (`body`: its params; `kit`: its species) wearing and holding `outfit`
- * (dress()'s), of what they made (`type`, the outfit key it is under; none: all of it). `look` is
+ * (dress()'s), of what they made (`type`, the outfit key it is under; none: all of it; and its
+ * `silhouette`, which picks the authored shot where one is keyed by it, selfie.js shotFor). `look` is
  * the page's tone mapping and exposure, so the picture matches the page it is shown on.
  * Returns the picture as a data URL, which shot took it (selfie.js), and with `grade`, gradeSelfie's
- * numbers for it.
+ * numbers for it and the scored search's score. `scored`: taken by the scored search (scoredSelfie),
+ * the shot then its pick, or null when no shot passed its rules.
  */
-export function snap({ body, kit, outfit, type = null }, { toneMapping, exposure }, { grade = false } = {}) {
+export function snap({ body, kit, outfit, type = null, silhouette = null }, { toneMapping, exposure }, { grade = false, scored = false } = {}) {
   studio ??= buildStudio();
   studio.renderer.toneMapping = toneMapping;
   studio.renderer.toneMappingExposure = exposure;
@@ -109,8 +111,8 @@ export function snap({ body, kit, outfit, type = null }, { toneMapping, exposure
   // After dressing (garments are built at rest, and follow the pose), and of what they made: the
   // shot that shows a hat is not the one that shows a cowl.
   const look = idLook(built);
-  const shot = takeSelfie(built, studio.camera, type, look);
-  const grades = grade ? gradeSelfie(built, studio.camera, type, look) : null;
+  const shot = scored ? scoredSelfie(built, studio.camera, type, look) : takeSelfie(built, studio.camera, type, silhouette, look);
+  const grades = grade ? { ...gradeSelfie(built, studio.camera, type, look), score: selfieScore(built, studio.camera, type, look) } : null;
   const url = develop(built);
   studio.scene.remove(built.root);
   undress(built);

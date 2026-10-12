@@ -30,7 +30,7 @@
   }
   #roster i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
   #toast {
-    position: fixed; left: 50%; top: 16px; transform: translateX(-50%); z-index: 20;
+    position: fixed; left: 50%; top: 16px; transform: translateX(-50%); z-index: 40;
     background: rgba(20,20,20,.88); color: #fff; font-size: 12px;
     padding: 8px 14px; border-radius: 8px; pointer-events: none; opacity: 0; transition: opacity .2s;
   }
@@ -58,6 +58,9 @@
   #selfies img { display: block; width: 100%; height: auto; }
   #selfies figcaption { font-size: 11px; line-height: 1.45; color: #444; padding-top: 5px; }
   #selfies figcaption.fails { color: #a3271d; }
+  #selfies figure.pick { cursor: pointer; outline: 2px dashed #c8a25a; }
+  #selfies figure.pick:hover { outline-style: solid; }
+  #selfies figure.kept { outline: 3px solid #5b8c5a; cursor: default; }
 </style>
 </head>
 <body>

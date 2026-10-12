@@ -48,6 +48,7 @@ const S = {
   toneMapping:  BASE_PARAMS.toneMapping,
   seedFacing:   true,
   selfieOf:     'hat',
+  selfieCompare: false,    // the scored search's pick beside each selfie (selfie.js scoredSelfie)
 };
 
 // One player-facing setting, not three technical switches. Each tier bundles every lever
@@ -438,6 +439,7 @@ const tune = { use: false, species: 'all', behind: false, ...STARTERS.hat };
 const sheet = /** @type {HTMLElement} */ (document.getElementById('selfies'));
 const sheetGrid = sheet.querySelector('.grid');
 let sheetRun = 0;
+const closeSheet = () => { sheet.hidden = true; };
 
 const pct = (x) => (x == null ? '—' : `${Math.round(x * 100)}%`);
 /** The caption's grade line, each failing number marked. */
@@ -447,17 +449,56 @@ function gradeLine(g) {
     bad(g.eyes <= 0.3, `eyes ${pct(g.eyes)}`), `face ${g.face.toFixed(2)}`].join(' · ');
 }
 
-/** One member's selfie of the subject, captioned with who, what, which shot, and its grades. */
-function selfieOf(member) {
+/** A shot rounded as the tuner's sliders step: what to paste, or to tune from. */
+const rounded = (shot) => Object.fromEntries(Object.entries(shot).map(([k, v]) => [k, Math.round(v * 100) / 100]));
+const shotText = (shot) => JSON.stringify(rounded(shot));
+
+/** A scored pick into the tuner, as this member's species' own shot: then copy the table to keep it. */
+function adopt(member, shot, fig) {
+  const { id } = member.kit;
+  Object.assign(tune, rounded(shot), { species: id, behind: false, use: true });
+  // straight into SHOTS, not through applyTune: that retakes the whole sheet, every picture of it
+  // blocking the page, so the click looked like it froze it
+  (SHOTS[S.selfieOf] ??= {})[id] = Object.fromEntries(SHOT_KEYS.map((k) => [k, tune[k]]));
+  fig.classList.add('kept');
+  fig.querySelector('figcaption')?.prepend(`✓ kept as the ${id} ${S.selfieOf} shot -- P to retake the sheet with it\n`);
+  toast(`${id} ${S.selfieOf}: kept, and in the tuner`);
+}
+
+/**
+ * One member's selfie of the subject, captioned with who, what, which shot, and its grades. With
+ * compare on, the scored search's pick beside it -- once a species (`done`, the ones scored this
+ * sheet): a shot fits every one of a species, and is kept as the species' own.
+ */
+function selfieOf(member, done) {
   const subject = SUBJECTS[S.selfieOf]();
   const outfit = { ...member.outfit, ...(subject && { [subject.type]: subject.item }) };
-  const { url, shot, grades } = snap({ body: member.P, kit: member.kit, outfit, type: subject?.type ?? null },
-    { toneMapping: TONE_MAPPING[S.toneMapping], exposure: S.exposure }, { grade: true });
+  // the tuner keys by type: while it is in use, its shot is the one taken, not a silhouette's own
+  const silhouette = tune.use ? null : subject?.item.silhouette ?? null;
+  const take = (scored) => snap({ body: member.P, kit: member.kit, outfit, type: subject?.type ?? null, silhouette },
+    { toneMapping: TONE_MAPPING[S.toneMapping], exposure: S.exposure }, { grade: true, scored });
+  const { url, shot, grades } = take(false);
+  const figs = [figure(url, `${member.name} · ${member.species}\n${S.selfieOf} · ${shotSource(member, shot, silhouette)}`, grades)];
+  if (S.selfieCompare && !done.has(member.kit.id)) {
+    done.add(member.kit.id);
+    const best = take(true), fig = figure(best.url, `↳ scored search, ${member.kit.id}${best.shot ? ' · click to tune' : ''}\n${best.shot ? shotText(best.shot.shot) : 'no shot passes its rules'}`, best.grades);
+    if (best.shot) {
+      fig.classList.add('pick');
+      fig.addEventListener('click', () => adopt(member, best.shot.shot, fig), { once: true });
+    }
+    figs.push(fig);
+  }
+  return figs;
+}
+
+/** A picture and its caption, the grade line under `title`, marked when a grade fails. */
+function figure(url, title, grades) {
   const fig = document.createElement('figure');
   const img = new Image(W, H);
   img.src = url;
   const cap = document.createElement('figcaption');
-  cap.innerText = `${member.name} · ${member.species}\n${S.selfieOf} · ${shotSource(member, shot)}\n${gradeLine(grades)}`;
+  const score = Number.isFinite(grades.score) ? grades.score.toFixed(2) : 'breaks a rule';
+  cap.innerText = `${title}\n${gradeLine(grades)} · score ${score}`;
   if (grades.handOut === false || grades.eyes <= 0.3 || (grades.made != null && grades.made <= 0.15)) cap.classList.add('fails');
   fig.append(img, cap);
   return fig;
@@ -488,10 +529,11 @@ function slideTune() {
 }
 
 /** Which shot a member's selfie of the subject took: their species' own, the all-species one, or searched. */
-function shotSource(member, searched) {
-  const { id } = member.kit, shot = shotFor(S.selfieOf, id);
+function shotSource(member, searched, silhouette) {
+  const { id } = member.kit, shot = shotFor(S.selfieOf, id, silhouette);
   if (!shot) return `searched: ${searched}`;
-  return SHOTS[S.selfieOf][id] === shot ? `own ${id} shot` : 'all-species shot';
+  const own = SHOTS[`${S.selfieOf}:${silhouette}`], from = own && Object.values(own).includes(shot) ? `${S.selfieOf}:${silhouette}` : S.selfieOf;
+  return SHOTS[from][id] === shot ? `own ${id} ${from} shot` : `all-species ${from} shot`;
 }
 
 /** The tuned species takes no authored shot of this subject, not even `all`'s: searched (selfie.js shotFor). */
@@ -511,17 +553,17 @@ function copyShots() {
 
 /** Every member's selfie, one a frame so the sheet fills in rather than freezing the page. */
 function selfieSheet() {
-  const run = ++sheetRun, members = [...crowd];
+  const run = ++sheetRun, members = [...crowd], done = new Set();
   sheetGrid.replaceChildren();
   sheet.hidden = false;
   const next = (i) => {
     if (run !== sheetRun || sheet.hidden || i >= members.length) return;
-    sheetGrid.append(selfieOf(members[i]));
+    sheetGrid.append(...selfieOf(members[i], done));
     requestAnimationFrame(() => next(i + 1));
   };
   next(0);
 }
-sheet.querySelector('.close').addEventListener('click', () => { sheet.hidden = true; });
+sheet.querySelector('.close').addEventListener('click', closeSheet);
 
 // ---------------------------------------------------------------- ui
 function updateRoster() {
@@ -588,6 +630,7 @@ gui.add(S, 'toneMapping', ['AgX', 'ACES', 'None']).onChange((v) => (renderer.ton
 const gSelfie = gui.addFolder('selfies');
 gSelfie.add(S, 'selfieOf', Object.keys(SUBJECTS)).name('of').onChange(() => { loadTune(); if (!sheet.hidden) selfieSheet(); });
 gSelfie.add({ f: selfieSheet }, 'f').name('selfie every character  (P)');
+gSelfie.add(S, 'selfieCompare').name('compare scored search').onChange(() => { if (!sheet.hidden) selfieSheet(); });
 const gTune = gSelfie.addFolder('tune the shot');
 gTune.add(tune, 'species', ['all', ...speciesIds()]).name('for species').listen().onChange(loadTune);
 gTune.add(tune, 'use').name('use this shot').listen().onChange(applyTune);
@@ -622,7 +665,7 @@ const KEYS = {
   d: distanceTest,
   b: () => renderer.domElement.classList.toggle('squint'),
   p: selfieSheet,
-  escape: () => { sheet.hidden = true; },
+  escape: closeSheet,
 };
 
 addEventListener('keydown', (e) => {

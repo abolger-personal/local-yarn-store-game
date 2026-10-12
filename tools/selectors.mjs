@@ -1,16 +1,8 @@
-// Every element the shop looks up must exist in store.html, game.html or puzzle.html.
-//
-// The markup and the code that drives it are in different files, so renaming an element is a
-// silent break: `getElementById` returns null and the failure lands later, somewhere else. It
-// cost a whole debugging round when #rotator became #furnBtns — installMove() threw, which took
-// out installInput() behind it, and the symptom was "items don't follow the mouse".
+// Usage: node tools/selectors.mjs (part of npm run check; see tools/README.md)
 import { readFileSync } from 'node:fs';
 import { storeFiles } from './modules.mjs';
 
-// All three pages, as one pool of ids. The store modules drive the shop AND the puzzle bench, and a
-// module cannot say which page it was loaded by — so this can no longer tell you an element is on
-// the WRONG page, only that it exists on none of them, which is the failure that actually happened.
-// exterior.js is markup too: the entry and the door, drawn into the front door and the night screen.
+// ponytail: one id pool for all pages, so an id on the wrong page passes; per-page pools if that bites
 const html = ['characters/store.html', 'characters/game.html', 'characters/puzzle.html', 'characters/store/ui/exterior.js']
   .map((f) => readFileSync(f, 'utf8')).join('\n');
 const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]));

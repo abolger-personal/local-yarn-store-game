@@ -32,12 +32,33 @@ Two things it does NOT catch, so do not trust it for them:
 What is left is project-specific, and no off-the-shelf rule knows about it:
 
 - **`selectors.mjs`** — every `getElementById` / `querySelector` in the shop resolves to real
-  markup in `store.html`. Renaming an element is otherwise silent: the lookup returns null and the
+  markup in `store.html`, `game.html`, `puzzle.html` or `ui/exterior.js` (which draws the entry
+  and the door). One pool for all pages: it catches an id on no page, not one on the wrong page. Renaming an element is otherwise silent: the lookup returns null and the
   failure lands somewhere else entirely. `#rotator` → `#furnBtns` cost a debugging round this way.
 - **`sideeffects.mjs`** — the bare `import '../owl.js'` registrations are still there. They export
   nothing and are referenced by nothing, so every other tool considers them dead code. Dropping
   them leaves no species registered and the shop fails to open.
 - **`modules.mjs`** — shared helper: every store module, wherever it lives in the folder tree.
+
+Every lint rule is an **error**, not a warning: a warning nobody has to fix is one nobody reads.
+
+## selfie-tuning/tune-shots.mjs
+
+`node tools/selfie-tuning/tune-shots.mjs [out.json] [workers]` — tunes `characters/selfie.js`
+SHOTS: one shot per species × garment silhouette (plus the pot holder and the armful), by random
+search on selfie.js's scored-search score. Results: `selfie-tuning/shots-report.md`.
+
+- A seed is `BODIES` fresh random bodies, each in a random item of that silhouette at close-up
+  detail (as `selfie-studio.js` snap dresses them; a bag is held up). A shot's score is the mean
+  over the bodies, a body where it breaks a rule counting 0.
+- A worn garment's shot must also hold `garments.test.mjs`'s authored-shot floors on every body,
+  since the tuned shots become authored. Held pieces only have to show, which the score checks.
+- The search starts from every authored front shot, the best already found for that type (any
+  species), and the best kept so far (rescored on each seed's bodies, so a shot must hold for any
+  body), draws `DRAWS` more across selfie.js RANGES, then hill-climbs round the top few.
+- A combination is done at its first seed reaching `GOOD`; after `SEEDS` without, it is flagged.
+- The shawl is not searched: its shots are from behind and the score assumes a front selfie.
+- Results are written after every combination, so a stopped run resumes.
 
 ## Why not eslint-config-google / airbnb
 

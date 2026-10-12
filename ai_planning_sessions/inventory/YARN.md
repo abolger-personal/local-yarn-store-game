@@ -21,3 +21,13 @@ Every yarn also needs a **held** design with a flat ball band, and knitting need
 
 - A rigging note here is that all yarn should look "right" when held by the NPCs: knitting in particular is a 2 handed operation. It would be ok to have a specific visual design per notion of what it looks like being *held*, which could even come with a pose (sitting at a spinning wheel, holding up a drop spindle, sitting or standing knitting with 2 hands, crochet with 1 hand, etc.)
 
+## Colour count
+
+48 distinct colours (`YARN_COLOR_COUNT`): enough for a rainbow wall, the "overwhelming variety"
+above. The catalog holds only the count; the palette lives in the renderer.
+
+## TODO
+
+- **TODO(spec):** gradients, sparkle and fuzziness are not modelled. Each yarn is one flat hue
+  (`colorIndex`); these need art and a detail channel, not just a data field.
+- **TODO(spec):** yarn and pattern atlas cells are placeholder silhouettes; real illustrations to come.

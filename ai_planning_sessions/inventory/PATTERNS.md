@@ -64,3 +64,11 @@ The visual spec asks for these to be kept here as they come up.
     - mittens are a pattern and a DECOR finished object: knitted, never worn (no rendered fingers). VISUAL-DESIGN-FINISHED-OBJ.md §1 lists them under decor
     - blanket added as a decor type (6 balls, proposed): it drapes over the shop's chair backs and display tables, which record where it fits
     - ~~the code lags this table~~ Done 2026-10-03 for the wearables: `PATTERN_TYPES` in `inventory/catalog.js` makes sweater, shawl, scarf, bag, hat and socks at this table's costs, and `yarnUnits` counts one per item. Each named design carries the silhouette it makes (`silhouette`, garments.js's own words), and the finished object is built as that silhouette. The decor types are still not patterns: nothing draws a decor FO yet, so one would finish invisible; see VISUAL-DESIGN-FINISHED-OBJ.md §6
+- `yarnUnits` also sets how many rounds a project takes (WIP-AND-FINISHED-OBJ-FORMATION.md): socks are
+  a quick win, a sweater spans a visit or two. Decor types (only the pot holder so far) stay off random
+  stock and customers' patterns until something draws them; the pot holder is put out by the tutorial alone.
+
+## Open questions
+
+- **TODO(spec):** tie a pattern's tool size to its difficulty instead of rolling it flat.
+  CHARACTER-ATTRIBUTES.md: "crochet and needle size tiny" for a high-Intellect pattern.

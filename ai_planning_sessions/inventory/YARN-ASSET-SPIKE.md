@@ -141,6 +141,10 @@ Reads as *storybook illustration* rather than *soft object*. Risk: hard bands ac
 read as plastic. Wants a deliberately soft ramp to stay cosy. Cheaper than standard, not as cheap
 as matcap.
 
+Built: the ramp is biased toward the lit band (0.34 + 0.66·x^0.72) so the shadow reads as an
+accent; an even split makes a round object look half in shadow, dramatic rather than cosy.
+`NearestFilter` is required, or linear filtering smooths the steps back into a gradient.
+
 ### C. Baked vertex-colour AO, unlit
 
 Bake AO/curvature into vertex colours at build time, render `basic`. No lights, no textures, tiny
@@ -198,6 +202,10 @@ discipline. Six levers, cheapest first:
 
 4. **Orientation per family, which is free** — it lives in the instance matrix. Cones stand, cakes
    sit, skeins lie down, hanks hang. In a grid this reads strongly.
+   The ball is slightly oblate (y × 0.92): a perfect sphere reads as a bouncy ball, a squashed one
+   as something soft that has sat on a shelf. The booklet **stands**: the only hard-edged, planar
+   item, it punctuates a shelf of round things. It takes no ball band (its cover is its label) and
+   no yarn end.
 
 5. **Winding direction as texture or normal, never geometry.** The strand direction is what says
    *yarn* instead of *ball*. At low poly this has to be shading; object-space direction in the
@@ -807,6 +815,13 @@ full spread.
   that box stays empty at every spread — which is what makes opening the rest safe rather than a
   camouflage regression. Asserted at spreads 0, 0.5 and 1.
 - Curation returns later as *themes* or *box sets*, on top of a wide range rather than instead of one.
+- **Three colour families, not one box.** Bold 45% (L 0.52–0.72, C 0.13–0.20), muted/heather 40%
+  (L 0.52–0.78, C 0–0.07), pastel 15% (L 0.80–0.93, C 0.04–0.11). A real shop is mostly saturated
+  mid tones and heathers, with pastels a minority; one box makes any light, slightly chromatic
+  colour a pastel and the wall reads as Easter. garments.test.mjs holds the bold and pastel shares.
+- **A colour inside `characterRange` is nudged to its nearer lightness edge, not re-rolled**, so the
+  distribution stays even. Only low-chroma colours can collide, so a saturated yarn may sit at any
+  lightness.
 
 One thing the check found: **`oklch()` clips out-of-gamut channels at zero, and clipping a channel
 rotates the hue.** At full spread, 83 of 2000 samples were landing more than 12 degrees off their
@@ -974,7 +989,8 @@ no shadow would be flat, which is the opposite failure.
 `scatterYaw()` and `settleYaw()` now live in `pick-place.js` beside the rest of the placement
 logic. They had drifted into three copies at three different amounts — 0.18pi in the shop, 0.22pi
 for notions in the demo, and **0.5pi for yarn**, which is nearly a quarter turn and reads as dumped
-rather than arranged. One number, one place, and yarn now gets exactly what notions get.
+rather than arranged. One number, one place, and yarn now gets exactly what notions get. Booklets
+are the exception: they stand square to the shelf like books, with no jitter.
 
 `settleYaw` accumulates rather than re-rolling, which is the property worth protecting: a thing
 never lands quite as it was lifted, but repeated pick-ups must not erase an arrangement.

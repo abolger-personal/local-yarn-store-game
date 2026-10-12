@@ -1,5 +1,3 @@
-// Every store module, wherever it lives. The files are grouped into folders now, so nothing may
-// assume a flat directory.
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 

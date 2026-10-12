@@ -1,10 +1,4 @@
-// Every bare `import './x.js'` that the shop used to have must still be there somewhere.
-//
-// A bare import is a REGISTRATION: owl.js and llama.js add themselves to npc.js's species list
-// and export nothing. Nothing references them by name, so eslint sees nothing missing, the link
-// checker sees nothing missing, and the failure surfaces far away — at the first NPC spawn, as
-// "Cannot read properties of undefined (reading 'randomise')". Which is how it got dropped when
-// the inline script became 20 modules.
+// Usage: node tools/sideeffects.mjs (part of npm run check; see tools/README.md)
 import { readFileSync } from 'node:fs';
 import { storeFiles } from './modules.mjs';
 

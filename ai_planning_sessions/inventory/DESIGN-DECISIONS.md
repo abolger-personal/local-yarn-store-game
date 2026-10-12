@@ -125,6 +125,10 @@ The game is an **orbiting diorama**, so the camera moves and this choice is visi
 A full billboard on an item resting on a shelf looks wrong as the camera orbits — it pivots in place
 like a cardboard cutout. **Y-axis is the likely default**, with fixed cards for anything lying flat.
 
+Built: each notion is a box, for volume, with the illustrated card as a label flush on its forward
+face (standing, like a product on a shelf) and a second copy lying flat on its top, so it reads both
+from the side and from straight above.
+
 ### Flat notions next to 3D yarn is a feature, not an inconsistency
 
 The briefing asks for notions to read "as if they are an ink drawing". Sitting flat, outlined and
@@ -191,6 +195,8 @@ nobody. Scale is a property of the *situation*, so it belongs with the situation
 1. **Communicating notion attributes.** A 1mm and a 30mm crochet hook cannot be distinguished by
    silhouette at diorama scale. Non-diegetic number, an inspect panel, or colour coding? The project
    is committed to *mostly* diegetic UI, so this needs an explicit exception, not a drift.
+   *Prototyped:* a crochet hook's size is a millimetre number printed on the box's side face,
+   perpendicular to the front label. EU/metric only for MVP; US/UK/manufacturer sizing varies too much.
 2. **Fuzz tiers vs family split vs custom shader** (section 2).
 3. **Does a notion's pose belong to the notion or to the activity?** Knitting-with-needles and
    knitting-with-a-different-needle-size are the same pose. Suggests poses attach to *activities*,
@@ -233,7 +239,8 @@ independent of notion count. Section 2's central claim is now demonstrated rathe
 the card, delivers thickness *and* the ink outline in **one extra draw call for the whole field** —
 because it shares the main field's instance attributes rather than maintaining a synced copy. A
 fragment-stage gradient across the card adds form with no geometry at all. Billboards stay
-billboards.
+billboards. Because labels stand flush on box faces, the outline copy is biased in the depth test
+(`polygonOffset`) rather than pushed behind the card.
 
 **Picking uses a plane at the card's mid-height, not the floor.** An upright card is drawn well
 above its own footprint, so a floor hit test asks the player to click empty grid below the thing
@@ -241,7 +248,26 @@ they can see. Still one plane intersection, still O(1), still never raycasts an 
 
 **Picking is forgiving by design.** An ink drawing occupies a fraction of its slot, so an exact hit
 test feels like the item is not where it looks. `pickSlot` falls back to the nearest occupied slot
-within a grab radius.
+within a grab radius. Click to pick up, click again to put down (press-and-hold is hard on the hands
+for the core mechanic). Each occupied column is tested against its own plane at the item's middle
+height, so a tall item is grabbable over its whole body. An exact hit wins (nearest the camera);
+otherwise the nearest item within a **screen-space** grab radius (44 CSS px on touch, half for a
+mouse) measured to the item's vertical axis, so the tolerance means the same at any zoom. Among near
+misses the closest on screen wins, then the closest to the camera. Hovering to *read* uses the nearest
+item box the ray meets, buried or not, so the visible edge of a lower item shows that item.
+
+**Dropping.** A drop lands in the nearest slot the item actually *fits*, within 1.6 slots, never
+"the cell under the pointer", which is often full, and a silent no-op reads as broken. Reach is in
+slots, in the display's plane, so it does not drift with zoom. Footprints covering the pointer beat
+ones that don't; among those the most centred wins (a 3x3 centres on the pointed cell, a 2x2 takes
+the side the pointer is nearer). Each occupied column is aimed at as a solid block, floor to stack
+top, so pointing at a tall item's top or front stacks onto it. The targeted level is the nearest one
+whose lattice is under the pointer, with half a slot of slack past the edge so outer rows can be
+aimed from outside. The "display is full" warning tries the quarter turn too, per item. An item set
+back home whose column filled while it was in hand goes to the first free slot on its home display.
+
+**Placeholder art shares the one atlas.** Yarn and pattern placeholder shapes are composited into the
+notion atlas, drawn white so they recolour per instance: no extra draw calls.
 
 > `GridHelper` only draws squares. On a non-square grid it silently draws the wrong pitch, so the
 > player aims at lines that are not the slots. Use `makeGridLines`.
@@ -293,6 +319,12 @@ again.
 `fullyExposed` moved from `characters/visit.js` into `grid.js` — it is pure grid occupancy, the
 player's pick needs the same answer the NPC does, and `inventory/` must not depend on `characters/`.
 Re-exported from `visit.js`, so existing callers are unchanged.
+
+Holding an item across displays: hovering onto another display activates it for the drop, with no
+key press; hovering over dead space returns to the display it came from. An incidental switch
+mid-hold never moves the camera; an explicit one (D, the dropdown, a fresh pick-up) recentres it. A
+keyboard plane or display switch re-aims the drop at once. On a click the forgiving item pick runs
+first; only if it finds nothing does the click select the display under the pointer.
 
 ### Yarn is in the shop — 2026-09-09
 

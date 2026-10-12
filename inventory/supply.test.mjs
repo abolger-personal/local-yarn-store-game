@@ -1,4 +1,3 @@
-// Self-check for the delivery script, the supplier throttle and the overnight carry-over.
 // Run: node inventory/supply.test.mjs
 import assert from 'node:assert/strict';
 import { mulberry32 } from '../characters/store/core/util.js';
@@ -8,7 +7,6 @@ import { toolSuitsPattern, yarnSuitsPattern } from '../characters/wip.js';
 
 const isGoods = (it) => it.name === 'yarn' || it.name === 'pattern';
 
-// --- day 1 is the starting pile, with one formation that works ------------------------------
 for (let seed = 1; seed <= 50; seed++) {
   const pile = resolveOrder(buildOrder(1), mulberry32(seed));
   assert.ok(pile.length >= 24 && pile.length <= 30, `day 1 is 24-30 items, got ${pile.length}`);
@@ -17,7 +15,6 @@ for (let seed = 1; seed <= 50; seed++) {
   assert.ok(solvable, 'the starting pile holds a pattern AND every ball it needs');
 }
 
-// --- no notions until day 4; script slots carry their source ---------------------------------
 for (let day = 1; day <= 3; day++) {
   for (let seed = 1; seed <= 20; seed++) {
     assert.ok(resolveOrder(buildOrder(day), mulberry32(seed)).every(isGoods), `day ${day} has no notions`);
@@ -26,11 +23,9 @@ for (let day = 1; day <= 3; day++) {
 assert.ok(resolveOrder(buildOrder(4), mulberry32(1)).some((it) => !isGoods(it)), 'notions arrive on day 4');
 assert.ok(buildOrder(5).every((s) => s.source === 'script'), 'days 1-10 are scripted');
 
-// --- a new weight is only the new weight ----------------------------------------------------
 assert.deepEqual(buildOrder(5)[0].template.weights, ['bulky'], 'day 5 introduces bulky');
 assert.ok(!buildOrder(4).some((s) => s.template.weights?.includes('bulky')), 'and nothing has it before');
 
-// --- the order's lines: the script's for two days, one of yours on night 2, then all yours ----
 SCRIPT.forEach((row, i) => {
   const day = i + 1;
   const want = day <= 2 ? 0 : day === 3 ? 1 : row.length;
@@ -41,7 +36,6 @@ const withForm = buildOrder(7, { chosen: [mine] });
 assert.equal(withForm.filter((s) => s.source === 'player').length, 1, 'a chosen template takes one slot');
 assert.equal(withForm.find((s) => s.source === 'player').template, mine, 'and is used as given');
 
-// --- day 11+: shrinks as the shop fills, never below the minimum ----------------------------
 let last = Infinity;
 for (let occ = 0; occ <= 1.2; occ += 0.05) {
   const n = supplyFor(occ);
@@ -57,7 +51,6 @@ for (let seed = 1; seed <= 20; seed++) {
   }
 }
 
-// --- carry-over: what was there, minus what was bought, plus the delivery --------------------
 {
   const floor = { id: 'floor0', g: makeDisplay(4, 4, { headroom: 24 }) };
   const items = [];
@@ -66,9 +59,9 @@ for (let seed = 1; seed <= 20; seed++) {
     items.push({ ...it, display: floor.id, shelf: 0, c, r, keys, layers: 1,
       layer: place(floor.g, keys, items.length, 1), gone: false });
   };
-  for (let i = 0; i < 6; i++) put({ name: 'yarn', i }, i % 2, 0);   // two stacks of three
-  items[1].gone = true;                                              // bought: bottom of stack 1
-  items[4].gone = true;                                              // bought: top of stack 0
+  for (let i = 0; i < 6; i++) put({ name: 'yarn', i }, i % 2, 0);
+  items[1].gone = true;
+  items[4].gone = true;
   assert.equal(carryOver(items, [floor]), 2, 'two bought items dropped');
   assert.equal(items.length, 4, 'six minus two purchases');
   assert.deepEqual(items.map((it) => it.layer), [0, 1, 0, 1], 'what sat on a bought item drops; the rest keep their layer');
@@ -78,9 +71,6 @@ for (let seed = 1; seed <= 20; seed++) {
   assert.equal(items.length, 4 + delivery.length, 'carried stock plus the delivery');
 }
 
-// --- the packing slip: tomorrow's order in words, the player's slots marked ------------------
-// The night screen shows the order built at closing and delivers that same object, so the words
-// only have to be true to the slots: day 3's order (set on night 2), with its one line that is yours.
 assert.deepEqual(buildOrder(3).map(describeSlot), [
   { count: 5, item: 'ball of yarn', detail: 'worsted or dk', yours: true },
   { count: 2, item: 'pattern', detail: 'for worsted or dk', yours: false },
@@ -93,8 +83,6 @@ for (let day = 1; day <= 30; day++)
   for (const slot of buildOrder(day, { occupancy: 0.4, rng: mulberry32(day) }))
     assert.equal(describeSlot(slot).yours, slot.playerChoosable, `day ${day}: a choosable slot is marked`);
 
-// --- tutorial day 1 (game.html): exactly a pot holder pattern, its hook and one ball ------------
-// The playground's day 1 is the pile above, and random stock never holds the tutorial's pot holder.
 for (let seed = 1; seed <= 50; seed++) {
   const { table, floor } = tutorialDay1(mulberry32(seed));
   assert.equal(table.patternType, 'potholder');
@@ -108,7 +96,6 @@ for (let seed = 1; seed <= 50; seed++) {
     'no pot holder in the playground pile');
 }
 
-// --- the player's line (night 2 on): every choice resolves to that line's count, in its weights --
 {
   const line = buildOrder(3).find((s) => s.playerChoosable);
   assert.ok(line, 'day 3 has a line of the player\'s');

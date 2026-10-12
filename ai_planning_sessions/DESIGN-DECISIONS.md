@@ -138,7 +138,8 @@ hundred remembered NPCs free.
    *Exception:* the floor pile (≤ ~40 items) is its own small raycastable `InstancedMesh`.
 6. **Items do not cast into the shadow map.** 1000 shadow casters roughly doubles draw cost and
    reads as noise at this scale. Only the room shell and displays cast. Items get baked AO plus
-   fake contact-shadow quads.
+   fake contact-shadow quads, each sized to what is actually drawn rather than to the slot: a shadow
+   bigger than the object makes it look like it is hovering.
 7. `InstancedMesh` capacity is fixed at allocation. Allocate per family with headroom
    (`nextPow2`) plus a free-list with swap-remove repacking — **or** use `BatchedMesh`
    (three r168+), which also gives per-instance frustum culling. Decide after measuring.
@@ -606,6 +607,24 @@ Build it once, in P2.
 - Doubles as tutorial pacing: withhold notions for the first few days so the player masters
   yarn-only formations first. Invisible to the player.
 - Also testable — a fixed curve lets tests assert "by day 10 the player can build formation X".
+- Weights arrive over the script: worsted and dk on day 1, so sorting has a dimension from the
+  start; bulky on day 5 and fingering on day 8, each as a "new weight" slot.
+- Notions are held back until day 4. Day 1's guaranteed formation is a kit: one pattern plus every
+  ball it needs, one weight and material, inside one colour family (colours vary within it, so a
+  multi-colour design still has its colours). A colour family is one sixth of the colour wheel.
+- The supplier's full delivery is day 10's size (kits excluded); the minimum delivery is 2.
+- The packing slip describes each slot's template, never the items: the catalog picks those on the
+  day. A blank line is never offered as a kit, because a kit is not "count of" anything.
+
+### The shop's range
+
+The shop carries a curated range, not one of everything: weights fingering, dk, worsted, bulky;
+materials wool, cotton, alpaca, acrylic; tool sizes 3–6 mm (`SHOP_RANGE` in `inventory/catalog.js`).
+This is game balance. Matching is strict (one weight and material out of 8×8, one tool out of
+2×12), so against uniformly random stock a shelf item meets a given want ~0.9% of the time for yarn
+and 0.5% for a tool, and almost no project would get made. Drawing stock and patterns from the same
+small range keeps the strict match playable. Every weight × material pair in the range has at least
+one named design, so a customer holding any stock yarn has a pattern to shop for.
 
 ### Homeostasis — stopping growth toward the 1000 ceiling
 
@@ -650,6 +669,12 @@ an invisible overnight tidy-up (a) or as a Hoarder NPC or moths (c) is **present
 **Both homeostasis systems stay off during days 1–10.** Throttling fights the authored curve, and
 destashing punishes new players. Clean boundary: days 1–10 pure authored, day 11+ systems on.
 
+### Open questions
+
+- **TODO(spec):** stocking should become the player's choice. What the shop carries is exactly the
+  kind of choice LYS.md wants the player making, and CHARACTER-ATTRIBUTES.md's "getting to know your
+  NPCs will help the player solve the puzzle" only means something if stocking is a choice.
+
 ---
 
 ## 7. Art direction
@@ -670,6 +695,9 @@ like the same game recoloured), and semi-realistic (N× texture cost per theme).
   Different themes, zero new shaders, zero new geometry.
 - Hue variation **must** be palette-constrained (anchor hues plus small perceptual jitter).
   Uniform-random hue destroys the pastel read instantly.
+- Lighting is three 0.160's `RoomEnvironment` (room at y=0, overhead point light 5), pinned in
+  `inventory/room-environment.js`. Every page's brightness was tuned under it; switching to three's
+  current room needs a full brightness retune.
 
 ---
 

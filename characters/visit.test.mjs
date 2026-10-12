@@ -277,7 +277,9 @@ function fixture({ rng = seq(0.5), traits, seats = SEATS, wips } = {}) {
   assert.equal(npc.considering?.index, buried, 'and records what is being turned over');
   assert.ok(!items[buried].gone, 'considering does not remove it from the display');
 
+  assert.ok(npc.restructured.includes('pile'), 'digging spent their one rearrange of the pile');
   assert.equal(interact(npc, pile, world), 'complete', 'the round after that buys it');
+  assert.ok(!npc.restructured.includes('pile'), 'DISPLAYS.md rule 9: the buy earns one more rearrange');
   assert.ok(items[buried].gone, 'the purchase removes the item from the display');
   assert.equal(npc.carrying.name, 'crochet-hook', 'and the NPC carries it out');
   assert.equal(npc.considering, null, 'the consideration is spent');

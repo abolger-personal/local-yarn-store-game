@@ -690,7 +690,8 @@ function finishingPush(npc, world) {
  * tutorial friend (world.js openTutorial) does not run out of rounds while something they want is
  * out where they can notice it, or buried where they can still dig (Assertiveness 5), so a
  * stranger's patience cannot send them home past it. Bought by someone else, never put out, or
- * still buried where they have already dug ends the wait as MAX_ROUNDS would, so a day cannot stall.
+ * still buried where they have dug since their last buy there (DISPLAYS.md rule 9) ends the wait
+ * as MAX_ROUNDS would, so a day cannot stall.
  */
 const waitsForPlayer = (npc, { displays, items }) => npc.patience === 'friend' &&
   displays.some((d) => consideredHere(npc, d, items).length ||
@@ -900,9 +901,9 @@ function buyConsidered(npc, display, world) {
   if (!want) { remember(npc, `put ${index}`, { what: 'putBack', item: { ...item } }); return false; }
   item.gone = true;                      // "Inventory removed from display"
   rebuildPlane(display, items, item.shelf, onPlane(display, items, item.shelf));
+  npc.restructured = npc.restructured.filter((id) => id !== display.id);   // rule 9: a buy earns one more rearrange
   const bought = { ...item, ...provenance(npc, display, world, item.shelf) };
-  npc.bought.push(bought);
-  npc.carrying = bought;
+  npc.bought.push(npc.carrying = bought);
   const wip = stow(npc, bought, want);
   npc.willReturn = true;      // "NPC Visitors who manage to either buy any items or..."
   say(world, npc, `bought ${labelOf(bought)} for ${want.wip}${
@@ -913,8 +914,9 @@ function buyConsidered(npc, display, world) {
 // --- "else If (Rules for display result in Rearrange or Tidy)" ----------------------------
 //
 // DISPLAYS.md rule 9: an NPC may restructure a given display at most ONCE per visit, after which
-// further interactions can only Buy or Look. That rule is what makes "Interaction Not Complete"
-// terminate instead of prescribing the same tidy every round forever.
+// further interactions can only Buy or Look -- until they buy there, which earns one more (a buy
+// restacks the plane and can bury their next want). That rule is what makes "Interaction Not
+// Complete" terminate instead of prescribing the same tidy every round forever: a buy uses up an item.
 /** Spreads, tidies or digs through the display, once a visit: whether they did. */
 function restructure(npc, display, world) {
   const { items } = world;

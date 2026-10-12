@@ -10,7 +10,7 @@ Gameplay mechanics:
 7. Before internal rules apply, an NPC must "notice" a display. Rules for noticing a shelf are defined by a primary tier of logic so that internal display logic isn't running all the time. 
 8. All display interactions take place within a round once the character has walked to that display in the previous game round. No interaction continues over multiple game rounds. 
 
-9. An NPC may RESTRUCTURE a given display (Spread, Tidy or Rearrange - see the per-type scoring rules below) at most ONCE per visit. After that, further interactions with the same display can only Buy or Look.
+9. An NPC may RESTRUCTURE a given display (Spread, Tidy or Rearrange - see the per-type scoring rules below) at most ONCE per visit. After that, further interactions with the same display can only Buy or Look. Exception (decided 2026-10-12): a purchase at a display earns that NPC ONE more restructure of it, since the purchase restacks the display and can bury the next thing they want. A reticent NPC, who only ever takes what is on top, gains nothing from it; and every extra restructure costs an item, so it still terminates.
 
 10. The Player may MOVE entire displays whereever they want inside the shop as long as it follows the rules of: peg boards stay on the wall, and floor piles stay on the floor. All Inventory will stay with the move. Displays may be rotated as well. For MVP, rotations may be every 45 degrees.
 

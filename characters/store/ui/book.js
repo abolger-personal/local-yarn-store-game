@@ -130,6 +130,5 @@ export function installBook() {
   }, true);
   olderBtn.addEventListener('click', () => { showing -= 1; drawBook(); });
   newerBtn.addEventListener('click', () => { showing += 1; drawBook(); });
-  bookEl.querySelector('.close').addEventListener('click', () => { bookEl.hidden = true; });
   photoEl.querySelector('.close').addEventListener('click', () => { photoEl.hidden = true; });
 }

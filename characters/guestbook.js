@@ -1,29 +1,17 @@
-// What a Guestbook entry says: the expanded rows and the selfie's thank-you line.
-//
-// Pure: no three.js, no DOM, node-testable (guestbook.test.mjs). visit.js records the facts as the
-// visit happens; this only words them. Every line here is built from something the sim recorded,
-// never from what a customer wanted (DESIGN-DECISIONS.md: observed behaviour, never hidden state).
-//
-// Specs: ai_planning_sessions/TUTORIAL.md §7.1 (ball band), §7.3 (rows, witnessed vs gist),
-//        ai_planning_sessions/characters/PROJECTS-AND-AUTHORSHIP.md §4b (the thank-you line).
+// TUTORIAL.md §7.1, §7.3; PROJECTS-AND-AUTHORSHIP.md §4b
 
 import { labelOf, TOOL_FOR_CRAFT, YARN_COLOR_COUNT, yarnUnits } from '../inventory/catalog.js';
 
-// ---------------------------------------------------------------- the ball band (§7.1)
-
-// The palette places hue i at about (i + ½) × 360/count degrees of OKLCH (YARN_COLORS in stock.js).
 // ponytail: hue bands only, so a muted or very pale yarn still gets its hue's word; add "grey" /
 // "pale" when the band needs lightness and chroma too.
 const HUE_WORDS = /** @type {[number, string][]} */ ([[15, 'pink'], [45, 'red'], [75, 'orange'], [110, 'yellow'],
   [165, 'green'], [205, 'teal'], [270, 'blue'], [320, 'purple'], [360, 'pink']]);
 
-/** The colour family a shopper would read off a ball. */
 export function colourWord(colorIndex) {
   const hue = (((colorIndex % YARN_COLOR_COUNT) + 0.5) * 360) / YARN_COLOR_COUNT;
   return HUE_WORDS.find(([upTo]) => hue < upTo)?.[1] ?? 'pink';
 }
 
-/** One item as its ball band reads: only what a shopper could read off the real object. */
 export function bandOf(item) {
   if (item.name === 'yarn') {
     return `${item.weight} ${item.material} ${item.shape ?? 'ball'}${item.colorIndex == null ? '' : `, ${colourWord(item.colorIndex)}`}`;
@@ -35,16 +23,10 @@ export function bandOf(item) {
   return labelOf(item).replace('-', ' ');
 }
 
-/** Capitals for the house lettering, which has no lowercase: "super-bulky" reads SUPER BULKY. */
 const caps = (s) => String(s).replaceAll('-', ' ').toUpperCase();
 const mm = (n) => `${Number(n).toFixed(1)}MM`;
-// The same word on a yarn's band and a pattern's, so the player can match one to the other.
 const units = (n) => `${n} ${n === 1 ? 'UNIT' : 'UNITS'}`;
 
-/**
- * The paper ball band on screen, one printed line each: the same facts as bandOf, laid out as a
- * band prints them. A pattern's tool line names its craft too (CROCHET HOOK, KNITTING NEEDLES).
- */
 export function bandLines(item) {
   if (item.name === 'yarn') {
     return [`${caps(item.weight)} WEIGHT`, caps(item.material),
@@ -56,7 +38,6 @@ export function bandLines(item) {
   return [caps(item.name), ...(item.size == null ? [] : [mm(item.size)])];
 }
 
-/** A pattern's needs as [label, value] rows, in its band's order. */
 export function patternNeeds(item) {
   return [
     ['MAKES', caps([item.silhouette, item.patternType].filter(Boolean).join(' '))],
@@ -66,29 +47,17 @@ export function patternNeeds(item) {
   ];
 }
 
-// ---------------------------------------------------------------- the label's card (§7.1)
-
-// A card is { head, body }: `head` in the house lettering (ui/label.js draws and rules it off),
-// `body` HTML, so each bought thing is one list entry however it wraps, and a pattern's needs are
-// label/value rows under its title.
 const escape = (s) => String(s).replace(/[&<"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '"': '&quot;' })[c]);
 const list = (cls, xs) => (xs.length ? `<ul class="${cls}">${xs.map((x) => `<li>${escape(x)}</li>`).join('')}</ul>` : '');
 const needsHtml = (item) => `<dl class="needs">${patternNeeds(item).map(([k, v]) => `<dt>${k}</dt><dd>${escape(v)}</dd>`).join('')}</dl>`;
 const patternTitle = (item) => caps(item.title ?? `${item.patternType} pattern`);
 
-/** An item's card: its band's first line as the heading and the rest as facts; a pattern's, its needs. */
 export function bandCard(item) {
   if (item.name === 'pattern') return { head: patternTitle(item), body: needsHtml(item) };
   const [head, ...facts] = bandLines(item);
   return { head, body: list('facts', facts) };
 }
 
-/**
- * A customer's tag (§7.1): their name and what they have bought this visit, never what they
- * still want. PROJECTS-AND-AUTHORSHIP.md §1: once the player has seen them knit (a witnessed 🪑,
- * or `knitting`, the pattern on their needles right now as the player looks), their pattern's band
- * too, which is what the project needs.
- */
 export function tagCard(npc, knitting = null) {
   const pattern = npc.did?.find((d) => d.what === 'sat' && d.witnessed)?.pattern ?? knitting;
   const bought = (npc.bought ?? []).map((it) => (it.name === 'pattern' ? patternTitle(it) : caps(bandOf(it))));
@@ -98,22 +67,15 @@ export function tagCard(npc, knitting = null) {
   return { head: caps(npc.name), body: (list('items', bought) || '<p class="status">Nothing bought yet</p>') + making };
 }
 
-/** What a yarn or pattern IS, in a customer's words: "the blue", "the hat pattern". */
 function thingOf(item) {
   if (item.name === 'yarn' && item.colorIndex != null) return `the ${colourWord(item.colorIndex)}`;
   if (item.name === 'pattern') return `the ${item.patternType} pattern`;
   return `the ${bandOf(item)}`;
 }
 
-// ---------------------------------------------------------------- where it stood (§4b)
-
 const near = (a, b, r) => Math.hypot(a.x - b.x, a.z - b.z) < r;
 
-/**
- * PROJECTS-AND-AUTHORSHIP.md §4b's place word, from where the display stood at the buy.
- * `room` is world.room (door, guestbook = the counter, bounds, windows); `seats` world.seats.
- * ponytail: hand-set radii; they are the knob if a word lands on the wrong display.
- */
+// ponytail: hand-set radii; they are the knob if a word lands on the wrong display.
 export function placeWord(d, room, seats = []) {
   const b = room.bounds;
   const words = /** @type {[string, () => boolean][]} */ ([
@@ -128,13 +90,10 @@ export function placeWord(d, room, seats = []) {
   return words.find(([, holds]) => holds())?.[0] ?? 'on the shelf';
 }
 
-// ---------------------------------------------------------------- the rows (§7.3)
-
 const CRAFT_VERB = { knitting: 'knitted', crochet: 'crocheted' };
 
 const BOUGHT_ICON = { yarn: '🧶', pattern: '📖' };
 
-/** One remembered doing as a row: in detail if witnessed, otherwise its gist. */
 const DID = {
   putBack: (d) => ({ icon: '🙁', text: d.witnessed ? `turned over a ${bandOf(d.item)}, put it back`
     : 'turned something over and put it back' }),
@@ -149,16 +108,6 @@ const TAG_ROW = {
   huff: { icon: '💨', text: 'gave up and left in a huff' },
 };
 
-/**
- * An entry's expanded rows, as [{ icon, text }]. Purchases always (the till keeps receipts);
- * behaviour in detail only if the player saw it, otherwise its gist.
- *
- * TODO(spec): TUTORIAL.md §7.3's 🎁 rows (gifts, swaps, treats between customers) wait on stash
- * swaps and the treat tin; the per-customer "who they give to" list waits on those rows.
- * TODO(spec): a witnessed chat should be translated into words (§7.4); that waits on chat topics
- * and picture bubbles, so every chat is its gist for now.
- * TODO(spec): REGULARS-AND-SHOP-CHARACTER.md's taste-change lines wait on tastes changing at all.
- */
 export function entryRows(g) {
   return [
     ...(g.note ? [{ icon: '✎', text: `“${g.note.full}”` }] : []),
@@ -169,13 +118,8 @@ export function entryRows(g) {
   ];
 }
 
-
-// ---------------------------------------------------------------- the thank-you line (§4b)
-
-/** The voices in §4b's table, in its order, which breaks ties. Volatility and Industriousness have no row. */
 const VOICES = ['Enthusiasm', 'Politeness', 'Openness', 'Orderliness', 'Intellect', 'Assertiveness', 'Compassion', 'Withdrawal'];
 
-/** Each voice wraps a fact's sentence (full) and its short phrase. */
 const VOICE = {
   Enthusiasm:    { full: (s) => `${s}!! Love it!!`, short: (k) => `${k}!!` },
   Politeness:    { full: (s) => `${s}. Thank you!`, short: (k) => `${k}, thank you` },
@@ -192,11 +136,6 @@ export const voiceOf = (traits) => VOICES.reduce((best, t) => ((traits?.[t] ?? 0
 const SHORT_MAX = 24;
 const fit = (...options) => options.find((o) => o.length <= SHORT_MAX) ?? options.at(-1).slice(0, SHORT_MAX);
 
-/**
- * The facts one finished object can honestly be remembered by, best first. Each is
- * { word, sentence, short }: `word` is the recorded fact the line must name (the test holds that).
- * Read off the provenance visit.js stamps on an item at the buy: `place`, `beside`, `alsoIn`.
- */
 export function factsOf(made, { workedHere = false } = {}) {
   const items = [...(made.yarn ?? []), made.pattern].filter(Boolean);
   const facts = [];
@@ -215,7 +154,6 @@ export function factsOf(made, { workedHere = false } = {}) {
   return [...facts, ...lastFacts(items, workedHere)];
 }
 
-/** The person, then the facts that need no provenance at all: the chair, and yarn from home. */
 function lastFacts(items, workedHere) {
   const who = items.find((it) => it.alsoIn)?.alsoIn;
   return [
@@ -225,15 +163,6 @@ function lastFacts(items, workedHere) {
   ].filter(Boolean);
 }
 
-/**
- * The selfie's handwritten line, { short, full, voice, facts }, from recorded facts only. Quiet
- * customers (Withdrawal leads, or Enthusiasm ≤ 2) name one fact; chatty ones (Enthusiasm or
- * Openness 4+) name two when there are two.
- *
- * TODO(spec): the sight (a recipe that fired), a gap (a substitution) and how it started
- * (HOW-THEY-SHOP.md §6) wait on recipes, near-miss substitution and shopping starts.
- * TODO(spec): "no repeats within the last several cards" waits on the board choosing templates.
- */
 export function thankYou(made, traits, opts) {
   const facts = factsOf(made, opts);
   const voice = voiceOf(traits);

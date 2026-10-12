@@ -296,6 +296,8 @@ Found by playing `game.html`. Each answer is an object, not a panel.
     a pattern counts in);
   - pattern: title, what it makes, craft, needle or hook size, the yarn weight and how many units it takes;
   - notion: what it is, and its size.
+  - A yarn's band and a pattern's use the same words (UNITS, the weight), so the player can match
+    one to the other.
 - **Clicking a customer** swaps it for their **tag: their name and the items they have bought.**
   Never their hidden wants: inferring those is the puzzle.
 
@@ -447,5 +449,10 @@ any language, with the mood in the icons.
   because it is the game. At five to ten minutes that may be fine; a second game might still want
   a faster start.
 - **Where does a "new game" live** without a menu? See §6.
+- TODO(spec): §7.3's 🎁 rows (gifts, swaps, treats) wait on stash swaps and the treat tin; the
+  per-customer "who they give to" list waits on those rows.
+- TODO(spec): a witnessed chat should be put into words (§7.4); until chat topics and picture
+  bubbles exist, every chat is its gist.
+- TODO(spec): REGULARS-AND-SHOP-CHARACTER.md's taste-change lines wait on tastes changing at all.
 - ~~How much does a disappointed customer tell you?~~ **Resolved (§7.3):** what they picked up
   and put back; never what they wanted.

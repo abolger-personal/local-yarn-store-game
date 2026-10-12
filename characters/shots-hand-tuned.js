@@ -1,7 +1,3 @@
-// Backup: the selfie shots tuned by eye on crowd.html, 2026-10-10..11, as selfie.js SHOTS had them
-// before the scored search (selfie.js scoredSelfie) generated a table. Same shape as SHOTS: paste
-// back, or set SHOTS from it, to return to them. They are also the scored search's training set.
-
 export const SHOTS_HAND_TUNED = {
   hat: { owl: { headYaw: -0.2, headPitch: 0.2, fov: 40, up: 0.7, k: 0.6, drop: 0.15, off: 0.2 } },
   scarf: {

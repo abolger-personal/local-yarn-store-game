@@ -15,7 +15,6 @@ import { PATTERN_DESIGNS } from '../inventory/catalog.js';
 
 console.info('LYS build', BUILD);
 
-// importing a species file is all it takes to put it in the crowd
 import './owl.js';
 import './llama.js';
 import './lion.js';
@@ -48,12 +47,10 @@ const S = {
   toneMapping:  BASE_PARAMS.toneMapping,
   seedFacing:   true,
   selfieOf:     'hat',
-  selfieCompare: false,    // the scored search's pick beside each selfie (selfie.js scoredSelfie)
+  selfieCompare: false,
 };
 
-// One player-facing setting, not three technical switches. Each tier bundles every lever
-// that measured as mattering: tessellation (GPU), shadow strategy (CPU draws + tile resolve),
-// and resolution (fill rate). The individual controls below stay as developer overrides.
+// DESIGN-DECISIONS.md: graphics quality is a player-facing setting
 const QUALITY = {
   low:    { detail: 'low',  renderScale: 0.75, blobShadows: true,  partShadows: false },
   medium: { detail: 'med',  renderScale: 1.00, blobShadows: true,  partShadows: false },
@@ -64,7 +61,6 @@ const QUALITY_KEY = 'lys.crowd.quality';
 S.quality = localStorage.getItem(QUALITY_KEY) ?? S.quality;
 if (!QUALITY[S.quality]) S.quality = 'medium';
 
-// ---------------------------------------------------------------- renderer
 const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -101,7 +97,7 @@ key.shadow.camera.right = 5;
 key.shadow.camera.top = 5;
 key.shadow.camera.bottom = -5;
 key.shadow.bias = -0.0012;
-key.shadow.radius = 1;   // three 0.160 ignored this under PCFSoft; 1 keeps that edge now PCF is soft
+key.shadow.radius = 1;
 scene.add(key);
 scene.add(new THREE.HemisphereLight('#cfe0ff', '#8b7a68', 0.55));
 const rim = new THREE.DirectionalLight('#bcd4ff', 1.1);
@@ -116,9 +112,6 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// ---------------------------------------------------------------- blob shadows
-// The shadow map is a second full pass over every caster - ~29 extra draws per character.
-// This replaces all of them with ONE instanced draw, which is the standard mobile trade.
 let blobTex = null;
 function blobTexture() {
   const c = document.createElement('canvas');
@@ -133,7 +126,7 @@ function blobTexture() {
   return new THREE.CanvasTexture(c);
 }
 
-let crowd = [];   // declared here: the blob shadows below read it
+let crowd = [];
 
 let blobs = null;
 function clearBlobs() {
@@ -161,17 +154,12 @@ function buildBlobs() {
   scene.add(blobs);
 }
 
-/**
- * The key light's direction along the ground. All shadows share it: per-character facing would be
- * more literal but reads as decals; one direction is what sells "lit by the same lamp".
- */
 function keyGround() {
   const dx = -key.position.x, dz = -key.position.z;
   const len = Math.hypot(dx, dz) || 1;
   return [dx / len, dz / len];
 }
 
-/** One blob under each character, pushed away from the key light. */
 function placeBlobs() {
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
@@ -191,14 +179,13 @@ function placeBlobs() {
   });
 }
 
-// ---------------------------------------------------------------- crowd
 const crowdGroup = new THREE.Group();
 scene.add(crowdGroup);
 
 function clearCrowd() {
   for (const o of crowd) {
     crowdGroup.remove(o.built.root);
-    undress(o.built);   // an unmerged dressed character's garments are geometry of its own
+    undress(o.built);
     disposeCharacter(o.built);
   }
   crowd = [];
@@ -210,8 +197,6 @@ function spawn(speciesId) {
   const kit = getSpecies(speciesId);
   const P = kit.randomise(structuredClone(kit.defaults));
   P.partShadows = S.partShadows;
-  // Dressed, the merge waits until the clothes are on: the fit is measured off the unmerged body,
-  // and the clothes then merge into the character's meshes like any other part.
   P.mergeMeshes = S.mergeMeshes && !S.dressed;
   const built = createCharacter(P, kit);
   const outfit = S.dressed ? worstOutfit() : {};
@@ -222,7 +207,6 @@ function spawn(speciesId) {
   return { kit, P, built, outfit };
 }
 
-/** Grid cell i of cols x rows, jittered, and facing anywhere if the crowd is not lined up. */
 function setDown(root, i, cols, rows) {
   const cx = (i % cols) - (cols - 1) / 2;
   const cz = Math.floor(i / cols) - (rows - 1) / 2;
@@ -234,7 +218,6 @@ function setDown(root, i, cols, rows) {
   root.rotation.y = S.seedFacing ? Math.random() * Math.PI * 2 : 0;
 }
 
-/** Crowd member i: spawned, set down in its grid cell with some jitter, and given a temperament. */
 function addMember(i, cols, rows) {
   const { kit, P, built, outfit } = spawn(nextSpecies());
   setDown(built.root, i, cols, rows);
@@ -242,17 +225,12 @@ function addMember(i, cols, rows) {
 
   const start = pickPose();
   crowd.push({
-    built, kit, P, outfit,   // the last three: what the selfie sheet rebuilds them from
+    built, kit, P, outfit,
     name: P.name,
     species: kit.label,
     color: P.bodyColor,
-    // the pose the engine springs toward: a frozen POSES entry, which is how it tells a new
-    // target from the same one
     target: start,
-    // Each its own temperament, as in the shop and species-checker: how fast it springs, how
-    // much it fidgets, blinks and looks about.
     opts: { ...MOTION_DEFAULTS, ...motionOf(randomTraits(), kit.motionRanges) },
-    // desynchronised on purpose: a crowd changing pose in unison looks like a chorus line
     wait: Math.random() * S.poseInterval,
   });
   resetMotion(built.motion, start);
@@ -261,7 +239,6 @@ function addMember(i, cols, rows) {
 function buildCrowd() {
   clearCrowd();
 
-  // loose grid with jitter: reads as a gathering rather than a parade
   const cols = Math.ceil(Math.sqrt(S.count));
   const rows = Math.ceil(S.count / cols);
 
@@ -278,13 +255,9 @@ function pickPose() {
   return POSES[names[Math.floor(Math.random() * names.length)]];
 }
 
-// ---------------------------------------------------------------- motion
-// The shop's own engine, per character per frame: a spring toward the target pose and the idle
-// layer on top (breathing, blinks, glances, fidgets). The crowd is where its cost and its look are
-// judged at scale, so it runs the same path the game does, not a stand-in.
 function tickMotion(dt) {
   for (const o of crowd) {
-    o.opts.idleAmount = S.idle ? 1 : 0;   // assigned, not spread: read 60 times a second each
+    o.opts.idleAmount = S.idle ? 1 : 0;
     stepMotion(o.built, o.target, dt, o.opts);
     if (!S.cyclePoses) continue;
     o.wait -= dt;
@@ -295,7 +268,6 @@ function tickMotion(dt) {
   }
 }
 
-// ---------------------------------------------------------------- framing
 function crowdBox() {
   return new THREE.Box3().setFromObject(crowdGroup);
 }
@@ -311,7 +283,6 @@ function frameCrowd() {
   controls.update();
 }
 
-// distance at which ONE character is 150px tall - the real readability check
 function distanceTest() {
   const box = crowdBox();
   const center = box.getCenter(new THREE.Vector3());
@@ -324,9 +295,6 @@ function distanceTest() {
   controls.update();
 }
 
-// ---------------------------------------------------------------- yarn wall
-// Stands in for the shelf wall from the design docs: ONE InstancedMesh, per-instance colour.
-// The point is to see what characters cost once the merchandise is also on screen.
 let yarnMesh = null;
 
 function buildYarnWall() {
@@ -340,7 +308,7 @@ function buildYarnWall() {
     sheenColor: new THREE.Color('#ffffff'),
   });
   yarnMesh = new THREE.InstancedMesh(geo, mat, n);
-  yarnMesh.castShadow = false;   // per perf rule 6: items never cast into the shadow map
+  yarnMesh.castShadow = false;
   yarnMesh.receiveShadow = true;
 
   shelveYarn(n);
@@ -349,7 +317,6 @@ function buildYarnWall() {
   scene.add(yarnMesh);
 }
 
-/** n balls round a curved wall of five shelves, each its own size and colour. */
 function shelveYarn(n) {
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
@@ -372,11 +339,9 @@ function shelveYarn(n) {
   }
 }
 
-// ---------------------------------------------------------------- perf overlay
 const perfEl = document.getElementById('perf');
 let fps = 60, lastPerf = 0;
 
-/** A reading's colour on the overlay: fine, getting there, or over budget. */
 function cls(v, warn, bad) {
   if (v >= bad) return 'bad';
   return v >= warn ? 'warn' : 'ok';
@@ -403,13 +368,6 @@ function updatePerf(dt) {
     `<span style="opacity:.65">${(r.calls / Math.max(S.count, 1)).toFixed(0)} calls/character</span>`;
 }
 
-// ---------------------------------------------------------------- selfies
-//
-// The Guestbook's selfie (selfie-studio.js, the same code the shop uses) of every member, of one
-// subject (`S.selfieOf`: a garment put on them, the pot holder or an armful in hand, or just what
-// they have on), captioned with the shot and its grades (selfie.js gradeSelfie). The tune folder
-// authors selfie.js SHOTS for one subject and species, live; "copy shot table" is what to paste back.
-
 const randomHex = () => `#${new THREE.Color().setHSL(Math.random(), 0.5, 0.55).getHexString()}`;
 const finished = (pattern) => ({ pattern, yarn: [{ c: randomHex() }] });
 const designsOf = (types) => PATTERN_DESIGNS.filter((d) => types.includes(d.patternType));
@@ -421,8 +379,6 @@ const SUBJECTS = {
     () => finished(pick(designsOf(Object.keys(GARMENTS))))), (y) => y.c),
 };
 
-// Where the tune sliders start for a subject with no shot yet: guesses, graded poorly as they are
-// (the phone hand in most, and the eyes lost in the wide ones). Starting points, not answers.
 const STARTERS = {
   hat: { headYaw: -0.2, headPitch: 0.2, fov: 40, up: 0.7, k: 1.1, drop: 0.15, off: 0.2 },
   scarf: { headYaw: 0.3, headPitch: -0.45, fov: 40, up: 0.25, k: 1.3, drop: 0.55, off: 0.25 },
@@ -442,38 +398,27 @@ let sheetRun = 0;
 const closeSheet = () => { sheet.hidden = true; };
 
 const pct = (x) => (x == null ? '—' : `${Math.round(x * 100)}%`);
-/** The caption's grade line, each failing number marked. */
 function gradeLine(g) {
   const bad = (fail, text) => (fail ? `✗ ${text}` : text);
   return [g.handOut === null ? 'no phone' : bad(!g.handOut, g.handOut ? 'hand cut' : 'hand WHOLE'), bad(g.made != null && g.made <= 0.15, `made ${pct(g.made)}`),
     bad(g.eyes <= 0.3, `eyes ${pct(g.eyes)}`), `face ${g.face.toFixed(2)}`].join(' · ');
 }
 
-/** A shot rounded as the tuner's sliders step: what to paste, or to tune from. */
 const rounded = (shot) => Object.fromEntries(Object.entries(shot).map(([k, v]) => [k, Math.round(v * 100) / 100]));
 const shotText = (shot) => JSON.stringify(rounded(shot));
 
-/** A scored pick into the tuner, as this member's species' own shot: then copy the table to keep it. */
 function adopt(member, shot, fig) {
   const { id } = member.kit;
   Object.assign(tune, rounded(shot), { species: id, behind: false, use: true });
-  // straight into SHOTS, not through applyTune: that retakes the whole sheet, every picture of it
-  // blocking the page, so the click looked like it froze it
   (SHOTS[S.selfieOf] ??= {})[id] = Object.fromEntries(SHOT_KEYS.map((k) => [k, tune[k]]));
   fig.classList.add('kept');
   fig.querySelector('figcaption')?.prepend(`✓ kept as the ${id} ${S.selfieOf} shot -- P to retake the sheet with it\n`);
   toast(`${id} ${S.selfieOf}: kept, and in the tuner`);
 }
 
-/**
- * One member's selfie of the subject, captioned with who, what, which shot, and its grades. With
- * compare on, the scored search's pick beside it -- once a species (`done`, the ones scored this
- * sheet): a shot fits every one of a species, and is kept as the species' own.
- */
 function selfieOf(member, done) {
   const subject = SUBJECTS[S.selfieOf]();
   const outfit = { ...member.outfit, ...(subject && { [subject.type]: subject.item }) };
-  // the tuner keys by type: while it is in use, its shot is the one taken, not a silhouette's own
   const silhouette = tune.use ? null : subject?.item.silhouette ?? null;
   const take = (scored) => snap({ body: member.P, kit: member.kit, outfit, type: subject?.type ?? null, silhouette },
     { toneMapping: TONE_MAPPING[S.toneMapping], exposure: S.exposure }, { grade: true, scored });
@@ -491,7 +436,6 @@ function selfieOf(member, done) {
   return figs;
 }
 
-/** A picture and its caption, the grade line under `title`, marked when a grade fails. */
 function figure(url, title, grades) {
   const fig = document.createElement('figure');
   const img = new Image(W, H);
@@ -504,31 +448,26 @@ function figure(url, title, grades) {
   return fig;
 }
 
-/** The tune sliders onto the subject's shot for the tuned species, or the starter where there is none. */
 function loadTune() {
   const shot = SHOTS[S.selfieOf]?.[tune.species];
   Object.assign(tune, { behind: false }, STARTERS[S.selfieOf] ?? STARTERS.hat, shot, { use: Boolean(shot) });
 }
 
-/** The sliders into SHOTS (or out of it, unticked), and the sheet again if it is open. */
 function applyTune() {
-  if (!STARTERS[S.selfieOf]) return;   // 'as dressed' has no one subject to shoot
+  if (!STARTERS[S.selfieOf]) return;
   const shots = (SHOTS[S.selfieOf] ??= {});
   if (tune.use) shots[tune.species] = Object.fromEntries(SHOT_KEYS.map((k) => [k, tune[k]]));
   else delete shots[tune.species];
-  // a species' own shot wins over `all` (selfie.js shotFor): say so, or `all` looks like it does nothing
   const own = Object.keys(shots).filter((k) => k !== 'all');
   if (tune.species === 'all' && own.length) toast(`${own.join(', ')} keep their own ${S.selfieOf} shot`);
   if (!sheet.hidden) selfieSheet();
 }
 
-/** A slider moved: that is choosing to use the shot, so tick it rather than silently do nothing. */
 function slideTune() {
   tune.use = true;
   applyTune();
 }
 
-/** Which shot a member's selfie of the subject took: their species' own, the all-species one, or searched. */
 function shotSource(member, searched, silhouette) {
   const { id } = member.kit, shot = shotFor(S.selfieOf, id, silhouette);
   if (!shot) return `searched: ${searched}`;
@@ -536,7 +475,6 @@ function shotSource(member, searched, silhouette) {
   return SHOTS[from][id] === shot ? `own ${id} ${from} shot` : `all-species ${from} shot`;
 }
 
-/** The tuned species takes no authored shot of this subject, not even `all`'s: searched (selfie.js shotFor). */
 function searchInstead() {
   if (tune.species === 'all' || !STARTERS[S.selfieOf]) return;
   (SHOTS[S.selfieOf] ??= {})[tune.species] = null;
@@ -551,7 +489,6 @@ function copyShots() {
   navigator.clipboard?.writeText(text).then(() => toast('shot table copied'), () => toast('shot table in the console'));
 }
 
-/** Every member's selfie, one a frame so the sheet fills in rather than freezing the page. */
 function selfieSheet() {
   const run = ++sheetRun, members = [...crowd], done = new Set();
   sheetGrid.replaceChildren();
@@ -565,7 +502,6 @@ function selfieSheet() {
 }
 sheet.querySelector('.close').addEventListener('click', closeSheet);
 
-// ---------------------------------------------------------------- ui
 function updateRoster() {
   document.getElementById('roster').innerHTML =
     crowd.map((o) =>
@@ -596,8 +532,6 @@ gPerf.add(S, 'detail', Object.keys(GEO_DETAIL)).name('geometry detail').onChange
 });
 gPerf.add(S, 'yarnWall').name('yarn wall').onChange(buildYarnWall);
 gPerf.add(S, 'yarnCount', 100, 3000, 100).name('yarn count').onFinishChange(buildYarnWall);
-// DevTools throttling slows the CPU only. Oversampling is the GPU-side proxy: a tablet is
-// fill-rate and bandwidth limited long before it runs out of draw calls.
 gPerf.add(S, 'renderScale', 0.5, 3, 0.25).name('render scale (GPU load)').onFinishChange(applyRenderScale);
 gPerf.add(S, 'partShadows').name('characters cast shadow').onChange(() => { clearCrowd(); buildCrowd(); });
 gPerf.add(S, 'mergeMeshes').name('merge static meshes').onChange(() => { clearCrowd(); buildCrowd(); });
@@ -616,7 +550,6 @@ gui.add(S, 'view', ['felted', 'grey', 'silhouette']).onChange((v) => setViewMode
 gui.add(S, 'cyclePoses').name('cycle poses');
 gui.add(S, 'poseInterval', 0.5, 8, 0.1).name('pose interval (s)');
 gui.add(S, 'idle').name('idle layer (blinks, breathing)');
-// The worst case for the budget: every NPC wearing every slot, each item a random pattern.
 gui.add(S, 'dressed').name('dressed up (every slot)').onChange(buildCrowd);
 gui.add(S, 'spacing', 0.5, 2.5, 0.05).onFinishChange(buildCrowd);
 gui.add(S, 'jitter', 0, 1.2, 0.02).onFinishChange(buildCrowd);
@@ -645,8 +578,6 @@ gTune.add(tune, 'off', -1, 1.5, 0.01).name('aim aside').listen().onFinishChange(
 gTune.add({ f: searchInstead }, 'f').name('this species: search instead');
 gTune.add({ f: copyShots }, 'f').name('copy shot table');
 
-// Capture phase: lil-gui's own inputs handle keydown and can swallow it before it reaches
-// window. Bailing on form fields keeps typing in a GUI box from firing shortcuts.
 const typing = (t) => t instanceof HTMLElement
   && (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA');
 
@@ -685,7 +616,6 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-/** One player-facing setting: every lever of the tier at once, and the crowd rebuilt under it. */
 function applyQuality(name) {
   const q = QUALITY[name] ?? QUALITY.medium;
   S.quality = name;
@@ -699,7 +629,6 @@ function applyQuality(name) {
   gui.controllersRecursive().forEach((c) => c.updateDisplay());
 }
 
-// ---------------------------------------------------------------- go
 applyQuality(S.quality);
 
 const clock = new THREE.Timer();

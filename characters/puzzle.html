@@ -10,10 +10,6 @@
   #app { position: fixed; inset: 0; }
   canvas { display: block; touch-action: none; }
 
-  /* The UA's own `[hidden] { display: none }` loses to any rule that sets display — and
-     `label.row` below sets `display: flex`. Without this every field of the stock palette stayed
-     on screen whatever kind of thing was being built, so the form read as "fill in anything"
-     when only the fields for the chosen kind are used. */
   [hidden] { display: none !important; }
 
   .panel {
@@ -32,8 +28,6 @@
   .fold[open] > summary::before { transform: rotate(90deg); }
   .fold[open] > summary { margin-bottom: 6px; }
 
-  /* Two columns, both scrolling inside themselves: the bench is a form, and a form that pushes
-     its own buttons off the bottom of the screen is a form you cannot use. */
   #left, #rail {
     position: fixed; top: 10px; bottom: 10px; z-index: 10;
     width: 300px; display: flex; flex-direction: column; gap: 8px;
@@ -91,8 +85,6 @@
 </head>
 <body>
 <div id="app"></div>
-<!-- interact/input.js latches furniture mode onto this button. The bench has no furniture mode,
-     but the button has to exist or installInput throws and nothing gets a pointer at all. -->
 <button id="moveBtn" hidden></button>
 
 <div id="left">

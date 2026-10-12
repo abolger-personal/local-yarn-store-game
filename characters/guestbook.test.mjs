@@ -1,5 +1,3 @@
-// The Guestbook's words: every thank-you line names a recorded fact, and the short form fits a
-// polaroid. Run: node characters/guestbook.test.mjs
 import assert from 'node:assert/strict';
 import { TRAITS, makeNpc } from './visit.js';
 import { wantsOf } from './wip.js';
@@ -11,7 +9,6 @@ const yarn = (extra) => ({ name: 'yarn', weight: 'worsted', material: 'wool', sh
 const pattern = { name: 'pattern', patternType: 'hat', craft: 'knitting', toolSize: 4.5, weight: 'worsted', materials: ['wool'], yarnUnits: 3 };
 const made = (yarns, opts) => ({ id: 'WIP 1', pattern, yarn: yarns, ...opts });
 
-// Every shape of provenance the buy can record, and none at all.
 const cases = [
   made([yarn({ place: 'by the window' })]),
   made([yarn({ place: 'in the back corner', beside: 'socks', alsoIn: 'Bramblewick' })]),
@@ -34,7 +31,6 @@ for (const m of cases) {
   }
 }
 
-// Place words come from where the display stood.
 const room = { door: { x: 0, z: 3.25 }, guestbook: { x: -3, z: 1.55 }, windows: [{ x: 0, z: -3.6 }],
                bounds: { minX: -4.2, maxX: 4.2, minZ: -2.2, maxZ: 2.7 } };
 assert.equal(placeWord({ form: 'floor', solid: false, x: 0, z: 0 }, room), 'on the floor');
@@ -42,7 +38,6 @@ assert.equal(placeWord({ form: 'table', x: 0.5, z: 2.5 }, room), 'by the door');
 assert.equal(placeWord({ form: 'wall-shelf', x: 0, z: -3.1 }, room), 'by the window');
 assert.equal(placeWord({ form: 'wall-shelf', x: -4.3, z: -2.0 }, room), 'in the back corner');
 
-// Rows: purchases always in full; behaviour in detail only when witnessed.
 const rows = (did) => entryRows({ bought: [yarn()], did }).map((r) => r.text);
 assert.ok(rows([])[0].startsWith('bought a worsted wool ball, '), 'a purchase reads as its ball band');
 assert.deepEqual(rows([{ what: 'putBack', item: yarn({ weight: 'dk' }), witnessed: true }])[1].split(', ')[0],
@@ -51,7 +46,6 @@ assert.equal(rows([{ what: 'putBack', item: yarn(), witnessed: false }])[1], 'tu
 assert.ok(rows([{ what: 'sat', pattern, witnessed: true }])[1].startsWith('sat and knitted on the hat pattern'));
 assert.equal(rows([{ what: 'sat', pattern, witnessed: false }])[1], 'sat and worked on a project');
 
-// The ball band (§7.1): only what the object says, in capitals the house lettering can draw.
 assert.deepEqual(bandLines(yarn({ weight: 'super-bulky', shape: 'cone' })), ['SUPER BULKY WEIGHT', 'WOOL', 'BLUE', 'CONE', '1 UNIT']);
 assert.deepEqual(bandLines({ ...pattern, title: 'Bird Brain Beanie', silhouette: 'beanie' }),
   ['BIRD BRAIN BEANIE', 'MAKES BEANIE HAT', '4.5MM KNITTING NEEDLES', 'TAKES 3 UNITS WORSTED WOOL']);
@@ -61,8 +55,6 @@ assert.deepEqual(bandLines({ ...pattern, minColors: 1 }).at(-1), 'SUGGESTS 1 COL
 assert.deepEqual(bandLines({ name: 'crochet-hook', size: 5 }), ['CROCHET HOOK', '5.0MM']);
 assert.deepEqual(bandLines({ name: 'stitch-markers', size: null }), ['STITCH MARKERS']);
 
-// A customer's tag: their name and what they bought, never what they still want. Their pattern's
-// needs only once their knitting was witnessed.
 for (let seed = 1; seed <= 40; seed++) {
   const npc = makeNpc({ id: `n${seed}`, name: 'Marguerite', species: 'Owl', rng: mulberry32(seed) });
   assert.ok(wantsOf(npc).length, 'a fresh customer has wants to hide');

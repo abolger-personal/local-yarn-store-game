@@ -469,7 +469,12 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
    "SOMETIMES" satisfies the buy condition afterwards. Currently it always resolves on the next
    interaction. What should "sometimes" actually depend on?
 
-6. **Which notions have which attributes is not written down anywhere.** Today the rule lives in
+6. **The shop floor is a display you walk on** (`solid: false`). It blocks no sightline and no
+   route, and a floor tile is seen at its nearest point, not its centroid: a tile half under a shelf
+   has its centroid hidden, and whatever sat on its open half could never be noticed. **Confirm** that
+   reading of CHARACTER-VISIT.md's centroid visibility rule.
+
+7. **Which notions have which attributes is not written down anywhere.** Today the rule lives in
    `SIZED_NOTIONS` in `store.html` — hooks have a millimetre size, stitch markers and darning
    needles have none. That belongs in the catalog schema (P6) alongside the Ravelry-shaped
    attributes, not in a page. It matters more than it looks: an attribute printed on a box is

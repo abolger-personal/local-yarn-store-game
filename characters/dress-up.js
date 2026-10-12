@@ -1,6 +1,3 @@
-// A HARNESS, not game code: everything a garment is lives in garments.js, everything a character is
-// lives in npc.js and the species kits. This page only holds three characters, one outfit and the
-// controls to change them, so that one silhouette at one fit can be judged on every species at once.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { roomEnvironment } from '../inventory/room-environment.js';
@@ -23,11 +20,9 @@ import './lion.js';
 
 console.info('LYS build', BUILD);
 
-// Fixed: the point of the page is the same item on all three at once.
 const SLOTS = ['owl', 'llama', 'lion'];
 const STORE_KEY = 'lys.dressUp.v1';
 
-// A pattern names its tool; the page keeps it a number so a slider can hold it.
 function freshPattern(type) {
   const p = defaultItem(type);
   return { ...p, tool: usualTool(p.craft, p.weight) };
@@ -47,16 +42,12 @@ function freshUsed() { return Object.fromEntries(Object.keys(GARMENTS).map((t) =
 const state = {
   detail: 'high', view: 'felted', pose: 'rest', exposure: 0.40, toneMapping: 'ACES', spacing: 0.62,
   play: false, idle: true, walk: false, speed: 0.5, dance: 'none', repeat: true,
-  // Close-ups by default: the page is where the look is judged. LOOK's own default is the game's.
   look: { ...LOOK, viewPx: 0 },
-  // Per wearable: the PATTERN (the item as designed, made to pattern it is fit 1), and what the NPC
-  // USED instead -- each override off, or 'as pattern', until set. garments.js's madeItem joins them.
   patterns: freshPatterns(),
   used: freshUsed(),
   params: { owl: null, llama: null, lion: null },
 };
 
-/** The overrides that are on, as madeItem takes them: only what differs from the pattern. */
 function usedOf(type) {
   const u = state.used[type], out = {};
   if (u.ownTool) out.tool = u.tool;
@@ -71,12 +62,8 @@ function usedOf(type) {
 const madeOf = (type) => madeItem(state.patterns[type], usedOf(type));
 const madeOutfit = () => Object.fromEntries(Object.keys(GARMENTS).map((t) => [t, madeOf(t)]));
 
-// Un-merged, because garments.js dresses an un-merged rig -- see the ponytail note at the top of
-// garments.js.
 const freshParams = (id) => Object.assign(structuredClone(getSpecies(id).defaults), { mergeMeshes: false });
 
-
-// ---------------------------------------------------------------- renderer
 const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -104,7 +91,7 @@ function addLights() {
   key.shadow.mapSize.set(1024, 1024);
   Object.assign(key.shadow.camera, { near: 0.5, far: 14, left: -2.4, right: 2.4, top: 2, bottom: -2 });
   key.shadow.bias = -0.0012;
-  key.shadow.radius = 1;   // three 0.160 ignored this under PCFSoft; 1 keeps that edge now PCF is soft
+  key.shadow.radius = 1;
   const rim = new THREE.DirectionalLight('#bcd4ff', 1.1);
   rim.position.set(-2.4, 1.6, -2.4);
   scene.add(key, rim, new THREE.HemisphereLight('#cfe0ff', '#8b7a68', 0.55));
@@ -116,7 +103,6 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// ---------------------------------------------------------------- characters
 const built = { owl: null, llama: null, lion: null };
 const slotState = { owl: {}, llama: {}, lion: {} };
 const slotX = (id) => (SLOTS.indexOf(id) - 1) * state.spacing;
@@ -140,7 +126,6 @@ function buildSlot(id) {
   dressSlot(id);
 }
 
-/** Put the one outfit on one character. Garments ride the rig's joints, so motion needs nothing. */
 function dressSlot(id) {
   if (!built[id]) return;
   dress(built[id], madeOutfit());
@@ -159,7 +144,6 @@ function buildAll() {
   updatePlates();
 }
 
-// ---------------------------------------------------------------- framing
 const VIEW_DIR = new THREE.Vector3(0.32, 0.20, 1).normalize();
 
 function frameAll(targetPx = 0) {
@@ -175,7 +159,6 @@ function frameAll(targetPx = 0) {
     ? (Math.max(size.y, 0.01) * innerHeight / targetPx) / (2 * Math.tan(vFov / 2)) + depth
     : 1.15 * Math.max(size.y / (2 * Math.tan(vFov / 2)), size.x / (2 * Math.tan(hFov / 2))) + depth;
   if (!Number.isFinite(dist) || !Number.isFinite(center.y)) return;
-  // The GUI covers the right third: shift the film, not the target, so the orbit pivot stays on them.
   camera.filmOffset = ((size.x * 0.16) / dist) * camera.getFilmWidth();
   camera.updateProjectionMatrix();
   controls.target.copy(center);
@@ -202,7 +185,6 @@ function orbitBy(dTheta, dPhi) {
   setOrbit(spherical.theta + dTheta, spherical.phi + dPhi);
 }
 
-// ---------------------------------------------------------------- nameplates
 const plates = {
   owl: document.getElementById('plateOwl'),
   llama: document.getElementById('plateLlama'),
@@ -227,20 +209,11 @@ function positionPlates() {
   }
 }
 
-// ---------------------------------------------------------------- persistence
 function save() {
   const { play, dance: _dance, ...rest } = state;
-  // `dance` is not saved: reloading mid-pirouette reads as broken, not restored.
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ ...rest, play })); } catch { /* quota */ }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ ...rest, play })); } catch {}
 }
 
-// Merged OVER defaults, never used wholesale: a save from before a key existed would leave it
-// undefined, and one undefined number is a NaN mesh scale and a culled character.
-/**
- * A saved pattern made good against today's vocabulary: a form or accessory its type no longer
- * offers (a shawl wrapped twice) becomes the first it does, or none; a stitch off its craft, a
- * missing tool and a fit (patterns no longer keep one) as they always were.
- */
 function mendPattern(type, p) {
   if (!GARMENTS[type].silhouettes.includes(p.silhouette)) p.silhouette = GARMENTS[type].silhouettes[0];
   if (formsOf(type).length && !formsOf(type).includes(p.form)) p.form = formsOf(type)[0];
@@ -254,9 +227,8 @@ function load() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null');
     if (!saved) return;
-    const { spread: _spread, ...look } = saved.look ?? {};   // `spread` was removed from LOOK (tuned to 1)
+    const { spread: _spread, ...look } = saved.look ?? {};
     Object.assign(state, saved, { dance: 'none', look: { ...LOOK, viewPx: 0, ...look } });
-    // A save from before patterns kept one `outfit`: its items become the patterns, fit dropped.
     const pats = saved.patterns ?? saved.outfit;
     state.patterns = Object.fromEntries(Object.keys(GARMENTS).map((type) => [type, { ...freshPattern(type), ...pats?.[type] }]));
     for (const [type, p] of Object.entries(state.patterns)) mendPattern(type, p);
@@ -264,11 +236,10 @@ function load() {
     delete state.outfit;
     state.params = /** @type {typeof state.params} */ (Object.fromEntries(SLOTS.map((id) => [id, saved.params?.[id] ? { ...freshParams(id), ...saved.params[id] } : null])));
     if (!(state.pose in POSES)) state.pose = 'rest';
-  } catch { /* corrupt save, defaults */ }
+  } catch {}
 }
 
-// ---------------------------------------------------------------- actions
-let gui = null;   // built by buildGui, rebuilt when a menu's choices change
+let gui = null;
 const refreshGui = () => gui?.controllersRecursive().forEach((c) => c.updateDisplay());
 
 function randomiseSlot(id) {
@@ -282,7 +253,6 @@ function randomiseSlot(id) {
 
 const randomiseAll = () => SLOTS.forEach(randomiseSlot);
 
-/** A random PATTERN for one item, made to pattern: the fastest way to find a pairing that breaks. */
 function randomiseItem(type) {
   Object.assign(state.patterns[type], randomItem(type));
   refreshGui();
@@ -328,7 +298,6 @@ function setView(mode) {
   SLOTS.forEach((id) => built[id] && setViewMode(built[id].root, mode));
 }
 
-// ---------------------------------------------------------------- motion (as species-checker)
 const clock = new THREE.Timer();
 
 function stepDanceFor(id, character, slot, dt) {
@@ -396,7 +365,6 @@ function resetPlacement(id) {
   root.rotation.y = 0;
 }
 
-// ---------------------------------------------------------------- gui
 let openItem = 'scarf';
 
 function addTopControls() {
@@ -431,12 +399,10 @@ function addSceneFolder() {
   folder.close();
 }
 
-/** The look knobs garments.js exposes: stylisation scale, relief depth, rim strength. */
 function addLookFolder() {
   const folder = gui.addFolder('knit look (all items)');
   const apply = () => { Object.assign(LOOK, state.look); dressAll(); };
   folder.add(state.look, 'stitchScale', 1, 6, 0.1).name('stitch size ×').onFinishChange(apply);
-  // What the game builds for its crowd (LOOK's default): relief too small to see there is skipped.
   folder.add(state.look, 'viewPx', { 'close-up (no limit)': 0, '300px': 300, '150px (game crowd)': 150 })
     .name('build for').onChange(apply);
   folder.add(state.look, 'relief', 0, 4, 0.05).name('relief depth').onFinishChange(apply);
@@ -448,12 +414,6 @@ function addLookFolder() {
   folder.close();
 }
 
-/**
- * One folder per wearable (spec §1), in two tabs: the PATTERN -- the item as designed, which made to
- * pattern is fit 1 -- and what the NPC MADE IT WITH instead. Changes redress all three characters on
- * RELEASE (onFinishChange): a sweater with cables is tens of thousands of triangles, and regenerating
- * three of them per slider tick makes the drag stutter.
- */
 function addItemFolder(type) {
   const pattern = state.patterns[type];
   const folder = gui.addFolder(type);
@@ -467,24 +427,18 @@ function addItemFolder(type) {
   folder.add(out, 'drawn').name('→ drawn as').disable();
   addPatternFolder(folder.addFolder('pattern (as designed)'), type, redress);
   addUsedFolder(folder.addFolder('made with (overrides)'), type, redress);
-  // The item last touched is the one O randomises. A DOM listener, not lil-gui's onOpenClose: three
-  // (0.160 through 0.186) bundles lil-gui 0.17.0, which does not have it -- calling it threw
-  // inside buildGui, before the render loop started, and the page drew nothing at all.
   folder.domElement.addEventListener('pointerdown', () => { openItem = type; });
   if (type !== openItem) folder.close();
 }
 
-/** The item's shape: silhouette, and form and sleeves where the item has them. */
 function addShapeControls(folder, type, redress) {
   const g = GARMENTS[type], p = state.patterns[type];
-  // Form only where it changes the item: an infinity scarf or a cowl has no ends to tie.
   let form = null;
   folder.add(p, 'silhouette', g.silhouettes).onChange(() => { form?.show(hasForm(type, p.silhouette)); redress(); });
   if (formsOf(type).length) form = folder.add(p, 'form', formsOf(type)).onChange(redress).show(hasForm(type, p.silhouette));
   if (g.sleeves) folder.add(p, 'sleeves', SLEEVES).onChange(redress);
 }
 
-/** The yarn: weight, tool, fibre and colours, plus the pattern's randomise and reset. */
 function addYarnControls(folder, type, redress, retool) {
   const p = state.patterns[type];
   folder.add(p, 'weight', WEIGHTS).name('yarn weight').onChange(() => { retool(); redress(); });
@@ -499,13 +453,12 @@ function addYarnControls(folder, type, redress, retool) {
 function addPatternFolder(folder, type, redress) {
   const p = state.patterns[type];
   addShapeControls(folder, type, redress);
-  // Changing the craft or the yarn resets the pattern's tool to the usual one for them.
   const retool = () => { p.tool = usualTool(p.craft, p.weight); };
   folder.add(p, 'craft', CRAFTS).onChange(() => {
     p.stitch = craftStitch(p.craft, p.stitch);
     retool();
     redress();
-    queueMicrotask(buildGui);   // the stitch menus are the craft's; rebuilt after lil-gui's own handler returns
+    queueMicrotask(buildGui);
   });
   folder.add(p, 'stitch', STITCHES_BY_CRAFT[p.craft] ?? STITCHES_BY_CRAFT.knit).onChange(redress);
   folder.add(p, 'colourwork', COLOURWORKS).onChange(redress);
@@ -544,7 +497,6 @@ function buildGui() {
   gui.onFinishChange(save);
 }
 
-// ---------------------------------------------------------------- keys
 const KEY_ACTIONS = {
   r: () => randomiseAll(),
   o: () => randomiseItem(openItem),
@@ -585,7 +537,6 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-// ---------------------------------------------------------------- go
 load();
 Object.assign(LOOK, state.look);
 setGeometryDetail(state.detail);
@@ -596,8 +547,6 @@ setView(state.view);
 buildGui();
 frameAll();
 
-// Draw calls and triangles for the whole frame, for WEARABLE-LOOK-VS-PERFORMANCE.md. Unthrottled
-// desktop numbers: a count, not a frame budget -- measure frame time under the 20x throttle.
 const stats = document.getElementById('stats');
 let statsAt = 0;
 

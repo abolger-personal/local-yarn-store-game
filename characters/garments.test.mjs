@@ -16,7 +16,9 @@ import {
   LOOK, WEIGHTS, madeItem, usualTool, bodyFit, defaultItem, dress, undress, resolveColourwork, hasForm, garmentMaterial, randomItem, outfitPieces,
   formsOf, accessoriesOf, wornAs, heldAs, pileAs,
 } from './garments.js';
-import { gradeSelfie, scoredSelfie, seenShare, shotFor, takeSelfie } from './selfie.js';
+import { SHOTS, gradeSelfie, idLook, scoredSelfie, seenShare, shotFor, takeSelfie } from './selfie.js';
+import { studioLights } from './selfie-studio.js';
+import { roomEnvironment } from '../inventory/room-environment.js';
 import { PATTERN_DESIGNS, PATTERN_TITLES, PATTERN_TYPES } from '../inventory/catalog.js';
 import { WEAR_SLOTS, WEAR_SLOT_FOR } from './wip.js';
 
@@ -1972,6 +1974,71 @@ for (const id of speciesIds()) for (const silhouette of GARMENTS.sweater.silhoue
     const cover = ((box.max.x - box.min.x) * (box.max.y - box.min.y)) / 4, off = box.getCenter(new THREE.Vector2()).length();
     assert.ok(cover >= 0.5 && off <= 0.4, `${id}: the scored hat shot has them covering ${cover.toFixed(2)} of the frame, ${off.toFixed(2)} off its middle`);
   }
+}
+
+// The selfie lights what they made: a lens at the chest or below, looking up at a sweater or a
+// held pot holder, sees undersides, and the key, the sky and the room environment all shine from
+// above. Lit as diffuse irradiance (each light's luminance, cosine-weighted) on what the lens sees
+// of it, against the same piece seen as the shop shows it (from the front, 45 degrees up, no phone),
+// and against the face. Without the phone's glow (selfie-studio.js studioLights): a mean of 0.83 of
+// the shop's, 20% of shots under 0.7, the owl's pot holder lit 0.19 as well as its face; with it,
+// 1.02, 3% and 0.43.
+{
+  const lum = (c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b, V = () => new THREE.Vector3();
+  // the room environment's glowing panels, a patch per face: most of the light (selfie-studio.js)
+  const panels = [];
+  roomEnvironment().traverse((o) => {
+    if (o.material?.emissiveIntensity) for (const ax of [0, 1, 2]) for (const side of [-1, 1]) {
+      const at = o.position.clone().setComponent(ax, o.position.getComponent(ax) + (side * o.scale.getComponent(ax)) / 2);
+      const area = (o.scale.x * o.scale.y * o.scale.z) / o.scale.getComponent(ax), cos = -side * at.clone().normalize().getComponent(ax);
+      if (cos > 0) panels.push({ w: at.clone().normalize(), k: (o.material.emissiveIntensity * area * cos) / at.lengthSq() });
+    }
+  });
+  const irradiance = (n, lights) => lights.reduce((e, l) => e + (l.isHemisphereLight
+    ? l.intensity * THREE.MathUtils.lerp(lum(l.groundColor), lum(l.color), 0.5 * n.y + 0.5)
+    : l.intensity * lum(l.color) * Math.max(0, n.dot(l.getWorldPosition(V()).sub(l.target.getWorldPosition(V())).normalize()))),
+  panels.reduce((e, p) => e + p.k * Math.max(0, n.dot(p.w)), 0));
+  // the mean over a sample of the triangles the lens sees, each turned toward it (garments are two-sided)
+  const lit = (cam, parts, look, lights) => {
+    let sum = 0, n = 0;
+    for (const m of parts) {
+      const { index, attributes: { position } } = m.geometry, tris = (index ?? position).count / 3;
+      for (let t = 0; t < tris; t += Math.max(1, Math.floor(tris / 300))) {
+        const [a, b, c] = [0, 1, 2].map((k) => m.localToWorld(m.getVertexPosition(index ? index.getX(3 * t + k) : 3 * t + k, V())));
+        const mid = a.clone().add(b).add(c).divideScalar(3), nrm = b.sub(a).cross(c.sub(a)).normalize();
+        if (!Number.isFinite(nrm.x) || !look(cam, mid, parts)) continue;
+        if (nrm.dot(cam.position.clone().sub(mid)) < 0) nrm.negate();
+        sum += irradiance(nrm, lights);
+        n++;
+      }
+    }
+    return sum / n;
+  };
+  const cam = new THREE.PerspectiveCamera(30, 240 / 300, 0.01, 50), shop = new THREE.PerspectiveCamera(35, 1.6, 0.1, 50);
+  const room = studioLights(cam), lights = [...room, ...cam.children.filter((c) => c.isLight)];
+  cam.updateMatrixWorld(true);
+  const potholder = PATTERN_DESIGNS.find((d) => d.patternType === 'potholder'), hat = PATTERN_DESIGNS.find((d) => d.patternType === 'hat');
+  const held = {
+    potholder: heldAs({ pattern: potholder, yarn: [{ c: '#c0504d' }] }, (y) => y.c).item,
+    pile: pileAs([potholder, hat, hat].map((pattern) => ({ pattern, yarn: [{ c: '#3d5a80' }] })), (y) => y.c).item,
+  };
+  const ratios = [];
+  for (const id of speciesIds()) for (const key of Object.keys(SHOTS)) {
+    const [type, silhouette = type === 'shawl' ? GARMENTS.shawl.silhouettes[0] : null] = key.split(':'), built = build(id);
+    dress(built, { [type]: held[type] ?? item(type, { silhouette, ...(type === 'bag' && { held: true }) }) });
+    const look = idLook(built), made = built.garments.filter((g) => g.userData.worn.includes(type)), face = [];
+    built.joints.head.traverse((o) => { if (o.isMesh && !o.userData.worn && !built.joints.eye.some(({ node }) => node.getObjectById(o.id))) face.push(o); });
+    takeSelfie(built, cam, type, silhouette, look);
+    const shot = lit(cam, made, look, lights), toFace = shot / lit(cam, face, look, lights);
+    const mid = new THREE.Box3().setFromObject(made[0]).getCenter(V());
+    shop.position.copy(mid).add(new THREE.Vector3(0, 5, 5));
+    shop.lookAt(mid);
+    shop.updateMatrixWorld(true);
+    ratios.push(shot / lit(shop, made, idLook(built), room));
+    assert.ok(toFace > 0.35, `${id} ${key}: what they made is lit ${toFace.toFixed(2)} as well as the face in its selfie`);
+  }
+  const mean = ratios.reduce((s, r) => s + r, 0) / ratios.length, under = ratios.filter((r) => r < 0.7).length / ratios.length;
+  assert.ok(mean > 0.95 && under < 0.1, `selfies light what they made ${mean.toFixed(2)} as well as the shop does, ${(under * 100).toFixed(0)}% under 0.7`);
 }
 
 console.log('garments.js self-check: all assertions passed');

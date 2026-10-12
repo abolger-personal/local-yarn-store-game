@@ -18,6 +18,25 @@ export const W = 240, H = 300;
 // renderer into a target and reading the pixels back would save the context; not worth it for one.
 let studio = null;
 
+/**
+ * The studio's lights: the shop's warm key, cool rim and sky, all from above (as is the room
+ * environment, which is most of the light), and the phone screen's glow, along the lens on `camera`.
+ * Without the glow a lens at the chest or below, looking up at a sweater or a held pot holder, saw
+ * undersides none of the rest reach: a fifth of the authored shots lit what they made under 70% as
+ * well as the shop shows it (garments.test.mjs). At 1.5 no surface those shots see is lit past the
+ * brightest the rest can light anything. Returns the scene's lights; the glow is the camera's.
+ */
+export function studioLights(camera) {
+  const key = new THREE.DirectionalLight('#ffe6c4', 2.4);
+  key.position.set(1.5, 3, 2.5);
+  const rim = new THREE.DirectionalLight('#bcd4ff', 0.9);
+  rim.position.set(-2, 2, -2);
+  const glow = new THREE.DirectionalLight('#ffffff', 1.5);
+  glow.position.set(0, 0, 1);         // behind the lens, shining where it looks
+  camera.add(glow, glow.target);
+  return [key, rim, new THREE.HemisphereLight('#cfe0ff', '#8b7a68', 0.55)];
+}
+
 function buildStudio() {
   // Transparent: the character is laid over a backdrop painted in 2D (see backdrop.js).
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -25,15 +44,12 @@ function buildStudio() {
   renderer.setSize(W, H);
   const scene = new THREE.Scene();
   scene.environment = new THREE.PMREMGenerator(renderer).fromScene(roomEnvironment(), 0.04).texture;
-  const key = new THREE.DirectionalLight('#ffe6c4', 2.4);
-  key.position.set(1.5, 3, 2.5);
-  const rim = new THREE.DirectionalLight('#bcd4ff', 0.9);
-  rim.position.set(-2, 2, -2);
-  scene.add(key, rim, new THREE.HemisphereLight('#cfe0ff', '#8b7a68', 0.55));
+  const camera = new THREE.PerspectiveCamera(30, W / H, 0.01, 50);
+  scene.add(...studioLights(camera), camera);     // in the scene, so its glow is drawn
   const print = document.createElement('canvas');
   print.width = W;
   print.height = H;
-  return { renderer, scene, camera: new THREE.PerspectiveCamera(30, W / H, 0.01, 50), print: print.getContext('2d') };
+  return { renderer, scene, camera, print: print.getContext('2d') };
 }
 
 /** Where `p` lands in the picture, in pixels. */

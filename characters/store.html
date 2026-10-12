@@ -8,27 +8,21 @@
   :root { color-scheme: light; }
   html, body { margin: 0; height: 100%; overflow: hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
   #app { position: fixed; inset: 0; }
-  /* touch-action: none or the browser claims one-finger drags for scroll/pinch and pointermove
-     never reaches the page — which would silently kill the touch preview below. */
   canvas { display: block; touch-action: none; transition: filter 120ms linear; }
   canvas.squint { filter: blur(6px); }
 
-  /* Every window folds. <details>/<summary> is the platform's own disclosure widget: it collapses
-     with no JavaScript, is keyboard-operable and screen-reader-labelled for free, and survives
-     whatever the panel's contents are. The only script involved is remembering the state. */
   .fold > summary {
     cursor: pointer; user-select: none; list-style: none;
     font: 700 10px ui-sans-serif, system-ui, sans-serif;
     letter-spacing: .06em; text-transform: uppercase; opacity: .55;
     display: flex; align-items: center; gap: 6px;
   }
-  .fold > summary::-webkit-details-marker { display: none; }   /* Safari's default triangle */
+  .fold > summary::-webkit-details-marker { display: none; }
   .fold > summary::before {
     content: '▸'; font-size: 11px; line-height: 1; transition: transform 120ms ease;
   }
   .fold[open] > summary::before { transform: rotate(90deg); }
   .fold > summary:hover { opacity: .9; }
-  /* Shut, a panel is just its title bar — no leftover padding pretending there is content. */
   .fold:not([open]) { padding-bottom: 6px; }
   .fold[open] > summary { margin-bottom: 6px; }
 
@@ -38,9 +32,6 @@
     border: 1px solid rgba(0,0,0,.08); border-radius: 10px;
     padding: 10px 12px; font-size: 12px; line-height: 1.5; color: #333;
   }
-  /* The bottom-left stack: the furniture buttons sit ON TOP of the controls panel, and the panel
-     folds, so the two are laid out as a column rather than both being pinned to the corner with
-     hand-tuned offsets that would overlap the moment anyone collapses it. */
   #leftStack {
     position: fixed; left: 12px; bottom: 12px; z-index: 11;
     display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
@@ -62,8 +53,6 @@
   #hud .held .no { color: #b4553f; }
   #furnBtns { display: flex; gap: 8px; }
   #furnBtns button {
-    /* 44px is the Apple/Material minimum touch target, and these ARE the touch alternative to
-       M and Q/E — so they must not shrink on small screens. */
     width: 44px; height: 44px; border-radius: 50%;
     border: 1px solid rgba(0,0,0,.18); background: rgba(255,252,246,.94); color: #3d2b1f;
     font: 20px/1 system-ui, sans-serif; cursor: pointer; padding: 0;
@@ -71,31 +60,24 @@
   }
   #furnBtns button:hover:not(:disabled) { background: #fff; }
   #furnBtns button:active:not(:disabled) { transform: scale(.94); }
-  /* Nothing selected means nothing to turn. Dimmed rather than hidden: a cluster that changes
-     width as you select things makes the buttons move under the finger reaching for them. */
   #furnBtns button:disabled { opacity: .38; cursor: default; box-shadow: none; }
-  /* Furniture mode is a MODE, so it latches — same treatment as the camera lock. */
   #moveBtn[aria-pressed="true"] { background: #c2703f; border-color: #a85f33; color: #fff; }
   #camBtns { position: fixed; right: 12px; bottom: 12px; z-index: 11; display: flex; gap: 8px; }
   #camBtns button {
-    width: 48px; height: 48px; border-radius: 50%;      /* over the 44px minimum touch target */
+    width: 48px; height: 48px; border-radius: 50%;
     border: 1px solid rgba(0,0,0,.18); background: rgba(255,252,246,.94); color: #3d2b1f;
     font: 22px/1 system-ui, sans-serif; cursor: pointer; padding: 0;
     box-shadow: 0 2px 8px rgba(0,0,0,.25);
   }
   #camBtns button:hover { background: #fff; }
   #camBtns button:active { transform: scale(.94); }
-  /* Locked is a MODE, so it has to look latched rather than just having swapped its glyph. */
   #lockBtn[aria-pressed="true"] { background: #c2703f; border-color: #a85f33; color: #fff; }
 
-  /* perf overlay — copied from crowd.html so the two views report the same numbers */
   #perf {
     position: fixed; left: 12px; top: 12px; z-index: 10;
     background: rgba(20,20,20,.82); color: #e8e8e8;
     font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
     border-radius: 8px; padding: 9px 12px; min-width: 190px;
-    /* Was pointer-events:none so the overlay never stole a click from the shop. The SUMMARY has to
-       take clicks to fold, so the exemption moves down to the body only. */
   }
   #perf #perfBody { pointer-events: none; }
   #perf > summary { color: #e8e8e8; }
@@ -104,25 +86,15 @@
   #perf .bad { color: #ff6b6b; }
   #perf .ok { color: #8fd67a; }
 
-  /* the round / timer window */
   #rail {
     position: fixed; right: 12px; top: 12px; z-index: 10;
     width: 268px; max-height: calc(100vh - 24px);
     display: flex; flex-direction: column; gap: 10px;
-    /* The rail itself is not a surface — only the panels in it take clicks, so the gaps between
-       them stay part of the shop and an orbit drag started there still works. */
     pointer-events: none;
-    /* And therefore the rail must NEVER be the scroll container. `overflow-y: auto` here drew a
-       scrollbar belonging to a pointer-events:none element: it could not be dragged, and a wheel
-       over it fell through to the canvas and zoomed the camera instead. A scrollbar you cannot
-       use is worse than no scrollbar. The panel that actually grows scrolls itself — see #debug. */
     overflow: hidden;
   }
   #rail > * { pointer-events: auto; }
-  /* Inside the rail they are stacked, not placed: the flex column owns their position. */
   #rail > .panel { position: static; flex: 0 0 auto; }
-  /* NPC state is the one that grows without bound, so it is the one that gives up space first —
-     it may shrink below its content (min-height:0) and scroll inside itself. */
   #rail > #debug { min-height: 0; flex: 0 1 auto; }
   #rail .lil-gui { width: 100%; }
   #timer .round { font: 600 22px/1.1 ui-monospace, monospace; color: #111; }
@@ -139,11 +111,7 @@
   #timer .bar { height: 3px; background: rgba(0,0,0,.09); border-radius: 2px; margin-top: 7px; overflow: hidden; }
   #timer .bar i { display: block; height: 100%; background: #c2703f; width: 0; }
 
-  /* the NPC state debug window */
   #debug {
-    /* The one scroller on this side of the screen, and it belongs to a pointer-events:auto
-       element so the bar can be dragged. `contain` stops a flick past the end from chaining out
-       to the canvas, where the wheel means zoom. */
     max-height: 46vh; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
     font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
   }
@@ -174,18 +142,14 @@
   #debug .book { margin-top: 8px; border-top: 1px solid rgba(0,0,0,.1); padding-top: 6px; font-size: 10px; color: #4a3f35; }
   #debug .book div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #debug .book .tags { opacity: .9; letter-spacing: 1px; }
-  /* An entry opens into what they did (TUTORIAL.md §7.3). */
   .entry > summary { cursor: pointer; }
   .entry .row { margin: 2px 0 2px 1.4em; font-size: .92em; }
-  /* A photo entry's button: a pill, so it reads as something to press rather than as an emoji. */
   .snap {
     font: 600 10px/1.5 ui-sans-serif, system-ui, sans-serif; color: #8a4a22; cursor: pointer;
     background: #fbeee4; border: 1px solid #c2703f; border-radius: 9px; padding: 0 6px; margin-right: 2px;
   }
   .snap:hover { background: #c2703f; color: #fff; }
-  /* The guestbook selfie, beside the rail it was opened from. */
   #debug .book .open-book { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: underline dotted; }
-  /* The Guestbook, opened: one day's page, paged back through the days. */
   #book { right: 292px; top: 12px; width: 280px; max-height: calc(100vh - 24px); overflow-y: auto;
           overscroll-behavior: contain; font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; color: #4a3f35; }
   #book[hidden] { display: none; }
@@ -196,7 +160,6 @@
   #book .tags { letter-spacing: 1px; }
   #book .close { position: absolute; top: 4px; right: 6px; border: 0; background: none; font-size: 16px; cursor: pointer; color: #5c5349; }
   #photo { right: 292px; top: 12px; margin: 0; padding: 10px 10px 6px; text-align: center; }
-  /* Beside the open book, not on top of it. */
   #book:not([hidden]) ~ #photo { right: 582px; }
   #photo[hidden] { display: none; }
   #photo img { display: block; width: 240px; height: 300px; border-radius: 4px; }
@@ -204,8 +167,6 @@
   #photo .close { position: absolute; top: 4px; right: 6px; border: 0; background: none; font-size: 16px; cursor: pointer; color: #5c5349; }
   #debug .log { margin-top: 8px; border-top: 1px solid rgba(0,0,0,.1); padding-top: 6px; font-size: 10px; color: #6a5f55; }
   #debug .log div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  /* The label: a paper ball band on the right edge (TUTORIAL.md §7.1, ui/label.js). Passive,
-     so it never takes the pointer from the shop under it. Note paper, black house lettering. */
   #band {
     position: fixed; right: 0; top: 50%; translate: 0 -50%; z-index: 9; pointer-events: none;
     width: min(150px, 34vw); padding: 4px 0; background: #fbf8ef; border-radius: 3px 0 0 3px;
@@ -221,22 +182,12 @@
   <div id="perfBody"></div>
 </details>
 
-<!-- Everything on the right lives in ONE column. The panels used to be individually fixed at
-     hard-coded tops (timer at 12px, NPC state at 168px) with lil-gui auto-placing over both, so
-     any panel that grew — the timer did, when it gained a second checkbox — silently buried the
-     one below it. A flex column cannot overlap itself whatever the contents do. -->
 <div id="rail">
 <details id="timer" class="panel fold" open>
-  <!-- The day/round line lives in the SUMMARY, so it is still readable when the panel is shut —
-       collapsing a window should hide the controls, not the thing you are watching. -->
   <summary><span class="round" id="roundLabel">round 0</span></summary>
   <div class="sub" id="clockLabel">shop is opening</div>
   <button id="advance">Advance round &rarr;</button>
-  <!-- A trial shortcut: one press lays every display out flat and by category. Kept or turned into
-       a mechanic depending on how it plays — see tidyShop in visit.js. -->
   <button id="tidy" title="lay every display out flat, by category, and clear the floor">Tidy the shop</button>
-  <!-- Both default ON: the shop should be alive the moment the page loads, not waiting to be
-       clicked through a round at a time. -->
   <label><input type="checkbox" id="auto" checked /> auto-advance rounds</label>
   <label><input type="checkbox" id="autoDay" checked /> then roll into the next day</label>
   <div class="bar"><i id="autoBar"></i></div>
@@ -267,18 +218,11 @@
 
 <aside id="band" aria-label="The label" hidden></aside>
 
-<!-- Reset the camera. A corner button rather than only the F key, because a tablet has no F key
-     and getting lost is the one state you cannot orbit your way out of. -->
 <div id="camBtns">
   <button id="lockBtn" title="lock the camera" aria-label="Lock the camera" aria-pressed="false">&#128275;</button>
   <button id="frameBtn" title="reset the camera (F)" aria-label="Reset the camera">&#9974;</button>
 </div>
 
-<!-- Bottom-left cluster: switch to arranging the FURNITURE, and turn whatever is selected.
-     HTML rather than scene geometry — the browser does the hit-testing, they stay a constant
-     comfortable size however far the camera is, and they cost no raycast. They used to float
-     above the selected piece, which put them under the dragging finger and off-screen whenever
-     the selection was behind the camera; a fixed cluster is always reachable. -->
 <div id="leftStack">
 <div id="furnBtns">
   <button id="moveBtn" title="move the furniture (M)" aria-label="Move the furniture" aria-pressed="false">&#129681;</button>

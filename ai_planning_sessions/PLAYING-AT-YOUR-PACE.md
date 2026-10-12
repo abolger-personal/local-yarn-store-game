@@ -109,6 +109,11 @@ Strangers shop fast and cannot be helped in time. Regulars hesitate longer. Frie
 counter until you get to them. The early shop is hard because nobody knows you; the late shop
 relaxes around you because you earned it.
 
+- **A friend's patience** (the tutorial friend): they do not run out of rounds while something they
+  want is out where they can notice it, or buried where they can still dig. It ends as MAX_ROUNDS
+  would once it is bought by someone else, never put out, or buried where they have already dug
+  since their last buy there (DISPLAYS.md rule 9), so a day cannot stall.
+
 ---
 
 ## 5. The order for tomorrow

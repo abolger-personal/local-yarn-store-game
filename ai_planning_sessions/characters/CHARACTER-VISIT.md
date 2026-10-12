@@ -20,9 +20,9 @@ RETURNING VISITORS:
 - This is what lets a long project span more than one visit, and so is a primary driver of Finished Object count.
 
 GUESTBOOK ENTRY ICONS (MVP: the entry is one line with a leading icon, so a page of the book reads at a glance):
-- 📷 they made a finished object — the photo, of the most recently finished one
+- 📷 they made a finished object — the photo, of the most recently finished one. An object is photographed once: a regular who walks back in wearing yesterday's hat has nothing new to show and signs with a note instead
 - 🙂 happy: they found what they were looking for (bought something for a WIP)
-- 🙁 disappointed: they did not find what they needed
+- 🙁 disappointed: they did not find what they needed. Buying anything counts as finding it; a customer who needed nothing, or sat and worked on a WIP, is 🙂, not 🙁
 - 🧶 they bought yarn
 - 📖 they bought a pattern
 - 🪡 they bought a tool notion (hook or needles)
@@ -94,7 +94,7 @@ ACTIONS WITHOUT PRESCRIPTIONS:
 
 - Wait a Round
 
-    Stay still. 
+    Stay still. Not offered on the doormat: an NPC parked there blocks the one way in and out.
     
     PRESCRIBED NEXT ACTION: If another NPC2 is within a small distance of NPC1, chance of "PRESCRIBED NEXT ACTION" being another 'Wait a round' to keep interacting is:
         
@@ -106,7 +106,7 @@ ACTIONS WITHOUT PRESCRIPTIONS:
 
 - Move around the store to a spot. 
     
-    Generate a random XY target not inside a display, and a path to move there. 
+    Generate a random XY target not inside a display (nor a chair, nor the doormat), and a path to move there. 
 
     PRESCRIBED NEXT ACTION: None
 

@@ -320,7 +320,7 @@ again.
 player's pick needs the same answer the NPC does, and `inventory/` must not depend on `characters/`.
 Re-exported from `visit.js`, so existing callers are unchanged.
 
-Holding an item across displays: hovering onto another display activates it for the drop, with no
+Holding an item across displays (experimental, demo only right now: stash-and-stuff): hovering onto another display activates it for the drop, with no
 key press; hovering over dead space returns to the display it came from. An incidental switch
 mid-hold never moves the camera; an explicit one (D, the dropdown, a fresh pick-up) recentres it. A
 keyboard plane or display switch re-aims the drop at once. On a click the forgiving item pick runs

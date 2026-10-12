@@ -71,7 +71,7 @@ Interaction "Consideration" scoring:
 Interaction scoring rules in order of satisfying: 
     NPC with an Orderliness attribute = 1 should "spread out" the stack to make a mess: all items will get randomly flattened to as low in Z as possible. (thus allowing them to SOMETIMES satisfy the "Buy" condition afterwards)
 
-    NPC with an Orderliness attribute = 5 will "Tidy" the stack: items will get sorted by category in a single xz tower  (thus allowing them to SOMETIMES satisfy the "Buy" condition afterwards). Tidy groups by kind — a notion by its name, yarn by its family — one tower per kind, overflowing into another tower of the same kind at headroom.
+    NPC with an Orderliness attribute = 5 will "Tidy" the stack: items will get sorted by category in a single xz tower  (thus allowing them to SOMETIMES satisfy the "Buy" condition afterwards). (Experimental, demo only right now: stash-and-stuff.) Tidy groups by kind — a notion by its name, yarn by its family — one tower per kind, overflowing into another tower of the same kind at headroom.
     
     NPC with an Assertiveness attribute > 3 will "Rearrange" a stack in place to move an item or formation they want to the top of the stack (thus allowing them to ALWAYS satisfy the "Buy" condition afterwards)
   

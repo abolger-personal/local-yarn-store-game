@@ -462,14 +462,11 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
 3. **Display "attractiveness weights" are undefined.** CHARACTER-VISIT.md requires each display to
    carry "a meta 'attractiveness' list of weights to use against a particular NPC". The placeholder
    has the right shape (per-NPC, 0..1, thresholded at 0.5) but invented weights.
-4. **About a third of NPCs never reach a display at all** — they wander, wait and work on WIPs until
-   MAX_ROUNDS. That follows from uniform random selection over the action set. If browsing should
-   dominate, the action set needs weighting, not just more entries.
-5. **Interaction outcome for "not complete" is ambiguous.** DISPLAYS.md says a tidy/spread
+4. **Interaction outcome for "not complete" is ambiguous.** DISPLAYS.md says a tidy/spread
    "SOMETIMES" satisfies the buy condition afterwards. Currently it always resolves on the next
    interaction. What should "sometimes" actually depend on?
 
-6. **Which notions have which attributes is not written down anywhere.** Today the rule lives in
+5. **Which notions have which attributes is not written down anywhere.** Today the rule lives in
    `SIZED_NOTIONS` in `store.html` — hooks have a millimetre size, stitch markers and darning
    needles have none. That belongs in the catalog schema (P6) alongside the Ravelry-shaped
    attributes, not in a page. It matters more than it looks: an attribute printed on a box is

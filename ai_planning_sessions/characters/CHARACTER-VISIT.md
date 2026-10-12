@@ -66,7 +66,7 @@ ACTIONS WITH PRESCRIPTIONS:
         
         If the NPC "walked to a display" "interacted" with a display in the last round, no new walking actions will be added to this rounds set as we want an NPC to stay at the current display. 
 
-    For each display, calculate a boolean "visible" value for each display. Keep this simple: if there's nothing intersecting the vector between the NPC and the display centroid, it's "visible". 
+    For each display, calculate a boolean "visible" value for each display. Keep this simple: if there's nothing intersecting the vector between the NPC and the display centroid, it's "visible". Exception, the shop floor: floor tiles are walked on, so they never block a sightline (or a route), and a floor tile is seen at its point nearest the NPC rather than its centroid — a tile half under a shelf or a table has its centroid hidden, and what sits on its open half must still be noticeable. 
     
     For visible displays, calculate attractiveness of each display using weights. All displays with an attractiveness of more than 50% become unique actions added to the possible set: "Walk to display A".  
 
@@ -106,7 +106,7 @@ ACTIONS WITHOUT PRESCRIPTIONS:
 
 - Move around the store to a spot. 
     
-    Generate a random XY target not inside a display (nor a chair, nor the doormat), and a path to move there. 
+    Generate a random XY target not inside a display (nor a chair, nor the doormat), and a path to move there. The shop floor's tiles don't count as displays here — the target may be anywhere on the floor, so a patient wanderer eventually sees the whole shop. 
 
     PRESCRIBED NEXT ACTION: None
 

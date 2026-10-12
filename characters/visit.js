@@ -186,7 +186,7 @@ const nearestPoint = ({ x, z, w, d }, p) => ({
   x: clamp(p.x, x - w / 2, x + w / 2), z: clamp(p.z, z - d / 2, z + d / 2) });
 
 export function visibleTo(world, from, display) {
-  // VISIT-POC-TODO.md spec gap 6
+  // CHARACTER-VISIT.md: the floor exception to centroid visibility
   const to = display.solid === false ? nearestPoint(display, from) : display;
   return !world.displays.some((d) =>
     d.id !== display.id && d.solid !== false && segmentHitsBox(from, to, d));

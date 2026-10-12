@@ -220,6 +220,21 @@
     box-shadow: 0 3px 10px rgb(0 0 0 / .28); border-left: 3px double #1c1712;
   }
   #band svg { display: block; width: 100%; height: auto; }
+  /* The card under the ruled-off name (guestbook.js bandCard / tagCard): what they hold as one
+     bulleted entry each, wraps hanging; status muted; the pattern a titled section of needs. */
+  #band { --muted: #6e6354; color: #1c1712; font: 600 11px/1.25 ui-sans-serif, system-ui, sans-serif; }
+  #band h2, #band h3, #band p, #band ul, #band dl, #band dd { margin: 0; padding: 0; font-size: inherit; }
+  #band > :not(h2) { margin: 0 11px 9px; }
+  #band ul { list-style: none; }
+  #band .items { padding-left: 1em; list-style: disc; }
+  #band li + li { margin-top: 4px; }
+  #band .status { color: var(--muted); font-weight: 400; font-style: italic; }
+  #band .making { border-top: 1px solid rgb(28 23 18 / .25); padding-top: 6px; }
+  #band h3 { color: var(--muted); font-size: 8.5px; letter-spacing: .12em; text-transform: uppercase; }
+  #band .title { font-size: 12px; font-weight: 700; margin: 1px 0 4px; }
+  #band .needs { display: grid; grid-template-columns: auto 1fr; gap: 2px 6px; align-items: baseline; }
+  #band dt { color: var(--muted); font-size: 8px; letter-spacing: .08em; }
+  #band dd { font-weight: 400; text-transform: lowercase; }
 </style>
 </head>
 <body>

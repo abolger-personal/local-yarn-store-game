@@ -4,12 +4,12 @@
 // the shop. Hovering an item (mouse) or picking one up (any pointer) puts its band up; it stays
 // after the item is set down, until something else is hovered or picked up, or bare floor is
 // clicked, so it can be read while arranging. Only clicking a customer swaps it for their tag
-// (guestbook.js tagLines); pointing at one without a click counts as watching them (shop.watched, read by world.js markInView).
+// (guestbook.js tagCard); pointing at one without a click counts as watching them (shop.watched, read by world.js markInView).
 
 import * as THREE from 'three';
 import { EMPTY } from '../../../inventory/grid.js';
 import { ACTION, STATE } from '../../visit.js';
-import { bandLines, tagLines } from '../../guestbook.js';
+import { bandCard, tagCard } from '../../guestbook.js';
 import { S } from '../core/config.js';
 import { cast, drag, items, shop } from '../core/state.js';
 import { renderer } from '../scene/stage.js';
@@ -18,8 +18,8 @@ import { CELL, INK, layout, svgLettering } from './lettering.js';
 
 const band = document.getElementById('band');
 
-// The band's drawing, in its own units: 300 wide, the heading at cap 26, the rest at cap 19.
-const W = 300, PAD = 22, HEAD = 26, BODY = 19, LEAD = 0.75;
+// The heading's drawing, in its own units: 300 wide (the band's 150px), the heading at cap 26.
+const W = 300, PAD = 22, HEAD = 26, LEAD = 0.75, RULE_GAP = 12;
 
 /** Greedy word wrap to the band's width; one word too long for a line is shrunk by svgLettering. */
 function wrap(text, cap) {
@@ -35,20 +35,20 @@ function wrap(text, cap) {
 
 const escape = (s) => s.replace(/[&<"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '"': '&quot;' })[c]);
 
-/** The band as SVG: the first line is the heading, ruled off from the rest like a printed band. */
-function drawBand(lines) {
+/**
+ * The band: its heading in the house lettering, ruled off like a printed band, then the card's
+ * body as HTML (guestbook.js bandCard / tagCard), styled by #band in game.html.
+ */
+function drawBand({ head, body }) {
   let y = PAD, art = '';
-  lines.forEach((line, i) => {
-    const cap = i ? BODY : HEAD;
-    for (const row of wrap(line, cap)) {
-      y += cap;
-      art += svgLettering(row, PAD, y, { cap, align: 'left', maxWidth: W - PAD * 2 });
-      y += cap * LEAD;
-    }
-    if (i === 0) { art += `<path d="M${PAD} ${y} H${W - PAD}" stroke="${INK}" stroke-width="2" />`; y += BODY * LEAD; }
-  });
-  const h = Math.round(y - BODY * LEAD + PAD);
-  band.innerHTML = `<svg viewBox="0 0 ${W} ${h}" role="img" aria-label="${escape(lines.join('. '))}">${art}</svg>`;
+  for (const row of wrap(head, HEAD)) {
+    y += HEAD;
+    art += svgLettering(row, PAD, y, { cap: HEAD, align: 'left', maxWidth: W - PAD * 2 });
+    y += HEAD * LEAD;
+  }
+  art += `<path d="M${PAD} ${y} H${W - PAD}" stroke="${INK}" stroke-width="2" />`;
+  const h = Math.round(y + RULE_GAP);
+  band.innerHTML = `<h2><svg viewBox="0 0 ${W} ${h}" role="img" aria-label="${escape(head)}">${art}</svg></h2>${body}`;
   band.hidden = false;
 }
 
@@ -62,17 +62,17 @@ function knittingNow(npc) {
 
 // A customer has a visit's `bought` list; an item never does.
 const isCustomer = (thing) => Array.isArray(thing.bought);
-const linesOf = (thing) => (isCustomer(thing) ? tagLines(thing, knittingNow(thing)) : bandLines(thing));
+const cardOf = (thing) => (isCustomer(thing) ? tagCard(thing, knittingNow(thing)) : bandCard(thing));
 
 function show(thing) {
   if (!thing || thing === shown) return;
   shown = thing;
-  drawBand(linesOf(thing));
+  drawBand(cardOf(thing));
 }
 
 /** Redraw what is up when the sim moves on: a customer's tag grows as they buy. */
 export function redrawLabel() {
-  if (shown && isCustomer(shown)) drawBand(linesOf(shown));
+  if (shown && isCustomer(shown)) drawBand(cardOf(shown));
 }
 
 const box = new THREE.Box3(), hit = new THREE.Vector3();

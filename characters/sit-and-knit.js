@@ -1,6 +1,3 @@
-// A HARNESS, not game code: the animation lives in craft-anim.js and sparkle.js, the body in npc.js and the species
-// kits. This page seats one character and gives the craft's knobs a panel, so the knitting and the
-// crochet can be judged close up and at shop distance.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { roomEnvironment } from '../inventory/room-environment.js';
@@ -25,7 +22,6 @@ const state = {
   color: '#c8657a', wallYaw: 0.9, view: 'close',
 };
 
-// ---------------------------------------------------------------- stage
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
@@ -54,10 +50,6 @@ function addLights() {
   scene.add(key, rim, new THREE.HemisphereLight('#cfe0ff', '#8b7a68', 0.55), ground);
 }
 
-/**
- * A stand-in chair: the shop's seat height, width and back stand-off, as plain boxes. The shop's
- * farmhouse chair (store/scene/seating.js) cannot be imported without booting the shop's stage.
- */
 function addChair() {
   const wood = new THREE.MeshStandardMaterial({ color: '#b27c51', roughness: 0.72 });
   const top = new THREE.Mesh(new THREE.BoxGeometry(CHAIR_W, 0.025, CHAIR_W), wood);
@@ -70,10 +62,8 @@ function addChair() {
 addLights();
 addChair();
 
-// ---------------------------------------------------------------- the sitter
 let built = null, craft = null, sparkle = null, opts = null, seatY = 0;
 
-/** Where the root goes for the backside to rest on the seat (as cast.js measureSeatDrop). */
 function seat(b) {
   applyPose(b, POSES.sit);
   seatY = SEAT_H + b.root.position.y - lowestResting(b) - 0.01;
@@ -103,10 +93,8 @@ function buildSitter(randomise = false) {
   frame();
 }
 
-// ---------------------------------------------------------------- framing
 const VIEW_DIR = new THREE.Vector3(0.45, 0.35, 1).normalize();
 
-/** Close up, or at the size the shop draws a customer (~150px tall), from the same angle. */
 function frame() {
   const box = new THREE.Box3().setFromObject(built.root);
   const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
@@ -118,7 +106,6 @@ function frame() {
   controls.update();
 }
 
-// ---------------------------------------------------------------- panel
 const live = (k) => (v) => { if (craft) craft[k] = v; };
 
 function buildGui() {
@@ -138,7 +125,6 @@ function buildGui() {
   gui.add(state, 'view', ['close', 'shop']).name('camera').onChange(frame);
 }
 
-// ---------------------------------------------------------------- loop
 const clock = new THREE.Timer();
 const stats = document.getElementById('stats');
 
@@ -146,7 +132,7 @@ function tick() {
   const dt = Math.min(clock.update().getDelta(), 0.1);
   stepCraft(craft, dt);
   stepMotion(built, POSES.sit, dt, opts, craft.add);
-  built.root.position.y = seatY;   // weight on the seat, not the feet (cast.js does the same)
+  built.root.position.y = seatY;
   poseCraft(craft);
   stepSparkle(sparkle, dt);
   state.progress = craft.progress;

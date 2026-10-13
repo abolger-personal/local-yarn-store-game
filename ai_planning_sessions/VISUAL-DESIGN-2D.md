@@ -84,9 +84,11 @@ and the drop ghost share the green so the eye pairs them (STORE-SCENE.md §Drop 
 
 ### Yarn colour words
 
-A ball band's colour word comes from the drawn swatch's OKLCH (`YARN_PALETTE`), not its hue alone:
-C < 0.03 is *grey*; L < 0.5 is *dark* (*brown*, *olive*, *navy*); L > 0.75 is *pale* (*peach* for red
-and orange); C < 0.08 is *dusty* (*tan* for orange); otherwise the bare hue word.
+A ball band names its colourway like an indie dyer: a word of its own, then the nearest CSS named
+colour to the drawn swatch in OKLab (*wistful peach puff*, *sprig teal*). Grey yarn (C < 0.03) gets only
+grey names, and coloured yarn never does. Shade-modified names (dark, medium, light, pale, deep) are left out, so the adjective is the only modifier. Each of
+the 48 palette colours has its own word in the *everyday* pack (`COLOURWAY_PACKS`), none a colour itself, so no
+two share a name. A yarn's `namePack` picks another pack.
 
 ---
 

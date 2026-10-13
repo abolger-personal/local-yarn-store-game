@@ -91,6 +91,8 @@ function toOklch({ r, g, b }) {
            h: ((Math.atan2(bb, a) * 180) / Math.PI + 360) % 360 };
 }
 
+export const oklchOf = (hex) => toOklch(new THREE.Color(hex));
+
 // YARN-ASSET-SPIKE.md §17: the palette, with each colour's OKLCH after the gamut clamp.
 export const YARN_PALETTE = (() => {
   const rng = mulberry32(0x105);

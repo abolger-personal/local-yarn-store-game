@@ -1,28 +1,28 @@
 // TUTORIAL.md §7.1, §7.3; PROJECTS-AND-AUTHORSHIP.md §4b
 
 import { labelOf, TOOL_FOR_CRAFT, yarnUnits } from '../inventory/catalog.js';
-import { YARN_PALETTE } from '../inventory/yarn-look.js';
+import { YARN_PALETTE, oklchOf } from '../inventory/yarn-look.js';
+import { COLOURWAY_PACKS, CSS_COLOURS } from '../inventory/css-colours.js';
 
-// OKLCH hue upper bounds.
-const HUE_WORDS = /** @type {[number, string][]} */ ([[15, 'pink'], [45, 'red'], [80, 'orange'], [115, 'yellow'],
-  [170, 'green'], [220, 'teal'], [280, 'blue'], [330, 'purple'], [360, 'pink']]);
-const DARK = { orange: 'brown', yellow: 'olive', blue: 'navy' };
-const PALE = { red: 'peach', orange: 'peach' };
-const DUSTY = { orange: 'tan' };
+const GREY = 0.03;
+const lab = ({ l, c, h }) => [l, c * Math.cos((h * Math.PI) / 180), c * Math.sin((h * Math.PI) / 180)];
+const NAMED = CSS_COLOURS.map(([word, hex]) => {
+  const ok = oklchOf(hex);
+  return { word, grey: ok.c < GREY, at: lab(ok) };
+});
 
-export function colourWord(colorIndex) {
-  const { l, c, h } = YARN_PALETTE[colorIndex % YARN_PALETTE.length];
-  if (c < 0.03) return 'grey';
-  const hue = HUE_WORDS.find(([upTo]) => h < upTo)?.[1] ?? 'pink';
-  if (l < 0.5) return DARK[hue] ?? `dark ${hue}`;
-  if (l > 0.75) return PALE[hue] ?? `pale ${hue}`;
-  if (c < 0.08) return DUSTY[hue] ?? `dusty ${hue}`;
-  return hue;
+export function colourWord(colorIndex, pack = 'everyday') {
+  const swatch = YARN_PALETTE[colorIndex % YARN_PALETTE.length], at = lab(swatch), grey = swatch.c < GREY;
+  const dist = (n) => Math.hypot(...n.at.map((v, k) => v - at[k]));
+  const { word } = NAMED.filter((n) => n.grey === grey)
+    .reduce((best, n) => (dist(n) < dist(best) ? n : best));
+  const words = COLOURWAY_PACKS[pack] ?? COLOURWAY_PACKS.everyday;
+  return `${words[colorIndex % words.length]} ${word}`;
 }
 
 export function bandOf(item) {
   if (item.name === 'yarn') {
-    return `${item.weight} ${item.material} ${item.shape ?? 'ball'}${item.colorIndex == null ? '' : `, ${colourWord(item.colorIndex)}`}`;
+    return `${item.weight} ${item.material} ${item.shape ?? 'ball'}${item.colorIndex == null ? '' : `, ${colourWord(item.colorIndex, item.namePack)}`}`;
   }
   if (item.name === 'pattern') {
     return `${item.title ? `${item.title}: ` : ''}${item.patternType} pattern, ${item.craft} ${item.toolSize}mm, ` +
@@ -38,7 +38,7 @@ const units = (n) => `${n} ${n === 1 ? 'UNIT' : 'UNITS'}`;
 export function bandLines(item) {
   if (item.name === 'yarn') {
     return [`${caps(item.weight)} WEIGHT`, caps(item.material),
-      ...(item.colorIndex == null ? [] : [caps(colourWord(item.colorIndex))]), caps(item.shape ?? 'ball'), units(yarnUnits(item))];
+      ...(item.colorIndex == null ? [] : [caps(colourWord(item.colorIndex, item.namePack))]), caps(item.shape ?? 'ball'), units(yarnUnits(item))];
   }
   if (item.name === 'pattern') {
     return [...(item.title ? [caps(item.title)] : []), ...patternNeeds(item).map(([k, v]) => (k === 'TOOL' ? v : `${k} ${v}`))];
@@ -76,7 +76,7 @@ export function tagCard(npc, knitting = null) {
 }
 
 function thingOf(item) {
-  if (item.name === 'yarn' && item.colorIndex != null) return `the ${colourWord(item.colorIndex)}`;
+  if (item.name === 'yarn' && item.colorIndex != null) return `the ${colourWord(item.colorIndex, item.namePack)}`;
   if (item.name === 'pattern') return `the ${item.patternType} pattern`;
   return `the ${bandOf(item)}`;
 }

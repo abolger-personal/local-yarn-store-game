@@ -119,7 +119,7 @@ Always available, from the first second of the game. It costs nothing.
 - **One control, two faces:** the speed button in the corner stack, whose fourth state ⏸ is
   pause, and **the break card on the counter**, which flips face-out ("Back after this row")
   while paused. Clicking the card toggles pause too, so a player who never opens the stack can
-  still find it in the room. *The card is to build; game.js marks where it hooks in.*
+  still find it in the room. *The card is to build; it hooks in beside `togglePause` in game.js.*
 - **Keys:** **Space** steps the button on (▶ → ▶▶ → ▶▶▶ → ⏸), **P** pauses and resumes at the
   speed it left. Game page only: on store.html Space still advances a round.
 - **The speeds:** ▶ (the default) is a stroll, slow enough to watch every customer shop; ▶▶ and
@@ -130,7 +130,7 @@ Always available, from the first second of the game. It costs nothing.
 - **The player keeps acting:** pick up, place, move furniture, change the camera. Arranging while
   paused is the point.
 - **The signals are objects:** the card, and the wall clock's pendulum stopping. No overlay.
-- Holding an item still pauses on its own; the night screen is the pause the game gives every day.
+- Holding an item should pause on its own (not built: ROADMAP F1); the night screen is the pause the game gives every day.
 
 ---
 
@@ -187,10 +187,8 @@ and SCRIPTED-EVENTS.md §4.
   Guestbook. The Guestbook shows something new, which invites the first click.
 - **Fallback:** if the player never moves anything, the friend eventually finds the ball and hook
   on the floor themselves (floors are slow, not impossible), and the Guestbook still fills.
-- **Needs:** a fresh tutorial game that starts with only these three items (today a fresh game
-  fills to `stockCount` first); the scripted `cast` and `seed … facing` actions; pot holder as a
-  pattern type (the decor finished-object types are a TODO in `inventory/catalog.js`); the kit
-  growing to pattern + yarn + hook.
+- **Needs:** the scripted `cast` and `seed … facing` actions (built hard-coded today in
+  `openTutorial`), and the kit growing to pattern + yarn + hook.
 
 ### Night 1: what comes tomorrow
 

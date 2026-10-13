@@ -70,5 +70,5 @@ The visual spec asks for these to be kept here as they come up.
 
 ## Open questions
 
-- **TODO(spec):** tie a pattern's tool size to its difficulty instead of rolling it flat.
-  CHARACTER-ATTRIBUTES.md: "crochet and needle size tiny" for a high-Intellect pattern.
+- **TODO(spec):** tie a pattern's tool size to its difficulty; tracked in
+  characters/NEAR-MISS-AND-SUBSTITUTION.md, open questions ("Difficulty is not a pattern attribute yet").

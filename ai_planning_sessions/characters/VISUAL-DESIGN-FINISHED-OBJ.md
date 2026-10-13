@@ -286,7 +286,8 @@ relief pattern), **sheen**, and **drape**.
    - **Sheen:** silk and mercerised cotton are reflective. **Not modelled yet:** every garment shares
      one material. **To do:** a cheap per-fibre sheen, for example a vertex attribute the shared
      shader reads, rather than a material per fibre.
-   - **Drape:** on hold, because it is hard to model cheaply. **To do:** find a cheap way.
+   - **Drape:** revisit later: drape vs performance needs more work once NPC movement is more
+     complex. Today a single `DRAPE` scalar (garments.js).
    - **Pilling or halo, and durability:** not a game mechanic now, and not planned.
    - **Washability and care:** may become a mechanic later, since washing could shrink or felt a
      garment. Not now.
@@ -359,8 +360,8 @@ object comes out relative to the pattern's intended size.
   the player stocked the tool size and yarn weight the pattern asks for, where the NPC could find
   them together.
 - **Decor items scale freely** from the same inputs, with no "fit".
-- The fit limits, and how far off the tool and yarn have to be to reach them, are **(open)**:
-  tune on the rig.
+- The fit limits are **decided**: `FIT_RANGE` [0.2, 1.6] (garments.js), reached through the tool
+  and yarn's real stitch width.
 
 ### Colour
 
@@ -379,7 +380,8 @@ object comes out relative to the pattern's intended size.
   size/fit. Weight also shares everything tool size drives (§2b).
 - **Fibre sets sheen; its drape is on hold** (§2b). Where drape is drawn today, it picks among a few
   pre-shaped drape meshes, from stiff (linen, cotton) to fluid (alpaca, silk, mohair), with no
-  cloth simulation. The fibre-to-drape order stays **(proposed)** until a cheap drape model exists.
+  cloth simulation. The fibre-to-drape order stays **(proposed)**: revisit later, once NPC movement is more complex;
+  today a single `DRAPE` scalar (garments.js).
 
 ### NPC skill
 
@@ -444,8 +446,8 @@ A swatch is **both a crafting step and a leftover object**.
 
 While an NPC knits or carries a WIP, it shows as **needles (or a hook) plus a partial object that
 grows with progress**. It starts as a swatch-sized piece and builds toward the finished silhouette.
-It is the same generator as the FO, clipped by progress, in the WIP's yarn colours. Holding it needs
-the two-handed knitting pose that NOTIONS.md flags.
+It is the same generator as the FO, clipped by progress, in the WIP's yarn colours. Holding it uses
+the two-handed knitting pose in `craft-anim.js`.
 
 - [ ] **TODO(spec): the full sit-and-knit piece.** The draft (`characters/craft-anim.js`, test page
   `characters/sit-and-knit.html`, commit 94be68a) draws the work as a plain one-colour rectangle,
@@ -471,7 +473,6 @@ payoff. This supersedes P1-SPIKE-PLAN.md's "species + fur + signature accessory"
 
 ## 5. Open questions
 
-- **Size-to-fit tuning:** the fit limits, and how far tool and yarn may be off before each end.
 - **Yarn per WIP:** NPCs buy by units, and may end up with the wrong colour when matching units are
   not stocked together. The rules come from skill and personality; not specified yet.
 - **Who swatches, and what a swatch changes:** the swatch as a step.
@@ -494,9 +495,9 @@ Listed so nothing is missed; struck through where done.
     for the six wearables, at PATTERNS.md's costs; `hints` is gone. Each named design carries its
     **silhouette** (`PATTERN_TITLES` is keyed by type and silhouette), and `wornAs` in
     `garments.js` builds the finished object as it. Still open:
-    - the **decor types** (blanket, potholder, cozy, chair cover, amigurumi, mittens). The sim
-      copes (no slot, so always lent), but nothing draws a decor FO, in the shop or in the
-      Guestbook photo, and they have no cover icon.
+    - the **decor types** other than the potholder (blanket, cozy, chair cover, amigurumi,
+      mittens): not in `PATTERN_TYPES` yet. The potholder is drawn, photographed and has a cover
+      icon.
     - a design's **texture, colourwork, edge, form and accessory**. A shop FO is still the
       silhouette's defaults, with stripes when it is knitted in more than one colour.
   - ~~`yarnUnits`: **1 per yarn item**, not footprint.~~ Done 2026-10-03. Pattern costs are 1–8 items of the pattern's weight (PATTERNS.md), and a wrong-weight item is a near-miss, not a conversion.

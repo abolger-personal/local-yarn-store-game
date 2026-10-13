@@ -26,7 +26,7 @@ export function randomTraits(rng = Math.random) {
 
 export const maxWips = (t) => t.Enthusiasm + t.Openness + t.Volatility;
 
-// CHARACTER-VISIT.md MAX_ROUNDS; its range is VISIT-POC-TODO.md spec gap 1
+// CHARACTER-VISIT.md MAX_ROUNDS
 export function maxRounds(t, rng = Math.random) {
   return Math.max(1, Math.round((t.Openness + t.Industriousness + t.Enthusiasm) * (1 + rng())));
 }
@@ -357,7 +357,7 @@ export const consideredHere = (npc, display, items) =>
 export const holdsTarget = (display, items, target) =>
   items.some((it) => available(it) && it.display === display.id && matchesTarget(it, target));
 
-// TODO(spec): placeholder weights, VISIT-POC-TODO.md spec gap 3
+// TODO(spec): placeholder weights, VISIT-POC-TODO.md spec gap 2
 
 export function attractiveness(npc, display, items) {
   const t = npc.traits;

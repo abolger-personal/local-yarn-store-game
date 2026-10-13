@@ -51,58 +51,47 @@ These come from the original concept and should be re-read before any design cha
 
 | Layer | Choice |
 | --- | --- |
-| Renderer | three.js |
-| Scene glue | `@react-three/fiber` + `@react-three/drei` |
-| Post FX | `@react-three/postprocessing` |
-| State | `zustand` (UI only); plain TypeScript for simulation |
-| Build | Vite + TypeScript |
-| Storage | `idb-keyval` (IndexedDB, one autosave slot) — see "Saving" in §5. Revised 2026-10-03 from `idb`, which is more than one slot needs |
-| Tests | Vitest (headless) |
+| Renderer | three.js 0.186, plain ES modules loaded from a CDN import map in each page |
+| Build | None. The repo is served as-is |
+| Framework | None. UI is DOM built in plain JS (`characters/store/ui/`) |
+| Types | JS type-checked by `tsc` via `jsconfig.json` (JSDoc plus inference, no TypeScript syntax); `three` is a devDependency only for its type definitions |
+| Lint | ESLint (`eslint.config.js`; rule choices in `tools/README.md`) |
+| Tests | Node self-check scripts (`*.test.mjs`), run by `npm run check` |
+| Hosting | GitHub Pages, serving the repo as-is (`.nojekyll`) |
+| Storage | `idb-keyval` (IndexedDB, one autosave slot), planned, not built yet — see "Saving" in §5. Revised 2026-10-03 from `idb`, which is more than one slot needs |
 
 **Deliberately not used:**
 
 - **Physics engine** — grid slots make it unnecessary.
 - **Navmesh library** (recast etc.) — one rectangular room, so grid A* suffices.
 - **ECS library** — premature at this scale.
+- **A build step or framework** — nothing here needs one, and a page that is just files is one less thing to break.
 
 Babylon.js was considered and rejected: heavier, and a smaller community in this genre.
-Vanilla three.js was considered and rejected: drei's helpers (`AccumulativeShadows`,
-`Environment`, `Instances`, camera rigs) each represent real work we would otherwise repeat.
 
 ---
 
 ## 3. Architecture
 
 ```
-src/
-  sim/     ZERO three.js imports. Headless, unit-testable. Enforced by an ESLint rule.
-    rng.ts        sfc32 seeded PRNG; every random draw traces to worldSeed
-    clock.ts      fixed 10Hz tick, day cycle
-    catalog/      item definitions, Ravelry-shaped schema
-    grid.ts       display slot model, occupancy
-    formations/   JSON rule definitions + matcher + dirty tracking
-    npc/          spawn, hidden stash, affinity, WIP, browse, purchase, craft queue
-    supply/       floor pile, delivery schedule, destash selector
-    guestbook/    signatures, observed tells, customer-of-the-week selection
-    world.ts      aggregate state + reducers
-    save.ts       IndexedDB, versioned + migrations
-  render/  Reads sim, writes matrices. NEVER owns state.
-    geometry/     procedural yarn-form builders
-    ItemInstances.tsx, NpcInstances.tsx
-    theme/        theme tokens -> materials / lights / env / postfx
-    portraits/    offscreen render-to-texture for finished-object cards
-    camera/       orbit + focus-on-display
-  ui/      React DOM overlay: tray, day indicator, morning summary
-           (Guestbook and bulletin board are DIEGETIC — in-world, not overlay)
-  data/    baked JSON catalogs
-scripts/
-  harvest-ravelry.ts   Node-only, .env key, NEVER bundled
-tests/
+characters/        the shop game and the character rig
+  visit.js, wip.js, guestbook.js   ZERO three.js imports. Headless, unit-testable sim
+  npc.js, motion.js, garments.js   rig, motion engine, worn finished objects
+  store/
+    core/      config, shared state
+    sim/       world.js (the day loop) and cast.js (sim -> characters)
+    scene/     room, displays, seating, plants, props
+    goods/     items, yarn, painting, stock
+    interact/  picking, moving, glow
+    ui/        DOM overlay: HUD, guestbook, packing slip, labels
+inventory/         catalog, grid slot model, supply, pick-and-place, yarn geometry
+tools/             lint-adjacent checks run by npm run check
 ```
 
-The `sim` / `render` split is the load-bearing decision. It makes formation rules and NPC
-behaviour testable without a browser, keeps simulation work off the React reconciler, and is
-what makes the performance rules below achievable. **Enforce it with lint, not discipline.**
+The sim / render split is the load-bearing decision. It makes formation rules and NPC
+behaviour testable without a browser and is what makes the performance rules below achievable.
+It is held by convention, not lint: `characters/store/sim/world.js` still imports three
+(ROADMAP.md X1).
 
 ---
 
@@ -126,8 +115,8 @@ hundred remembered NPCs free.
 > signal drowns in noise. At 10, each visitor is legible — which is exactly what makes a koala
 > memorable as a repeat customer.
 
-1. Simulation state **never** in React state. Per-frame motion mutates matrices in `useFrame`.
-   Putting NPC positions in React state means a re-render per NPC per frame.
+1. Simulation state **never** lives in the DOM UI. Per-frame motion mutates matrices in the render loop.
+   Driving NPC positions through the UI means DOM work per NPC per frame.
 2. Items and NPCs render via `InstancedMesh` grouped by shape family. Target **under 30 draw calls**.
 3. `instanceMatrix.needsUpdate` only on dirty.
 4. The formation matcher runs only on dirty displays.
@@ -652,6 +641,9 @@ the wrong vibe.
 
 **Outflow — (a) end-of-day destash, day 11+**
 
+> **Superseded (TUTORIAL.md §7.2):** the player-filled donation box replaces (a)'s automatic
+> destash; (b) is built as `supplyFor()` in `inventory/supply.js`.
+
 - Sort by `lastPlacedDay` ascending, nulls (never organised) first. Remove N.
 - Self-balancing, and it rewards the core verb: curated arrangements are protected precisely
   *because* the player touched them.
@@ -665,7 +657,7 @@ the wrong vibe.
 - **Legibility:** needs a morning summary ("4 skeins went to the charity box"). Silent
   disappearance reads as a bug.
 
-**(c) is a re-skin of (a) — architect for it now**
+**(c) is a re-skin of (a)** *(historical: (a) is superseded, see above)*
 
 The selection logic is identical for both: *pick the least-loved items*. Whether that is narrated as
 an invisible overnight tidy-up (a) or as a Hoarder NPC or moths (c) is **presentation only**.
@@ -676,11 +668,8 @@ an invisible overnight tidy-up (a) or as a Hoarder NPC or moths (c) is **present
 **Both homeostasis systems stay off during days 1–10.** Throttling fights the authored curve, and
 destashing punishes new players. Clean boundary: days 1–10 pure authored, day 11+ systems on.
 
-### Open questions
-
-- **TODO(spec):** stocking should become the player's choice. What the shop carries is exactly the
-  kind of choice LYS.md wants the player making, and CHARACTER-ATTRIBUTES.md's "getting to know your
-  NPCs will help the player solve the puzzle" only means something if stocking is a choice.
+**Decided:** stocking is the player's: the packing slip's lines are theirs from night 2 (TUTORIAL.md
+§7.2; built in `store/ui/night.js`, `choicesFor()` in `inventory/supply.js`).
 
 ---
 
@@ -729,7 +718,7 @@ like the same game recoloured), and semi-realistic (N× texture cost per theme).
 
 | Phase | Contents |
 | --- | --- |
-| **P0 Foundations** | Vite/TS/R3F, sim–render split plus ESLint guard, seeded RNG, fixed tick, IndexedDB save stub, Vitest harness, GH Actions → Pages |
+| **P0 Foundations** | Plain ES modules plus CDN import map, sim–render split, seeded RNG, fixed tick, IndexedDB save stub, tsc/ESLint/node self-checks, GitHub Pages serving the repo |
 | **P1 Look & feel spike** | See [P1-SPIKE-PLAN.md](P1-SPIKE-PLAN.md). Runs parallel with P6 research |
 | **P2 Placement** | Slot model, derived jitter, pick/place, orbit + display-focus camera, tray UI, floor pile as universal inbox, jumble generator, `lastPlacedDay`, 1000-item stress test |
 | **P3 Formation engine** | Rule DSL, matcher, dirty tracking, discovery feedback, Formation Atlas UI, headless tests. Parallel with P4 |
@@ -780,7 +769,7 @@ first-person mode, Hoarder/Moth narration, multiple shipped themes (plumbing onl
 
 ## 12. Size assessment
 
-- **MVP:** roughly 10 systems, 35–45 modules, 7–10k lines of TypeScript.
+- **MVP:** roughly 10 systems, 35–45 modules, 7–10k lines of JavaScript.
 - **Full concept:** roughly 3–4× the MVP.
 - **Most expensive and riskiest:**
   1. Formation rule **content** authoring — effectively unbounded. This is design work, not

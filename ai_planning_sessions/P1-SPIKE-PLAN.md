@@ -140,11 +140,8 @@ Had we chosen skinned meshes, every garment would need rigging against every bod
 
 ### Which garments to prioritise
 
-**TODO (post-MVP): wearables need appearance attributes beyond colour.**
-
-The spike's scarf is a `TorusGeometry` placeholder — it reads as a collar, not a scarf. It has no
-length, no ends, no drape and no fringe. Colour is currently the *only* thing that varies, which is
-nowhere near enough for a game where the finished objects are the point.
+**Done (VISUAL-DESIGN-FINISHED-OBJ.md, `characters/garments.js`):** appearance comes from yarn
+weight, craft and stitch.
 
 **The key idea: derive appearance from the source yarn and pattern, do not author it per object.**
 The catalog already carries weight, fibre and colour family. A scarf knitted from bulky wool should

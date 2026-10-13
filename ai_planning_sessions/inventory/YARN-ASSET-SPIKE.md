@@ -257,9 +257,6 @@ Two open layout questions:
 - `YARN.md` wants "overwhelming variety… gradients, sparkle, fuzziness, ball bands". Gradients and
   sparkle are per-instance-able; **fuzziness is not**, and becomes a family/tier split. Is 2–3 fuzz
   tiers enough variety, or is mohair its own family?
-- Does the flat-notion / 3D-yarn contrast still read as deliberate once yarn is genuinely 3D? The
-  DDR argues it separates *tools* from *stock* at a glance. That argument gets stronger, not
-  weaker — worth confirming with eyes.
 
 ---
 
@@ -314,9 +311,7 @@ Four things the write-up above got wrong, all caught by `scratchpad/tm/yarncheck
 
 ### Still open
 
-- **Nothing here has been seen.** No visual verification was possible from this side — the browser
-  extension is unavailable, so every claim above is measured or structural, never "it looks good".
-  The silhouette test in particular is a *judgement*, and the tooling only sets it up.
+- ~~**Nothing here has been seen.**~~ **Seen:** §8, §10, §15.
 - **The matcap is generated, not painted.** Good for tuning, and a real painted matcap will beat it.
 - ~~**`trueVolume` exposes a live layout conflict.**~~ **RESOLVED — see §12.** A 3×3×3 ball drawn at true volume is
   `3 × cell × 0.9` tall — **0.70 units** at the demo's default 0.26 cell — against a 0.22 shelf
@@ -326,8 +321,7 @@ Four things the write-up above got wrong, all caught by `scratchpad/tm/yarncheck
   notions are flat so it never came up — and this is the substantive layout finding of the spike:
   either the shelf gap grows with the bulkiest yarn a display accepts, or bulk stops meaning
   height. §4 flagged the stacking half of this; the build turned it into a number.
-- **Yarn is raycast directly** in the demo, which the perf rules forbid at 1000 items. Fine at
-  demo scale, and noted in the HUD, but the production path must go back to slot-plane picking.
+- ~~**Yarn is raycast directly**~~ **Done:** §9, pick-place.js.
 
 ---
 
@@ -796,7 +790,7 @@ camouflage against the stock (`../DESIGN-DECISIONS.md` §5, "Anti-camouflage"). 
 the one that makes it safe: the reason to constrain lightness was never "make it all one
 lightness", it was "keep merchandise out of the band the characters live in".
 
-Not yet built — recorded as a decision to take.
+Built in §14.
 
 ---
 

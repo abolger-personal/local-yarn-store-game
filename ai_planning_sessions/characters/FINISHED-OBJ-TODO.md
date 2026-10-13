@@ -22,7 +22,7 @@ Strike items through when they're done, with the date.
   slider inflates them:
   - ~~pom-pom~~: done 2026-09-27. Sized from the skull, torso or shin (`POM_OF_*`). The hat's
     tassel and flower share its size, so they're fixed on hats too.
-  - buttons: `thick × 1.4–1.8`
+  - ~~buttons~~: done, sized from the body (`BUTTON_OF_*`).
   - flower (scarf, shawl, sweater): `thick × 4`
   - tassel (shawl): `thick × 5`
 
@@ -40,7 +40,8 @@ Strike items through when they're done, with the date.
   It doesn't drive drape yet, which waits on the drape model below.
 - [ ] **Tune `TOOL_SHARE`** (0.6, the tool's share of real stitch width against the yarn's) and the
   usual tools in `TOOL_MM`.
-- [ ] **Drape:** find a cheap way to model it (spec §2b.4).
+- [ ] **Drape:** revisit later: drape vs performance needs more work once NPC movement is more
+  complex. Today a single `DRAPE` scalar (garments.js).
 - [ ] **Hats' fit 1:** the beanie and the slouch are tuned (`size` in `HAT`); review the rest.
 
 ## Game integration
@@ -50,22 +51,8 @@ Strike items through when they're done, with the date.
   does the same. The old stiff-fibre stand-off hid this for scarves by accident; it was removed
   because the ends stood off the body. Fix: fit outer layers to the inner garment's measured
   surface (dress sweaters first, then measure the torso with them on).
-- [ ] **Dress before the merge pass.** The game merges each joint's meshes into one per material
-  family (felt, knit, eye), with `npc.js` `mergeCharacter`. Dressing a merged rig breaks:
-  - **Hat fit:** the skull is found as the head's own sphere, which the merge bakes into the head's
-    one felt mesh. Hats would fall back to a generic head size.
-  - **Pressing the mane:** skull, muzzle, nose and mane are one mesh after the merge, so the whole
-    head would count as a coat over the crown. The face gets pressed into the skull (the
-    bucket-brim bug).
-  - **Colour, if merged after dressing:** `paintGeometry` repaints every mesh from its material
-    colour, wiping colourwork.
-
-  **Not broken:** hiding eyes and ears. They are joints, so each keeps its own node through the
-  merge. (Corrected 2026-09-27: this note used to say the merge baked the eyes into the head.)
-
-  **Fix:** build un-merged, `dress()`, then `mergeCharacter()`, and teach `paintGeometry` to keep
-  a mesh's existing colour attribute. A merged character can't be re-dressed in place, so changing
-  clothes means rebuilding it or keeping an un-merged copy. Decide which when the game needs it.
+- [x] ~~**Dress before the merge pass.**~~ Done: `dressedCharacter` builds un-merged, dresses, then
+  merges; re-dressing rebuilds (`redress`).
 - [x] ~~**Relief respects the geometry detail tiers.**~~ Done 2026-09-27 as on-screen size
   (`LOOK.viewPx`) rather than tier: relief under 1.5px a stitch isn't built.
 - [ ] **The game sets `LOOK.viewPx`** to its real crowd size (150 is assumed), and to 0 for any

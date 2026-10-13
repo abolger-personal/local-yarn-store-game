@@ -12,9 +12,8 @@ open http://localhost:8765/characters/motion-lab.html
 node characters/motion.test.mjs      # the headless self-check; needs no browser, no three.js
 ```
 
-**Nothing here is wired into the game yet.** `characters/store/sim/cast.js` still runs the old
-smoothstep blend. The lab is the only page using the new engine. That is the next big step and
-it is deliberately not started — see step 3.
+Wired into the game: `cast.js` drives every customer through `stepMotion`, the walk layer and
+`phaseStep`; `crowd.html` uses the same engine.
 
 ---
 
@@ -88,82 +87,24 @@ offset or seated NPCs sink through their chairs — which is exactly what would 
 
 ---
 
-## Open decisions — these need a judgement, not code
+## Open decisions
 
-**1. Which interpolator wins.** Both ship, switchable per character, compared side by side in
-the lab against smoothstep as the control. Measured in the renderer, max velocity step at the
-interrupt:
-
-| | spring | hermite | smoothstep (today) |
-| --- | --- | --- | --- |
-| max \|dv\| | 1.86 | 0.48 | 4.72 |
-
-Hermite is quantitatively smoothest. The spring's larger number is partly genuine deceleration,
-and it is the one that gives overshoot as a temperament knob (`zeta` below 1). **This is an eyes
-call.** Open the lab, press Enter, and pick. Then delete the loser: three grep-able places, all
-named `mode` — the branch in `integrate()`, the key in `MOTION_DEFAULTS`, and the one read of
-`opts.mode`. Delete `smoothstep` too; it exists only as the control.
-
-**2. Pacing. The cast moves faster than their legs can carry — though less than it looked.**
-With the foot-lock condition corrected the geometric ceiling doubled, so honest top speed is now
-about 0.92 units/s rather than half that. The gap is real but smaller; re-measure the skate
-meter before changing `S.travel`, because the number below was taken under the old condition.
-
-**Original note, taken under the broken `/2` foot-lock:** Peak ground speed
-is about 2.1 units/s on a ~1.0-tall character at `S.travel = 1.4`, which at default proportions
-is ~11 steps/second. The walk cycle cannot hide this — a distance-locked stride reports it
-instead, and the lab's skate meter reads **24% at a speed of 0.55**. Clamping cadence does not
-rescue it: the stride required would be 5.3x leg length, i.e. `asin(1.32)`, which is
-geometrically impossible.
-
-Believable `θmax ≤ 0.6 rad` caps honest speed near 1.2 units/s, so `S.travel` wants roughly
-doubling to ~2.5, which pulls `S.autoSeconds` up from 3 (`config.js:110`, whose comment already
-ties the two together). **This is a feel change to the game, not a tuning tweak**, which is why
-it is flagged rather than done. `SPIKE-FUN.md` argues longer rounds become affordable exactly
-when idles land — and they have now landed.
+Both decided. Interpolator: spring (§The interpolator bake-off). Pacing: `gameSpeed` sets walk
+speed in units/s; `speed.test.mjs` holds ▶'s peak under the shortest legs' top speed.
 
 ---
 
 ## Next steps, in order
 
-1. **Bake off the interpolators in the lab, pick one, delete the loser and `smoothstep`.**
-   Everything downstream is simpler once there is one engine.
-2. **Decide the pacing question** (open decision 2). It changes `S.travel` and `S.autoSeconds`.
-3. **Wire into `cast.js` / `world.js`.** The risky part is the root-Y reorder — *test a seated
-   NPC first*, before anything else. Expected deletions: `BLEND`, the `blended` scratch,
-   `blendedValue` (it exists only to re-derive the in-flight value, which stored velocity makes
-   unnecessary), the hop-undo dance and its now-false comment, `wantedPose`'s `moving` branch
-   and the `travelled > 0.05` hack, and `POSES.walk` / `POSES['walk+carry']` (both exist only
-   because there was no cycle). `cast.js` should come out ~20 lines shorter than it went in;
-   net deletion is the success signal.
-   - `rec.walkDist` must accumulate real per-frame root displacement and **must survive
-     `retarget`** (`world.js:378`), or every NPC foot-pops on the round boundary every 3s, in
-     unison.
-   - Do NOT use `rec.travelled` for this. Despite the name it is the route's total length, not
-     distance covered.
-   - Seed `rec.walkDist = Math.random() * strideLen` at spawn, or the queue walks in in perfect
-     lockstep — `crowd.html:310`'s chorus line with extra steps.
-   - `walkGain = 0` while `rec.celebrate > 0`, or an NPC hops and strides at once. The old code
-     enforced "delight outranks the walk" by swapping poses; an additive layer cannot.
-4. **Move `crowd.html` onto the shared engine**, deleting the fourth hand-inlined smoothstep and
-   its separate `S.blend`. After that, smoothstep appears exactly once in the repo —
-   `cast.js:248`, the walk *route* tween, which is not a pose blend. A helper for one call site
-   is not a helper.
-5. **Perf pass** under 20x CPU throttle, against the recorded baseline of 35fps `low` / 23fps
-   `high` at 40 NPCs. Frame the whole scene first (`F`) and sanity-check draw-calls-per-character
-   against mesh count. A reading near 60/120 is a vsync ceiling, not a measurement — for the
-   motion-on/off A/B use CPU self time in a profile, not fps. `idleAmount: 0` is the A/B switch.
-6. **Content, once the engine is settled** — the authored idle vocabulary in `SPIKE-FUN.md:341`
-   is the list: deliberating, chatting, waiting, and the seated knitting loop that `:347` calls
-   "the money shot of the entire game".
+1. Delete hermite and smoothstep from motion.js and the lab.
+2. Delete `POSES.walk`, `POSES['walk+carry']` and the `kneeAmount` rectifier.
+3. Perf pass under 20x throttle.
+4. Deliberating, chatting and waiting idles (the seated knitting loop is built).
 
 ---
 
 ## Known ceilings, marked in code
 
-- `armTuck` is a constant elbow offset, so it also bends the arm of a character reaching for a
-  shelf. Capped low enough to read as "holds themselves in" rather than as a broken reach. The
-  real fix is posture that fades while a pose needs a specific arm shape.
 - No per-channel clamp on the additive layer. `POSES.delighted` authors `earPerk: 0.38` and a
   twitch on top can drive an ear through a skull. If that shows up, build limits from the ranges
   already in `BASE_GUI.pose` rather than a second table that will drift.
@@ -174,13 +115,10 @@ when idles land — and they have now landed.
 
 ## Waiting to bite, not caused by this work
 
-- **NPCs pass through each other in transit** (`VISIT-POC-TODO.md:502`; steering is separate
+- **NPCs pass through each other in transit** (`VISIT-POC-TODO.md:461`; steering is separate
   work). A real walk cycle makes this much more obvious — two characters merging while both sets
   of legs stride reads as a glitch in a way two gliding statues did not. **This may well be the
   thing that looks worst after the walk lands, and it will not be the walk's fault.**
-- **`clampArmOut` vs two-handed poses** (`inventory/DESIGN-DECISIONS.md:147`: "this will look
-  like a bug when someone first authors a knitting pose"). Not triggered yet. It bites the moment
-  the seated knitting pose lands, which is the next piece of content anyone will want.
 - **Blob shadows sit at the character root** and do not follow a lean. `QUALITY.high` disables
   them, so this is a low/medium-tier artifact — i.e. exactly the cheap tablets that are the
   target.
@@ -306,11 +244,8 @@ Above the ceiling the body outruns the legs and the feet slide. That is allowed 
 `skate` reports; it reads as hurrying. What is NOT allowed is the legs spinning to pretend
 otherwise, which is what used to happen — see the bug list.
 
-**This is the pacing decision, now with a number on it.** `config.js` ships `S.travel = 1.4`,
-which is above the honest ceiling for every character shorter than about 0.35 legHeight. Either
-`S.travel` comes down to roughly 0.8, or `cadenceMax` goes up (3.4 steps/s is already brisk), or
-the cast is authored leggier. Coming down is the right call and this branch is what makes it
-affordable: longer rounds stop reading as statues once idles land.
+The game walks at `gameSpeed`'s units/s, each walker clamped to its own `topSpeed`
+(`secondsPerUnit`, cast.js).
 
 ## Reading the motion range: the extremes matrix
 
@@ -651,40 +586,10 @@ kick, ~0.5 reads as a march. It is a RATIO of `kneeLift` rather than its own amo
 your feet up" stays one control — two would drift apart and give a high knee with a dangling
 shin.
 
-Still true of the knee itself: it is one rectified harmonic, so the flicker near footstrike
-described below remains.
-
-### Known ceiling: the legs are exact mirrors
-
-`applyPose` drives both legs from one scalar as `legSwing * side`, so at every phase their hip
-angles are equal and opposite. With equal knees their feet sit at exactly the same height and
-grounding has no reason to prefer either. Only the knee breaks the tie — and a backward-bending
-knee only RAISES the foot while the leg is behind the hip, because flexing a leg that is already
-forward just brings the shin back toward vertical and puts the foot down. So the lift works over
-the back half of the swing and does nothing over the front half.
-
-Swept over amplitude x phase, the best a one-harmonic lift reaches is **3 ground-contact swaps
-per cycle instead of 2** — one extra flicker near footstrike, where the feet are genuinely tied
-anyway. Whether that reads on screen is an eyes call.
-
-**The upgrade path, if it does read.** A per-leg shape `f(p)` with the other leg at `f(p + 0.5)`
-is exactly representable on channels that already exist, because `hip = legSwing * side -
-hipFlex` is `a + b*side` with `a = -hipFlex` and `b = legSwing`. Set
-
-    legSwing = (f(p) - f(p + 0.5)) / 2
-    hipFlex  = -(f(p) + f(p + 0.5)) / 2
-
-and any stance/swing asymmetry becomes authorable — a real 60/40 split, a fast swing, a slow
-stance. The knee needs the same treatment, which means replacing the `max(0, side * kneeSwing)`
-rectifier in `applyPose` with a linear `kneeSwing + side * kneeSwingAlt` pair. It is a redesign
-of `walkLayer`, not a tweak, so do it only against a visible problem.
+The knee is still one rectified harmonic: one extra contact flicker near footstrike.
 
 ### Still to do here
 
-- `kneeLift` is a single global constant, not a per-species span. It is an ANGLE, so it belongs
-  in `BASE_MOTION_RANGES` with the other style dials (high-stepping vs shuffling is exactly the
-  kind of thing one llama should differ from another on). Left out only because basic walking
-  came first.
 - `POSES.walk` and `POSES['walk+carry']` are frozen single frames from before the cycle existed,
   and the lab now says so in its pose banner. They are still in the list; the plan deletes them
   when `cast.js` is wired.

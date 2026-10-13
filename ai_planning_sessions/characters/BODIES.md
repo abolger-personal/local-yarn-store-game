@@ -240,5 +240,5 @@ Everything is judged at play distance: characters are ~150px tall.
 
 - Lion: a second mane shell on the chest if the head-anchored mane reads too light.
 - Lion: quantise the drawn mane values if a big crowd shows the per-lion geometry memory.
-- Blink is a y-squash (reads as a squint); a lid disc if it ever matters at play distance.
+- Blink: see MOTION-TODO.md §Known ceilings (`characters/MOTION-TODO.md`).
 - Lion motion ranges still to be tuned in the motion lab, as the llama's were.

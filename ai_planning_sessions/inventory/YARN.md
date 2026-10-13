@@ -3,9 +3,7 @@
 
 Yarn is a centerpiece of this game. Visually it should to come in an overwhelming variety of colors, ball bands, gradients, sizes, shapes (at least balls, cones, and skeins), sparkle level, fuzziness, and textures. Non visually, thickness, yardage, and material are also important. 
 
-Yarn as inventory is still 2.5D — a flat
-illustration facing the camera is cheaper than a model and is the only way the ink-outline look is
-affordable. Some attributes cannot be shown by color or shape at all and will need a text channel or detail channel.  
+Yarn is 3D (low-poly, matcap, ink outline; DESIGN-DECISIONS.md 'Yarn asset spike'). Notions stay 2.5D.
 Every yarn also needs a **held** design with a flat ball band, and knitting needs **two hands with the yarn on the lap**, **crochet needs 1 hand with the yarn on the lap**.
 
 > Rendering decisions and the rig constraints behind them live in `DESIGN-DECISIONS.md` in this
@@ -28,6 +26,6 @@ above. The catalog holds only the count; the palette lives in the renderer.
 
 ## TODO
 
-- **TODO(spec):** gradients, sparkle and fuzziness are not modelled. Each yarn is one flat hue
-  (`colorIndex`); these need art and a detail channel, not just a data field.
-- **TODO(spec):** yarn and pattern atlas cells are placeholder silhouettes; real illustrations to come.
+- **TODO(spec):** gradients, sparkle and fuzziness are not modelled; each yarn is one flat hue
+  (`colorIndex`). Tracked in YARN-ASSET-SPIKE.md §6.
+- **TODO(spec):** pattern atlas cells are placeholder silhouettes (characters/store/goods/art.js); real illustrations to come.

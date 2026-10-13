@@ -112,7 +112,7 @@ Consequences:
 > Billboards must still be **instanced**. One `Object3D` per notion would reintroduce exactly the
 > node-count cost that dominates the character budget.
 
-### Which way does the card face — decide in P1
+### Which way the card faces
 
 The game is an **orbiting diorama**, so the camera moves and this choice is visible:
 
@@ -123,7 +123,7 @@ The game is an **orbiting diorama**, so the camera moves and this choice is visi
 | Fixed card | no rotation at all | items lying flat, seen from a limited arc |
 
 A full billboard on an item resting on a shelf looks wrong as the camera orbits — it pivots in place
-like a cardboard cutout. **Y-axis is the likely default**, with fixed cards for anything lying flat.
+like a cardboard cutout.
 
 Built: each notion is a box, for volume, with the illustrated card as a label flush on its forward
 face (standing, like a product on a shelf) and a second copy lying flat on its top, so it reads both
@@ -148,11 +148,6 @@ The character rig as built supports most of what the briefing asks, with three g
 **The rig has two hold nodes, and only one is used.** `leftHold` and `rightHold` both exist on the
 skeleton, but `buildHeldItem` attaches to one hand. Knitting is two-handed. The held-item slot needs
 to become `one-hand | two-hand | lap | none`.
-
-**`clampArmOut` will fight two-handed poses.** The clamp exists to stop a pose driving the elbow
-inside the body, and it does that by forcing arms *outward*. Bringing both hands together in front of
-the chest is the opposite motion. Either the clamp becomes pose-aware, or two-handed poses opt out of
-it. **This will look like a bug when someone first authors a knitting pose.**
 
 **A held billboard may not survive being held.** A camera-facing card in a hand pivots independently
 of the hand holding it, which reads as detached. The likely answer is that held notions leave the
@@ -192,15 +187,12 @@ nobody. Scale is a property of the *situation*, so it belongs with the situation
 
 ## 5. Open questions for P1
 
-1. **Communicating notion attributes.** A 1mm and a 30mm crochet hook cannot be distinguished by
-   silhouette at diorama scale. Non-diegetic number, an inspect panel, or colour coding? The project
-   is committed to *mostly* diegetic UI, so this needs an explicit exception, not a drift.
-   *Prototyped:* a crochet hook's size is a millimetre number printed on the box's side face,
-   perpendicular to the front label. EU/metric only for MVP; US/UK/manufacturer sizing varies too much.
-2. **Fuzz tiers vs family split vs custom shader** (section 2).
-3. **Does a notion's pose belong to the notion or to the activity?** Knitting-with-needles and
-   knitting-with-a-different-needle-size are the same pose. Suggests poses attach to *activities*,
-   with notions declaring which activity they belong to.
+1. ~~Communicating notion attributes~~ **Built:** mm size printed on the box's side and top
+   (`makeSizeAtlas`, store/goods/items.js). EU/metric only.
+2. ~~Fuzz tiers vs family split vs custom shader~~ **Answered (below):** matcap, so fuzz is a
+   texture swap per tier. Unbuilt; see YARN.md TODO.
+3. ~~Does a notion's pose belong to the notion or the activity?~~ **The activity:** `CRAFT_MODES`
+   in craft-anim.js; the tool is a prop.
 
 ---
 
@@ -272,13 +264,6 @@ notion atlas, drawn white so they recolour per instance: no extra draw calls.
 > `GridHelper` only draws squares. On a non-square grid it silently draws the wrong pitch, so the
 > player aims at lines that are not the slots. Use `makeGridLines`.
 
-### Awaiting the next round of visual feedback
-
-- thickness and outline settings (`edgeGrow`, `edgePush`, gradient) \u2014 all live in the GUI
-- lying flat vs upright, now that upright picking works
-- whether placeholder line weights are consistent enough to judge anything
-- notion scale against slot size
-
 ### Yarn asset spike — 2026-09-08
 
 The seven 3D yarn families are built: `inventory/yarn-geometry.js` (geometry) and
@@ -305,7 +290,7 @@ Two things the build corrected that the analysis alone had wrong: the mini-skein
 *scaled* skein (identical proportions read as the same object at shelf distance, which
 P1-SPIKE-PLAN.md warned about and a uniform scale cannot satisfy by construction), and **bulk-as-
 height clashes with the shelf gap** — a 3×3×3 ball at true volume is 0.70 units against a 0.22 gap.
-That one is unresolved and is the substantive layout question the spike surfaced.
+Resolved in YARN-ASSET-SPIKE.md §12: `trueVolume` removed; bulky yarn goes on tables and the floor.
 
 ### Pick and place is now shared — 2026-09-08
 
@@ -341,11 +326,10 @@ Three things worth carrying forward from it:
   eaten by the ramp. That is what decides which yarn can go on a wall, and it is now one named
   constant (`SHELF_CLEAR`) rather than a hand-typed headroom of 3.
 - **Section 4 (held notions) is half done.** An NPC carries the real ball out of the shop now,
-  sharing the shelf's geometry and cloning only the material. The rig side of section 4 — a notion
-  posed in the hand rather than a group tipped out of the fist — is still untouched.
+  sharing the shelf's geometry and cloning only the material. Seated knitters now hold needles or a hook
+  (craft-anim.js, via sim/cast.js); only the carried item is still a group tipped out of the fist.
 
 ### Not started
 
-Held notions on a character (section 4) as specified — an NPC carries real yarn now, but through
-the same tipped-group placeholder, not the rig work that section describes. And the 1000-item
+Carrying a notion in the hand properly (section 4). And the 1000-item
 sameyness check: the tooling exists (one button in the demo), but nobody has looked at it yet.

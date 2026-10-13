@@ -68,8 +68,8 @@ dangles from the tip.
 ## 7. The ready sparkle (`characters/sparkle.js`)
 
 - PROJECTS-AND-AUTHORSHIP.md §1, "the gap, closed". Not a craft animation: it plays wherever the
-  customer is the moment their wants empty. The sim hook (`wantsOf(npc)` going empty after a buy)
-  is not wired yet: ROADMAP.md D7.
+  customer is the moment their wants empty. Fired by `checkReady` (cast.js) when a buy makes a WIP
+  ready.
 - Five four-point stars in a cluster above the head, one draw. Unlit and not tone-mapped, so the
   shop's ACES exposure cannot dull it.
 - A pop to 1.35× in 0.18 s, settling to 1, a ±12% twinkle pulse while it spins, then it shrinks

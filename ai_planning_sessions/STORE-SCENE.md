@@ -219,5 +219,6 @@ stretched across the day, so it always agrees with the light (`shop.dayT`).
 
 - TODO: the room shell is a blockout. DESIGN-DECISIONS.md wants a static shell with baked AO and no
   real-time shadow map.
-- TODO: the painting code in `scene/displays.js` is a copy of inventory/stash-and-stuff.html's;
-  extract it into inventory/.
+- TODO: `inventory/stash-and-stuff.js` (demo only) still keeps its own copy of the painting in
+  `store/goods/paint.js` and `goods/yarn.js`; the matrices are already shared in
+  `inventory/notions.js`. Extract only if the demo survives.

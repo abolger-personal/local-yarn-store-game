@@ -1,6 +1,6 @@
 # Store visit POC — what is real, what is a placeholder
 
-Covers `characters/store.html` (scene) and `characters/visit.js` (pure sim, `visit.test.mjs`).
+Covers `characters/store.html` (page shell) and `characters/store/**` (scene, sim, goods, interact), plus `characters/visit.js` (pure sim, `visit.test.mjs`).
 Written at the end of the session that built them, so the next session does not have to
 re-discover which parts are load-bearing and which are scaffolding.
 
@@ -84,7 +84,7 @@ nobody in the doorway, no seat double-booked or leaked:
 | 6 NPCs, all max sociability | 2400 | 30 rounds | 79% |
 
 > Note the 0-chairs row buys *more*. Seats are a genuine competitor for rounds: an NPC who sits
-> down to knit is an NPC not browsing. Worth watching when MAX_ROUNDS gets its real formula.
+> down to knit is an NPC not browsing.
 
 ---
 
@@ -135,10 +135,8 @@ Still open here:
   it "shouldn't" have, purely because something is standing in it.
 - **Off-axis cells are tested by circumradius**, not a real OBB. At the 45° detents that refuses
   placements which would just barely have fitted. Conservative, never wrong the dangerous way.
-- **`WALL_GAP` is derived from `WALL_INSET`, not chosen.** It was chosen once, at 0.05 against an
-  inset of 0.06, and the result was a wall shelf that snapped flush to a wall and was then refused
-  for standing too close to it — red on every wall in the shop, droppable nowhere. Any standoff that
-  the placement test can disagree with has to be derived from the same constant.
+- Any wall standoff must come from `WALL_INSET` itself; a separate gap constant once made every wall
+  refuse a flush shelf.
 - **NPCs follow a display they are standing at** (`followDisplay`) but are not re-separated until
   the next round, so two customers can briefly overlap after a move.
 - **A chair snaps to a 45° detent the moment it is grabbed**, losing its authored decorative angle
@@ -149,8 +147,8 @@ Still open here:
   into a notch the counter carved out of a display. Displays get the finer test because they are the
   ones that come out funny shapes.
 - **No undo.** Restart (R) is the only way back to the authored layout.
-- **The player can wall a customer in.** Nothing stops a ring of displays around an NPC; there is
-  no pathfinding for it to defeat yet.
+- **The player can wall a customer in.** `findPath` finds no route and falls back to a straight
+  line, so the customer walks through the ring.
 
 ---
 
@@ -171,18 +169,6 @@ Two things that needed deciding to make that work:
 - **The closeout plan is frozen when closeout begins**, not recomputed each round. Lending empties
   `npc.finished`, and a recomputed plan would drop the Drop Off step out from under the NPC
   mid-sequence, leaving them with no step to take. Caught by the tests.
-- **Finished objects had to exist at all.** NPCs now arrive with one at a flat 30% chance, and a
-  round of `WORK_ON_WIP` completes the project at `Industriousness / 10`. Neither number is in any
-  spec — both are placeholders, shaped so CHARACTER-ATTRIBUTES.md's stated goal holds (keeping NPCs
-  in the store longer should yield more Finished Objects). **Worth tuning:** at these values a
-  400-seed soak leaves 777 photos to 423 notes, so roughly two thirds of visits end with a lend.
-  That may be too generous for something meant to feel like a gift.
-
-**Volatility 5** now cuts `MAX_ROUNDS` to 1 after any interaction with a noticed display that does
-not end in a buy. Read literally that includes an interaction that *restructures* the display — a
-tidy or a dig sets up a buy next round but does not itself find anything — so a volatile shopper
-storms out having just rearranged a shelf. In character, but it means the restructure never pays
-off for them. **Flag if** the intent was the terminal "looked, nothing doing" outcome only.
 
 ---
 
@@ -209,11 +195,7 @@ holding. Three things had to be true for that to work, and one of them was broke
 
 > The HUD carries the `BUILD` stamp from `npc.js`. If a fix appears not to have worked, check that
 > first: the page may be running an older module than the one on disk.
-- **Buying is legible.** See the delight placeholder above.
-
-Still missing, and the bigger half of the "not as much fun" problem: **the stock is too easy to
-find**. There is one notion family with three kinds, so an NPC's target is nearly always sitting in
-plain sight. That is a catalog problem, not a browse-logic one — P6 owns it.
+- **Buying is legible.** See the delight placeholder below.
 
 ---
 
@@ -245,20 +227,12 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
 
 ### Decisions this forced, which are worth a look
 
-- **Patterns needed two attributes PATTERNS.md does not list.** The match rules require a tool
-  `size` ("the notion is the correct size") and a yarn `weight` ("the same yarn attributes (weight,
-  material)"), so `makePattern` sets both. CHARACTER-ATTRIBUTES.md already assumes a tool size
-  exists ("crochet and needle size tiny"). **Worth adding to PATTERNS.md's attribute list.**
 - **The shop needed a RANGE** (`SHOP_RANGE` in catalog.js). This is a balance decision, not a spec
   rule, and it is load-bearing. Measured against uniformly random stock, the chance one shelf item
   satisfies a given want is **0.9% for yarn and 0.5% for a tool** — roughly 117 and 192 items
   before one fits, where a display holds about twenty. Nothing would ever get made. Drawing both
   the stock and the NPCs' own patterns from a curated 4x4 palette lifts that to **3.4% and 1.5%**.
   It is also just true of a real yarn store: a curated range, carried deeply.
-- **Even so, projects rarely finish under RANDOM stock** — a 400-seed soak completes about 0.2% of
-  WIPs. That is the mechanic working, not failing: the soak models *a shop nobody is running*.
-  Making projects finish is the player's job, and it is the first time the player's verb has had a
-  measurable effect on an NPC outcome. Worth re-measuring once formations score.
 - **A finished object leaves the WIP slot — but WHEN depends on where it goes.** A WIP slot is a
   limited resource (`maxWips`), so an object cannot sit in one forever; finishing has to give the
   capacity back. Worn objects leave immediately ("store FO in a worn slot" is a move). Objects
@@ -329,15 +303,9 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
   🙂 / 🙁) plus tags for what happened — 🧶 📖 🪡 bought, ✨ lent, 🧑‍🤝‍🧑 chatted, 🪑 sat and worked,
   ⏳ ran out of rounds, 💨 left in a huff. Every one is read off state the visit already tracked, so
   the book cannot disagree with what happened. All ten fire across a 400-seed soak.
-- **Yarn and pattern art is placeholder.** Procedural silhouettes (three yarn shapes, four pattern
-  covers, knitting needles) composited into the loaded atlas by `extendAtlas`, so the whole shop
-  still costs one draw call per label channel. YARN.md wants ball bands, gradients, sparkle and
-  fuzziness; PATTERNS.md wants a box that reads as a BOOK. Both belong in
-  `illustrations/notion_processing.py`, not in the page.
-- **Nothing renders a worn finished object.** The model is there — `npc.worn` has the four slots,
-  wearing takes priority over lending — but the rig only has a scarf. WEARABLE-FINISHED-OBJ.md's
-  payoff is seeing the hat, and `pattern.hints` (`stripes`, `pom pom`, `fringe`, `star`) exists to
-  drive exactly that and is currently unread.
+- **Pattern art is placeholder.** Procedural covers in `PLACEHOLDER_ART`
+  (`characters/store/goods/art.js`). PATTERNS.md wants a box that reads as a BOOK. Yarn is real
+  geometry now (`inventory/yarn-geometry.js`).
 - **"Return borrowed FO to NPC" has no UI.** `returnToNpc()` implements it, including the displaced
   object landing in `world.backPile` "behind the guestbook", but nothing clicks it and nothing
   draws the back pile.
@@ -352,12 +320,11 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
 
 ## Touch and small screens
 
-- **Total inventory is a setting** (`total inventory`, default **10**). Customer seeds are placed
+- **Total inventory is a setting** (`total inventory`, default **100**). Customer seeds are placed
   first and count against the budget, then general stock fills the remainder — filling with random
-  stock and then finding no room for anybody's yarn is the wrong way round, and at 10 boxes it
-  would happen every time. The console reports the split and says so if the shop had no room.
-- **Rounds default to continuous.** Both timer checkboxes start ticked, the round interval is 3s
-  (just over the longest a staggered walk can take, so a round ends about when the motion does) and
+  stock and then finding no room for anybody's yarn is the wrong way round. The console reports the split and says so if the shop had no room.
+- **Rounds default to continuous.** Both timer checkboxes start ticked, the round interval is 4s
+  (`12/k` at a game speed; just over the longest a staggered walk can take, so a round ends about when the motion does) and
   the pause between days is 0. At the old 30s the cast walked for ~1.5s and stood frozen for 28.
 - **Grabbing was near-impossible on a tablet, and the measurement says it was bad everywhere.** A
   0.2-unit slot renders **12-20px** across at the framing camera once a diorama angle foreshortens
@@ -440,13 +407,7 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
 
 ## Spec gaps found while building — these need a decision, not just code
 
-1. **`MAX_ROUNDS` — formula landed, range annotation disagrees with it.** Now
-   `(Openness + Industriousness + Enthusiasm) * uniform(1, 2)`, rolled once per visit, per the
-   spec. The doc annotates the range as "worst case 3 to longest visit 45"; with traits at 1-5 the
-   formula gives **3 to 30** — 45 would need a x3 multiplier. The formula is explicit and the range
-   reads like arithmetic done in passing, so the formula is what shipped. **Decision needed:** was
-   the range the intent, and should the multiplier be 1-3?
-2. ~~**Prescriptions have no termination bound.**~~ **RESOLVED, both in spec.** 22% of visits never
+1. ~~**Prescriptions have no termination bound.**~~ **RESOLVED, both in spec.** 22% of visits never
    ended before this; two prescription chains were unbounded, and both are now fixed in the specs
    rather than worked around in code.
    - *Re-tidying the same display every round* → DISPLAYS.md rule 9: an NPC may restructure a given
@@ -459,31 +420,22 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
    > **Invariant to preserve: every prescription chain must be bounded.** A prescription outranks
    > MAX_ROUNDS by design, so anything that can prescribe itself needs either a hard cap or a
    > decaying chance. Re-check this before adding a new prescribed action.
-3. **Display "attractiveness weights" are undefined.** CHARACTER-VISIT.md requires each display to
+2. **Display "attractiveness weights" are undefined.** CHARACTER-VISIT.md requires each display to
    carry "a meta 'attractiveness' list of weights to use against a particular NPC". The placeholder
    has the right shape (per-NPC, 0..1, thresholded at 0.5) but invented weights.
-4. **Interaction outcome for "not complete" is ambiguous.** DISPLAYS.md says a tidy/spread
+3. **Interaction outcome for "not complete" is ambiguous.** DISPLAYS.md says a tidy/spread
    "SOMETIMES" satisfies the buy condition afterwards. Currently it always resolves on the next
    interaction. What should "sometimes" actually depend on?
-
-5. **Which notions have which attributes is not written down anywhere.** Today the rule lives in
-   `SIZED_NOTIONS` in `store.html` — hooks have a millimetre size, stitch markers and darning
-   needles have none. That belongs in the catalog schema (P6) alongside the Ravelry-shaped
-   attributes, not in a page. It matters more than it looks: an attribute printed on a box is
-   something the player is invited to *arrange by*, so a wrong one is a wrong game rule, not a
-   cosmetic slip.
 
 ---
 
 ## Placeholders in the scene
 
 - **The buy reaction is a placeholder.** `delighted` plus three decaying hops (`CELEBRATE_S`,
-  `CELEBRATE_HOPS`, `HOP_H` in `store.html`), triggered the frame `npc.carrying` goes from null to
+  `CELEBRATE_HOPS`, `HOP_H` in `store/sim/cast.js`), triggered the frame `npc.carrying` goes from null to
   something. Wants squash on landing and the ear perk timed to the apex. Delight outranks the walk
   pose, so an NPC who buys as they turn away stops to cheer rather than gliding out mid-celebration.
 
-- **No walk cycle.** Movement follows the round's route holding the static `walk` pose — the feet
-  do not move. P1-SPIKE-PLAN.md step E owns the real one.
 - **NPCs no longer walk through furniture.** `findPath` in `visit.js` builds a visibility graph over
   the corners of every display, chair and room solid, grown by a `PATH_CLEARANCE` berth, and runs
   Dijkstra over it; the renderer walks the resulting polyline at constant speed instead of lerping
@@ -516,42 +468,21 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
   push-out and the pair never separates however many passes it gets. Rotating the pair is the only
   escape from a collinear pin. It switches on only after progress stalls, and takes its sign from
   the pair's indices, so a seed still replays identically.
-- **The carried notion is the shelf card, shrunk.** It reads at diorama distance, but the same doc
-  says the held design is genuinely a second asset — and knitting is two-handed, which will surface
-  the `clampArmOut` conflict the moment someone authors that pose.
-- **Guestbook is a blockout** — a book-shaped object on the counter so the signing has somewhere to
-  happen, but no signing animation, no entries, no finished object, no bulletin board. The Drop Off
-  is still a coloured rectangle. LYS.md 5c is the real design.
-- **A chair is a cube.** Wants to be a chair, probably with a small table. Seated height
-  (`seatLift`) is an eyeballed GUI value, not derived — the rig grounds every pose to feet-at-zero,
-  so it cannot be computed from the seat box.
-- **WIPs are a count**, 1-3 random, with no pattern, yarn or progress behind them. Only the count
-  matters today (it weights the action set). `maxWips` is computed and displayed but not enforced.
-- **The room is a blockout** — five boxes and a doormat. DESIGN-DECISIONS.md wants a static shell
-  with baked AO and no real-time shadow map at all.
-- **No formations.** A "target formation" is literally one notion. The real matcher (shape mask,
-  attribute predicates, gradient rules) is P3.
-- **No floor pile / universal inbox, no deliveries, no destash.** Stock is scattered at startup.
-- **Visibility ignores rotation.** Displays are treated as axis-aligned boxes; furniture that is not
-  a display (the counter) does not block sight at all.
-- **`headroom: 8` on the table pile**, not the spec's 100. A hundred-layer Jenga tower is legal by
-  the rules and absurd on screen; revisit when stacking is something the player does.
-- **Notions render as a copy of the `stash-and-stuff.html` painting code**, not a shared import —
-  that file is a page, not a module. Extract `paintInstance`/`refresh` into `inventory/` once
-  `stash-and-stuff.html` can be touched, or the two will drift.
-- **Nothing rewards arranging yet.** The player can move stock around, but there is no formation
-  matcher, so an arrangement has no effect on any NPC. That is P3 and it is the point of the game —
-  today's pick-and-place only proves the *verb* works, not the loop.
-- **Package footprints are authored, not derived.** `PACKAGES` in `store.html` lists the box shapes
+- **The Drop Off has no prop.** Signing is the `reach` pose at the guestbook; there is no signing
+  animation of its own.
+- **`maxWips` is computed and displayed but not enforced.**
+- **No formation matcher.** An NPC's target is a per-item want from its WIPs. The real matcher is P3.
+- **No destash.**
+- **Visibility uses each display's rotated AABB, not its OBB, and the counter and props do not block
+  sight.**
+- **Two `paintInstance` functions**, `store/goods/paint.js` and `inventory/stash-and-stuff.js`. The
+  matrices are shared in `inventory/notions.js`. The demo is experimental, so merge only if it stays.
+- **Nothing rewards arranging yet.** Placement decides what an NPC can see and reach; no arrangement
+  recipe pays off (P3).
+- **Package footprints are authored, not derived.** `PACKAGES` in `store/goods/stock.js` lists the box shapes
   each notion ships in (1×1 and 2×1 for hooks, 1×2 for needles, 2×2 for marker tins). Like the size
   attribute, that belongs in the catalog schema at P6 rather than in a page.
 - **No undo, no "put it back where it came from".** A misdrop is fixed by picking it up again.
-- **Picking is not forgiving yet.** `inventory/DESIGN-DECISIONS.md` §7 records that an ink drawing
-  fills a fraction of its slot, so an exact hit test feels like the item is not where it looks, and
-  `pickSlot` should fall back to the nearest occupied slot within a grab radius. This port does the
-  exact test only. Measured residual: **0.6% of clicks grab a neighbouring box**, all of them on the
-  flat table at grazing camera angles, where the ray crosses a box's side rather than its top face.
-  That is the number a grab radius would fix.
 
 > **Fixed, and worth not regressing: picking on a multi-level shelf.** The ported version tested
 > only the *active* plane (default 0, the bottom shelf) with a single cast against the shelf FLOOR,
@@ -562,7 +493,7 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
 > Measured over 7,320 clicks × 48 camera angles, excluding items a higher shelf genuinely hides:
 > **44.6% correct before, 99.4% after.** The pointer now also *sets* the active level, which
 > previously could only be changed from the GUI slider.
-- **Round advance is manual by design.** Auto-advance exists behind a checkbox at the spec's 30s.
+- **Rounds auto-advance by default** (`autoRounds`, 4s). Untick it for manual.
 - **Dropping snaps; the drop feedback is per-display.** Three player-test findings, all touch:
 > A drop used to demand the pointer land in a column the item happened to fit in. `nearestSlot`
 > (grid.js) now takes the nearest slot within `S.snapCells` (1.6) that the item *actually fits in*,
@@ -576,16 +507,15 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
 > world lift into screen rise, so the old 0.14 was worth **15px** there (69px on a flat table).
 > `S.liftHeight` 0.30 along screen up is 84px everywhere. The shadow stays under the pointer.
 >
-> A display that cannot take the held item **anywhere** now says so: its lattice goes red, and
-> pointing at it washes the level red. Both draw with `depthTest` off, because a display with no
-> room is by definition covered in the boxes that would otherwise hide the warning. Answered per
-> item — a 3×3×3 super-bulky ball and a 1×1 hook get different answers about the same shelf.
+> A display that cannot take the held item **anywhere** now says so: pointing at it washes the
+> level red. Answered per item — a 3×3×3 super-bulky ball and a 1×1 hook get different answers
+> about the same shelf.
 >
-> TODO: the wash paints the *active* level only (the lattice covers them all), and the reach is a
-> flat constant rather than something that scales with how coarse the pointer is.
+> TODO: the wash paints the *active* level only, and the reach is a flat constant rather than
+> scaling with pointer coarseness.
 - **UI colour does not go through the tone mapper.** The warning red first shipped as `#a2382f`
 and arrived on screen as maroon. The hex was not the problem:
-> The shop renders through ACES at exposure **0.40** — a look chosen for felted wool, and ruinous
+> The shop renders through ACES at exposure **0.6** — a look chosen for felted wool, and ruinous
 > for a signal colour, because the exposure halves the value in linear space before the curve even
 > runs. `#a2382f` is delivered as `#640b0e`: **41% lightness down to 22%**. The old ghost green
 > `#3f7f5a` fared worse, arriving at **17%**. No hex survives that, so every UI material now sets
@@ -609,11 +539,7 @@ An NPC normalises to ~1.0 units tall, so everything is a fraction of a customer:
 | --- | --- | --- |
 | slot pitch (`CELL`) | 0.20 | uniform across all displays — DISPLAYS.md rule 2 |
 | one 2.5D layer (`BOX_H`) | 0.055 | |
-| shelf spacing | 0.28 | must exceed `headroom × BOX_H` or a stack pokes through the glass |
+| shelf spacing | ≈0.45, derived (`SHELF_GAP`) | must exceed `headroom × BOX_H` or a stack pokes through the glass |
 | wall shelf | 5 × 2 × 3 levels | 1.0 wide, on a 0.34 plinth, top shelf near head height |
 | table pile | 5 × 5 × 1 level | 1.0 × 1.0, top at 0.44 |
-| room | 6.4 × 6.4 × 2.2 | door 1.0 wide |
-
-A notion box is a fifth of a person wide. That is deliberate per LYS.md — at real scale they are
-invisible — but it is the number most likely to want tuning once yarn (which has honest volume)
-shares the shelves.
+| room | 9.6 × 7.2 × 2.6 | door 1.2 wide |

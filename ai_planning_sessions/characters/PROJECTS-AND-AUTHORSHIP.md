@@ -228,7 +228,7 @@ ARRANGEMENT-RECIPES.md §5):
 - **Exactly how is "big" and "small" judged for fair isle?** By yarn weight (bulky vs fingering),
   by ball size on the grid, or both?
 - ~~**Do recipes need a pattern beside them?**~~ No: see HOW-THEY-SHOP.md.
-- **How many recipes at launch?** Fourteen is the full list; five or six may be the right start.
+- **How many recipes at launch?** ARRANGEMENT-RECIPES.md lists 23; five or six may be the right start.
 - **Can recipes combine?** A fair isle hat with a pom-pom is two recipes on one object.
 - TODO(spec): the thank-you line's sight (a recipe that fired), gap (a substitution) and how it
   started (HOW-THEY-SHOP.md §6) wait on recipes, near-miss substitution and shopping starts.

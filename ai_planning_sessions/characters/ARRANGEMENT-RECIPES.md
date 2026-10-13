@@ -196,7 +196,7 @@ whose title says "cable" carries `notions: ['cable-needle']` and every cardigan 
 
 ## Open questions
 
-- **How many at launch?** 25 rows here. A first set of five or six (stripes, colour block,
+- **How many at launch?** 23 rows here. A first set of five or six (stripes, colour block,
   seamless, fringe, pom-pom, held double) covers every layer but stitch.
 - **Held double and the units rule:** a held pair counts as one unit, so a held-double sweater
   needs 16 balls. Realistic, but it may need the pattern's unit count to scale with weight.

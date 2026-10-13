@@ -41,6 +41,6 @@ Packaging belongs to the kind (footprints in slots, one picked per box):
 Yarn's footprint comes from its weight; a pattern is always 2×2 (`catalog.js`). Only hooks and
 needles carry a mm size.
 
-TODO: yarn and pattern art are still placeholder silhouettes. YARN.md wants ball bands,
-gradients, sparkle and fuzziness; PATTERNS.md wants a labelled box that looks like a book, with a
-cover icon per type. That work belongs in `illustrations/notion_processing.py`.
+TODO: pattern art is still placeholder (a book outline with a per-type cover icon,
+characters/store/goods/art.js). Yarn is 3D with ball bands; gradients, sparkle and fuzz are YARN.md's
+TODO.

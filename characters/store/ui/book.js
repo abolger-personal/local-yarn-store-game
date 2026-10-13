@@ -7,7 +7,7 @@ const TAG_ICONS = {
   yarn: ['🧶', 'bought yarn'],
   pattern: ['📖', 'bought a pattern'],
   tool: ['🪡', 'bought a hook or needles'],
-  lent: ['✨', 'lent a finished object to the shop'],
+  lent: ['🏁', 'lent a finished object to the shop'],
   chatted: ['🧑‍🤝‍🧑', 'chatted with another customer'],
   sat: ['🪑', 'sat and worked on a WIP'],
   ranOut: ['⏳', 'ran out of time before finding anything'],

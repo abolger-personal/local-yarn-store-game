@@ -300,7 +300,7 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
   scheduling decision, and it is the hook for LYS.md's day cycle.
 
 - **Guestbook entries carry icon tags** from CHARACTER-VISIT.md's list: one mood icon (📷 photo, or
-  🙂 / 🙁) plus tags for what happened — 🧶 📖 🪡 bought, ✨ lent, 🧑‍🤝‍🧑 chatted, 🪑 sat and worked,
+  🙂 / 🙁) plus tags for what happened — 🧶 📖 🪡 bought, 🏁 lent, 🧑‍🤝‍🧑 chatted, 🪑 sat and worked,
   ⏳ ran out of rounds, 💨 left in a huff. Every one is read off state the visit already tracked, so
   the book cannot disagree with what happened. All ten fire across a 400-seed soak.
 - **Pattern art is placeholder.** Procedural covers in `PLACEHOLDER_ART`

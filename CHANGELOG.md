@@ -12,6 +12,8 @@ What's new in L.Y.S. — Local Yarn Store. [Play it here.](https://abolger-perso
 
 ### Fixes
 - A selfie's caption wraps under the photo instead of stretching across the screen.
+- In the Guestbook, a customer who finished a project and lent it to the shop gets 🏁, not ✨; ✨ is
+  only the sparkle when a customer has everything their project needs.
 - You can watch a customer knit or crochet the last stretch of their project in the chair; the round that finished it used to show them sitting still.
 
 ## 0.0.0 — 2026-10-12

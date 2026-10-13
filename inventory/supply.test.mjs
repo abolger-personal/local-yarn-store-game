@@ -72,12 +72,12 @@ for (let seed = 1; seed <= 20; seed++) {
 }
 
 assert.deepEqual(buildOrder(3).map(describeSlot), [
-  { count: 5, item: 'ball of yarn', detail: 'worsted or dk', yours: true },
+  { count: 5, item: 'units of yarn', detail: 'worsted or dk', yours: true },
   { count: 2, item: 'pattern', detail: 'for worsted or dk', yours: false },
   { count: 1, item: 'kit', detail: 'a pattern and its yarn, worsted or dk, one colour family', yours: false },
 ]);
 assert.deepEqual(describeSlot(buildOrder(5)[0]),
-  { count: 5, item: 'ball of yarn', detail: 'bulky, one colour family', yours: true }, "day 5's new weight, alone");
+  { count: 5, item: 'units of yarn', detail: 'bulky, one colour family', yours: true }, "day 5's new weight, alone");
 assert.equal(describeSlot(buildOrder(1)[0]).detail, 'a pattern and its yarn, worsted or dk, one colour family');
 for (let day = 1; day <= 30; day++)
   for (const slot of buildOrder(day, { occupancy: 0.4, rng: mulberry32(day) }))

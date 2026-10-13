@@ -280,7 +280,7 @@ advances it but the player opening the door.
   - **The packing slip,** `#fbf8ef` paper with the note's shadow (`#note`), taped to the top
     carton by four strips of yellowed clear tape `#efe4c4` at its corners. In the house lettering,
     black: *WOOL & CO. SUPPLY*, a rule, *FOR: LOCAL YARN STORE*, *ARRIVES: DAY N, MORNING*, a rule,
-    then one line per slot as quantity × item (*6 × BALL OF YARN*) over its limits (*WORSTED OR DK,
+    then one line per slot as quantity × item (*6 × UNITS OF YARN*: units, not balls, since yarn also comes as skeins, cakes and cones) over its limits (*WORSTED OR DK,
     ONE COLOUR FAMILY*). **No checkboxes.** Words from `describeSlot()` in `inventory/supply.js`;
     the template's words, never an item's. The `×` is its own glyph in `lettering.js`.
   - **A slot that will be the player's** (`playerChoosable`) is a blank write-in line after its

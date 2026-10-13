@@ -117,7 +117,7 @@ function weightWords(weights = SHOP_RANGE.weights) {
 export function describeSlot({ template: { kind, count = 1, weights, family }, playerChoosable }) {
   const fam = family ? ', one colour family' : '';
   const words = {
-    yarn: ['ball of yarn', `${weightWords(weights)}${fam}`],
+    yarn: [count === 1 ? 'unit of yarn' : 'units of yarn', `${weightWords(weights)}${fam}`],
     pattern: ['pattern', `for ${weightWords(weights)}`],
     notion: ['notion', 'tools and accessories'],
     kit: ['kit', `a pattern and its yarn, ${weightWords(weights)}, one colour family`],

@@ -266,4 +266,21 @@ for (const k of [1, 2, 3]) {
   assert.equal(emptyWalks, 0, 'nobody walks up to a display holding nothing to browse it');
 }
 
+{
+  let a = 1;   // mulberry32
+  const random = Math.random;
+  Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  open({ k: 1, tutorial: true });
+  const buys = [], seen = new Map();
+  run(240, { each: (rec, t) => {
+    const n = rec.npc.bought.length;
+    for (let i = seen.get(rec) ?? 0; i < n; i++) buys.push({ rec, t, what: rec.npc.bought[i].name, cheer: 0 });
+    seen.set(rec, n);
+    for (const b of buys) if (b.rec === rec && t - b.t < 2.5 && rec.celebrate > 0) b.cheer += DT;
+  } });
+  Math.random = random;
+  assert.ok(buys.length >= 2, `tutorial day 1 has a second purchase to cheer (${buys.length})`);
+  for (const b of buys) assert.ok(b.cheer >= 0.5, `${b.rec.npc.name} cheers buying ${b.what} at ${b.t.toFixed(1)}s (${b.cheer.toFixed(2)}s)`);
+}
+
 console.log('walk: prompt door, real pause, full strides at every speed, no jumps, faces the display');

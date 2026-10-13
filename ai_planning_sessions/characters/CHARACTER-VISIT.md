@@ -160,7 +160,7 @@ The sim is lockstep; the animation must not be.
 - A finished piece shows on the wearer the same round it is finished. A dressed body costs +1 draw call; bodies are rebuilt only when the outfit changes, at most one per frame.
 
 ### Celebration
-- Buying (nothing in hand to an item) plays `delighted` plus decaying hops; putting an item down never does. Delight outranks every other pose and the walk, so they stop and cheer.
+- Every purchase plays `delighted` plus decaying hops, the second and third of a visit as well as the first (keyed on `bought` growing, not on the hand going from empty to full); putting an item down never does. Delight outranks every other pose and the walk, so they stop and cheer.
 - Each customer rolls their own cheer at spawn: delay 0–0.55s, duration 0.8–1.25 × 1.6s, 2–4 whole hops (the last one lands), height 0.75–1.3 × 0.10, so customers who buy on the same frame don't cheer in unison.
 - A sparkle plays when a purchase makes one of their WIPs READY; none for a WIP already ready when they walked in.
 - TODO: the celebration is a placeholder (P1-SPIKE-PLAN): squash on landing, an ear perk at the top of the hop, and the cheer delay derived from Enthusiasm once the emotion layer exists.

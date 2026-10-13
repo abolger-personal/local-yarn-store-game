@@ -187,6 +187,8 @@ function checkReady(rec) {
   rec.ready ??= readyWips(n);
   if (n.bought.length === rec.boughtN) return;
   rec.boughtN = n.bought.length;
+  // ponytail: cheer delay is random, not personality-driven; derive it from enthusiasm in the emotion layer.
+  rec.cheerIn = rec.cheer.delay;
   const ready = readyWips(n);
   if (ready.some((id) => !rec.ready.includes(id))) playSparkle(rec.sparkle ??= makeSparkle(rec.built));
   rec.ready = ready;
@@ -212,8 +214,6 @@ function syncCarried(rec) {
   const carried = rec.npc.carrying ?? null;
   const want = carried ? cellNameFor(carried) : null;
   if (rec.carriedName === want) return;
-  // ponytail: cheer delay is random, not personality-driven; derive it from enthusiasm in the emotion layer.
-  if (!rec.carriedName && want) rec.cheerIn = rec.cheer.delay;
   rec.carriedName = want;
   if (rec.carriedMesh) {
     rec.carriedMesh.removeFromParent();

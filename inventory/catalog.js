@@ -49,11 +49,13 @@ export const YARN_WEIGHT_NAMES = Object.freeze(YARN_WEIGHTS.map((w) => w.name));
 export const yarnWeight = (name) => YARN_WEIGHTS.find((w) => w.name === name);
 
 export const YARN_SHAPES = Object.freeze(['ball', 'cone', 'skein']);
+// YARN.md, "Units".
+export const SHAPE_UNITS = Object.freeze({ ball: 10, cone: 10, skein: 1 });
 
 // YARN.md, "Colour count".
 export const YARN_COLOR_COUNT = 48;
 
-export const yarnUnits = (item) => (item.name === 'yarn' ? 1 : 0);
+export const yarnUnits = (item) => (item.name === 'yarn' ? SHAPE_UNITS[item.shape] ?? 1 : 0);
 
 const pickFrom = (list, rng) => list[Math.floor(rng() * list.length)];
 

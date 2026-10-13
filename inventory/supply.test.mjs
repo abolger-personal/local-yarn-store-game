@@ -4,14 +4,18 @@ import { mulberry32 } from '../characters/store/core/util.js';
 import { makeDisplay, footprint, place, topAt } from './grid.js';
 import { MIN_DELIVERY, SCRIPT, buildOrder, carryOver, choicesFor, describeSlot, resolveOrder, slipLine, supplyFor, tutorialDay1 } from './supply.js';
 import { toolSuitsPattern, yarnSuitsPattern } from '../characters/wip.js';
+import { yarnUnits } from './catalog.js';
 
 const isGoods = (it) => it.name === 'yarn' || it.name === 'pattern';
+const unitsOf = (pile) => pile.reduce((n, it) => n + (it.name === 'yarn' ? yarnUnits(it) : 1), 0);
 
 for (let seed = 1; seed <= 50; seed++) {
   const pile = resolveOrder(buildOrder(1), mulberry32(seed));
-  assert.ok(pile.length >= 24 && pile.length <= 30, `day 1 is 24-30 items, got ${pile.length}`);
-  const solvable = pile.some((pat) => pat.name === 'pattern' && pile.filter((it) => it.name === 'yarn' &&
-    it.weight === pat.weight && pat.materials.includes(it.material)).length >= pat.yarnUnits);
+  const yarn = unitsOf(pile.filter((it) => it.name === 'yarn'));
+  assert.equal(pile.filter((it) => it.name === 'pattern').length, 7, 'day 1 is the kit\'s pattern and six more');
+  assert.ok(yarn >= 16 && yarn <= 33, `and 15 units of yarn plus the kit's, got ${yarn}`);
+  const solvable = pile.some((pat) => pat.name === 'pattern' && unitsOf(pile.filter((it) => it.name === 'yarn' &&
+    it.weight === pat.weight && pat.materials.includes(it.material))) >= pat.yarnUnits);
   assert.ok(solvable, 'the starting pile holds a pattern AND every ball it needs');
 }
 
@@ -47,7 +51,7 @@ for (let seed = 1; seed <= 20; seed++) {
   for (const occupancy of [0, 0.5, 1]) {
     const order = buildOrder(11 + seed, { occupancy, rng: mulberry32(seed) });
     assert.ok(order.every((s) => s.source === 'supplier'), 'day 11+ is the supplier');
-    assert.equal(resolveOrder(order, mulberry32(seed)).length, supplyFor(occupancy), 'delivers what the throttle says');
+    assert.equal(unitsOf(resolveOrder(order, mulberry32(seed))), supplyFor(occupancy), 'delivers what the throttle says');
   }
 }
 
@@ -119,6 +123,7 @@ for (let seed = 1; seed <= 50; seed++) {
   const [hook, ball] = floor;
   assert.ok(toolSuitsPattern(hook, table), `${hook.name} ${hook.size}mm makes "${table.title}"`);
   assert.ok(yarnSuitsPattern(ball, table), `${ball.weight} ${ball.material} makes "${table.title}"`);
+  assert.ok(yarnUnits(ball) >= table.yarnUnits, `a ${ball.shape} is enough yarn for it`);
   assert.ok(!resolveOrder(buildOrder(1), mulberry32(seed)).some((it) => it.patternType === 'potholder'),
     'no pot holder in the playground pile');
 }
@@ -128,9 +133,18 @@ for (let seed = 1; seed <= 50; seed++) {
   assert.ok(line, 'day 3 has a line of the player\'s');
   for (const template of choicesFor(line)) {
     const got = resolveOrder([{ ...line, template, source: 'player' }], mulberry32(7));
-    assert.equal(got.length, line.template.count, `${describeSlot({ template }).item}: ${got.length}`);
+    assert.equal(unitsOf(got), line.template.count, `${describeSlot({ template }).item}: ${unitsOf(got)}`);
     assert.ok(got.every((it) => !it.weight || line.template.weights.includes(it.weight)), 'in the line\'s weights');
   }
+}
+
+for (let seed = 1; seed <= 50; seed++) {
+  const line = resolveOrder([{ template: { kind: 'yarn', count: 5 } }], mulberry32(seed));
+  assert.equal(unitsOf(line), 5, `seed ${seed}: "5 units of yarn" is 5 units (${line.map((y) => y.shape)})`);
+  const [pattern, ...kit] = resolveOrder([{ template: { kind: 'kit' } }], mulberry32(seed));
+  const units = unitsOf(kit);
+  assert.ok(units >= pattern.yarnUnits && units - yarnUnits(kit.at(-1)) < pattern.yarnUnits,
+    `seed ${seed}: a kit holds the ${pattern.yarnUnits} units its pattern takes, not a ball more (${units})`);
 }
 
 console.log('supply.test.mjs: all checks passed');

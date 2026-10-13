@@ -25,7 +25,7 @@ Every type in VISUAL-DESIGN-FINISHED-OBJ.md §1 except the swatch, which is a cr
 | mittens | mittens (proposed) | 2 |
 | potholder | square (proposed) | 1 |
 
-**A pattern's yarn cost is a count of yarn ITEMS (balls, cones, skeins) of the pattern's own recommended weight, never more than 8.** One item is one unit, whatever its weight.
+**A pattern's yarn cost is a count of yarn UNITS of the pattern's own recommended weight, never more than 8.** A yarn's units come from its shape, never its weight (YARN.md, "Units"; revised 2026-10-12, it was one unit per item).
 
 - Yarn weight still decides an item's size on the shelf: lace, fingering and sport are 1x1x1; dk, worsted and aran are 2x2x2; bulky and super-bulky are 3x3x3. That is space in the shop, not an amount of yarn.
 - Yarn of a different weight still counts one item each, but it is a near-miss: it moves the FO's fit and can make it COMPROMISED. See NEAR-MISS-AND-SUBSTITUTION.md and the visual doc §3.

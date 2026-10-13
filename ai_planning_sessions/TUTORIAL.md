@@ -310,7 +310,7 @@ Found by playing `game.html`. Each answer is an object, not a panel.
   or touch). It stays after the item is set down, until something else is hovered, picked up or
   clicked, so it can be read while arranging.
 - **Shows only what a shopper could read off the real object:**
-  - yarn: weight, fibre, colour family, shape (ball, cone, skein), and its units (1 UNIT, the word
+  - yarn: weight, fibre, colour family, shape (ball, cone, skein), and its units (from its shape: a skein is 1 UNIT, a ball or cone 10; the word
     a pattern counts in);
   - pattern: title, what it makes, craft, needle or hook size, the yarn weight and how many units it takes;
   - notion: what it is, and its size.

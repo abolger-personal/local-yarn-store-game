@@ -21,6 +21,8 @@ What's new in L.Y.S. — Local Yarn Store. [Play it here.](https://abolger-perso
 - The packing slip orders "units of yarn", not "balls": yarn also comes as skeins, cakes and cones.
 - In the Guestbook, a customer who finished a project and lent it to the shop gets 🏁, not ✨; ✨ is
   only the sparkle when a customer has everything their project needs.
+- Customers who sit down to knit or crochet start right away, instead of sitting idle in the chair
+  for several seconds first.
 - You can watch a customer knit or crochet the last stretch of their project in the chair; the round that finished it used to show them sitting still.
 
 ## 0.0.0 — 2026-10-12

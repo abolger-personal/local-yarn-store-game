@@ -147,8 +147,9 @@ export function checkOutfit(rec) {
 }
 
 function craftingWip(n) {
-  if (n.action?.type !== ACTION.WORK_ON_WIP || n.seat === null) return null;
-  const wip = n.wips.find((w) => w.id === n.action.params.wip);
+  const work = n.action?.type === ACTION.WALK_TO_SEAT ? n.prescribed : n.action;
+  if (work?.type !== ACTION.WORK_ON_WIP || n.seat === null) return null;
+  const wip = n.wips.find((w) => w.id === work.params.wip);
   return wip?.state === WIP_STATE.IN_PROGRESS ||
     (wip?.state === WIP_STATE.FINISHED && wip.finishedRound === shop.world?.round) ? wip : null;
 }

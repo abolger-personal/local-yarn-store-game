@@ -151,6 +151,7 @@ The sim is lockstep; the animation must not be.
 
 ### Knitting in a chair
 - A seated customer with an IN_PROGRESS WIP shows the craft: tool (needles or hook) from the pattern, the piece sized by its type, pace by skill, the running-out tell from their yarn, the ball on the floor by the chair. It starts only once they are seated (>90%). On a round change the hands go back before the craft is put away. A WIP not started, or with no pattern, shows no craft.
+- The walk-to-seat round already shows the craft of the WIP it prescribes, once seated: the rest of that round would otherwise be spent sitting idle. Progress only moves on the work round.
 
 ### What they carry out
 - Nobody walks in carrying anything: "are they carrying something?" is how the player reads a successful visit.

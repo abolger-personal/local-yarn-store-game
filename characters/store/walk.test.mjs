@@ -139,7 +139,7 @@ for (const k of [1, 2, 3]) {
 {
   const { items } = await import('./core/state.js');
   const { WIP_STATE, wantFor, stow } = await import('../wip.js');
-  const random = Math.random, rounds = [];
+  const random = Math.random, rounds = [], seatToCraft = [];
   for (let seed = 1; seed <= 50; seed++) {
     let a = seed;   // mulberry32
     Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -156,6 +156,15 @@ for (const k of [1, 2, 3]) {
     for (let day = 1; day <= 3; day++) {
       if (day > 1) try { restart(); } catch (err) { assert.match(err.stack, /sizeInstanceBuffers/); }
       assert.ok(shop.world.npcs.includes(friend), `seed ${seed}: the friend comes in on day ${day}`);
+      if (day === 2 && seed <= 10) {
+        let sat = null, crafting = null;
+        run(60, { each: (rec, t) => {
+          if (rec.npc !== friend) return;
+          if (sat === null && rec.npc.seat !== null && rec.moveT >= 1) sat = t;
+          if (crafting === null && rec.craft?.hands > 0.5) crafting = t;
+        } });
+        if (sat !== null) seatToCraft.push(crafting === null ? Infinity : crafting - sat);
+      }
       if (day === 3 && seed === 1) {
         let crocheted = 0;
         run(200, { each: (rec) => { if (rec.npc === friend && rec.craft?.mode === 'crochet' && rec.craft.hands > 0.5) crocheted += DT; } });
@@ -174,6 +183,8 @@ for (const k of [1, 2, 3]) {
     rounds.push(potHolder.finishedRound);
   }
   Math.random = random;
+  assert.ok(seatToCraft.length > 0 && seatToCraft.every((t) => t < 1.5),
+    `the friend starts crocheting once seated, not a round later (${seatToCraft.map((t) => t.toFixed(2)).join(', ')}s)`);
   rounds.sort((x, y) => x - y);
   assert.ok(rounds.at(-1) <= 5, `the finish comes early on day 3 (rounds ${rounds.join(',')})`);
   console.log(`tutorial: the pot holder is finished in the shop on day 3, round ${rounds[25]} (median), ${rounds.at(-1)} (worst)`);

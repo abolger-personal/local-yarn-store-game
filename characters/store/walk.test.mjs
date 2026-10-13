@@ -156,6 +156,15 @@ for (const k of [1, 2, 3]) {
     for (let day = 1; day <= 3; day++) {
       if (day > 1) try { restart(); } catch (err) { assert.match(err.stack, /sizeInstanceBuffers/); }
       assert.ok(shop.world.npcs.includes(friend), `seed ${seed}: the friend comes in on day ${day}`);
+      if (day === 2 && seed === 3) {
+        let sat = null, crafting = null;
+        run(60, { each: (rec, t) => {
+          if (rec.npc !== friend) return;
+          if (sat === null && rec.npc.seat !== null && rec.moveT >= 1) sat = t;
+          if (crafting === null && rec.craft?.hands > 0.5) crafting = t;
+        } });
+        assert.ok(sat !== null && crafting - sat < 1.5, `the friend starts crocheting once seated, not a round later (${(crafting - sat).toFixed(2)}s)`);
+      }
       if (day === 3 && seed === 1) {
         let crocheted = 0;
         run(200, { each: (rec) => { if (rec.npc === friend && rec.craft?.mode === 'crochet' && rec.craft.hands > 0.5) crocheted += DT; } });

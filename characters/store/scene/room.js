@@ -330,7 +330,6 @@ function placeFixtures() {
   roomGroup.add(mat);
   buildCounter();
   marker([0.9, 0.7], [-3.0, 1.55], '#c9a24a');      // signing spot
-  marker([1.0, 1.0], [3.85, 1.9], '#7f9ec2');        // Drop Off
 }
 
 function guestbookPages() {

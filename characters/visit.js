@@ -46,14 +46,14 @@ export const ACTION = Object.freeze({
   WAIT:            'Wait a Round',
   MOVE:            'Move around the store to a spot',
   SIGN_GUESTBOOK:  'Sign the Guestbook',
-  DROP_OFF:        'Lend a finished object',
+  LEND:            'Lend a finished object',
   LEAVE:           'Leave through the door',
   ENTER:           'Enter through the door',
   QUEUE:           'Wait outside for the door',
 });
 
 export const CLOSEOUT_SEQUENCE = Object.freeze([
-  ACTION.SIGN_GUESTBOOK, ACTION.DROP_OFF, ACTION.LEAVE,
+  ACTION.SIGN_GUESTBOOK, ACTION.LEND, ACTION.LEAVE,
 ]);
 
 export const STATE = Object.freeze({
@@ -120,7 +120,7 @@ function leavingState() {
 }
 
 /**
- * @param room   door, guestbook, dropOff, queueAt and the walkable bounds
+ * @param room   door, guestbook, queueAt and the walkable bounds
  * @param seats  [{ id, x, z, facing }], one per chair
  */
 export function makeWorld({ displays, items, room, seats = [], rng = Math.random }) {
@@ -133,7 +133,7 @@ export function makeWorld({ displays, items, room, seats = [], rng = Math.random
     seats: seats.map((s) => ({ ...s, occupiedBy: null })),
     door: { ...room.door, busy: null },
     guestbook: [],
-    dropOff: [],
+    lent: [],
     backPile: [],
     returning: [],
     rng,
@@ -890,7 +890,7 @@ export function signGuestbook(world, npc) {
 }
 
 export const closeoutFor = (npc) =>
-  CLOSEOUT_SEQUENCE.filter((step) => step !== ACTION.DROP_OFF || npc.toLend.length > 0);
+  CLOSEOUT_SEQUENCE.filter((step) => step !== ACTION.LEND || npc.toLend.length > 0);
 
 function stepCloseout(npc, world) {
   releaseSeat(world, npc);
@@ -901,7 +901,7 @@ function stepCloseout(npc, world) {
   const type = npc.closeout[npc.closeoutStep];
   npc.action = { type, params: {} };
   if (type === ACTION.SIGN_GUESTBOOK) signAtGuestbook(npc, world);
-  else if (type === ACTION.DROP_OFF) lendAtDropOff(npc, world);
+  else if (type === ACTION.LEND) lendAtCounter(npc, world);
   else headForDoor(npc, world);
 }
 
@@ -914,13 +914,12 @@ function signAtGuestbook(npc, world) {
     : `signed the Guestbook — a ${entry.mood} note`);
 }
 
-function lendAtDropOff(npc, world) {
-  moveTo(world, npc, world.room.dropOff);
+function lendAtCounter(npc, world) {
   npc.closeoutStep += 1;
   const wip = lend(npc, npc.toLend.shift());
-  world.dropOff.push({ npc: npc.name, npcId: npc.id, wip, object: labelOf(wip.pattern),
+  world.lent.push({ npc: npc.name, npcId: npc.id, wip, object: labelOf(wip.pattern),
                        round: world.round });
-  say(world, npc, `lent ${labelOf(wip.pattern)} to the Drop Off`);
+  say(world, npc, `lent ${labelOf(wip.pattern)} to the shop`);
 }
 
 function headForDoor(npc, world) {

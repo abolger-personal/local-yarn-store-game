@@ -38,7 +38,6 @@ export const room = {
   outside:   { x: 0, z: HALF_D + 1.4 },
   queueAt:   { x: 0, z: HALF_D + 0.8 },
   guestbook: { x: -3.0, z: 1.55 },
-  dropOff:   { x: 3.85, z: 1.9 },
   windows:   WINDOW_SPOTS,
   personalSpace: 0.62,
   doorClearance: 0.8,

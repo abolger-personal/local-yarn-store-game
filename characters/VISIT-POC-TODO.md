@@ -159,15 +159,15 @@ CHARACTER-VISIT.md changed two of the three steps, and both are implemented:
 - **Signing always leaves an entry.** `world.guestbook` is real data now, one entry per visit. With
   a finished object it is a photo of them holding it; without one it is a note reading **happy**
   (they are carrying their target) or **disappointed** (they are not). Shown in the debug panel.
-- **The Drop Off is conditional** on having a finished object to lend. The step no longer exists in
+- **Lending is conditional** on having a finished object to lend. The step no longer exists in
   the sequence otherwise, rather than being skipped at runtime — `closeoutFor(npc)` builds it.
-- **Lending removes the object** from the NPC. It is a loan to the shop, so `world.dropOff` records
+- **Lending removes the object** from the NPC. It is a loan to the shop, so `world.lent` records
   it and `npc.finished` loses it.
 
 Two things that needed deciding to make that work:
 
 - **The closeout plan is frozen when closeout begins**, not recomputed each round. Lending empties
-  `npc.finished`, and a recomputed plan would drop the Drop Off step out from under the NPC
+  `npc.finished`, and a recomputed plan would drop the lending step out from under the NPC
   mid-sequence, leaving them with no step to take. Caught by the tests.
 
 ---
@@ -236,11 +236,11 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
 - **A finished object leaves the WIP slot — but WHEN depends on where it goes.** A WIP slot is a
   limited resource (`maxWips`), so an object cannot sit in one forever; finishing has to give the
   capacity back. Worn objects leave immediately ("store FO in a worn slot" is a move). Objects
-  being **lent leave at the Drop Off**, which is 2nd-to-last — *after* signing, which is
+  being **lent leave at the lending step**, at the counter, which is 2nd-to-last — *after* signing, which is
   3rd-to-last. That ordering is the point: the NPC is photographed for the Guestbook still holding
   what they made, and hands it over on the next step. Getting this one step early is an easy and
   invisible mistake, so `visit.test.mjs` walks the three closeout rounds and asserts the object is
-  still in its slot at signing time and gone after the Drop Off.
+  still in its slot at signing time and gone after lending.
   **Nothing refills a freed slot**: an NPC who finishes mid-visit has capacity for a new project
   and no way to start one. That is the natural home for a "cast on something new" action.
 - **`stow` refuses a null want** rather than filing an item into the nearest slot. A wrong guess
@@ -468,7 +468,7 @@ A WIP with yarn but no pattern generates **no tool want at all**, per the spec.
   push-out and the pair never separates however many passes it gets. Rotating the pair is the only
   escape from a collinear pin. It switches on only after progress stalls, and takes its sign from
   the pair's indices, so a seed still replays identically.
-- **The Drop Off has no prop.** Signing is the `reach` pose at the guestbook; there is no signing
+- Signing is the `reach` pose at the guestbook; there is no signing
   animation of its own.
 - **`maxWips` is computed and displayed but not enforced.**
 - **No formation matcher.** An NPC's target is a per-item want from its WIPs. The real matcher is P3.

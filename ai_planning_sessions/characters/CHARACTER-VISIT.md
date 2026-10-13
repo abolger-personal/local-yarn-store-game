@@ -11,7 +11,7 @@ BROWSE is a set of actions with order chosen randomly. At then end of each round
 (closing sequence is entered when no more options exist )
 CLOSEOUT SEQUENCE: 
 - ALWAYS 3rd to LAST: NPC moves to sign guest book (hardcoded). Event where a picture of a finished object gets added to the LYS guestbook (always happens. If if they made a finished object while in visit or if they brought one in with them, a picture generated of them holding object. The item in the PHOTO should be the most recently finished object, and the NPC should be pictured in/with it even if they are not currently wearing it (e.g. it is being lent to the shop). Otherwise, a note about whether or not they are happy (found what they are looking for) or disappointed (did not find what they needed) is added) 
-- 2nd to LAST IF NPC HAS A FINISHED OBJECT: NPC (fancy animation here!) will all the player to borrow a finished object for display in the LYS, and place the object in a hard coded "Drop Off" Floor Display area with infinite headroom. 
+- 2nd to LAST IF NPC HAS A FINISHED OBJECT: NPC (fancy animation here!) will all the player to borrow a finished object for display in the LYS, and hand the object over at the counter, where they just signed. 
 - ALWAYS LAST: leaving through the door
 
 RETURNING VISITORS:

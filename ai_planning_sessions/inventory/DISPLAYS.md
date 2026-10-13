@@ -113,6 +113,8 @@ IN THE STORE (as built in characters/store/; code points here with `DISPLAYS.md 
 - A customer stands 0.65 in front of a display; a floor pile has no front, so they take its first side clear of walls and everything else.
 - Slots inside a wall, the counter, a chair, the doorway or an earlier display are masked out when the display is built, so a display can come out a funny shape (a 4×4 pile against the counter becomes a 3×2). Where two overlap the earlier keeps its cells.
 
+- The default shop is the north wall shelf and two 5×5 tables: one in the middle of the floor, one in the front-right corner by the right wall. The tutorial puts its pattern on the table nearest the door, the middle one.
+
 ### Stock
 - By default the shop puts out 100 boxes; the GUI goes to 200 and CAPACITY is the hard ceiling. A crammed shop is both the look and the sorting game.
 - Random stock is 55% yarn, 20% patterns, 25% notions (yarn leads because WIPs use most of it), dealt round-robin over places (the whole floor counts as one place) and stacked 1–3 high, so piles read as piles and burying means something.

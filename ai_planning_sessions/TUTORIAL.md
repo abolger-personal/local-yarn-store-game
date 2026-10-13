@@ -227,11 +227,11 @@ and SCRIPTED-EVENTS.md §4.
   player's first success. Its thank-you line (PROJECTS-AND-AUTHORSHIP.md §4b) remembers day 1
   truthfully, e.g. *"First thing I ever made! The red one was right there on the floor."*, which
   quietly echoes the note. A pot holder has no wear slot (WEARABLE-FINISHED-OBJ.md: decor is
-  always lent), so they also lend it to the shop at the drop-off, and it can be displayed.
+  always lent), so they also lend it to the shop at the counter, and it can be displayed.
 - **Counter note:** *"Look who's back!"*
 - **Success:** the player sees the selfie, and places the lent pot holder somewhere they will see
   it: the arrangement verb used as the relationship verb (REGULARS §3). Small on purpose.
-- **Fallback:** the selfie stays on the board; the pot holder waits at the drop-off.
+- **Fallback:** the selfie stays on the board; the pot holder waits with the shop's lent objects.
 - **Built:** the pot holder is held short of done until day 3 (`holdAt` 90%, `wip.js`
   `progressLimit`), day 3 lifts the hold as knitted at home, and the finishing push (`visit.js`,
   ROADMAP I1) sits the friend down to finish it: round 3 of day 3, about half a minute at ▶

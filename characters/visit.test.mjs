@@ -29,7 +29,6 @@ const ROOM = {
   outside:   { x: 0, z: 5 },
   queueAt:   { x: 0, z: 4 },
   guestbook: { x: -2, z: 0 },
-  dropOff:   { x: 2, z: 0 },
   personalSpace: 0.6,
   doorClearance: 0.8,
   bounds: { minX: -2.5, maxX: 2.5, minZ: -2.5, maxZ: 2.5 },
@@ -327,11 +326,11 @@ const runCloseout = (world, npc) => {
   npc.wips = [WIP()];
 
   assert.deepEqual(closeoutFor(npc), [ACTION.SIGN_GUESTBOOK, ACTION.LEAVE],
-    'nothing to lend, so no Drop Off step exists at all');
+    'nothing to lend, so no lending step exists at all');
   const seen = runCloseout(world, npc);
   assert.deepEqual(seen.slice(0, 2), [ACTION.SIGN_GUESTBOOK, ACTION.LEAVE],
     'sign the Guestbook, then leave');
-  assert.ok(!seen.includes(ACTION.DROP_OFF), 'an empty-handed NPC must not visit the Drop Off');
+  assert.ok(!seen.includes(ACTION.LEND), 'an empty-handed NPC must not lend');
   assert.equal(npc.state, STATE.GONE, 'and the visit is over');
 
   assert.equal(world.guestbook.length, 1, 'signing always leaves an entry');
@@ -339,7 +338,7 @@ const runCloseout = (world, npc) => {
     { kind: world.guestbook[0].kind, mood: world.guestbook[0].mood },
     { kind: 'note', mood: 'disappointed' },
     'no object and no purchase reads as disappointed');
-  assert.equal(world.dropOff.length, 0, 'and nothing was lent');
+  assert.equal(world.lent.length, 0, 'and nothing was lent');
 }
 
 {
@@ -352,7 +351,7 @@ const runCloseout = (world, npc) => {
   assert.deepEqual(seen.slice(0, 2), [ACTION.SIGN_GUESTBOOK, ACTION.LEAVE],
     'they wear it home rather than lending it');
   assert.equal(npc.worn.head?.id, 'WIP 1', 'the hat is on their head');
-  assert.equal(world.dropOff.length, 0, 'and the shop gets nothing');
+  assert.equal(world.lent.length, 0, 'and the shop gets nothing');
   assert.equal(world.guestbook[0].kind, 'photo', 'a finished object still makes it a picture');
 }
 
@@ -369,7 +368,7 @@ const runCloseout = (world, npc) => {
   assert.deepEqual(seen.slice(0, 3), [...CLOSEOUT_SEQUENCE],
     'sign the Guestbook, lend the spare, then leave — in that order');
   assert.equal(npc.worn.head?.id, 'WIP 1', 'the first hat is worn');
-  assert.deepEqual(world.dropOff.map((d) => d.wip.id), ['WIP 2'], 'the second is lent');
+  assert.deepEqual(world.lent.map((d) => d.wip.id), ['WIP 2'], 'the second is lent');
   assert.deepEqual(npc.toLend, [], 'and nothing is left over');
 }
 
@@ -385,11 +384,11 @@ const runCloseout = (world, npc) => {
   assert.equal(world.guestbook.length, 1, 'and writes the entry');
   assert.deepEqual(npc.wips.map((w) => w.id), ['spare hat'],
     'the object being lent is STILL theirs while they sign');
-  assert.equal(world.dropOff.length, 0, 'nothing has been handed over yet');
+  assert.equal(world.lent.length, 0, 'nothing has been handed over yet');
 
   advanceRound(world);
-  assert.equal(npc.action.type, ACTION.DROP_OFF, 'the Drop Off comes second');
-  assert.deepEqual(world.dropOff.map((d) => d.wip.id), ['spare hat'], 'now the shop has it');
+  assert.equal(npc.action.type, ACTION.LEND, 'lending comes second');
+  assert.deepEqual(world.lent.map((d) => d.wip.id), ['spare hat'], 'now the shop has it');
   assert.deepEqual(npc.wips, [], 'and only now does it leave the WIP slots');
 
   advanceRound(world);
@@ -458,11 +457,11 @@ const runCloseout = (world, npc) => {
   const worn = WIP({ id: 'old hat', state: WIP_STATE.FINISHED });
   const lent = WIP({ id: 'new hat', state: WIP_STATE.FINISHED });
   npc.worn.head = worn;
-  world.dropOff.push({ npc: npc.name, npcId: npc.id, wip: lent, object: 'hat', round: 1 });
+  world.lent.push({ npc: npc.name, npcId: npc.id, wip: lent, object: 'hat', round: 1 });
 
   assert.ok(returnToNpc(world, npc, lent), 'the shop can hand it back');
   assert.equal(npc.worn.head, lent, 'it goes on their head');
-  assert.equal(world.dropOff.length, 0, 'and off the Drop Off display');
+  assert.equal(world.lent.length, 0, 'and off the lent pile');
   assert.deepEqual(world.backPile.map((b) => b.wip.id), ['old hat'],
     'the one they were wearing goes in the pile behind the guestbook');
 }

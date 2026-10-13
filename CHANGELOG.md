@@ -4,6 +4,10 @@ What's new in L.Y.S. — Local Yarn Store. [Play it here.](https://abolger-perso
 
 ## 0.0.1 — coming soon
 
+### The shop
+- The blue Drop Off square is gone; a second table stands in its corner. Customers lend a finished
+  piece at the counter when they sign the Guestbook.
+
 ### Fixes
 - A selfie's caption wraps under the photo instead of stretching across the screen.
 - You can watch a customer knit or crochet the last stretch of their project in the chair; the round that finished it used to show them sitting still.

@@ -360,6 +360,7 @@ export const holdsTarget = (display, items, target) =>
 // TODO(spec): placeholder weights, VISIT-POC-TODO.md spec gap 2
 
 export function attractiveness(npc, display, items) {
+  if (!items.some((it) => available(it) && it.display === display.id)) return 0;
   const t = npc.traits;
   let a = 0.20;
   const wanted = items.some((it) => available(it) && it.display === display.id && matchesAnyWant(npc, it));

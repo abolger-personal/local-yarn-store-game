@@ -206,7 +206,12 @@ for (const k of [1, 2, 3]) {
   const { planTomorrow } = await import('./sim/world.js');
   const { makeStockNotion } = await import('../../inventory/catalog.js');
   const random = Math.random;
-  const runDay = () => { for (let r = 0; r < 400 && shop.world.npcs.some((n) => n.state !== STATE.GONE); r++) doAdvanceRound(); };
+  let emptyWalks = 0;
+  const runDay = () => { for (let r = 0; r < 400 && shop.world.npcs.some((n) => n.state !== STATE.GONE); r++) {
+    const stocked = new Set(items.filter((x) => !x.gone && !x.held).map((x) => x.display));
+    doAdvanceRound();
+    emptyWalks += shop.world.npcs.filter((n) => n.action?.type === ACTION.WALK_TO_DISPLAY && !stocked.has(n.action.params.displayId)).length;
+  } };
   for (let seed = 1; seed <= 40; seed++) {
     let a = seed;   // mulberry32
     Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -247,6 +252,7 @@ for (const k of [1, 2, 3]) {
   }
   Math.random = random;
   assert.ok(buried >= 10, `only ${buried} wanted things were buried; the dig-out went untested`);
+  assert.equal(emptyWalks, 0, 'nobody walks up to a display holding nothing to browse it');
 }
 
 console.log('walk: prompt door, real pause, full strides at every speed, no jumps, faces the display');

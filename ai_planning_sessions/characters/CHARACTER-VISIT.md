@@ -69,6 +69,7 @@ ACTIONS WITH PRESCRIPTIONS:
     For each display, calculate a boolean "visible" value for each display. Keep this simple: if there's nothing intersecting the vector between the NPC and the display centroid, it's "visible". Exception, the shop floor: floor tiles are walked on, so they never block a sightline (or a route), and a floor tile is seen at its point nearest the NPC rather than its centroid — a tile half under a shelf or a table has its centroid hidden, and what sits on its open half must still be noticeable. 
     
     For visible displays, calculate attractiveness of each display using weights. All displays with an attractiveness of more than 50% become unique actions added to the possible set: "Walk to display A".  
+    A display (or floor tile) holding no items has attractiveness 0: nobody walks up to browse an empty place.
 
     PRESCRIBED NEXT ACTION: Interact with noticed display.
 
@@ -96,7 +97,7 @@ ACTIONS WITHOUT PRESCRIPTIONS:
 
 - Wait a Round
 
-    Stay still. Not offered on the doormat: an NPC parked there blocks the one way in and out.
+    Stay still. Not offered on the doormat: an NPC parked there blocks the one way in and out. Drawn standing, not leaning in at the goods: a wait lands wherever a wander did, empty shelf or bare floor included.
     
     PRESCRIBED NEXT ACTION: If another NPC2 is within a small distance of NPC1, chance of "PRESCRIBED NEXT ACTION" being another 'Wait a round' to keep interacting is:
         

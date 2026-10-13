@@ -137,6 +137,11 @@ either passes or ends the check; nothing here is a menu or a number the player s
 never more. An Orderliness 4+ giver never splits a dye lot: all of it, or none. What leaves their bag
 leaves their stash pile (§2, "Stash is one slot").
 
+TODO(spec): over-buying feeds gifts. Yarn units come from shape (a cone holds more than a skein), so a
+customer who buys a cone for a 3-unit pattern leaves with units to spare. Those leftovers become their
+stash and are what a later gift or swap gives away. Decide how a multi-unit item is given when the
+receiver is short fewer units than it holds: whole item, or split.
+
 **Afterwards:** the receiver's yarn records where it came from (the giver), for the Guestbook (a 🎁 row on both pages, TUTORIAL.md §7.3) and
 the thank-you line (PROJECTS-AND-AUTHORSHIP.md §4b: *"Mira's blues, from her stash. I owe her
 one."*). It adds to their bond (REGULARS §2, "Measuring it").

@@ -1,15 +1,23 @@
 // TUTORIAL.md §7.1, §7.3; PROJECTS-AND-AUTHORSHIP.md §4b
 
-import { labelOf, TOOL_FOR_CRAFT, YARN_COLOR_COUNT, yarnUnits } from '../inventory/catalog.js';
+import { labelOf, TOOL_FOR_CRAFT, yarnUnits } from '../inventory/catalog.js';
+import { YARN_PALETTE } from '../inventory/yarn-look.js';
 
-// ponytail: hue bands only, so a muted or very pale yarn still gets its hue's word; add "grey" /
-// "pale" when the band needs lightness and chroma too.
-const HUE_WORDS = /** @type {[number, string][]} */ ([[15, 'pink'], [45, 'red'], [75, 'orange'], [110, 'yellow'],
-  [165, 'green'], [205, 'teal'], [270, 'blue'], [320, 'purple'], [360, 'pink']]);
+// OKLCH hue upper bounds.
+const HUE_WORDS = /** @type {[number, string][]} */ ([[15, 'pink'], [45, 'red'], [80, 'orange'], [115, 'yellow'],
+  [170, 'green'], [220, 'teal'], [280, 'blue'], [330, 'purple'], [360, 'pink']]);
+const DARK = { orange: 'brown', yellow: 'olive', blue: 'navy' };
+const PALE = { red: 'peach', orange: 'peach' };
+const DUSTY = { orange: 'tan' };
 
 export function colourWord(colorIndex) {
-  const hue = (((colorIndex % YARN_COLOR_COUNT) + 0.5) * 360) / YARN_COLOR_COUNT;
-  return HUE_WORDS.find(([upTo]) => hue < upTo)?.[1] ?? 'pink';
+  const { l, c, h } = YARN_PALETTE[colorIndex % YARN_PALETTE.length];
+  if (c < 0.03) return 'grey';
+  const hue = HUE_WORDS.find(([upTo]) => h < upTo)?.[1] ?? 'pink';
+  if (l < 0.5) return DARK[hue] ?? `dark ${hue}`;
+  if (l > 0.75) return PALE[hue] ?? `pale ${hue}`;
+  if (c < 0.08) return DUSTY[hue] ?? `dusty ${hue}`;
+  return hue;
 }
 
 export function bandOf(item) {

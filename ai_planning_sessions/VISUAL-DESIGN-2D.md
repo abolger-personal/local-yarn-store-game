@@ -82,6 +82,12 @@ The 3D shop's yes/no signals are `#25e06a` (fits) and `#ff2d16` (no room), at 0.
 UI, not paint, so their materials skip tone mapping (`toneMapped = false`). The held item's halo
 and the drop ghost share the green so the eye pairs them (STORE-SCENE.md §Drop feedback).
 
+### Yarn colour words
+
+A ball band's colour word comes from the drawn swatch's OKLCH (`YARN_PALETTE`), not its hue alone:
+C < 0.03 is *grey*; L < 0.5 is *dark* (*brown*, *olive*, *navy*); L > 0.75 is *pale* (*peach* for red
+and orange); C < 0.08 is *dusty* (*tan* for orange); otherwise the bare hue word.
+
 ---
 
 ## Type

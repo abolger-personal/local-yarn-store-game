@@ -18,7 +18,7 @@ What's new in L.Y.S. — Local Yarn Store. [Play it here.](https://abolger-perso
 - A finished piece a customer lends the shop now sits on the counter beside the Guestbook, and
   stays there overnight.
 - Customers' delight is easier to spot: a bigger hop for everyone, a wagging tail on lions and
-  flapping ears on llamas.
+  flapping ears on llamas. They light up at every find, not just the first one of a visit.
 
 ### Fixes
 - Customers no longer walk up to empty shelves, or lean in at bare floor as if shopping it.

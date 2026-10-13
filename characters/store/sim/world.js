@@ -1,7 +1,7 @@
 import { abortDrag } from '../interact/pick.js';
-import { rnd } from '../core/util.js';
+import { freshSeed, hash, mulberry32, rnd } from '../core/util.js';
 import { clearSelection } from '../interact/move.js';
-import { cast, seats, props, displays, items, touchHud, shop, clocks } from '../core/state.js';
+import { cast, seats, props, displays, items, touchHud, shop, clocks, simRng } from '../core/state.js';
 import { makeStockNotion, makeStockPattern, makeStockYarn, stockPatternFor, yarnWeight } from '../../../inventory/catalog.js';
 import {
   NAMES,
@@ -51,10 +51,10 @@ export const lentGroup = new THREE.Group();
 
 // DISPLAYS.md §Stock
 function randomStock() {
-  const roll = Math.random();
-  if (roll < 0.55) return makeStockYarn();
-  if (roll < 0.75) return makeStockPattern();
-  return makeStockNotion();
+  const roll = simRng();
+  if (roll < 0.55) return makeStockYarn(simRng);
+  if (roll < 0.75) return makeStockPattern(simRng);
+  return makeStockNotion(simRng);
 }
 
 function stockSpots() {
@@ -69,13 +69,13 @@ function fillStock(n) {
   let placed = 0, tries = 0;
   const spots = stockSpots();
   for (let i = 0; placed < n && tries < n * 8; i++, tries++) {
-    const d = pick(spots[i % spots.length]);
+    const d = pick(spots[i % spots.length], simRng);
     if (d.kind === 'shelf') {
-      if (addItem(d, rnd(d.g.shelves), randomStock()) >= 0) placed++;
+      if (addItem(d, rnd(d.g.shelves, simRng), randomStock()) >= 0) placed++;
       continue;
     }
-    const tall = Math.min(n - placed, 1 + rnd(3));
-    let top = { c: rnd(d.g.cols), r: rnd(d.g.rows) };
+    const tall = Math.min(n - placed, 1 + rnd(3, simRng));
+    let top = { c: rnd(d.g.cols, simRng), r: rnd(d.g.rows, simRng) };
     for (let k = 0; k < tall; k++) {
       const index = addItem(d, 0, randomStock(), k ? { over: top } : top);
       if (index >= 0) { placed++; top = items[index]; }
@@ -86,7 +86,7 @@ function fillStock(n) {
 
 function placeFrom(spots, start, spec, where) {
   for (let k = 0; k < spots.length; k++) {
-    const group = spots[(start + k) % spots.length], from = rnd(group.length);
+    const group = spots[(start + k) % spots.length], from = rnd(group.length, simRng);
     for (let j = 0; j < group.length; j++) {
       const display = group[(from + j) % group.length];
       const index = addItem(display, 0, spec, where);
@@ -116,7 +116,7 @@ function buryOne(npc, i, want, unburied) {
     { avoidWall: true, reserve: 1, ...(spec.w ? {} : { shape: [1, 1] }) });
   if (buried < 0) return 0;
   const it = items[buried];
-  const lid = addItem(hidden, 0, makeStockNotion(Math.random, 'darning-needle'),
+  const lid = addItem(hidden, 0, makeStockNotion(simRng, 'darning-needle'),
                       { c: it.c, r: it.r, shape: [it.w, it.h] });
   if (lid < 0) unburied.push(`${npc.name}'s ${want.kind} landed on ${hidden.id} with no lid`);
   return 1 + (lid >= 0 ? 1 : 0);
@@ -138,13 +138,13 @@ function seedWants(npcs) {
 
 function specFor(want) {
   if (want.kind === 'pattern') {
-    return want.forYarn ? stockPatternFor(want.forYarn) : makeStockPattern();
+    return want.forYarn ? stockPatternFor(want.forYarn, simRng) : makeStockPattern(simRng);
   }
   if (want.kind === 'yarn') {
-    const y = makeStockYarn();
+    const y = makeStockYarn(simRng);
     y.weight = want.weight;
     y.w = y.h = yarnWeight(want.weight).size;
-    y.material = pick(want.materials);
+    y.material = pick(want.materials, simRng);
     return y;
   }
   return { name: want.tool, size: want.size };
@@ -154,7 +154,7 @@ const usedNames = new Set();
 
 function claimName() {
   const free = NAMES.filter((n) => !usedNames.has(n));
-  let name = free.length ? pick(free) : null;
+  let name = free.length ? pick(free, simRng) : null;
   for (let k = 2; !name; k++) {
     const candidate = `${NAMES[usedNames.size % NAMES.length]} ${k}`;
     if (!usedNames.has(candidate)) name = candidate;
@@ -177,11 +177,12 @@ function buildBody(speciesId, saved, outfit) {
 }
 
 function buildMind(returning, kit) {
-  const npc = returning ? rejoin(returning) : makeNpc({
+  const npc = returning ? rejoin(returning, { rng: simRng }) : makeNpc({
     id: `npc-${nextNpcId++}`,
     name: claimName(),
     species: kit.label,
     target: null,
+    rng: simRng,
   });
   npc.speciesId = kit.id;
   npc.target = wantsOf(npc)[0] ?? null;
@@ -196,22 +197,25 @@ function queueOutside(npc, i) {
 }
 
 const finished = (type) => {
-  const pattern = makeStockPattern(Math.random, type);
+  const pattern = makeStockPattern(simRng, type);
   return { id: type, state: WIP_STATE.FINISHED, progress: 100, pattern, tool: null, notions: [],
-    yarn: Array.from({ length: pattern.minColors }, () => makeStockYarn()) };
+    yarn: Array.from({ length: pattern.minColors }, () => makeStockYarn(simRng)) };
 };
 
 function formerOwner() {
-  const speciesId = pick(speciesIds());
-  return Object.assign(makeNpc({ id: `npc-${nextNpcId++}`, name: claimName(), species: getSpecies(speciesId).label }), {
+  const speciesId = pick(speciesIds(), simRng);
+  return Object.assign(makeNpc({ id: `npc-${nextNpcId++}`, name: claimName(), species: getSpecies(speciesId).label, rng: simRng }), {
     speciesId, wips: [], farewell: "Shop's all yours! Make some fun stuff!",
     worn: Object.fromEntries(Object.entries(WEAR_SLOT_FOR).map(([type, slot]) => [slot, finished(type)])),
-    carries: Array.from({ length: 3 + rnd(3) }, () => finished('potholder')),
+    carries: Array.from({ length: 3 + rnd(3, simRng) }, () => finished('potholder')),
   });
 }
 
 const signingOut = (npc) => Object.assign(npc, { state: STATE.CLOSEOUT, maxRounds: 0, ...room.guestbook,
   from: { ...room.guestbook }, facing: Math.atan2(room.door.x - room.guestbook.x, room.door.z - room.guestbook.z) });
+
+/** Visual timing's dice, off the sim's stream: the same for one npc and round on a replay. */
+const looks = (npc, round) => mulberry32(hash(shop.world.seed, shop.day, shop.world.attempt, npc.id, round));
 
 const castRecord = (npc, built, color) => ({
   npc, built, color,
@@ -220,16 +224,16 @@ const castRecord = (npc, built, color) => ({
   wait: 0, dur: S.travel, pace: 1, go: 1,
   carriedName: null, carriedMesh: null,
   outfit: {}, outfitKey: '{}', redress: false, craft: null, craftFor: null, craftWip: null, sparkle: null, boughtN: 0, ready: null,
-  celebrate: 0, cheerIn: 0, cheer: rollCheer(), hop: 0, route: [{ x: npc.x, z: npc.z }, { x: npc.x, z: npc.z }],
+  celebrate: 0, cheerIn: 0, cheer: rollCheer(looks(npc, 'cheer')), hop: 0, route: [{ x: npc.x, z: npc.z }, { x: npc.x, z: npc.z }],
   opts: { ...MOTION_DEFAULTS, ...motionOf(npc.traits, built.species?.motionRanges), ...SHOP_GAIT },
-  phase: Math.random(),
+  phase: looks(npc, 'phase')(),
   moved: 0,
   speed: 0,
 });
 
 function spawnOne(returning, i, place = queueOutside) {
   const outfit = returning ? outfitOf(returning) : {};
-  const { kit, P, built } = buildBody(returning ? returning.speciesId : pick(speciesIds()),
+  const { kit, P, built } = buildBody(returning ? returning.speciesId : pick(speciesIds(), simRng),
                                       returning?.body, outfit);
   const npc = buildMind(returning, kit);
   npc.body = P;
@@ -259,7 +263,8 @@ function stockTheShop(npcs) {
   console.info(`stock: ${items.length} boxes — ${seeded} seeded for customers, ${filled} general${short}`);
 }
 
-function deliver(order = buildOrder(shop.day, { occupancy: items.length / CAPACITY }), goods = resolveOrder(order)) {
+function deliver(order = buildOrder(shop.day, { occupancy: items.length / CAPACITY, rng: simRng }),
+                 goods = resolveOrder(order, simRng)) {
   const floor = [displays.filter((d) => d.solid === false)];
   let landed = 0;
   for (const spec of goods) if (placeFrom(floor, 0, spec).index >= 0) landed++;
@@ -271,7 +276,7 @@ function deliver(order = buildOrder(shop.day, { occupancy: items.length / CAPACI
 
 export function planTomorrow() {
   const kept = items.filter((it) => !it.gone).length;
-  return buildOrder(shop.day + 1, { occupancy: kept / CAPACITY });
+  return buildOrder(shop.day + 1, { occupancy: kept / CAPACITY, rng: simRng });
 }
 
 export function sizeInstanceBuffers() {
@@ -320,7 +325,7 @@ function openTutorial(npc, pattern) {
 }
 
 function castAndStock(fresh, order) {
-  const tutorial = S.tutorial && fresh && shop.day === 1 ? tutorialDay1() : null;
+  const tutorial = S.tutorial && fresh && shop.day === 1 ? tutorialDay1(simRng) : null;
   const npcs = spawnCast(tutorial ? 1 : S.npcCount, Boolean(tutorial));
   if (tutorial) openTutorial(npcs[0], tutorial.table);
   else if (fresh) stockTheShop(npcs);
@@ -329,20 +334,26 @@ function castAndStock(fresh, order) {
   return { npcs, delivered: deliver(order, tutorial?.floor) };
 }
 
+function openWorld(yesterday, seed) {
+  const { lent = [], backPile = [], attempt = 0 } = yesterday ?? {};
+  shop.world = makeWorld({ displays, items, room, seats, seed: seed ?? yesterday?.seed ?? freshSeed(), day: shop.day, attempt });
+  Object.assign(shop.world, { lent, backPile });
+}
+
 /**
- * @param {{ keepRegulars?: boolean, rebuild?: boolean, order?: ReturnType<typeof buildOrder> }} [opts]
+ * @param {{ keepRegulars?: boolean, rebuild?: boolean, order?: ReturnType<typeof buildOrder>, seed?: number }} [opts]
+ *   seed: a new game's; a kept game carries yesterday's
  */
-export function restart({ keepRegulars = true, rebuild = false, order } = {}) {
+export function restart({ keepRegulars = true, rebuild = false, order, seed } = {}) {
   fileGuestbook(keepRegulars);
   shop.day = keepRegulars ? shop.day + 1 : 1;
   Object.assign(clocks, { day: 0, auto: S.autoSeconds });
   const fresh = rebuild || !keepRegulars || !displays.length;
   setUpShop(fresh);
   if (!keepRegulars) roster = [];
+  openWorld(keepRegulars ? shop.world : null, seed);
   const { npcs, delivered } = castAndStock(fresh, order);
-  const { lent = [], backPile = [] } = keepRegulars ? shop.world ?? {} : {};
-  shop.world = makeWorld({ displays, items, room, seats });
-  Object.assign(shop.world, { npcs, lent, backPile });
+  shop.world.npcs = npcs;
   showLent();
   shop.world.log.push(`r0 ${delivered}`);
   shop.dayT = 0;
@@ -361,9 +372,10 @@ function retarget(rec, slot = 0, total = 1) {
                ...(n.path ?? []).slice(0, -1).map((p) => ({ x: p.x, z: p.z })),
                { x: n.x, z: n.z }];
   rec.travelled = routeLength(rec.route);
-  rec.wait = n.action?.type === ACTION.ENTER ? 0 : ((slot + Math.random()) / Math.max(1, total)) * S.travelJitter
+  const jitter = looks(n, shop.world.round);
+  rec.wait = n.action?.type === ACTION.ENTER ? 0 : ((slot + jitter()) / Math.max(1, total)) * S.travelJitter
     + (rec.seatRef ? STAND_TIME : 0);
-  rec.pace = 1 + (Math.random() * 2 - 1) * S.paceJitter;
+  rec.pace = 1 + (jitter() * 2 - 1) * S.paceJitter;
   rec.dur = Math.max(S.travel * rec.pace, 0.05);
 }
 
@@ -382,9 +394,9 @@ export function doAdvanceRound() {
   showLent();
   for (const rec of cast) checkOutfit(rec);
   clocks.auto = 0;
-  const order = cast.map((_, i) => i);
+  const order = cast.map((_, i) => i), shuffle = looks({ id: 'order' }, shop.world.round);
   for (let i = order.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(shuffle() * (i + 1));
     const swap = order[i];
     order[i] = order[j];
     order[j] = swap;

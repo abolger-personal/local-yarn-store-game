@@ -15,8 +15,8 @@ import { EMPTY, topAt } from '../../inventory/grid.js';
 import { loadAtlas } from '../../inventory/notions.js';
 
 import { S } from './core/config.js';
-import { aim, clocks, displays, items, shop, takeViewDirty, touchView } from './core/state.js';
-import { esc } from './core/util.js';
+import { aim, clocks, displays, items, shop, simRng, takeViewDirty, touchView } from './core/state.js';
+import { esc, freshSeed } from './core/util.js';
 import { installStage, renderer, scene, camera, controls } from './scene/stage.js';
 import { buildRoomShell, cullWalls } from './scene/room.js';
 import { installSeating, buildChairs } from './scene/seating.js';
@@ -88,10 +88,10 @@ function placeNpc() {
 /** @param {{traits?: any, prefs?: any}} [keep] */
 function spawnNpc({ traits, prefs } = {}) {
   if (bench.built) { castGroup.remove(bench.built.root); disposeCharacter(bench.built); }
-  const kit = getSpecies(pick(speciesIds()));
+  const kit = getSpecies(pick(speciesIds(), simRng));
   const P = bodyParams(kit, null, S);
   bench.built = createCharacter(P, kit);
-  const npc = /** @type {any} */ (makeNpc({ id: 'bench', name: pick(NAMES), species: kit.label, traits, prefs }));
+  const npc = /** @type {any} */ (makeNpc({ id: 'bench', name: pick(NAMES, simRng), species: kit.label, traits, prefs, rng: simRng }));
   npc.speciesId = kit.id;
   npc.state = /** @type {any} */ (STATE.BROWSE);
   npc.body = P;
@@ -166,16 +166,16 @@ function syncPalette() {
 
 function specOf() {
   if (build.kind === 'yarn') {
-    return Object.assign(makeYarn(Math.random, build.weight),
+    return Object.assign(makeYarn(simRng, build.weight),
                          { material: build.material, shape: build.shape,
                            colorIndex: Number(build.colorIndex) });
   }
   if (build.kind === 'pattern') {
-    return Object.assign(makePattern(Math.random, build.patternType),
+    return Object.assign(makePattern(simRng, build.patternType),
                          { craft: build.craft, weight: build.weight,
                            materials: [build.material], toolSize: Number(build.toolSize) });
   }
-  const n = makeNotion(Math.random, build.notion);
+  const n = makeNotion(simRng, build.notion);
   if (n.size != null) n.size = Number(build.toolSize);
   return n;
 }
@@ -422,7 +422,7 @@ function openTheBench(loaded) {
   buildChairs(0);
   buildDisplays(S.displayCount);
   items.length = 0;
-  bench.world = makeWorld({ displays, items, room, seats: [] });
+  bench.world = makeWorld({ displays, items, room, seats: [], seed: freshSeed() });
   shop.world = bench.world;
   aim.active = bench.at;
   spawnNpc();

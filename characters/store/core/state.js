@@ -1,3 +1,5 @@
+import { draw } from './util.js';
+
 export const items = [];
 
 export const displays = [];
@@ -24,6 +26,9 @@ export const clocks = {
 
 export const shop = { world: null, day: 0, dayT: 0, hudDirty: true, viewDirty: true, pastBooks: [],
   press: null, watched: new Set() };
+
+/** The day's sim dice: draws from and advances `shop.world.rngState`. */
+export const simRng = () => draw(shop.world);
 
 export const touchView = () => { shop.viewDirty = true; };
 export const touchHud = () => { shop.hudDirty = true; shop.viewDirty = true; };

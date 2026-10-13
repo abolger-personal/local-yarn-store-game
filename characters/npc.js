@@ -159,7 +159,7 @@ export const NAMES = [
 ];
 
 export const rand = (a, b) => a + Math.random() * (b - a);
-export const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+export const pick = (arr, rng = Math.random) => arr[Math.floor(rng() * arr.length)];
 export const hsl = (h, s, l) => `#${new THREE.Color().setHSL(h, s, l).getHexString()}`;
 export const randHex = (sat, light) => hsl(Math.random(), rand(...sat), rand(...light));
 

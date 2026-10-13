@@ -22,6 +22,8 @@ What's new in L.Y.S. — Local Yarn Store. [Play it here.](https://abolger-perso
 
 ### Fixes
 - Customers no longer walk up to empty shelves, or lean in at bare floor as if shopping it.
+- When one customer buys from a pile, the shelf no longer re-buries what another customer just
+  dug out.
 - A kit now comes with everything its pattern needs: the yarn, the hook or needles in the right
   size, and any buttons or other notions. The pieces may arrive scattered for you to gather.
 - Yarn colourways have indie-dyer names that match what you see: a pale salmon ball is

@@ -152,7 +152,7 @@ function shadow(ctx, { project, feet }) {
   ctx.globalAlpha = 1;
 }
 
-export function paintBackdrop(ctx, view, rng = Math.random) {
+export function paintBackdrop(ctx, view, rng) {
   const { width: w, height: h } = ctx.canvas;
   const sky = pick(rng, SKIES);
   const kind = view.horizon.y > 0 ? 'pavement' : pick(rng, Object.keys(GROUNDS));

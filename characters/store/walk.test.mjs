@@ -33,7 +33,7 @@ Object.assign(globalThis, { document: el(), window: globalThis, innerWidth: 1280
   devicePixelRatio: 1, addEventListener() {}, HTMLElement: class {} });
 
 const { S, gameSpeed } = await import('./core/config.js');
-const { shop, cast, clocks } = await import('./core/state.js');
+const { shop, cast, clocks, simRng } = await import('./core/state.js');
 await import('../owl.js'); await import('../llama.js'); await import('../lion.js');
 const { STATE, ACTION } = await import('../visit.js');
 const { topSpeed } = await import('../motion.js');
@@ -47,9 +47,9 @@ buildRoomShell(); installSeating(); installDisplays(); installWorld();
 S.blobShadows = false;
 
 /** A new day; without the atlas, restart() throws at sizeInstanceBuffers. */
-function open({ k, tutorial }) {
+function open({ k, tutorial, seed = 1 }) {
   Object.assign(S, gameSpeed(k), { tutorial });
-  try { restart({ keepRegulars: false }); } catch (err) { assert.match(err.stack, /sizeInstanceBuffers/); }
+  try { restart({ keepRegulars: false, seed }); } catch (err) { assert.match(err.stack, /sizeInstanceBuffers/); }
   assert.ok(shop.world, 'the day opened');
 }
 
@@ -60,7 +60,7 @@ function tickRounds(dt, sit) {
   if (clocks.auto < S.autoSeconds || cast.some((rec) => rec.moveT < 1)) return;
   for (const n of shop.world.npcs) {
     const free = sit && shop.world.seats.find((s) => s.occupiedBy === null);
-    if (free && n.state === STATE.BROWSE && n.seat === null && !n.prescribed && Math.random() < 0.5)
+    if (free && n.state === STATE.BROWSE && n.seat === null && !n.prescribed && simRng() < 0.5)
       n.prescribed = { type: ACTION.WALK_TO_SEAT, params: { wip: n.wips[0].id, seatId: free.id } };
   }
   doAdvanceRound();
@@ -139,11 +139,9 @@ for (const k of [1, 2, 3]) {
 {
   const { items } = await import('./core/state.js');
   const { WIP_STATE, wantFor, stow } = await import('../wip.js');
-  const random = Math.random, rounds = [], seatToCraft = [];
+  const rounds = [], seatToCraft = [];
   for (let seed = 1; seed <= 50; seed++) {
-    let a = seed;   // mulberry32
-    Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-    open({ k: 1, tutorial: true });
+    open({ k: 1, tutorial: true, seed });
     const friend = shop.world.npcs[0];
     for (const kind of ['pattern', 'yarn', 'crochet-hook']) {
       const it = items.find((x) => x.name === kind && !x.gone);
@@ -182,7 +180,6 @@ for (const k of [1, 2, 3]) {
     assert.ok(onCounter() && shop.world.lent[0]?.wip === potHolder, `seed ${seed}: and is still there on day 4`);
     rounds.push(potHolder.finishedRound);
   }
-  Math.random = random;
   assert.ok(seatToCraft.length > 0 && seatToCraft.every((t) => t < 1.5),
     `the friend starts crocheting once seated, not a round later (${seatToCraft.map((t) => t.toFixed(2)).join(', ')}s)`);
   rounds.sort((x, y) => x - y);
@@ -216,7 +213,6 @@ for (const k of [1, 2, 3]) {
   const { addItem } = await import('./goods/stock.js');
   const { planTomorrow } = await import('./sim/world.js');
   const { makeStockNotion } = await import('../../inventory/catalog.js');
-  const random = Math.random;
   let emptyWalks = 0;
   const runDay = () => { for (let r = 0; r < 400 && shop.world.npcs.some((n) => n.state !== STATE.GONE); r++) {
     const stocked = new Set(items.filter((x) => !x.gone && !x.held).map((x) => x.display));
@@ -224,9 +220,7 @@ for (const k of [1, 2, 3]) {
     emptyWalks += shop.world.npcs.filter((n) => n.action?.type === ACTION.WALK_TO_DISPLAY && !stocked.has(n.action.params.displayId)).length;
   } };
   for (let seed = 1; seed <= 40; seed++) {
-    let a = seed;   // mulberry32
-    Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-    open({ k: 1, tutorial: true });
+    open({ k: 1, tutorial: true, seed });
     const friend = shop.world.npcs[0];
     runDay();
     const page = shop.world.guestbook.find((g) => g.npc === friend.name);
@@ -234,9 +228,7 @@ for (const k of [1, 2, 3]) {
   }
   let buried = 0;
   for (let seed = 1; seed <= 40; seed++) {
-    let a = seed;   // mulberry32
-    Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-    open({ k: 1, tutorial: true });
+    open({ k: 1, tutorial: true, seed });
     const friend = shop.world.npcs[0], pattern = items.find((x) => x.name === 'pattern');
     pattern.gone = true;
     stow(friend, pattern, wantFor(friend, pattern));
@@ -254,22 +246,18 @@ for (const k of [1, 2, 3]) {
       const roomy = seed % 2 ? addItem(table, 0, spec, { reserve: 1 }) : -1;
       const i = roomy >= 0 ? roomy : addItem(table, 0, spec);
       assert.ok(i >= 0, `seed ${seed}: room on the table`);
-      if (roomy >= 0) buried += addItem(table, 0, makeStockNotion(Math.random, 'darning-needle'),
+      if (roomy >= 0) buried += addItem(table, 0, makeStockNotion(simRng, 'darning-needle'),
         { c: items[i].c, r: items[i].r, shape: [items[i].w, items[i].h] }) >= 0;
     }
     runDay();
     const page = shop.world.guestbook.find((g) => g.npc === friend.name);
     assert.equal(page?.mood, 'happy', `seed ${seed}: the friend found the hook and ball on the table (${page?.tags})`);
   }
-  Math.random = random;
   assert.ok(buried >= 10, `only ${buried} wanted things were buried; the dig-out went untested`);
   assert.equal(emptyWalks, 0, 'nobody walks up to a display holding nothing to browse it');
 }
 
 {
-  let a = 1;   // mulberry32
-  const random = Math.random;
-  Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   open({ k: 1, tutorial: true });
   const buys = [], seen = new Map();
   run(240, { each: (rec, t) => {
@@ -278,7 +266,6 @@ for (const k of [1, 2, 3]) {
     seen.set(rec, n);
     for (const b of buys) if (b.rec === rec && t - b.t < 2.5 && rec.celebrate > 0) b.cheer += DT;
   } });
-  Math.random = random;
   assert.ok(buys.length >= 2, `tutorial day 1 has a second purchase to cheer (${buys.length})`);
   for (const b of buys) assert.ok(b.cheer >= 0.5, `${b.rec.npc.name} cheers buying ${b.what} at ${b.t.toFixed(1)}s (${b.cheer.toFixed(2)}s)`);
 }

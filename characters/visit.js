@@ -8,6 +8,7 @@ import {
 } from './wip.js';
 import { labelOf as labelItem, TOOL_NOTIONS } from '../inventory/catalog.js';
 import { placeWord, thankYou } from './guestbook.js';
+import { draw, hash } from './store/core/util.js';
 
 export const labelOf = labelItem;
 export { labelWant };
@@ -122,8 +123,9 @@ function leavingState() {
 /**
  * @param room   door, guestbook, queueAt and the walkable bounds
  * @param seats  [{ id, x, z, facing }], one per chair
+ * seed, day and attempt start the morning's dice at hash(seed, day, attempt); rng is for tests' scripted rolls
  */
-export function makeWorld({ displays, items, room, seats = [], rng = Math.random }) {
+export function makeWorld({ displays, items, room, seats = [], seed = 0, day = 0, attempt = 0, rng = null }) {
   return {
     round: 0,
     npcs: [],
@@ -136,10 +138,15 @@ export function makeWorld({ displays, items, room, seats = [], rng = Math.random
     lent: [],
     backPile: [],
     returning: [],
-    rng,
+    seed,
+    attempt,
+    rngState: hash(seed, day, attempt),
+    ...(rng && { rng }),
     log: [],
   };
 }
+
+const roll = (world) => world.rng?.() ?? draw(world);
 
 const freeSeats = (world, npc) =>
   world.seats.filter((s) => s.occupiedBy === null || s.occupiedBy === npc.id);
@@ -396,7 +403,7 @@ function displayWalks(npc, world) {
 }
 
 function npcWalks(npc, world, snapshot) {
-  if (!(world.rng() < approachChance(npc.traits))) return [];
+  if (!(roll(world) < approachChance(npc.traits))) return [];
   const others = snapshot.filter((o) => o.id !== npc.id && o.state === STATE.BROWSE);
   if (!others.length) return [];
   const closest = others.reduce((m, o) => (dist2(npc, o) < dist2(npc, m) ? o : m));
@@ -441,7 +448,7 @@ export function DetermineNextBrowseAction(npc, world, snapshot) {
   if (push) return push;
   const set = browseActionSet(npc, world, snapshot);
   if (!set.length) return null;
-  return set[Math.floor(world.rng() * set.length)];
+  return set[Math.floor(roll(world) * set.length)];
 }
 
 const cellsOf = (display, shelf) => {
@@ -553,7 +560,7 @@ function buyConsidered(npc, display, world) {
   npc.considering = null;
   if (!want) { remember(npc, `put ${index}`, { what: 'putBack', item: { ...item } }); return false; }
   item.gone = true;
-  rebuildPlane(display, items, item.shelf, onPlane(display, items, item.shelf));
+  rebuildPlane(display, items, item.shelf, onPlane(display, items, item.shelf).sort((a, b) => items[a].layer - items[b].layer));
   npc.restructured = npc.restructured.filter((id) => id !== display.id);
   const bought = { ...item, ...provenance(npc, display, world, item.shelf) };
   npc.bought.push(npc.carrying = bought);
@@ -812,7 +819,7 @@ const BROWSE = {
       npc.chatted = true;
       remember(npc, `chat ${near.id}`, { what: 'chat', with: near.name });
     }
-    npc.prescribed = near && world.rng() < keepChattingChance(npc.traits)
+    npc.prescribed = near && roll(world) < keepChattingChance(npc.traits)
       ? { type: ACTION.WAIT, params: {} }
       : null;
     say(world, npc, near ? 'stayed to keep chatting' : 'waited a round');
@@ -971,8 +978,8 @@ function randomSpot(world) {
   const { minX, maxX, minZ, maxZ } = world.room.bounds;
   for (let attempt = 0; attempt < 30; attempt++) {
     const p = {
-      x: minX + world.rng() * (maxX - minX),
-      z: minZ + world.rng() * (maxZ - minZ),
+      x: minX + roll(world) * (maxX - minX),
+      z: minZ + roll(world) * (maxZ - minZ),
     };
     if (inDoorway(world, p)) continue;
     const clearOfDisplays = world.displays.every((d) => d.solid === false ||

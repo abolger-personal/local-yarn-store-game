@@ -611,7 +611,7 @@ Build it once, in P2.
 - The supplier's full delivery is day 10's size (kits excluded); the minimum delivery is 2.
 - A yarn line's count is units, not boxes (YARN.md, "Units"): "5 units of yarn" is five skeins or
   fewer, bigger boxes, and a kit's yarn totals at least its pattern's units. **Open:** this shrank the
-  starting pile to ~14–21 boxes against the 24–30 above.
+  starting pile to 14–22 boxes (mean 17) against the 24–30 above.
 - The packing slip describes each slot's template, never the items: the catalog picks those on the
   day. A blank line is never offered as a kit, because a kit is not "count of" anything.
 

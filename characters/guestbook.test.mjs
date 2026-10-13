@@ -46,7 +46,7 @@ assert.equal(rows([{ what: 'putBack', item: yarn(), witnessed: false }])[1], 'tu
 assert.ok(rows([{ what: 'sat', pattern, witnessed: true }])[1].startsWith('sat and knitted on the hat pattern'));
 assert.equal(rows([{ what: 'sat', pattern, witnessed: false }])[1], 'sat and worked on a project');
 
-assert.deepEqual(bandLines(yarn({ weight: 'super-bulky', shape: 'cone' })), ['SUPER BULKY WEIGHT', 'WOOL', 'BLUE', 'CONE', '10 UNITS']);
+assert.deepEqual(bandLines(yarn({ weight: 'super-bulky', shape: 'cone' })), ['SUPER BULKY WEIGHT', 'WOOL', 'BLUE', 'CONE', '4 UNITS']);
 assert.deepEqual(bandLines({ ...pattern, title: 'Bird Brain Beanie', silhouette: 'beanie' }),
   ['BIRD BRAIN BEANIE', 'MAKES BEANIE HAT', '4.5MM KNITTING NEEDLES', 'TAKES 3 UNITS WORSTED WOOL']);
 assert.ok(bandLines({ ...pattern, yarnUnits: 1 }).includes('TAKES 1 UNIT WORSTED WOOL'), 'one unit reads singular, like a yarn band');

@@ -50,7 +50,7 @@ export const yarnWeight = (name) => YARN_WEIGHTS.find((w) => w.name === name);
 
 export const YARN_SHAPES = Object.freeze(['ball', 'cone', 'skein']);
 // YARN.md, "Units".
-export const SHAPE_UNITS = Object.freeze({ ball: 10, cone: 10, skein: 1 });
+export const SHAPE_UNITS = Object.freeze({ skein: 1, ball: 2, cone: 4 });
 
 // YARN.md, "Colour count".
 export const YARN_COLOR_COUNT = 48;

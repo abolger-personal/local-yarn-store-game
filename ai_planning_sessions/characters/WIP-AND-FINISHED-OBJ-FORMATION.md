@@ -5,7 +5,7 @@ A WIP is either: UNSTARTED, IN PROGRESS, FINISHED OBJECT, (or FROGGED, a post MV
 
 An UNSTARTED WIP slot at NPC Generation time is initialized with: 
 - 0 or 1 PATTERNS
-- 0 to 1 items of YARN (a yarn item is 1 to 10 units by its shape, inventory/YARN.md "Units". A pattern costs 1 to 8 units of its own recommended weight. See inventory/PATTERNS.md)
+- 0 to 1 items of YARN (a yarn item is 1 to 4 units by its shape, inventory/YARN.md "Units". A pattern costs 1 to 8 units of its own recommended weight. See inventory/PATTERNS.md)
 - 0 or 1 TOOL NOTIONS (crochet hook or knitting needles)
 - (POST MVP MECHANIC) 0 or 1 ACCESSORY NOTIONS (stitch markers)
 - 0 percent "progress to completion"

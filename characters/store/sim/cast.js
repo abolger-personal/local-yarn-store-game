@@ -1,4 +1,4 @@
-import { cast, displays, seats } from '../core/state.js';
+import { cast, displays, seats, shop } from '../core/state.js';
 import { cellRect } from '../../../inventory/notions.js';
 import { BANDS, TAILS, bandMatrix, familyExtent, tailMatrix, yarnFit }
   from '../../../inventory/yarn-geometry.js';
@@ -149,7 +149,8 @@ export function checkOutfit(rec) {
 function craftingWip(n) {
   if (n.action?.type !== ACTION.WORK_ON_WIP || n.seat === null) return null;
   const wip = n.wips.find((w) => w.id === n.action.params.wip);
-  return wip?.state === WIP_STATE.IN_PROGRESS ? wip : null;
+  return wip?.state === WIP_STATE.IN_PROGRESS ||
+    (wip?.state === WIP_STATE.FINISHED && wip.finishedRound === shop.world?.round) ? wip : null;
 }
 
 function craftFor(rec, wip) {

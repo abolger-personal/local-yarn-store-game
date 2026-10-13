@@ -156,6 +156,11 @@ for (const k of [1, 2, 3]) {
     for (let day = 1; day <= 3; day++) {
       if (day > 1) try { restart(); } catch (err) { assert.match(err.stack, /sizeInstanceBuffers/); }
       assert.ok(shop.world.npcs.includes(friend), `seed ${seed}: the friend comes in on day ${day}`);
+      if (day === 3 && seed === 1) {
+        let crocheted = 0;
+        run(200, { each: (rec) => { if (rec.npc === friend && rec.craft?.mode === 'crochet' && rec.craft.hands > 0.5) crocheted += DT; } });
+        assert.ok(crocheted > 5, `the friend is seen crocheting the round they finish it (${crocheted.toFixed(1)}s)`);
+      }
       for (let r = 0; r < 200 && shop.world.npcs.some((n) => n.state !== STATE.GONE); r++) doAdvanceRound();
       if (day < 3) assert.equal(potHolder.state, WIP_STATE.IN_PROGRESS, `seed ${seed}: not finished on day ${day} (${potHolder.progress}%)`);
     }

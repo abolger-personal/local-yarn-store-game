@@ -90,6 +90,8 @@ ACTIONS WITHOUT PRESCRIPTIONS:
         
     More than 1 "Work on a WIP" action can be added to the action set for choosing: more WIPs deliberately thus makes it more likely this action gets picked for a round.  
 
+    Every round of work is drawn as a whole round of knitting or crochet in the chair, the round that finishes the WIP included: the Guestbook's 🪑 is always something the player could have watched.
+
     PRESCRIBED NEXT ACTION: None
 
 - Wait a Round

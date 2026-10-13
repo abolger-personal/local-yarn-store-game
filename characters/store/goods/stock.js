@@ -1,10 +1,9 @@
 import { items } from '../core/state.js';
 import { rnd } from '../core/util.js';
-import { YARN_COLOR_COUNT } from '../../../inventory/catalog.js';
 import { fits, footprint, place } from '../../../inventory/grid.js';
 import { scatterYaw } from '../../../inventory/pick-place.js';
 import { yarnFit } from '../../../inventory/yarn-geometry.js';
-import { yarnColor } from '../../../inventory/yarn-look.js';
+import { YARN_PALETTE } from '../../../inventory/yarn-look.js';
 import { pick } from '../../npc.js';
 import { CAPACITY } from './items.js';
 import { YARN_FIT } from './yarn.js';
@@ -27,20 +26,7 @@ const PACKAGES = {
 
 const packageFor = (name) => pick(PACKAGES[name] ?? [[1, 1]]);
 
-const mulberry32 = (a) => () => {
-  a = (a + 0x6D2B79F5) | 0;
-  let t = Math.imul(a ^ (a >>> 15), 1 | a);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-};
-
-// inventory/YARN-ASSET-SPIKE.md §17: the palette
-export const YARN_COLORS = (() => {
-  const rng = mulberry32(0x105);
-  return Array.from({ length: YARN_COLOR_COUNT }, (_, i) =>
-    `#${yarnColor(rng, undefined,
-                  { hue: ((i + rng()) * 360) / YARN_COLOR_COUNT }).getHexString()}`);
-})();
+export const YARN_COLORS = YARN_PALETTE.map((p) => p.hex);
 
 const INK = '#241e22';
 

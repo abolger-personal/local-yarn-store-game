@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { YARN_COLOR_COUNT } from './catalog.js';
+import { mulberry32 } from '../characters/store/core/util.js';
 
 export const SHADING = Object.freeze(['matcap', 'toon', 'sheen', 'flat', 'silhouette']);
 
@@ -78,6 +80,25 @@ export function yarnColor(rng = Math.random, target = new THREE.Color(),
   }
   return oklchClamped(l, c, h, target);
 }
+
+function toOklch({ r, g, b }) {
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  const a = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s;
+  const bb = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
+  return { l: 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, c: Math.hypot(a, bb),
+           h: ((Math.atan2(bb, a) * 180) / Math.PI + 360) % 360 };
+}
+
+// YARN-ASSET-SPIKE.md §17: the palette, with each colour's OKLCH after the gamut clamp.
+export const YARN_PALETTE = (() => {
+  const rng = mulberry32(0x105);
+  return Array.from({ length: YARN_COLOR_COUNT }, (_, i) => {
+    const color = yarnColor(rng, undefined, { hue: ((i + rng()) * 360) / YARN_COLOR_COUNT });
+    return Object.freeze({ hex: `#${color.getHexString()}`, ...toOklch(color) });
+  });
+})();
 
 export function makeMatcap({
   // YARN-ASSET-SPIKE.md §8 and §16: near-white and achromatic.

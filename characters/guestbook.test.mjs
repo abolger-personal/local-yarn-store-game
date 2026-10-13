@@ -1,9 +1,21 @@
 import assert from 'node:assert/strict';
 import { TRAITS, makeNpc } from './visit.js';
 import { wantsOf } from './wip.js';
-import { bandCard, bandLines, entryRows, patternNeeds, placeWord, tagCard, thankYou } from './guestbook.js';
+import { bandCard, bandLines, colourWord, entryRows, patternNeeds, placeWord, tagCard, thankYou } from './guestbook.js';
 import { GLYPHS } from './store/ui/lettering.js';
 import { mulberry32 } from './store/core/util.js';
+import { YARN_PALETTE } from '../inventory/yarn-look.js';
+import { tutorialDay1 } from '../inventory/supply.js';
+
+const HUES = new Set(['pink', 'red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple']);
+const named = (i) => {
+  const { l, c, h } = YARN_PALETTE[i], word = colourWord(i);
+  if (HUES.has(word)) assert.ok(l <= 0.75 && c >= 0.08, `#${i} (L ${l.toFixed(2)} C ${c.toFixed(3)} h ${h.toFixed(0)}) is too pale or grey for "${word}"`);
+  if (/pale|peach/.test(word)) assert.ok(l > 0.75, `#${i} is not light enough for "${word}"`);
+};
+YARN_PALETTE.forEach((_, i) => named(i));
+assert.equal(colourWord(4), 'peach', 'the light salmon tutorial ball is not "red"');
+for (let seed = 1; seed <= 200; seed++) named(tutorialDay1(mulberry32(seed)).floor[1].colorIndex);
 
 const yarn = (extra) => ({ name: 'yarn', weight: 'worsted', material: 'wool', shape: 'ball', colorIndex: 32, ...extra });
 const pattern = { name: 'pattern', patternType: 'hat', craft: 'knitting', toolSize: 4.5, weight: 'worsted', materials: ['wool'], yarnUnits: 3 };
@@ -46,7 +58,7 @@ assert.equal(rows([{ what: 'putBack', item: yarn(), witnessed: false }])[1], 'tu
 assert.ok(rows([{ what: 'sat', pattern, witnessed: true }])[1].startsWith('sat and knitted on the hat pattern'));
 assert.equal(rows([{ what: 'sat', pattern, witnessed: false }])[1], 'sat and worked on a project');
 
-assert.deepEqual(bandLines(yarn({ weight: 'super-bulky', shape: 'cone' })), ['SUPER BULKY WEIGHT', 'WOOL', 'BLUE', 'CONE', '4 UNITS']);
+assert.deepEqual(bandLines(yarn({ weight: 'super-bulky', shape: 'cone' })), ['SUPER BULKY WEIGHT', 'WOOL', 'DUSTY BLUE', 'CONE', '4 UNITS']);
 assert.deepEqual(bandLines({ ...pattern, title: 'Bird Brain Beanie', silhouette: 'beanie' }),
   ['BIRD BRAIN BEANIE', 'MAKES BEANIE HAT', '4.5MM KNITTING NEEDLES', 'TAKES 3 UNITS WORSTED WOOL']);
 assert.ok(bandLines({ ...pattern, yarnUnits: 1 }).includes('TAKES 1 UNIT WORSTED WOOL'), 'one unit reads singular, like a yarn band');
@@ -62,7 +74,7 @@ for (let seed = 1; seed <= 40; seed++) {
   npc.bought.push(yarn(), { name: 'crochet-hook', size: 5 });
   const onNeedles = npc.wips.find((w) => w.pattern)?.pattern ?? pattern;
   npc.did.push({ what: 'sat', pattern: onNeedles, witnessed: false });
-  assert.equal(tagCard(npc).body, '<ul class="items"><li>WORSTED WOOL BALL, BLUE</li><li>CROCHET HOOK 5.0MM</li></ul>',
+  assert.equal(tagCard(npc).body, '<ul class="items"><li>WORSTED WOOL BALL, DUSTY BLUE</li><li>CROCHET HOOK 5.0MM</li></ul>',
     'an unwitnessed sit stays hidden; each thing bought is one list entry');
   npc.did[0].witnessed = true;
   const { head, body } = tagCard(npc);

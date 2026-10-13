@@ -20,6 +20,7 @@ import {
   makeMatcap,
   makePaperMatcap,
   yarnMaterial,
+  YARN_LOOK,
 } from '../../../inventory/yarn-look.js';
 import * as THREE from 'three';
 import { BOX_H, CELL } from '../core/config.js';
@@ -28,19 +29,7 @@ import { UP } from '../scene/room.js';
 import { levelFrame } from '../scene/displays.js';
 import { CAPACITY, FILL, _hide, _pos, _shadowMat, shadows } from './items.js';
 
-// inventory/YARN-ASSET-SPIKE.md §16: settled values, retuned in the demo, not here
-export const YARN = {
-  tier:   'low',
-  matcap: { base: '#f0ebe3', light: '#ffffff', shadow: '#4a3550', rim: 1.0, wrap: 0.55 },
-  paper:  { rim: 0.0, wrap: 0.22 },
-  hatch:  { freq: 26, depth: 0.16 },
-  outlineWidth: 0.016,
-  edgeColor: '#1b1418',
-  bandColor: '#f6efe1',
-};
-
-// inventory/YARN-ASSET-SPIKE.md §11: strand density per weight
-const HATCH_FOR_BULK = [1.8, 1.0, 0.62];
+export const YARN = YARN_LOOK;
 
 export const YARN_FIT = { cell: CELL, boxHeight: BOX_H, fill: FILL, tier: YARN.tier };
 
@@ -91,7 +80,7 @@ export function buildYarnMeshes() {
     const mesh = yarnInstances(bakeVertexAO(buildFamily(shape, YARN.tier)), yarnMat({ hatch: true }));
     addHatchScale(mesh, CAPACITY);
     yarnMeshes[shape] = mesh;
-    yarnHulls[shape] = makeHull(mesh, { color: YARN.edgeColor, width: YARN.outlineWidth });
+    yarnHulls[shape] = makeHull(mesh, YARN.outline);
     scene.add(yarnHulls[shape]);
   }
   bandMesh = yarnInstances(buildBand(YARN.tier), yarnMat({ paper: true }));
@@ -125,7 +114,7 @@ function paintWool(index, item) {
   mesh.setColorAt(index, _yarnCol.set(item.color));
   mesh.instanceColor.needsUpdate = true;
   const hs = mesh.userData.hatchScale;
-  hs.setX(index, HATCH_FOR_BULK[(item.w ?? 1) - 1] ?? 1);
+  hs.setX(index, YARN.hatchForBulk[(item.w ?? 1) - 1] ?? 1);
   hs.needsUpdate = true;
 }
 

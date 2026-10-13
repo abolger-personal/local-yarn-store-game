@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { makeDisplay, footprint, place, slotRect } from './grid.js';
 import { makePicker, settledBase } from './pick-place.js';
-import { buildFamily, restingSolid, yarnFit } from './yarn-geometry.js';
+import { buildFamily, familyExtent, restingSolid, yarnFit } from './yarn-geometry.js';
 import { SHAPE_UNITS } from './catalog.js';
 
 // a mouse: the half grab radius, the harder case
@@ -11,8 +11,8 @@ globalThis.innerWidth = W;
 globalThis.innerHeight = H;
 globalThis.matchMedia = () => ({ matches: false });
 
-// from characters/store/core/config.js; TABLE_Y from scene/displays.js
-const CELL = 0.20, BOX_H = 0.055, FILL = 0.9, TABLE_Y = 0.44;
+// from characters/store/core/config.js; TABLE_Y from scene/displays.js; TIER from goods/yarn.js
+const CELL = 0.20, BOX_H = 0.055, FILL = 0.9, TABLE_Y = 0.44, TIER = 'med';
 
 // ui/framing.js's camera: one slot ~56px tall
 function shopCamera() {
@@ -148,7 +148,7 @@ function screenOf(g, frame, camera, it, t) {
 }
 
 {
-  const G = { cell: CELL, boxHeight: BOX_H, fill: FILL, tier: 'low' };
+  const G = { cell: CELL, boxHeight: BOX_H, fill: FILL, tier: TIER };
   const solid = (it) => restingSolid(it.family, it, G);
   const opts = { layerY: (l) => l * BOX_H, solid };
   const stack = (spec) => {
@@ -167,9 +167,9 @@ function screenOf(g, frame, camera, it, t) {
     const [a, b] = [items[i], items[j]], [sa, sb] = [solid(a), solid(b)];
     const ra = slotRect(g, a.c, a.r, a.w, a.h), rb = slotRect(g, b.c, b.r, b.w, b.h);
     let min = Infinity;
-    for (let u = 0; u <= 80; u++)
-      for (let v = 0; v <= 80; v++) {
-        const x = ra.x + sa.r * (u / 40 - 1), z = ra.z + sa.r * (v / 40 - 1);
+    for (let u = 0; u <= 320; u++)
+      for (let v = 0; v <= 320; v++) {
+        const x = ra.x + sa.r * (u / 160 - 1), z = ra.z + sa.r * (v / 160 - 1);
         const d = base(i) + sa.bottom(x - ra.x, z - ra.z) - base(j) - sb.top(x - rb.x, z - rb.z);
         if (d < min) min = d;
       }
@@ -197,13 +197,15 @@ function screenOf(g, frame, camera, it, t) {
     for (let i = 0; i < g.index.count; i += 3) v += at(i).dot(at(i + 1).cross(at(i + 2)));
     return Math.abs(v) / 6;
   };
-  const grid = { cell: 0.2, boxHeight: 0.055, fill: 0.9, tier: 'low' };
+  const grid = { cell: 0.2, boxHeight: 0.055, fill: 0.9, tier: TIER };
   for (const size of [1, 2, 3]) {
-    const drawn = (shape) => { const f = yarnFit(shape, size, size, grid); return volume(buildFamily(shape, 'low')) * f.k * f.k * f.ky; };
-    for (const shape of Object.keys(SHAPE_UNITS)) {
-      const ratio = drawn(shape) / drawn('skein') / SHAPE_UNITS[shape];
-      assert.ok(ratio > 0.75 && ratio < 1.25, `${size}x${size} ${shape}: drawn volume follows its units (${ratio.toFixed(2)})`);
-    }
+    const drawn = (shape) => { const f = yarnFit(shape, size, size, grid); return volume(buildFamily(shape, TIER)) * f.k * f.k * f.ky; };
+    const cone = drawn('cone') / drawn('ball') / (SHAPE_UNITS.cone / SHAPE_UNITS.ball);
+    assert.ok(cone > 0.75 && cone < 1.25, `${size}x${size}: cone over ball follows units (${cone.toFixed(2)})`);
+    const skein = drawn('skein') / (drawn('ball') / SHAPE_UNITS.ball);
+    assert.ok(skein > 0.75, `${size}x${size}: a skein draws at least about its unit (${skein.toFixed(2)})`);
+    const f = yarnFit('skein', size, size, grid), [uw, uh] = familyExtent('skein', TIER);
+    assert.ok((f.ky * uh) / (f.k * uw) > 0.4, `${size}x${size}: skein is a hank, not a pancake`);
   }
 }
 

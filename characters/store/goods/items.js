@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { extendAtlas, makeField, makeEdge, makeShadows, makeBoxes, makeSizeAtlas } from '../../../inventory/notions.js';
+import { CARD_LOOK, extendAtlas, makeField, makeEdge, makeShadows, makeBoxes, makeSizeAtlas } from '../../../inventory/notions.js';
 import { HOOK_SIZES_MM } from '../../../inventory/catalog.js';
 import { scene } from '../scene/stage.js';
 import { PLACEHOLDER_ART } from './art.js';
@@ -25,12 +25,10 @@ export const _hide = new THREE.Matrix4().makeScale(0, 0, 0);
 
 export function buildItemMeshes(loaded) {
   atlas = extendAtlas(loaded, PLACEHOLDER_ART);
-  sideField = makeField(atlas.texture, CAPACITY * 4, { unlit: true, shade: 0.28 });
-  sideEdge = makeEdge(sideField, '#1b1418');
-  sideEdge.material.userData.uniforms.uGrow.value = 1.07;
-  fieldTop = makeField(atlas.texture, CAPACITY, { unlit: true, shade: 0.28 });
-  edgeTop = makeEdge(fieldTop, '#1b1418');
-  edgeTop.material.userData.uniforms.uGrow.value = 1.07;
+  sideField = makeField(atlas.texture, CAPACITY * 4, { unlit: true, shade: CARD_LOOK.shade });
+  sideEdge = makeEdge(sideField);
+  fieldTop = makeField(atlas.texture, CAPACITY, { unlit: true, shade: CARD_LOOK.shade });
+  edgeTop = makeEdge(fieldTop);
   shadows = makeShadows(CAPACITY);
   boxes = makeBoxes(CAPACITY, '#e7ddc9');
   sizeAtlas = makeSizeAtlas(HOOK_SIZES_MM.map((mm) => mm.toFixed(1)));

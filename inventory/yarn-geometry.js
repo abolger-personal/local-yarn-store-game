@@ -16,7 +16,7 @@ const SEG = {
 
 const v2 = (x, y) => new THREE.Vector2(x, y);
 
-const SKEIN_DEPTH = 2.6;
+const SKEIN_DEPTH = 1.6, SKEIN_LIFT = 0.8;
 
 const CAKE_PROFILE = [
   [0.08, 0.00], [0.48, 0.00], [0.50, 0.10], [0.50, 0.66], [0.46, 0.74], [0.20, 0.74], [0.14, 0.62],
@@ -48,9 +48,9 @@ const BUILDERS = {
 
   cone: (t) => new THREE.LatheGeometry(CONE_PROFILE, SEG.cone.w[t]),
 
-  // YARN-ASSET-SPIKE.md §15; YARN.md "Units": as deep as it is long, so it holds a unit's volume
+  // YARN-ASSET-SPIKE.md §15; YARN.md "Units": a hank half as tall as it is long, whatever its units
   skein: (t) => new THREE.TubeGeometry(
-    skeinCurve(0.35, 0.13, 0.17), SEG.skein.t[t], 0.125, SEG.skein.r[t], true).scale(1, 0.58, SKEIN_DEPTH),
+    skeinCurve(0.35, 0.13, 0.17), SEG.skein.t[t], 0.125, SEG.skein.r[t], true).scale(1, SKEIN_LIFT, SKEIN_DEPTH),
 
   // YARN-ASSET-SPIKE.md §15
   mini: (t) => new THREE.TubeGeometry(
@@ -96,7 +96,7 @@ export const BANDS = Object.freeze({
   cake:    { r: 0.53, y: 0.49, h: 0.34, axis: 'y' },
   // YARN-ASSET-SPIKE.md §11
   cone:    { r: 0.285, y: 0.28, h: 0.10, axis: 'y' },
-  skein:   { r: 0.215, rz: 0.215 * SKEIN_DEPTH, y: 0.50, h: 0.26, axis: 'x' },
+  skein:   { r: 0.37 * SKEIN_LIFT, rz: 0.215 * SKEIN_DEPTH, y: 0.50, h: 0.26, axis: 'x' },
   mini:    { r: 0.178, y: 0.50, h: 0.20, axis: 'x' },
 });
 
@@ -198,10 +198,13 @@ const volumePerUnit = (name, tier) => {
   return _perUnit.get(cacheKey);
 };
 
-/** YARN.md "Units": shrink each shop shape inside its footprint until drawn volume follows its units.
+const SCALED_TO_UNITS = ['ball', 'cone'];
+
+/** YARN.md "Units": shrink ball and cone inside their footprints until drawn volume follows their units;
+ * the skein fills its footprint.
  * @param {string} family @param {number|string} [tier] */
-export const unitScale = (family, tier = 1) => (SHAPE_UNITS[family] == null ? 1 : Math.cbrt(
-  Math.min(...Object.keys(SHAPE_UNITS).map((n) => volumePerUnit(n, tier))) / volumePerUnit(family, tier)));
+export const unitScale = (family, tier = 1) => (!SCALED_TO_UNITS.includes(family) ? 1 : Math.cbrt(
+  Math.min(...SCALED_TO_UNITS.map((n) => volumePerUnit(n, tier))) / volumePerUnit(family, tier)));
 
 /**
  * @param {string} family

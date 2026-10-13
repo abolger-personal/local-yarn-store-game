@@ -13,6 +13,8 @@ What's new in L.Y.S. — Local Yarn Store. [Play it here.](https://abolger-perso
 - Yarn comes in real amounts: a skein is 1 unit, a ball 2 and a cone 4, and each is drawn that
   much bigger. Labels, patterns and the packing slip all count in units, so one cone can cover a
   hat. The starting pile has fewer, bigger items.
+- Skeins stand up as tall, twisted hanks instead of flat squares, keeping the same shape at every
+  size, and yarn in the shop has a softer, tuned shading and outline.
 - A finished piece a customer lends the shop now sits on the counter beside the Guestbook, and
   stays there overnight.
 - Customers' delight is easier to spot: a bigger hop for everyone, a wagging tail on lions and

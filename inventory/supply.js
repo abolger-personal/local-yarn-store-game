@@ -29,7 +29,8 @@ function resolveTemplate({ kind, count = 1, weights = SHOP_RANGE.weights, family
     const first = yarnOf(rng, weights, fam);
     const pattern = stockPatternFor(first, rng);
     const balls = times(pattern.yarnUnits - 1, () => ({ ...yarnOf(rng, [first.weight], fam), material: first.material }));
-    return [pattern, first, ...balls];
+    const tool = { name: TOOL_FOR_CRAFT[pattern.craft], size: pattern.toolSize };
+    return [pattern, first, ...balls, tool, ...pattern.notions.map((name) => makeStockNotion(rng, name))];
   }
   throw new Error(`unknown template kind "${kind}"`);
 }
@@ -132,7 +133,7 @@ export function describeSlot({ template: { kind, count = 1, weights, family }, p
     yarn: [count === 1 ? 'unit of yarn' : 'units of yarn', `${weightWords(weights)}${fam}`],
     pattern: [count === 1 ? 'pattern' : 'patterns', `for ${weightWords(weights)}`],
     notion: [count === 1 ? 'notion' : 'notions', 'tools and accessories'],
-    kit: ['kit', `a pattern and its yarn, ${weightWords(weights)}, one colour family`],
+    kit: ['kit', `a pattern with its yarn, tool and notions, ${weightWords(weights)}, one colour family`],
   }[kind];
   if (!words) throw new Error(`unknown template kind "${kind}"`);
   return { count, item: words[0], detail: words[1], yours: Boolean(playerChoosable) };

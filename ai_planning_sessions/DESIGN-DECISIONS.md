@@ -605,9 +605,12 @@ Build it once, in P2.
 - Also testable — a fixed curve lets tests assert "by day 10 the player can build formation X".
 - Weights arrive over the script: worsted and dk on day 1, so sorting has a dimension from the
   start; bulky on day 5 and fingering on day 8, each as a "new weight" slot.
-- Notions are held back until day 4. Day 1's guaranteed formation is a kit: one pattern plus every
-  ball it needs, one weight and material, inside one colour family (colours vary within it, so a
-  multi-colour design still has its colours). A colour family is one sixth of the colour wheel.
+- Notions are held back until day 4, except inside a kit. Day 1's guaranteed formation is a kit:
+  one pattern plus every ball it needs, one weight and material, inside one colour family (colours
+  vary within it, so a multi-colour design still has its colours), plus the hook or needles in the
+  pattern's size and every notion it calls for. A kit is always complete; its pieces land scattered
+  in the delivery like other stock, for the player to put together. A colour family is one sixth
+  of the colour wheel.
 - The supplier's full delivery is day 10's size (kits excluded); the minimum delivery is 2.
 - The packing slip describes each slot's template, never the items: the catalog picks those on the
   day. A blank line is never offered as a kit, because a kit is not "count of" anything.

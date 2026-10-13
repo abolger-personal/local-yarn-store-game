@@ -2,6 +2,18 @@ import * as THREE from 'three';
 
 export const SHADING = Object.freeze(['matcap', 'toon', 'sheen', 'flat', 'silhouette']);
 
+// YARN-ASSET-SPIKE.md §16: tuned in stash-and-stuff.html; the shop and the demo both start here
+export const YARN_LOOK = Object.freeze({
+  tier:      'med',
+  matcap:    Object.freeze({ base: '#d9d1c4', light: '#ffffff', shadow: '#112718', rim: 1, wrap: 0.55 }),
+  paper:     Object.freeze({ rim: 1, wrap: 0.73 }),
+  hatch:     Object.freeze({ freq: 15, depth: 0.56 }),
+  // YARN-ASSET-SPIKE.md §11: strand density per weight
+  hatchForBulk: Object.freeze([1.8, 1.0, 0.62]),
+  outline:   Object.freeze({ width: 0.009, color: '#1b1418' }),
+  bandColor: '#f6efe1',
+});
+
 export function oklch(l, c, h, target = new THREE.Color()) {
   const a = c * Math.cos((h * Math.PI) / 180), b = c * Math.sin((h * Math.PI) / 180);
   const l_ = (l + 0.3963377774 * a + 0.2158037573 * b) ** 3;
@@ -79,14 +91,15 @@ export function yarnColor(rng = Math.random, target = new THREE.Color(),
   return oklchClamped(l, c, h, target);
 }
 
+/** @param {{base?: string, light?: string, shadow?: string, rim?: number, rimWidth?: number, wrap?: number,
+ *           size?: number}} [look] */
 export function makeMatcap({
-  // YARN-ASSET-SPIKE.md §8 and §16: near-white and achromatic.
-  base = '#f0ebe3',
-  light = '#ffffff',
-  shadow = '#4a3550',
-  rim = 0.55,
+  base = YARN_LOOK.matcap.base,
+  light = YARN_LOOK.matcap.light,
+  shadow = YARN_LOOK.matcap.shadow,
+  rim = YARN_LOOK.matcap.rim,
   rimWidth = 3.2,
-  wrap = 0.55,
+  wrap = YARN_LOOK.matcap.wrap,
   size = 128,
 } = {}) {
   const canvas = document.createElement('canvas');
@@ -126,7 +139,7 @@ function paintMatcap(img, size, { cb, cl, cs, rim, rimWidth, wrap }) {
 
 // YARN-ASSET-SPIKE.md §11: matte paper for the ball band.
 export const PAPER = Object.freeze({
-  base: '#ece7de', light: '#fffaf0', shadow: '#5b5060', rim: 0, rimWidth: 3.2, wrap: 0.22,
+  base: '#ece7de', light: '#fffaf0', shadow: '#5b5060', rimWidth: 3.2, ...YARN_LOOK.paper,
 });
 
 export const makePaperMatcap = (over = {}) => makeMatcap({ ...PAPER, ...over });
@@ -228,8 +241,9 @@ const HATCH_COLOR_FRAGMENT = `#include <color_fragment>
 /**
  * ponytail: one strand direction per family, taken from the UVs. A real ball is wound in crossing
  * passes; if that matters, the upgrade is a second modulation at an angle, not a texture.
+ * @param {any} material @param {{freq?: number, depth?: number}} [hatch]
  */
-export function applyHatching(material, { freq = 26, depth = 0.16 } = {}) {
+export function applyHatching(material, { freq = YARN_LOOK.hatch.freq, depth = YARN_LOOK.hatch.depth } = {}) {
   const uniforms = {
     uHatchFreq: { value: freq },
     uHatchDepth: { value: depth },
@@ -257,7 +271,8 @@ export function addHatchScale(mesh, capacity) {
   return attr;
 }
 
-export function makeHull(source, { color = '#211a20', width = 0.02 } = {}) {
+/** @param {any} source @param {{color?: string, width?: number}} [ink] */
+export function makeHull(source, { color = YARN_LOOK.outline.color, width = YARN_LOOK.outline.width } = {}) {
   const material = new THREE.MeshBasicMaterial({ color, side: THREE.BackSide });
   material.userData.uniforms = { uWidth: { value: width } };
   material.onBeforeCompile = (shader) => {

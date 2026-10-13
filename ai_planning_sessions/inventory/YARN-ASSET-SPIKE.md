@@ -336,6 +336,7 @@ only kind of evidence the rest of this document cannot produce.
 - **A medium-weight ink outline beats a hairline.**
 
 Both are now the defaults (`mcRim` 1.0, `outlineWidth` 0.016).
+Superseded 2026-10-12: outline width 0.009, ink colour `#1b1418` (`YARN_LOOK` in `yarn-look.js`, see §16).
 
 ### Fix
 
@@ -974,6 +975,11 @@ ACES gets to it.**
 Guarded: `lookcheck.mjs` now asserts the lit midtone is above 0.72, with the old mid-grey kept as a
 negative control, and separately asserts the shadow side still descends — a near-white matcap with
 no shadow would be flat, which is the opposite failure.
+
+**Retuned 2026-10-12** in the demo GUI, now `YARN_LOOK` in `yarn-look.js`, read by the demo and the shop: tier
+`med`, matcap `#d9d1c4` / `#ffffff` / `#112718`, rim 1, wrap 0.55; paper band rim 1, wrap 0.73; hatching 15
+strands at depth 0.56; ink outline 0.009, `#1b1418`. The new midtone sits below the near-white this section
+argued for; the shop's yarn bypasses tone mapping (`toneMapped = false` in `goods/yarn.js`), so exposure 0.95 stays demo-only.
 
 ### Yaw jitter, shared
 

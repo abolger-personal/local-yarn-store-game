@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { roomEnvironment } from './room-environment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
-  loadAtlas, cellRect, makeGridLines, makeField, makeEdge, makeShadows, makeBoxes, makeSizeAtlas,
+  CARD_LOOK, loadAtlas, cellRect, makeGridLines, makeField, makeEdge, makeShadows, makeBoxes, makeSizeAtlas,
   setInstance, placeMatrix, placeBoxMatrix, placeLabelMatrix,
 } from './notions.js';
 import {
@@ -15,7 +15,7 @@ import {
   YARN_FAMILIES, TIERS, BANDS, TAILS, buildFamily, buildBand, buildTail, bandMatrix, tailMatrix,
   familyFootprint, familyExtent, triangleCount, aspectDistance, yarnFit as sharedYarnFit,
 } from './yarn-geometry.js';
-import { SHADING, makeMatcap, makePaperMatcap, makeToonRamp, yarnMaterial, bakeVertexAO, makeHull,
+import { SHADING, YARN_LOOK, makeMatcap, makePaperMatcap, makeToonRamp, yarnMaterial, bakeVertexAO, makeHull,
          yarnColor, applyHatching, addHatchScale } from './yarn-look.js';
 
 // Relative to this module, not the page, so it still resolves when served below a site root (GitHub Pages).
@@ -43,31 +43,32 @@ const S = {
   showGrid:   true,
   liftHeight: 0.14,
   edge:       true,
-  edgeGrow:   1.07,
-  edgeColor:  '#1b1418',
-  shade:      0.28,
+  edgeGrow:   CARD_LOOK.edgeGrow,
+  edgeColor:  CARD_LOOK.edgeColor,
+  shade:      CARD_LOOK.shade,
 
   stock:      'yarn',
   shading:    'matcap',
-  tier:       'low',
+  tier:       YARN_LOOK.tier,
   familyRow:  true,
   yarnCount:  40,
   bands:      true,
   tails:      true,
   hatch:      true,
   paletteSpread: 1.0,
-  hatchFreq:  26,
-  hatchDepth: 0.16,
+  hatchFreq:  YARN_LOOK.hatch.freq,
+  hatchDepth: YARN_LOOK.hatch.depth,
   perWeight:  true,
   outline:    true,
-  outlineWidth: 0.016,   // YARN-ASSET-SPIKE.md §8
-  mcBase:     '#f0ebe3',   // YARN-ASSET-SPIKE.md §16: near-white, the matcap multiplies albedo
-  mcLight:    '#ffffff',
-  mcShadow:   '#4a3550',
-  mcRim:      1.0,
-  paperRim:   0.0,
-  paperWrap:  0.22,
-  mcWrap:     0.55,
+  outlineWidth: YARN_LOOK.outline.width,
+  inkColor:   YARN_LOOK.outline.color,
+  mcBase:     YARN_LOOK.matcap.base,
+  mcLight:    YARN_LOOK.matcap.light,
+  mcShadow:   YARN_LOOK.matcap.shadow,
+  mcRim:      YARN_LOOK.matcap.rim,
+  paperRim:   YARN_LOOK.paper.rim,
+  paperWrap:  YARN_LOOK.paper.wrap,
+  mcWrap:     YARN_LOOK.matcap.wrap,
   toonSteps:  3,
 };
 
@@ -304,9 +305,7 @@ const _q = new THREE.Quaternion();
 const _s3 = new THREE.Vector3();
 const _p3 = new THREE.Vector3();
 
-// YARN-ASSET-SPIKE.md §11
-const HATCH_FOR_BULK = [1.8, 1.0, 0.62];
-const hatchScaleOf = (item) => (S.perWeight ? HATCH_FOR_BULK[(item.bulk ?? 1) - 1] : 1);
+const hatchScaleOf = (item) => (S.perWeight ? YARN_LOOK.hatchForBulk[(item.bulk ?? 1) - 1] : 1);
 
 const yarnFit = (family, bulk) =>
   sharedYarnFit(family, ...familyFootprint(family, bulk),
@@ -332,7 +331,7 @@ function buildFamilyMesh(f) {
   mesh.userData.owner = [];
   if (mesh.material.userData.hatch) addHatchScale(mesh, YARN_CAPACITY);
   yarnMeshes[f] = mesh;
-  yarnHulls[f] = makeHull(mesh, { color: S.edgeColor, width: S.outlineWidth });
+  yarnHulls[f] = makeHull(mesh, { color: S.inkColor, width: S.outlineWidth });
   scene.add(yarnHulls[f]);
 }
 
@@ -409,7 +408,7 @@ function paintYarnDetails(item) {
     const bm = bandMatrix(item.family, _bandLocal);
     bandMesh.setMatrixAt(item.bandSlot, bm.premultiply(_yarnMat));
     bandMesh.instanceMatrix.needsUpdate = true;
-    bandMesh.setColorAt(item.bandSlot, _yarnCol.set('#f6efe1'));
+    bandMesh.setColorAt(item.bandSlot, _yarnCol.set(YARN_LOOK.bandColor));
     bandMesh.instanceColor.needsUpdate = true;
   }
 
@@ -888,6 +887,13 @@ gLook.add(S, 'shade', 0, 0.8, 0.01).name('gradient').onChange((v) => {
 gLook.add(S, 'exposure', 0.2, 2, 0.01).name('exposure')
   .onChange((v) => { renderer.toneMappingExposure = v; });
 
+const gEdge = gLook.addFolder('card edge');
+const edges = () => [edge, edgeTop];
+gEdge.add(S, 'edge').name('enabled').onChange((v) => edges().forEach((e) => { e.visible = v; }));
+gEdge.add(S, 'edgeGrow', 1.0, 1.30, 0.005).name('width')
+  .onChange((v) => edges().forEach((e) => { e.material.userData.uniforms.uGrow.value = v; }));
+gEdge.addColor(S, 'edgeColor').name('colour').onChange((v) => edges().forEach((e) => e.material.color.set(v)));
+
 const remakeMatcap = () => {
   matcapTex?.dispose();
   paperTex?.dispose();
@@ -938,13 +944,9 @@ gHull.add(S, 'outline').name('enabled').onChange(applyShading);
 gHull.add(S, 'outlineWidth', 0, 0.05, 0.001).name('width').onChange((v) => {
   for (const f of YARN_FAMILIES) yarnHulls[f].material.userData.uniforms.uWidth.value = v;
 });
-
-const gEdge = gui.addFolder('thickness / outline');
-const edges = () => [edge, edgeTop];
-gEdge.add(S, 'edge').name('enabled').onChange((v) => edges().forEach((e) => { e.visible = v; }));
-gEdge.add(S, 'edgeGrow', 1.0, 1.30, 0.005).name('outline width')
-  .onChange((v) => edges().forEach((e) => { e.material.userData.uniforms.uGrow.value = v; }));
-gEdge.addColor(S, 'edgeColor').name('colour').onChange((v) => edges().forEach((e) => e.material.color.set(v)));
+gHull.addColor(S, 'inkColor').name('colour').onChange((v) => {
+  for (const f of YARN_FAMILIES) yarnHulls[f].material.color.set(v);
+});
 
 const KEY_ACTIONS = new Map([
   ['g', () => { S.showGrid = !S.showGrid; paintActivePlane(); }],

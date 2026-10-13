@@ -120,6 +120,9 @@ function patchAtlasUV(material, extraVertex = '', extraFragment = '') {
 
 const uniform = (value) => ({ value });
 
+// DESIGN-DECISIONS.md "Thickness comes from an edge pass": the shop and the demo both start here
+export const CARD_LOOK = Object.freeze({ shade: 0.28, edgeColor: '#1b1418', edgeGrow: 1.07 });
+
 export function notionMaterial(texture, { unlit = true, shade = 0 } = {}) {
   const Material = unlit ? THREE.MeshBasicMaterial : THREE.MeshStandardMaterial;
   const material = new Material({
@@ -134,7 +137,7 @@ export function notionMaterial(texture, { unlit = true, shade = 0 } = {}) {
   return material;
 }
 
-export function makeEdge(field, color = '#1b1418') {
+export function makeEdge(field, color = CARD_LOOK.edgeColor) {
   const material = new THREE.MeshBasicMaterial({
     map: field.material.map,
     color: new THREE.Color(color),
@@ -145,7 +148,7 @@ export function makeEdge(field, color = '#1b1418') {
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1,
   });
-  material.userData.uniforms = { uGrow: uniform(1.06), uShade: uniform(0) };
+  material.userData.uniforms = { uGrow: uniform(CARD_LOOK.edgeGrow), uShade: uniform(0) };
   patchAtlasUV(material, 'transformed.xy *= uGrow;');
 
   const edge = new THREE.InstancedMesh(field.geometry, material, field.instanceMatrix.count);

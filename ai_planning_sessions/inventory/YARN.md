@@ -24,11 +24,12 @@ Every yarn also needs a **held** design with a flat ball band, and knitting need
 A yarn's units come from its shape, so a bigger-looking yarn is more yarn: **skein 1, ball 2,
 cone 4** (`SHAPE_UNITS` in `inventory/catalog.js`; `yarnUnits(item)` is the one reader).
 
-- Units are set by design and the models follow them (2026-10-12): `yarnFit` shrinks each shape
-  inside its footprint (`unitScale`) until its drawn mesh volume per unit matches the roomiest
-  shape's, and the skein is built as deep as it is long so it fills its footprint. Measured at
-  every weight: skein 1, ball 2.2–2.4, cone 3.9. Never wider than the footprint, never stretched
-  to the layer grid, so no new layers.
+- Units are set by design and the models follow them (2026-10-12): `yarnFit` shrinks ball and cone
+  inside their footprints (`unitScale`) until their drawn volumes run 2:4. Never wider than the
+  footprint, never stretched to the layer grid.
+- The skein is exempt: it is drawn as a twisted hank half as tall as it is long (h/w 0.46–0.50,
+  2, 3 and 5 layers at 1x1, 2x2, 3x3), so a bulky skein no longer fits a wall shelf. It draws at
+  about 0.9 of its one unit; the look wins over the volume (user ruling, 2026-10-12).
 - Weight never changes units: it sets the footprint (lace/fingering/sport 1x1, dk/worsted/aran 2x2,
   bulky 3x3), which is thicker yarn being bulkier, not more of it.
 - Everything adds units, never items: a pattern's cost, a customer's shortfall (they buy until held

@@ -19,6 +19,22 @@ Every yarn also needs a **held** design with a flat ball band, and knitting need
 
 - A rigging note here is that all yarn should look "right" when held by the NPCs: knitting in particular is a 2 handed operation. It would be ok to have a specific visual design per notion of what it looks like being *held*, which could even come with a pose (sitting at a spinning wheel, holding up a drop spindle, sitting or standing knitting with 2 hands, crochet with 1 hand, etc.)
 
+## Units
+
+A yarn's units come from its shape, so a bigger-looking yarn is more yarn: **skein 1, ball 2,
+cone 4** (`SHAPE_UNITS` in `inventory/catalog.js`; `yarnUnits(item)` is the one reader).
+
+- Units are set by design and the models follow them (2026-10-12): `yarnFit` shrinks each shape
+  inside its footprint (`unitScale`) until its drawn mesh volume per unit matches the roomiest
+  shape's, and the skein is built as deep as it is long so it fills its footprint. Measured at
+  every weight: skein 1, ball 2.2–2.4, cone 3.9. Never wider than the footprint, never stretched
+  to the layer grid, so no new layers.
+- Weight never changes units: it sets the footprint (lace/fingering/sport 1x1, dk/worsted/aran 2x2,
+  bulky 3x3), which is thicker yarn being bulkier, not more of it.
+- Everything adds units, never items: a pattern's cost, a customer's shortfall (they buy until held
+  units reach it; the leftover stays theirs), a kit (its yarn totals at least the pattern's cost), and
+  an order line ("N units of yarn" delivers exactly N, finishing with skeins).
+
 ## Colour count
 
 48 distinct colours (`YARN_COLOR_COUNT`): enough for a rainbow wall, the "overwhelming variety"

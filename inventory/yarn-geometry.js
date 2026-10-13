@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SHAPE_UNITS } from './catalog.js';
 
 export const TIERS = Object.freeze(['chunky', 'low', 'med']);
 export const tierIndex = (t) => Math.max(0, TIERS.indexOf(t));
@@ -14,6 +15,8 @@ const SEG = {
 };
 
 const v2 = (x, y) => new THREE.Vector2(x, y);
+
+const SKEIN_DEPTH = 2.6;
 
 const CAKE_PROFILE = [
   [0.08, 0.00], [0.48, 0.00], [0.50, 0.10], [0.50, 0.66], [0.46, 0.74], [0.20, 0.74], [0.14, 0.62],
@@ -45,9 +48,9 @@ const BUILDERS = {
 
   cone: (t) => new THREE.LatheGeometry(CONE_PROFILE, SEG.cone.w[t]),
 
-  // YARN-ASSET-SPIKE.md §15
+  // YARN-ASSET-SPIKE.md §15; YARN.md "Units": as deep as it is long, so it holds a unit's volume
   skein: (t) => new THREE.TubeGeometry(
-    skeinCurve(0.35, 0.13, 0.17), SEG.skein.t[t], 0.125, SEG.skein.r[t], true).scale(1, 0.58, 1),
+    skeinCurve(0.35, 0.13, 0.17), SEG.skein.t[t], 0.125, SEG.skein.r[t], true).scale(1, 0.58, SKEIN_DEPTH),
 
   // YARN-ASSET-SPIKE.md §15
   mini: (t) => new THREE.TubeGeometry(
@@ -93,7 +96,7 @@ export const BANDS = Object.freeze({
   cake:    { r: 0.53, y: 0.49, h: 0.34, axis: 'y' },
   // YARN-ASSET-SPIKE.md §11
   cone:    { r: 0.285, y: 0.28, h: 0.10, axis: 'y' },
-  skein:   { r: 0.215, y: 0.50, h: 0.26, axis: 'x' },
+  skein:   { r: 0.215, rz: 0.215 * SKEIN_DEPTH, y: 0.50, h: 0.26, axis: 'x' },
   mini:    { r: 0.178, y: 0.50, h: 0.20, axis: 'x' },
 });
 
@@ -114,7 +117,7 @@ const _tz = new THREE.Matrix4();
 export function bandMatrix(name, target = new THREE.Matrix4()) {
   const b = BANDS[name];
   if (!b) return null;
-  target.makeScale(b.r, b.h, b.r);
+  target.makeScale(b.r, b.h, b.rz ?? b.r);
   if (b.axis === 'x') target.premultiply(_rz.makeRotationZ(Math.PI / 2));
   return target.premultiply(_tz.makeTranslation(0, b.y * familyHeight(name), 0));
 }
@@ -140,7 +143,7 @@ export const TAILS = Object.freeze({
   // YARN-ASSET-SPIKE.md §10
   ball:    { at: [0.22, 0.88, 0.17], size: 0.26, spin: 0.6 },
   cake:    { at: [0.00, 0.74, 0.00], size: 0.32, spin: 0.0 },
-  skein:   { at: [0.34, 0.44, 0.10], size: 0.26, spin: 2.2 },
+  skein:   { at: [0.34, 0.44, 0.10 * SKEIN_DEPTH], size: 0.26, spin: 2.2 },
   mini:    { at: [0.22, 0.46, 0.08], size: 0.20, spin: 2.0 },
   cone:    null,
 });
@@ -175,6 +178,31 @@ export function familyExtent(name, tier = 1) {
 // YARN-ASSET-SPIKE.md §14: squash to meet the layer grid, never stretch.
 export const SETTLE_MIN = 0.82;
 
+function meshVolume(g) {
+  const p = g.attributes.position, idx = g.index, n = idx ? idx.count : p.count;
+  const at = (i) => new THREE.Vector3().fromBufferAttribute(p, idx ? idx.getX(i) : i);
+  let v = 0;
+  for (let i = 0; i < n; i += 3) v += at(i).dot(at(i + 1).cross(at(i + 2)));
+  return Math.abs(v) / 6;
+}
+
+const _perUnit = new Map();
+const volumePerUnit = (name, tier) => {
+  const cacheKey = `${name}@${tier}`;
+  if (!_perUnit.has(cacheKey)) {
+    const g = buildFamily(name, tier);
+    const [uw, , ud] = familyExtent(name, tier);
+    _perUnit.set(cacheKey, meshVolume(g) / Math.max(uw, ud) ** 3 / SHAPE_UNITS[name]);
+    g.dispose();
+  }
+  return _perUnit.get(cacheKey);
+};
+
+/** YARN.md "Units": shrink each shop shape inside its footprint until drawn volume follows its units.
+ * @param {string} family @param {number|string} [tier] */
+export const unitScale = (family, tier = 1) => (SHAPE_UNITS[family] == null ? 1 : Math.cbrt(
+  Math.min(...Object.keys(SHAPE_UNITS).map((n) => volumePerUnit(n, tier))) / volumePerUnit(family, tier)));
+
 /**
  * @param {string} family
  * @param {number} footW
@@ -185,7 +213,7 @@ export const SETTLE_MIN = 0.82;
 export function yarnFit(family, footW, footD,
                         { cell, boxHeight, fill = 0.9, tier = 1, settleMin = SETTLE_MIN }) {
   const [uw, uh, ud] = familyExtent(family, tier);
-  const k = Math.min((footW * cell * fill) / uw, (footD * cell * fill) / ud);
+  const k = unitScale(family, tier) * Math.min((footW * cell * fill) / uw, (footD * cell * fill) / ud);
   const natural = k * uh;
   const layers = Math.max(1, Math.ceil((natural * settleMin) / boxHeight));
   const settle = Math.min(1, (layers * boxHeight) / natural);

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mulberry32 } from './store/core/util.js';
 import {
-  PATTERN_TYPES, YARN_WEIGHTS, yarnUnits, makeYarn, makePattern, makeNotion, labelOf,
+  PATTERN_TYPES, YARN_WEIGHTS, SHAPE_UNITS, yarnUnits, makeYarn, makePattern, makeNotion, labelOf,
   SIZED_NOTIONS, NOTION_NAMES, PATTERN_TITLES, PATTERN_DESIGNS, SHOP_RANGE, makeStockPattern,
   stockPatternFor, CRAFTS, CRAFT_TERMS,
 } from '../inventory/catalog.js';
@@ -30,8 +30,9 @@ const npcWith = (wips, over = {}) => ({
   assert.deepEqual(cost, { sweater: 8, shawl: 5, scarf: 4, bag: 4, hat: 3, socks: 2, potholder: 1 });
   assert.ok(Object.values(cost).every((n) => n >= 1 && n <= 8), '"never more than 8"');
 
-  assert.equal(yarnUnits({ name: 'yarn', w: 1, h: 1 }), 1);
-  assert.equal(yarnUnits({ name: 'yarn', w: 3, h: 3 }), 1, 'a bulky ball is still one item');
+  assert.equal(yarnUnits({ name: 'yarn', shape: 'skein', w: 1, h: 1 }), 1, 'a skein is the unit');
+  assert.equal(yarnUnits({ name: 'yarn', shape: 'skein', w: 3, h: 3 }), 1, 'a bulky skein is still one: weight is not amount');
+  assert.equal(yarnUnits({ name: 'yarn', shape: 'cone', w: 1, h: 1 }), SHAPE_UNITS.cone, 'a cone is its shape\'s units');
   assert.equal(yarnUnits({ name: 'crochet-hook', w: 3, h: 3 }), 0, 'a hook is not yarn');
 
   assert.equal(YARN_WEIGHTS.find((w) => w.name === 'lace').size, 1);
@@ -85,6 +86,10 @@ const npcWith = (wips, over = {}) => ({
   wip.yarn.push({ ...ball }, { ...ball });
   assert.equal(unitsShort(wip), 0, 'three balls is the whole hat');
   assert.deepEqual(wantsOf(npc), [], 'and nothing is wanted any more');
+
+  wip.yarn = [{ ...ball, shape: 'cone' }];
+  assert.equal(unitsShort(wip), 0, 'one cone covers a three-unit hat');
+  assert.ok(!wantsOf(npc).some((w) => w.kind === 'yarn'), 'so no second cone is wanted');
 }
 
 {
@@ -483,7 +488,7 @@ const npcWith = (wips, over = {}) => ({
 
 {
   const pattern = { yarnUnits: 4 };
-  const ball = makeYarn(seq(0));
+  const ball = { ...makeYarn(seq(0)), shape: 'skein' };
   const per = yarnUnits(ball);
   const wip = (progress, balls) => ({ pattern, progress, yarn: Array.from({ length: balls }, () => ball) });
   assert.equal(runningOut(wip(0, 1)), false, 'just cast on, yarn in hand');

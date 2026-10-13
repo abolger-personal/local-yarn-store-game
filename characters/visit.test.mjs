@@ -14,7 +14,7 @@ const PATTERN = (over = {}) => ({
   toolSize: 4.5, weight: 'bulky', materials: ['wool'], w: 2, h: 2, ...over,
 });
 const YARN = (over = {}) => ({
-  name: 'yarn', material: 'wool', weight: 'bulky', shape: 'ball', colorIndex: 0, w: 3, h: 3, ...over,
+  name: 'yarn', material: 'wool', weight: 'bulky', shape: 'skein', colorIndex: 0, w: 3, h: 3, ...over,
 });
 const WIP = (over = {}) => ({
   id: 'WIP 1', state: WIP_STATE.UNSTARTED, pattern: PATTERN(), yarn: [YARN(), YARN(), YARN()], tool: null,

@@ -10,6 +10,9 @@ What's new in L.Y.S. — Local Yarn Store. [Play it here.](https://abolger-perso
 - The packing slip writes each of your lines as what you've picked, "supplier's choice" until you
   change it, and the quantities vary, so stock is something to plan. You take over the slip
   gradually: one line on night 2, two on night 3, all of it from night 4.
+- Yarn comes in real amounts: a skein is 1 unit, a ball 2 and a cone 4, and each is drawn that
+  much bigger. Labels, patterns and the packing slip all count in units, so one cone can cover a
+  hat. The starting pile has fewer, bigger items.
 - A finished piece a customer lends the shop now sits on the counter beside the Guestbook, and
   stays there overnight.
 - Customers' delight is easier to spot: a bigger hop for everyone, a wagging tail on lions and

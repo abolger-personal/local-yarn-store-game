@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { makeDisplay, footprint, place, slotRect } from './grid.js';
 import { makePicker, settledBase } from './pick-place.js';
-import { restingSolid, yarnFit } from './yarn-geometry.js';
+import { buildFamily, restingSolid, yarnFit } from './yarn-geometry.js';
+import { SHAPE_UNITS } from './catalog.js';
 
 // a mouse: the half grab radius, the harder case
 const W = 1440, H = 900;
@@ -187,6 +188,23 @@ function screenOf(g, frame, camera, it, t) {
   const tower = stack([['ball', 2, 1, 1], ['ball', 2, 2, 2], [null, 1, 3, 3]]);
   assert.ok(tower.base(2) < tower.items[2].layer * BOX_H - 0.1, 'the box came down with the ball under it');
   assert.ok(Math.abs(clearance(tower, 2, 1)) < 0.003, 'and still sits on it');
+}
+
+{
+  const volume = (g) => {
+    const p = g.attributes.position, at = (i) => new THREE.Vector3().fromBufferAttribute(p, g.index.getX(i));
+    let v = 0;
+    for (let i = 0; i < g.index.count; i += 3) v += at(i).dot(at(i + 1).cross(at(i + 2)));
+    return Math.abs(v) / 6;
+  };
+  const grid = { cell: 0.2, boxHeight: 0.055, fill: 0.9, tier: 'low' };
+  for (const size of [1, 2, 3]) {
+    const drawn = (shape) => { const f = yarnFit(shape, size, size, grid); return volume(buildFamily(shape, 'low')) * f.k * f.k * f.ky; };
+    for (const shape of Object.keys(SHAPE_UNITS)) {
+      const ratio = drawn(shape) / drawn('skein') / SHAPE_UNITS[shape];
+      assert.ok(ratio > 0.75 && ratio < 1.25, `${size}x${size} ${shape}: drawn volume follows its units (${ratio.toFixed(2)})`);
+    }
+  }
 }
 
 console.log('pick-place.js self-check: all assertions passed');

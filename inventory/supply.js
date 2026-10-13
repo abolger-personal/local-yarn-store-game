@@ -2,8 +2,8 @@
 
 import { anySlot, fits, place } from './grid.js';
 import { mulberry32 } from '../characters/store/core/util.js';
-import { SHOP_RANGE, TOOL_FOR_CRAFT, YARN_COLOR_COUNT, makeStockNotion, makeStockPattern, makeYarn, stockPatternFor }
-  from './catalog.js';
+import { SHOP_RANGE, TOOL_FOR_CRAFT, YARN_COLOR_COUNT, makeStockNotion, makeStockPattern, makeYarn, stockPatternFor,
+  yarnUnits } from './catalog.js';
 
 const pickFrom = (list, rng) => list[Math.floor(rng() * list.length)];
 
@@ -20,16 +20,27 @@ function yarnOf(rng, weights, family = null) {
 
 const times = (n, f) => Array.from({ length: n }, f);
 
+function yarnTotalling(units, make) {
+  const out = [];
+  for (let left = units; left > 0; left -= yarnUnits(out.at(-1))) {
+    const y = make();
+    if (yarnUnits(y) > left) y.shape = 'skein';
+    out.push(y);
+  }
+  return out;
+}
+
 function resolveTemplate({ kind, count = 1, weights = SHOP_RANGE.weights, family = false }, rng) {
   const fam = family || kind === 'kit' ? Math.floor(rng() * FAMILIES) : null;
-  if (kind === 'yarn') return times(count, () => yarnOf(rng, weights, fam));
+  if (kind === 'yarn') return yarnTotalling(count, () => yarnOf(rng, weights, fam));
   if (kind === 'pattern') return times(count, () => stockPatternFor(yarnOf(rng, weights), rng));
   if (kind === 'notion') return times(count, () => makeStockNotion(rng));
   if (kind === 'kit') {
     const first = yarnOf(rng, weights, fam);
     const pattern = stockPatternFor(first, rng);
-    const balls = times(pattern.yarnUnits - 1, () => ({ ...yarnOf(rng, [first.weight], fam), material: first.material }));
-    return [pattern, first, ...balls];
+    const more = yarnTotalling(pattern.yarnUnits - yarnUnits(first),
+      () => ({ ...yarnOf(rng, [first.weight], fam), material: first.material }));
+    return [pattern, first, ...more];
   }
   throw new Error(`unknown template kind "${kind}"`);
 }

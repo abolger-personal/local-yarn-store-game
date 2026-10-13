@@ -31,7 +31,7 @@ performance"* was right, and is now proven rather than asserted.
 
 ## 2. Decision: merchandise is instanced, one `InstancedMesh` per geometry family
 
-**Seven 3D families** (skein, ball, cake, hank, cone, mini-skein, booklet) plus **one billboard
+**3D yarn families** (skein, ball, cake, hank, cone, mini-skein; the booklet was dropped 2026-10-12, see PATTERNS.md) plus **one billboard
 family** for every notion, covering the entire shop — eight nodes, eight draw calls, eight
 materials, at any item count.
 
@@ -204,7 +204,7 @@ Back to the original scope — this is a merchandise and arrangement spike, not 
    The skein is the hero shape and deserves the most iteration.
 2. **A display with a slot grid**, and placement by raycasting the slot plane rather than the items.
 3. **The 1000-item wall**, checked for *sameyness* rather than frame rate — the perf question is
-   already answered.
+   already answered. **Passed 2026-10-12.**
 4. **A notion atlas** with 2-3 visual treatments (outline / gold / sparkle) to choose between, and
    the billboard facing mode settled against an orbiting camera.
 5. **One two-handed held notion**, purely to surface the `clampArmOut` conflict early while it is
@@ -331,5 +331,6 @@ Three things worth carrying forward from it:
 
 ### Not started
 
-Carrying a notion in the hand properly (section 4). And the 1000-item
-sameyness check: the tooling exists (one button in the demo), but nobody has looked at it yet.
+Carrying a notion in the hand properly (section 4).
+
+The 1000-item sameyness check **passed** (2026-10-12, by eye on the stash demo's "the 1000-item wall").

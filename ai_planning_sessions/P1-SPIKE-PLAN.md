@@ -44,7 +44,7 @@ Minimum eight. Different **silhouettes** are what break clone-stamping — not d
 4. **Hank** (untwisted loop) — flattened, draped torus.
 5. **Cone** (mill end / weaving yarn) — `LatheGeometry` cone.
 6. **Mini-skein** — scaled skein variant; must read as distinct, since these come in bundles.
-7. **Pattern booklet** — thin box plus cover plane. A completely different silhouette, and therefore
+7. ~~**Pattern booklet**~~ (dropped 2026-10-12: it read as a pattern or notion box; patterns are pattern boxes, PATTERNS.md) — thin box plus cover plane. A completely different silhouette, and therefore
    excellent for visual rhythm on a dense shelf.
 8. **Notions** — needles (cylinder pairs), hooks (cylinder plus bent tip), buttons (short cylinder),
    scissors, stitch markers, tape measure.

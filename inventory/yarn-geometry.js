@@ -3,7 +3,7 @@ import * as THREE from 'three';
 export const TIERS = Object.freeze(['chunky', 'low', 'med']);
 export const tierIndex = (t) => Math.max(0, TIERS.indexOf(t));
 
-export const YARN_FAMILIES = Object.freeze(['ball', 'cake', 'skein', 'cone', 'mini', 'booklet']);
+export const YARN_FAMILIES = Object.freeze(['ball', 'cake', 'skein', 'cone', 'mini']);
 
 const SEG = {
   ball:    { w: [8, 12, 16], h: [6, 8, 12] },
@@ -53,7 +53,6 @@ const BUILDERS = {
   mini: (t) => new THREE.TubeGeometry(
     skeinCurve(0.20, 0.082, 0.155), SEG.mini.t[t], 0.115, SEG.mini.r[t], true).scale(1, 0.50, 1),
 
-  booklet: () => new THREE.BoxGeometry(0.68, 0.90, 0.11),
 };
 
 function seat(g) {
@@ -78,7 +77,6 @@ export const FAMILY_FOOTPRINT = Object.freeze({
   cone:    [1, 1],
   skein:   [2, 1],
   mini:    [1, 1],
-  booklet: [1, 1],
 });
 
 /** @returns {[number, number]} */
@@ -97,7 +95,6 @@ export const BANDS = Object.freeze({
   cone:    { r: 0.285, y: 0.28, h: 0.10, axis: 'y' },
   skein:   { r: 0.215, y: 0.50, h: 0.26, axis: 'x' },
   mini:    { r: 0.178, y: 0.50, h: 0.20, axis: 'x' },
-  booklet: null,
 });
 
 const _height = new Map();
@@ -146,7 +143,6 @@ export const TAILS = Object.freeze({
   skein:   { at: [0.34, 0.44, 0.10], size: 0.26, spin: 2.2 },
   mini:    { at: [0.22, 0.46, 0.08], size: 0.20, spin: 2.0 },
   cone:    null,
-  booklet: null,
 });
 
 const _ts = new THREE.Matrix4();

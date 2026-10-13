@@ -192,8 +192,7 @@ discipline. Six levers, cheapest first:
    before any asset work exists.
 
 2. **Exaggerate the proportion axes past realism.** Ball = round and tall; cake = squat, wide, flat
-   top; cone = tall triangle; skein = long horizontal twisted bone; hank = thin flat ring; booklet
-   = hard-edged rectangle. Cartoon proportion is what makes them nameable at 40px.
+   top; cone = tall triangle; skein = long horizontal twisted bone; hank = thin flat ring. Cartoon proportion is what makes them nameable at 40px.
 
 3. **The ball band is the single largest readability win** and the DDR already reached this
    conclusion (*"a second family… keeps the band's colour independent of the yarn's, which is the
@@ -203,9 +202,7 @@ discipline. Six levers, cheapest first:
 4. **Orientation per family, which is free** — it lives in the instance matrix. Cones stand, cakes
    sit, skeins lie down, hanks hang. In a grid this reads strongly.
    The ball is slightly oblate (y × 0.92): a perfect sphere reads as a bouncy ball, a squashed one
-   as something soft that has sat on a shelf. The booklet **stands**: the only hard-edged, planar
-   item, it punctuates a shelf of round things. It takes no ball band (its cover is its label) and
-   no yarn end.
+   as something soft that has sat on a shelf. There is no booklet family: a hard-edged box read as a pattern or notion box, so it was dropped (2026-10-12); patterns are drawn as pattern boxes (PATTERNS.md).
 
 5. **Winding direction as texture or normal, never geometry.** The strand direction is what says
    *yarn* instead of *ball*. At low poly this has to be shading; object-space direction in the
@@ -1005,7 +1002,7 @@ What moved, and what deliberately did not:
 
 | | demo | shop |
 |---|---|---|
-| families | 6 (`ball cake skein cone mini booklet`) | the 3 the catalog sells |
+| families | 5 (`ball cake skein cone mini`) | the 3 the catalog sells |
 | footprint | from the GEOMETRY (`familyFootprint`, skein 2x1) | from `catalog.js` — a yarn's WEIGHT |
 | layer pitch | `cell/8`, fine | `BOX_H` 0.055, coarse and already tuned for notions |
 | colour | rolled per item | a fixed index the sim carries (`colorIndex`) |

@@ -2,6 +2,7 @@
 
 ## Appearance in Store: 
 - A pattern is a 3D box like a notion, but should be given labels on the box and possibly additional details to make it look like a BOOK. Cover icons match pattern types. 
+- **TODO(spec), design later:** today's pattern boxes don't work — they read as just another notion box. A pattern must look like a book at a glance (spine, cover, pages), distinct from both notion boxes and yarn. To be designed fully; until then the placeholder covers in `characters/store/goods/art.js` stand in. (Decided 2026-10-12, when the stash demo's yarn-coloured "booklet" family was dropped for reading as a pattern or notion box.)
 - Physical grid wise it is always 2x2x1. 
 - Clicking or inspecting a pattern shows a detail screen with the BASE finished object, an offscreen render of the same generator that builds the 3D FO (see `../characters/VISUAL-DESIGN-FINISHED-OBJ.md` §2). No shop-level thumbnail.
 

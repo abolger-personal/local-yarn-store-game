@@ -543,7 +543,7 @@ function pushYarn(disp, family, bulk, { shelf, c, r, keys }) {
     layers: fit.layers,
     layer: place(disp.g, keys, index, fit.layers),
     color: yarnColor(Math.random, undefined, { spread: S.paletteSpread }),
-    yaw: family === 'booklet' ? 0 : scatterYaw(),
+    yaw: scatterYaw(),
   });
 }
 

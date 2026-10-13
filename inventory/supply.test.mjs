@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { mulberry32 } from '../characters/store/core/util.js';
 import { makeDisplay, footprint, place, topAt } from './grid.js';
-import { MIN_DELIVERY, SCRIPT, buildOrder, carryOver, choicesFor, describeSlot, resolveOrder, supplyFor, tutorialDay1 } from './supply.js';
+import { MIN_DELIVERY, SCRIPT, buildOrder, carryOver, choicesFor, describeSlot, resolveOrder, slipLine, supplyFor, tutorialDay1 } from './supply.js';
 import { toolSuitsPattern, yarnSuitsPattern } from '../characters/wip.js';
 
 const isGoods = (it) => it.name === 'yarn' || it.name === 'pattern';
@@ -28,7 +28,7 @@ assert.ok(!buildOrder(4).some((s) => s.template.weights?.includes('bulky')), 'an
 
 SCRIPT.forEach((row, i) => {
   const day = i + 1;
-  const want = day <= 2 ? 0 : day === 3 ? 1 : row.length;
+  const want = day <= 2 ? 0 : day === 3 ? 1 : day === 4 ? 2 : row.length;
   assert.equal(buildOrder(day).filter((s) => s.playerChoosable).length, want, `day ${day} choosable slots`);
 });
 const mine = { kind: 'notion', count: 3 };
@@ -73,7 +73,7 @@ for (let seed = 1; seed <= 20; seed++) {
 
 assert.deepEqual(buildOrder(3).map(describeSlot), [
   { count: 5, item: 'units of yarn', detail: 'worsted or dk', yours: true },
-  { count: 2, item: 'pattern', detail: 'for worsted or dk', yours: false },
+  { count: 2, item: 'patterns', detail: 'for worsted or dk', yours: false },
   { count: 1, item: 'kit', detail: 'a pattern and its yarn, worsted or dk, one colour family', yours: false },
 ]);
 assert.deepEqual(describeSlot(buildOrder(5)[0]),
@@ -82,6 +82,33 @@ assert.equal(describeSlot(buildOrder(1)[0]).detail, 'a pattern and its yarn, wor
 for (let day = 1; day <= 30; day++)
   for (const slot of buildOrder(day, { occupancy: 0.4, rng: mulberry32(day) }))
     assert.equal(describeSlot(slot).yours, slot.playerChoosable, `day ${day}: a choosable slot is marked`);
+
+const choosable = (order) => order.filter((s) => s.playerChoosable && s.template.kind !== 'kit');
+const sum = (order) => order.reduce((t, s) => t + s.template.count, 0);
+for (let day = 4; day <= 30; day++) {
+  for (let seed = 0; seed <= 10; seed++) {
+    const opts = { occupancy: 0.3, seed };
+    const lines = choosable(buildOrder(day, { ...opts, rng: mulberry32(day) }));
+    const plan = day <= SCRIPT.length ? SCRIPT[day - 1].filter((t) => t.kind !== 'kit') : null;
+    assert.deepEqual(lines.map((s) => s.template.count),
+      choosable(buildOrder(day, { ...opts, rng: mulberry32(day) })).map((s) => s.template.count), 'split is seeded');
+    assert.ok(lines.every((s) => s.template.count >= 1), `day ${day}: every line gets at least one`);
+    if (plan && day > 4) assert.equal(sum(lines), plan.reduce((t, x) => t + x.count, 0), `day ${day}: within the plan`);
+    if (!plan) assert.equal(sum(lines), supplyFor(0.3), `day ${day}: within the delivery budget`);
+  }
+}
+assert.equal(sum(choosable(buildOrder(4))), 6, "day 4's two lines share the yarn and pattern counts");
+assert.ok([1, 2, 3, 4, 5].some((s) => buildOrder(9, { seed: s })[0].template.count !== SCRIPT[8][0].count),
+  'counts are split, not the script\'s');
+assert.deepEqual(buildOrder(3).map(slipLine).map(({ count, item, detail }) => [count, item, detail]), [
+  [5, "supplier's choice", ''], [2, 'patterns', 'for worsted or dk'],
+  [1, 'kit', 'a pattern and its yarn, worsted or dk, one colour family'],
+], 'a line of the player\'s reads as the supplier\'s choice until picked');
+{
+  const [line] = buildOrder(3);
+  const picked = { ...line, template: choicesFor(line)[0], source: 'player' };
+  assert.deepEqual(slipLine(picked), { count: 5, item: 'units of yarn', detail: 'worsted', yours: true }, 'and as the pick after');
+}
 
 for (let seed = 1; seed <= 50; seed++) {
   const { table, floor } = tutorialDay1(mulberry32(seed));

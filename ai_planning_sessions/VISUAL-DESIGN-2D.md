@@ -283,12 +283,14 @@ advances it but the player opening the door.
     then one line per slot as quantity × item (*6 × UNITS OF YARN*: units, not balls, since yarn also comes as skeins, cakes and cones) over its limits (*WORSTED OR DK,
     ONE COLOUR FAMILY*). **No checkboxes.** Words from `describeSlot()` in `inventory/supply.js`;
     the template's words, never an item's. The `×` is its own glyph in `lettering.js`.
-  - **A slot that will be the player's** (`playerChoosable`) is a blank write-in line after its
-    quantity (*5 × ____*), its limits still under it. A native `<select>` lies see-through over
-    the blank (pointer cursor, a faint wash on hover, a focus ring): *supplier's choice* (the
-    default, the planned slot arrives) or that count of yarn, one-family yarn or patterns in a
-    weight the line allows, or notions (`choicesFor()`). The choice is lettered onto the line,
-    underlined as the player's.
+  - **A slot that will be the player's** (`playerChoosable`) is lettered as its selection,
+    underlined as the player's (`slipLine()`): *5 × SUPPLIER'S CHOICE* by default, with no limits
+    under it, then the pick's own words (*5 × UNITS OF YARN* over *WORSTED, ONE COLOUR FAMILY*).
+    A native `<select>` lies see-through over it after the quantity (pointer cursor, a faint wash
+    on hover, a focus ring): *supplier's choice* (the planned slot arrives; on the handover nights
+    it names that slot, *supplier's choice: 5 units of yarn, worsted or dk*) or that count of yarn,
+    one-family yarn or patterns in a weight the line allows, or notions (`choicesFor()`). For now
+    the counts are a seeded random split of the day's planned total, each line at least one.
   - The slip has an `aria-label` reading the same lines, since the lettering is paths.
   - The clipboard's foot line (*DAY N: 5 SIGNED THE GUESTBOOK*) went with it: a supplier's slip
     does not know who signed the book, which is the Guestbook's to say.

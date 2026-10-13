@@ -209,13 +209,16 @@ and SCRIPTED-EVENTS.md §4.
 
 ### Night 2: a line of your own
 
-- **Arrives as:** one line on the packing slip is blank and the player's.
+- **Arrives as:** one line on the packing slip reads *5 × SUPPLIER'S CHOICE*, and is the player's.
 - **Door note:** *"Tomorrow's order is on the packing slip. One line is yours."*
 - **Success:** the player's choice is in tomorrow's pile.
-- **Fallback:** a blank line is filled by the supplier. Never empty.
-- **Built:** a dropdown over the blank line on the slip (`store/ui/night.js`, `choicesFor()` in
-  `inventory/supply.js`); `SCRIPT` marks day 3's order (set on night 2) with the player's first
-  line, then every line from day 4. Not yet: §7.2's budget of 6 + sold as free lines, the
+- **Fallback:** a line left as the supplier's choice is filled by the supplier. Never empty.
+- **Built:** a dropdown over the line on the slip (`store/ui/night.js`, `choicesFor()` and
+  `slipLine()` in `inventory/supply.js`); the line is lettered as its selection. `SCRIPT` marks
+  one line of day 3's order (set on night 2) and two of day 4's (night 3); every line from day 5
+  (`HANDOVER_DAYS`). On nights 2 and 3 the *supplier's choice* option names what would come
+  (*supplier's choice: 5 units of yarn, worsted or dk*). For now each line's count is a seeded
+  random split of the day's planned total. Not yet: §7.2's budget of 6 + sold as free lines, the
   "supplier's choice" button for the whole slip, and the supplier sample.
 
 ### Day 3: they come back
@@ -244,7 +247,7 @@ and SCRIPTED-EVENTS.md §4.
   decor object in hand.
 
 **After day 3** the tutorial is over without announcing it. The friend keeps visiting as a
-regular. From night 3 the whole packing slip is the player's; what the supplier fills blank lines
+regular. Night 3 hands over a second line, and from night 4 the whole packing slip is the player's; what the supplier fills blank lines
 with still introduces new weights and notions gradually (DESIGN-DECISIONS.md §6), which is pacing
 the player never notices, not tutorial.
 

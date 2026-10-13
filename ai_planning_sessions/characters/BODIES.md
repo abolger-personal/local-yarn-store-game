@@ -49,6 +49,7 @@ Everything is judged at play distance: characters are ~150px tall.
 - `earPerk` hinges the ear forward/back (the expression channel); `earSplay` adds outward tilt *on top
   of* the species' resting tilt.
 - `tailLift` raises from the species' resting droop (negative tucks); `tailWag` 0 still, 1 a happy wag.
+- `earFlap` swings the ears outward on the wag clock, 0 still, 1 a flap of `FLAP_AMP` (0.9 rad).
 - `blink` 0 open, 1 shut; never interpolated (MOTION.md).
 - `pose` sliders apply without a rebuild; `rig` sliders change the mesh and need one.
 

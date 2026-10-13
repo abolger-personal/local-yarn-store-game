@@ -119,6 +119,10 @@ The tail is the one deliberate exception, and it keeps its own state (see Tail).
 - The tail sways slowly on the fidget clock, so it holds still when they do.
 - The wag clock follows `idleRate` only partly (`0.7 + 0.3 * idleRate`, ~2 wags/s at 1), or an
   anxious lion's tail buzzes.
+- Delight (the buy cheer) is `POSES.delighted` plus decaying hops (`HOP_H` 0.15 in cast.js). A
+  species may swap in its own `delighted` pose, which stepMotion uses in its place: the lion lifts
+  and wags its tail harder (`tailLift` 0.9, `tailWag` 1.6) and the llama flaps its ears
+  (`earFlap` 1), because their arms vanish against mane and fleece. The owl keeps the base pose.
 
 ## Tail
 

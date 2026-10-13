@@ -196,7 +196,7 @@ const CELEBRATE_S = 1.6;
 
 const CELEBRATE_HOPS = 3;
 
-const HOP_H = 0.10;
+const HOP_H = 0.15;
 
 export function rollCheer(rnd = Math.random) {
   return {

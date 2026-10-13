@@ -68,6 +68,7 @@ export const BASE_PARAMS = Object.freeze({
   headTilt:      0.00,
   tailLift:      0.00,
   tailWag:       0.00,
+  earFlap:       0.00,
   blink:         0.00,
   holdItem:      false,
   heldColor:     '#7a9e6b',
@@ -1066,6 +1067,7 @@ const tailSpring = (P) => ({
 });
 
 export function stepMotion(built, target, dt, opts, add) {
+  if (target === POSES.delighted) target = built.species.delighted ?? target;
   integrate(built.motion, target, dt, opts);
   compose(_out, built.motion, opts);
   if (add) add(_out);
@@ -1173,7 +1175,7 @@ export const BASE_GUI = Object.freeze({
     ['earPerk', -1.2, 1.2], ['earSplay', -0.8, 1.2],
     ['armSwingAlt', -1.0, 1.0], ['armOutAlt', -1.5, 1.5], ['spineTwist', -1.2, 1.2],
     ['headYaw', -5.0, 5.0], ['headPitch', -0.9, 0.9], ['headTilt', -0.8, 0.8],
-    ['tailLift', -1.2, 1.2], ['tailWag', 0, 1.5],
+    ['tailLift', -1.2, 1.2], ['tailWag', 0, 1.5], ['earFlap', 0, 1.5],
     ['blink', 0, 1],
     ['holdItem', 'bool'],
   ],

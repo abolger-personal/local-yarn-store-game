@@ -2,7 +2,7 @@
 export const POSE_KEYS = [
   'armSwing', 'armSwingAlt', 'armOut', 'armOutAlt', 'elbowBend', 'legSwing', 'kneeBend',
   'hipFlex', 'spineBend', 'spineRoll', 'spineTwist', 'earPerk', 'earSplay',
-  'headYaw', 'headPitch', 'headTilt', 'tailLift', 'tailWag',
+  'headYaw', 'headPitch', 'headTilt', 'tailLift', 'tailWag', 'earFlap',
 ];
 
 export const MOTION_KEYS = [...POSE_KEYS, 'hold'];
@@ -13,7 +13,7 @@ const TAU = Math.PI * 2;
 export const REST_POSE = Object.freeze({
   armSwing: 0, armSwingAlt: 0, armOut: 0, armOutAlt: 0, elbowBend: 0, legSwing: 0, kneeBend: 0,
   hipFlex: 0, spineBend: 0, spineRoll: 0, spineTwist: 0, earPerk: 0, earSplay: 0,
-  headYaw: 0, headPitch: 0, headTilt: 0, tailLift: 0, tailWag: 0,
+  headYaw: 0, headPitch: 0, headTilt: 0, tailLift: 0, tailWag: 0, earFlap: 0,
   holdItem: false, blink: 0,
 });
 
@@ -338,6 +338,7 @@ const MAX_H = 1 / 120;
 
 const WAG_W = TAU * 2.0;
 const WAG_AMP = 0.45;
+const FLAP_AMP = 0.90;
 const FLICK_DUR = 0.34;
 const BLINK_DUR = 0.12;
 const BREATH_W = TAU * 0.25;
@@ -499,6 +500,8 @@ export function compose(out, m, opts) {
   out.elbowBend += opts.armTuck ?? 0;
   out.tailPitch = out.tailLift + (opts.tailCarry ?? 0);
   out.tailYaw = out.tailWag * WAG_AMP * Math.sin(m.wagPhase);
+  // Outward only, on the wag clock: a flap that swung inward would cross the ears over the head.
+  out.earSplay += out.earFlap * FLAP_AMP * (1 - Math.cos(m.wagPhase)) / 2;
 
   if (opts.idleAmount <= 0) return out;
   const a = opts.idleAmount * opts.idleAmp;

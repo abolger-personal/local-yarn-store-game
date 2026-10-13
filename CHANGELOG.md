@@ -20,6 +20,8 @@ What's new in L.Y.S. — Local Yarn Store. [Play it here.](https://abolger-perso
 
 ### Fixes
 - Customers no longer walk up to empty shelves, or lean in at bare floor as if shopping it.
+- A kit now comes with everything its pattern needs: the yarn, the hook or needles in the right
+  size, and any buttons or other notions. The pieces may arrive scattered for you to gather.
 - A selfie's caption wraps under the photo instead of stretching across the screen.
 - The packing slip orders "units of yarn", not "balls": yarn also comes as skeins, cakes and cones.
 - In the Guestbook, a customer who finished a project and lent it to the shop gets 🏁, not ✨; ✨ is

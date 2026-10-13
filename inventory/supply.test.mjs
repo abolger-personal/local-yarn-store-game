@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mulberry32 } from '../characters/store/core/util.js';
 import { makeDisplay, footprint, place, topAt } from './grid.js';
 import { MIN_DELIVERY, SCRIPT, buildOrder, carryOver, choicesFor, describeSlot, resolveOrder, slipLine, supplyFor, tutorialDay1 } from './supply.js';
-import { toolSuitsPattern, yarnSuitsPattern } from '../characters/wip.js';
+import { WIP_STATE, stow, toolSuitsPattern, wantFor, wantsOf, yarnSuitsPattern } from '../characters/wip.js';
 import { yarnUnits } from './catalog.js';
 
 const isGoods = (it) => it.name === 'yarn' || it.name === 'pattern';
@@ -21,7 +21,22 @@ for (let seed = 1; seed <= 50; seed++) {
 
 for (let day = 1; day <= 3; day++) {
   for (let seed = 1; seed <= 20; seed++) {
-    assert.ok(resolveOrder(buildOrder(day), mulberry32(seed)).every(isGoods), `day ${day} has no notions`);
+    const order = buildOrder(day).filter((s) => s.template.kind !== 'kit');
+    assert.ok(resolveOrder(order, mulberry32(seed)).every(isGoods), `day ${day} has no notions outside its kit`);
+  }
+}
+
+const kitDays = SCRIPT.flatMap((row, i) => (row.some((t) => t.kind === 'kit') ? [i + 1] : []));
+for (const day of kitDays) {
+  for (let seed = 1; seed <= 200; seed++) {
+    const kit = resolveOrder(buildOrder(day).filter((s) => s.template.kind === 'kit'), mulberry32(seed));
+    const pattern = kit[0];
+    assert.ok(kit.some((it) => toolSuitsPattern(it, pattern)), `day ${day} seed ${seed}: the kit's tool fits`);
+    for (const name of pattern.notions) assert.ok(kit.some((it) => it.name === name), `day ${day} seed ${seed}: ${name}`);
+    const npc = { wips: [{ id: 0, state: WIP_STATE.UNSTARTED, pattern: null, yarn: [], tool: null, notions: [], progress: 0 }] };
+    for (const it of kit) assert.ok(stow(npc, it, wantFor(npc, it)), `day ${day} seed ${seed}: ${it.name} is wanted`);
+    assert.deepEqual(wantsOf(npc), [], `day ${day} seed ${seed}: the kit alone completes "${pattern.title}"`);
+    assert.equal(npc.wips[0].state, WIP_STATE.IN_PROGRESS);
   }
 }
 assert.ok(resolveOrder(buildOrder(4), mulberry32(1)).some((it) => !isGoods(it)), 'notions arrive on day 4');
@@ -78,11 +93,11 @@ for (let seed = 1; seed <= 20; seed++) {
 assert.deepEqual(buildOrder(3).map(describeSlot), [
   { count: 5, item: 'units of yarn', detail: 'worsted or dk', yours: true },
   { count: 2, item: 'patterns', detail: 'for worsted or dk', yours: false },
-  { count: 1, item: 'kit', detail: 'a pattern and its yarn, worsted or dk, one colour family', yours: false },
+  { count: 1, item: 'kit', detail: 'a pattern with its yarn, tool and notions, worsted or dk, one colour family', yours: false },
 ]);
 assert.deepEqual(describeSlot(buildOrder(5)[0]),
   { count: 5, item: 'units of yarn', detail: 'bulky, one colour family', yours: true }, "day 5's new weight, alone");
-assert.equal(describeSlot(buildOrder(1)[0]).detail, 'a pattern and its yarn, worsted or dk, one colour family');
+assert.equal(describeSlot(buildOrder(1)[0]).detail, 'a pattern with its yarn, tool and notions, worsted or dk, one colour family');
 for (let day = 1; day <= 30; day++)
   for (const slot of buildOrder(day, { occupancy: 0.4, rng: mulberry32(day) }))
     assert.equal(describeSlot(slot).yours, slot.playerChoosable, `day ${day}: a choosable slot is marked`);
@@ -106,7 +121,7 @@ assert.ok([1, 2, 3, 4, 5].some((s) => buildOrder(9, { seed: s })[0].template.cou
   'counts are split, not the script\'s');
 assert.deepEqual(buildOrder(3).map(slipLine).map(({ count, item, detail }) => [count, item, detail]), [
   [5, "supplier's choice", ''], [2, 'patterns', 'for worsted or dk'],
-  [1, 'kit', 'a pattern and its yarn, worsted or dk, one colour family'],
+  [1, 'kit', 'a pattern with its yarn, tool and notions, worsted or dk, one colour family'],
 ], 'a line of the player\'s reads as the supplier\'s choice until picked');
 {
   const [line] = buildOrder(3);
@@ -141,7 +156,8 @@ for (let seed = 1; seed <= 50; seed++) {
 for (let seed = 1; seed <= 50; seed++) {
   const line = resolveOrder([{ template: { kind: 'yarn', count: 5 } }], mulberry32(seed));
   assert.equal(unitsOf(line), 5, `seed ${seed}: "5 units of yarn" is 5 units (${line.map((y) => y.shape)})`);
-  const [pattern, ...kit] = resolveOrder([{ template: { kind: 'kit' } }], mulberry32(seed));
+  const [pattern, ...rest] = resolveOrder([{ template: { kind: 'kit' } }], mulberry32(seed));
+  const kit = rest.filter((it) => it.name === 'yarn');
   const units = unitsOf(kit);
   assert.ok(units >= pattern.yarnUnits && units - yarnUnits(kit.at(-1)) < pattern.yarnUnits,
     `seed ${seed}: a kit holds the ${pattern.yarnUnits} units its pattern takes, not a ball more (${units})`);

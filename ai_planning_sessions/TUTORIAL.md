@@ -188,7 +188,9 @@ and SCRIPTED-EVENTS.md §4.
 - **Fallback:** if the player never moves anything, the friend eventually finds the ball and hook
   on the floor themselves (floors are slow, not impossible), and the Guestbook still fills.
 - **Needs:** the scripted `cast` and `seed … facing` actions (built hard-coded today in
-  `openTutorial`), and the kit growing to pattern + yarn + hook.
+  `openTutorial`). Every kit is pattern + yarn + the tool in the pattern's size + its notions
+  (`resolveTemplate` in `inventory/supply.js`); day 1's three things are the same set, built by
+  `tutorialDay1`.
 
 ### Night 1: what comes tomorrow
 

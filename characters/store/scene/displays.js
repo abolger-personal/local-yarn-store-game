@@ -22,6 +22,7 @@ export const STAND_OFF = 0.65;
 export const DISPLAY_SLOTS = [
   { id: 'shelf-n', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: SHELF_ROWS, shelves: 3, headroom: SHELF_HEADROOM, x: -1.5, z: -HALF_D + 0.5, yaw: 0 },
   { id: 'table-a', kind: 'pile',  form: 'table',      cols: 5, rows: 5, shelves: 1, headroom: PILE_HEADROOM, x: 0.6,  z: -0.3,          yaw: 0 },
+  { id: 'table-d', kind: 'pile',  form: 'table',      cols: 5, rows: 5, shelves: 1, headroom: PILE_HEADROOM, x: 3.85, z: 1.9,           yaw: 0 },
   { id: 'shelf-e', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: SHELF_ROWS, shelves: 3, headroom: SHELF_HEADROOM, x: HALF_W - 0.5, z: -1.3,  yaw: -Math.PI / 2 },
   { id: 'shelf-w', kind: 'shelf', form: 'wall-shelf', cols: 5, rows: SHELF_ROWS, shelves: 3, headroom: SHELF_HEADROOM, x: -HALF_W + 0.5, z: -2.0, yaw: Math.PI / 2 },
   { id: 'table-b', kind: 'pile',  form: 'table',      cols: 4, rows: 4, shelves: 1, headroom: PILE_HEADROOM, x: 2.4,  z: 1.9,           yaw: 0 },

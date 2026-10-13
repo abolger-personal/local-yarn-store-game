@@ -306,7 +306,7 @@ const npcWith = (wips, over = {}) => ({
   assert.ok(!npc.wips.includes(npc.worn.neck), 'and so is the cowl');
 
   assert.deepEqual(npc.wips.map((w) => w.id), ['live', 'hat2'],
-    'the spare hat waits in its slot until the Drop Off; the live project stays put');
+    'the spare hat waits in its slot until it is lent; the live project stays put');
   assert.equal(everythingMade(npc).length, 3,
     'all three are findable for the Guestbook photo, taken before any of them is lent');
 
@@ -323,7 +323,7 @@ const npcWith = (wips, over = {}) => ({
   assert.equal(slotFor(odd), null, 'a blanket fits no clothing slot');
   const offered = wearOrOffer(npc);
   assert.deepEqual(offered.map((w) => w.id), ['blanket'], 'so it is offered to the shop');
-  assert.deepEqual(npc.wips.map((w) => w.id), ['blanket'], 'and waits in its slot until the Drop Off');
+  assert.deepEqual(npc.wips.map((w) => w.id), ['blanket'], 'and waits in its slot until it is lent');
   lend(npc, offered[0]);
   assert.deepEqual(npc.wips, [], 'where it leaves the slot like any other lend');
 }
@@ -379,11 +379,11 @@ const npcWith = (wips, over = {}) => ({
   const old = fo('old'), lent = fo('lent');
   const npc = npcWith([old, lent]);
   npc.worn.head = old;
-  const world = { dropOff: [{ npc: 'Test', npcId: 'n1', wip: lent }], backPile: [] };
+  const world = { lent: [{ npc: 'Test', npcId: 'n1', wip: lent }], backPile: [] };
 
   assert.ok(returnToNpc(world, npc, lent), 'the shop can hand it back');
   assert.equal(npc.worn.head, lent, 'it goes into the worn slot');
-  assert.equal(world.dropOff.length, 0, 'and comes off the Drop Off display');
+  assert.equal(world.lent.length, 0, 'and comes off the lent pile');
   assert.deepEqual(world.backPile.map((b) => b.wip.id), ['old'],
     '"place any previously offscreen item the NPC was wearing in a pile"');
 

@@ -205,9 +205,9 @@ export function lend(npc, wip) {
 export function returnToNpc(world, npc, wip) {
   const slot = slotFor(wip);
   if (!slot) return false;
-  const index = world.dropOff.findIndex((d) => d.wip === wip);
+  const index = world.lent.findIndex((d) => d.wip === wip);
   if (index === -1) return false;
-  world.dropOff.splice(index, 1);
+  world.lent.splice(index, 1);
   const displaced = npc.worn[slot];
   npc.worn[slot] = wip;
   if (displaced) world.backPile.push({ npc: npc.name, wip: displaced });

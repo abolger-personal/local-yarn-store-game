@@ -234,7 +234,7 @@ function poseFor(npc) {
     case ACTION.WALK_TO_SEAT:   return POSES.sit;
     case ACTION.WORK_ON_WIP:    return POSES.sit;
     case ACTION.SIGN_GUESTBOOK: return POSES.reach;
-    case ACTION.DROP_OFF:       return POSES.delighted;
+    case ACTION.LEND:           return POSES.delighted;
     case ACTION.WALK_TO_NPC:
     case ACTION.WAIT:           return POSES.browse;
     default:                    return laden(npc) ? POSES.carry : POSES.rest;

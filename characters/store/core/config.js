@@ -58,7 +58,7 @@ export const S = {
   shadows:     true,
   view:        'felted',
   npcCount:     2,
-  displayCount: 2,
+  displayCount: 3,
   chairCount:   2,
   showGrid:    true,
   floorGrid:   true,

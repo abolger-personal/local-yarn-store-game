@@ -117,7 +117,7 @@ Displays, chairs and props move by one verb (inventory/DISPLAYS.md rule 10 for w
 - **The bulletin board** hangs on the left wall over the signing spot, high enough to clear a peg
   board: 1.76 × 1.12, from 1.24 to 2.36 up the wall, scaled 1.6× so its photos read from the
   default camera.
-- The counter (with the Guestbook) and the Drop Off area are still blockout markers.
+- The signing spot by the counter is still a blockout marker. A customer lends a finished object at the counter, right after signing; the front-right corner holds a second table.
   TODO: real diegetic objects NPCs animate against (LYS.md 5c).
 
 ## Daylight

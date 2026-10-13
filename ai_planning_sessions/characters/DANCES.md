@@ -121,7 +121,7 @@ it is celebrated with a dance.
    it: the new hat bounces. If the slot is taken, they hold it up and dance with it, and it is lent
    as usual.
 3. **Decor** (pot holder, blanket): held aloft through the dance, then lent to the shop at the
-   drop-off as usual.
+   counter as usual.
 
 ### The finisher's dance: personality
 

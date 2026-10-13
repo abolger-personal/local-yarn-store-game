@@ -1188,4 +1188,15 @@ for (const id of speciesIds()) {
   }
 }
 
+{
+  const peak = (id, key) => {
+    const built = build(id), o = { ...MOTION_DEFAULTS, idleAmount: 0 };
+    let p = 0;
+    for (let i = 0; i < 96; i++) p = Math.max(p, Math.abs(stepMotion(built, POSES.delighted, 1 / 60, o)[key]));
+    return p;
+  };
+  assert.ok(peak('lion', 'tailYaw') > 0.8, 'a delighted lion wags harder than the base pose');
+  assert.ok(peak('llama', 'earSplay') > 0.6, 'a delighted llama flaps its ears');
+}
+
 console.log('npc.js rig self-check: all assertions passed');

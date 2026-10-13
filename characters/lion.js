@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
   addEars, addEyes, addTail, createCharacter, hsl, pick, rand, tailBaseHeight, touchingScallopSize,
-  feltMaterial, LIMB_TAPER, part, randomiseBase, registerSpecies, scallopAngles,
+  feltMaterial, LIMB_TAPER, POSES, part, randomiseBase, registerSpecies, scallopAngles,
   scallopBases, scallopGeometry, scallopMesh,
 } from './npc.js';
 
@@ -418,6 +418,8 @@ export const lion = registerSpecies({
   randomise: randomiseInto,
   onPresetChange: applyManePreset,
   presetKey: 'manePreset',
+  // The arms vanish against the mane, so the tail carries the cheer: lifted clear of the body.
+  delighted: Object.freeze({ ...POSES.delighted, tailLift: 0.9, tailWag: 1.6 }),
 });
 
 export const createLion = (P) => createCharacter(P, lion);

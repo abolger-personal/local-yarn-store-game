@@ -7,6 +7,8 @@ What's new in L.Y.S. — Local Yarn Store. [Play it here.](https://abolger-perso
 ### The shop
 - The blue Drop Off square is gone; a second table stands in its corner. Customers lend a finished
   piece at the counter when they sign the Guestbook.
+- Customers' delight is easier to spot: a bigger hop for everyone, a wagging tail on lions and
+  flapping ears on llamas.
 
 ### Fixes
 - A selfie's caption wraps under the photo instead of stretching across the screen.

@@ -1,7 +1,7 @@
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
   addEars, addEyes, addTail, createCharacter, deriveCoatColor, touchingScallopSize,
-  feltMaterial, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh,
+  feltMaterial, POSES, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh,
 } from './npc.js';
 
 export const DEFAULT_PARAMS = {
@@ -280,6 +280,8 @@ export const llama = registerSpecies({
   randomise: randomiseInto,
   onPresetChange: applyFleecePreset,
   presetKey: 'fleecePreset',
+  // The arms vanish against the fleece, so the ears carry the cheer.
+  delighted: Object.freeze({ ...POSES.delighted, earFlap: 1 }),
 });
 
 export const createLlama = (P) => createCharacter(P, llama);

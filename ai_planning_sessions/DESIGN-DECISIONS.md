@@ -585,8 +585,8 @@ Build it once, in P2.
 ### Delivery — scripted progression, 10 days
 
 > **Revised 2026-10-03:** the tutorial is three days (TUTORIAL.md). The player owns one order line
-> on night 2 and every line from night 3; the authored days 4–10 below now only decide what fills a
-> line the player leaves blank.
+> on night 2, two on night 3 and every line from night 4; the authored days 4–10 below now only
+> decide what fills a line the player leaves as the supplier's choice.
 
 > **Updated 2026-10-03:** a delivery is now the resolution of an **order**, and the scripted days
 > 1–10 below are an order form gradually handed to the player as the ordering tutorial. Blank

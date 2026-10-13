@@ -1,6 +1,6 @@
 import { shop } from '../core/state.js';
 import { planTomorrow, restart } from '../sim/world.js';
-import { choicesFor, describeSlot } from '../../../inventory/supply.js';
+import { HANDOVER_DAYS, choicesFor, describeSlot, slipLine } from '../../../inventory/supply.js';
 import { dressExterior, exteriorMarkup, swingOpen } from './exterior.js';
 import { CELL, INK, layout, svgLettering } from './lettering.js';
 import { closeBook, openBook } from './book.js';
@@ -19,15 +19,12 @@ const rule = (y, from = LEFT) => `<path d="M${from} ${y} H${LEFT + WIDE}" stroke
 const blankFrom = (count) => LEFT + layout(`${count} ×`).width * 18 / CELL + 8;
 
 function rowMarkup(slot, i) {
-  const { count, item, detail, yours } = describeSlot(slot);
+  const { count, item, detail, yours } = slipLine(slot);
   const y = TOP + i * ROW;
-  const qty = `${count} ×`;
-  const what = yours && slot.source !== 'player'
-    ? svgLettering(qty, LEFT, y, { cap: 18, align: 'left' }) + rule(y, blankFrom(count))
-    : svgLettering(`${qty} ${item}`.toUpperCase(), LEFT, y, { cap: 18, align: 'left', maxWidth: WIDE })
-      + (yours ? rule(y + 3, blankFrom(count)) : '');
-  return what + wrap(detail.toUpperCase()).map((t, j) =>
-    svgLettering(t, LEFT, y + 20 + j * 14, { cap: DETAIL, align: 'left', maxWidth: WIDE })).join('');
+  return svgLettering(`${count} × ${item}`.toUpperCase(), LEFT, y, { cap: 18, align: 'left', maxWidth: WIDE })
+    + (yours ? rule(y + 3, blankFrom(count)) : '')
+    + (detail ? wrap(detail.toUpperCase()).map((t, j) =>
+      svgLettering(t, LEFT, y + 20 + j * 14, { cap: DETAIL, align: 'left', maxWidth: WIDE })).join('') : '');
 }
 
 function wrap(text) {
@@ -41,13 +38,19 @@ function wrap(text) {
 
 const words = (template) => { const d = describeSlot({ template, playerChoosable: false }); return `${d.item}, ${d.detail}`; };
 
-function pickerMarkup(slot, i) {
+function supplierChoice(slot, day) {
+  if (day > HANDOVER_DAYS) return "supplier's choice";
+  const { count, item, detail } = describeSlot(slot);
+  return `supplier's choice: ${count} ${item}, ${detail}`;
+}
+
+function pickerMarkup(slot, i, day) {
   if (!slot.playerChoosable) return '';
   const x = blankFrom(slot.template.count), y = TOP + i * ROW;
   const options = choicesFor(slot).map((t, k) => `<option value="${k}">${words(t)}</option>`).join('');
   return `<foreignObject x="${x}" y="${y - 22}" width="${LEFT + WIDE - x}" height="28">`
     + `<select class="slip-pick" data-line="${i}" aria-label="Line ${i + 1}: ${slot.template.count} of what?">`
-    + `<option value="">supplier's choice</option>${options}</select></foreignObject>`;
+    + `<option value="">${supplierChoice(slot, day)}</option>${options}</select></foreignObject>`;
 }
 
 function slipMarkup(day) {
@@ -55,14 +58,14 @@ function slipMarkup(day) {
     + svgLettering('FOR: LOCAL YARN STORE', LEFT, 202, { cap: 12, align: 'left', maxWidth: WIDE })
     + svgLettering(`ARRIVES: DAY ${day + 1}, MORNING`, LEFT, 224, { cap: 12, align: 'left', maxWidth: WIDE })
     + rule(238);
-  return `${head}<g data-rows>${order.map(rowMarkup).join('')}</g>${planned.map(pickerMarkup).join('')}`;
+  return `${head}<g data-rows>${order.map(rowMarkup).join('')}</g>${planned.map((s, i) => pickerMarkup(s, i, day + 1)).join('')}`;
 }
 
 function describeSlip(day) {
   slip.setAttribute('aria-label', [`Packing slip from ${SUPPLIER}, for Local Yarn Store, arrives day ${day + 1}, morning:`,
     ...order.map((s) => {
-      const d = describeSlot(s);
-      return `${d.count} × ${d.yours && s.source !== 'player' ? 'blank, yours to choose' : d.item}, ${d.detail}.`;
+      const { count, item, detail } = slipLine(s);
+      return `${count} × ${detail ? `${item}, ${detail}` : item}.`;
     })].join(' '));
 }
 

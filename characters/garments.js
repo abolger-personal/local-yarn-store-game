@@ -2162,6 +2162,20 @@ export function pileAs(wips, colourOf) {
 const BUILDERS = { hat: buildHat, scarf: buildScarf, shawl: buildShawl, sweater: buildSweater, bag: buildBag, socks: buildSocks,
   ...HELD_BUILDERS, pile: buildPile };
 
+/**
+ * A lent finished object off the body, lying flat in an anchor's XY plane (+Z up),
+ * sized as if held against a torso `width` across.
+ */
+export function lentPiece(wip, colourOf, width) {
+  const made = heldAs(wip, colourOf) ?? pileAs([wip], colourOf);
+  if (!made) return null;
+  const anchor = new THREE.Group();
+  anchor.updateMatrixWorld(true);
+  const fit = { height: 1, torso: [width], holds: [anchor, anchor], joints: { upperArm: [] } };
+  garmentMesh(anchor, BUILDERS[made.type](fit, forView(fabric(made.item), fit)).map((p) => p.geo));
+  return anchor;
+}
+
 let material = null;
 
 export function garmentMaterial() {

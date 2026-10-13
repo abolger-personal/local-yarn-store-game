@@ -19,6 +19,7 @@ An NPC wears at most one FO per slot. Mittens are knitted but never worn: they a
     - if the NPC is not yet wearing an FO in that object's slot (table above), the NPC stores the FO in its "worn" slot and does not offer it to the shop to lend
     - decor FOs (potholder, chair cover, cozy, amigurumi, mittens, blanket) have no slot, so they are always lent
     - At any time IN THE SHOP, the player can choose to click on an FO and "return borrowed FO to NPC", which will, off screen, move that item into the worn slot for the NPC and place any *previously offscreen* item the NPC was wearing in a pile in the shop behind the guestbook. 
+    - until the player places it (not built yet), a lent object waits on the counter beside the Guestbook, where it was handed over, stacked on any lent before it, and stays there day to day until it is returned (`showLent` in `store/sim/world.js`, drawn by `lentPiece` in `garments.js`: a pot holder lies flat, anything else as a folded knit)
     - a COMPROMISED object can deviate from this default depending on its maker: see NEAR-MISS-AND-SUBSTITUTION.md §5b
 
 ## Pattern names

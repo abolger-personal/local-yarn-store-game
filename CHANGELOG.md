@@ -4,6 +4,9 @@ What's new in L.Y.S. — Local Yarn Store. [Play it here.](https://abolger-perso
 
 ## 0.0.1 — coming soon
 
+### Fixes
+- A selfie's caption wraps under the photo instead of stretching across the screen.
+
 ## 0.0.0 — 2026-10-12
 
 The first public build: a three-day tutorial in a small yarn shop.

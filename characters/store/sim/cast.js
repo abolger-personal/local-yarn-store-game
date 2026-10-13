@@ -201,7 +201,7 @@ const CELEBRATE_HOPS = 3;
 
 const HOP_H = 0.15;
 
-export function rollCheer(rnd = Math.random) {
+export function rollCheer(rnd) {
   return {
     delay: rnd() * 0.55,
     dur: CELEBRATE_S * (0.8 + rnd() * 0.45),

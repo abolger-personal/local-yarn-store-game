@@ -156,6 +156,14 @@ export default [
     },
   },
   {
+    // ROADMAP A1: a day replays from its seed, day and attempt.
+    files: ['characters/store/**/*.js'],
+    rules: {
+      'no-restricted-properties': ['error', { object: 'Math', property: 'random',
+        message: 'Draw from the world: simRng for the sim, a hash for visual timing.' }],
+    },
+  },
+  {
     // DESIGN-DECISIONS.md: the simulation stays headless. Inert until src/sim exists.
     files: ['src/sim/**/*.js', 'src/sim/**/*.ts'],
     rules: {

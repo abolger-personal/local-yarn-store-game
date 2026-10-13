@@ -1,4 +1,4 @@
-import { items } from '../core/state.js';
+import { items, simRng } from '../core/state.js';
 import { rnd } from '../core/util.js';
 import { fits, footprint, place } from '../../../inventory/grid.js';
 import { scatterYaw } from '../../../inventory/pick-place.js';
@@ -24,7 +24,7 @@ const PACKAGES = {
   'buttons':          [[1, 1], [2, 1]],
 };
 
-const packageFor = (name) => pick(PACKAGES[name] ?? [[1, 1]]);
+const packageFor = (name) => pick(PACKAGES[name] ?? [[1, 1]], simRng);
 
 export const YARN_COLORS = YARN_PALETTE.map((p) => p.hex);
 
@@ -51,7 +51,7 @@ function cellOrder(display, { c, r, avoidWall }) {
       cells.push({ c: cc, r: rr });
     }
   if (c != null) return [{ c, r }, ...cells];
-  return cells.slice(rnd(cells.length)).concat(cells);
+  return cells.slice(rnd(cells.length, simRng)).concat(cells);
 }
 
 /**
@@ -76,7 +76,7 @@ export function addItem(display, shelf, spec, { c, r, over, avoidWall = false, s
       display: display.id, shelf, c: cell.c, r: cell.r, w, h, layers,
       keys, layer: place(g, keys, index, layers),
       color: spec.name === 'yarn' ? YARN_COLORS[spec.colorIndex % YARN_COLORS.length] : INK,
-      yaw: scatterYaw(), gone: false, held: false,
+      yaw: scatterYaw(simRng), gone: false, held: false,
     });
     return index;
   }

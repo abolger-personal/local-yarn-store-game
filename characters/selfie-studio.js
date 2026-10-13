@@ -72,7 +72,7 @@ function viewOf(camera, built) {
 
 function develop(built) {
   studio.renderer.render(studio.scene, studio.camera);
-  paintBackdrop(studio.print, viewOf(studio.camera, built));
+  paintBackdrop(studio.print, viewOf(studio.camera, built), Math.random);
   studio.print.drawImage(studio.renderer.domElement, 0, 0, W, H);
   return studio.print.canvas.toDataURL('image/png');
 }

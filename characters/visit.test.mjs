@@ -8,6 +8,7 @@ import {
   findPath, obstacles, closeoutFor, rejoin, regulars, dayProgress, tidyShop,
 } from './visit.js';
 import { WIP_STATE, wantsOf, canStart, workRound, returnToNpc } from './wip.js';
+import { draw } from './store/core/util.js';
 
 const PATTERN = (over = {}) => ({
   name: 'pattern', patternType: 'hat', craft: 'crochet', yarnUnits: 3, minColors: 1,
@@ -817,6 +818,32 @@ const runCloseout = (world, npc) => {
   assert.deepEqual(items.map((it) => it.display === pile.id && `${it.c},${it.r},${it.layer}`), pileWas,
     'the considered item\'s plane moved under the NPC');
   assert.deepEqual(items[held], heldWas, 'the item in the player\'s hand was moved');
+}
+
+{
+  const morning = (seed, attempt = 0) => {
+    const { pile, shelf, items, add } = fixture();
+    add(pile, [0, 0, 0], 'crochet-hook', 4.5);
+    add(pile, [0, 1, 0], 'darning-needle');
+    add(shelf, [0, 1, 1], 'stitch-markers');
+    const world = makeWorld({ displays: [pile, shelf], items, room: ROOM, seats: SEATS, seed, day: 1, attempt });
+    const rng = () => draw(world);
+    world.npcs = [0, 1, 2].map((i) => makeNpc({ id: `d${i}`, name: `D${i}`, species: 'Owl', rng }));
+    return world;
+  };
+  const decisions = (world, rounds = 200) => {
+    for (let r = 0; r < rounds && world.npcs.some((n) => n.state !== STATE.GONE); r++) advanceRound(world);
+    return world.log.slice(0, 50);
+  };
+
+  const mid = morning(7);
+  decisions(mid, 6);
+  assert.deepEqual(structuredClone(mid), mid, 'a mid-game world is plain data');
+  const once = decisions(morning(7));
+  assert.equal(once.length, 50);
+  assert.deepEqual(decisions(morning(7)), once, 'one seed, one morning, the same 50 decisions');
+  assert.notDeepEqual(decisions(morning(7, 1)), once, 'a reload re-rolls the day');
+  assert.notDeepEqual(decisions(morning(8)), once, 'another seed, another day');
 }
 
 console.log('visit.js self-check: all assertions passed');

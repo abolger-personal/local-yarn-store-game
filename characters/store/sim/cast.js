@@ -94,7 +94,7 @@ export function makeHeldNotion(item) {
   return group;
 }
 
-const colourOf = (yarn) => YARN_COLORS[yarn.colorIndex % YARN_COLORS.length];
+export const colourOf = (yarn) => YARN_COLORS[yarn.colorIndex % YARN_COLORS.length];
 
 export function outfitOf(npc) {
   const look = { worn: { ...npc.worn }, wips: npc.wips };

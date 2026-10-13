@@ -40,7 +40,7 @@ const { topSpeed } = await import('../motion.js');
 const { buildRoomShell } = await import('./scene/room.js');
 const { installSeating } = await import('./scene/seating.js');
 const { installDisplays } = await import('./scene/displays.js');
-const { installWorld, restart, doAdvanceRound } = await import('./sim/world.js');
+const { installWorld, restart, doAdvanceRound, lentGroup } = await import('./sim/world.js');
 const { tickCast } = await import('./sim/cast.js');
 const { cellNameFor } = await import('./goods/stock.js');
 buildRoomShell(); installSeating(); installDisplays(); installWorld();
@@ -167,6 +167,10 @@ for (const k of [1, 2, 3]) {
     assert.equal(potHolder.state, WIP_STATE.FINISHED, `seed ${seed}: finished on day 3 (${potHolder.progress}%)`);
     assert.ok(shop.world.guestbook.some((g) => g.npcId === friend.id && g.kind === 'photo' && g.wip === potHolder),
       `seed ${seed}: and photographed with it in day 3's Guestbook`);
+    const onCounter = () => lentGroup.children.length === 1 && lentGroup.children[0].children[0]?.isMesh;
+    assert.ok(onCounter(), `seed ${seed}: the lent pot holder lies on the counter`);
+    try { restart(); } catch (err) { assert.match(err.stack, /sizeInstanceBuffers/); }
+    assert.ok(onCounter() && shop.world.lent[0]?.wip === potHolder, `seed ${seed}: and is still there on day 4`);
     rounds.push(potHolder.finishedRound);
   }
   Math.random = random;

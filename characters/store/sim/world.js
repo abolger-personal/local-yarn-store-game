@@ -26,8 +26,9 @@ import { CAPACITY, boxes, edgeTop, fieldTop, shadows, sideEdge, sideField, sizeS
 import { refreshAll } from '../goods/paint.js';
 import { addItem } from '../goods/stock.js';
 import { TUTORIAL_DAYS, buildOrder, carryOver, resolveOrder, tutorialDay1 } from '../../../inventory/supply.js';
-import { STAND_TIME, buildBlobs, checkOutfit, disposeRecord, dressedCharacter, measureSeatDrop, outfitOf, rollCheer,
+import { STAND_TIME, buildBlobs, checkOutfit, colourOf, disposeRecord, dressedCharacter, measureSeatDrop, outfitOf, rollCheer,
   routeLength } from './cast.js';
+import { lentPiece } from '../../garments.js';
 
 let nextNpcId = 0;
 
@@ -46,6 +47,7 @@ export const room = {
 };
 
 export const castGroup = new THREE.Group();
+export const lentGroup = new THREE.Group();
 
 // DISPLAYS.md §Stock
 function randomStock() {
@@ -338,8 +340,10 @@ export function restart({ keepRegulars = true, rebuild = false, order } = {}) {
   setUpShop(fresh);
   if (!keepRegulars) roster = [];
   const { npcs, delivered } = castAndStock(fresh, order);
+  const { lent = [], backPile = [] } = keepRegulars ? shop.world ?? {} : {};
   shop.world = makeWorld({ displays, items, room, seats });
-  shop.world.npcs = npcs;
+  Object.assign(shop.world, { npcs, lent, backPile });
+  showLent();
   shop.world.log.push(`r0 ${delivered}`);
   shop.dayT = 0;
   sizeInstanceBuffers();
@@ -370,12 +374,12 @@ function collectRegulars() {
 }
 
 export function doAdvanceRound() {
-  if (!shop.world) return;
-  if (!shop.world.npcs.some((n) => n.state !== STATE.GONE)) return;
+  if (!shop.world?.npcs.some((n) => n.state !== STATE.GONE)) return;
   markInView(shop.world.npcs);
   advanceRound(shop.world);
   shop.dayT = Math.max(shop.dayT, dayProgress(shop.world));
   collectRegulars();
+  showLent();
   for (const rec of cast) checkOutfit(rec);
   clocks.auto = 0;
   const order = cast.map((_, i) => i);
@@ -404,6 +408,27 @@ function markInView(npcs) {
   shop.watched.clear();
 }
 
+// WEARABLE-FINISHED-OBJ.md §Lending: lent objects wait on the counter beside the Guestbook, stacked.
+const LENT_AT = { x: COUNTER.x + 0.31, z: COUNTER.z - 0.12, width: 0.22 };
+let shownLent = [];
+function showLent() {
+  const lent = shop.world.lent.map((d) => d.wip);
+  if (lent.length === shownLent.length && lent.every((w, i) => w === shownLent[i])) return;
+  shownLent = lent;
+  for (const piece of lentGroup.children) piece.traverse((m) => m.geometry?.dispose());
+  lentGroup.clear();
+  let y = COUNTER.h;
+  for (const wip of lent) {
+    const piece = lentPiece(wip, colourOf, LENT_AT.width);
+    if (!piece) continue;
+    piece.rotation.x = -Math.PI / 2;
+    piece.position.set(LENT_AT.x, y, LENT_AT.z);
+    lentGroup.add(piece);
+    piece.updateMatrixWorld(true);
+    ({ y } = new THREE.Box3().setFromObject(piece).max);
+  }
+}
+
 export function doTidy() {
   if (!shop.world) return;
   const stacked = tidyShop(shop.world);
@@ -414,5 +439,5 @@ export function doTidy() {
 }
 
 export function installWorld() {
-  scene.add(castGroup);
+  scene.add(castGroup, lentGroup);
 }

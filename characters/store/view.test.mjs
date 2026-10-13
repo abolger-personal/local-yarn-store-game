@@ -51,6 +51,8 @@ assert.match(/function closeForTheNight\(\) \{[\s\S]*?\n\}/.exec(src('ui/night.j
 assert.match(/#book \{[^}]*\}/.exec(src('../game.html'))?.[0] ?? '', /var\(--brass\) border-box/, 'the Guestbook lost its brass rim');
 for (const f of ['../game.html', '../store.html'])
   assert.match(/#photo \{[^}]*\}/.exec(src(f))?.[0] ?? '', /width: min-content/, `${f}: the photo's caption no longer wraps at the photo's width`);
+for (const f of ['../game.html', '../store.html'])
+  assert.match(/#photo \{[^}]*\}/.exec(src(f))?.[0] ?? '', /padding: 2[4-9]px/, `${f}: the photo's close button lands on the photo`);
 for (const f of ['boot.js', 'puzzle.js', '../../inventory/stash-and-stuff.js'])
   assert.match(src(f), /ATLAS_URL = new URL\([^)]*import\.meta\.url\)/, `${f}: the atlas path is resolved against the page, which breaks on GitHub Pages`);
 

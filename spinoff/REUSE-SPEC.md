@@ -238,10 +238,14 @@ it from start to finish.
   percent resets to 0.
 - **Anyone can grab the spilled donuts**, the faller included, on the way back in. A ring-out
   turns into a scramble instead of a pause.
-- **A launching hit pops one donut** out of the bag as a pickup, so carrying is risky even
+- **Any hit pops the carried donut** out of the bag as a pickup, so carrying is risky even
   without ring-outs.
 
-Starting numbers to tune: 12 donuts per shelf, bag capacity 3, a ring-out spills the whole bag,
+- **Everyone carries one donut at a time to start** (decided 2026-10-13). A grab fills the bag;
+  the carrier has to run home and bank before grabbing again, and any hit knocks the donut loose.
+  A bigger bag comes later, as an unlock (see Open questions). Bad guys follow the same limit.
+
+Starting numbers to tune: 12 donuts per shelf, one donut per bag, a ring-out spills the whole bag,
 a 3-minute timer.
 
 ## Mode: donut capture the flag
@@ -360,8 +364,6 @@ system.
 | Own hit-sphere radius | ×1.0 | ×1.5 | ×0.75 | host sim |
 | Input buffer (ticks a press stays live) | 4 | 14 | 0 | host sim |
 | Mid-air jumps | 1 | 3 | 1 (never below pro) | host sim |
-| Bag spilled on ring-out | 100% | 50% | 100% (never above all of it) | host sim |
-| Bag capacity | 3 | 4 | 3 (2.5 rounds up) | host sim |
 | Power bar fill rate | ×1.0 | ×1.6 | ×0.7 | host sim |
 | Pickup reach | ×1.0 | ×2.0 | ×1.0 (never below pro) | host sim |
 | Respawn invincibility (s) | 2 | 4 | 1 | host sim |
@@ -816,3 +818,7 @@ bad guy grabs a donut and banks it.
 
 - **The owl's move set.** Its punches are wing swings with the gloves on its wing tips (see
   Costumes) and its kick a talon swipe from a hop; the rest of its moves are still to design.
+- **The bigger bag.** Carrying more than one donut is a later unlock. Is it a level unlock (from
+  some level on, everyone's bag holds 2, then 3), or a power (a full bar or a gesture gives a big
+  bag for a while)? Either way, the hit table (punch knocks 1 loose, kick 2, powers the whole bag)
+  only matters once bags hold more than one.

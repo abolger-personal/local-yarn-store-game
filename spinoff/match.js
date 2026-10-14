@@ -68,8 +68,9 @@ export const STAGE = Object.freeze({
  *             icing: string }} BrickState
  * @typedef {{ team: Team, x: number, y: number, z: number, donuts: DonutLook[] }} ShelfState
  * @typedef {{ x: number, y: number, z: number, move: 'punch'|'kick'|'stomp', on: 'fighter'|'brick',
- *             broke: boolean }} HitEvent
- *   a hit that landed this tick, at its point of contact, for the page's BAM burst and shake;
+ *             target: string, broke: boolean }} HitEvent
+ *   a hit that landed this tick, at its point of contact, on the fighter or brick `target` (its id),
+ *   for the page's BAM burst and shake;
  *   both fighters freeze for HITSTOP_TICKS on contact. `broke`: the brick (or bag) gave way.
  * @typedef {{ fighter: string, kind: 'steal'|'bank'|'pickup', x: number, y: number, z: number }} DonutEvent
  *   a donut changed hands this tick: taken from the enemy shelf (`steal`), put on your own shelf

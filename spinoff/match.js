@@ -71,6 +71,9 @@ export const STAGE = Object.freeze({
  *             broke: boolean }} HitEvent
  *   a hit that landed this tick, at its point of contact, for the page's BAM burst and shake;
  *   both fighters freeze for HITSTOP_TICKS on contact. `broke`: the brick (or bag) gave way.
+ * @typedef {{ fighter: string, kind: 'steal'|'bank'|'pickup', x: number, y: number, z: number }} DonutEvent
+ *   a donut changed hands this tick: taken from the enemy shelf (`steal`), put on your own shelf
+ *   (`bank`), or picked up off the floor (`pickup`), at that spot, for the page's celebrations.
  * @typedef {{ fighter: string, x: number, y: number, z: number }} FullBagEvent
  *   a fighter already carrying a donut touched a loose donut or reached the enemy shelf this tick,
  *   at that donut or shelf, so the page can show "your bag holds one".
@@ -80,7 +83,8 @@ export const STAGE = Object.freeze({
  * `winner` is the team with more donuts on its shelf then, or null for a tie.
  * @typedef {{ tick: number, secondsLeft: number, over: boolean, winner: Team|null,
  *             fighters: FighterState[], donuts: LooseDonut[], bricks: BrickState[],
- *             shelves: ShelfState[], hits: HitEvent[], fullBag: FullBagEvent[] }} Snapshot
+ *             shelves: ShelfState[], hits: HitEvent[], fullBag: FullBagEvent[],
+ *             donutEvents: DonutEvent[] }} Snapshot
  *
  * Who is in the match. height / width / reach come from the fighter's params (fighter.js) as plain
  * numbers; look is the donut frosting this entrant brings to its team's shelf, and the icing

@@ -896,6 +896,12 @@ bad guy grabs a donut and banks it.
    - **Raised floors are solid** (playtest: the lion walked straight through the gumdrop hill,
      which the flat version treated as a pass-under platform). In the depth band, a raised floor
      is a block from the ground up: you jump onto it or walk around it, never through it.
+   - **Stealing a donut is a victory moment** (playtest, 2026-10-14). The snapshot's `donutEvents`
+     says when a donut is stolen from the enemy shelf, banked, or picked up. A steal gets a
+     sparkle burst (`sparkle.js`, recoloured), the species' `delighted` pose for a beat while it
+     keeps moving, and the donut popping up into the bag. Banking gets a bigger one: a sprinkle
+     confetti burst over your shelf and the shelf count bouncing. A pickup off the floor gets a
+     small sparkle.
    - **Phase A, the sim** (`spinoff/sim.js`, pure, no three.js, fixed 60 Hz `tick` +
      `snapshot`): stage as platform data with jump links, shelves on `inventory/grid.js`,
      navigation (tap a point or a thing, routes with jumps, ledge stop, tap-above jump, facing

@@ -291,6 +291,17 @@ and smashers each get a round that is theirs.
   level after adds one (gingerbread wall, jelly bounce pad, sprinkle-slick tile, …). Pieces stay
   unlocked for the rest of the evening's room. A new piece is the level's surprise, alongside its
   extra bad guy.
+- **Pieces are fixed by level and number of players** (decided 2026-10-13). Each player gets their
+  own small pile to place, so siblings never fight over pieces and every kid builds something:
+
+  ```
+  piecesEach(level) = min(6, 2 + floor((level - 1) / 2))      team pieces = piecesEach × team size
+  ```
+
+  Level 1 is 2 each, level 3 is 3 each, up to 6 each from level 9. The pile mixes the unlocked
+  piece kinds, newest first, so a new level's piece is always in hand. CPU bad guys count
+  toward their team's size and place theirs instantly. The team's grid floor caps the total, so
+  a big team on a small stage can't fill every cell.
 - **Every fort piece can be smashed** in the knock-it-down round, so a fort slows the other team
   down without ever walling a 4-year-old out. Kicks hit fort pieces hardest.
 
@@ -744,7 +755,5 @@ bad guy grabs a donut and banks it.
   stronger, slower moves), or only how it looks while moving?
 - **The owl.** It is already a species in the code. Its wings are the one set of arms that
   would read, which makes it a natural third move set.
-- **How many pieces per team?** A fixed number per level, more with each level, or a budget where
-  stronger pieces cost more?
 - **Powers for bad guys.** Do CPU bad guys fill a bar and use powers too (a grownup bad guy can,
   at `help -0.5` fill rate)? It makes them scarier and the shelf dome a real counter.

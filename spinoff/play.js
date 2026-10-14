@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { POSES, setGeometryDetail } from '../characters/npc.js';
 import { playSparkle, stepSparkle } from '../characters/sparkle.js';
 import { attachControls, createControls } from './controls.js';
-import * as match from './fake-match.js';
+import * as match from './sim.js';
 import { MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, setFur, stepFighter } from './fighter.js';
 import { RIOT, confettiMats, createFx, makeShadow, placeShadow, riotSparkleOn } from './fx.js';
 import { BRICK, STAGE, TICK_HZ } from './match.js';

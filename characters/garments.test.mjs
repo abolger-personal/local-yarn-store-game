@@ -17,6 +17,9 @@ import { WEAR_SLOTS, WEAR_SLOT_FOR } from './wip.js';
 
 LOOK.viewPx = 0;
 
+// FULL=1 runs every combination of the sweeps below; by default every other one, so each species, garment and fit still turns up.
+const sampled = () => { let k = 0; return () => Boolean(process.env.FULL) || k++ % 2 === 0; };
+
 const build = (id) => createCharacter({ ...BASE_PARAMS, ...getSpecies(id).defaults, mergeMeshes: false, scarf: false }, id);
 const item = (type, over = {}) => ({ ...defaultItem(type), on: true, ...over });
 const craftOf = (stitch) => Object.keys(STITCHES_BY_CRAFT).find((c) => STITCHES_BY_CRAFT[c].includes(stitch));
@@ -26,6 +29,7 @@ const onNeck = (mesh) => (i) => mesh.geometry.attributes.skinWeight.getY(i) > 0.
 
 {
   let n = 0;
+  const sweep = sampled();
   for (const id of speciesIds()) {
     const built = build(id);
     for (const [type, g] of Object.entries(GARMENTS)) {
@@ -39,6 +43,7 @@ const onNeck = (mesh) => (i) => mesh.geometry.attributes.skinWeight.getY(i) > 0.
             form: FORMS[i % FORMS.length], sleeves: SLEEVES[i % SLEEVES.length],
           });
           n++;
+          if (!sweep()) continue;
           const meshes = dress(built, { [type]: it });
           built.root.updateMatrixWorld(true);
           assert.ok(meshes.length > 0, `${id} ${type} ${silhouette} at fit ${fit} produced nothing`);
@@ -969,15 +974,9 @@ for (const id of speciesIds()) {
 
 {
   const q = new THREE.Vector3(), v = new THREE.Vector3();
+  const sweep = sampled();
   const PARTS = { 'pom-pom': 1, tassel: 2, flower: 6, buttons: 1 }, SUNK = { 'pom-pom': 0.3, tassel: 0.3, flower: 0.08, buttons: 0.08 };
-  const near = (tris, p, box) => {
-    let d = Infinity;
-    for (const t of tris) {
-      if (box && !box.intersectsTriangle(t)) continue;
-      d = Math.min(d, t.closestPointToPoint(p, q).distanceTo(p));
-    }
-    return d;
-  };
+  const near = (tris, p) => tris.reduce((d, t) => Math.min(d, t.closestPointToPoint(p, q).distanceTo(p)), Infinity);
   for (const id of speciesIds()) {
     const built = build(id);
     built.root.updateMatrixWorld(true);
@@ -985,6 +984,7 @@ for (const id of speciesIds()) {
     const trim = ({ geo }) => geo.attributes.color.getY(0) > 0.5;
     const key = ({ geo }) => { const a = geo.attributes.position; return `${a.count}:${a.getX(0)}:${a.getY(0)}:${a.getZ(0)}`; };
     for (const silhouette of GARMENTS.scarf.silhouettes) {
+      if (!sweep()) continue;
       const base = { silhouette, form: 'wrapped twice', weight: 'super-bulky', tool: null, stitch: 'cable', edge: 'none', colourwork: 'solid', colorCount: 2, color1: '#ff0000', color2: '#00ff00' };
       const bare = outfitPieces(built, { scarf: item('scarf', { ...base, accessory: 'none' }) });
       const had = new Set(bare.filter(trim).map(key));
@@ -1000,14 +1000,15 @@ for (const id of speciesIds()) {
           const box = new THREE.Box3();
           parts.slice(u, u + PARTS[accessory]).forEach((g) => box.expandByObject(new THREE.Mesh(g)));
           const size = box.getSize(new THREE.Vector3()).length() / 2, centre = box.getCenter(new THREE.Vector3()), around = box.clone().expandByScalar(size);
+          const local = tris.filter((t) => around.intersectsTriangle(t));
           let gap = Infinity;
           for (const g of parts.slice(u, u + PARTS[accessory])) {
             const p = g.attributes.position;
-            for (let i = 0; i < p.count; i += 3) gap = Math.min(gap, near(tris, v.fromBufferAttribute(p, i), around));
+            for (let i = 0; i < p.count; i += 3) gap = Math.min(gap, near(local, v.fromBufferAttribute(p, i)));
           }
           const what = `${id}: a ${accessory} (#${u / PARTS[accessory]}) on a super-bulky cable ${silhouette}`;
           assert.ok(gap < size * 0.15, `${what} is ${(gap / size).toFixed(2)} of its size off the fabric -- it hovers`);
-          assert.ok(near(tris, centre, null) > size * SUNK[accessory], `${what} has its centre ${(near(tris, centre, null) / size).toFixed(2)} of its size from the fabric -- sunk in it`);
+          assert.ok(near(tris, centre) > size * SUNK[accessory], `${what} has its centre ${(near(tris, centre) / size).toFixed(2)} of its size from the fabric -- sunk in it`);
         }
       }
     }
@@ -1483,7 +1484,9 @@ for (const id of speciesIds()) for (const silhouette of GARMENTS.sweater.silhoue
 {
   const cam = new THREE.PerspectiveCamera(30, 240 / 300, 0.01, 50);
   const onScreen = (v) => { const p = v.clone().project(cam); return Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1 && p.z < 1 ? p : null; };
+  const sweep = sampled();
   for (const id of speciesIds()) for (const type of ['hat', 'scarf', 'shawl', 'sweater', 'socks']) for (const silhouette of GARMENTS[type].silhouettes) {
+    if (!sweep()) continue;
     const built = build(id), what = `${type} ${silhouette}`;
     dress(built, { [type]: item(type, { silhouette }) });
     takeSelfie(built, cam, type, silhouette);

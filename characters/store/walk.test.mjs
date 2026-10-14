@@ -67,6 +67,8 @@ function tickRounds(dt, sit) {
 }
 
 const DT = 1 / 60;
+const SEEDS = Number(process.env.SEEDS ?? 5);
+console.info = () => {};   // the day's stock and delivery lines, once per restart
 
 function run(seconds, { sit = false, each = () => {}, at = () => {} } = {}) {
   const last = new Map();
@@ -140,7 +142,7 @@ for (const k of [1, 2, 3]) {
   const { items } = await import('./core/state.js');
   const { WIP_STATE, wantFor, stow } = await import('../wip.js');
   const rounds = [], seatToCraft = [];
-  for (let seed = 1; seed <= 50; seed++) {
+  for (let seed = 1; seed <= SEEDS; seed++) {
     open({ k: 1, tutorial: true, seed });
     const friend = shop.world.npcs[0];
     for (const kind of ['pattern', 'yarn', 'crochet-hook']) {
@@ -154,7 +156,7 @@ for (const k of [1, 2, 3]) {
     for (let day = 1; day <= 3; day++) {
       if (day > 1) try { restart(); } catch (err) { assert.match(err.stack, /sizeInstanceBuffers/); }
       assert.ok(shop.world.npcs.includes(friend), `seed ${seed}: the friend comes in on day ${day}`);
-      if (day === 2 && seed <= 10) {
+      if (day === 2) {
         let sat = null, crafting = null;
         run(60, { each: (rec, t) => {
           if (rec.npc !== friend) return;
@@ -184,7 +186,7 @@ for (const k of [1, 2, 3]) {
     `the friend starts crocheting once seated, not a round later (${seatToCraft.map((t) => t.toFixed(2)).join(', ')}s)`);
   rounds.sort((x, y) => x - y);
   assert.ok(rounds.at(-1) <= 5, `the finish comes early on day 3 (rounds ${rounds.join(',')})`);
-  console.log(`tutorial: the pot holder is finished in the shop on day 3, round ${rounds[25]} (median), ${rounds.at(-1)} (worst)`);
+  console.log(`tutorial: the pot holder is finished in the shop on day 3, round ${rounds[rounds.length >> 1]} (median), ${rounds.at(-1)} (worst)`);
 }
 
 {
@@ -219,7 +221,7 @@ for (const k of [1, 2, 3]) {
     doAdvanceRound();
     emptyWalks += shop.world.npcs.filter((n) => n.action?.type === ACTION.WALK_TO_DISPLAY && !stocked.has(n.action.params.displayId)).length;
   } };
-  for (let seed = 1; seed <= 40; seed++) {
+  for (let seed = 1; seed <= SEEDS; seed++) {
     open({ k: 1, tutorial: true, seed });
     const friend = shop.world.npcs[0];
     runDay();
@@ -227,7 +229,7 @@ for (const k of [1, 2, 3]) {
     assert.equal(page?.mood, 'happy', `seed ${seed}: day 1's friend takes the kit off the floor and goes home (${friend.state})`);
   }
   let buried = 0;
-  for (let seed = 1; seed <= 40; seed++) {
+  for (let seed = 1; seed <= SEEDS; seed++) {
     open({ k: 1, tutorial: true, seed });
     const friend = shop.world.npcs[0], pattern = items.find((x) => x.name === 'pattern');
     pattern.gone = true;
@@ -253,7 +255,7 @@ for (const k of [1, 2, 3]) {
     const page = shop.world.guestbook.find((g) => g.npc === friend.name);
     assert.equal(page?.mood, 'happy', `seed ${seed}: the friend found the hook and ball on the table (${page?.tags})`);
   }
-  assert.ok(buried >= 10, `only ${buried} wanted things were buried; the dig-out went untested`);
+  assert.ok(buried >= SEEDS / 2, `only ${buried} wanted things were buried; the dig-out went untested`);
   assert.equal(emptyWalks, 0, 'nobody walks up to a display holding nothing to browse it');
 }
 

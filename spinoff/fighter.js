@@ -15,16 +15,16 @@ export const SPECIES = Object.freeze(['lion', 'llama', 'owl']);
 
 const swatches = (pairs) => Object.freeze(pairs.map(([hex, name]) => Object.freeze({ hex, name })));
 
-export const FUR = Object.freeze({
-  lion: swatches([['#d9a54a', 'gold'], ['#c98a3a', 'amber'], ['#e8c27a', 'sand'], ['#b8743a', 'copper'], ['#f0d9a0', 'cream'], ['#a8653a', 'rust']]),
-  llama: swatches([['#f3ead8', 'white'], ['#e0c9a6', 'oat'], ['#c49a6c', 'caramel'], ['#8f6a4a', 'cocoa'], ['#f2d4c4', 'blush'], ['#d8b98a', 'honey']]),
-  owl: swatches([['#b08a5e', 'bark'], ['#8f6f50', 'chestnut'], ['#d4b896', 'biscuit'], ['#c9a27a', 'tawny'], ['#e6d3b3', 'snowy'], ['#a3825c', 'hazel']]),
-});
+// REUSE-SPEC.md §Look: when in doubt, colour riot. Fur is not natural colours.
+const RIOT = [
+  ['#ff3b7f', 'hot pink'], ['#ff7a1a', 'tangerine'], ['#ffd21a', 'lemon'], ['#8be02a', 'lime'],
+  ['#1fd18b', 'jade'], ['#14c4e0', 'cyan'], ['#2f6bff', 'electric blue'], ['#8a4dff', 'violet'],
+  ['#e83ad8', 'magenta'], ['#ff6f61', 'coral'], ['#6fc8ff', 'sky'], ['#ff9ad5', 'bubblegum'],
+];
 
-export const CLOTH = swatches([
-  ['#e04a4a', 'red'], ['#f08a2c', 'orange'], ['#f2c832', 'yellow'], ['#5cb85c', 'green'], ['#2fa8c8', 'teal'],
-  ['#3c6fd8', 'blue'], ['#e86aa8', 'pink'], ['#c9a8f0', 'lavender'], ['#8bd3c7', 'mint'], ['#f4f1ea', 'white'],
-]);
+export const FUR = swatches(RIOT);
+export const CLOTH = swatches([...RIOT, ['#ffffff', 'white']]);
+const FIRST_FUR = Object.freeze({ lion: '#ff7a1a', llama: '#ff9ad5', owl: '#14c4e0' });
 
 export const HATS = Object.freeze(['beanie', 'pixie', 'beret', 'bucket', 'earflap']);
 export const CAPES = Object.freeze(['cape', 'capelet']);
@@ -52,8 +52,8 @@ const hexIn = (list, hex) => list.some((s) => s.hex === hex);
 
 /** @returns {Look} */
 export const defaultLook = () => ({
-  hat: 'beanie', hatColor: CLOTH[0].hex, cape: 'cape', capeColor: CLOTH[5].hex,
-  bag: 'backpack', bagColor: CLOTH[2].hex, gloves: CLOTH[0].hex,
+  hat: 'beanie', hatColor: '#8be02a', cape: 'cape', capeColor: '#8a4dff',
+  bag: 'backpack', bagColor: '#ffd21a', gloves: '#ff3b7f',
 });
 
 const coatOf = (species, fur) => (species === 'lion' ? deriveManeColor(fur) : deriveCoatColor(fur));
@@ -68,7 +68,7 @@ export function setFur(f, fur) {
 /** @returns {Fighter} */
 export function newFighter(species) {
   const f = { species, params: structuredClone(getSpecies(species).defaults), look: defaultLook() };
-  return setFur(f, FUR[species][0].hex);
+  return setFur(f, FIRST_FUR[species]);
 }
 
 const pickOf = (list, rng) => list[Math.floor(rng() * list.length)];
@@ -82,7 +82,7 @@ export function randomFighter(rng = Math.random, species = pickOf(SPECIES, rng))
     hat: pickOf([...HATS, null], rng), hatColor: colour(), cape: pickOf([...CAPES, null], rng), capeColor: colour(),
     bag: pickOf(BAGS, rng), bagColor: colour(), gloves: colour(),
   };
-  return setFur(f, pickOf(FUR[species], rng).hex);
+  return setFur(f, pickOf(FUR, rng).hex);
 }
 
 function readParams(species, raw) {

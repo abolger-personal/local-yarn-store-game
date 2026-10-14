@@ -266,6 +266,10 @@ bad-guy AI and 5 connections, all cheap. Stage art is the budget to watch.
 
 ## Look
 
+**Palette rule: when unclear, colour riot** (decided 2026-10-13). Main characters' fur does not
+have to be a natural colour: a hot-pink lion and a cyan owl are the point. Quiet, natural and
+grey colours belong to the bad guys.
+
 Keep `felted` (the shop look, free), or try `toon` / `matcap` shading from
 `inventory/yarn-look.js` `SHADING` for a punchier arcade read. `setViewMode(root, 'silhouette')`
 gives a "who's that?" character-select reveal. Stages from the bakery: a giant cake, a stack of
@@ -328,11 +332,12 @@ only, pictures and colour, no words needed; every button has an `aria-label` for
 
 1. **Pick an animal.** Three big tiles (🦁 🦙 🦉). The new animal does its species `delighted`
    pose.
-2. **Pick fur.** Six swatches per species (`FUR`), never a colour wheel: a 4-year-old can tap a
+2. **Pick fur.** Twelve colour-riot swatches (`FUR`, the same for every animal), never a colour wheel: a 4-year-old can tap a
    swatch but not aim inside `<input type="color">`. The coat (fleece, mane, feathers) follows
    through the existing `deriveCoatColor` / `deriveManeColor`.
 3. **Pick clothes.** Hat pictures and cape pictures (each with a "none" tile), bag pictures (no
-   "none": every fighter carries a bag), each followed by its colour swatches (`CLOTH`), then
+   "none": every fighter carries a bag), each followed by its colour swatches (`CLOTH`: the riot
+   colours plus white), then
    glove colour. Icons are drawn in the colour currently picked. Each tap rebuilds the fighter
    (about 17 ms) on a gently turning preview.
 4. **Surprise me.** 🎲 runs the species' `randomise` plus a random outfit.

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { POSES, applyPose } from '../characters/npc.js';
 import { LOOK } from '../characters/garments.js';
+import { oklchOf } from '../inventory/yarn-look.js';
 import {
   BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, newFighter,
   randomFighter, readFighter, setFur,
@@ -59,7 +60,9 @@ for (const species of SPECIES) for (const cape of CAPES) {
 
 {
   for (const { hex, name } of CLOTH) assert.ok(!isBadGuyCloth(hex), `${name} is a bad-guy colour and can't be a kid's swatch`);
-  for (const [species, list] of Object.entries(FUR)) for (const { hex, name } of list) assert.ok(!isBadGuyFur(hex), `${species} ${name} fur reads as bad-guy grey`);
+  for (const { hex, name } of FUR) assert.ok(!isBadGuyFur(hex) && !isBadGuyCloth(hex), `${name} fur reads as a bad guy`);
+  for (const { hex, name } of FUR) assert.ok(oklchOf(hex).c > 0.1, `${name} is too quiet for the colour riot`);
+  for (const species of SPECIES) assert.ok(FUR.some((s) => s.hex === newFighter(species).params.bodyColor), `a new ${species} starts on a riot swatch`);
   assert.ok(isBadGuyCloth('#111111') && isBadGuyCloth('#4b2466') && isBadGuyFur('#8c8c8c'), 'black, dark purple and grey are the bad guys\'');
   assert.ok(!isBadGuyCloth('#c9a8f0'), 'light lavender stays a kid colour');
   assert.ok(isBadGuyFur('#a0a6ba'), 'the rig\'s default blue-grey fur reads as a bad guy, so a kid never starts with it');
@@ -84,8 +87,8 @@ for (const species of SPECIES) for (const cape of CAPES) {
 }
 
 {
-  const f = setFur(newFighter('llama'), FUR.llama[3].hex);
-  assert.equal(f.params.bodyColor, FUR.llama[3].hex);
+  const f = setFur(newFighter('llama'), FUR[3].hex);
+  assert.equal(f.params.bodyColor, FUR[3].hex);
   assert.notEqual(f.params.fleeceColor, newFighter('llama').params.fleeceColor, 'the fleece follows a new fur colour');
 }
 

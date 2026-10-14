@@ -48,7 +48,7 @@ function render() {
   const { species, look, params } = fighter;
   panel.innerHTML = [
     row('🐾', 'animal', SPECIES.map((s) => button('species', s, s, `<span class="emoji">${ANIMAL[s]}</span>`, s === species)).join('')),
-    row('🎨', 'fur', swatchRow('fur', FUR[species], params.bodyColor)),
+    row('🎨', 'fur', swatchRow('fur', FUR, params.bodyColor)),
     row('🎩', 'hat', pickRow('hat', HATS, look.hat, look.hatColor, true) + swatchRow('hatColor', CLOTH, look.hatColor)),
     row('🦸', 'cape', pickRow('cape', CAPES, look.cape, look.capeColor, true) + swatchRow('capeColor', CLOTH, look.capeColor)),
     row('🎒', 'bag', pickRow('bag', BAGS, look.bag, look.bagColor, false) + swatchRow('bagColor', CLOTH, look.bagColor)),

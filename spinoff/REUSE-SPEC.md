@@ -617,6 +617,10 @@ scary, for 4–6 year olds.
 - **Everybody starts over each new game** (decided 2026-10-13). Moves earned in a game (a room,
   from 🏠 to leaving) last only for that game. Next game night, grownup bad guys start again from
   the first moves. The one thing kept is the heroes' highest level (see Saving progress).
+- **Starting high gives grownup bad guys that level's moves** (decided 2026-10-13). A game that
+  starts on a high level hands every grownup bad guy the moves of that level's tier up front, the
+  same moves CPU bad guys have there. Either the grownup knows how to use them or they figure it
+  out in play; earning carries on from there.
 - **A bad guy's power bar fills from taking hits** (decided 2026-10-13), the FF7 Limit gauge: the
   more the kids clobber a bad guy, the sooner it can strike back. Heroes' bars never fill from
   being hit.

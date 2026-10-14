@@ -334,6 +334,10 @@ and smashers each get a round that is theirs.
 - **Every fort piece can be smashed** in the knock-it-down round, by anyone, so a fort slows the
   other team down without ever walling a 4-year-old out. Kicks hit fort pieces hardest. A piece
   must rest on something when placed (the grid's support rule).
+- **Pieces on top fall with a broken piece** (decided 2026-10-13). When a piece breaks, everything
+  resting on it drops straight down until it lands on something, and stays whole: knocking out
+  the bottom of a tall wall brings the wall down a level. Mixed-joint toughness is recounted when
+  pieces land, so a fallen wall can lose (or gain) its bonus.
 
 ## Handicap: one `help` number per player
 
@@ -805,8 +809,6 @@ bad guy grabs a donut and banks it.
 
 - **The owl's move set.** Its punches are wing swings with the gloves on its wing tips (see
   Costumes) and its kick a talon swipe from a hop; the rest of its moves are still to design.
-- **Collapse.** When a fort piece breaks, do the pieces resting on it fall (and stay whole), or
-  break with it? Falling is the grid's support rule and the most fun to watch.
 - **Who CPU bad guys go after.** The nearest kid, or grownups on the heroes' team first?
 - **How many tablets.** "Up to 6 players" in the intro: 6 heroes, or 6 people including grownup
   bad guys?

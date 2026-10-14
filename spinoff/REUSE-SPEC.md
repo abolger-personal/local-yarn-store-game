@@ -745,6 +745,8 @@ scary, for 4–6 year olds.
   It goes for the weakest piece within reach of its path (fewest hits left), so a mixed wall
   steers it toward a single-colour gap: the kids' best walls really do protect them. Breaking a
   piece charges nobody's bar.
+- **Targets: the nearest hero** (decided 2026-10-13), kid or grownup alike; no one is singled out.
+  The fairness rules below still apply on top (no two bad guys on one hero, grace after a hit).
 - **Fair to 4-year-olds.** About half a second of reaction delay before acting on anything new;
   at most one attack about every 0.8 s; two CPU bad guys never chase the same kid; after hitting a
   kid, a bad guy leaves that kid alone for a few seconds; no waiting at the stage edge to knock a
@@ -809,6 +811,5 @@ bad guy grabs a donut and banks it.
 
 - **The owl's move set.** Its punches are wing swings with the gloves on its wing tips (see
   Costumes) and its kick a talon swipe from a hop; the rest of its moves are still to design.
-- **Who CPU bad guys go after.** The nearest kid, or grownups on the heroes' team first?
 - **How many tablets.** "Up to 6 players" in the intro: 6 heroes, or 6 people including grownup
   bad guys?

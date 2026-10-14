@@ -461,8 +461,28 @@ snapshots and the host are not built yet. The yarn store's seeded rng (ROADMAP A
   state snapshots. Guests never talk to each other: 8 tablets is 7 connections, not 28.
 - **Transport is WebRTC data channels**, tablet to tablet over the home network. No server of
   ours. Connecting uses [Trystero](https://github.com/dmotz/trystero) (one CDN import) over its
-  Nostr strategy: the host shows a random room code, guests tap it in on the picture keypad (see Lobby). Signalling needs internet;
-  play traffic stays on the local network.
+  Nostr strategy: the host shows a random room code, guests tap it in on the picture keypad (see Lobby).
+- **Home network only** (decided 2026-10-13). The game is published as static files (GitHub
+  Pages), and every household plays only with the tablets on its own Wi-Fi; nothing about a game
+  or a fighter leaves the house. Three layers, in `spinoff/net.js` and `spinoff/roster.js`:
+  - **No STUN servers** (`rtcConfig: { iceServers: [] }`, which replaces Trystero's Google and
+    Cloudflare defaults). A tablet never learns its public address, so it can't leak it, and
+    WebRTC has no way to build a route across the internet. Browsers also hide home addresses
+    behind random `.local` names.
+  - **The room code scrambles the introductions** (Trystero's `password`), so the public Nostr
+    relays only pass along encrypted connection details. The code is a label that sorts tablets
+    within a house, not a lock: two households on the same code just fail to connect.
+  - **Each tablet checks the real route** (`remoteOf` + `isHomeRoute`): after connecting, it asks
+    its own browser which route the connection uses and hangs up unless the far end is a
+    home-network address (private IPv4, IPv6 local ranges, or a hidden `.local` host). Nothing is
+    sent or accepted before the check. This covers the one gap no STUN leaves: a modified copy
+    advertising a public IPv6 address. The check runs on the honest tablet, so editing a copy of
+    the game can't get around it.
+
+  What still crosses the internet: the page itself (from GitHub Pages), and the scrambled
+  introductions through the relays, which see that a tablet connected to them (its public IP, as
+  any website does) but not what it says. A household that can't reach the relays can't start a
+  game, even though play never leaves the house.
 - **Inputs** are a move target (a point or a tapped thing), 🥊 / 🦶 presses and a fired power
   ("power X at point P", see Power moves), sent only when they change, a few bytes each, on a
   reliable channel. A lost packet costs little: the target stays where it was. The host does the route-finding.
@@ -504,7 +524,8 @@ rollback or replays possible later.
   each other. Symptom: everyone joins the room but no data channel opens. Use the main network.
 - **Host leaves, match ends.** `ponytail:` no host migration; the room shows "host left" and
   everyone rejoins. Add migration only if it happens often.
-- **Room code is the only gate.** Random, shown on the host, not a word.
+- **The room code is a label, not a lock.** Random, shown on the host, not a word. The home-network
+  rules above keep strangers out; 1,296 picture codes only need to keep one house's games apart.
 
 ## Performance budget
 

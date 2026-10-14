@@ -15,3 +15,6 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 ### Lobby
 - 🏠 opens a room with a four-treat code; 🔑 joins one by tapping the code in. Everyone in the
   room stands together on the floor.
+- **Games stay in your home.** Tablets only play with other tablets on the same home Wi-Fi, and
+  your fighters and games are never sent anywhere else. The internet is used just to load the
+  game and to pass a scrambled hello so your tablets can find each other.

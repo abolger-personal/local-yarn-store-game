@@ -4,7 +4,7 @@ import { POSES, applyPose } from '../characters/npc.js';
 import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import {
-  BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, buildFighter, disposeFighter, gloveAnchors, isBadGuyCloth, isBadGuyFur,
+  BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, buildFighter, disposeFighter, gloveAnchors, isBadGuyCloth, isBadGuyFur,
   newFighter, randomFighter, readFighter, setFur,
 } from './fighter.js';
 import { wingShape } from '../characters/owl.js';
@@ -93,7 +93,7 @@ for (const species of SPECIES) for (const cape of CAPES) {
   assert.equal(readFighter(null), null);
   assert.equal(readFighter({ species: 'dragon' }), null, 'only the three animals');
   const junk = readFighter({ species: 'llama', params: { headRadius: 'big', bodyColor: 'red;}', legHeight: Number.NaN, view: '<script>' },
-    look: { hat: 'crown', hatColor: '#000000', cape: null, bag: 'suitcase', gloves: 12 } });
+    look: { hat: 'crown', hatColor: '#000000', hatStitch: 'linen stitch', cape: null, bag: 'suitcase', gloves: 12 } });
   const fresh = newFighter('llama');
   assert.equal(junk.params.headRadius, fresh.params.headRadius, 'a non-number size is ignored');
   assert.equal(junk.params.legHeight, fresh.params.legHeight, 'NaN is ignored');
@@ -103,6 +103,23 @@ for (const species of SPECIES) for (const cape of CAPES) {
   assert.equal(junk.look.cape, null, 'no cape is a real choice');
   assert.ok(BAGS.includes(junk.look.bag) && CLOTH.some((s) => s.hex === junk.look.gloves), 'unknown bag and glove colour fall back');
   assert.ok(CLOTH.some((s) => s.hex === junk.look.hatColor), 'black is not a kid\'s hat colour, even from another tablet');
+  assert.ok(TEXTURES.includes(junk.look.hatStitch), 'linen stitch is too heavy for a tablet, even from another tablet');
+}
+
+{
+  const triangles = (stitch) => {
+    const f = newFighter('lion');
+    f.look = { ...f.look, hat: 'beanie', hatStitch: stitch, cape: 'cape', capeStitch: stitch };
+    const built = buildFighter(f);
+    const n = built.garments.filter((m) => /hat|shawl/.test(m.userData.worn)).reduce((sum, m) => sum + m.geometry.index.count / 3, 0);
+    disposeFighter(built);
+    return n;
+  };
+  const smooth = triangles('stockinette');
+  for (const stitch of TEXTURES) {
+    assert.ok(triangles(stitch) <= smooth * 5, `${stitch} hat and cape cost ${triangles(stitch)} triangles, over 5× smooth (${smooth})`);
+  }
+  assert.ok(triangles('cable') > smooth * 2, 'a cable hat and cape are actually textured');
 }
 
 {

@@ -5,7 +5,7 @@ import {
   stepMotion,
 } from '../characters/npc.js';
 import { deriveManeColor } from '../characters/lion.js';
-import { defaultItem, dress, undress, usualTool } from '../characters/garments.js';
+import { CRAFTS, STITCHES_BY_CRAFT, defaultItem, dress, undress, usualTool } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import '../characters/llama.js';
 import { wingShape } from '../characters/owl.js';
@@ -29,6 +29,8 @@ const FIRST_FUR = Object.freeze({ lion: '#ff7a1a', llama: '#ff9ad5', owl: '#14c4
 export const HATS = Object.freeze(['beanie', 'pixie', 'beret', 'bucket', 'earflap']);
 export const CAPES = Object.freeze(['cape', 'capelet']);
 export const BAGS = Object.freeze(['backpack', 'drawstring bag', 'crossbody pouch']);
+// REUSE-SPEC.md §Costumes: up to cable's weight; seed, puff and linen stitch cost 6–18× the triangles
+export const TEXTURES = Object.freeze(['stockinette', 'rib', 'garter', 'cable', 'single crochet', 'waffle', 'lace']);
 
 // spinoff/REUSE-SPEC.md §Bad guys: grey fur, black and dark purple, reserved from the kids' swatches
 export function isBadGuyCloth(hex) {
@@ -45,14 +47,14 @@ const HEX = /^#[0-9a-f]{6}$/i;
 const hexIn = (list, hex) => list.some((s) => s.hex === hex);
 
 /**
- * @typedef {{ hat: string|null, hatColor: string, cape: string|null, capeColor: string,
+ * @typedef {{ hat: string|null, hatColor: string, hatStitch: string, cape: string|null, capeColor: string, capeStitch: string,
  *             bag: string, bagColor: string, gloves: string }} Look
  * @typedef {{ species: string, params: Record<string, any>, look: Look }} Fighter
  */
 
 /** @returns {Look} */
 export const defaultLook = () => ({
-  hat: 'beanie', hatColor: '#8be02a', cape: 'cape', capeColor: '#8a4dff',
+  hat: 'beanie', hatColor: '#8be02a', hatStitch: 'rib', cape: 'cape', capeColor: '#8a4dff', capeStitch: 'stockinette',
   bag: 'backpack', bagColor: '#ffd21a', gloves: '#ff3b7f',
 });
 
@@ -79,7 +81,8 @@ export function randomFighter(rng = Math.random, species = pickOf(SPECIES, rng))
   getSpecies(species).randomise(f.params);
   const colour = () => pickOf(CLOTH, rng).hex;
   f.look = {
-    hat: pickOf([...HATS, null], rng), hatColor: colour(), cape: pickOf([...CAPES, null], rng), capeColor: colour(),
+    hat: pickOf([...HATS, null], rng), hatColor: colour(), hatStitch: pickOf(TEXTURES, rng),
+    cape: pickOf([...CAPES, null], rng), capeColor: colour(), capeStitch: pickOf(TEXTURES, rng),
     bag: pickOf(BAGS, rng), bagColor: colour(), gloves: colour(),
   };
   return setFur(f, pickOf(FUR, rng).hex);
@@ -103,7 +106,8 @@ function readLook(raw) {
   const colour = (k) => (hexIn(CLOTH, r[k]) ? r[k] : base[k]);
   const choice = (k, list, none) => (list.includes(r[k]) || (none && r[k] === null) ? r[k] : base[k]);
   return {
-    hat: choice('hat', HATS, true), hatColor: colour('hatColor'), cape: choice('cape', CAPES, true), capeColor: colour('capeColor'),
+    hat: choice('hat', HATS, true), hatColor: colour('hatColor'), hatStitch: choice('hatStitch', TEXTURES, false),
+    cape: choice('cape', CAPES, true), capeColor: colour('capeColor'), capeStitch: choice('capeStitch', TEXTURES, false),
     bag: choice('bag', BAGS, false), bagColor: colour('bagColor'), gloves: colour('gloves'),
   };
 }
@@ -124,16 +128,17 @@ export function saveFighter(f) {
   globalThis.navigator?.storage?.persist?.().catch(() => {});
 }
 
-function wear(type, silhouette, color) {
+function wear(type, silhouette, color, stitch = 'stockinette') {
   const item = defaultItem(type);
   if (!silhouette) return { ...item, on: false };
-  return { ...item, on: true, silhouette, color1: color, colorCount: 1, colourwork: 'solid', tool: usualTool(item.craft, item.weight) };
+  const craft = CRAFTS.find((c) => STITCHES_BY_CRAFT[c].includes(stitch));
+  return { ...item, on: true, silhouette, color1: color, colorCount: 1, colourwork: 'solid', craft, stitch, tool: usualTool(craft, item.weight) };
 }
 
 /** @param {Look} look */
 export const outfitOf = (look) => ({
-  hat: wear('hat', look.hat, look.hatColor),
-  shawl: wear('shawl', look.cape, look.capeColor),
+  hat: wear('hat', look.hat, look.hatColor, look.hatStitch),
+  shawl: wear('shawl', look.cape, look.capeColor, look.capeStitch),
   bag: wear('bag', look.bag, look.bagColor),
 });
 

@@ -329,6 +329,11 @@ Every fighter wears a hat, a cape, a bag and boxing gloves, each in colours the 
   Seven silhouettes; the backpack and the drawstring bag read best from the side. The bag is
   what carries donuts (see Mode: donut capture the flag), so the hands stay free for gloves.
   The rig's own held skein (`buildHeldItem` in `npc.js`) is simply never shown.
+- **Stitch texture on hats and capes** (`TEXTURES` in `fighter.js`): stockinette, rib, garter,
+  cable, single crochet, waffle, lace. Relief adds triangles but never draw calls; measured on a
+  lion's beanie plus cape, from 4,320 triangles (stockinette) up to 18,784 (cable, 4.3×). Seed
+  (6.3×), puff (8.7×) and linen stitch (18.5×) are left out for tablet GPUs. Colourwork
+  (stripes, fair isle, …) is free (vertex colours) and is the next texture to offer.
 
 ## Fighter chooser
 
@@ -343,7 +348,8 @@ only, pictures and colour, no words needed; every button has an `aria-label` for
 3. **Pick clothes.** Hat pictures and cape pictures (each with a "none" tile), bag pictures (no
    "none": every fighter carries a bag), each followed by its colour swatches (`CLOTH`: the riot
    colours plus white), then
-   glove colour. Icons are drawn in the colour currently picked. Each tap rebuilds the fighter
+   glove colour. Icons are drawn in the colour currently picked. Tapping the hat or cape you
+   already wear knits it in the next stitch; the icon shows the stitch as a pattern. Each tap rebuilds the fighter
    (about 17 ms) on a gently turning preview.
 4. **Surprise me.** 🎲 runs the species' `randomise` plus a random outfit.
 5. **Done.** ✅ saves `{ species, params, look }` to `localStorage` under `lys.fighter.v1` and

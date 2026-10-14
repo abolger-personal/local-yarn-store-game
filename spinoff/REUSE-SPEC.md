@@ -92,12 +92,13 @@ Not reusable: the store sim, displays, inventory grid, pathing, puzzle, stock an
 - **No per-channel joint limits** (`MOTION-TODO.md` §Known ceilings). Exaggerated attack poses
   plus an idle twitch can push an ear through the skull.
 
-### Design constraint from the rig
+### Arms read, thanks to the gloves
 
-**Arms disappear into fleece and mane.** Both species kits say so in their `delighted` comment:
-the llama cheers with ear flaps, the lion with its tail, because arm poses don't read through
-the coat (`coatBulge`). Signature moves should use what does read: the llama's long neck
-(headbutt, spit), the lion's tail and mane (tail whip, roar), legs for kicks.
+The species kits' `delighted` comments say arm poses don't read through fleece and mane
+(`coatBulge`), which is why the llama cheers with its ears and the lion with its tail. That was
+about bare arms moving inside the coat. Gloves fix it (see Costumes): the glove is what the eye
+follows, so punches are fine as signature moves (checked by eye on dozens of random fighters,
+2026-10-13). The neck, tail, mane and wings are extras on top, not substitutes.
 
 ## Scoring: everyone plays the whole time
 
@@ -337,7 +338,7 @@ in colours the kid picks.
   down the wing. The glove sits at 80% of the way down the wing instead, sized to swallow the
   tip whatever the owl's wing size (up to about 1.8 times a hand glove), so the wing is the arm
   and the glove is its fist. Owl punches are wing swings from the shoulder.
-- **Gloves fix the vanishing arms.** Arms disappear into fleece and mane (Design constraint,
+- **Gloves fix the vanishing arms.** Bare arms disappear into fleece and mane (Arms read,
   above), but a big coloured glove at the end of each arm is the most readable thing on screen,
   so punches can be signature moves after all.
 - **Bags:** `garments.js` bag, as-is (`GARMENTS.bag`, built by `buildBag` on the chest joint).

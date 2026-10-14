@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>Donut fighters — touch test</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #f6e7d4; font: 18px ui-rounded, system-ui, sans-serif; color: #4a3a30;
+    touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  #pad { position: absolute; inset: 0; }
+  #log { position: absolute; top: 12px; left: 16px; right: 16px; pointer-events: none; white-space: pre-line; }
+  .finger { position: absolute; width: 90px; height: 90px; margin: -45px 0 0 -45px; border-radius: 50%; display: grid; place-items: center;
+    color: #fff; font-weight: 700; pointer-events: none; }
+  .buttons { position: absolute; right: 40px; bottom: 60px; display: flex; gap: 24px; }
+  .buttons button { width: 110px; height: 110px; border-radius: 50%; border: 5px solid #e7d6c1; background: #fff; font-size: 54px; touch-action: none; }
+  .buttons button.down { background: #ff3b7f; border-color: #e0663a; transform: scale(1.1); }
+</style>
+</head>
+<body>
+<div id="pad"></div>
+<div id="log"></div>
+<div class="buttons">
+  <button id="punch" aria-label="punch">🥊</button>
+  <button id="kick" aria-label="kick">🦶</button>
+</div>
+<script type="module">
+  const COLOURS = ['#ff7a1a', '#14c4e0', '#8be02a', '#8a4dff', '#e83ad8', '#2f6bff', '#ffd21a', '#1fd18b'];
+  const pad = document.getElementById('pad'), log = document.getElementById('log');
+  const fingers = new Map(), pressed = new Map(), count = { cancel: 0, maxAtOnce: 0, maxButtonsAndFingers: 0 };
+
+  const show = () => {
+    count.maxAtOnce = Math.max(count.maxAtOnce, fingers.size);
+    if (fingers.size && pressed.size) count.maxButtonsAndFingers = Math.max(count.maxButtonsAndFingers, fingers.size + pressed.size);
+    log.textContent = `touch points the tablet reports: ${navigator.maxTouchPoints}\n`
+      + `fingers on the stage now: ${fingers.size}   most at once: ${count.maxAtOnce}\n`
+      + `buttons held now: ${[...pressed.values()].join(' ') || '–'}\n`
+      + `stage finger + button together, best: ${count.maxButtonsAndFingers || '–'}\n`
+      + `pointercancel (the browser stole a touch): ${count.cancel}`;
+  };
+
+  pad.addEventListener('pointerdown', (e) => {
+    pad.setPointerCapture(e.pointerId);
+    const dot = document.createElement('div');
+    dot.className = 'finger';
+    dot.style.background = COLOURS[fingers.size % COLOURS.length];
+    dot.textContent = e.pointerId;
+    pad.append(dot);
+    fingers.set(e.pointerId, dot);
+    move(e);
+  });
+  const move = (e) => {
+    const dot = fingers.get(e.pointerId);
+    if (dot) { dot.style.left = `${e.clientX}px`; dot.style.top = `${e.clientY}px`; }
+    show();
+  };
+  const lift = (e) => {
+    if (e.type === 'pointercancel') count.cancel++;
+    fingers.get(e.pointerId)?.remove();
+    fingers.delete(e.pointerId);
+    show();
+  };
+  pad.addEventListener('pointermove', move);
+  pad.addEventListener('pointerup', lift);
+  pad.addEventListener('pointercancel', lift);
+
+  for (const b of document.querySelectorAll('.buttons button')) {
+    b.addEventListener('pointerdown', (e) => { b.setPointerCapture(e.pointerId); b.classList.add('down'); pressed.set(e.pointerId, b.textContent); show(); });
+    const up = (e) => { if (e.type === 'pointercancel') count.cancel++; b.classList.remove('down'); pressed.delete(e.pointerId); show(); };
+    b.addEventListener('pointerup', up);
+    b.addEventListener('pointercancel', up);
+  }
+  document.addEventListener('contextmenu', (e) => e.preventDefault());
+  show();
+</script>
+</body>
+</html>

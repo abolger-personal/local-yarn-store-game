@@ -1080,7 +1080,7 @@ export function stepMotion(built, target, dt, opts, add) {
 }
 
 // BODIES.md §Tail
-const TAIL_TELEPORT = 6;
+const TAIL_TELEPORT = 50, TAIL_TELEPORT_STEP = 3;
 const _tailAt = new THREE.Vector3(), _tailV = new THREE.Vector3(), _tailQ = new THREE.Quaternion();
 const _tailA = [0, 0, 0];
 
@@ -1092,7 +1092,7 @@ function tailAcceleration(built, dt) {
   const track = (built.tailTrack ??= { at: null, vel: null });
   const v = track.at && _tailV.subVectors(_tailAt, track.at).divideScalar(dt);
   track.at = (track.at ?? new THREE.Vector3()).copy(_tailAt);
-  if (!v || v.length() > TAIL_TELEPORT) {
+  if (!v || v.length() > Math.min(TAIL_TELEPORT, TAIL_TELEPORT_STEP / dt)) {
     track.vel = null;
     return _tailA;
   }

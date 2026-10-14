@@ -130,7 +130,9 @@ buttons are 🥊 punch and 🦶 kick, which attack where the fighter is, while i
   wall, and the kid smashes through. No route-finding around forts.
 - **Two thumbs at once.** One thumb taps the stage while the other presses 🥊 or 🦶, tracked
   separately by `pointerId` (Pointer Events, `touch-action: none`). A touch that starts on a
-  button never counts as a move.
+  button never counts as a move. Tested 2026-10-13 on the Android tablet with
+  `spinoff/touch-test.html`: many fingers at once, each tracked separately, with the buttons held
+  alongside ("like a piano keyboard"). Still to test on an iPad.
 - **Buttons are big,** sized for small hands.
 
 ## Scoring: everyone plays the whole time
@@ -598,3 +600,6 @@ bad guy grabs a donut and banks it.
   would read, which makes it a natural third move set.
 - **How many pieces per team?** A fixed number per level, more with each level, or a budget where
   stronger pieces cost more?
+- **Many fingers as a play goal.** The touch test showed the tablet tracking many fingers at once,
+  every one separately. Is that a mechanic inside the fighter (whole-hand slaps, chords, building
+  forts with several fingers), a between-levels minigame, or its own game?

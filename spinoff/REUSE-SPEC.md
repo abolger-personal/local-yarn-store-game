@@ -1,6 +1,6 @@
 # Spinoff: donut fighters
 
-The same llama, lion and owl characters in a **2.5D platform fighter for up to 6 players, each
+The same llama, lion and owl characters in a **2.5D platform fighter for up to 8 players (6 heroes, 2 played bad guys), each
 on their own tablet with their own camera**, on one shared home network: the kids' team against
 a team of bad guys (CPU, or grownups who join as one) in donut capture the flag. Decided with the players, 2026-10-13. This doc sorts the existing code by how much of it carries over, lists what
 the fighter still needs, and sets out the network design. A bare file name is in `characters/`;
@@ -427,7 +427,7 @@ snapshots and the host are not built yet. The yarn store's seeded rng (ROADMAP A
 
 - **One kid's tablet hosts**, and that kid also plays. The host runs the only copy of the game
   state at a fixed 60 Hz tick. Each guest sends inputs to the host; the host sends each guest
-  state snapshots. Guests never talk to each other: 6 players is 5 connections, not 15.
+  state snapshots. Guests never talk to each other: 8 tablets is 7 connections, not 28.
 - **Transport is WebRTC data channels**, tablet to tablet over the home network. No server of
   ours. Connecting uses [Trystero](https://github.com/dmotz/trystero) (one CDN import) over its
   Nostr strategy: the host shows a random room code, guests tap it in on the picture keypad (see Lobby). Signalling needs internet;
@@ -446,7 +446,7 @@ snapshots and the host are not built yet. The yarn store's seeded rng (ROADMAP A
   answers about one frame late. `ponytail:` add prediction for the guest's own fighter only if
   that feels laggy in play.
 - **Rollback is out.** It needs bit-identical simulation on every tablet, and mispredictions
-  multiply with 6 players. Host-authoritative needs neither.
+  multiply with 8 players. Host-authoritative needs neither.
 
 ### What crosses the network and what doesn't
 
@@ -480,7 +480,7 @@ rollback or replays possible later.
 Measured on the shop: ~15 draw calls per character, 40 characters at 35 fps under 20× CPU
 throttle (`WEARABLE-LOOK-VS-PERFORMANCE.md`). Every tablet renders at most 14 fighters (6 kids,
 8 bad guys) plus a stage, well under that measured 40; the host also runs a 14-body 2D sim, the
-bad-guy AI and 5 connections, all cheap. Stage art is the budget to watch.
+bad-guy AI and 7 connections, all cheap. Stage art is the budget to watch.
 
 Measured on fighters (2026-10-13, headless): 14 dressed fighters are **142 draws** (about 10 each),
 a quarter of the 600 that ran at 35 fps. Triangles are the GPU's side and are unmeasured on a
@@ -621,7 +621,7 @@ Built: `spinoff/lobby.html` (page) on `spinoff/net.js` and `spinoff/roster.js`.
 - Everyone in the room stands together on a **grid floor** (`inventory/grid.js` display, drawn
   with `makeGridLines` from `inventory/notions.js`). `standingSpots` gives every tablet the same
   arrangement whatever order people joined in: front row first, from the middle out, 7 × 2
-  cells, room for 14 (6 kids, 8 bad guys).
+  cells, room for 14 (6 heroes, 8 bad guys).
 - A newcomer arrives with a cheer. 👋 waves bye and leaves the room (not a door: a door reads as going in as much as out); ✏️ goes back to the chooser.
 - Network: Trystero 0.26 over Nostr, loaded from esm.sh through the import map, a devDependency
   for its types only (the same arrangement as `three`). Each tablet sends its fighter to each
@@ -634,6 +634,11 @@ The other team: up to 8 bad guys, drawn from **8 fixed presets**. A grownup can 
 the host fills the rest of the team with CPU bad guys from the presets nobody took. Silly, not
 scary, for 4–6 year olds.
 
+- **Eight tablets at most: 6 heroes and 2 played bad guys** (decided 2026-10-13). Up to six
+  people play heroes. A seventh or eighth person plays a bad guy whether they tapped 🥷 or not:
+  the latest arrivals, in the order the host saw them join, so nobody who was already a hero is
+  moved. At most two people play bad guys; once two have, 🥷 greys out. A ninth tablet is
+  turned away with a "room full" picture. CPU bad guys fill the rest of the bad-guy team, up to 8.
 - **Grownups join as bad guys with one button** (decided 2026-10-13). 🥷 in the lobby swaps your
   fighter for a bad guy; tap it again to go back. Nothing to pick: you get the first preset no
   other grownup in the room has. Which one is worked out the way `standingSpots` places people:
@@ -801,7 +806,7 @@ bad guy grabs a donut and banks it.
 2. **Two tablets.** Done: the fighter chooser, the room code and the join handshake, with
    everyone standing on the lobby floor. Still to do: inputs up, snapshots down, interpolation,
    per-tablet camera.
-3. **Kids vs bad guys.** Up to six tablets on one team, the bad-guy team from its 8 presets,
+3. **Kids vs bad guys.** Up to eight tablets (six heroes, two played bad guys), the bad-guy team from its 8 presets,
    `ninja` hat and AI, two shelves on a stage wider than a screen, edge markers, the match timer
    and team shelf score, donut pickups, a results screen with `selfie.js` portraits.
 4. **Content.** Full move lists per species, stages, alternate costumes, item drops with
@@ -811,5 +816,3 @@ bad guy grabs a donut and banks it.
 
 - **The owl's move set.** Its punches are wing swings with the gloves on its wing tips (see
   Costumes) and its kick a talon swipe from a hop; the rest of its moves are still to design.
-- **How many tablets.** "Up to 6 players" in the intro: 6 heroes, or 6 people including grownup
-  bad guys?

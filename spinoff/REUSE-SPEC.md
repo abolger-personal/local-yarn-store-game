@@ -23,7 +23,7 @@ chooser reuses its logic, not its screen.
 | Module | What it gives | Imports |
 | --- | --- | --- |
 | `npc.js` | Species registry, `BASE_PARAMS` body proportions, `createCharacter` (procedural build → one rigid-skinned mesh per material family), `applyPose`, `groundCharacter`, `stepMotion`, `setViewMode` (`felted` / `grey` / `silhouette`), randomiser, `disposeCharacter` | `three`, `motion.js` |
-| `motion.js` | Spring-driven pose channels (19 joints + hold), interrupt-safe blending, idle layer (breath, weight shift, blinks, ear flicks), walk layer, `DANCES` step sequencer, `motionOf(traits)` personality → motion | nothing |
+| `motion.js` | Spring-driven pose channels (19 joints + hold), interrupt-safe blending, idle layer (breath, weight shift, blinks, ear flicks), walk layer, `DANCES` step sequencer | nothing |
 | `llama.js`, `lion.js`, `owl.js` | Species kits: defaults, random ranges, presets (fleece / mane / feathers), per-species motion ranges, species `delighted` pose | `npc.js` |
 | `sparkle.js` | Timed particle burst on a character | `three` |
 | `inventory/room-environment.js` | The lighting environment the felt look was tuned under | `three` |
@@ -38,8 +38,6 @@ What matters more for a fighter than it did for a shop:
   per-move `stiff` / `zeta` and root extras (`rise`, `turn`, `travel`, `shift`, `hop`). An attack
   is the same shape: wind-up, strike, recovery. `hold` becomes frame data; `stiff` becomes how
   snappy the move looks. New attacks are data entries, not new code.
-- **Personality already drives motion.** `motionOf(traits)` maps the ten traits to stiffness,
-  overshoot (`zeta`), sway, head carry. A high-Volatility fighter already overshoots its poses.
 - **Tails react to world acceleration.** `tailAcceleration` reads the tail root's world position,
   so a lion's tail swings on its own when the body turns, jumps or is knocked back.
 
@@ -56,10 +54,9 @@ charm: a fighter's alternate costumes are outfits. `selfie.js` is the victory sc
 
 ## Tier 3: ideas to borrow, code to leave
 
-- `visit.js` `TRAITS` / `randomTraits`: the ten-trait personality model (use the exact trait names,
-  per `CHARACTER-ATTRIBUTES.md`).
-- `guestbook.js`: trait-voiced lines. Could become taunts or win quotes, but it is wired to yarn
-  vocabulary; treat it as a pattern.
+- **Personality is left out** (decided 2026-10-13). The yarn store's ten-trait model (`visit.js`
+  `TRAITS`, `motionOf(traits)`, the trait-voiced `guestbook.js`) doesn't fit a fighter, so the
+  spinoff uses none of it. Every fighter moves with the same idle style (`IDLE` in `fighter.js`).
 
 Not reusable: the store sim, displays, inventory grid, pathing, puzzle, stock and HUD.
 
@@ -693,9 +690,8 @@ scary, for 4–6 year olds.
   - run home and bank;
   - break off to attack a kid who is carrying donuts nearby.
 
-  One exact trait tunes it: **Assertiveness** sets how often a bad guy chases a carrier instead
-  of grabbing. `ponytail:` one state machine for every bad guy; personalities per bad guy only if
-  matches feel samey.
+  One number tunes it: how often a bad guy chases a carrier instead of grabbing. `ponytail:` one
+  state machine for every bad guy.
 - **The bad-guy team grows level by level** (decided 2026-10-13). Level 1 is the grownups who
   tapped 🥷, or one CPU bad guy if nobody did. Each level after adds one CPU bad guy:
 
@@ -751,8 +747,6 @@ bad guy grabs a donut and banks it.
 
 ## Open questions
 
-- **Personality.** Should traits change how a fighter plays (a high-Volatility lion with
-  stronger, slower moves), or only how it looks while moving?
 - **The owl.** It is already a species in the code. Its wings are the one set of arms that
   would read, which makes it a natural third move set.
 - **Powers for bad guys.** Do CPU bad guys fill a bar and use powers too (a grownup bad guy can,

@@ -212,7 +212,7 @@ export function disposeFighter(built) {
   disposeCharacter(built);
 }
 
-// ponytail: one idle style for everyone; per-fighter motionOf(traits) once fighters have personalities
+// REUSE-SPEC.md §Tier 3: no personalities, so one idle style for everyone
 const IDLE = Object.freeze({ ...MOTION_DEFAULTS });
 
 /** @param {keyof typeof POSES} [pose] */

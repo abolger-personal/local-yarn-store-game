@@ -1,10 +1,10 @@
 # Spinoff: donut fighters
 
-The same llama, lion (and owl) characters in a **2.5D platform fighter for up to 6 players, each
+The same llama, lion and owl characters in a **2.5D platform fighter for up to 6 players, each
 on their own tablet with their own camera**, on one shared home network: the kids' team against
-a team of CPU bad guys in donut capture the flag. Decided with the players, 2026-10-13. This doc sorts the existing code by how much of it carries over, lists what
-the fighter still needs, and sets out the network design. References are to `characters/` and
-`inventory/` as of `d27156c`.
+a team of bad guys (CPU, or grownups who join as one) in donut capture the flag. Decided with the players, 2026-10-13. This doc sorts the existing code by how much of it carries over, lists what
+the fighter still needs, and sets out the network design. A bare file name is in `characters/`;
+other paths are from the repo root.
 
 ## Layout
 
@@ -16,7 +16,7 @@ tails, garments) would then have to be ported by hand.
 Each kid makes their fighter on the spinoff's own **fighter chooser** page (see below) and it is
 saved on their tablet, so each kid brings the fighter they made. The yarn store's
 `dress-up.html` is a grown-up tuning tool (lil-gui panels, text everywhere) and stays one; the
-chooser reuses its logic, not its screen.
+chooser is its own code in `spinoff/fighter.js`, with its own save.
 
 ## Tier 1: reuse as-is (no yarn-store coupling)
 
@@ -45,9 +45,8 @@ What matters more for a fighter than it did for a shop:
 
 | Module | What it gives | Drags in |
 | --- | --- | --- |
-| `garments.js` | The costumer: `dress(built, outfit)` / `undress`, six garment types × many silhouettes, colourwork, fit to body | `inventory/yarn-look.js`, `inventory/catalog.js`, `store/core/util.js` |
+| `garments.js` | The costumer: `dress(built, outfit)` / `undress`, six garment types × many silhouettes, colourwork, fit to body | `inventory/yarn-look.js`, `inventory/catalog.js` |
 | `selfie.js` | `shotFor` / `takeSelfie`: a camera that frames a character's face and outfit | `npc.js` |
-| `dress-up.js` | Save/load shape for species params + outfit, rebuild-on-change loop. The chooser borrows these; its lil-gui screen is not for kids | everything above, `visit.js` for `randomTraits` |
 
 The drag-ins are small and in the same repo, so reuse means importing them. Knitwear is the
 charm: a fighter's alternate costumes are outfits. `selfie.js` is the victory screen camera.
@@ -57,8 +56,13 @@ charm: a fighter's alternate costumes are outfits. `selfie.js` is the victory sc
 - **Personality is left out** (decided 2026-10-13). The yarn store's ten-trait model (`visit.js`
   `TRAITS`, `motionOf(traits)`, the trait-voiced `guestbook.js`) doesn't fit a fighter, so the
   spinoff uses none of it. Every fighter moves with the same idle style (`IDLE` in `fighter.js`).
+- **`dress-up.js`'s save and rebuild loop.** The chooser does the same job (species params plus
+  outfit, rebuilt on every change) in `spinoff/fighter.js`, saved under `lys.fighter.v1`; it
+  imports nothing from `dress-up.js`.
 
-Not reusable: the store sim, displays, inventory grid, pathing, puzzle, stock and HUD.
+Not reusable: the store sim, displays, pathing, puzzle, stock and HUD. The inventory grid is
+reused: `inventory/grid.js` for the lobby floor, team shelves and forts, and
+`inventory/pick-place.js` for fort placement (see Forts).
 
 ## What the fighter needs
 
@@ -257,8 +261,8 @@ wide stage costs nothing new.
   existing house rule from `PROJECT-BAGS.md` §1–2 ("balls poking out, countable"), with donuts
   for balls. A full bag can't grab more.
 - **Shelves are the shop's shelves.** A team shelf is a `grid.js` display like the wall shelves
-  in `DISPLAY_SLOTS` (`store/scene/displays.js`), seen from the side: columns across, shelves up.
-  The grab and bank rules are pure `grid.js` calls with no three.js, so they run in the node
+  in `DISPLAY_SLOTS` (`characters/store/scene/displays.js`), seen from the side: columns across,
+  shelves up. The grab and bank rules are pure `grid.js` calls with no three.js, so they run in the node
   sim test.
 - **Friendly fire is off, as a setting.** Teammates pass through each other's attacks. Every
   fighter carries a `team`, and whether one fighter can hit another is `canHit(a, b, match)` in
@@ -381,10 +385,10 @@ Check: the milestone 1 node test runs the same scripted hit against fighters at 
 
 ### Where things stand
 
-No networking code in the repo, and the game ships as static files on GitHub Pages. The
-seeded-rng work on `0.0.1` is so far a ROADMAP entry (A1); `mulberry32` exists in
-`store/core/util.js` but the sim still defaults to `Math.random`. Neither blocks the design
-below.
+The game ships as static files on GitHub Pages. The lobby's networking is built
+(`spinoff/net.js`, Trystero; see Lobby): every tablet swaps fighters with every other. Inputs,
+snapshots and the host are not built yet. The yarn store's seeded rng (ROADMAP A1) draws from
+`world.rngState` (`draw` in `characters/store/core/util.js`); the spinoff doesn't depend on it.
 
 ### Design: one host tablet, star topology
 
@@ -395,12 +399,13 @@ below.
   ours. Connecting uses [Trystero](https://github.com/dmotz/trystero) (one CDN import) over its
   Nostr strategy: the host shows a random room code, guests type it. Signalling needs internet;
   play traffic stays on the local network.
-- **Inputs** are a move target (a point or a tapped thing) plus 🥊 / 🦶 presses, sent only when
-  they change, a few bytes each, on a reliable channel. A lost packet costs little: the target
-  stays where it was. The host does the route-finding.
+- **Inputs** are a move target (a point or a tapped thing), 🥊 / 🦶 presses and a fired power
+  ("power X at point P", see Power moves), sent only when they change, a few bytes each, on a
+  reliable channel. A lost packet costs little: the target stays where it was. The host does the route-finding.
 - **Snapshots** (per fighter: position, velocity, facing, percent, donuts in bag, move id, move
-  step, ~30 bytes; under 450 bytes for 14 fighters; plus each shelf's donut count and loose donut
-  pickups as positions) go 30 times a second on an unreliable channel
+  step, ~30 bytes; under 450 bytes for 14 fighters; plus a few bytes each for bar level, tap
+  target and power state, see Team powers; plus each shelf's donut count and loose donut pickups
+  as positions) go 30 times a second on an unreliable channel
   (`{ ordered: false, maxRetransmits: 0 }`). A newer snapshot replaces any lost one, so a drop
   never stalls the stream.
 - **Guests draw other fighters ~1–2 snapshots behind**, interpolating between the last two.
@@ -416,7 +421,7 @@ The split follows the A1 plan: gameplay is one authority, cosmetics are local.
 
 | Crosses | Stays local on each tablet |
 | --- | --- |
-| Join: the `lys.fighter.v1` save (species, params, outfit, gloves) and `help`, about 2 KB of JSON sent once; or, for a bad-guy player, only "bad guy" (the preset comes from the sorted ids) | Building the character from those params (`createCharacter` is deterministic from params; randomness lives only in `randomise*`) |
+| Join: the `lys.fighter.v1` save (species, params, outfit, gloves) and the saved highest level (`lys.level.v1`, see Bad guys, Saving progress), about 2 KB of JSON sent once; never `help`, which the host sets; or, for a bad-guy player, only "bad guy" (the preset comes from the sorted ids) | Building the character from those params (`createCharacter` is deterministic from params; randomness lives only in `randomise*`) |
 | Inputs, guest → host | Spring rig, idle layer, blinks, ear flicks, tail sway (`motion.js` `Math.random`) |
 | Snapshots, host → guest: move id + step drives the guest's rig toward that move's pose | Camera, edge markers, sparkle effects, sound |
 
@@ -739,7 +744,7 @@ bad guy grabs a donut and banks it.
 2. **Two tablets.** Done: the fighter chooser, the room code and the join handshake, with
    everyone standing on the lobby floor. Still to do: inputs up, snapshots down, interpolation,
    per-tablet camera.
-3. **Kids vs bad guys.** Up to six tablets on one team, the bad-guy team with its generator,
+3. **Kids vs bad guys.** Up to six tablets on one team, the bad-guy team from its 8 presets,
    `ninja` hat and AI, two shelves on a stage wider than a screen, edge markers, the match timer
    and team shelf score, donut pickups, a results screen with `selfie.js` portraits.
 4. **Content.** Full move lists per species, stages, alternate costumes, item drops with
@@ -747,7 +752,7 @@ bad guy grabs a donut and banks it.
 
 ## Open questions
 
-- **The owl.** It is already a species in the code. Its wings are the one set of arms that
-  would read, which makes it a natural third move set.
+- **The owl's move set.** Its punches are wing swings with the gloves on its wing tips (see
+  Costumes) and its kick a talon swipe from a hop; the rest of its moves are still to design.
 - **Powers for bad guys.** Do CPU bad guys fill a bar and use powers too (a grownup bad guy can,
   at `help -0.5` fill rate)? It makes them scarier and the shelf dome a real counter.

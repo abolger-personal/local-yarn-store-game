@@ -1,196 +1,338 @@
 import assert from 'node:assert/strict';
-import { BRICK, DONUTS_PER_SHELF, STAGE } from './match.js';
-import { createMatch, snapshot, tick } from './sim.js';
+import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, ROUND_SECONDS, STAGE, TICK_HZ } from './match.js';
+import { DUMMY, createMatch, snapshot, tick } from './sim.js';
 
 const LOOK = { dough: '#e8c48a', frosting: '#14c4e0', stripe: false };
 const BAD = { dough: '#2a1a14', frosting: '#7a2bbf', stripe: true };
-const body = { height: 0.75, width: 0.45, reach: 1 };
+const body = { height: 0.9, width: 0.45, reach: 0.38 };
+const R = body.width / 2;
 const hero = { id: 'kid', team: 'heroes', ...body, look: LOOK };
 const dummy = { id: 'dummy', team: 'badGuys', ...body, look: BAD, dummy: true };
+const dummy2 = { ...dummy, id: 'dummy2' };
 const brute = { id: 'brute', team: 'badGuys', ...body, look: BAD };
+const HILL = STAGE.floors.find((f) => f.x0 < 0 && f.x1 > 0 && f.y > 0);
+const WALL_X = STAGE.bricks[0].x;
+const CLOSED = [-2, -1.6, -1.2, -0.8, -0.4, 0, 0.4, 0.8, 1.2, 1.6].flatMap((z) =>
+  [0, BRICK].map((y) => ({ team: 'badGuys', x: WALL_X, z, y, hits: 2 })));
 
+/** A fighter's body is inside the hill's block, below its top. */
+const inHill = (f) => f.y < HILL.y - 1e-6
+  && Math.hypot(Math.max(HILL.x0 - f.x, 0, f.x - HILL.x1), Math.max(HILL.z0 - f.z, 0, f.z - HILL.z1)) < R - 1e-6;
+const RIM = [
+  ...[-9, -8.6, -8.2, -7.8, -7.4, -7, -6.6, -6.4].map((x) => ({ team: 'heroes', x, z: -1.2, y: 1.1, hits: 2 })),
+  ...[-2, -1.6].map((z) => ({ team: 'heroes', x: -6.4, z, y: 1.1, hits: 2 })),
+];
 const total = (snap) => snap.shelves.reduce((n, s) => n + s.donuts.length, 0)
   + snap.fighters.filter((f) => f.carrying).length + snap.donuts.length;
+const me = (snap, id = 'kid') => snap.fighters.find((f) => f.id === id);
+const near = (a, b, tol = 0.03) => Math.abs(a - b) <= tol;
+const say = (input, id = 'kid') => ({ [id]: { target: null, punch: false, kick: false, ...input } });
+const once = (input, id = 'kid') => (_, i) => (i === 0 ? say(input, id) : {});
+const tap = (x, z, y = 0) => once({ target: { x, z, y } });
 
-/** Steps the match, checking every tick that no donut was made or lost. */
-function run(m, n, inputs = () => ({})) {
+/** Steps the match, checking every tick that no donut was made or lost; `watch` sees every snapshot. */
+function run(m, n, inputs = () => ({}), watch = () => {}) {
   let snap = snapshot(m);
   for (let i = 0; i < n; i++) {
     tick(m, inputs(snap, i));
     snap = snapshot(m);
     assert.equal(total(snap), 2 * DONUTS_PER_SHELF, `donut total changed on tick ${snap.tick}`);
+    watch(snap, i);
   }
   return snap;
 }
 
-const once = (input, id = 'kid') => (_, i) => (i === 0 ? { [id]: { target: null, punch: false, kick: false, ...input } } : {});
-const me = (snap, id = 'kid') => snap.fighters.find((f) => f.id === id);
-const near = (a, b, tol = 0.03) => Math.abs(a - b) <= tol;
-
-{
-  const m = createMatch([hero]);
-  const start = me(snapshot(m)).x;
-  let snap = run(m, 5, once({ target: { x: -2, y: 0 } }));
-  assert.equal(me(snap).facing, 1, 'walking right faces right');
-  assert.ok(me(snap).x > start, 'it is on its way');
-  snap = run(m, 240);
-  assert.ok(near(me(snap).x, -2) && me(snap).y === 0 && me(snap).onGround, 'a ground tap walks there');
-  assert.equal(me(snap).move, 'idle', 'and stops');
-  snap = run(m, 5, once({ target: { x: -6, y: 0 } }));
-  assert.equal(me(snap).facing, -1, 'walking left faces left');
-}
-
-{
-  const m = createMatch([hero]);
-  run(m, 300, once({ target: { x: -1.9, y: 0 } }));
-  let peak = 0;
-  run(m, 120, (s, i) => { peak = Math.max(peak, me(s).y); return once({ target: { x: -1.9, y: 0.9 } })(s, i); });
-  const snap = snapshot(m);
-  assert.ok(peak > 1, `a tap just above the head jumps (peak ${peak.toFixed(2)})`);
-  assert.ok(near(me(snap).x, -1.9) && me(snap).y === 0, 'and lands back where it was');
-  let peak2 = 0;
-  run(m, 120, (s, i) => {
-    peak2 = Math.max(peak2, me(s).y);
-    if (i === 0) return { kid: { target: { x: -1.9, y: 0.9 }, punch: false, kick: false } };
-    return i === 15 ? { kid: { target: { x: -1.9, y: me(s).y + 1 }, punch: false, kick: false } } : {};
+/** Counts the jumps a fighter starts, and the ticks it walks without getting anywhere, while the match runs. */
+function jumpsDuring(m, n, inputs, id = 'kid') {
+  let jumps = 0, inPlace = 0, was = me(snapshot(m), id);
+  const snap = run(m, n, inputs, (s) => {
+    const f = me(s, id);
+    if (was.onGround && !f.onGround && f.vy > 0) jumps++;
+    if (f.move === 'walk' && Math.hypot(f.x - was.x, f.z - was.z) < 1e-3) inPlace++;
+    was = f;
   });
-  assert.ok(peak2 > peak + 0.5, `a tap higher in the air is the mid-air jump (${peak2.toFixed(2)} > ${peak.toFixed(2)})`);
+  return { jumps, inPlace, snap };
 }
 
 {
   const m = createMatch([hero]);
-  const p4 = STAGE.platforms[4], p1 = STAGE.platforms[1];
-  let snap = run(m, 300, once({ target: { x: -3.4, y: p4.y + 0.2 } }));
-  assert.ok(near(me(snap).x, -3.4) && me(snap).y === p4.y && me(snap).onGround, 'an upper ledge tap gets there by jumping');
-  snap = run(m, 300, once({ target: { x: -7, y: p1.y + 0.2 } }));
-  assert.ok(near(me(snap).x, -7) && me(snap).y === p1.y, 'and on to the next ledge, jump to jump');
-  snap = run(m, 300, once({ target: { x: -2, y: 0 } }));
-  assert.ok(near(me(snap).x, -2) && me(snap).y === 0, 'and back down to the ground by a drop route');
+  let snap = run(m, 400, tap(-4, 1.5));
+  assert.ok(near(me(snap).x, -4) && near(me(snap).z, 1.5) && me(snap).y === 0, 'a floor tap walks there in x and z');
+  assert.equal(me(snap).move, 'idle', 'and stops');
+  snap = run(m, 5, tap(-4, -1));
+  assert.ok(me(snap).z < 1.5 && me(snap).vz < 0 && near(me(snap).facing, -Math.PI / 2, 0.05), 'a tap away from the camera walks back in z, facing it');
+  snap = run(m, 400);
+  assert.ok(near(me(snap).z, -1), 'all the way');
+  snap = run(m, 400, tap(-4, 1));
+  assert.ok(near(me(snap).z, 1) && near(me(snap).facing, Math.PI / 2, 0.05), 'and toward the camera');
 }
 
 {
   const m = createMatch([hero]);
-  const g = STAGE.platforms[0];
-  let low = Infinity;
-  const snap = run(m, 300, (s, i) => { low = Math.min(low, me(s).y); return once({ target: { x: -14, y: 0 } })(s, i); });
-  assert.ok(near(me(snap).x, g.x0, 0.06) && me(snap).x > g.x0 && me(snap).onGround, 'a tap past the end stops at the ledge');
+  const deck = STAGE.shelves[0];
+  let { jumps, snap } = jumpsDuring(m, 400, tap(deck.x, -1.1, deck.y));
+  assert.ok(near(me(snap).x, deck.x) && near(me(snap).z, -1.1) && me(snap).y === deck.y && me(snap).onGround, 'a deck tap gets up there');
+  assert.equal(jumps, 1, 'by one jump');
+  ({ jumps, snap } = jumpsDuring(m, 400, tap(-4, 0)));
+  assert.ok(near(me(snap).x, -4) && me(snap).y === 0 && jumps === 0, 'and walks off the edge back down');
+}
+
+{
+  const m = createMatch([hero]);
+  let low = Infinity, snap = run(m, 400, tap(-4, 10), (s) => { low = Math.min(low, me(s).y); });
+  assert.ok(near(me(snap).z, STAGE.floors[0].z1, 0.06) && me(snap).z < STAGE.floors[0].z1 && me(snap).onGround, 'a tap past the front edge stops at it');
+  snap = run(m, 600, tap(-20, 0), (s) => { low = Math.min(low, me(s).y); });
+  assert.ok(near(me(snap).x, STAGE.floors[0].x0, 0.06) && me(snap).x > STAGE.floors[0].x0, 'a tap past the end stops at the end');
   assert.equal(low, 0, 'it never stepped off');
 }
 
-const reachDummy = (m) => run(m, 300, once({ target: { thing: 'fighter', id: 'dummy' } }));
-function hitOnce(button) {
+{
+  const m = createMatch([hero]);
+  let crossings = 0, overlaps = 0;
+  const watchHill = (s) => {
+    if (inHill(me(s))) overlaps++;
+    if (me(s).x > HILL.x0 && me(s).x < HILL.x1) crossings++;
+  };
+  const snap = run(m, 600, tap(3, 0), watchHill);
+  assert.ok(near(me(snap).x, 3) && near(me(snap).z, 0), 'a tap past the hill gets there');
+  assert.ok(crossings > 0 && overlaps === 0, `around or over the hill, never through it (${overlaps} ticks inside)`);
+  run(m, 600, tap(0, 0), watchHill);
+  assert.ok(overlaps === 0, `a ground tap inside the hill stops beside it (${overlaps} ticks inside)`);
+}
+
+{
+  const m = createMatch([hero]);
+  const zs = [];
+  const { jumps, snap } = jumpsDuring(m, 900, tap(7, 0));
+  run(createMatch([hero]), 900, tap(7, 0), (s) => { if (Math.abs(me(s).x - WALL_X - BRICK / 2) < BRICK / 2) zs.push(me(s).z); });
+  assert.ok(near(me(snap).x, 7) && near(me(snap).z, 0) && me(snap).move === 'idle', 'a tap behind the bad-guy wall gets there');
+  assert.ok(zs.length && zs.every((z) => z < -1.2 - R + 1e-6 || z > 1.2 + R - 1e-6), 'through a gap');
+  assert.equal(jumps, 0, 'without hopping');
+}
+
+{
+  const m = createMatch([hero], CLOSED);
+  let { snap, inPlace } = jumpsDuring(m, 900, tap(7, 0));
+  assert.equal(me(snap).move, 'blocked', 'a closed wall leaves the fighter blocked');
+  assert.ok(inPlace <= 5, `without walking in place first (${inPlace} ticks)`);
+  assert.ok(me(snap).x < WALL_X - R + 0.05 && me(snap).x > WALL_X - R - 0.3, 'as close as it can get');
+  assert.ok(near(me(snap).facing, 0, 0.3), `facing the wall (${me(snap).facing.toFixed(2)})`);
+  const at = me(snap);
+  const after = jumpsDuring(m, 120, () => ({}));
+  ({ snap, inPlace } = after);
+  assert.equal(inPlace, 0, 'not walking in place');
+  assert.ok(me(snap).x === at.x && me(snap).z === at.z && me(snap).vx === 0 && me(snap).move === 'blocked', 'not walking in place');
+  assert.equal(after.jumps, 0, 'nor jumping');
+}
+
+{
+  const m = createMatch([hero]);
+  let snap = run(m, 20, tap(4, 0));
+  const { x } = me(snap);
+  snap = run(m, 60, once({ target: { stop: true } }));
+  assert.ok(me(snap).x - x < 0.2 && me(snap).move === 'idle' && me(snap).target === null, '{ stop: true } stops where it is');
+}
+
+{
+  const awkward = [
+    ['the deck over the fort', [hero], { x: 7.5, z: -1.2, y: 1.1 }],
+    ['behind the closed wall', [hero], { x: 7, z: 0, y: 0 }, CLOSED],
+    ['under a deck edge', [hero], { x: -5.9, z: -1.4, y: 0 }],
+    ['on top of a brick', [hero], { x: 4.8, z: -1, y: BRICK }],
+    ['on top of the closed wall', [hero], { x: 4.8, z: 0, y: 2 * BRICK }, CLOSED],
+    ['the enemy shelf', [hero], { thing: 'shelf', team: 'badGuys' }],
+    ['a deck walled in by a brick rim', [hero], { thing: 'shelf', team: 'heroes' }, RIM, 'blocked'],
+  ];
+  for (const [what, who, target, bricks, ends] of awkward) {
+    const m = createMatch(who, bricks);
+    const { jumps, inPlace, snap } = jumpsDuring(m, 10 * TICK_HZ, once({ target }));
+    assert.ok(jumps <= 3, `${what}: ${jumps} jumps`);
+    assert.ok(inPlace <= 5, `${what}: never walks in place (${inPlace} ticks)`);
+    assert.ok((ends ? [ends] : ['idle', 'blocked']).includes(me(snap).move) && me(snap).onGround, `${what}: ends standing (${me(snap).move})`);
+  }
+}
+
+{
+  const m = createMatch([hero]);
+  let low = Infinity, high = -Infinity;
+  const snap = run(m, 900, (s, i) => say({ target: i === 0 ? { x: 4.2, z: 1, y: 0 } : null, kick: i % 60 === 5 }),
+    (s) => { low = Math.min(low, me(s).y); high = Math.max(high, me(s).y); });
+  assert.ok(low === 0 && high === 0, `kicking on the walk never leaves the ground (${high})`);
+  assert.ok(near(me(snap).x, 4.2) && near(me(snap).z, 1), 'and still gets there');
+}
+
+/** Puts the kid `gap` from the dummy's body (and `dz` deeper), facing it, and swings until the first hit lands. */
+function swing(button, gap, dz = 0) {
   const m = createMatch([hero, dummy]);
-  let snap = reachDummy(m);
-  assert.equal(me(snap).facing, 1, 'arriving at a tapped fighter ends facing it');
-  const x0 = me(snap, 'dummy').x;
-  let launch = null;
-  snap = run(m, 120, (s, i) => {
+  run(m, 600, tap(DUMMY.x - 2 * R - gap, DUMMY.z + dz));
+  run(m, 5, tap(DUMMY.x - 2 * R - gap + 0.01, DUMMY.z + dz));
+  let at = run(m, 1, once({ [button]: true }));
+  for (let i = 0; i < 40 && !at.hits.length; i++) at = run(m, 1);
+  return { m, at, events: at.hits };
+}
+
+{
+  for (const [button, gap] of [['punch', 0.3], ['kick', 0.45], ['punch', 0.6], ['kick', 0.75]]) {
+    const { events } = swing(button, gap);
+    assert.equal(events.length, 1, `a ${button} lands across a ${gap} gap`);
+    assert.ok(events[0].move === button && events[0].on === 'fighter' && events[0].target === 'dummy', 'as one hit event on the dummy');
+    assert.ok(events[0].x > DUMMY.x - R - 0.01 && events[0].x < DUMMY.x, 'at the dummy\'s body');
+  }
+  assert.equal(swing('punch', 1.3).events.length, 0, 'a punch from too far whiffs');
+  assert.equal(swing('kick', 0.2, 1.2).events.length, 0, 'nothing lands a lane away in depth');
+}
+
+for (const [button, gap] of [['punch', 0.3], ['kick', 0.45]]) {
+  const { m, at } = swing(button, gap);
+  const still = (s) => [me(s), me(s, 'dummy')].map((f) => [f.x, f.y, f.z, f.step]);
+  const frozen = still(at);
+  let snap;
+  for (let i = 0; i < HITSTOP_TICKS; i++) {
+    snap = run(m, 1);
+    assert.deepEqual(still(snap), frozen, `a ${button}'s hit-stop holds both fighters (tick ${i + 1})`);
+  }
+  snap = run(m, 2);
+  assert.notDeepEqual(still(snap), frozen, 'then the hit carries on');
+}
+
+/** The dummy's flight from one hit: its launch velocity and how far it went. */
+function launch(button) {
+  const { m, at } = swing(button, 0.3);
+  const x0 = me(at, 'dummy').x;
+  let v = null;
+  const snap = run(m, 120, () => ({}), (s) => {
     const d = me(s, 'dummy');
-    if (!launch && d.percent > 0) launch = { vx: d.vx, vy: d.vy, move: d.move };
-    return once({ [button]: true })(s, i);
+    if (!v && Math.hypot(d.vx, d.vz) > 0) v = { along: d.vx, up: d.vy, move: d.move };
   });
-  return { launch, dist: me(snap, 'dummy').x - x0, snap };
+  return { v, dist: me(snap, 'dummy').x - x0 };
 }
 
 {
-  const punch = hitOnce('punch'), kick = hitOnce('kick');
-  assert.ok(punch.launch, 'a punch in range hits the dummy');
-  assert.equal(punch.launch.move, 'launched', 'and launches it');
-  assert.ok(punch.launch.vx > 0 && punch.launch.vy > 0, 'away from the puncher and up');
-  assert.ok(kick.launch, 'a kick in range hits the dummy');
+  const punch = launch('punch'), kick = launch('kick');
+  assert.equal(punch.v.move, 'launched', 'a punch launches the dummy');
+  assert.ok(punch.v.along > 0 && punch.v.up > 0, 'away from the puncher and up');
   assert.ok(kick.dist > punch.dist, `a kick sends it further (${kick.dist.toFixed(2)} > ${punch.dist.toFixed(2)})`);
-  const angle = (l) => Math.atan2(l.vy, l.vx);
-  assert.ok(angle(kick.launch) < angle(punch.launch), 'and flatter');
+  assert.ok(kick.v.up / kick.v.along < 0.8 * (punch.v.up / punch.v.along), 'and flatter');
 }
 
 {
   const m = createMatch([hero, dummy]);
-  reachDummy(m);
   const speeds = [];
-  let last = 0;
-  run(m, 900, (s, i) => {
+  let last = 0, inside = 0, nearHill = 0;
+  run(m, 900, (s, i) => say({ target: i === 0 ? { thing: 'fighter', id: 'dummy' } : null, punch: i % 40 === 39 }), (s) => {
     const d = me(s, 'dummy');
-    if (d.percent > last) speeds.push(Math.hypot(d.vx, d.vy));
+    if (inHill(d)) inside++;
+    if (d.x > HILL.x0 - 2 * R && d.y < HILL.y) nearHill++;
+    if (d.percent > last && d.percent > 0) speeds.push(null);
+    if (speeds.at(-1) === null && Math.hypot(d.vx, d.vy) > 0) speeds[speeds.length - 1] = Math.hypot(d.vx, d.vy);
     last = d.percent;
-    return { kid: { target: i === 0 ? { thing: 'fighter', id: 'dummy' } : null, punch: i % 40 === 0, kick: false } };
   });
   assert.ok(speeds.length >= 4, `the dummy was hit again and again (${speeds.length})`);
-  for (let k = 1; k < 4; k++) assert.ok(speeds[k] > speeds[k - 1], `knockback grows with percent (${speeds.map((v) => v.toFixed(2))})`);
+  for (let k = 1; k < 4; k++) assert.ok(speeds[k] > speeds[k - 1], `knockback grows with percent (${speeds.map((v) => v?.toFixed(2))})`);
+  assert.ok(nearHill > 0 && inside === 0, `knocked against the hill, it stops at its side (${inside} ticks inside)`);
 }
 
 {
-  const { snap: hit, launch } = hitOnce('punch');
-  assert.ok(launch && !me(hit, 'dummy').carrying, 'a hit knocks the carried donut loose');
-  assert.equal(hit.donuts.length, 1, 'it is a loose donut on the stage');
-  const m = createMatch([hero, dummy]);
-  reachDummy(m);
-  let snap = run(m, 120, once({ punch: true }));
+  const { m, events } = swing('punch', 0.3);
+  assert.ok(events[0].broke, 'a hit on a carrier pops the bag');
+  let snap = run(m, 120);
+  assert.ok(!me(snap, 'dummy').carrying && snap.donuts.length === 1, 'the donut is loose on the stage');
   const [d] = snap.donuts;
   snap = run(m, 120);
-  assert.deepEqual(snap.donuts[0], d, 'a dropped donut stays where it landed');
-  snap = run(m, 400, once({ target: { thing: 'donut', id: d.id } }));
+  assert.deepEqual(snap.donuts[0], d, 'and stays where it landed');
+  const kinds = [];
+  snap = run(m, 400, once({ target: { thing: 'donut', id: d.id } }), (s) => kinds.push(...s.donutEvents.map((e) => e.kind)));
   assert.equal(snap.donuts.length, 0, 'tapping it picks it up');
   assert.deepEqual(me(snap).carrying, d.look, 'into the bag, looking the same');
+  assert.deepEqual(kinds, ['pickup'], 'one pickup event');
+}
+
+{
+  const m = createMatch([hero, dummy, dummy2]);
+  run(m, 400, once({ target: { thing: 'fighter', id: 'dummy' } }));
+  run(m, 60, once({ punch: true }));
+  run(m, 400, once({ target: { thing: 'donut', id: snapshot(m).donuts[0].id } }));
+  run(m, 400, once({ target: { thing: 'fighter', id: 'dummy2' } }));
+  let snap = run(m, 60, once({ punch: true }));
+  assert.ok(me(snap).carrying && snap.donuts.length === 1, 'carrying, with a second donut loose');
+  const full = [];
+  snap = run(m, 400, once({ target: { thing: 'donut', id: snap.donuts[0].id } }), (s) => full.push(...s.fullBag));
+  assert.equal(full.length, 1, `touching it with a full bag says so once (${full.length})`);
+  assert.equal(snap.donuts.length, 1, 'and it stays loose');
 }
 
 const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).donuts.length;
 
 {
   const m = createMatch([hero]);
-  let snap = run(m, 400, once({ target: { thing: 'shelf', team: 'badGuys' } }));
-  const wall = STAGE.bricks[0];
-  assert.ok(near(me(snap).x, wall.x - hero.width / 2, 0.01) && me(snap).onGround, 'a three-high wall stops a fighter heading through it');
-  assert.ok(me(snap).x > STAGE.bricks[3].x + BRICK, 'after hopping the one-high wall on the way');
-  snap = run(m, 60);
-  assert.ok(near(me(snap).x, wall.x - hero.width / 2, 0.01), 'and it stays stopped');
-  const before = [shelfCount(snap, 'heroes'), shelfCount(snap, 'badGuys')];
-  run(m, 300, once({ target: { x: 7, y: 1.5 } }));
-  snap = run(m, 300, once({ target: { thing: 'shelf', team: 'badGuys' } }));
-  assert.ok(me(snap).carrying, 'over the ledge and down: the grab fills the bag');
-  assert.equal(shelfCount(snap, 'badGuys'), before[1] - 1, 'from the enemy shelf');
-  run(m, 300, once({ target: { x: 7, y: 1.5 } }));
-  snap = run(m, 900, once({ target: { thing: 'shelf', team: 'heroes' } }));
-  assert.ok(!me(snap).carrying, 'home again, the bag is empty');
-  assert.equal(shelfCount(snap, 'heroes'), before[0] + 1, 'banked on our shelf');
+  const before = [shelfCount(snapshot(m), 'heroes'), shelfCount(snapshot(m), 'badGuys')];
+  const events = [];
+  const log = (s) => events.push(...s.donutEvents.map((e) => e.kind), ...s.fullBag.map(() => 'full'));
+  let snap = run(m, 900, once({ target: { thing: 'shelf', team: 'badGuys' } }), log);
+  assert.ok(me(snap).carrying && shelfCount(snap, 'badGuys') === before[1] - 1, 'the grab takes one off the enemy shelf');
+  snap = run(m, 120, once({ target: { thing: 'shelf', team: 'badGuys' } }), log);
+  assert.equal(shelfCount(snap, 'badGuys'), before[1] - 1, 'a full bag grabs nothing more');
+  snap = run(m, 1200, once({ target: { thing: 'shelf', team: 'heroes' } }), log);
+  assert.ok(!me(snap).carrying && shelfCount(snap, 'heroes') === before[0] + 1, 'home again, banked on our shelf');
+  assert.deepEqual(events, ['steal', 'full', 'bank'], 'one event each');
 }
 
 {
   const m = createMatch([hero, brute]);
-  run(m, 300, once({ target: { x: -14, y: 0 } }));
-  run(m, 300, once({ target: { x: 7, y: 1.5 } }, 'brute'));
+  run(m, 400, tap(-4, 10));
+  run(m, 400, once({ target: { x: -4, z: -1, y: 0 } }, 'brute'));
+  run(m, 400, once({ target: { x: -4, z: 1.2, y: 0 } }, 'brute'));
   const goal = me(snapshot(m)).target;
   let out = null;
-  run(m, 1200, (s, i) => {
-    const k = me(s);
-    if (!out && k.invincible) out = k;
-    return { brute: { target: i === 0 ? { thing: 'fighter', id: 'kid' } : null, punch: i % 30 === 0, kick: false } };
-  });
+  run(m, 300, (s, i) => say({ punch: i % 30 === 0 }, 'brute'), (s) => { if (!out && me(s).invincible) out = me(s); });
   const r = STAGE.ringOut;
-  assert.ok(out, 'the kid was rung out');
-  assert.ok(out.x >= r.x0 && out.x <= r.x1 && out.y >= r.y, 'back in play on the same tick');
+  assert.ok(out, 'the kid was knocked off the front edge');
+  assert.ok(out.x >= r.x0 && out.x <= r.x1 && out.z <= r.z1 && out.y >= r.y, 'and is back in play on the same tick');
   assert.equal(out.percent, 0, 'percent reset');
   assert.deepEqual(out.target, goal, 'still heading where it was going');
+  const snap = run(m, 600);
+  assert.ok(near(me(snap).x, goal.x) && near(me(snap).z, goal.z) && me(snap).y === 0, 'and gets back there');
 }
 
 {
   const m = createMatch([hero]);
-  run(m, 600, once({ target: { thing: 'brick', id: 'b0' } }));
-  let snap = run(m, 40, once({ punch: true }));
-  assert.equal(me(snap).facing, 1, 'arriving at a brick ends facing it');
-  const b1 = snap.bricks.find((b) => b.id === 'b1');
-  assert.equal(b1.hits, b1.maxHits - 1, 'a punch takes a hit off a brick');
-  snap = run(m, 40, once({ kick: true }));
-  assert.ok(!snap.bricks.some((b) => b.id === 'b0'), 'a kick breaks the bottom brick');
-  snap = run(m, 60);
-  const col = snap.bricks.filter((b) => b.x === STAGE.bricks[0].x).sort((a, b) => a.y - b.y);
-  assert.deepEqual(col.map((b) => [b.id, b.y, b.hits]), [['b1', 0, 1], ['b2', BRICK, 2]], 'the bricks above fell straight down and stayed whole');
+  run(m, 600, tap(4, -1));
+  run(m, 300, once({ target: { thing: 'brick', id: 'b0' } }));
+  const hits = [];
+  let snap = run(m, 40, once({ punch: true }), (s) => hits.push(...s.hits));
+  assert.equal(me(snap).facing, 0, 'arriving at a brick ends facing it');
+  assert.equal(snap.bricks.find((b) => b.id === 'b0')?.hits, 1, 'a punch takes one hit off a brick');
+  snap = run(m, 40, once({ punch: true }), (s) => hits.push(...s.hits));
+  assert.ok(!snap.bricks.some((b) => b.id === 'b0'), 'two punches break it');
+  assert.deepEqual(hits.map((h) => [h.on, h.target, h.move, h.broke]), [['brick', 'b0', 'punch', false], ['brick', 'b0', 'punch', true]], 'one event per punch');
+  run(m, 300, tap(4, -0.2));
+  run(m, 300, once({ target: { thing: 'brick', id: 'b2' } }));
+  hits.length = 0;
+  snap = run(m, 60, once({ kick: true }), (s) => hits.push(...s.hits));
+  assert.ok(!snap.bricks.some((b) => b.id === 'b2'), 'a kick breaks one at once');
+  assert.deepEqual(hits.map((h) => [h.target, h.move, h.broke]), [['b2', 'kick', true]], 'and says so');
+  const fell = snap.bricks.find((b) => b.id === 'b6');
+  assert.deepEqual([fell.y, fell.hits, fell.x, fell.z], [0, 2, STAGE.bricks[6].x, STAGE.bricks[6].z], 'the brick above fell straight down and stayed whole');
+  assert.equal(fell.icing, snapshot(createMatch([hero])).bricks[0].icing, 'bad-guy bricks keep the bad-guy icing');
+}
+
+{
+  const m = createMatch([hero, dummy]);
+  let snap = run(m, ROUND_SECONDS * TICK_HZ, (s, i) => (i === 0 ? say({ target: { x: -4, z: 0, y: 0 } }) : {}));
+  assert.ok(snap.over && snap.secondsLeft === 0, 'the clock runs out');
+  assert.equal(snap.winner, 'heroes', 'the team with more donuts home wins');
+  const end = snap;
+  snap = run(m, 60, (s, i) => say({ target: { x: 0, z: 0, y: 0 }, punch: i % 2 === 0 }));
+  assert.deepEqual(snap, end, 'and nothing moves after');
+  const tie = createMatch([hero]);
+  assert.equal(run(tie, ROUND_SECONDS * TICK_HZ).winner, null, 'equal shelves are a tie');
 }
 
 {
   const play = () => {
     const m = createMatch([hero, dummy]);
-    reachDummy(m);
-    return run(m, 200, (_, i) => ({ kid: { target: null, punch: i % 25 === 0, kick: i % 60 === 7 } }));
+    run(m, 300, once({ target: { thing: 'fighter', id: 'dummy' } }));
+    return run(m, 300, (_, i) => say({ punch: i % 25 === 0, kick: i % 60 === 7 }));
   };
   assert.deepEqual(play(), play(), 'the same inputs give the same match');
 }

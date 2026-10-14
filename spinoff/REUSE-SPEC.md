@@ -1,6 +1,6 @@
 # Spinoff: donut fighters
 
-The same llama, lion and owl characters in a **2.5D platform fighter for up to 8 players (6 heroes, 2 played bad guys), each
+The same llama, lion and owl characters in a **2.5D brawler (a depth band you walk around in) for up to 8 players (6 heroes, 2 played bad guys), each
 on their own tablet with their own camera**, on one shared home network: the kids' team against
 a team of bad guys (CPU, or grownups who join as one) in donut capture the flag. Decided with the players, 2026-10-13. This doc sorts the existing code by how much of it carries over, lists what
 the fighter still needs, and sets out the network design. A bare file name is in `characters/`;
@@ -68,8 +68,10 @@ reused: `inventory/grid.js` for the lobby floor, team shelves and forts, and
 
 ### New
 
-- **2D physics on the x/y plane:** gravity, jump, platforms, ledges, ring-out bounds. A few
-  dozen lines of add/multiply; no physics library (see Determinism below for why add/multiply).
+- **Physics in a depth band** (decided 2026-10-13, replacing the earlier flat x/y plane): fighters
+  walk in x (along the stage) and z (toward and away from the camera), and jump in y onto raised
+  floors. Gravity, jumps, raised floors, ring-out off the front and the two ends; the back is a
+  wall. Add/multiply only; no physics library (see Determinism below for why add/multiply).
 - **Percent and knockback:** hits raise a fighter's percent; knockback grows with it; leaving
   the stage bounds is a ring-out. Damage pops sprinkles (`sparkle.js` recoloured). A ring-out
   costs donuts, never playing time (see Scoring).
@@ -109,6 +111,14 @@ follows, so punches are fine as signature moves (checked by eye on dozens of ran
 
 No joystick (decided 2026-10-13). Tap where you want to go and your fighter goes there. The only
 buttons are 🥊 punch and 🦶 kick, which attack where the fighter is, while it keeps moving.
+
+**It's a depth band, not a flat line** (decided 2026-10-13, after the first playtest felt like "2D
+with 3D graphics"). The stage is a floor you walk around on, like a belt-scrolling brawler: a
+tap on the floor is a spot in x and z, and raised floors (decks, the gumdrop hill) are reached
+by jumping. Facing is a direction on the floor (a yaw), not just left or right. Hits only land on
+fighters at about the same depth (`HIT_DEPTH` in `match.js`), and every fighter casts a round
+shadow on the floor so kids can see who is lined up with whom. The camera looks down at the
+floor at an angle and follows your fighter.
 
 - **Tap a place:** the fighter goes to the nearest spot it can stand on there. A tap on a higher
   platform jumps there on its own: the host keeps a small map of the stage's platforms with jump
@@ -251,7 +261,7 @@ over 3 minutes.
 - **How donuts look** (decided 2026-10-13). Heroes' donuts are beige dough with frosting in the
   heroes' own colours: the shelf's donuts share out the fur colours of the heroes in the room, so
   the kids' shelf is a colour riot of their own fighters. Villains' donuts are black dough with
-  purple frosting and a drizzled stripe across it. A donut keeps its look wherever it goes, which
+  purple frosting and a squiggly zig-zag drizzle across it (a wavy line, never a straight bar; decided 2026-10-13). A donut keeps its look wherever it goes, which
   is how a stolen donut reads as stolen.
 - **Donuts are never destroyed** (decided 2026-10-13, MVP). The 24 donuts are always somewhere:
   on a shelf, in a bag, or on the floor, so every donut the bad guys hold is one the kids don't.
@@ -269,13 +279,14 @@ wide stage costs nothing new.
 
 | Zone | Terrain | Forts |
 | --- | --- | --- |
-| Heroes' third | Their shelf on the ground, an upper ledge above it | Heroes build here only |
-| Middle third | A gumdrop hill with a ledge each side, joining the upper and lower lanes | Nobody builds: always open ground to fight over |
+| Heroes' third | A raised deck against the back wall with their shelf on it | Heroes build here only |
+| Middle third | A gumdrop hill in the middle of the band, to jump on or walk around | Nobody builds: always open ground to fight over |
 | Bad guys' third | The mirror of the heroes' third | Bad guys build here only |
 
-Two lanes, ground and upper, mean one wall never closes a side: builders choose which lane to
-block, and a fort ringing the shelf has to cover the ledge above too. Terrain never breaks; only
-fort pieces do, so routes stay predictable and the host's jump-link map is fixed for a match.
+The band is wide enough to walk around things, so one wall never closes a side: a fort is a ring
+on the floor grid around the deck, and a raider looks for the gap or the weakest piece. Terrain
+never breaks; only fort pieces do, so routes stay predictable. Milestone 1's bad-guy fort is a
+wall across the band (two high in the middle) with gaps at the back and front.
 Later levels of Gingerbread World can bring new hand-made stages.
 
 - **Many small flags.** Each shelf starts stocked with donuts. Every donut is a flag, so every
@@ -294,8 +305,8 @@ Later levels of Gingerbread World can bring new hand-made stages.
   markers show it for carriers off screen, and a hit sends it flying out in an arc. A full bag
   can't grab more.
 - **Shelves are the shop's shelves.** A team shelf is a `grid.js` display like the wall shelves
-  in `DISPLAY_SLOTS` (`characters/store/scene/displays.js`), seen from the side: columns across,
-  shelves up. The grab and bank rules are pure `grid.js` calls with no three.js, so they run in the node
+  in `DISPLAY_SLOTS` (`characters/store/scene/displays.js`), standing against the back wall on its
+  team's deck: columns across, shelves up, facing the camera. The grab and bank rules are pure `grid.js` calls with no three.js, so they run in the node
   sim test.
 - **Friendly fire is off, as a setting.** Teammates pass through each other's attacks. Every
   fighter carries a `team`, and whether one fighter can hit another is `canHit(a, b, match)` in
@@ -855,6 +866,14 @@ bad guy grabs a donut and banks it.
      `Input`, `Snapshot` and `Entrant` types both phases build against, so Phase A and Phase B run
      in parallel and the type checker catches any drift. The snapshot is also what milestone 2
      sends over the network.
+   - **First playtest (2026-10-13), and the rework it caused.** The flat x/y version felt like "2D
+     with 3D graphics", so the stage became a depth band (see Navigation) and the contract moved
+     to x/y/z: floors are rectangles, facing is a yaw, hits need `HIT_DEPTH`, snapshots carry `z`,
+     each fighter's `height`, `over`/`winner`, and brick `icing`; `Input` can say stop. Also from
+     the playtest: an end screen when the clock runs out (it looked frozen), a `'blocked'` state
+     when a fighter stands at a wall it can't hop (it walked in place forever), shelves standing
+     behind the fighters' floor (the lion walked into its own shelf), and the villain drizzle as a
+     squiggle.
    - **Phase A, the sim** (`spinoff/sim.js`, pure, no three.js, fixed 60 Hz `tick` +
      `snapshot`): stage as platform data with jump links, shelves on `inventory/grid.js`,
      navigation (tap a point or a thing, routes with jumps, ledge stop, tap-above jump, facing

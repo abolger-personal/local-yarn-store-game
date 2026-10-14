@@ -610,6 +610,11 @@ scary, for 4–6 year olds.
   violet or magenta.
 - **Names:** a short list of silly villain names, shown only as pictures and voice, never as
   text the kids have to read.
+- **Bad-guy moves are a shared pool, not per preset** (decided 2026-10-13). Any bad guy can use
+  any move it has. CPU bad guys gain moves as the levels get harder; grownup bad guys earn them
+  through success in play (donuts, hit streaks and the like). The details of earning are being
+  worked out on the Final Fantasy VII Limit Break model. The grape fizz bolt below is the first
+  move in the pool.
 - **First bad-guy power: the grape fizz bolt** (decided 2026-10-13). A cartoon lightning bolt,
   made cute: a chunky, rounded zig-zag like a gummy candy, grape purple with white fizz sparkles
   trailing, with a kazoo "bzzzt" rather than thunder.

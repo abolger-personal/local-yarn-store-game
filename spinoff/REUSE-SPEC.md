@@ -830,6 +830,10 @@ bad guy grabs a donut and banks it.
    **pre-placed gingerbread bricks** (no build round yet) that fall when the one under them
    breaks. Built as the host from day one: the sim takes per-player inputs per tick and produces
    a snapshot, and the page draws only from snapshots.
+   - **The contract is `spinoff/match.js`** (2026-10-13): the stage layout (`STAGE`), and the
+     `Input`, `Snapshot` and `Entrant` types both phases build against, so Phase A and Phase B run
+     in parallel and the type checker catches any drift. The snapshot is also what milestone 2
+     sends over the network.
    - **Phase A, the sim** (`spinoff/sim.js`, pure, no three.js, fixed 60 Hz `tick` +
      `snapshot`): stage as platform data with jump links, shelves on `inventory/grid.js`,
      navigation (tap a point or a thing, routes with jumps, ledge stop, tap-above jump, facing

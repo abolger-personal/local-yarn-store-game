@@ -71,13 +71,16 @@ export const STAGE = Object.freeze({
  *             broke: boolean }} HitEvent
  *   a hit that landed this tick, at its point of contact, for the page's BAM burst and shake;
  *   both fighters freeze for HITSTOP_TICKS on contact. `broke`: the brick (or bag) gave way.
+ * @typedef {{ fighter: string, x: number, y: number, z: number }} FullBagEvent
+ *   a fighter already carrying a donut touched a loose donut or reached the enemy shelf this tick,
+ *   at that donut or shelf, so the page can show "your bag holds one".
  *
  * Everything the page draws, every tick. No three.js objects, only numbers and strings, so it
  * can cross the network unchanged in milestone 2. `over` is true once the clock runs out;
  * `winner` is the team with more donuts on its shelf then, or null for a tie.
  * @typedef {{ tick: number, secondsLeft: number, over: boolean, winner: Team|null,
  *             fighters: FighterState[], donuts: LooseDonut[], bricks: BrickState[],
- *             shelves: ShelfState[], hits: HitEvent[] }} Snapshot
+ *             shelves: ShelfState[], hits: HitEvent[], fullBag: FullBagEvent[] }} Snapshot
  *
  * Who is in the match. height / width / reach come from the fighter's params (fighter.js) as plain
  * numbers; look is the donut frosting this entrant brings to its team's shelf, and the icing

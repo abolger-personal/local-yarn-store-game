@@ -888,6 +888,14 @@ bad guy grabs a donut and banks it.
      edges, a thick white piped-icing border, flooded team-colour icing inside with a few white
      dots, a slight random tilt per piece, and thick dark cracks as hits drop. They still fill one
      `BRICK` cell in the sim.
+   - **"Your bag holds one" has to show** (playtest: it was only clear to the game designer). When
+     a fighter already carrying a donut touches another loose donut or reaches the enemy shelf,
+     the snapshot's `fullBag` says so once, and the page answers in pictures: the fighter shakes
+     its head, its carried donut pulses big, and the touched donut hops away a little. A grabbing
+     arm never closes on a second donut.
+   - **Raised floors are solid** (playtest: the lion walked straight through the gumdrop hill,
+     which the flat version treated as a pass-under platform). In the depth band, a raised floor
+     is a block from the ground up: you jump onto it or walk around it, never through it.
    - **Phase A, the sim** (`spinoff/sim.js`, pure, no three.js, fixed 60 Hz `tick` +
      `snapshot`): stage as platform data with jump links, shelves on `inventory/grid.js`,
      navigation (tap a point or a thing, routes with jumps, ledge stop, tap-above jump, facing

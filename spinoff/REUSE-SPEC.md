@@ -180,7 +180,7 @@ and smashers each get a round that is theirs.
 ## Handicap: one `help` number per player
 
 Players are 4–6 year olds and grownups in the same match. Each player has one number, `help`,
-chosen when they join and sent to the host with their params. Every handicap knob is a straight
+that nobody chooses: the game sets it from how they play (below). Every handicap knob is a straight
 line between a **pro** value and a **full help** value:
 
 ```
@@ -211,8 +211,23 @@ Starting points to tune in play, not measured values. Whole-number knobs round; 
 switch at the threshold shown. UI knobs never go below pro: a grownup is handicapped in the fight,
 never with smaller buttons.
 
-Suggested starting levels: age 4 → `1`, age 5 → `0.75`, age 6 → `0.5`, grownups on the kids'
-team → `0` or `-0.5`. Bad guys never pick a level: a played bad guy is always `-0.5`, and CPU bad
+**Nobody sets `help`; scoring does** (decided 2026-10-13, the Mario Kart way). Every hero starts at
+full help, `1`. After each level the host compares each hero's banked donuts with their fair share
+(the team's banked donuts ÷ the number of heroes):
+
+- more than 1.5× their share: `help` drops a quarter, down to `-0.5` at the lowest;
+- less than half their share: `help` rises a quarter, up to `1`;
+- in between: no change.
+
+So a grownup on the heroes' team who keeps scoring slides down to `-0.5` on their own, and a kid
+who is struggling climbs back up, with no age, no label and no grown-up deciding. `help` stays
+fixed during a match (the sim stays plain arithmetic) and changes only between levels. It is
+saved with the fighter on that tablet (`lys.fighter.v1`) so it carries over to the next evening,
+and `readFighter` accepts only quarters from `-0.5` to `1`. Starting numbers (1.5×, ½, a quarter
+a level) are for tuning in play. A grownup who passes donuts to a kid instead of banking them
+keeps their help, which is the behaviour the game wants anyway.
+
+Bad guys are outside this: a played bad guy is always `-0.5`, and CPU bad
 guys play at `0` until auto-scaling exists (see Bad guys).
 
 Design rules:
@@ -220,8 +235,8 @@ Design rules:
 - **Help may be visible if it looks like a power, never like a label.** The Mario Kart test:
   kids happily take a big item they can see when they're behind; what stings is being marked
   as the easy one. So a safety bounce can be a showy bouncy-icing trampoline and a bigger hit can pop
-  extra sprinkles, but there is no "easy" badge or help number in play. Levels are shown only on
-  the join screen, as pictures (4–6 year olds don't read), and a grownup sets them.
+  extra sprinkles, but there is no "easy" badge or help number in play. Levels are never shown
+  anywhere; they change on their own (above).
 - **Catch-up items are the visible, automatic half.** Once item drops exist (milestone 4), weight
   them by standing: the team behind on its shelf gets the best drops. This adjusts within a
   match on its own, while `help` stays the fixed per-player baseline.
@@ -426,8 +441,8 @@ Trust boundary: `readFighter` is the only way in, from storage or from another t
 only known param keys with the right type (finite numbers, booleans, `#rrggbb` colours, a name
 from the rig's `NAMES`), and only known hats, capes, bags and kid colours.
 
-Not built yet: the silhouette reveal on the animal tiles, and the grown-up long-press for the
-`help` level.
+Not built yet: the silhouette reveal on the animal tiles. There is no `help` control anywhere:
+scoring sets it (see Handicap).
 
 ## Lobby
 

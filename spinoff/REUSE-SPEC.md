@@ -468,8 +468,10 @@ scary, for 4–6 year olds.
   drops it. The level lives on the host for the evening (a new room starts at level 1).
 - **No difficulty setting** (decided 2026-10-13). CPU bad guys play at `help 0`; the level (how
   many of them) is the only dial for now. `ponytail:` auto-scaling comes later: nudge the CPU bad
-  guys' `help` (between `-0.5` and `0.5`, below the kids' safety bounce at `0.75`) from how the
-  kids did on the previous level, aiming to keep a level at 2–3 minutes (see Open questions).
+  guys' `help` (between `-0.5` and `0.5`, below the kids' safety bounce at `0.75`) from the
+  previous level's **donut margin** (decided 2026-10-13). Matches keep the fixed 3-minute timer,
+  never longer, so time can't be the signal: a big win nudges the next level harder, a narrow win or
+  a loss nudges it easier.
 
 Check: a node test runs one bad guy against an idle kid on the two-shelf stage and asserts the
 bad guy grabs a donut and banks it.
@@ -501,12 +503,6 @@ bad guy grabs a donut and banks it.
   stronger, slower moves), or only how it looks while moving?
 - **The owl.** It is already a species in the code. Its wings are the one set of arms that
   would read, which makes it a natural third move set.
-- **Auto-scaling needs a level that can end early.** The plan is to tune CPU bad guys from how
-  long the kids took to beat the last level, aiming for 2–3 minutes. But Scoring says a match runs
-  on a fixed 3-minute timer and the fuller shelf wins, so every match takes exactly 3 minutes and
-  there's no time to measure. Either a level ends early when the kids win outright (say, the bad
-  guys' shelf is emptied), with the timer as a backstop; or the dial reads the donut margin instead
-  of the time.
 - **Does pick-and-place have a job in this mode?** Banking is automatic. The touch picker could
   run a short setup phase to arrange your shelf or place obstacles in front of it (the earlier
   obstacle-building idea), or stay out of this mode.

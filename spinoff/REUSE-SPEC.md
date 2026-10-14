@@ -615,6 +615,9 @@ scary, for 4–6 year olds.
   through success in play (donuts, hit streaks and the like). The details of earning are being
   worked out on the Final Fantasy VII Limit Break model. The grape fizz bolt below is the first
   move in the pool.
+- **Everybody starts over each new game** (decided 2026-10-13). Moves earned in a game (a room,
+  from 🏠 to leaving) last only for that game. Next game night, grownup bad guys start again from
+  the first moves, as the level starts again from 1.
 - **A bad guy's power bar fills from taking hits** (decided 2026-10-13), the FF7 Limit gauge: the
   more the kids clobber a bad guy, the sooner it can strike back. Heroes' bars never fill from
   being hit.

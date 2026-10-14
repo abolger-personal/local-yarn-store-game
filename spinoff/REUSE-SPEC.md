@@ -271,9 +271,9 @@ a quarter of the 600 that ran at 35 fps. Triangles are the GPU's side and are un
 tablet: a fighter is about 86k triangles at `high` geometry detail (100–109k with cable hat and
 cape), 29k at `med` and 16k at `low`. So the chooser (one fighter, close up) builds at `high`, and
 the lobby and the match build at `med`: 14 fighters are about 0.5M triangles instead of 1.4M.
-Drop to `low` if a real tablet stutters. At `med` and lobby size, a llama's hat is too small for its
-stitch to show, so `garments.js` draws it smooth (the shop's `LOOK.viewPx` rule); the chooser
-turns that rule off, like the selfie studio. Lobby squares are 1.2 wide, so the widest fighter
+Drop to `low` if a real tablet stutters. With super-bulky hats and capes (see Costumes) the
+heaviest fighter at `med` is 37k triangles, 14 of them about 0.5M, and every stitch still shows.
+Lobby squares are 1.2 wide, so the widest fighter
 (1.11 with gloves and cape) never overlaps a neighbour (`fighter.test.mjs`).
 
 ## Look
@@ -312,7 +312,8 @@ The characters stay the yarn store's characters, so hats and capes stay knitwear
 
 ## Costumes: hats, capes, bags, boxing gloves
 
-Every fighter wears a hat, a cape, a bag and boxing gloves, each in colours the kid picks.
+Every fighter wears a bag and boxing gloves; a hat and a cape are the kid's choice. Each piece is
+in colours the kid picks.
 
 - **Hats:** `garments.js` hat, as-is. Ten silhouettes already (beanie, beret, bucket, earflap,
   pixie, …); the chooser offers a handful.
@@ -342,10 +343,18 @@ Every fighter wears a hat, a cape, a bag and boxing gloves, each in colours the 
   what carries donuts (see Mode: donut capture the flag), so the hands stay free for gloves.
   The rig's own held skein (`buildHeldItem` in `npc.js`) is simply never shown.
 - **Stitch texture on hats and capes** (`TEXTURES` in `fighter.js`): stockinette, rib, garter,
-  cable, single crochet, waffle, lace. Relief adds triangles but never draw calls; measured on a
-  lion's beanie plus cape, from 4,320 triangles (stockinette) up to 18,784 (cable, 4.3×). Seed
-  (6.3×), puff (8.7×) and linen stitch (18.5×) are left out for tablet GPUs. Colourwork
-  (stripes, fair isle, …) is free (vertex colours) and is the next texture to offer.
+  cable, single crochet, waffle, lace. Seed, puff and linen stitch are left out (6–18× the
+  triangles in worsted). Colourwork (stripes, fair isle, …) is free (vertex colours) and is the
+  next texture to offer.
+- **Fighters knit in super-bulky yarn** (`YARN` in `fighter.js`, decided 2026-10-13). In worsted, a
+  llama's rib, garter and cable were drawn smooth at lobby and match size by the shop's
+  `LOOK.viewPx` rule (stitches under 1.5 px become plain), so the chooser showed a stitch the
+  match never did. Super-bulky stitches are big enough to survive on every species, and fewer of
+  them means fewer triangles: a beanie plus cape is 7.1k (stockinette) to 13.4k (garter), against
+  up to 24k in worsted. Chunky knits also suit the toy look. `fighter.test.mjs` checks every stitch
+  shows on every species at `med` detail with the shop's `viewPx`.
+- **Kids wear whatever they like** (decided 2026-10-13): any hat or none, any cape or none. Only
+  the bag is required, since it carries donuts. Bad guys always wear the `ninja` hat.
 
 ## Fighter chooser
 
@@ -433,7 +442,9 @@ scary, for 4–6 year olds.
 - **The `ninja` hat** is one more row in `garments.js`'s `HAT` table. It starts from `hood`,
   which already frames the face with the eyes uncovered (`face: true, eyesOut: true`), and sits
   lower (`seat`) so the edge reaches the brow. The eyes stay visible on purpose: light eyes on
-  a dark hood read as a goofy villain, a hidden face as a scary one. The shop gets the hat too.
+  a dark hood read as a goofy villain, a hidden face as a scary one. **Spinoff only** (decided
+  2026-10-13): like the cape, it stays out of the shop's silhouette list, since a new shop
+  silhouette re-rolls every pattern design after it in `PATTERN_TITLES`.
 - **Reserved colours.** Black and dark purple belong to the bad guys alone; the fighter chooser
   leaves them out of the kids' swatches. This follows the anti-camouflage rule
   (`DESIGN-DECISIONS.md` §5, `CHARACTER_RANGE` in `yarn-look.js`), which reserves a colour range

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { POSES, applyPose } from '../characters/npc.js';
+import { POSES, applyPose, setGeometryDetail } from '../characters/npc.js';
 import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import {
@@ -10,6 +10,7 @@ import {
 import { wingShape } from '../characters/owl.js';
 import { floorGrid } from './roster.js';
 
+const SHOP_VIEW_PX = LOOK.viewPx;
 LOOK.viewPx = 0;
 
 const at = (o) => o.getWorldPosition(new THREE.Vector3());
@@ -120,7 +121,6 @@ for (const species of SPECIES) for (const cape of CAPES) {
   for (const stitch of TEXTURES) {
     assert.ok(triangles(stitch) <= smooth * 5, `${stitch} hat and cape cost ${triangles(stitch)} triangles, over 5× smooth (${smooth})`);
   }
-  assert.ok(triangles('cable') > smooth * 2, 'a cable hat and cape are actually textured');
 }
 
 {
@@ -138,6 +138,25 @@ for (const species of SPECIES) for (const cape of CAPES) {
     assert.ok(size.x < cell && size.z < cell, `a ${built.species.id} (${size.x.toFixed(2)} × ${size.z.toFixed(2)}) spills out of its ${cell} lobby square`);
     disposeFighter(built);
   }
+}
+
+{
+  setGeometryDetail('med');
+  LOOK.viewPx = SHOP_VIEW_PX;
+  const relief = (species, stitch) => {
+    const f = newFighter(species);
+    f.look = { ...f.look, hat: 'beanie', hatStitch: stitch, cape: 'cape', capeStitch: stitch };
+    const built = buildFighter(f);
+    const n = built.garments.filter((m) => /hat|shawl/.test(m.userData.worn)).reduce((sum, m) => sum + m.geometry.index.count / 3, 0);
+    disposeFighter(built);
+    return n;
+  };
+  for (const species of SPECIES) {
+    const smooth = relief(species, 'stockinette');
+    for (const stitch of TEXTURES.slice(1)) assert.ok(relief(species, stitch) > smooth, `a ${species}'s ${stitch} is drawn smooth at match size`);
+  }
+  LOOK.viewPx = 0;
+  setGeometryDetail('high');
 }
 
 console.log('fighter ok');

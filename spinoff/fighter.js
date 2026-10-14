@@ -128,11 +128,16 @@ export function saveFighter(f) {
   globalThis.navigator?.storage?.persist?.().catch(() => {});
 }
 
+// REUSE-SPEC.md §Costumes: stitches big enough to survive match size, where worsted turns smooth
+export const YARN = 'super-bulky';
+
 function wear(type, silhouette, color, stitch = 'stockinette') {
   const item = defaultItem(type);
   if (!silhouette) return { ...item, on: false };
   const craft = CRAFTS.find((c) => STITCHES_BY_CRAFT[c].includes(stitch));
-  return { ...item, on: true, silhouette, color1: color, colorCount: 1, colourwork: 'solid', craft, stitch, tool: usualTool(craft, item.weight) };
+  return {
+    ...item, on: true, silhouette, color1: color, colorCount: 1, colourwork: 'solid', craft, stitch, weight: YARN, tool: usualTool(craft, YARN),
+  };
 }
 
 /** @param {Look} look */

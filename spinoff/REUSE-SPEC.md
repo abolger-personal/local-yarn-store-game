@@ -155,6 +155,26 @@ a gesture.
 - **Same gestures, species flavour.** Each gesture does the same job for every fighter but looks
   like its species: the lion's slap is a roar, the llama's a stomp, the owl's a wing gust.
 
+**Heroes unlock lots of moves by level** (decided 2026-10-13). Level 1 is 🥊, 🦶 and the
+whole-hand slap. Every level after adds one or two: a new power gesture, a situational move (dash
+punch, air stomp, wall-kick jump, charged swing) or a species extra (the llama's headbutt, the
+lion's roar, the owl's glide). A locked gesture falls back to the slap, so a full bar always does
+something. Unlocks are per game like everything else, and a game that starts on a high level
+starts with that level's moves. Hero and bad-guy unlocks live in **one move table keyed by level**,
+so the two ladders can't drift apart. A first ladder, for tuning:
+
+| Level | New for heroes |
+| --- | --- |
+| 1 | 🥊 punch, 🦶 kick, whole-hand slap |
+| 2 | Two-finger swipe: donut roll |
+| 3 | Air stomp (🦶 in the air) |
+| 4 | Pinch on a bad guy: grab and throw |
+| 5 | Species extra: headbutt / roar / glide |
+| 6 | Spread: gust; dash punch (🥊 while running) |
+| 7 | Two-finger tap on your shelf: icing dome |
+| 8 | Wall-kick jump; charged swing (hold 🥊) |
+| 9+ | The rest of the gesture table, one per level |
+
 Candidate gestures (brainstorm, 2026-10-13; first ones to try are marked ★):
 
 | Gesture | Power | For |

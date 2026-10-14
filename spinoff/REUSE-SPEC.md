@@ -324,8 +324,7 @@ none counts as more than 1.5×.
 So a grownup on the heroes' team who keeps scoring slides down to `-0.5` on their own, and a kid
 who is struggling climbs back up, with no age, no label and no grown-up deciding. `help` stays
 fixed during a match (the sim stays plain arithmetic) and changes only between levels. It is
-saved with the fighter on that tablet (`lys.fighter.v1`) so it carries over to the next evening,
-and `readFighter` accepts only quarters from `-0.5` to `1`. Starting numbers (1.5×, ½, a quarter
+not saved: every game starts every hero at `1` again (see Bad guys, Saving progress). Starting numbers (1.5×, ½, a quarter
 a level) are for tuning in play. A grownup who passes donuts to a kid instead of banking them
 keeps their help, which is the behaviour the game wants anyway.
 
@@ -617,7 +616,7 @@ scary, for 4–6 year olds.
   move in the pool.
 - **Everybody starts over each new game** (decided 2026-10-13). Moves earned in a game (a room,
   from 🏠 to leaving) last only for that game. Next game night, grownup bad guys start again from
-  the first moves, as the level starts again from 1.
+  the first moves. The one thing kept is the heroes' highest level (see Saving progress).
 - **A bad guy's power bar fills from taking hits** (decided 2026-10-13), the FF7 Limit gauge: the
   more the kids clobber a bad guy, the sooner it can strike back. Heroes' bars never fill from
   being hit.
@@ -671,7 +670,16 @@ scary, for 4–6 year olds.
 
   Two grownups on level 3 face the kids with 2 CPU bad guys beside them; no grownups on level 3
   is 3 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
-  drops it. The level lives on the host for the evening (a new room starts at level 1).
+  drops it.
+- **Saving progress: only the highest level** (decided 2026-10-13). Each tablet saves one number,
+  the highest level its kid has unlocked (by winning the level before it), under its own key
+  (`lys.level.v1`), apart from the fighter so changing animals never loses it. Everything else
+  starts over each game: `help`, earned moves, power bars. When a room forms, its heroes send
+  their saved level with their fighter, and the room can start at the **highest level every hero
+  has reached** (the lowest of their saved levels). A kid who is new to the game brings the
+  room's start down to where they are. Bad-guy players don't count: the level is the heroes'
+  progress. The number is checked on the way in, like the fighter: a whole number from 1 to the
+  last level.
 - **No difficulty setting** (decided 2026-10-13). CPU bad guys play at `help 0`; the level (how
   many of them) is the only dial for now. `ponytail:` auto-scaling comes later: nudge the CPU bad
   guys' `help` (between `-0.5` and `0.5`, below the kids' safety bounce at `0.75`) from the

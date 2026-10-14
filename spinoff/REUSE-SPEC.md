@@ -180,7 +180,7 @@ never with smaller buttons.
 
 Suggested starting levels: age 4 → `1`, age 5 → `0.75`, age 6 → `0.5`, grownups on the kids'
 team → `0` or `-0.5`. Bad guys never pick a level: a played bad guy is always `-0.5`, and CPU bad
-guys follow the match difficulty, `-0.5` to `0.5` (see Bad guys).
+guys play at `0` until auto-scaling exists (see Bad guys).
 
 Design rules:
 
@@ -416,16 +416,14 @@ scary, for 4–6 year olds.
 - **A bad-guy player sends only "bad guy", never a look.** Every tablet builds the preset from the
   table in code, so `readFighter` still never lets a bad-guy colour in from the network, and a kid
   still can't dress as one.
-- **Bad-guy players get the penalty; CPU bad guys get the difficulty setting** (decided
-  2026-10-13). A bad guy a person plays is fixed at `help -0.5`, the grownup end of the
-  table, because the grownups are the ones playing them: more knockback taken, less damage dealt,
+- **Bad-guy players get the penalty** (decided 2026-10-13). A bad guy a person plays is fixed at
+  `help -0.5`, the grownup end of the table, because the grownups are the ones playing them: more knockback taken, less damage dealt,
   smaller hit spheres, no input buffer, shorter respawn invincibility. Nobody picks that level: it
-  comes with the 🥷 button. CPU bad guys are adjusted by the match difficulty instead (below).
+  comes with the 🥷 button. CPU bad guys are adjusted by level instead (below).
 - **The 8 presets look different from each other**, so two grownups (and the kids watching them)
   can tell bad guys apart within the reserved colours. Each pair differs in at least two things a
   kid sees from across the stage: species, size, cape or capelet, bag shape, black or purple
   gloves, and fur shade. A node test checks every pair.
-
 - **Look:**
   - Grey fur: near-zero chroma, mid-dark lightness. The coat (fleece, mane, feathers) follows
     through `deriveCoatColor` (`npc.js`) and `deriveManeColor` (`lion.js`), so it comes out a
@@ -468,12 +466,10 @@ scary, for 4–6 year olds.
   Two grownups on level 3 face the kids with 2 CPU bad guys beside them; no grownups on level 3
   is 3 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
   drops it. The level lives on the host for the evening (a new room starts at level 1).
-- **CPU difficulty reuses the `help` table, pointing the right way.** One grown-up setting on the
-  host, three pictures, gives every CPU bad guy the same `help`: easy `-0.5` (weaker bad guys),
-  normal `0`, hard `0.5` (tougher: harder to launch, hit harder, a second mid-air jump). `help`
-  always helps whoever holds it, so a lower number is an easier match for the kids. Hard stops at
-  `0.5` so CPU bad guys never get the kids' safety bounce (`help ≥ 0.75`). No second difficulty
-  system.
+- **No difficulty setting** (decided 2026-10-13). CPU bad guys play at `help 0`; the level (how
+  many of them) is the only dial for now. `ponytail:` auto-scaling comes later: nudge the CPU bad
+  guys' `help` (between `-0.5` and `0.5`, below the kids' safety bounce at `0.75`) from how the
+  kids did on the previous level, aiming to keep a level at 2–3 minutes (see Open questions).
 
 Check: a node test runs one bad guy against an idle kid on the two-shelf stage and asserts the
 bad guy grabs a donut and banks it.
@@ -505,11 +501,12 @@ bad guy grabs a donut and banks it.
   stronger, slower moves), or only how it looks while moving?
 - **The owl.** It is already a species in the code. Its wings are the one set of arms that
   would read, which makes it a natural third move set.
-- **Levels and the difficulty pictures.** Levels now set how many CPU bad guys join; the three
-  difficulty pictures set their `help`. Keep both, or let the level drive `help` too (say, easy on
-  the early levels, harder as the team fills up) and drop the pictures?
-- **How many bad guys?** Eight against one 4-year-old is a lot. One rule: as many bad guys as
-  kids, capped at 8, with the difficulty setting doing the rest.
+- **Auto-scaling needs a level that can end early.** The plan is to tune CPU bad guys from how
+  long the kids took to beat the last level, aiming for 2–3 minutes. But Scoring says a match runs
+  on a fixed 3-minute timer and the fuller shelf wins, so every match takes exactly 3 minutes and
+  there's no time to measure. Either a level ends early when the kids win outright (say, the bad
+  guys' shelf is emptied), with the timer as a backstop; or the dial reads the donut margin instead
+  of the time.
 - **Does pick-and-place have a job in this mode?** Banking is automatic. The touch picker could
   run a short setup phase to arrange your shelf or place obstacles in front of it (the earlier
   obstacle-building idea), or stay out of this mode.

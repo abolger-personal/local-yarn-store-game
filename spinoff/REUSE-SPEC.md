@@ -615,6 +615,9 @@ scary, for 4–6 year olds.
   through success in play (donuts, hit streaks and the like). The details of earning are being
   worked out on the Final Fantasy VII Limit Break model. The grape fizz bolt below is the first
   move in the pool.
+- **A bad guy's power bar fills from taking hits** (decided 2026-10-13), the FF7 Limit gauge: the
+  more the kids clobber a bad guy, the sooner it can strike back. Heroes' bars never fill from
+  being hit.
 - **First bad-guy power: the grape fizz bolt** (decided 2026-10-13). A cartoon lightning bolt,
   made cute: a chunky, rounded zig-zag like a gummy candy, grape purple with white fizz sparkles
   trailing, with a kazoo "bzzzt" rather than thunder.

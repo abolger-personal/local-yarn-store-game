@@ -824,16 +824,30 @@ bad guy grabs a donut and banks it.
 
 ## Milestones
 
-1. **Fun to hit, one tablet.** One `spinoff/` page: a default fighter wearing boxing gloves,
-   with touch controls, versus a second fighter as a standing training dummy, on one flat
-   platform: tap to move (including a tap-above jump), a punch and a kick as move entries, sphere hit test, knockback, ring-out with instant drop-back-in. A dummy
-   rather than two players sharing a screen, since two kids' hands on one tablet is cramped and
-   milestone 2 gives each their own anyway. Build it as the host from day one: the sim takes an array of per-player
-   inputs per tick and produces a snapshot, and the renderer draws only from snapshots. Check:
-   a node test that feeds scripted inputs to the sim and asserts a hit lands and launches,
-   and that a ring-out spills the bag and the fighter is back in play the same tick. Also one
-   enemy shelf and a bag: grab a donut from the shelf, bank it on your own, and assert the
-   shelf counts change.
+1. **Fun to hit, one tablet** (planned 2026-10-13). On one tablet, your fighter on the stage in
+   thirds against a training dummy: tap to move, 🥊 and 🦶, knock the dummy's donut loose and
+   scramble for it, grab from the enemy shelf and bank on yours, and kick through a few
+   **pre-placed gingerbread bricks** (no build round yet) that fall when the one under them
+   breaks. Built as the host from day one: the sim takes per-player inputs per tick and produces
+   a snapshot, and the page draws only from snapshots.
+   - **Phase A, the sim** (`spinoff/sim.js`, pure, no three.js, fixed 60 Hz `tick` +
+     `snapshot`): stage as platform data with jump links, shelves on `inventory/grid.js`,
+     navigation (tap a point or a thing, routes with jumps, ledge stop, tap-above jump, facing
+     follows travel, target kept through hits), punch and kick as data with per-step hit spheres,
+     body spheres from the fighter's proportions, percent and knockback, ring-out with instant
+     drop-back-in, one-donut bags, grab and bank, popped donuts that stay until tapped, bricks with
+     hit counts and collapse, and the dummy as a bad guy whose input is "nothing".
+     `spinoff/sim.test.mjs` drives it with scripted inputs, and asserts **the donut total never
+     changes**, every tick.
+   - **Phase B, the page** (`spinoff/controls.js`, `spinoff/play.html` + `play.js`): Pointer
+     Events per finger from `touch-test.html`, taps to targets, 🥊 / 🦶 buttons; gingerbread
+     platforms and bricks, two-torus donuts, fighters at `med` detail walking on the rig's walk
+     layer (as `dress-up.js` does), punch and kick poses, the oversized carried donut, a camera
+     that follows your fighter.
+   - **Shared rig fix first, on `0.0.1`:** `TAIL_TELEPORT` resets the tail above 6 units/s, which a
+     knockback launch passes. Reset it only on a real teleport, then merge into this branch.
+   - Out of scope: networking, the build round, bad-guy behaviour, powers, levels, `help`
+     changes, team combos.
 2. **Two tablets.** Done: the fighter chooser, the room code and the join handshake, with
    everyone standing on the lobby floor. Still to do: inputs up, snapshots down, interpolation,
    per-tablet camera.

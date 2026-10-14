@@ -131,8 +131,11 @@ for (const species of SPECIES) for (const cape of CAPES) {
 
 {
   const { cell } = floorGrid();
-  for (let i = 0; i < 60; i++) {
-    const built = buildFighter(randomFighter());
+  // ponytail: sampled, since species randomise() is Math.random only; 1.4 vs 1.26 widest of 600 is the margin
+  for (let i = 0; i < 40; i++) {
+    const f = randomFighter();
+    f.look = { ...f.look, cape: 'capelet', bag: 'crossbody pouch' };
+    const built = buildFighter(f);
     built.root.updateMatrixWorld(true);
     const size = new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3());
     assert.ok(size.x < cell && size.z < cell, `a ${built.species.id} (${size.x.toFixed(2)} × ${size.z.toFixed(2)}) spills out of its ${cell} lobby square`);

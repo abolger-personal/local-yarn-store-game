@@ -273,8 +273,10 @@ cape), 29k at `med` and 16k at `low`. So the chooser (one fighter, close up) bui
 the lobby and the match build at `med`: 14 fighters are about 0.5M triangles instead of 1.4M.
 Drop to `low` if a real tablet stutters. With super-bulky hats and capes (see Costumes) the
 heaviest fighter at `med` is 37k triangles, 14 of them about 0.5M, and every stitch still shows.
-Lobby squares are 1.2 wide, so the widest fighter
-(1.11 with gloves and cape) never overlaps a neighbour (`fighter.test.mjs`).
+Lobby squares are 1.4 wide, so the widest fighter
+(1.26: a llama in a super-bulky capelet, gloves out) never overlaps a neighbour
+(`fighter.test.mjs`: 40 random bodies, each in that widest outfit; sampled, not seeded, because
+species `randomise` only uses `Math.random`).
 
 ## Look
 

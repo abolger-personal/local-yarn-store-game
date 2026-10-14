@@ -72,13 +72,19 @@ Not reusable: the store sim, displays, inventory grid, pathing, puzzle, stock an
 - **Percent and knockback:** hits raise a fighter's percent; knockback grows with it; leaving
   the stage bounds is a ring-out. Damage pops sprinkles (`sparkle.js` recoloured). A ring-out
   costs donuts, never playing time (see Scoring).
+- **Kicking is required** (the kids' own ask, 2026-10-13). Punch and kick are the two core
+  attacks, each with its own button, so a 4-year-old never needs a stick-plus-button combo to kick.
+  The rig already kicks: `motion.js` has `rd-kick-l` / `rd-kick-r` poses on the `legSwing`,
+  `hipFlex` and `kneeBend` channels, used in a dance. A kick reaches further and launches flatter
+  than a punch, and is a little slower. In the air it becomes a diving stomp. The owl's legs are
+  short, so its kick is a talon swipe from a hop.
 - **Moves:** ~6–10 per species as `DANCES`-style entries. Each move also carries its hit
   spheres per step (offset, radius, active steps), authored as data, not read off live joints
   (see Multiplayer: the spring rig is cosmetic and differs per tablet).
 - **Hurt spheres:** sized from params (`headRadius`, `torsoW/H/D`, `legHeight`), fixed to the
   fighter's body position, not to animated joints.
 - **Touch controls, and nothing else.** No keyboard path, not even for development. A virtual
-  stick plus jump / attack / special buttons, large enough for small hands, built on Pointer
+  stick plus jump / 🥊 punch / 🦶 kick / special buttons, large enough for small hands, built on Pointer
   Events with `touch-action: none` so a stick thumb and a button thumb are tracked separately by
   `pointerId`. Development is tested by scripted inputs in node and on a real tablet.
 - **Per-tablet camera:** each tablet frames its own fighter and the nearest opponents, with
@@ -494,7 +500,7 @@ bad guy grabs a donut and banks it.
 
 1. **Fun to hit, one tablet.** One `spinoff/` page: a default fighter wearing boxing gloves,
    with touch controls, versus a second fighter as a standing training dummy, on one flat
-   platform: jump, one attack as a move entry, sphere hit test, knockback, ring-out with instant drop-back-in. A dummy
+   platform: jump, a punch and a kick as move entries, sphere hit test, knockback, ring-out with instant drop-back-in. A dummy
    rather than two players sharing a screen, since two kids' hands on one tablet is cramped and
    milestone 2 gives each their own anyway. Build it as the host from day one: the sim takes an array of per-player
    inputs per tick and produces a snapshot, and the renderer draws only from snapshots. Check:

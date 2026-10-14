@@ -169,6 +169,37 @@ Candidate gestures (brainstorm, 2026-10-13; first ones to try are marked ★):
 | Two-finger tap on your shelf | Icing dome over your shelf for a few seconds | Last-second defence |
 | Drumming (many quick taps) | Sprinkle cannon | Mashers |
 
+### Team powers
+
+Teamwork makes the dream work (decided 2026-10-13). Teammates who fire powers close together get
+a bigger, combined power, and every tablet shows what teammates are doing so they can find each
+other.
+
+- **Nobody waits.** The first power fires at once, as usual. It opens a **2-second join window**:
+  any teammate who fires a power inside it adds the team bonus on top. Missing the window costs
+  nothing.
+- **Combos:** the same gesture twice is a bigger version (two slaps: an earthquake across the
+  whole stage; two donut rolls: a donut parade). Different gestures make a mix, decided per pair
+  as powers get built. A third or later teammate in the window adds more sprinkles and a bigger
+  push, not new rules.
+- **Joining shows.** A sparkly ribbon in the team's colours links the fighters in the combo, and
+  the combo pops a burst big enough to see from across the stage.
+
+Visual indicators, so each kid can tell what their teammates are doing:
+
+- **Everyone's power bar is visible.** A small icing ring floats over every teammate's fighter;
+  along the screen edge, one donut per teammate in their fur colour fills as their bar does.
+  A full one glows.
+- **A fired power calls the team.** The firing fighter glows with the power's picture over its
+  head, and on every teammate's screen a big pulsing ring and the same picture appear on that
+  fighter, or on its edge marker if it is off screen, with the ring shrinking as the window
+  closes. "Join now" is told by picture and timing, no words.
+- **Where teammates are heading.** Each teammate's tap target shows as a small footprint in their
+  fur colour, so "I'm going for the shelf" is visible without talking. The target already goes
+  to the host as an input, so this costs one more snapshot field.
+- **The network side is small.** Each fighter's bar level (one byte), current target and power
+  state ride in the snapshot; the host alone decides whether a power joined a window.
+
 ## Scoring: everyone plays the whole time
 
 No lives, no elimination, no waiting to respawn. A match runs on a timer and every player is in
@@ -576,6 +607,22 @@ scary, for 4–6 year olds.
   violet or magenta.
 - **Names:** a short list of silly villain names, shown only as pictures and voice, never as
   text the kids have to read.
+- **First bad-guy power: the grape fizz bolt** (decided 2026-10-13). A cartoon lightning bolt,
+  made cute: a chunky, rounded zig-zag like a gummy candy, grape purple with white fizz sparkles
+  trailing, with a kazoo "bzzzt" rather than thunder.
+
+  | Part | Starting rule |
+  | --- | --- |
+  | Trigger | Full power bar, then a swipe with two or more fingers |
+  | Direction | Leaves the bad guy in the swipe's direction, wherever on screen the swipe is |
+  | Speed | Slow enough to see and step away from (about walking-and-a-half), after a short wind-up glow |
+  | Hit | **Static frizz:** the coat (fleece, mane, feathers) puffs into a fuzzy ball, eyes swirl, a hop, one donut pops out, a light push, never a ring-out |
+  | Blocked by | Fort pieces: the bolt breaks the first one it hits |
+  | Fill rate | A played bad guy's bar fills at the `help -0.5` rate, ×0.7 |
+
+  The frizz is meant to be funny, so being zapped is something kids laugh at. To check before
+  building: whether the coat can be scaled on its own after `mergeCharacter`, or the puff needs
+  its own mesh.
 - **AI is an input generator on the host.** The sim already takes one input per fighter per
   tick; a bad guy's comes from a small state machine instead of a touch screen:
   - head for the kids' shelf;
@@ -637,5 +684,6 @@ bad guy grabs a donut and banks it.
   stronger pieces cost more?
 - **Powers for bad guys.** Do CPU bad guys fill a bar and use powers too (a grownup bad guy can,
   at `help -0.5` fill rate)? It makes them scarier and the shelf dome a real counter.
-- **Team powers.** Two kids firing the same power within a second of each other could combine
-  into a bigger one. Worth it, or one thing too many?
+- **Team powers for bad guys?** The same join window would let two grownup bad guys combine
+  bolts. Fair and fun between grownups, but CPU bad guys timing combos perfectly would be a lot
+  for 4-year-olds: heroes only, played bad guys too, or everyone?

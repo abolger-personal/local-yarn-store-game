@@ -175,6 +175,9 @@ Teamwork makes the dream work (decided 2026-10-13). Teammates who fire powers cl
 a bigger, combined power, and every tablet shows what teammates are doing so they can find each
 other.
 
+- **Who can combine:** heroes, and bad guys played by people (decided 2026-10-13). Two grownup bad
+  guys can join bolts. CPU bad guys never combine: perfectly timed CPU combos would be too much for
+  4-year-olds.
 - **Nobody waits.** The first power fires at once, as usual. It opens a **2-second join window**:
   any teammate who fires a power inside it adds the team bonus on top. Missing the window costs
   nothing.
@@ -684,6 +687,3 @@ bad guy grabs a donut and banks it.
   stronger pieces cost more?
 - **Powers for bad guys.** Do CPU bad guys fill a bar and use powers too (a grownup bad guy can,
   at `help -0.5` fill rate)? It makes them scarier and the shelf dome a real counter.
-- **Team powers for bad guys?** The same join window would let two grownup bad guys combine
-  bolts. Fair and fun between grownups, but CPU bad guys timing combos perfectly would be a lot
-  for 4-year-olds: heroes only, played bad guys too, or everyone?

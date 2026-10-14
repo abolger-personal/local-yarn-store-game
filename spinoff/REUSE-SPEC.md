@@ -178,7 +178,9 @@ Starting points to tune in play, not measured values. Whole-number knobs round; 
 switch at the threshold shown. UI knobs never go below pro: a grownup is handicapped in the fight,
 never with smaller buttons.
 
-Suggested starting levels: age 4 → `1`, age 5 → `0.75`, age 6 → `0.5`, grownups → `0` or `-0.5`.
+Suggested starting levels: age 4 → `1`, age 5 → `0.75`, age 6 → `0.5`, grownups on the kids'
+team → `0` or `-0.5`. `help` is for the kids' team only: bad guys, CPU or played by a grownup,
+are always `0` (see Bad guys).
 
 Design rules:
 
@@ -236,7 +238,7 @@ The split follows the A1 plan: gameplay is one authority, cosmetics are local.
 
 | Crosses | Stays local on each tablet |
 | --- | --- |
-| Join: the `lys.fighter.v1` save (species, params, outfit, gloves) and `help`; a few hundred bytes of JSON, sent once | Building the character from those params (`createCharacter` is deterministic from params; randomness lives only in `randomise*`) |
+| Join: the `lys.fighter.v1` save (species, params, outfit, gloves) and `help`, about 2 KB of JSON sent once; or, for a bad-guy player, only "bad guy" (the preset comes from the sorted ids) | Building the character from those params (`createCharacter` is deterministic from params; randomness lives only in `randomise*`) |
 | Inputs, guest → host | Spring rig, idle layer, blinks, ear flicks, tail sway (`motion.js` `Math.random`) |
 | Snapshots, host → guest: move id + step drives the guest's rig toward that move's pose | Camera, edge markers, sparkle effects, sound |
 
@@ -401,8 +403,26 @@ Built: `spinoff/lobby.html` (page) on `spinoff/net.js` and `spinoff/roster.js`.
 
 ## Bad guys
 
-The other team: a cast of up to 8 CPU fighters, made fresh at the start of each match on the
-host. Silly, not scary, for 4–6 year olds.
+The other team: up to 8 bad guys, drawn from **8 fixed presets**. A grownup can play one (below);
+the host fills the rest of the team with CPU bad guys from the presets nobody took. Silly, not
+scary, for 4–6 year olds.
+
+- **Grownups join as bad guys with one button** (decided 2026-10-13). 🥷 in the lobby swaps your
+  fighter for a bad guy; tap it again to go back. Nothing to pick: you get the first preset no
+  other grownup in the room has. Which one is worked out the way `standingSpots` places people:
+  every tablet sorts the bad-guy players' ids and hands out presets in order, so all tablets agree
+  with no extra messages. Your own fighter stays saved; the bad guy is not written to
+  `lys.fighter.v1`.
+- **A bad-guy player sends only "bad guy", never a look.** Every tablet builds the preset from the
+  table in code, so `readFighter` still never lets a bad-guy colour in from the network, and a kid
+  still can't dress as one.
+- **Bad guys get no handicaps** (decided 2026-10-13): every bad guy, played or CPU, is fixed at
+  `help 0`, the game as designed. No help and no grownup penalty either; a grownup who wants it
+  harder can play a bad guy instead of a `-0.5` kid-team fighter.
+- **The 8 presets look different from each other**, so two grownups (and the kids watching them)
+  can tell bad guys apart within the reserved colours. Each pair differs in at least two things a
+  kid sees from across the stage: species, size, cape or capelet, bag shape, black or purple
+  gloves, and fur shade. A node test checks every pair.
 
 - **Look:**
   - Grey fur: near-zero chroma, mid-dark lightness. The coat (fleece, mane, feathers) follows
@@ -418,9 +438,12 @@ host. Silly, not scary, for 4–6 year olds.
   leaves them out of the kids' swatches. This follows the anti-camouflage rule
   (`DESIGN-DECISIONS.md` §5, `CHARACTER_RANGE` in `yarn-look.js`), which reserves a colour range
   so characters never blend into the stock. Here it stops a bad guy blending into the kids' team.
-- **Generator:** pick a species, run its `randomise` for body shape, then override the colours
-  and outfit from the bad-guy sets. The host sends the resulting params to every tablet, exactly
-  like a joining player's. Send params, never a seed (see Multiplayer).
+- **Presets, not a generator.** The 8 bad guys are fixed params in `spinoff/` code (designed once,
+  using the species `randomise` for a starting shape), identical on every tablet. A preset index is
+  all that crosses the network.
+- **Their colours stay inside the reserved range:** every preset colour passes `isBadGuyCloth` /
+  `isBadGuyFur`, so "purple" means the dark purple the kids' swatches leave out, never the kids'
+  violet or magenta.
 - **Names:** a short list of silly villain names, shown only as pictures and voice, never as
   text the kids have to read.
 - **AI is an input generator on the host.** The sim already takes one input per fighter per
@@ -433,9 +456,8 @@ host. Silly, not scary, for 4–6 year olds.
   One exact trait tunes it: **Assertiveness** sets how often a bad guy chases a carrier instead
   of grabbing. `ponytail:` one state machine for every bad guy; personalities per bad guy only if
   matches feel samey.
-- **Difficulty reuses the `help` table.** One grown-up setting on the host, shown as three
-  pictures, gives every bad guy the same `help`: easy `1`, normal `0`, hard `-0.5`. No second
-  difficulty system.
+- **Difficulty is not `help`.** Bad guys stay at `help 0` (above). How hard the match is comes from
+  how many CPU bad guys there are and how often they chase (see Open questions).
 
 Check: a node test runs one bad guy against an idle kid on the two-shelf stage and asserts the
 bad guy grabs a donut and banks it.
@@ -467,9 +489,9 @@ bad guy grabs a donut and banks it.
   stronger, slower moves), or only how it looks while moving?
 - **The owl.** It is already a species in the code. Its wings are the one set of arms that
   would read, which makes it a natural third move set.
-- **Where do grownups play?** On the kids' team they're a helper. As a bad guy (choosing a
-  bad-guy fighter on their own tablet) they're the villain the kids get to beat, often the most
-  fun version at this age. Both can be allowed; the question is the default.
+- **CPU difficulty.** With bad guys fixed at `help 0`, the knobs left are how many CPU bad guys
+  join and their AI (how often they chase a carrier instead of grabbing). Is one grown-up setting
+  for those enough?
 - **How many bad guys?** Eight against one 4-year-old is a lot. One rule: as many bad guys as
   kids, capped at 8, with the difficulty setting doing the rest.
 - **Does pick-and-place have a job in this mode?** Banking is automatic. The touch picker could

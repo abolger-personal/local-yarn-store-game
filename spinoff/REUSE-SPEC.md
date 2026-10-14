@@ -566,6 +566,12 @@ species `randomise` only uses `Math.random`).
 have to be a natural colour: a hot-pink lion and a cyan owl are the point. Quiet, natural and
 grey colours belong to the bad guys.
 
+**Hit-stop is our rumble** (playtest 2026-10-14: "that little freeze feels AWESOME"). Tablets
+have no controller rumble, so a short freeze of everyone involved (`HITSTOP_TICKS`, 5 ticks at
+60 Hz, about 80 ms) is how an impact is felt. Use it more, scaled by how big the moment is:
+landing a hit, a brick breaking, knocking a donut loose, a steal, a power move going off, a
+ring-out. Keep it short, and in the sim so every tablet freezes on the same tick.
+
 Keep `felted` (the shop look, free), or try `toon` / `matcap` shading from
 `inventory/yarn-look.js` `SHADING` for a punchier arcade read. `setViewMode(root, 'silhouette')`
 gives a "who's that?" character-select reveal. Stages from the bakery: a giant cake, a stack of

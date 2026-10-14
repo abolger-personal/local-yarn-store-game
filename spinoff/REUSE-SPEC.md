@@ -160,6 +160,11 @@ and smashers each get a round that is theirs.
 - **The build round has no timer.** It ends when both teams are ready: every hero has tapped 👍
   and every bad-guy player has tapped 👍. Tapping 👍 again takes it back, to keep building.
   Nobody is rushed, and a careful builder can take as long as their team lets them.
+- **Readers can force the start** (decided 2026-10-13). Beside 👍 is the written line "hold 👍 to
+  start now". Holding 👍 for 2 seconds, with a ring filling around it, starts the round for
+  everyone. Reading is the gate, not a grown-up/kid label: nobody is marked as anything, and a
+  kid who can read the line has earned the button. The 2-second hold keeps a 4-year-old's
+  ordinary tap from setting it off.
 - **CPU bad guys build their fort and are ready at once.** With no grownup bad guys, the bad
   guys' side is ready from the start, so only the heroes decide when to go.
 - **Placement is the shop's touch picker** (`inventory/pick-place.js` on the team's
@@ -544,8 +549,5 @@ bad guy grabs a donut and banks it.
   stronger, slower moves), or only how it looks while moving?
 - **The owl.** It is already a species in the code. Its wings are the one set of arms that
   would read, which makes it a natural third move set.
-- **A hero who never taps 👍.** With no timer, a 4-year-old who has wandered off holds up the
-  whole room. Does a grownup on the heroes' team get a long-press to call the team ready, or does
-  the host's tablet?
 - **How many pieces per team?** A fixed number per level, more with each level, or a budget where
   stronger pieces cost more?

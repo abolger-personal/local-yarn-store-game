@@ -73,7 +73,7 @@ Not reusable: the store sim, displays, inventory grid, pathing, puzzle, stock an
   the stage bounds is a ring-out. Damage pops sprinkles (`sparkle.js` recoloured). A ring-out
   costs donuts, never playing time (see Scoring).
 - **Kicking is required** (the kids' own ask, 2026-10-13). Punch and kick are the two core
-  attacks, each with its own button, so a 4-year-old never needs a stick-plus-button combo to kick.
+  attacks, each with its own button, so a 4-year-old never needs a combo to kick.
   The rig already kicks: `motion.js` has `rd-kick-l` / `rd-kick-r` poses on the `legSwing`,
   `hipFlex` and `kneeBend` channels, used in a dance. A kick reaches further and launches flatter
   than a punch, and is a little slower. In the air it becomes a diving stomp. The owl's legs are
@@ -83,10 +83,8 @@ Not reusable: the store sim, displays, inventory grid, pathing, puzzle, stock an
   (see Multiplayer: the spring rig is cosmetic and differs per tablet).
 - **Hurt spheres:** sized from params (`headRadius`, `torsoW/H/D`, `legHeight`), fixed to the
   fighter's body position, not to animated joints.
-- **Touch controls, and nothing else.** No keyboard path, not even for development. A virtual
-  stick plus jump / 🥊 punch / 🦶 kick / special buttons, large enough for small hands, built on Pointer
-  Events with `touch-action: none` so a stick thumb and a button thumb are tracked separately by
-  `pointerId`. Development is tested by scripted inputs in node and on a real tablet.
+- **Touch controls, and nothing else.** No keyboard path, not even for development. Development
+  is tested by scripted inputs in node and on a real tablet. See Navigation: tap to move.
 - **Per-tablet camera:** each tablet frames its own fighter and the nearest opponents, with
   edge markers for fighters off screen. Purely local; nothing about it crosses the network.
 
@@ -105,6 +103,35 @@ The species kits' `delighted` comments say arm poses don't read through fleece a
 about bare arms moving inside the coat. Gloves fix it (see Costumes): the glove is what the eye
 follows, so punches are fine as signature moves (checked by eye on dozens of random fighters,
 2026-10-13). The neck, tail, mane and wings are extras on top, not substitutes.
+
+## Navigation: tap to move
+
+No joystick (decided 2026-10-13). Tap where you want to go and your fighter goes there. The only
+buttons are 🥊 punch and 🦶 kick, which attack where the fighter is, while it keeps moving.
+
+- **Tap a place:** the fighter goes to the nearest spot it can stand on there. A tap on a higher
+  platform jumps there on its own: the host keeps a small map of the stage's platforms with jump
+  links between them and walks the route. A tap straight above the fighter is a jump; another
+  tap higher, in the air, is the next mid-air jump. There is no jump button.
+- **Tap a thing:** the fighter goes to it and acts. A bad guy: chase them. A loose donut: pick it
+  up. The enemy shelf: grab. Your own shelf: bank. The fighter **ends facing what was tapped**.
+- **Facing follows the direction of travel, for everyone** (decided 2026-10-13). A punch or kick
+  goes the way the fighter is walking, or last walked. Turning is a small tap just in front of or
+  behind the fighter. Facing is never a handicap knob: a rule that switched on and off with `help`
+  would make the game work differently for a kid as their help changes.
+- **Holding a finger down** makes the target follow the finger, until it lifts.
+- **Walking stops at a ledge.** A tap beyond the edge of the stage walks to the edge, never off it.
+  Only a jump, or being hit, leaves the stage.
+- **Hits don't cancel the target.** After a launch, or a ring-out and drop-back-in, the fighter
+  carries on to where it was going, so nobody has to re-tap after every hit.
+- **Attacking on the move.** A punch is layered on the upper body over the walk on the legs, so
+  the fighter keeps going. A kick needs the legs: the fighter pauses for the kick and walks on.
+- **Fort walls are not walked around.** A fighter heading for a target behind a wall stops at the
+  wall, and the kid smashes through. No route-finding around forts.
+- **Two thumbs at once.** One thumb taps the stage while the other presses 🥊 or 🦶, tracked
+  separately by `pointerId` (Pointer Events, `touch-action: none`). A touch that starts on a
+  button never counts as a move.
+- **Buttons are big,** sized for small hands.
 
 ## Scoring: everyone plays the whole time
 
@@ -203,7 +230,6 @@ system.
 | Pickup reach | ×1.0 | ×2.0 | ×1.0 (never below pro) | host sim |
 | Respawn invincibility (s) | 2 | 4 | 1 | host sim |
 | Safety bounce below the stage, per fall | 0 | 1 (at help ≥ 0.75), recharges after 20 s | 0 | host sim |
-| Turn to face nearest opponent on attack | off | on (at help ≥ 0.5) | off | host sim |
 | Touch button size | ×1.0 | ×1.4 | ×1.0 | local UI |
 | Placement grab radius / snap reach | 44 px / 1.6 cells | 64 px / 2.5 cells | 44 px / 1.6 cells | local UI (`makePicker` already takes both as functions) |
 
@@ -271,8 +297,9 @@ below.
   ours. Connecting uses [Trystero](https://github.com/dmotz/trystero) (one CDN import) over its
   Nostr strategy: the host shows a random room code, guests type it. Signalling needs internet;
   play traffic stays on the local network.
-- **Inputs** (a few bytes per tick) go on a reliable channel, or unreliable with each packet
-  carrying the last ~5 inputs so a dropped jump is covered by the next packet.
+- **Inputs** are a move target (a point or a tapped thing) plus 🥊 / 🦶 presses, sent only when
+  they change, a few bytes each, on a reliable channel. A lost packet costs little: the target
+  stays where it was. The host does the route-finding.
 - **Snapshots** (per fighter: position, velocity, facing, percent, donuts in bag, move id, move
   step, ~30 bytes; under 450 bytes for 14 fighters; plus each shelf's donut count and loose donut
   pickups as positions) go 30 times a second on an unreliable channel
@@ -546,7 +573,7 @@ bad guy grabs a donut and banks it.
 
 1. **Fun to hit, one tablet.** One `spinoff/` page: a default fighter wearing boxing gloves,
    with touch controls, versus a second fighter as a standing training dummy, on one flat
-   platform: jump, a punch and a kick as move entries, sphere hit test, knockback, ring-out with instant drop-back-in. A dummy
+   platform: tap to move (including a tap-above jump), a punch and a kick as move entries, sphere hit test, knockback, ring-out with instant drop-back-in. A dummy
    rather than two players sharing a screen, since two kids' hands on one tablet is cramped and
    milestone 2 gives each their own anyway. Build it as the host from day one: the sim takes an array of per-player
    inputs per tick and produces a snapshot, and the renderer draws only from snapshots. Check:

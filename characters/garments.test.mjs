@@ -1153,6 +1153,14 @@ for (const id of speciesIds()) for (const silhouette of GARMENTS.shawl.silhouett
   assert.ok(sag > fit.torso[1] * 0.05, `${id}: a draped ${silhouette}'s front edges start only ${sag.toFixed(3)} below its neck -- a square corner at the collarbone`);
 }
 
+for (const id of speciesIds()) for (const silhouette of ['capelet', 'triangle']) {
+  const built = build(id), fit = bodyFit(built);
+  const top = (accessory) => Math.max(...outfitPieces(built, { shawl: item('shawl', { silhouette, form: 'draped', edge: 'none', accessory }) })
+    .map(({ geo }) => new THREE.Box3().setFromBufferAttribute(geo.attributes.position).max.y));
+  const above = top('buttons') - top('tassel');
+  assert.ok(above < fit.torso[0] * 0.11, `${id}: a ${silhouette}'s buttons stand ${above.toFixed(3)} above its collar -- the row must hang down from the neckline, not straddle it (on a neckless owl it reaches the beak)`);
+}
+
 {
   assert.deepEqual([...formsOf('shawl')], ['draped', 'tied'], 'a shawl is worn draped or tied, nothing else');
   assert.ok(accessoriesOf('shawl').includes('pin') && !accessoriesOf('hat').includes('pin'), 'a pin is a shawl\'s accessory, and only a shawl\'s');

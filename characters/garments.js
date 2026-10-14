@@ -736,11 +736,11 @@ const HAT_PITCH = THREE.MathUtils.degToRad(35);
 const POM_OF_HEAD = 0.4, POM_OF_SHIN = 1.8;
 const BUTTON_OF_HEAD = 0.14, BUTTON_OF_TORSO = 0.11, BUTTON_OF_SHIN = 0.6;
 
-const BUTTONS_IN_A_ROW = 3;
+const BUTTONS_IN_A_ROW = 3, BUTTON_GAP = 2.6;
 
-function buttonRow(joint, p, n, size, dir = new THREE.Vector3(0, -1, 0)) {
+function buttonRow(joint, p, n, size, dir = DOWN) {
   const count = BUTTONS_IN_A_ROW;
-  return Array.from({ length: count }, (_, i) => ({ joint, p: p.clone().addScaledVector(dir, (i - (count - 1) / 2) * size * 2.6), n, size }));
+  return Array.from({ length: count }, (_, i) => ({ joint, p: p.clone().addScaledVector(dir, (i - (count - 1) / 2) * size * BUTTON_GAP), n, size }));
 }
 
 function slouchBag(v) {
@@ -1788,9 +1788,10 @@ function shawlPin(a, b, n, size) {
 }
 
 function shawlAnchors(fn, chest, front, f, torso) {
-  const low = fn(0.5, 1, new THREE.Vector3());
+  const low = fn(0.5, 1, new THREE.Vector3()), size = torso * BUTTON_OF_TORSO;
+  const hung = front.clone().addScaledVector(DOWN, ((BUTTONS_IN_A_ROW - 1) / 2) * size * BUTTON_GAP);
   return {
-    buttons: buttonRow(chest, front, new THREE.Vector3(0, 0, 1), torso * BUTTON_OF_TORSO),
+    buttons: buttonRow(chest, hung, new THREE.Vector3(0, 0, 1), size),
     flower: [{ joint: chest, p: fn(0.08, 0.3, new THREE.Vector3()), n: new THREE.Vector3(0, 0, 1), size: f.thick * 4 }],
     tassel: [{ joint: chest, p: low, size: f.thick * 5 }],
   };

@@ -118,9 +118,10 @@ export function loadFighter() {
   try { return readFighter(JSON.parse(localStorage.getItem(FIGHTER_KEY) ?? 'null')); } catch { return null; }
 }
 
-/** @param {Fighter} f */
+/** One fighter per tablet, overwritten on every change (REUSE-SPEC.md §Fighter chooser). @param {Fighter} f */
 export function saveFighter(f) {
   try { localStorage.setItem(FIGHTER_KEY, JSON.stringify(f)); } catch {}
+  globalThis.navigator?.storage?.persist?.().catch(() => {});
 }
 
 function wear(type, silhouette, color) {

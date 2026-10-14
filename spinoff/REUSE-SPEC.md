@@ -349,6 +349,13 @@ only, pictures and colour, no words needed; every button has an `aria-label` for
 5. **Done.** ✅ saves `{ species, params, look }` to `localStorage` under `lys.fighter.v1` and
    goes to the lobby. That same object is what the join handshake sends.
 
+Saving: there is no save button. Every tap overwrites the one saved fighter (about 2 KB) in
+`localStorage`, and asks the browser to keep it (`navigator.storage.persist()`). Not a cookie: a
+cookie is sent to the server with every request, has a 4 KB limit (the fighter is 2.8 KB
+encoded), and on Safari a cookie written by JavaScript expires within 7 days anyway. On an iPad,
+Safari can clear a site's storage after 7 days without a visit; adding the game to the Home
+Screen exempts it.
+
 Colours: `CLOTH` and `FUR` are checked against `isBadGuyCloth` / `isBadGuyFur` (black, dark
 purple, grey), so no kid can dress as a bad guy. The rig's default fur (`#a0a6ba`) is itself
 bad-guy grey, which is why a new fighter always starts from a `FUR` swatch.

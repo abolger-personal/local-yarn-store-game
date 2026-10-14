@@ -2,7 +2,7 @@
 
 What's new in L.Y.S. — Local Yarn Store. [Play it here.](https://abolger-personal.github.io/local-yarn-store-game/)
 
-## 0.0.1 — coming soon
+## 0.0.1 — 2026-10-13
 
 ### The shop
 - The blue Drop Off square is gone; a second table stands in its corner. Customers lend a finished
@@ -34,7 +34,8 @@ What's new in L.Y.S. — Local Yarn Store. [Play it here.](https://abolger-perso
   only the sparkle when a customer has everything their project needs.
 - Customers who sit down to knit or crochet start right away, instead of sitting idle in the chair
   for several seconds first.
-- You can watch a customer knit or crochet the last stretch of their project in the chair; the round that finished it used to show them sitting still.
+- You can watch a customer knit or crochet the last stretch of their project in the chair; the
+  round that finished it used to show them sitting still.
 
 ## 0.0.0 — 2026-10-12
 

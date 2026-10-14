@@ -317,6 +317,11 @@ Every fighter wears a hat, a cape, a bag and boxing gloves, each in colours the 
   Gloves are leather, not knit: a plain shiny `MeshStandardMaterial`, not `garmentMaterial`.
   They live in the spinoff, not in `garments.js`; the yarn store's mittens rule stays as it is
   unless decided separately.
+- **The owl wears its gloves on its wing tips** (kept, 2026-10-13). Its wing hangs from the upper
+  arm and buries the hand at its middle, so a glove on the hand showed only as a lump halfway
+  down the wing. The glove sits at 80% of the way down the wing instead, sized to swallow the
+  tip whatever the owl's wing size (up to about 1.8 times a hand glove), so the wing is the arm
+  and the glove is its fist. Owl punches are wing swings from the shoulder.
 - **Gloves fix the vanishing arms.** Arms disappear into fleece and mane (Design constraint,
   above), but a big coloured glove at the end of each arm is the most readable thing on screen,
   so punches can be signature moves after all.

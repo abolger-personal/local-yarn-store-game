@@ -4,9 +4,10 @@ import { POSES, applyPose } from '../characters/npc.js';
 import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import {
-  BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, newFighter,
-  randomFighter, readFighter, setFur,
+  BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, buildFighter, disposeFighter, gloveAnchors, isBadGuyCloth, isBadGuyFur,
+  newFighter, randomFighter, readFighter, setFur,
 } from './fighter.js';
+import { wingShape } from '../characters/owl.js';
 
 LOOK.viewPx = 0;
 
@@ -14,17 +15,35 @@ const at = (o) => o.getWorldPosition(new THREE.Vector3());
 
 for (const species of SPECIES) {
   const built = buildFighter(newFighter(species));
+  const anchors = gloveAnchors(built);
   assert.equal(built.gloves.length, 2, `${species}: a glove on each hand`);
   for (const pose of ['rest', 'reach', 'delighted']) {
     applyPose(built, { ...POSES.rest, ...POSES[pose] });
     built.root.updateMatrixWorld(true);
     built.gloves.forEach((glove, i) => {
-      const hand = built.holds[i].parent;
-      assert.ok(at(glove).distanceTo(at(hand)) < 1e-6, `${species} ${pose}: glove ${i} has come off its hand`);
+      const want = anchors[i].parent.localToWorld(new THREE.Vector3(...anchors[i].at));
+      assert.ok(at(glove).distanceTo(want) < 1e-6, `${species} ${pose}: glove ${i} has come off its anchor`);
     });
   }
   const r = new THREE.Box3().setFromObject(built.gloves[0]).getSize(new THREE.Vector3()).x / 2;
   assert.ok(r > 0.042 * 1.4, `${species}: a glove (r ${r.toFixed(3)}) must read bigger than the bare hand it covers`);
+  disposeFighter(built);
+}
+
+for (const f of [newFighter('owl'), ...Array.from({ length: 60 }, () => randomFighter(Math.random, 'owl'))]) {
+  const built = buildFighter(f);
+  const { pos, scale } = wingShape(built.params);
+  applyPose(built, POSES.rest);
+  built.root.updateMatrixWorld(true);
+  built.gloves.forEach((glove, i) => {
+    const arm = glove.parent;
+    const hand = arm.worldToLocal(at(built.holds.find((h) => h.parent.parent.parent === arm).parent));
+    const tip = glove.position, r = glove.scale.x;
+    assert.ok(tip.y < hand.y, `owl glove ${i} sits at y ${tip.y.toFixed(3)}: above the hand (${hand.y.toFixed(3)}), not on the wing tip`);
+    const across = Math.sqrt(1 - ((tip.y - pos[1]) / scale[1]) ** 2);
+    assert.ok(r >= scale[0] * across && r * 1.1 >= scale[2] * across, `owl glove ${i} (r ${r.toFixed(3)}) is narrower than the wing it should swallow`);
+    assert.ok(-(tip.y - r) > -(pos[1] - scale[1]), `owl glove ${i} must cover the wing's last tip, not leave it poking out below`);
+  });
   disposeFighter(built);
 }
 

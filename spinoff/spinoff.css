@@ -20,7 +20,12 @@ body { display: grid; grid-template-columns: 1fr minmax(320px, 44vw); }
 
 .row { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; border-bottom: 2px dashed #efe0cc; }
 .row .label { font-size: 30px; width: 40px; flex: none; padding-top: 14px; text-align: center; }
-.choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.choices { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px; }
+.choices button { flex: none; --tap: 52px; }
+.choices .dot { width: 34px; height: 34px; }
+.choices.pictures { flex-wrap: nowrap; overflow-x: auto; }
+.pictures button { --tap: 64px; }
 
 button {
   width: var(--tap); height: var(--tap); padding: 6px; border-radius: 50%; border: 3px solid #e7d6c1;

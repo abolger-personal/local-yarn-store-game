@@ -8,7 +8,7 @@ import { deriveManeColor } from '../characters/lion.js';
 import { defaultItem, dress, undress, usualTool } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import '../characters/llama.js';
-import '../characters/owl.js';
+import { wingShape } from '../characters/owl.js';
 
 export const FIGHTER_KEY = 'lys.fighter.v1';
 export const SPECIES = Object.freeze(['lion', 'llama', 'owl']);
@@ -148,16 +148,33 @@ function gloveGeometry() {
   return gloveGeo;
 }
 
-/** Boxing gloves on both hands (REUSE-SPEC.md §Costumes). */
+export const WING_TIP = 0.8;
+
+const handGlove = (P) => P.limbThick * GLOVE_SIZE;
+
+const onHands = (built) => built.holds.map((hold) => ({ parent: hold.parent, at: [0, 0, 0], r: handGlove(built.params) }));
+
+// REUSE-SPEC.md §Costumes: the owl's hand is buried mid-wing, so its wing tips go into the gloves,
+// each big enough to swallow its tip whatever the owl's wing size
+function onWingTips(built) {
+  const { pos, scale } = wingShape(built.params);
+  const across = Math.sqrt(1 - WING_TIP ** 2);
+  const r = 1.05 * Math.max(handGlove(built.params), scale[0] * across, (scale[2] * across) / 1.1, (scale[1] * (1 - WING_TIP)) / 0.95);
+  return built.joints.upperArm.map(({ node, side }) => ({ parent: node, at: [side * pos[0], pos[1] - scale[1] * WING_TIP, 0], r }));
+}
+
+export const gloveAnchors = (built) => (built.species.id === 'owl' ? onWingTips(built) : onHands(built));
+
+/** Boxing gloves on both hands, or both wing tips (REUSE-SPEC.md §Costumes). */
 export function addGloves(built, color) {
   removeGloves(built);
   const material = new THREE.MeshStandardMaterial({ color, roughness: 0.38, metalness: 0 });
-  const r = built.params.limbThick * GLOVE_SIZE;
-  built.gloves = built.holds.map((hold) => {
+  built.gloves = gloveAnchors(built).map(({ parent, at, r }) => {
     const glove = new THREE.Mesh(gloveGeometry(), material);
     glove.scale.setScalar(r);
+    glove.position.set(...at);
     glove.castShadow = true;
-    hold.parent.add(glove);
+    parent.add(glove);
     return glove;
   });
   return built.gloves;

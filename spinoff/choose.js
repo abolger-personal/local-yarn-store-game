@@ -41,18 +41,25 @@ const swatchRow = (action, list, current) => list.map(({ hex, name }) =>
 const pickRow = (action, list, current, colour, none) => [...(none ? [null] : []), ...list].map((v) =>
   button(action, v ?? '', v ?? 'none', svg(v ? ICON[v] : NONE, v ? colour : '#9a8f84'), v === current)).join('');
 
-const row = (icon, label, inner) =>
-  `<div class="row" role="group" aria-label="${label}"><span class="label" aria-hidden="true">${icon}</span><div class="choices">${inner}</div></div>`;
+const pictures = (html) => `<div class="choices pictures">${html}</div>`;
+const colours = (html) => `<div class="choices">${html}</div>`;
+
+const row = (icon, label, ...lines) => `<div class="row" role="group" aria-label="${label}">`
+  + `<span class="label" aria-hidden="true">${icon}</span><div class="lines">${lines.join('')}</div></div>`;
+
+const garment = (icon, kind, list, none) => row(icon, kind,
+  pictures(pickRow(kind, list, fighter.look[kind], fighter.look[`${kind}Color`], none)),
+  colours(swatchRow(`${kind}Color`, CLOTH, fighter.look[`${kind}Color`])));
 
 function render() {
   const { species, look, params } = fighter;
   panel.innerHTML = [
-    row('🐾', 'animal', SPECIES.map((s) => button('species', s, s, `<span class="emoji">${ANIMAL[s]}</span>`, s === species)).join('')),
-    row('🎨', 'fur', swatchRow('fur', FUR, params.bodyColor)),
-    row('🎩', 'hat', pickRow('hat', HATS, look.hat, look.hatColor, true) + swatchRow('hatColor', CLOTH, look.hatColor)),
-    row('🦸', 'cape', pickRow('cape', CAPES, look.cape, look.capeColor, true) + swatchRow('capeColor', CLOTH, look.capeColor)),
-    row('🎒', 'bag', pickRow('bag', BAGS, look.bag, look.bagColor, false) + swatchRow('bagColor', CLOTH, look.bagColor)),
-    row('🥊', 'gloves', swatchRow('gloves', CLOTH, look.gloves)),
+    row('🐾', 'animal', pictures(SPECIES.map((s) => button('species', s, s, `<span class="emoji">${ANIMAL[s]}</span>`, s === species)).join(''))),
+    row('🎨', 'fur', colours(swatchRow('fur', FUR, params.bodyColor))),
+    garment('🎩', 'hat', HATS, true),
+    garment('🦸', 'cape', CAPES, true),
+    garment('🎒', 'bag', BAGS, false),
+    row('🥊', 'gloves', colours(swatchRow('gloves', CLOTH, look.gloves))),
   ].join('');
 }
 

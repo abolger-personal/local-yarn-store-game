@@ -252,7 +252,7 @@ wide stage costs nothing new.
 
 - **Many small flags.** Each shelf starts stocked with donuts. Every donut is a flag, so every
   kid can score something in a match, not only whoever reaches a single flag first.
-- **Grab:** touch the enemy shelf and press attack. The top donut there is taken off the shelf
+- **Grab:** tap the enemy shelf (see Navigation); on arrival the fighter grabs. The top donut there is taken off the shelf
   (`lift` in `inventory/grid.js`) into your bag.
 - **Bank:** touch your own shelf. Everything in your bag goes onto it on its own: `anySlot` finds
   the spot and `place` puts it there, both in `inventory/grid.js`. No dragging, so a 4-year-old
@@ -287,11 +287,39 @@ and smashers each get a round that is theirs.
   guys' side is ready from the start, so only the heroes decide when to go.
 - **Placement is the shop's touch picker** (`inventory/pick-place.js` on the team's
   `inventory/grid.js` floor), with the `help` table's grab radius and snap reach for small hands.
-  This answers the old open question about whether pick-and-place has a job here.
-- **New levels add new fort pieces.** Level 1 has the plainest piece (say, a wafer wall); each
-  level after adds one (gingerbread wall, jelly bounce pad, sprinkle-slick tile, …). Pieces stay
-  unlocked for the rest of the evening's room. A new piece is the level's surprise, alongside its
-  extra bad guy.
+- **World 1 is Gingerbread World, levels 1–10** (decided 2026-10-13). Other worlds wait until
+  the game gets past level 10.
+- **Fort pieces are gingerbread, coloured by their icing** (decided 2026-10-13). Brown
+  gingerbread body; the builder's fur colour is the icing, flooded over most of the front with a
+  thin gingerbread rim, so the colour still reads at tablet size (thin piped lines would just look
+  brown). One gingerbread material for every piece, icing as vertex colour, the way garment
+  colourwork already works, so a many-coloured fort draws in a few batches. Damage shows as
+  cracks in the gingerbread with the icing crumbling off. Kinds differ by shape, one new kind per
+  level, unlocked for the rest of the game:
+
+  | Level | Piece | Shape |
+  | --- | --- | --- |
+  | 1 | Gingerbread brick | Plain block |
+  | 2 | Gable wall | House front with a peaked roof |
+  | 3 | Gumdrop bouncer | Low slab with a giant gumdrop to bounce on |
+  | 4 | Candy-cane post | Tall striped pillar, for reaching the top shelf |
+  | 5 | Gingerbread-man shield | A gingerbread man standing guard; takes extra hits |
+  | 6+ | More house parts | Windows, doors, chimneys |
+
+- **Heroes place only their own pieces** (decided 2026-10-13). Every hero's pieces carry their
+  fur colour (plus a small pattern when two kids share a colour). A hero can place and move only
+  their own pieces, never a teammate's, and can stack on anything: their own or a teammate's.
+  Nothing forces teamwork; the kids find it.
+- **Mixed walls are tougher, and look it** (decided 2026-10-13). Where a hero's piece rests on a
+  teammate's piece of another colour, both pieces in that joint take one extra hit. A piece
+  bonded twice (the middle of a three-colour stack) takes two extra. Bonded pieces are drawn
+  thicker, bulging toward the camera and overhanging their cell a little, with a fat bead of
+  white icing "glue" in the seam. Same-colour stacks get nothing. Toughness is computed from the
+  grid when the build round ends (count different-colour teammate pieces directly above and
+  below), a pure function with a node test, and drawing follows that count.
+- **Bad guys' pieces are all one colour and skip the teamwork rules** (decided 2026-10-13): dark
+  chocolate gingerbread with dark purple icing. Any bad guy can place or move any bad-guy piece,
+  and their walls never get the mixed bonus, so only the heroes can build chunky walls.
 - **Pieces are fixed by level and number of players** (decided 2026-10-13). Each player gets their
   own small pile to place, so siblings never fight over pieces and every kid builds something:
 
@@ -303,8 +331,9 @@ and smashers each get a round that is theirs.
   piece kinds, newest first, so a new level's piece is always in hand. CPU bad guys count
   toward their team's size and place theirs instantly. The team's grid floor caps the total, so
   a big team on a small stage can't fill every cell.
-- **Every fort piece can be smashed** in the knock-it-down round, so a fort slows the other team
-  down without ever walling a 4-year-old out. Kicks hit fort pieces hardest.
+- **Every fort piece can be smashed** in the knock-it-down round, by anyone, so a fort slows the
+  other team down without ever walling a 4-year-old out. Kicks hit fort pieces hardest. A piece
+  must rest on something when placed (the grid's support rule).
 
 ## Handicap: one `help` number per player
 
@@ -397,7 +426,7 @@ snapshots and the host are not built yet. The yarn store's seeded rng (ROADMAP A
   state snapshots. Guests never talk to each other: 6 players is 5 connections, not 15.
 - **Transport is WebRTC data channels**, tablet to tablet over the home network. No server of
   ours. Connecting uses [Trystero](https://github.com/dmotz/trystero) (one CDN import) over its
-  Nostr strategy: the host shows a random room code, guests type it. Signalling needs internet;
+  Nostr strategy: the host shows a random room code, guests tap it in on the picture keypad (see Lobby). Signalling needs internet;
   play traffic stays on the local network.
 - **Inputs** are a move target (a point or a tapped thing), 🥊 / 🦶 presses and a fired power
   ("power X at point P", see Power moves), sent only when they change, a few bytes each, on a
@@ -688,15 +717,37 @@ scary, for 4–6 year olds.
   The frizz is meant to be funny, so being zapped is something kids laugh at. To check before
   building: whether the coat can be scaled on its own after `mergeCharacter`, or the puff needs
   its own mesh.
-- **AI is an input generator on the host.** The sim already takes one input per fighter per
-  tick; a bad guy's comes from a small state machine instead of a touch screen:
-  - head for the kids' shelf;
-  - grab;
-  - run home and bank;
-  - break off to attack a kid who is carrying donuts nearby.
+- **AI is a fake player on the host.** A CPU bad guy produces the same inputs a tablet does (a
+  tap target, 🥊 / 🦶, a power gesture), played through the same sim, so it can do nothing a
+  player can't, and the scripted-input sim tests cover it. The training dummy of milestone 1 is a
+  bad guy whose input is "nothing". `ponytail:` one state machine for every bad guy.
 
-  One number tunes it: how often a bad guy chases a carrier instead of grabbing. `ponytail:` one
-  state machine for every bad guy.
+  | State | When | Does |
+  | --- | --- | --- |
+  | Raid | Default, bag not full | Heads for the kids' shelf, breaking through the fort (below) |
+  | Grab | At the kids' shelf | Takes one donut about every second until the bag is full or the shelf is empty |
+  | Run home | Bag full, or shelf empty | Heads home and banks |
+  | Chase | A kid carrying donuts comes in range and a chance roll says chase | Follows and attacks in reach; gives up after a few seconds, or when the kid banks or drops |
+  | Defend | A kid is grabbing at the bad guys' shelf | The nearest bad guy goes home to stop them |
+  | Scoop | A loose donut is close by | Picks it up on the way |
+  | Power | Bar full | Fires an unlocked move at the nearest kid, with the normal wind-up |
+
+  With two or more CPU bad guys, one stays home as a defender and the rest raid. In the build
+  round, CPU bad guys stack their pile as a wall in front of their shelf, instantly.
+- **CPU bad guys break walls** (required, 2026-10-13). The basic hero fort is a ring of walls with
+  the donut shelf in the middle, so a bad guy that can't get through is no opponent. A raider
+  heads straight for the shelf, never routing around the fort. At a wall one piece high it jumps
+  over; at anything taller it kicks the lowest piece in its way until it breaks, then carries on.
+  It goes for the weakest piece within reach of its path (fewest hits left), so a mixed wall
+  steers it toward a single-colour gap: the kids' best walls really do protect them. Breaking a
+  piece charges nobody's bar.
+- **Fair to 4-year-olds.** About half a second of reaction delay before acting on anything new;
+  at most one attack about every 0.8 s; two CPU bad guys never chase the same kid; after hitting a
+  kid, a bad guy leaves that kid alone for a few seconds; no waiting at the stage edge to knock a
+  falling kid off again; powers aim where the kid was about half a second ago. Chase chance,
+  reaction delay, attack pace and grace time are plain numbers that auto-scaling can tune later.
+- **MVP subset:** Raid (with wall breaking), Grab, Run home and Chase first; Defend, Scoop and
+  Power once matches work.
 - **The bad-guy team grows level by level** (decided 2026-10-13). Level 1 is the grownups who
   tapped 🥷, or one CPU bad guy if nobody did. Each level after adds one CPU bad guy:
 
@@ -754,5 +805,8 @@ bad guy grabs a donut and banks it.
 
 - **The owl's move set.** Its punches are wing swings with the gloves on its wing tips (see
   Costumes) and its kick a talon swipe from a hop; the rest of its moves are still to design.
-- **Powers for bad guys.** Do CPU bad guys fill a bar and use powers too (a grownup bad guy can,
-  at `help -0.5` fill rate)? It makes them scarier and the shelf dome a real counter.
+- **Collapse.** When a fort piece breaks, do the pieces resting on it fall (and stay whole), or
+  break with it? Falling is the grid's support rule and the most fun to watch.
+- **Who CPU bad guys go after.** The nearest kid, or grownups on the heroes' team first?
+- **How many tablets.** "Up to 6 players" in the intro: 6 heroes, or 6 people including grownup
+  bad guys?

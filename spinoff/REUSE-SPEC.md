@@ -618,6 +618,21 @@ scary, for 4–6 year olds.
 - **A bad guy's power bar fills from taking hits** (decided 2026-10-13), the FF7 Limit gauge: the
   more the kids clobber a bad guy, the sooner it can strike back. Heroes' bars never fill from
   being hit.
+- **Heroes fill from giving, and teamwork fills fastest** (decided 2026-10-13). Starting weights,
+  for tuning in play:
+
+  | Event | Hero's bar | Bad guy's bar |
+  | --- | --- | --- |
+  | Time passing | a little | a little |
+  | A hero lands a hit on a bad guy | ↑ (the hero) | ↑ (the bad guy hit) |
+  | A hero banks donuts | ↑ | — |
+  | A hero passes a donut to a teammate | ↑↑ | — |
+  | Assist: hitting a bad guy who is attacking a teammate (with a sparkle, so the kid sees it) | ↑↑ | ↑ |
+  | A team power lands | ↑ for everyone in the combo | **nothing**: team combos never charge a bad guy |
+  | A bad guy hits a hero | — | — |
+
+  Hurting a kid never charges anyone. Ganging up with plain hits charges the bad guy, but a team
+  combo doesn't, so the kids' best answer to a glowing bad guy is to combine.
 - **First bad-guy power: the grape fizz bolt** (decided 2026-10-13). A cartoon lightning bolt,
   made cute: a chunky, rounded zig-zag like a gummy candy, grape purple with white fizz sparkles
   trailing, with a kazoo "bzzzt" rather than thunder.

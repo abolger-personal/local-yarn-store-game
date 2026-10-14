@@ -116,8 +116,9 @@ Everything is judged at play distance: characters are ~150px tall.
   on purpose: a tail that settles without swinging is a stick.
 - The wag swings across the root-to-tip chord, so a hooked tail still swings its whole length.
 - The root takes the whole lift/tuck/wag; later segments share out only how far the tip lags.
-- The tail spring feels the body's real world motion (walking, turning, dancing, hopping). A jump over
-  6 units/s in one frame is a teleport (spawn, reset) and is ignored.
+- The tail spring feels the body's real world motion (walking, turning, dancing, hopping). A step faster
+  than 50 units/s, or longer than 3 units, is a teleport (spawn, reset) and is ignored; a knockback
+  launch (20-30 units/s) is real motion and swings the tail.
 
 ## Coats: scallop shells
 

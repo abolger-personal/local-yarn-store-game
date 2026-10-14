@@ -114,7 +114,7 @@ buttons are 🥊 punch and 🦶 kick, which attack where the fighter is, while i
 
 **It's a depth band, not a flat line** (decided 2026-10-13, after the first playtest felt like "2D
 with 3D graphics"). The stage is a floor you walk around on, like a belt-scrolling brawler: a
-tap on the floor is a spot in x and z, and raised floors (decks, the gumdrop hill) are reached
+tap on the floor is a spot in x and z, and raised floors (decks, the middle hill) are reached
 by jumping. Facing is a direction on the floor (a yaw), not just left or right. Hits only land on
 fighters at about the same depth (`HIT_DEPTH` in `match.js`), and every fighter casts a round
 shadow on the floor so kids can see who is lined up with whom. The camera looks down at the
@@ -283,14 +283,14 @@ wide stage costs nothing new.
 | Zone | Terrain | Forts |
 | --- | --- | --- |
 | Heroes' third | A raised deck against the back wall with their shelf on it | Heroes build here only |
-| Middle third | A gumdrop hill in the middle of the band, to jump on or walk around | Nobody builds: always open ground to fight over |
+| Middle third | A hill in the middle of the band, to jump on or walk around (Level 1: a stack of big pancakes) | Nobody builds: always open ground to fight over |
 | Bad guys' third | The mirror of the heroes' third | Bad guys build here only |
 
 The band is wide enough to walk around things, so one wall never closes a side: a fort is a ring
 on the floor grid around the deck, and a raider looks for the gap or the weakest piece. Terrain
 never breaks; only fort pieces do, so routes stay predictable. Milestone 1's bad-guy fort is a
 wall across the band (two high in the middle) with gaps at the back and front.
-Later levels of Gingerbread World can bring new hand-made stages.
+Later levels can bring new hand-made stages.
 
 - **Many small flags.** Each shelf starts stocked with donuts. Every donut is a flag, so every
   kid can score something in a match, not only whoever reaches a single flag first.
@@ -334,19 +334,32 @@ and smashers each get a round that is theirs.
   guys' side is ready from the start, so only the heroes decide when to go.
 - **Placement is the shop's touch picker** (`inventory/pick-place.js` on the team's
   `inventory/grid.js` floor), with the `help` table's grab radius and snap reach for small hands.
-- **World 1 is Gingerbread World, levels 1–10** (decided 2026-10-13). Other worlds wait until
-  the game gets past level 10.
-- **Fort pieces are gingerbread, coloured by their icing** (decided 2026-10-13). Brown
-  gingerbread body; the builder's fur colour is the icing, flooded over most of the front with a
-  thin gingerbread rim, so the colour still reads at tablet size (thin piped lines would just look
-  brown). One gingerbread material for every piece, icing as vertex colour, the way garment
-  colourwork already works, so a many-coloured fort draws in a few batches. Damage shows as
-  cracks in the gingerbread with the icing crumbling off. Kinds differ by shape, one new kind per
-  level, unlocked for the rest of the game:
+- **Each level has its own treat theme** (decided 2026-10-14, replacing "World 1 is Gingerbread
+  World"). The theme dresses the stage and the fort pieces; the rules underneath don't change.
+  `spinoff/scenery.js` `THEMES` holds one entry per level, and `play.html?level=2` shows a later
+  look before levels exist.
+  - **Level 1, breakfast:** a waffle floor (golden ridges, dark pockets on a 0.5 grid) and waffle
+    decks; translucent syrup puddled in the pockets and dripping off the front edge; the middle
+    hill is a stack of big pancakes with butter and syrup on top. Fort pieces are **little
+    pancake stacks, mortared with whipped cream in the builder's colour**: three pancakes with a
+    cream layer above each, the cream wider than the pancakes so the colour shows from any side.
+    Bad guys' stacks are chocolate pancakes with dark purple cream. Damage slides the top
+    pancake off and leans the stack.
+  - **Level 2, cake and sprinkles:** the first playtest's stage, kept as it was: gingerbread with
+    an icing top, the house-style sprinkles (Theme: treats), white icing drips, the green gumdrop
+    hill, and gingerbread-panel fort pieces (cookie panel, piped border, flooded icing, cracks).
+    The playtest said the hill and panels don't read as baked yet; fix them when Level 2 is built.
+  - Gingerbread as its own theme, and worlds beyond, wait until there are more levels.
+- **Fort pieces are coloured by their topping, in the builder's colour** (decided 2026-10-13;
+  whipped cream on Level 1, icing on Level 2), flooded big enough to read at tablet size (thin
+  piped lines would just look brown). One material per kind, colour per piece, so a many-coloured
+  fort draws in a few batches. Kinds differ by shape, one new kind per level, unlocked for the
+  rest of the game. The table below was written for gingerbread; later rows get re-dressed in
+  each level's theme:
 
   | Level | Piece | Shape |
   | --- | --- | --- |
-  | 1 | Gingerbread brick | Plain block |
+  | 1 | Pancake stack | Three pancakes mortared with whipped cream |
   | 2 | Gable wall | House front with a peaked roof |
   | 3 | Gumdrop bouncer | Low slab with a giant gumdrop to bounce on |
   | 4 | Candy-cane post | Tall striped pillar, for reaching the top shelf |
@@ -361,11 +374,11 @@ and smashers each get a round that is theirs.
   teammate's piece of another colour, both pieces in that joint take one extra hit. A piece
   bonded twice (the middle of a three-colour stack) takes two extra. Bonded pieces are drawn
   thicker, bulging toward the camera and overhanging their cell a little, with a fat bead of
-  white icing "glue" in the seam. Same-colour stacks get nothing. Toughness is computed from the
+  cream or icing "glue" in the seam. Same-colour stacks get nothing. Toughness is computed from the
   grid when the build round ends (count different-colour teammate pieces directly above and
   below), a pure function with a node test, and drawing follows that count.
 - **Bad guys' pieces are all one colour and skip the teamwork rules** (decided 2026-10-13): dark
-  chocolate gingerbread with dark purple icing. Any bad guy can place or move any bad-guy piece,
+  chocolate pastry (pancakes, gingerbread) with dark purple cream or icing. Any bad guy can place or move any bad-guy piece,
   and their walls never get the mixed bonus, so only the heroes can build chunky walls.
 - **Pieces are fixed by level and number of players** (decided 2026-10-13). Each player gets their
   own small pile to place, so siblings never fight over pieces and every kid builds something:

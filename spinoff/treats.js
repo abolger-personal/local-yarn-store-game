@@ -1,4 +1,4 @@
-// Donuts and gingerbread (REUSE-SPEC.md §Theme: treats, §Forts), one geometry and one material per kind, shared.
+// Donuts, gingerbread and pancakes (REUSE-SPEC.md §Theme: treats, §Forts), one geometry and one material per kind, shared.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { BRICK } from './match.js';
@@ -12,6 +12,8 @@ export function mat(color, roughness = 0.7) {
   if (!materials.has(key)) materials.set(key, new THREE.MeshStandardMaterial({ color, roughness }));
   return materials.get(key);
 }
+
+export const box = (w, h, d, color) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, 0.8));
 
 export function roundedRect(w, h, r) {
   const s = new THREE.Shape(), x = w / 2 - r, y = h / 2 - r;
@@ -108,7 +110,8 @@ export function brickMesh(b) {
   tilt.add(new THREE.Mesh(BRICK_GEO.panel, mat(GINGER[b.team], 0.8)), new THREE.Mesh(BRICK_GEO.piping, mat(PIPING, 0.5)), flood, ...cracks);
   tilt.rotation.set(0, ((h % 5) - 2) * 0.04, (((h >> 3) % 7) - 3) * 0.025);
   g.add(tilt);
-  return { g, tilt, flood, cracks, hits: -1, wobble: 0 };
+  const bits = [mat(PIPING, 0.5), mat(b.icing, 0.45)];
+  return { g, tilt, flood, cracks, hits: -1, wobble: 0, bits, crumbs: [mat(GINGER[b.team], 0.8), ...bits] };
 }
 
 /** Cracks and missing icing as hits drop; only when they change. @param {BrickState} b */
@@ -121,4 +124,41 @@ export function damageBrick(m, b) {
   m.flood.material = mat(`#${new THREE.Color(b.icing).lerp(new THREE.Color(GINGER[b.team]), hurt * 0.5).getHexString()}`, 0.45);
   m.flood.scale.set(1 - hurt * 0.3, 1 - hurt * 0.45, 1);
   m.flood.position.set(hurt * 0.04, -hurt * 0.05, 0);
+}
+
+// REUSE-SPEC.md §Forts: Level 1 pieces are little pancake stacks mortared with whipped cream in the builder's colour
+export const BATTER = Object.freeze({ heroes: '#efbb6c', badGuys: '#4a2a1a' });
+const STACK = { r: BRICK * 0.44, cake: 0.09, cream: BRICK / 3 - 0.09, layers: 3 };
+let STACK_GEO = null;
+
+const stackGeometry = () => ({
+  cake: slabGeometry(2 * STACK.r, 2 * STACK.r, STACK.cake, STACK.r, 0.035),
+  cream: slabGeometry(2.25 * STACK.r, 2.25 * STACK.r, STACK.cream, 1.125 * STACK.r, STACK.cream / 2),
+});
+
+/** A pancake stack, centred in its cell, each pancake nudged a little from its id. @param {BrickState} b */
+export function pancakeMesh(b) {
+  STACK_GEO ??= stackGeometry();
+  const g = new THREE.Group(), tilt = new THREE.Group(), h = hashOf(b.id), cream = mat(b.icing, 0.45);
+  const cakes = Array.from({ length: STACK.layers }, (_, i) => {
+    const y = -BRICK / 2 + i * (BRICK / STACK.layers), cake = new THREE.Mesh(STACK_GEO.cake, mat(BATTER[b.team], 0.75));
+    const top = new THREE.Mesh(STACK_GEO.cream, cream);
+    cake.position.set((((h >> i) % 5) - 2) * 0.008, y, (((h >> (i + 2)) % 5) - 2) * 0.008);
+    top.position.y = y + STACK.cake;
+    tilt.add(cake, top);
+    return cake;
+  });
+  g.add(tilt);
+  const bits = [cream, mat('#fffaf0', 0.45)];
+  return { g, tilt, cakes, hits: -1, wobble: 0, bits, crumbs: [mat(BATTER[b.team], 0.75), ...bits] };
+}
+
+/** The top pancake slides off and the stack leans as hits drop. @param {BrickState} b */
+export function damagePancake(m, b) {
+  if (m.hits === b.hits) return;
+  const hurt = 1 - b.hits / b.maxHits, top = m.cakes[m.cakes.length - 1];
+  m.hits = b.hits;
+  top.position.x = hurt * 0.07;
+  top.rotation.z = -hurt * 0.25;
+  m.tilt.rotation.x = hurt * 0.08;
 }

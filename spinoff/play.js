@@ -4,10 +4,11 @@ import { playSparkle, stepSparkle } from '../characters/sparkle.js';
 import { attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
 import { MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, setFur, stepFighter } from './fighter.js';
-import { RIOT, confettiMats, createFx, makeShadow, placeShadow, riotSparkleOn } from './fx.js';
+import { confettiMats, createFx, makeShadow, placeShadow, riotSparkleOn } from './fx.js';
 import { BRICK, STAGE, TICK_HZ } from './match.js';
 import { makeStage } from './stage.js';
-import { GINGER, PIPING, brickMesh, damageBrick, donutMesh, mat, sameLook, slabGeometry } from './treats.js';
+import { themeFor } from './scenery.js';
+import { box, donutMesh, sameLook } from './treats.js';
 
 /** @typedef {import('./match.js').Snapshot} Snapshot @typedef {import('./match.js').FighterState} FighterState */
 /** @typedef {import('./match.js').HitEvent} HitEvent @typedef {import('./match.js').DonutEvent} DonutEvent */
@@ -19,7 +20,7 @@ setGeometryDetail('med');
 
 const ME = 'me', DUMMY = 'dummy';
 const SHELF = { cols: 6, gap: 0.3, row: 0.32, rows: 4, r: 0.13, depth: 0.26 };
-const LOOSE_R = 0.2, ICING = '#fff3f8', FACE_CAMERA = -0.5;
+const LOOSE_R = 0.2, FACE_CAMERA = -0.5;
 const CAMERA = { pitch: THREE.MathUtils.degToRad(35), viewW: 7, viewH: 4.8, xMax: 6 };
 const BACK = new THREE.Vector3(0, Math.sin(CAMERA.pitch), Math.cos(CAMERA.pitch));
 const TIMERS = { squash: 0.22, no: 0.6, joy: 0.9, pop: 0.35, pulse: 0.45, wobble: 0.35, hop: 0.4 };
@@ -30,67 +31,15 @@ const _v = new THREE.Vector3(), _goal = new THREE.Vector3();
 const mine = loadFighter();
 if (!mine) location.replace('choose.html');
 
-const stage = makeStage(document.getElementById('stage'), { background: '#ffe3f0' });
+const theme = themeFor(location.search);
+const stage = makeStage(document.getElementById('stage'), { background: theme.background });
 const { scene, camera } = stage;
 const fx = createFx(scene, camera);
-
-const box = (w, h, d, color) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, 0.8));
 
 function badGuyFighter() {
   const f = setFur(newFighter('lion'), '#8f8f96');
   f.look = { ...f.look, hatColor: '#2a2030', capeColor: '#3b2152', bagColor: '#1d1a20', gloves: '#4b2a6b' };
   return f;
-}
-
-/** Gingerbread with an icing top, or the gumdrop hill; raised floors are solid to the ground. */
-function floorMesh(f, i) {
-  const w = f.x1 - f.x0, d = f.z1 - f.z0, g = new THREE.Group();
-  g.position.set((f.x0 + f.x1) / 2, 0, (f.z0 + f.z1) / 2);
-  if (f.y > 0 && f.z0 > STAGE.backWall) {
-    g.add(new THREE.Mesh(slabGeometry(w, d, f.y, 0.7, 0.22), mat('#2fd17a', 0.3)));
-    return g;
-  }
-  const base = i === 0 ? 0.7 : f.y;
-  const body = new THREE.Mesh(slabGeometry(w, d, base, 0.12), mat(GINGER.heroes, 0.8));
-  const top = new THREE.Mesh(slabGeometry(w + 0.08, d + 0.08, 0.08, 0.16, 0.03), mat(ICING, 0.45));
-  body.position.y = f.y - base;
-  top.position.y = f.y - 0.07;
-  g.add(body, top);
-  return g;
-}
-
-/** Instanced bits laid out with the R2 sequence, so they spread evenly without a random seed. */
-function scatter(geometry, material, n, place) {
-  const mesh = new THREE.InstancedMesh(geometry, material, n), m = new THREE.Object3D(), c = new THREE.Color();
-  for (let i = 0; i < n; i++) {
-    place(m, i, (i * 0.618034) % 1, (i * 0.7548776) % 1);
-    m.updateMatrix();
-    mesh.setMatrixAt(i, m.matrix);
-    mesh.setColorAt(i, c.set(RIOT[i % RIOT.length]));
-  }
-  return mesh;
-}
-
-function groundTreats() {
-  const [ground] = STAGE.floors, w = ground.x1 - ground.x0;
-  const sprinkles = scatter(new THREE.CapsuleGeometry(0.03, 0.1, 2, 6), mat('#ffffff', 0.5), 110, (m, i, u, v) => {
-    m.position.set(ground.x0 + 0.2 + u * (w - 0.4), 0.025, ground.z0 + 0.2 + v * (ground.z1 - ground.z0 - 0.4));
-    m.rotation.set(Math.PI / 2, 0, i * 2.4);
-  });
-  const drips = new THREE.InstancedMesh(new THREE.SphereGeometry(0.11, 10, 8), mat(ICING, 0.45), Math.floor(w / 0.3));
-  for (let i = 0; i < drips.count; i++) {
-    _goal.set(ground.x0 + 0.15 + i * 0.3, -0.06, ground.z1 + 0.02);
-    drips.setMatrixAt(i, new THREE.Matrix4().compose(_goal, new THREE.Quaternion(), _v.set(1, i % 3 ? 1.3 : 2, 0.7)));
-  }
-  return [sprinkles, drips];
-}
-
-function backdrop() {
-  const wall = box(26, 7, 0.4, '#f7bcd6');
-  wall.position.set(0, 2.8, STAGE.backWall - 0.2);
-  const skirting = box(26, 0.5, 0.2, GINGER.heroes);
-  skirting.position.set(0, 0.25, STAGE.backWall - 0.05);
-  return [wall, skirting];
 }
 
 function shelfFrame(s) {
@@ -119,7 +68,7 @@ function fillShelf(s) {
   return g;
 }
 
-scene.add(...STAGE.floors.map(floorMesh), ...groundTreats(), ...backdrop(), ...STAGE.shelves.map(shelfFrame));
+scene.add(...theme.scenery(), ...STAGE.shelves.map(shelfFrame));
 
 let frame = 0, now = 0;
 
@@ -210,13 +159,13 @@ function drawLoose(m, d, dt) {
 }
 
 function newBrick(b) {
-  const m = { ...brickMesh(b), team: b.team, shadow: makeShadow(scene) };
+  const m = { ...theme.brick(b), shadow: makeShadow(scene) };
   scene.add(m.g);
   return m;
 }
 
 function drawBrick(m, b, dt) {
-  damageBrick(m, b);
+  theme.damage(m, b);
   m.wobble = Math.max(0, m.wobble - dt / TIMERS.wobble);
   m.g.position.set(b.x + BRICK / 2, b.y + BRICK / 2, b.z + BRICK / 2);
   m.g.rotation.z = Math.sin(m.wobble * 40) * 0.15 * m.wobble;
@@ -295,9 +244,8 @@ function brickHit(h) {
   const m = closestTo(bricks.values(), h, posOf, 1);
   if (!m) return;
   m.wobble = 1;
-  const icing = [mat(PIPING, 0.5), m.flood.material];
-  fx.burst(h, icing, 4, 1.4);
-  if (h.broke) fx.burst(h, [mat(GINGER[m.team], 0.8), ...icing], 14, 2.2);
+  fx.burst(h, m.bits, 4, 1.4);
+  if (h.broke) fx.burst(h, m.crumbs, 14, 2.2);
 }
 
 function onFullBag(e) {
@@ -384,5 +332,5 @@ function play() {
 const goTo = (href) => () => { location.href = href; };
 document.getElementById('leave').addEventListener('click', goTo('lobby.html'));
 document.getElementById('bye').addEventListener('click', goTo('lobby.html'));
-document.getElementById('again').addEventListener('click', goTo('play.html'));
+document.getElementById('again').addEventListener('click', goTo(`play.html${location.search}`));
 if (mine) play();

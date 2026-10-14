@@ -17,7 +17,8 @@ export const roomName = (code) => `donut-${code.join('')}`;
 export const MATCH = Object.freeze({ friendlyFire: false });
 export const canHit = (a, b, match = MATCH) => a.id !== b.id && (a.team !== b.team || match.friendlyFire);
 
-export const floorGrid = () => makeDisplay(7, 2, { cell: 0.62 });
+// a cell holds the widest fighter, gloves and cape included (fighter.test.mjs)
+export const floorGrid = () => makeDisplay(7, 2, { cell: 1.2 });
 
 function centreOut(g) {
   const cells = [];

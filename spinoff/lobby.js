@@ -1,9 +1,13 @@
 import * as THREE from 'three';
+import { setGeometryDetail } from '../characters/npc.js';
 import { makeGridLines } from '../inventory/notions.js';
 import { animateFighter, buildFighter, disposeFighter, loadFighter } from './fighter.js';
 import { openRoom, selfId } from './net.js';
 import { CODE_LENGTH, ROOM_TREATS, floorGrid, isCode, randomCode, standingSpots } from './roster.js';
 import { makeStage } from './stage.js';
+
+// REUSE-SPEC.md §Performance: up to 14 small fighters on screen; 'high' is for the chooser's close-up
+setGeometryDetail('med');
 
 const mine = loadFighter();
 if (!mine) location.replace('choose.html');

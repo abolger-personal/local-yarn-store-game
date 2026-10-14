@@ -2,6 +2,7 @@ import {
   BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, animateFighter, buildFighter, disposeFighter, loadFighter, newFighter,
   randomFighter, saveFighter, setFur,
 } from './fighter.js';
+import { LOOK } from '../characters/garments.js';
 import { makeStage } from './stage.js';
 
 const ANIMAL = { lion: '🦁', llama: '🦙', owl: '🦉' };
@@ -33,6 +34,9 @@ document.body.insertAdjacentHTML('beforeend', `<svg width="0" height="0" aria-hi
 const textured = (body, stitch) => (PATTERN[stitch] ? `${body}<g fill="url(#${patternId(stitch)})">${body}</g>` : body);
 
 const svg = (body, colour) => `<svg viewBox="0 0 48 48" fill="currentColor" style="color:${colour}" aria-hidden="true">${body}</svg>`;
+
+// a close-up, like the selfie studio: always show the stitch, even on a tall llama
+LOOK.viewPx = 0;
 
 let fighter = loadFighter() ?? newFighter('lion');
 let built = null, cheer = 0, spin = 0;

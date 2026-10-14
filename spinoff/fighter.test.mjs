@@ -8,6 +8,7 @@ import {
   newFighter, randomFighter, readFighter, setFur,
 } from './fighter.js';
 import { wingShape } from '../characters/owl.js';
+import { floorGrid } from './roster.js';
 
 LOOK.viewPx = 0;
 
@@ -126,6 +127,17 @@ for (const species of SPECIES) for (const cape of CAPES) {
   const f = setFur(newFighter('llama'), FUR[3].hex);
   assert.equal(f.params.bodyColor, FUR[3].hex);
   assert.notEqual(f.params.fleeceColor, newFighter('llama').params.fleeceColor, 'the fleece follows a new fur colour');
+}
+
+{
+  const { cell } = floorGrid();
+  for (let i = 0; i < 60; i++) {
+    const built = buildFighter(randomFighter());
+    built.root.updateMatrixWorld(true);
+    const size = new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3());
+    assert.ok(size.x < cell && size.z < cell, `a ${built.species.id} (${size.x.toFixed(2)} × ${size.z.toFixed(2)}) spills out of its ${cell} lobby square`);
+    disposeFighter(built);
+  }
 }
 
 console.log('fighter ok');

@@ -264,6 +264,16 @@ throttle (`WEARABLE-LOOK-VS-PERFORMANCE.md`). Every tablet renders at most 14 fi
 8 bad guys) plus a stage, well under that measured 40; the host also runs a 14-body 2D sim, the
 bad-guy AI and 5 connections, all cheap. Stage art is the budget to watch.
 
+Measured on fighters (2026-10-13, headless): 14 dressed fighters are **142 draws** (about 10 each),
+a quarter of the 600 that ran at 35 fps. Triangles are the GPU's side and are unmeasured on a
+tablet: a fighter is about 86k triangles at `high` geometry detail (100–109k with cable hat and
+cape), 29k at `med` and 16k at `low`. So the chooser (one fighter, close up) builds at `high`, and
+the lobby and the match build at `med`: 14 fighters are about 0.5M triangles instead of 1.4M.
+Drop to `low` if a real tablet stutters. At `med` and lobby size, a llama's hat is too small for its
+stitch to show, so `garments.js` draws it smooth (the shop's `LOOK.viewPx` rule); the chooser
+turns that rule off, like the selfie studio. Lobby squares are 1.2 wide, so the widest fighter
+(1.11 with gloves and cape) never overlaps a neighbour (`fighter.test.mjs`).
+
 ## Look
 
 **Palette rule: when unclear, colour riot** (decided 2026-10-13). Main characters' fur does not

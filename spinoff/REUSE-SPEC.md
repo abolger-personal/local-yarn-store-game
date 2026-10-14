@@ -219,6 +219,11 @@ full help, `1`. After each level the host compares each hero's banked donuts wit
 - less than half their share: `help` rises a quarter, up to `1`;
 - in between: no change.
 
+**A hero playing alone** has the whole team's total as their share, so the rule above could never
+move. With one hero, the share is the bad guys' banked donuts instead: the same thresholds, the
+same signal (the donut margin) that will scale the CPU bad guys. Any donuts against the bad guys'
+none counts as more than 1.5×.
+
 So a grownup on the heroes' team who keeps scoring slides down to `-0.5` on their own, and a kid
 who is struggling climbs back up, with no age, no label and no grown-up deciding. `help` stays
 fixed during a match (the sim stays plain arithmetic) and changes only between levels. It is

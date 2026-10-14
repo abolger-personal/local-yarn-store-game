@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-  BASE_PARAMS, MOTION_DEFAULTS, NAMES, POSES, createCharacter, deriveCoatColor, disposeCharacter, getSpecies, mergeCharacter,
-  stepMotion,
+  BASE_PARAMS, DANCE_POSES, MOTION_DEFAULTS, NAMES, POSES, createCharacter, deriveCoatColor, disposeCharacter, getSpecies, mergeCharacter,
+  phaseStep, stepMotion, walkGain, walkLayer, walkPhase,
 } from '../characters/npc.js';
 import { deriveManeColor } from '../characters/lion.js';
 import { CRAFTS, STITCHES_BY_CRAFT, defaultItem, dress, undress, usualTool } from '../characters/garments.js';
@@ -217,3 +217,45 @@ const IDLE = Object.freeze({ ...MOTION_DEFAULTS });
 
 /** @param {keyof typeof POSES} [pose] */
 export const animateFighter = (built, dt, pose = 'rest') => stepMotion(built, POSES[pose], dt, IDLE);
+
+/** Rest pose plus the walk layer at `speed`, the way characters/dress-up.js walks. */
+export function stepFighter(built, dt, pose, speed) {
+  const L = built.params.legHeight + built.params.hipInset;
+  const at = built.walkAt ?? 0;
+  const w = walkPhase(at, speed, L, IDLE);
+  const gain = walkGain(built.motion, speed, dt, IDLE);
+  built.walkAt = (at + phaseStep(speed * dt, speed, L, IDLE)) % 1;
+  return stepMotion(built, pose, dt, IDLE, gain > 0 ? (out) => walkLayer(out, w, gain, IDLE) : null);
+}
+
+const posed = (p) => Object.freeze({ ...POSES.rest, ...p });
+
+const jab = (side) => posed({ armSwing: -0.75, armSwingAlt: -0.8 * side, armOut: 0.05, elbowBend: 0, spineTwist: 0.4 * side });
+
+// REUSE-SPEC.md §Navigation: a punch is upper body only, so it layers over the walk. Keyed by facing,
+// so the arm and leg nearer the camera do the hitting.
+export const MOVE_POSES = Object.freeze({
+  punch: Object.freeze({ 1: jab(1), [-1]: jab(-1) }),
+  kick: Object.freeze({ 1: DANCE_POSES['rd-kick-r'], [-1]: DANCE_POSES['rd-kick-l'] }),
+  hurt: posed({ armSwing: -0.5, armOut: 0.9, elbowBend: 1.2, spineBend: -0.2, headPitch: 0.25, kneeBend: 0.3 }),
+  air: posed({ armOut: 0.9, elbowBend: 0.4, kneeBend: 0.9, hipFlex: 0.6 }),
+});
+
+// REUSE-SPEC.md §Mode: how donuts look
+export const HERO_DOUGH = '#e8c48e';
+export const BAD_DONUT = Object.freeze({ dough: '#241a1d', frosting: '#7b2fbf', stripe: true });
+
+/**
+ * A built, unturned fighter as a match Entrant, measured from its rest-pose bounding box and glove anchors.
+ * @param {Fighter} f @param {{ id: string, team: import('./match.js').Team, dummy?: boolean }} who
+ * @returns {import('./match.js').Entrant}
+ */
+export function entrantOf(f, built, who) {
+  const { id, team, dummy = false } = who;
+  built.root.updateMatrixWorld(true);
+  const size = new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3());
+  const chest = built.chest.getWorldPosition(new THREE.Vector3());
+  const tip = ({ parent, at, r }) => parent.localToWorld(new THREE.Vector3(...at)).distanceTo(chest) + r;
+  const look = team === 'heroes' ? { dough: HERO_DOUGH, frosting: f.params.bodyColor, stripe: false } : BAD_DONUT;
+  return { id, team, height: size.y, width: size.z, reach: Math.max(...gloveAnchors(built).map(tip)), look, ...(dummy && { dummy }) };
+}

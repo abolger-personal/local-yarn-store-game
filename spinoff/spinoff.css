@@ -61,3 +61,18 @@ body.lobby { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
 .keypad .emoji { font-size: 44px; }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .overlay > * { pointer-events: auto; }
+
+/* play: touch only, every finger tracked (touch-test.html) */
+body.play { display: block; touch-action: none; -webkit-touch-callout: none; }
+body.play #stage { position: absolute; inset: 0; }
+body.play #stage canvas { touch-action: none; }
+.hud { position: absolute; top: 16px; left: 24px; right: 24px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
+.hud .clock, .hud .count { font-size: 52px; font-weight: 800; background: var(--panel); border-radius: 28px; padding: 4px 22px; border: 5px solid #e7d6c1; }
+.hud .count { display: flex; gap: 10px; align-items: center; }
+.hud .count.heroes { border-color: #ff9ad5; }
+.hud .count.badGuys { border-color: #5b2a86; }
+.hud .emoji { font-size: 48px; }
+.moves { position: absolute; right: 56px; bottom: 56px; display: flex; gap: 32px; }
+.moves button { width: 132px; height: 132px; border-width: 6px; touch-action: none; -webkit-touch-callout: none; }
+.moves .emoji { font-size: 68px; }
+.moves button.down { background: #ffd21a; border-color: var(--ring); transform: scale(1.1); }

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>Donut fighters — fight</title>
+<link rel="stylesheet" href="spinoff.css" />
+</head>
+<body class="play">
+<main id="stage"></main>
+<header class="hud">
+  <div class="count heroes" aria-label="donuts on our shelf"><span class="emoji">🍩</span><span id="count-heroes"></span></div>
+  <div id="clock" class="clock" aria-label="seconds left"></div>
+  <div class="count badGuys" aria-label="donuts on the bad guys' shelf"><span id="count-badGuys"></span><span class="emoji">🍩</span></div>
+</header>
+<div class="moves">
+  <button id="punch" aria-label="punch"><span class="emoji">🥊</span></button>
+  <button id="kick" aria-label="kick"><span class="emoji">🦶</span></button>
+</div>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.186.1/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.186.1/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="play.js"></script>
+</body>
+</html>

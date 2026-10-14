@@ -179,8 +179,8 @@ switch at the threshold shown. UI knobs never go below pro: a grownup is handica
 never with smaller buttons.
 
 Suggested starting levels: age 4 → `1`, age 5 → `0.75`, age 6 → `0.5`, grownups on the kids'
-team → `0` or `-0.5`. `help` is for the kids' team only: bad guys, CPU or played by a grownup,
-are always `0` (see Bad guys).
+team → `0` or `-0.5`. Bad guys never pick a level: a played bad guy is always `-0.5` and a CPU
+bad guy always `0` (see Bad guys).
 
 Design rules:
 
@@ -416,9 +416,11 @@ scary, for 4–6 year olds.
 - **A bad-guy player sends only "bad guy", never a look.** Every tablet builds the preset from the
   table in code, so `readFighter` still never lets a bad-guy colour in from the network, and a kid
   still can't dress as one.
-- **Bad guys get no handicaps** (decided 2026-10-13): every bad guy, played or CPU, is fixed at
-  `help 0`, the game as designed. No help and no grownup penalty either; a grownup who wants it
-  harder can play a bad guy instead of a `-0.5` kid-team fighter.
+- **Bad guys never get help; bad-guy players get the penalty** (decided 2026-10-13). A bad guy is
+  never above `help 0`. A bad guy a person plays is fixed at `help -0.5`, the grownup end of the
+  table, because the grownups are the ones playing them: more knockback taken, less damage dealt,
+  smaller hit spheres, no input buffer, shorter respawn invincibility. CPU bad guys stay at `0`, the
+  game as designed. Nobody picks the level for a bad guy: it comes with the 🥷 button.
 - **The 8 presets look different from each other**, so two grownups (and the kids watching them)
   can tell bad guys apart within the reserved colours. Each pair differs in at least two things a
   kid sees from across the stage: species, size, cape or capelet, bag shape, black or purple
@@ -456,7 +458,7 @@ scary, for 4–6 year olds.
   One exact trait tunes it: **Assertiveness** sets how often a bad guy chases a carrier instead
   of grabbing. `ponytail:` one state machine for every bad guy; personalities per bad guy only if
   matches feel samey.
-- **Difficulty is not `help`.** Bad guys stay at `help 0` (above). How hard the match is comes from
+- **CPU difficulty is not `help`.** CPU bad guys stay at `help 0` (above). How hard the match is comes from
   how many CPU bad guys there are and how often they chase (see Open questions).
 
 Check: a node test runs one bad guy against an idle kid on the two-shelf stage and asserts the
@@ -489,7 +491,7 @@ bad guy grabs a donut and banks it.
   stronger, slower moves), or only how it looks while moving?
 - **The owl.** It is already a species in the code. Its wings are the one set of arms that
   would read, which makes it a natural third move set.
-- **CPU difficulty.** With bad guys fixed at `help 0`, the knobs left are how many CPU bad guys
+- **CPU difficulty.** With CPU bad guys fixed at `help 0`, the knobs left are how many CPU bad guys
   join and their AI (how often they chase a carrier instead of grabbing). Is one grown-up setting
   for those enough?
 - **How many bad guys?** Eight against one 4-year-old is a lot. One rule: as many bad guys as

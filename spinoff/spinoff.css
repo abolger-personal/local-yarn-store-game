@@ -72,6 +72,7 @@ body.play #stage canvas { touch-action: none; }
 .hud .count.heroes { border-color: #ff9ad5; }
 .hud .count.badGuys { border-color: #5b2a86; }
 .hud .emoji { font-size: 48px; }
+.hud button { pointer-events: auto; width: 84px; height: 84px; }
 .moves { position: absolute; right: 56px; bottom: 56px; display: flex; gap: 32px; }
 .moves button { width: 132px; height: 132px; border-width: 6px; touch-action: none; -webkit-touch-callout: none; }
 .moves .emoji { font-size: 68px; }

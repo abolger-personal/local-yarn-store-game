@@ -97,6 +97,7 @@ const on = (id, fn) => document.getElementById(id).addEventListener('click', fn)
 on('host', () => enter(randomCode()));
 on('join', () => { typed = []; showCode([]); show('start', false); show('keypad', true); });
 on('edit', () => { location.href = 'choose.html'; });
+on('play', () => { location.href = 'play.html'; });
 on('exit', exit);
 buildKeypad();
 

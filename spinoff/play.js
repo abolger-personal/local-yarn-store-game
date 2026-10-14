@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { POSES, setGeometryDetail } from '../characters/npc.js';
 import { attachControls, createControls } from './controls.js';
-import * as match from './fake-match.js';
+import * as match from './sim.js';
 import { MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, setFur, stepFighter } from './fighter.js';
 import { BRICK, STAGE, TICK_HZ } from './match.js';
 import { makeStage } from './stage.js';
@@ -215,6 +215,7 @@ if (mine) {
   const controls = createControls(ME);
   const button = (id) => document.getElementById(id);
   attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: button('punch'), kick: button('kick') } });
+  document.getElementById('leave').addEventListener('click', () => { location.href = 'lobby.html'; });
   let snap = api.snapshot(state), acc = 0;
   stage.run((dt) => {
     for (acc += dt; acc >= 1 / TICK_HZ; acc -= 1 / TICK_HZ) {

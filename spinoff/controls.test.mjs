@@ -95,4 +95,11 @@ assert.deepEqual(pickTarget(snap, tap(front.x + 0.2, 0.2, front.z + 0.2), 'me'),
   assert.ok(snapshot(state).over && snapshot(state).winner === 'badGuys', 'the clock runs out and the fuller shelf wins');
 }
 
+{
+  const hill = STAGE.floors.find((f) => f.round);
+  assert.equal(floorTop((hill.x0 + hill.x1) / 2, (hill.z0 + hill.z1) / 2), hill.y, 'the middle of the rounded hill is its top');
+  assert.equal(floorTop(hill.x1 - 0.05, hill.z1 - 0.05), 0, 'its rounded-off corner is ground, not thin air');
+  assert.equal(floorTop(hill.x1 - 0.05, (hill.z0 + hill.z1) / 2), hill.y, 'its straight side still reaches the edge');
+}
+
 console.log('controls ok');

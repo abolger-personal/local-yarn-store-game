@@ -313,7 +313,7 @@ function cast() {
 }
 
 function play() {
-  const state = api.createMatch(cast());
+  const state = api.createMatch(cast(), STAGE.bricks, theme.puddles);
   const controls = createControls(ME);
   const button = (id) => document.getElementById(id);
   attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: button('punch'), kick: button('kick') } });

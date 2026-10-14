@@ -10,12 +10,25 @@ export const BRICK = 0.4;
 export const HIT_DEPTH = 0.35;
 export const HITSTOP_TICKS = 5;
 
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+/** The nearest point of a box's rounded core to (x, z): the box is everything within `round` of it, seen from above. */
+export function coreOf(b, x, z) {
+  const r = b.round ?? 0;
+  return { x: clamp(x, b.x0 + r, b.x1 - r), z: clamp(z, b.z0 + r, b.z1 - r), r };
+}
+/** How far (x, z) is outside a box seen from above, corners rounded by `round`; 0 inside or on the edge. */
+export function outside(b, x, z) {
+  const c = coreOf(b, x, z);
+  return Math.max(0, Math.hypot(x - c.x, z - c.z) - c.r);
+}
+
 /**
  * @typedef {'heroes'|'badGuys'} Team
- * @typedef {{ x0: number, x1: number, z0: number, z1: number, y: number }} Floor
- *   a walkable top: the rectangle x0..x1 by z0..z1 at height y
+ * @typedef {{ x0: number, x1: number, z0: number, z1: number, y: number, round?: number }} Floor
+ *   a walkable top: the rectangle x0..x1 by z0..z1 at height y, its corners rounded by `round`
  * @typedef {{ team: Team, x: number, z: number, y: number }} ShelfSpot  centre of the shelf's front
  * @typedef {{ team: Team, x0: number, x1: number }} BuildZone
+ * @typedef {{ x: number, z: number, r: number }} Puddle a round patch of sticky syrup on the ground
  * @typedef {{ team: Team, x: number, z: number, y: number, hits: number }} BrickSpot
  *   a BRICK cube with its bottom-left-back corner at (x, y, z)
  */
@@ -30,13 +43,15 @@ export const STAGE = Object.freeze({
     { x0: -9, x1: 9, z0: -2, z1: 2, y: 0 },
     { x0: -9, x1: -6, z0: -2, z1: -0.8, y: 1.1 },
     { x0: 6, x1: 9, z0: -2, z1: -0.8, y: 1.1 },
-    { x0: -1.2, x1: 1.2, z0: -0.9, z1: 0.9, y: 0.6 },
+    { x0: -1.2, x1: 1.2, z0: -0.9, z1: 0.9, y: 0.6, round: 0.6 },
   ]),
   backWall: -2,
   /** @type {readonly ShelfSpot[]} the shelves stand against the back wall on each end's raised deck */
   shelves: Object.freeze([{ team: 'heroes', x: -7.5, z: -1.7, y: 1.1 }, { team: 'badGuys', x: 7.5, z: -1.7, y: 1.1 }]),
   /** @type {readonly BuildZone[]} */
   zones: Object.freeze([{ team: 'heroes', x0: -9, x1: -3 }, { team: 'badGuys', x0: 3, x1: 9 }]),
+  /** @type {readonly Puddle[]} Level 1's syrup: in both gaps round the bad guys' wall (smash through or wade), and one in each half of the field */
+  puddles: Object.freeze([{ x: 4.8, z: 1.6, r: 0.45 }, { x: 4.8, z: -1.6, r: 0.45 }, { x: -2.6, z: 1.3, r: 0.6 }, { x: 2.4, z: -1.2, r: 0.55 }]),
   ringOut: Object.freeze({ x0: -11, x1: 11, z1: 3.5, y: -3 }),
   /** @type {readonly BrickSpot[]} milestone 1's pre-placed bad-guy fort: a wall across the band, two high in the middle, with gaps at the back and front */
   bricks: Object.freeze([
@@ -94,7 +109,7 @@ export const STAGE = Object.freeze({
  *             look: DonutLook, dummy?: boolean }} Entrant
  *
  * The sim's whole API, which sim.js implements:
- * @typedef {{ createMatch: (entrants: Entrant[]) => any,
+ * @typedef {{ createMatch: (entrants: Entrant[], bricks?: readonly BrickSpot[], puddles?: readonly Puddle[]) => any,
  *             tick: (state: any, inputs: Record<string, Input>) => void,
  *             snapshot: (state: any) => Snapshot }} MatchApi
  */

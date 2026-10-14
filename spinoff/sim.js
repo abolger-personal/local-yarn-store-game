@@ -1,6 +1,6 @@
 // The match host: one fixed tick of pure logic, no three.js, no Math.random. REUSE-SPEC.md §Milestones 1.
 // The stage is a depth band (§Navigation): fighters walk in x/z on floor tops and jump in y.
-import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, HIT_DEPTH, ROUND_SECONDS, STAGE, TICK_HZ } from './match.js';
+import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, HIT_DEPTH, ROUND_SECONDS, STAGE, TICK_HZ, coreOf, outside } from './match.js';
 import { EMPTY, anySlot, footprint, gridSize, lift, makeDisplay, place, topAt } from '../inventory/grid.js';
 import { canHit } from './roster.js';
 
@@ -11,6 +11,8 @@ const PUSH_PASSES = 4;
 export const GRAVITY = 30;
 export const WALK_SPEED = 3.5;
 export const AIR_SPEED = 4;
+/** Walking speed is multiplied by this while standing in syrup (REUSE-SPEC.md §Forts, Level 1). */
+export const SYRUP_SLOW = 0.45;
 export const JUMP_SPEED = 10;
 export const LEDGE_MARGIN = 0.05;
 export const CELL = 0.2;
@@ -82,9 +84,9 @@ const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const flat = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
-const inXZ = (b, x, z) => x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1;
-const toBox = (b, x, z) => Math.hypot(x - clamp(x, b.x0, b.x1), z - clamp(z, b.z0, b.z1));
-const FLOOR_BOXES = STAGE.floors.map((f) => ({ x0: f.x0, x1: f.x1, z0: f.z0, z1: f.z1, y0: -Infinity, y1: f.y, kind: 'floor' }));
+const inXZ = (b, x, z) => outside(b, x, z) === 0;
+const toBox = outside;
+const FLOOR_BOXES = STAGE.floors.map((f) => ({ x0: f.x0, x1: f.x1, z0: f.z0, z1: f.z1, y0: -Infinity, y1: f.y, round: f.round, kind: 'floor' }));
 const brickBox = (b) => ({ x0: b.x, x1: b.x + BRICK, z0: b.z, z1: b.z + BRICK, y0: b.y, y1: b.y + BRICK, kind: 'brick' });
 const shelfBox = (sh) => ({ x0: sh.x - sh.half, x1: sh.x + sh.half, z0: Z0, z1: sh.z, y0: sh.y, y1: sh.y + SHELF_H, kind: 'shelf' });
 const shelfOf = (s, team) => s.shelves.find((sh) => sh.team === team);
@@ -110,12 +112,12 @@ function pushOnce(list, p, r, h) {
   let moved = false;
   for (const b of list) {
     if (p.y >= b.y1 - STEP || p.y + h <= b.y0) continue;
-    const qx = clamp(p.x, b.x0, b.x1), qz = clamp(p.z, b.z0, b.z1), d = Math.hypot(p.x - qx, p.z - qz);
-    if (d >= r) continue;
+    const q = coreOf(b, p.x, p.z), d = Math.hypot(p.x - q.x, p.z - q.z);
+    if (d >= r + q.r) continue;
     moved = true;
     if (d > EPS) {
-      p.x = qx + ((p.x - qx) / d) * r;
-      p.z = qz + ((p.z - qz) / d) * r;
+      p.x = q.x + ((p.x - q.x) / d) * (r + q.r);
+      p.z = q.z + ((p.z - q.z) / d) * (r + q.r);
     } else escapeBox(p, b, r);
   }
   p.z = Math.max(p.z, Z0 + r);
@@ -416,11 +418,14 @@ function stuckCheck(f, moved) {
   else if (++f.stuck >= STUCK_TICKS) fail(f);
 }
 
+// ponytail: A* doesn't cost syrup, so routes wade straight through; weight syrup cells when NPCs should go round
+const inSyrup = (s, f) => f.y < STEP && s.puddles.some((p) => Math.hypot(f.x - p.x, f.z - p.z) < p.r);
+
 function walkStep(s, f) {
   const paused = f.stun > 0 || (f.attack && !MOVES[f.attack.id].walks);
   const to = paused ? null : f.walkTo;
   const dx = to ? to.x - f.x : 0, dz = to ? to.z - f.z : 0, d = Math.hypot(dx, dz);
-  const v = d > EPS ? Math.min(WALK_SPEED, d / DT) / d : 0, x0 = f.x, z0 = f.z;
+  const v = d > EPS ? Math.min(WALK_SPEED * (inSyrup(s, f) ? SYRUP_SLOW : 1), d / DT) / d : 0, x0 = f.x, z0 = f.z;
   Object.assign(f, { vx: dx * v, vy: 0, vz: dz * v });
   slide(s, f, f.vx * DT, f.vz * DT);
   stuckCheck(f, to && !f.attack && d > ARRIVE ? Math.hypot(f.x - x0, f.z - z0) : null);
@@ -734,9 +739,10 @@ function refresh(s) {
 /**
  * @param {import('./match.js').Entrant[]} entrants
  * @param {readonly import('./match.js').BrickSpot[]} [bricks] for tests: a fort other than STAGE.bricks
+ * @param {readonly import('./match.js').Puddle[]} [puddles] the level's syrup
  */
-export function createMatch(entrants, bricks = STAGE.bricks) {
-  const s = { tick: 0, nextDonut: 0, fighters: [], donuts: [], shelves: [], solids: [], grids: new Map(), brickKey: '',
+export function createMatch(entrants, bricks = STAGE.bricks, puddles = STAGE.puddles) {
+  const s = { tick: 0, puddles, nextDonut: 0, fighters: [], donuts: [], shelves: [], solids: [], grids: new Map(), brickKey: '',
     hits: [], fullBag: [], donutEvents: [],
     bricks: bricks.map((b, i) => ({ id: `b${i}`, team: b.team, x: b.x, y: b.y, z: b.z, vy: 0, hits: b.hits,
       maxHits: b.hits, icing: icingOf(entrants, b.team) })) };

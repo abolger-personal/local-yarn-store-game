@@ -63,7 +63,7 @@ function cakeBackdrop() {
 // Level 1: breakfast
 const WAFFLE = { cell: 0.5, ridge: 0.09, deep: 0.07, dough: '#e2a24e', pocket: '#a8651f' };
 const SYRUP = new THREE.MeshStandardMaterial({ color: '#c0560c', roughness: 0.08, transparent: true, opacity: 0.6, depthWrite: false });
-const HILL = { cakes: 4, nudge: [[0, 0], [0.05, -0.03], [-0.04, 0.03], [0.02, 0.02]], browned: '#c47a2c', butter: '#ffe680' };
+const HILL = { cakes: 4, nudge: [[0.05, -0.03], [-0.04, 0.03], [0.02, 0.02], [0, 0]], browned: '#c47a2c', butter: '#ffe680' };
 
 /** A waffle slab w × d, its ridges topping out at y, solid down `base`. */
 function waffle(w, d, y, base) {
@@ -84,15 +84,15 @@ function waffle(w, d, y, base) {
 /** A wobbly round puddle shape, radius about r. */
 function puddle(r, k) {
   const pts = Array.from({ length: 40 }, (_, i) => {
-    const a = (i / 40) * Math.PI * 2, rr = r * (1 + 0.18 * Math.sin(3 * a + k) + 0.08 * Math.sin(5 * a + 2 * k));
+    const a = (i / 40) * Math.PI * 2, rr = r * (1 + 0.1 * Math.sin(3 * a + k) + 0.05 * Math.sin(5 * a + 2 * k));
     return new THREE.Vector2(Math.cos(a) * rr, Math.sin(a) * rr);
   });
   return new THREE.Shape(pts);
 }
 
-/** Syrup lying in the waffle pockets with the ridges poking through. */
+/** The level's sticky syrup (STAGE.puddles), lying in the waffle pockets with the ridges poking through. */
 function syrupPools() {
-  return [[-4.2, 1, 0.7], [2.4, -1.3, 0.5], [-2.2, 1.4, 0.45], [6.9, 1.1, 0.6], [-7.6, 0.9, 0.5]].map(([x, z, r], i) => {
+  return STAGE.puddles.map(({ x, z, r }, i) => {
     const m = new THREE.Mesh(new THREE.ShapeGeometry(puddle(r, i * 1.7)).rotateX(-Math.PI / 2), SYRUP);
     m.position.set(x, -WAFFLE.deep + 0.035, z);
     return m;
@@ -110,18 +110,18 @@ function syrupDrips() {
   return drips;
 }
 
-/** The middle hill: a stack of big pancakes with butter and syrup on top. @param {import('./match.js').Floor} f */
+/** The middle hill: big pancakes, the top one exactly the floor you stand on, the ones under it a little bigger. @param {import('./match.js').Floor} f */
 function pancakeHill(f) {
   const w = f.x1 - f.x0, d = f.z1 - f.z0, g = new THREE.Group(), cake = f.y / HILL.cakes;
   HILL.nudge.forEach(([x, z], i) => {
-    const m = new THREE.Mesh(slabGeometry(w - 0.06 * i, d - 0.06 * i, cake, 0.6, 0.06), mat(BATTER.heroes, 0.75));
+    const grow = 0.04 * (HILL.cakes - 1 - i), m = new THREE.Mesh(slabGeometry(w + grow, d + grow, cake, (f.round ?? 0) + grow / 2, 0.06), mat(BATTER.heroes, 0.75));
     m.position.set(x, i * cake, z);
     g.add(m);
   });
-  const top = new THREE.Mesh(slabGeometry(w - 0.3, d - 0.3, 0.012, 0.5, 0.004), mat(HILL.browned, 0.7));
+  const top = new THREE.Mesh(slabGeometry(w - 0.3, d - 0.3, 0.012, (f.round ?? 0) - 0.15, 0.004), mat(HILL.browned, 0.7));
   const syrup = new THREE.Mesh(new THREE.ShapeGeometry(puddle(0.75, 2)).rotateX(-Math.PI / 2), SYRUP);
   const butter = new THREE.Mesh(slabGeometry(0.34, 0.26, 0.08, 0.05, 0.03), mat(HILL.butter, 0.35));
-  top.position.set(0.02, f.y - 0.008, 0.02);
+  top.position.y = f.y - 0.008;
   syrup.position.set(0.1, f.y + 0.012, 0);
   butter.position.set(-0.35, f.y, -0.2);
   butter.rotation.y = 0.4;
@@ -129,9 +129,29 @@ function pancakeHill(f) {
   return g;
 }
 
-/** Waffles for the ground and decks, the pancake stack for the hill; raised floors are solid to the ground. */
+const STACKED = { thick: 0.22, nudge: [[0, 0], [0.04, 0.02], [-0.03, -0.02], [0.03, -0.01], [-0.02, 0.02]] };
+
+/** A deck: waffles stacked up to y, the top one exactly the floor you stand on, the ones under it nudged. @param {import('./match.js').Floor} f */
+function waffleStack(f) {
+  const g = new THREE.Group(), n = Math.round(f.y / STACKED.thick), t = f.y / n;
+  for (let i = 0; i < n; i++) {
+    const [x, z] = STACKED.nudge[(n - 1 - i) % STACKED.nudge.length];
+    const w = waffle(f.x1 - f.x0, f.z1 - f.z0, (i + 1) * t, t - 0.01);
+    w.position.set(x, 0, z);
+    w.rotation.y = z * 0.4;
+    g.add(w);
+  }
+  return g;
+}
+
+/** A waffle ground, waffle-stack decks and the pancake hill; raised floors are solid to the ground. */
 function breakfastFloor(f, i) {
-  const g = f.y > 0 && f.z0 > STAGE.backWall ? pancakeHill(f) : waffle(f.x1 - f.x0, f.z1 - f.z0, f.y, i === 0 ? 0.7 : f.y);
+  if (i === 0) {
+    const g = waffle(f.x1 - f.x0, f.z1 - f.z0, f.y, 0.7);
+    g.position.set((f.x0 + f.x1) / 2, 0, (f.z0 + f.z1) / 2);
+    return g;
+  }
+  const g = f.z0 > STAGE.backWall ? pancakeHill(f) : waffleStack(f);
   g.position.set((f.x0 + f.x1) / 2, 0, (f.z0 + f.z1) / 2);
   return g;
 }
@@ -145,13 +165,13 @@ function breakfastBackdrop() {
 }
 
 /**
- * @typedef {{ background: string, scenery: () => THREE.Object3D[], brick: (b: import('./match.js').BrickState) => any,
+ * @typedef {{ background: string, scenery: () => THREE.Object3D[], puddles: readonly import('./match.js').Puddle[], brick: (b: import('./match.js').BrickState) => any,
  *   damage: (m: any, b: import('./match.js').BrickState) => void }} Theme
  * @type {Record<number, Theme>}
  */
 export const THEMES = {
-  1: { background: '#fff6e0', scenery: () => [...STAGE.floors.map(breakfastFloor), ...syrupPools(), syrupDrips(), ...breakfastBackdrop()], brick: pancakeMesh, damage: damagePancake },
-  2: { background: '#ffe3f0', scenery: () => [...STAGE.floors.map(floorMesh), ...groundTreats(), ...cakeBackdrop()], brick: brickMesh, damage: damageBrick },
+  1: { background: '#fff6e0', scenery: () => [...STAGE.floors.map(breakfastFloor), ...syrupPools(), syrupDrips(), ...breakfastBackdrop()], puddles: STAGE.puddles, brick: pancakeMesh, damage: damagePancake },
+  2: { background: '#ffe3f0', scenery: () => [...STAGE.floors.map(floorMesh), ...groundTreats(), ...cakeBackdrop()], puddles: [], brick: brickMesh, damage: damageBrick },
 };
 
 /** ?level=2 shows a later level's look; anything else is Level 1. */

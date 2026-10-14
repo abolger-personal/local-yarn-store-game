@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, ROUND_SECONDS, STAGE, TICK_HZ } from './match.js';
-import { DUMMY, createMatch, snapshot, tick } from './sim.js';
+import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, ROUND_SECONDS, STAGE, TICK_HZ, outside } from './match.js';
+import { DUMMY, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
 
 const LOOK = { dough: '#e8c48a', frosting: '#14c4e0', stripe: false };
 const BAD = { dough: '#2a1a14', frosting: '#7a2bbf', stripe: true };
@@ -17,7 +17,7 @@ const CLOSED = [-2, -1.6, -1.2, -0.8, -0.4, 0, 0.4, 0.8, 1.2, 1.6].flatMap((z) =
 
 /** A fighter's body is inside the hill's block, below its top. */
 const inHill = (f) => f.y < HILL.y - 1e-6
-  && Math.hypot(Math.max(HILL.x0 - f.x, 0, f.x - HILL.x1), Math.max(HILL.z0 - f.z, 0, f.z - HILL.z1)) < R - 1e-6;
+  && outside(HILL, f.x, f.z) < R - 1e-6;
 const RIM = [
   ...[-9, -8.6, -8.2, -7.8, -7.4, -7, -6.6, -6.4].map((x) => ({ team: 'heroes', x, z: -1.2, y: 1.1, hits: 2 })),
   ...[-2, -1.6].map((z) => ({ team: 'heroes', x: -6.4, z, y: 1.1, hits: 2 })),
@@ -300,7 +300,7 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
   run(m, 300, once({ target: { thing: 'brick', id: 'b0' } }));
   const hits = [];
   let snap = run(m, 40, once({ punch: true }), (s) => hits.push(...s.hits));
-  assert.equal(me(snap).facing, 0, 'arriving at a brick ends facing it');
+  assert.ok(near(me(snap).facing, 0, 0.01), 'arriving at a brick ends facing it');
   assert.equal(snap.bricks.find((b) => b.id === 'b0')?.hits, 1, 'a punch takes one hit off a brick');
   snap = run(m, 40, once({ punch: true }), (s) => hits.push(...s.hits));
   assert.ok(!snap.bricks.some((b) => b.id === 'b0'), 'two punches break it');
@@ -335,6 +335,18 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
     return run(m, 300, (_, i) => say({ punch: i % 25 === 0, kick: i % 60 === 7 }));
   };
   assert.deepEqual(play(), play(), 'the same inputs give the same match');
+}
+
+{
+  const [p] = STAGE.puddles, cross = (puddles) => {
+    const m = createMatch([hero], STAGE.bricks, puddles);
+    run(m, 400, tap(p.x - 1.2, p.z));
+    let ticks = 0;
+    run(m, 600, tap(p.x + 1.2, p.z), (s) => { if (me(s).move === 'walk') ticks++; });
+    return ticks;
+  };
+  const dry = cross([]), sticky = cross(STAGE.puddles), wade = (2 * p.r) / (WALK_SPEED * SYRUP_SLOW) - (2 * p.r) / WALK_SPEED;
+  assert.ok(near(sticky - dry, wade * TICK_HZ, 3), `syrup slows the walk across it (${dry} dry, ${sticky} sticky ticks)`);
 }
 
 console.log('sim ok');

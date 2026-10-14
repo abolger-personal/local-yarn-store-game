@@ -338,9 +338,16 @@ and smashers each get a round that is theirs.
   World"). The theme dresses the stage and the fort pieces; the rules underneath don't change.
   `spinoff/scenery.js` `THEMES` holds one entry per level, and `play.html?level=2` shows a later
   look before levels exist.
-  - **Level 1, breakfast:** a waffle floor (golden ridges, dark pockets on a 0.5 grid) and waffle
-    decks; translucent syrup puddled in the pockets and dripping off the front edge; the middle
-    hill is a stack of big pancakes with butter and syrup on top. Fort pieces are **little
+  - **Level 1, breakfast:** a waffle floor (golden ridges, dark pockets on a 0.5 grid); each
+    deck is a stack of waffles; translucent syrup drips off the front edge; the middle hill is a
+    stack of big pancakes with butter and syrup on top, its corners rounded in the rules too
+    (`Floor.round`), so you never stand on thin air past the drawn pancake. The top layer of a
+    stack is always exactly the floor you stand on.
+  - **Sticky syrup** (decided 2026-10-14): round puddles (`STAGE.puddles`) slow anyone walking
+    on the ground through them to `SYRUP_SLOW` (0.45×) of walking speed; jumping over is full
+    speed. Placed to make choices: one in each gap round the bad guys' wall (smash through the
+    wall, or wade round it) and one in each half of the field. Routing ignores syrup for now.
+    A level with no syrup passes no puddles. Fort pieces are **little
     pancake stacks, mortared with whipped cream in the builder's colour**: three pancakes with a
     cream layer above each, the cream wider than the pancakes so the colour shows from any side.
     Bad guys' stacks are chocolate pancakes with dark purple cream. Damage slides the top

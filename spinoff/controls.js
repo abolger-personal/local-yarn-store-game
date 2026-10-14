@@ -1,6 +1,6 @@
 // Taps to Inputs (REUSE-SPEC.md §Navigation: tap to move). Classification is pure; the DOM glue is thin.
 import * as THREE from 'three';
-import { BRICK, STAGE } from './match.js';
+import { BRICK, STAGE, outside } from './match.js';
 
 /** @typedef {import('./match.js').Snapshot} Snapshot @typedef {import('./match.js').Target} Target */
 /** @typedef {import('./match.js').Input} Input @typedef {import('./match.js').FighterState} FighterState */
@@ -10,7 +10,7 @@ export const TAP_RADIUS = { donut: 0.55, foe: 0.55, me: 0.35, shelf: 0.75, brick
 export const DONUT_UP = 0.2;
 export const SHELF_UP = 0.65;
 
-const inside = (f, x, z) => x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1;
+const inside = (f, x, z) => outside(f, x, z) === 0;
 
 /** The highest floor top at (x, z) no higher than maxY, or null off the stage. */
 export function floorTop(x, z, maxY = Infinity) {

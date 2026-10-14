@@ -246,13 +246,32 @@ it from start to finish.
   A bigger bag comes later, as an unlock (see Open questions). Bad guys follow the same limit.
 
 Starting numbers to tune: 12 donuts per shelf, one donut per bag, a ring-out spills the whole bag,
-a 3-minute timer.
+a **90-second** match to start (decided 2026-10-13; the kids will say if it's too short), never
+over 3 minutes.
+- **Donuts are never destroyed** (decided 2026-10-13, MVP). The 24 donuts are always somewhere:
+  on a shelf, in a bag, or on the floor, so every donut the bad guys hold is one the kids don't.
+- **Dropped donuts stay where they land** (decided 2026-10-13), as many as pile up, until someone
+  taps one and picks it up (see Navigation: tap a thing). Scrambling for a loose donut is a real
+  tactic, like a fumble in football; nothing rolls home on its own.
 
 ## Mode: donut capture the flag
 
 Two teams, the kids and the bad guys (see Bad guys), and two bakery shelves, one at each end of
 a stage wider than one screen. The per-tablet camera follows each kid's own fighter, so the
 wide stage costs nothing new.
+
+**The stage is in thirds** (decided 2026-10-13). One hand-made, mirrored stage for the MVP:
+
+| Zone | Terrain | Forts |
+| --- | --- | --- |
+| Heroes' third | Their shelf on the ground, an upper ledge above it | Heroes build here only |
+| Middle third | A gumdrop hill with a ledge each side, joining the upper and lower lanes | Nobody builds: always open ground to fight over |
+| Bad guys' third | The mirror of the heroes' third | Bad guys build here only |
+
+Two lanes, ground and upper, mean one wall never closes a side: builders choose which lane to
+block, and a fort ringing the shelf has to cover the ledge above too. Terrain never breaks; only
+fort pieces do, so routes stay predictable and the host's jump-link map is fixed for a match.
+Later levels of Gingerbread World can bring new hand-made stages.
 
 - **Many small flags.** Each shelf starts stocked with donuts. Every donut is a flag, so every
   kid can score something in a match, not only whoever reaches a single flag first.
@@ -261,9 +280,13 @@ wide stage costs nothing new.
 - **Bank:** touch your own shelf. Everything in your bag goes onto it on its own: `anySlot` finds
   the spot and `place` puts it there, both in `inventory/grid.js`. No dragging, so a 4-year-old
   banks by running home.
-- **The bag shows what it holds.** Donuts poke out of the bag, countable at a glance: the
-  existing house rule from `PROJECT-BAGS.md` §1–2 ("balls poking out, countable"), with donuts
-  for balls. A full bag can't grab more.
+- **A carried donut is oversized** (decided 2026-10-13): about two-thirds of head size, poking out
+  of the top of the bag over the shoulder, so who is carrying reads from anywhere on screen (a
+  donut drawn at bag scale would be ~10 px at tablet size). It's the house rule from
+  `PROJECT-BAGS.md` §1–2 ("balls poking out, countable"), scaled up. The donut wears its home
+  shelf's frosting, so a bad guy carrying the kids' donut is visibly carrying *theirs*. Edge
+  markers show it for carriers off screen, and a hit sends it flying out in an arc. A full bag
+  can't grab more.
 - **Shelves are the shop's shelves.** A team shelf is a `grid.js` display like the wall shelves
   in `DISPLAY_SLOTS` (`characters/store/scene/displays.js`), seen from the side: columns across,
   shelves up. The grab and bank rules are pure `grid.js` calls with no three.js, so they run in the node
@@ -276,7 +299,7 @@ wide stage costs nothing new.
 ## Forts: build it, then knock it down
 
 Every level is two rounds (decided 2026-10-13): a **build it** round, where each team fortifies
-its own shelf, then the **knock it down** round, the 3-minute capture-the-flag match. Builders
+its own shelf, then the **knock it down** round, the timed capture-the-flag match. Builders
 and smashers each get a round that is theirs.
 
 - **The build round has no timer.** It ends when both teams are ready: every hero has tapped 👍
@@ -786,8 +809,8 @@ scary, for 4–6 year olds.
 - **No difficulty setting** (decided 2026-10-13). CPU bad guys play at `help 0`; the level (how
   many of them) is the only dial for now. `ponytail:` auto-scaling comes later: nudge the CPU bad
   guys' `help` (between `-0.5` and `0.5`, below the kids' safety bounce at `0.75`) from the
-  previous level's **donut margin** (decided 2026-10-13). Matches keep the fixed 3-minute timer,
-  never longer, so time can't be the signal: a big win nudges the next level harder, a narrow win or
+  previous level's **donut margin** (decided 2026-10-13). Matches run on a fixed timer
+  (90 seconds to start, never over 3 minutes), so time can't be the signal: a big win nudges the next level harder, a narrow win or
   a loss nudges it easier.
 
 Check: a node test runs one bad guy against an idle kid on the two-shelf stage and asserts the

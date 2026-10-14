@@ -248,6 +248,11 @@ it from start to finish.
 Starting numbers to tune: 12 donuts per shelf, one donut per bag, a ring-out spills the whole bag,
 a **90-second** match to start (decided 2026-10-13; the kids will say if it's too short), never
 over 3 minutes.
+- **How donuts look** (decided 2026-10-13). Heroes' donuts are beige dough with frosting in the
+  heroes' own colours: the shelf's donuts share out the fur colours of the heroes in the room, so
+  the kids' shelf is a colour riot of their own fighters. Villains' donuts are black dough with
+  purple frosting and a drizzled stripe across it. A donut keeps its look wherever it goes, which
+  is how a stolen donut reads as stolen.
 - **Donuts are never destroyed** (decided 2026-10-13, MVP). The 24 donuts are always somewhere:
   on a shelf, in a bag, or on the floor, so every donut the bad guys hold is one the kids don't.
 - **Dropped donuts stay where they land** (decided 2026-10-13), as many as pile up, until someone
@@ -283,8 +288,9 @@ Later levels of Gingerbread World can bring new hand-made stages.
 - **A carried donut is oversized** (decided 2026-10-13): about two-thirds of head size, poking out
   of the top of the bag over the shoulder, so who is carrying reads from anywhere on screen (a
   donut drawn at bag scale would be ~10 px at tablet size). It's the house rule from
-  `PROJECT-BAGS.md` §1–2 ("balls poking out, countable"), scaled up. The donut wears its home
-  shelf's frosting, so a bad guy carrying the kids' donut is visibly carrying *theirs*. Edge
+  `PROJECT-BAGS.md` §1–2 ("balls poking out, countable"), scaled up. Heroes' donuts
+  and villains' donuts look different (below), so a bad guy carrying the kids' donut is visibly
+  carrying *theirs*. Edge
   markers show it for carriers off screen, and a hit sends it flying out in an arc. A full bag
   can't grab more.
 - **Shelves are the shop's shelves.** A team shelf is a `grid.js` display like the wall shelves

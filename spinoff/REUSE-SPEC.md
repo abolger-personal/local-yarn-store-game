@@ -383,7 +383,7 @@ Built: `spinoff/lobby.html` (page) on `spinoff/net.js` and `spinoff/roster.js`.
   with `makeGridLines` from `inventory/notions.js`). `standingSpots` gives every tablet the same
   arrangement whatever order people joined in: front row first, from the middle out, 7 × 2
   cells, room for 14 (6 kids, 8 bad guys).
-- A newcomer arrives with a cheer. 🚪 leaves; ✏️ goes back to the chooser.
+- A newcomer arrives with a cheer. 👋 waves bye and leaves the room (not a door: a door reads as going in as much as out); ✏️ goes back to the chooser.
 - Network: Trystero 0.26 over Nostr, loaded from esm.sh through the import map, a devDependency
   for its types only (the same arrangement as `three`). Each tablet sends its fighter to each
   newcomer (`maxReceiveBytes` 64 KB). `ponytail:` every tablet talks to every other in the lobby;

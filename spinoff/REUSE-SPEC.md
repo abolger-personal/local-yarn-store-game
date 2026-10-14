@@ -681,7 +681,10 @@ scary, for 4–6 year olds.
   starts over each game: `help`, earned moves, power bars. When a room forms, its heroes send
   their saved level with their fighter, and the room can start at the **highest level every hero
   has reached** (the lowest of their saved levels). A kid who is new to the game brings the
-  room's start down to where they are. Bad-guy players don't count: the level is the heroes'
+  room's start down to where they are. Before the first build round every tablet shows **two
+  pictures**, "1" and the shared level (decided 2026-10-13); the first tap chooses for the room
+  (the host settles two taps at once). When the shared level is 1, there is nothing to choose and
+  the pictures are skipped. Bad-guy players don't count: the level is the heroes'
   progress. The number is checked on the way in, like the fighter: a whole number from 1 to the
   last level.
 - **No difficulty setting** (decided 2026-10-13). CPU bad guys play at `help 0`; the level (how

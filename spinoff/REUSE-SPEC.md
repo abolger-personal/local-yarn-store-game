@@ -91,9 +91,9 @@ reused: `inventory/grid.js` for the lobby floor, team shelves and forts, and
 
 ### Fixes in the shared rig
 
-- **Tail resets above 6 units/s.** `TAIL_TELEPORT = 6` in `npc.js` treats faster movement as a
-  teleport and zeroes the tail spring. A character is about 0.75 units tall, so a strong
-  knockback launch passes this. Raise it, or reset only on an actual respawn.
+- **Tail resets above 6 units/s: fixed** (`425df37` on `0.0.1`, 2026-10-13). The tail now resets
+  only on a real teleport (faster than 50 units/s, or more than 3 units in one step), so a
+  knockback launch swings it.
 - **No per-channel joint limits** (`MOTION-TODO.md` §Known ceilings). Exaggerated attack poses
   plus an idle twitch can push an ear through the skull.
 
@@ -848,8 +848,8 @@ bad guy grabs a donut and banks it.
      platforms and bricks, two-torus donuts, fighters at `med` detail walking on the rig's walk
      layer (as `dress-up.js` does), punch and kick poses, the oversized carried donut, a camera
      that follows your fighter.
-   - **Shared rig fix first, on `0.0.1`:** `TAIL_TELEPORT` resets the tail above 6 units/s, which a
-     knockback launch passes. Reset it only on a real teleport, then merge into this branch.
+   - **Shared rig fix, done:** the tail resets only on a real teleport (`425df37` on `0.0.1`, merged
+     into this branch).
    - Out of scope: networking, the build round, bad-guy behaviour, powers, levels, `help`
      changes, team combos.
 2. **Two tablets.** Done: the fighter chooser, the room code and the join handshake, with

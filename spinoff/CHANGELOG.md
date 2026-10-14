@@ -18,3 +18,9 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **Games stay in your home.** Tablets only play with other tablets on the same home Wi-Fi, and
   your fighters and games are never sent anywhere else. The internet is used just to load the
   game and to pass a scrambled hello so your tablets can find each other.
+
+### Practice
+- ▶️ in the lobby plays by yourself on the gingerbread stage against a training dummy. Tap where
+  you want to go, 🥊 to punch and 🦶 to kick; knock the dummy's donut loose and grab it, kick
+  through the bad guys' gingerbread wall, take a donut from their shelf and run it home.
+  👋 goes back to the lobby.

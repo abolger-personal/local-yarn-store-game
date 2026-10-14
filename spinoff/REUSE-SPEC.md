@@ -591,6 +591,12 @@ Treat shapes are mostly three.js built-ins: a donut is `TorusGeometry` with a se
 torus on top for icing; a donut hole is a sphere; a cake is a lathe (the yarn `CAKE_PROFILE` is
 already a cake). Frosting colour, sprinkles and glaze are material and colour, not new geometry.
 
+**House style, keep it** (playtest 2026-10-14: "sprinkles and donut frosting look spectacular").
+Sprinkles are one instanced capsule (radius 0.03, 0.1 long, roughness 0.5), each instance tinted
+from `RIOT`, laid flat at a 2.4 rad turn per index and spread by the R2 sequence (`scatter` in
+`play.js`), so no random seed. Frosting is a squashed second torus at roughness 0.45 over matte
+dough at 0.7: the shine difference does the work. Every new treat surface reuses both.
+
 The characters stay the yarn store's characters, so hats and capes stay knitwear from
 `garments.js`. Boxing gloves are the one costume piece that isn't knitted (see Costumes).
 

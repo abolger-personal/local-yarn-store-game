@@ -20,7 +20,11 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   game and to pass a scrambled hello so your tablets can find each other.
 
 ### Practice
-- ▶️ in the lobby plays by yourself on the gingerbread stage against a training dummy. Tap where
-  you want to go, 🥊 to punch and 🦶 to kick; knock the dummy's donut loose and grab it, kick
-  through the bad guys' gingerbread wall, take a donut from their shelf and run it home.
-  👋 goes back to the lobby.
+- ▶️ in the lobby plays by yourself against a training dummy on a gingerbread stage you can walk
+  all around: toward the camera, away from it, and up onto the decks and the gumdrop hill.
+- Tap where you want to go, 🥊 to punch and 🦶 to kick. Hits land with a BAM, a little freeze and
+  a wobble; kick through the bad guys' gingerbread wall or find the gap in it.
+- Steal a donut from the bad guys' shelf for a sparkle and a happy dance, then run it home for
+  confetti. Your bag holds one donut: try for a second and your fighter shakes its head.
+- When time runs out, a card shows who has more donuts, with ▶️ to play again and 👋 back to the
+  lobby.

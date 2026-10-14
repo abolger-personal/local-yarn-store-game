@@ -135,6 +135,40 @@ buttons are 🥊 punch and 🦶 kick, which attack where the fighter is, while i
   alongside ("like a piano keyboard"). Still to test on an iPad.
 - **Buttons are big,** sized for small hands.
 
+## Power moves: gestures behind a power bar
+
+Many-finger gestures are extra moves inside the fighter, unlocked only when a power bar is full
+(decided 2026-10-13). Tap to move and the two buttons stay the whole game for a kid who never finds
+a gesture.
+
+- **One finger always moves.** Two or more fingers on the stage at once is a gesture, and only
+  when the bar is full; otherwise extra fingers are ignored and the first one steers.
+- **The bar is a donut filling with icing**, next to the buttons. It fills a little with time,
+  and more for landing hits, picking up donuts and banking, so even a kid who is struggling gets a
+  power now and then. A full donut glows, and a ghost hand shows one gesture as a picture, no words.
+  Using a power empties it.
+- **Any gesture works when the bar is full.** Whatever a kid does with several fingers, something
+  big happens (the slap, below, is the fallback). A deliberate player chooses which.
+- **Recognised on the tablet, sent as one input.** The tablet turns the finger tracks into "power
+  X at point P" and sends that to the host, a few bytes. The recogniser is a pure function of
+  pointer tracks, tested in node with scripted tracks.
+- **Same gestures, species flavour.** Each gesture does the same job for every fighter but looks
+  like its species: the lion's slap is a roar, the llama's a stomp, the owl's a wing gust.
+
+Candidate gestures (brainstorm, 2026-10-13; first ones to try are marked ★):
+
+| Gesture | Power | For |
+| --- | --- | --- |
+| ★ Whole-hand slap (4+ fingers at once) | Ground pound: a sprinkle shockwave that launches bad guys and knocks fort pieces loose | The fallback; what a 4-year-old does anyway |
+| ★ Two-finger swipe | Donut roll: charge across the stage that way, bowling bad guys over | Getting home fast with a full bag |
+| ★ Pinch on a bad guy | Grab and throw them | Precision, for confident hands |
+| Spread (reverse pinch) | Gust that pushes everyone near you away | Defending your shelf |
+| Two-finger twist | Spin attack, a little tornado | Crowds |
+| Three-finger swipe up | Rocket jump to the top of the stage | Reaching the sprinkle donuts up high |
+| Two fingers held apart | Candy-cane bridge between them, for a few seconds | Building mid-match |
+| Two-finger tap on your shelf | Icing dome over your shelf for a few seconds | Last-second defence |
+| Drumming (many quick taps) | Sprinkle cannon | Mashers |
+
 ## Scoring: everyone plays the whole time
 
 No lives, no elimination, no waiting to respawn. A match runs on a timer and every player is in
@@ -229,6 +263,7 @@ system.
 | Mid-air jumps | 1 | 3 | 1 (never below pro) | host sim |
 | Bag spilled on ring-out | 100% | 50% | 100% (never above all of it) | host sim |
 | Bag capacity | 3 | 4 | 3 (2.5 rounds up) | host sim |
+| Power bar fill rate | ×1.0 | ×1.6 | ×0.7 | host sim |
 | Pickup reach | ×1.0 | ×2.0 | ×1.0 (never below pro) | host sim |
 | Respawn invincibility (s) | 2 | 4 | 1 | host sim |
 | Safety bounce below the stage, per fall | 0 | 1 (at help ≥ 0.75), recharges after 20 s | 0 | host sim |
@@ -600,6 +635,7 @@ bad guy grabs a donut and banks it.
   would read, which makes it a natural third move set.
 - **How many pieces per team?** A fixed number per level, more with each level, or a budget where
   stronger pieces cost more?
-- **Many fingers as a play goal.** The touch test showed the tablet tracking many fingers at once,
-  every one separately. Is that a mechanic inside the fighter (whole-hand slaps, chords, building
-  forts with several fingers), a between-levels minigame, or its own game?
+- **Powers for bad guys.** Do CPU bad guys fill a bar and use powers too (a grownup bad guy can,
+  at `help -0.5` fill rate)? It makes them scarier and the shelf dome a real counter.
+- **Team powers.** Two kids firing the same power within a second of each other could combine
+  into a bigger one. Worth it, or one thing too many?

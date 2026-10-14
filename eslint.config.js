@@ -122,8 +122,8 @@ export default [
     files: ['**/*.js', '**/*.mjs'],
     plugins: { 'import-x': importX },
     settings: {
-      // `three` comes from a CDN import map at runtime, so it can't resolve on disk.
-      'import-x/ignore': ['^three'],
+      // `three` and `trystero` come from a CDN import map at runtime, so they can't resolve on disk.
+      'import-x/ignore': ['^three', '^trystero'],
       'import-x/resolver': { node: { extensions: ['.js', '.mjs'] } },
     },
     rules: {
@@ -131,7 +131,7 @@ export default [
       'import-x/no-cycle': ['error', { maxDepth: Infinity, ignoreExternal: true }],
       // A missing named export is a SyntaxError in the browser but invisible to per-file lint.
       'import-x/named': 'error',
-      'import-x/no-unresolved': ['error', { ignore: ['^three'] }],
+      'import-x/no-unresolved': ['error', { ignore: ['^three', '^trystero'] }],
       'import-x/no-self-import': 'error',
     },
   },

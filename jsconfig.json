@@ -25,6 +25,6 @@
     // errors under checkJs; the .d.ts beside them is what we actually want to read.
     "maxNodeModuleJsDepth": 0
   },
-  "include": ["characters/**/*.js", "inventory/**/*.js", "*.js"],
+  "include": ["characters/**/*.js", "inventory/**/*.js", "spinoff/**/*.js", "*.js"],
   "exclude": ["node_modules", "**/*.test.mjs"]
 }

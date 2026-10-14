@@ -1574,6 +1574,7 @@ const SHAWL = {
   }, open: 0.45, arm: 0.75 },
   crescent: { hem: hemOf(1.0, 0.45, { open: 0.6, easeFront: Math.sqrt }), open: 0.6, arm: 0.35 },
   capelet: { hem: () => 0.55, open: 0, button: true, circle: 0.75 },
+  cape: { hem: hemOf(0.25, 1.7, { open: 1.15, easeBack: (t) => 1 - (1 - t) ** 2 }), open: 1.15, arm: 0.3 },
   shrug: { depth: (th) => (back(th) > 0 ? 0.07 : 0), open: Math.PI / 2, sleeves: true },
 };
 

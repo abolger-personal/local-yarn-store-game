@@ -458,6 +458,16 @@ scary, for 4–6 year olds.
   One exact trait tunes it: **Assertiveness** sets how often a bad guy chases a carrier instead
   of grabbing. `ponytail:` one state machine for every bad guy; personalities per bad guy only if
   matches feel samey.
+- **The bad-guy team grows level by level** (decided 2026-10-13). Level 1 is the grownups who
+  tapped 🥷, or one CPU bad guy if nobody did. Each level after adds one CPU bad guy:
+
+  ```
+  badGuys(level, grownups) = min(8, max(grownups, 1) + level - 1)
+  ```
+
+  Two grownups on level 3 face the kids with 2 CPU bad guys beside them; no grownups on level 3
+  is 3 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
+  drops it. The level lives on the host for the evening (a new room starts at level 1).
 - **CPU difficulty reuses the `help` table, pointing the right way.** One grown-up setting on the
   host, three pictures, gives every CPU bad guy the same `help`: easy `-0.5` (weaker bad guys),
   normal `0`, hard `0.5` (tougher: harder to launch, hit harder, a second mid-air jump). `help`
@@ -495,8 +505,9 @@ bad guy grabs a donut and banks it.
   stronger, slower moves), or only how it looks while moving?
 - **The owl.** It is already a species in the code. Its wings are the one set of arms that
   would read, which makes it a natural third move set.
-- **CPU difficulty beyond `help`.** Should the same three pictures also set how many CPU bad guys
-  join and how often they chase a carrier instead of grabbing, or is `help` alone enough?
+- **Levels and the difficulty pictures.** Levels now set how many CPU bad guys join; the three
+  difficulty pictures set their `help`. Keep both, or let the level drive `help` too (say, easy on
+  the early levels, harder as the team fills up) and drop the pictures?
 - **How many bad guys?** Eight against one 4-year-old is a lot. One rule: as many bad guys as
   kids, capped at 8, with the difficulty setting doing the rest.
 - **Does pick-and-place have a job in this mode?** Banking is automatic. The touch picker could

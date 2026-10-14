@@ -137,8 +137,11 @@ floor at an angle and follows your fighter.
   carries on to where it was going, so nobody has to re-tap after every hit.
 - **Attacking on the move.** A punch is layered on the upper body over the walk on the legs, so
   the fighter keeps going. A kick needs the legs: the fighter pauses for the kick and walks on.
-- **Fort walls are not walked around.** A fighter heading for a target behind a wall stops at the
-  wall, and the kid smashes through. No route-finding around forts.
+- **Fort walls: around if there's a way, stop if there isn't** (depth band, 2026-10-13). On a
+  floor you can walk around things, so a tap behind a wall routes through a gap if one exists.
+  If the fort is closed, the fighter goes as close as it can and stands `'blocked'`, facing the
+  wall, and the kid smashes through. (In the flat version it always stopped; with a depth band
+  that looked broken next to an open gap.)
 - **Two thumbs at once.** One thumb taps the stage while the other presses 🥊 or 🦶, tracked
   separately by `pointerId` (Pointer Events, `touch-action: none`). A touch that starts on a
   button never counts as a move. Tested 2026-10-13 on the Android tablet with

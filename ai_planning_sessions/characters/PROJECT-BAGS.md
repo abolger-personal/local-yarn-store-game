@@ -178,9 +178,6 @@ Trait names are the exact ten from `CHARACTER-ATTRIBUTES.md`.
 
 ## Open questions
 
-- **Species that cannot carry.** P1-SPIKE-PLAN.md notes hooved front legs mean "no project bag, no
-  carrying a WIP". Is that still true of the current rigs (seated customers rest on the chair)? If
-  so, hooved customers could wear the bag across the body, or keep it at their feet.
 - **Project bags as stock** (LYS.md lists them under finishing and general). A customer who buys a
   new project bag could switch to it, a cosmetic change and a lovely gift. Later, if at all.
 - **What does the player get for a held bag that is collected?** Proposal: nothing extra beyond

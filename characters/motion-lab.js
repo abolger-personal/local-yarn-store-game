@@ -1,20 +1,3 @@
-// Motion lab — the tuning surface for continuous character motion.
-//
-// The page answers two questions the other viewers cannot:
-//
-//   1. Which interpolator survives an INTERRUPT? The two are indistinguishable on a clean
-//      blend and differ only when a transition is cut off mid-flight, so the same interrupt
-//      has to hit both on the same frame. Hence two rows driven from one event stream, and a
-//      scope that plots VELOCITY -- the difference is invisible to the eye at 60fps and
-//      unmistakable on a velocity trace.
-//   2. How much motion variation should ONE MEMBER of a species get? The trait values decide
-//      where in a span a character lands; the species decides how wide the span is. Drag a
-//      span's min/max and the whole row spreads or converges live.
-//
-// Not species-checker.html: that page's idiom is "params ARE the pose" (its sliders rebuild the
-// character), which cannot hold once motion is continuous -- every slider would be stomped 60
-// times a second.
-
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { roomEnvironment } from '../inventory/room-environment.js';
@@ -33,33 +16,12 @@ import './lion.js';
 
 console.info('LYS build', BUILD);
 
-// Three rows, front to back. 'smoothstep' is the CURRENT behaviour, on screen as the control:
-// the whole question is whether the other two look better than what the game does today, and
-// that is not answerable without it in the same frame.
-// SPRING IS THE CHOSEN ENGINE. Decided 2026-09-20 in this lab: smoothstep visibly twitches on
-// every interrupt (its slope is zero at both ends, so an interrupted move relaunches from a
-// standstill), and hermite, while smooth, is bit-identical to smoothstep on any move that is
-// NOT interrupted -- measured max difference 0.000000 rad from rest, because its start tangent
-// is seeded from incoming velocity and that is zero at rest, leaving a cubic Hermite with both
-// tangents zero, which IS t*t*(3-2t). Its end tangent is hard-zero, so it can never overshoot,
-// which kills the zeta dial that carries Volatility vs Orderliness.
-//
-// The other two are kept here as comparison rows, off by default, because the tuning that
-// follows is worth being able to sanity-check against. They are NOT kept in the game: the plan
-// deletes them from motion.js when cast.js is wired, at three grep-able places all named `mode`.
+// MOTION-TODO.md "The interpolator bake-off: decided"
 const CHOSEN = 'spring';
 const ENGINES = [CHOSEN, 'hermite', 'smoothstep'];
 
-
-// What each pose is meant to read as. A motion cannot be judged without knowing what it was
-// aiming for -- "is that arrival wrong, or is browse just like that?" is unanswerable otherwise.
 const POSE_MEANS = {
   rest: 'standing, arms down',
-  // These two are NOT the walk. They are single frozen frames, hand-authored back when nothing
-  // moved -- a snapshot of one instant of a stride, held forever. The actual walk is a layer
-  // added on top of whichever pose is selected, driven by distance travelled, and you turn it
-  // on with the `walking` slider folder (or the treadmill). Pick `rest` and push the treadmill
-  // up: that is the real gait. Both of these get deleted once the cycle is wired into the game.
   walk: 'a frozen snapshot of one stride frame -- NOT the walk cycle. Pick rest + treadmill for that.',
   carry: 'holding something at the chest',
   reach: 'arm out to a shelf',
@@ -68,55 +30,34 @@ const POSE_MEANS = {
   delighted: 'arms up, ears perked \u2014 the buy reaction',
   'walk+carry': 'the same frozen snapshot, holding something -- also not the walk cycle',
 };
-const LANE = 2.4;                 // characters wrap at +/- this, so a walk has somewhere to go
+const LANE = 2.4;
 const POSE_NAMES = Object.keys(POSES);
 
 const S = {
   species: speciesIds()[0],
   count: 2,
-  extremes: false,         // the 8 corner personalities instead of random ones
-  allSpecies: false,       // one character per species from IDENTICAL traits
+  extremes: false,
+  allSpecies: false,
   view: 'felted',
-  // bake-off
-  // A FRACTION of the move, not a wall-clock time. Absolute seconds made the duration knob
-  // change two things at once: how long a move takes AND how far through it the interrupt
-  // landed. Worse, at any duration shorter than the interrupt delay the move simply FINISHED
-  // first, so there was no interrupt to survive and the two duration-based engines printed
-  // identical numbers -- which reads as "the duration slider does nothing to smoothstep".
-  interruptAt: 0.45,       // 0..1 through the move
-  cutSlow: 0.2,            // time scale WHILE a scripted cut runs, so the eye can follow it
-  // OFF by default. The button says "CUT OFF A MOVE", singular, so that is what one press has
-  // to do -- a control that quietly does something forever is a lying affordance, however
-  // convenient the loop is once you know it is there.
+  interruptAt: 0.45,
+  cutSlow: 0.2,
   loopCut: false,
   chaos: false,
-  // Off: spring is chosen, so these are comparison rows you switch on to check something, not
-  // the normal view. Showing them by default triples the cast for no benefit while tuning.
   compare: { hermite: false, smoothstep: false },
   dtScale: 1,
-  // walk
   speed: 0.0,
-  lookOver: 0,             // -1..1 of the species' own headYawMax. An owl reaches ~264deg here
-                           // and a llama ~109, from one shared control and no per-species code.
+  lookOver: 0,
   scopeChannel: 'armSwing',
-  // tuning, copied so the lab never mutates a frozen export
   opts: { ...MOTION_DEFAULTS },
-  // MULTIPLIERS for the coefficients motionOf derives from personality, 1 = as authored.
-  // These cannot live in `opts`: coeffs() spreads motionOf() over it, so anything motionOf
-  // returns silently overwrote the slider and five knobs did nothing at all. Scaling after the
-  // merge keeps BOTH -- personality still spreads the cast, these shift the whole cast at once.
   scale: { stiff: 1, zeta: 1, stride: 1, bounce: 1, idleRate: 1,
            armGain: 1, sway: 1, lean: 1, headCarry: 1, headCock: 1, attend: 1, kneeLift: 1,
            armTuck: 1, tailCarry: 1 },
   ranges: spansOf(speciesIds()[0]),
 };
 
-/** The rows actually on screen. Spring is never hideable -- it is the one being tuned. */
 function shownEngines() {
   return ENGINES.filter((e) => e === CHOSEN || S.compare[e]);
 }
-
-// ---------------------------------------------------------------- scene
 
 const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -128,7 +69,7 @@ app.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#e9e4dc');
 const camera = new THREE.PerspectiveCamera(34, 1, 0.05, 60);
-const HOME = new THREE.Vector3(3.2, 2.5, 5.2);   // angled, so three rows read as three rows
+const HOME = new THREE.Vector3(3.2, 2.5, 5.2);
 camera.position.copy(HOME);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -140,8 +81,6 @@ const key = new THREE.DirectionalLight('#fff6e8', 1.5);
 key.position.set(2.2, 3.4, 2.0);
 scene.add(key, new THREE.AmbientLight('#cfd6e2', 0.35));
 
-// A grid, not a blank plane: a planted foot must hold still against a fixed reference, and
-// against a featureless floor even total skate looks like normal walking.
 function gridTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 64;
@@ -172,8 +111,6 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
-// ---------------------------------------------------------------- the cast
-
 /**
  * @typedef {{built: any, motion: any, opts: any, engine: string, traits: any,
  *   walkDist: number, phase: number, lane: number, maxDv?: number, skate?: number, top?: number,
@@ -181,7 +118,6 @@ resize();
  */
 /** @type {Actor[]} */
 let cast = [];
-/** A species' own spans, as an editable copy. Falls back to the shared defaults. */
 function spansOf(id) {
   return structuredClone(getSpecies(id)?.motionRanges ?? BASE_MOTION_RANGES);
 }
@@ -194,26 +130,15 @@ function clearCast() {
   cast = [];
 }
 
-/** The trait set every species shares while `allSpecies` is on. */
 let shared = null;
 
-/** The eight corner rows while `extremes` is on, else null. @type {Corner[] | null} */
+/** @type {Corner[] | null} */
 let matrix = null;
 
-// THE EXTREMES MATRIX. Random casts are the wrong instrument for learning the range of the
-// system: eight random personalities cluster near the middle of every dial and you end up
-// comparing near-duplicates. This walks the corners instead.
-//
-// Four factors drive motion, so "three at 5 and one at 1" has exactly four members -- one per
-// choice of which factor is low -- and "three at 1 and one at 5" has four more. Eight, which is
-// the whole cast, and each factor appears low twice and high twice across it. That is a
-// near-orthogonal design: read DOWN a column to see one factor's effect with the others held
-// at an extreme, and the difference is attributable rather than confounded.
+// MOTION-TODO.md "Reading the motion range: the extremes matrix"
 const FACTOR_ORDER = ['E', 'N', 'C', 'O'];
 
 /**
- * The eight corner personalities.
- *
  * @typedef {{E: number, N: number, C: number, O: number, label: string, odd: string}} Corner
  * @returns {Corner[]}
  */
@@ -224,10 +149,6 @@ function extremesMatrix() {
       const v = (x) => (x === k ? odd : base);
       rows.push({
         E: v('E'), N: v('N'), C: v('C'), O: v('O'),
-        // CASE IS THE VALUE: upper = 5, lower = 1. So "ENCo" is high on everything but
-        // Openness and "encO" is low on everything but Openness. Marking merely which factor
-        // was the odd one out gave both of those the same label, which is the one thing the
-        // label exists to tell apart.
         label: FACTOR_ORDER.map((x) => (v(x) === 5 ? x : x.toLowerCase())).join(''),
         odd: k,
       });
@@ -236,78 +157,41 @@ function extremesMatrix() {
   return rows;
 }
 
-/**
- * A corner row as the ten spec-named assets: both halves of a factor take the same value.
- * @param {Corner} row
- */
+/** @param {Corner} row */
 function traitsOf(row) {
   return {
     Enthusiasm: row.E, Assertiveness: row.E,
     Volatility: row.N, Withdrawal: row.N,
     Industriousness: row.C, Orderliness: row.C,
     Openness: row.O, Intellect: row.O,
-    // Agreeableness drives no motion, so it is pinned mid rather than varied -- varying it
-    // would suggest it does something here.
     Compassion: 3, Politeness: 3,
   };
 }
 
-/**
- * Builds one TRIO per slot: identical params, identical traits, one engine each.
- *
- * Identical is the whole point -- if the rows differed in proportion or temperament the
- * comparison would be between characters, not between interpolators.
- */
 function buildCast() {
   clearCast();
   const n = S.extremes ? 8 : S.count;
   const ids = S.allSpecies ? speciesIds() : Array.from({ length: n }, () => S.species);
-  // "one per species, SAME traits" means one trait roll shared by every species -- that is the
-  // whole comparison, temperament held constant so any difference left is the species' own
-  // MOTION_RANGES. Rolling per slot instead made each species a different character and there
-  // was nothing to compare. Rerolling then replaces the shared set, which is what makes the
-  // button do something visible in this mode.
   shared = S.allSpecies ? randomTraits() : null;
   matrix = S.extremes && !S.allSpecies ? extremesMatrix() : null;
   ids.forEach((id, i) => addPair(id, i, ids.length));
   setViewMode(group, S.view);
   refreshRoster();
-  showPose();     // the banner names which engines are on screen, so it changes with the cast
+  showPose();
   syncEngineControls();
 }
 
-
-/**
- * One slot: the same character and the same traits, built once per engine.
- *
- * Everyone walks along +X, so each build gets a Z lane of its own and nobody can walk through
- * anybody. The three engines of one slot sit adjacent, because those are what get compared and
- * a difference this small is only readable between neighbours.
- */
 function addPair(id, slot, slots) {
   const kit = getSpecies(id);
   const params = { ...BASE_PARAMS, ...kit.defaults };
-  // In matrix mode every body is IDENTICAL -- no randomise() -- because leg length dominates a
-  // walk far more than temperament does, and the point here is to see what temperament alone
-  // is worth. Randomised bodies would put a stilt llama next to a stumpy one and the motion
-  // difference would be unreadable underneath.
   if (!S.allSpecies && !matrix) kit.randomise?.(params);
   const corner = matrix?.[slot];
-  // ...except COLOUR, which is the one thing that cannot affect motion. Eight identical grey
-  // owls are a correct experiment and a useless one: the roster chips all match and there is no
-  // way to say which critter on screen is which row. A hue per corner fixes that and changes
-  // nothing that moves.
   if (corner) {
     const hue = (slot / 8) * 360;
     params.bodyColor = `hsl(${hue.toFixed(0)}, 42%, 62%)`;
     if (kit.coatColorKey) params[kit.coatColorKey] = `hsl(${hue.toFixed(0)}, 38%, 52%)`;
   }
   const traits = corner ? traitsOf(corner) : (shared ?? randomTraits());
-  // Shared ACROSS the trio, varied across slots. The three rows of one slot must differ by the
-  // interpolator and nothing else, or the comparison is contaminated -- but two different slots
-  // should still look like two different characters, which is what the idle seed provides.
-  // Matrix mode also fixes the idle seed and the stride phase, for the same reason: they are
-  // deliberate noise, and noise is exactly what you do not want while reading a comparison.
   const walkDist = matrix ? (slot / slots) * 0.4 : Math.random() * 0.4;
   const seed = matrix ? (slot + 0.5) / slots : Math.random();
 
@@ -319,7 +203,6 @@ function addPair(id, slot, slots) {
   });
 }
 
-/** One built character in one lane, running one engine. */
 function addOne(kit, params, engine, { traits, seed, walkDist, z, label, odd }) {
   const built = createCharacter({ ...params }, kit);
   built.root.position.set(0, 0, z);
@@ -331,20 +214,13 @@ function addOne(kit, params, engine, { traits, seed, walkDist, z, label, odd }) 
   });
 }
 
-/** Species span + trait position + the lab's global knobs, merged in that order. */
 function coeffs(traits, kit, engine) {
-  // S.ranges is the SELECTED species' spans, seeded from its kit and then editable here. It
-  // used to be seeded from BASE_MOTION_RANGES and never reseeded, so picking "llama" showed a
-  // cast built from the base spans while the game would have used the llama's -- a maxed-out
-  // llama read stiff 235 here against 187 in the game, and knee lift capped at the base 0.78
-  // when the kit authors 1.00. Every number in this folder was about a species nobody ships.
   const ranges = S.allSpecies ? (kit.motionRanges ?? S.ranges) : S.ranges;
   const per = motionOf(traits, ranges);
   for (const k of Object.keys(S.scale)) per[k] *= S.scale[k];
   return { ...S.opts, ...per, mode: engine };
 }
 
-/** Re-derives coefficients without rebuilding. Dragging a span must be felt immediately. */
 function retune() {
   for (const a of cast) {
     Object.assign(a.opts, coeffs(a.traits, a.built.species, a.engine));
@@ -357,25 +233,13 @@ const scratch = Object.fromEntries(
     ['neckCurve', 0]],
 );
 
-// ---------------------------------------------------------------- the pose event stream
-//
-// ONE source for both rows. Two independently-driven rows would be two experiments.
-
 let target = POSES.rest;
 let poseIndex = 0;
-// The scripted run, as a stage machine: settle -> reach -> (cut) -> browse -> done.
-// It used to be a one-shot that began by SNAPPING every character to rest in a single frame,
-// which is a whole-screen flash an order of magnitude more visible than the 0.35s event it was
-// setting up -- it read as the page reloading. The snap is still here, for the determinism it
-// buys, but it now happens only once everyone has already ANIMATED back to rest, so it moves
-// nothing and you never see it.
 let runStage = 'done';
 let runTimer = 0;
-let markNextSample = false;   // drawn as a vertical rule on the scope
-const poseTrail = [];         // the last two target names, so the banner can read "reach -> browse"
+let markNextSample = false;
+const poseTrail = [];
 
-// What the banner says at each stage of a scripted cut. Without this the settle stage looks
-// like the page doing something random before the thing you asked for.
 const RUN_STAGES = {
   settle: 'settling back to rest \u2014 so every run starts from the same place',
   reach:  'reaching \u2026 about to be cut off partway',
@@ -383,13 +247,6 @@ const RUN_STAGES = {
 };
 const poseEl = document.getElementById('pose');
 
-/**
- * `reset` clears the peak-velocity-step readout.
- *
- * It must NOT happen on the interrupt itself: the interrupt IS the frame being measured, and
- * zeroing there wipes the number one frame before it is read. So the setup pose resets and the
- * interrupt does not.
- */
 function setTarget(pose, reset = true) {
   const name = POSE_NAMES.find((n) => POSES[n] === pose) ?? '?';
   if (target !== pose) poseTrail.push(name);
@@ -400,16 +257,9 @@ function setTarget(pose, reset = true) {
   showPose();
 }
 
-/** The banner: what they are doing, and what it is supposed to look like. */
 function showPose() {
   const now = poseTrail.at(-1) ?? 'rest';
   const prev = poseTrail.length > 1 ? poseTrail.at(-2) : null;
-  // The trap this page is built around and did not warn about: the three engines interpolate the
-  // COMMANDED pose, and the walk and idle layers are added AFTERWARDS, identically for all
-  // three. Measured spread on armSwing between engines: 0.0000 rad while the target is held,
-  // 0.0227 across one clean pose change, 0.2670 across an interrupted one. So a walking cast
-  // holding a pose shows three bit-identical rows, and that reads as a broken engine switch
-  // when it is the system working correctly.
   let tail;
   if (runStage !== 'done') tail = `<span class="stage">${RUN_STAGES[runStage] ?? ''}</span>`;
   else if (shownEngines().length > 1) {
@@ -425,85 +275,48 @@ function showPose() {
   poseEl.innerHTML = `<b>${arrow}${now}</b><span>${POSE_MEANS[now] ?? ''}</span>${tail}`;
 }
 
-
 function cyclePose() {
   poseIndex = (poseIndex + 1) % POSE_NAMES.length;
   setTarget(POSES[POSE_NAMES[poseIndex]]);
 }
 
-/**
- * Fire one pose, then cut it off after exactly `interruptAfter` seconds.
- *
- * Deterministic and repeatable, which matters: eyeballing an interrupt by clicking twice fast
- * never lands on the same frame twice, and the whole comparison is about what happens on that
- * one frame.
- */
 function fireInterrupt() {
   runStage = 'settle';
   runTimer = 0;
 }
 
-/** Everyone home and stopped, so a hard reset from here changes nothing you can see. */
 function atRest() {
   return cast.every((a) => POSE_KEYS.every((k) => Math.abs(velocityOf(a.motion, k)) < 2e-3
     && Math.abs(valueOf(a.motion, k) - (POSES.rest[k] ?? 0)) < 2e-3));
 }
 
-/**
- * One frame of the scripted run.
- *
- * Deterministic and repeatable, which is the whole point: eyeballing an interrupt by clicking
- * twice fast never lands on the same frame twice, and the comparison is about that one frame.
- * Firing again from wherever the last run ended would measure nothing -- the second run would
- * start already at the target, no channel would move, and the readout would say 0.00 and look
- * like a broken instrument rather than a broken setup. Hence the settle stage.
- */
 function stepRun(dt) {
   runTimer += dt;
   if (runStage === 'settle') {
-    // `target` must be reset alongside the per-character state: integrate() detects a retarget
-    // by object IDENTITY, so leaving it pointing at POSES.reach means the setup pose below is
-    // not seen as a change at all and nothing ever starts moving.
     if (target !== POSES.rest) setTarget(POSES.rest);
-    if (!atRest() && runTimer < 3) return;          // timeout: a very low stiffness may crawl
+    if (!atRest() && runTimer < 3) return;
     for (const a of cast) resetMotion(a.motion, POSES.rest);
     setTarget(POSES.reach);
     runStage = 'reach';
     runTimer = 0;
   } else if (runStage === 'reach') {
-    // Scaled by the move duration, so that knob changes ONLY how fast the move is and never
-    // where the cut lands. The spring has no duration of its own, but all three rows run off
-    // one event stream and so must share one interrupt instant.
     if (runTimer < S.interruptAt * S.opts.blend) return;
     setTarget(POSES.browse, false);
     runStage = 'cut';
     runTimer = 0;
-    // Hold after the cut just long enough to see the arrival. This is SIMULATED time, so at
-    // cutSlow 0.2 a 1.5s hold is seven and a half real seconds of watching nothing happen --
-    // long enough that a looping cut feels broken rather than repetitive.
   } else if (runTimer > Math.max(0.6, S.opts.blend * 2)) {
     runStage = S.loopCut ? 'settle' : 'done';
     runTimer = 0;
   }
 }
 
-// ---------------------------------------------------------------- per-frame
-
 const clock = new THREE.Timer();
 let stepOnce = false;
 let paused = false;
 
-/**
- * The walk layer onto `out`: distance-driven, so the phase freezes when the character does.
- * Returns the gait's gain, which the lane walk below turns and travels by.
- */
 function walkStep(a, out, dt) {
   const P = a.built.params;
   const L = P.legHeight + P.hipInset;
-  // walkDist stays, but ONLY for the lane position below. The gait phase is accumulated
-  // separately: dividing a distance total by a speed-dependent stride length is what made legs
-  // spin on deceleration. The lab never showed it because its speed is a slider and so the
-  // divisor never moved -- see phaseStep in motion.js.
   const moved = S.speed * dt;
   a.walkDist += moved;
   const w = walkPhase(a.phase, S.speed, L, a.opts);
@@ -515,7 +328,6 @@ function walkStep(a, out, dt) {
   return gain;
 }
 
-/** One character: interpolate, sum the additive layers, apply. */
 function tickOne(a, dt) {
   const before = velocityOf(a.motion, S.scopeChannel);
   integrate(a.motion, target, dt, a.opts);
@@ -523,17 +335,11 @@ function tickOne(a, dt) {
   a.maxDv = Math.max(a.maxDv ?? 0, Math.abs(after - before));
 
   const out = compose(scratch, a.motion, a.opts);
-  // Deliberate head turn, as a fraction of what this species can physically do. applyPose
-  // clamps to headYawMax, so asking for more than an animal has simply saturates.
   if (S.lookOver !== 0) out.headYaw += S.lookOver * (a.built.params.headYawMax ?? 1.4);
 
   const gain = walkStep(a, out, dt);
   applyPose(a.built, out);
 
-  // Walk along +X, in a lane of their own, and TURN to face the way they are going -- reusing
-  // the gait's own gain, so the turn lands exactly as the stride starts and there is no snap.
-  // Facing is the whole point here: the rig faces +Z, so translating along X without the turn
-  // is a character sliding sideways while its legs stride forward.
   a.built.root.rotation.y = gain * (Math.PI / 2);
   const travelled = ((a.walkDist % (LANE * 2)) + LANE * 2) % (LANE * 2) - LANE;
   a.built.root.position.x = travelled * gain;
@@ -544,12 +350,7 @@ function frame() {
   if (paused && !stepOnce) dt = 0;
   if (stepOnce) { dt = (1 / 60) * S.dtScale; stepOnce = false; }
 
-  // Slowed only while a scripted run is in flight. Velocity continuity is a sub-100ms event:
-  // at real time there is nothing for an eye to catch, which is why pressing the button felt
-  // like it did nothing but flash. Walking speed is untouched when no run is going.
   if (runStage !== 'done') {
-    // Settling is setup, not evidence: run it at real time so the loop does not spend most of
-    // its wall clock watching characters stand back up.
     if (runStage !== 'settle') dt *= S.cutSlow;
     const was = runStage;
     stepRun(dt);
@@ -564,18 +365,10 @@ function frame() {
 }
 renderer.setAnimationLoop(frame);
 
-// ---------------------------------------------------------------- the scope
-//
-// The instrument the page exists for. Velocity continuity through an interrupt is invisible on
-// the characters and obvious here: smoothstep's trace drops to the axis and climbs back out.
-
 const scopeCanvas = /** @type {HTMLCanvasElement} */ (document.getElementById('scope'));
 const ctx2d = scopeCanvas.getContext('2d');
-const history = new Map();      // engine -> {v: number[], d: number[]}
+const history = new Map();
 
-// One palette, used by both the scope traces and the slider labels, so a colour means the same
-// thing wherever it appears. Smoothstep is purple rather than grey specifically so that GREY can
-// mean "applies to every engine" and never be mistaken for an engine of its own.
 const COLOUR = { spring: '#2f7fd1', hermite: '#d1642f', smoothstep: '#7a4fd1' };
 
 function sampleScope() {
@@ -600,7 +393,6 @@ function drawScope() {
   ctx2d.strokeStyle = 'rgba(0,0,0,.18)';
   ctx2d.beginPath(); ctx2d.moveTo(0, H / 2); ctx2d.lineTo(W, H / 2); ctx2d.stroke();
 
-  // a vertical rule at each interrupt: the only place on the trace worth looking at
   const marks = history.get(CHOSEN)?.mark ?? [];
   ctx2d.strokeStyle = 'rgba(0,0,0,.30)';
   ctx2d.beginPath();
@@ -610,8 +402,8 @@ function drawScope() {
   for (const engine of shownEngines()) {
     const h = history.get(engine);
     if (!h) continue;
-    trace(h.v, COLOUR[engine], 1, 0.35);      // value: solid
-    trace(h.d, COLOUR[engine], 0.45, 0.06);   // velocity: faint, scaled down
+    trace(h.v, COLOUR[engine], 1, 0.35);
+    trace(h.d, COLOUR[engine], 0.45, 0.06);
   }
 }
 
@@ -629,15 +421,8 @@ function trace(series, colour, alpha, scale) {
   ctx2d.globalAlpha = 1;
 }
 
-// ---------------------------------------------------------------- readouts
-
 const rosterEl = document.getElementById('roster');
 
-// The four Big-5 FACTORS that drive motion, each the mean of its two assets. Showing the
-// factors rather than the assets is the point: eight asset columns was more personality than
-// anyone can hold while tuning, and the coefficients do not read the assets individually
-// anyway. Agreeableness is left out rather than shown as a dead column -- it is the factor
-// about how you treat people, and it belongs to what an NPC does, not to how their body moves.
 const TRAIT_COLS = Object.freeze([
   ['E', 'Extraversion', 'Enthusiasm + Assertiveness'],
   ['N', 'Neuroticism', 'Volatility + Withdrawal'],
@@ -645,13 +430,6 @@ const TRAIT_COLS = Object.freeze([
   ['O', 'Openness/Intellect', 'Openness + Intellect'],
 ]);
 
-/**
- * One row: who it is, the traits that were rolled, then the coefficients they produced.
- *
- * The swatch is that character's actual body colour, plus its coat colour where the kit has one
- * (the owl's plumage, the llama's fleece), because at a glance the coat is what you actually
- * pick a character out by. Numbers alone gave you no way to tell which row was which animal.
- */
 function rosterRow(a) {
   const o = a.opts;
   const P = a.built.params;
@@ -660,8 +438,6 @@ function rosterRow(a) {
     ? `<span class="chip" style="background:${P[coat]}"></span>` : '';
   const swatch = `<span class="chip" style="background:${P.bodyColor}"></span>${second}`;
   const F = factors(a.traits);
-  // In matrix mode the odd-one-out factor is the whole point of the row, so mark its cell --
-  // eight rows of near-identical digits are unreadable otherwise.
   const traits = TRAIT_COLS.map(([ab, full]) => {
     const v = F[full.replace('/', '')].toFixed(1);
     return a.odd === ab ? `<td class="odd">${v}</td>` : `<td>${v}</td>`;
@@ -674,15 +450,6 @@ function rosterRow(a) {
 }
 
 function refreshRoster() {
-  // Traits are the CAUSE and the coefficients are the effect, so they belong on every row
-  // rather than only in the shared-traits banner. Reading "this one is stiffer" is useless
-  // without the trait that made it so -- and with several of ONE species on screen the
-  // traits are the only thing that differs between the rows at all.
-  // Sorted along the lane axis so row order matches the order they physically stand in --
-  // descending, which is nearest-camera first as the scene loads. Unsorted, the table was in
-  // build order, which is only the same thing by accident. Orbit far enough and any convention
-  // inverts, which is what the colour chip is for: the chip identifies the row, the order just
-  // makes it quick to find.
   const rows = cast.filter((a) => a.engine === CHOSEN)
     .sort((x, y) => y.lane - x.lane)
     .map(rosterRow).join('');
@@ -708,8 +475,6 @@ setInterval(() => {
     const a = cast.find((c) => c.engine === engine);
     return a ? `${engine} ${(a.maxDv ?? 0).toFixed(2)}` : engine;
   });
-  // Worst in the cast, not cast[0]. Skate is decided almost entirely by leg length, so with a
-  // mixed-height cast one character can be sliding badly while the first one reads fine.
   const shown = cast.filter((c) => c.engine === CHOSEN);
   const worst = Math.max(0, ...shown.map((c) => c.skate ?? 0));
   const slowest = Math.min(Infinity, ...shown.map((c) => c.top ?? Infinity));
@@ -723,19 +488,10 @@ setInterval(() => {
     + `${(worst * 100).toFixed(0)}%${warn}</span>${top}`;
 }, 120);
 
-// ---------------------------------------------------------------- gui
-
 const gui = new GUI({ title: 'motion lab' });
 
-/**
- * Add a control with a readable name and a hover explanation.
- *
- * lil-gui shows only the property name, and the property names here are the maths ("zeta",
- * "sinMax", "armGain") -- fine in the source, useless on a tuning surface where the whole job is
- * deciding what to drag. Every knob says what it does and which way is which.
- */
 function knob(folder, obj, prop, label, ...rest) {
-  const [help, ...range] = rest;   // the tooltip, then whatever lil-gui's add() takes after prop
+  const [help, ...range] = rest;
   const c = folder.add(obj, prop, ...range).name(label);
   c.domElement.title = help;
   const name = c.domElement.querySelector('.name');
@@ -743,26 +499,12 @@ function knob(folder, obj, prop, label, ...rest) {
   return c;
 }
 
-// Which engines each control actually reaches. Measured from the source, not guessed: spring()
-// reads opts.stiff and opts.zeta and nothing else; hermite() and smoothstep() both read
-// opts.blend and nothing else; every other knob feeds the idle or walk layers, which are
-// downstream of the interpolator and identical for all three.
-//
-// So there are no hermite-only or smoothstep-only controls to colour, and there never will be
-// while `blend` is the only thing either of them reads -- that one is shared between the two
-// duration engines and belongs to neither. It gets both dots.
 const tagged = [];
 
-/**
- * Mark a control as belonging to specific engines: colour its label, and hide it outright when
- * none of its engines are on screen. Untagged controls apply to everything and stay grey.
- */
 function forEngines(c, ...engines) {
   const name = c.domElement.querySelector('.name');
   if (name) {
     if (engines.length === 1) name.style.color = COLOUR[engines[0]];
-    // A control shared by SOME engines but not all cannot have one honest colour, so it gets a
-    // dot per engine instead of a blended one nobody could decode.
     const dots = engines.map((e) =>
       `<span class="dot" style="background:${COLOUR[e]}"></span>`).join('');
     name.insertAdjacentHTML('beforeend', ` ${dots}`);
@@ -772,7 +514,6 @@ function forEngines(c, ...engines) {
   return c;
 }
 
-/** Hide any control whose engines are all switched off. */
 function syncEngineControls() {
   const shown = shownEngines();
   for (const { c, engines } of tagged) c.show(engines.some((e) => shown.includes(e)));
@@ -804,13 +545,6 @@ knob(fCast, S, 'view', 'render as',
   + 'read at play distance either.', ['felted', 'grey', 'silhouette'])
   .onChange((v) => setViewMode(group, v));
 
-// The per-species knob: drag a span and the row spreads or converges, live.
-// How much ONE member of a species differs from another. Each row is a RANGE, not a value:
-// personality decides where in the range a character lands, the species decides how wide the
-// range is. Narrow the gap and every member moves alike; widen it and they vary.
-// The only coefficients any engine reads directly: spring() takes opts.stiff and opts.zeta,
-// hermite() and smoothstep() take opts.blend. Everything else feeds the idle and walk layers,
-// which sit downstream of the interpolator.
 const SPRING_ONLY = new Set(['stiff', 'zeta']);
 
 const SPAN_HELP = {
@@ -822,8 +556,6 @@ const SPAN_HELP = {
   bounce: 'walking bounce',
   kneeLift: 'how high they pick their feet up',
   headArc: 'how much they look around',
-  // The walking STYLE spans. These arrived with the personality-in-the-walk work and had no
-  // label here, so every one of them rendered as "undefined — least" / "undefined — most".
   armGain: 'how much the arms swing',
   sway: 'how far they roll side to side',
   lean: 'how far they lean into a walk',
@@ -837,14 +569,6 @@ fRanges.domElement.querySelector('.children')?.insertAdjacentHTML('afterbegin',
   '<div class="engine-key">Walking STYLE is deliberately not here: arm swing, sway, lean, head '
   + 'carriage and arms-held-in are the same spans for every species, so a walk reads the same '
   + 'way whatever animal is doing it. Their global knobs are under “walking”.</div>');
-// The slider bounds have to cover EVERY species, not just the shared defaults: the llama
-// authors a knee lift of 1.00 where the base tops out at 0.78, so bounds derived from the base
-// alone would have made the kit's own value undialable. Widened from the union across all
-// registered kits, so a new species with a bolder span widens the sliders by existing.
-//
-// The union is all this does; the PADDING rule lives in motion.js next to the table it pads,
-// because which channels are allowed below zero is a fact about the channels and not about
-// this panel -- and because it is then reachable from the self-check.
 function sliderBounds(k) {
   let lo = BASE_MOTION_RANGES[k][0], hi = BASE_MOTION_RANGES[k][1];
   for (const id of speciesIds()) {
@@ -854,7 +578,6 @@ function sliderBounds(k) {
   return spanBounds(k, lo, hi);
 }
 
-/** The two controllers per span, so switching species can push the new numbers into them. */
 const spanRows = [];
 
 function refreshSpans() {
@@ -876,8 +599,6 @@ for (const k of Object.keys(BASE_MOTION_RANGES)) {
   const mx = knob(fRanges, row, 'max', `${SPAN_HELP[k]} \u2014 most`, help, lo, hi)
     .onChange((v) => { S.ranges[k][1] = v; retune(); });
   spanRows.push({ k, row, mn, mx });
-  // stiff and zeta are read by spring() alone, so their spans are spring-only too -- the same
-  // fact as the global knobs of the same name, just applied per species.
   if (SPRING_ONLY.has(k)) { forEngines(mn, 'spring'); forEngines(mx, 'spring'); }
 }
 knob(fRanges, { copy: exportRanges }, 'copy', 'copy these spans as code',
@@ -886,7 +607,6 @@ knob(fRanges, { copy: exportRanges }, 'copy', 'copy these spans as code',
 fRanges.close();
 
 const fBake = gui.addFolder('how motion gets from A to B');
-// What the colours on the labels mean. Without this the dots are decoration.
 fBake.domElement.querySelector('.children')?.insertAdjacentHTML('afterbegin',
   '<div class="engine-key">label colour = which engine a control reaches:<br />'
   + `<i style="color:${COLOUR.spring}">spring</i> · `
@@ -973,8 +693,6 @@ knob(fWalk, S.scale, 'lean', 'forward lean',
   'How far they lean into the walk. Assertive, industrious characters lean in. Scales the '
   + 'whole cast.', 0, 2.5).onChange(retune);
 
-// The three gait LIMITS. Not style -- these say what the rig is physically willing to do, and
-// they are the first things to reach for when a walk looks wrong rather than merely bland.
 knob(fWalk, S.opts, 'sinMax', 'biggest believable step',
   'A ceiling on how far the legs will scissor, as a sine: 0.56 is sin(0.6 rad), about 34 '
   + 'degrees. Step length is clamped to this no matter what the stride knob asks for, so past '
@@ -999,8 +717,6 @@ knob(fWalk, S.opts, 'gateSpeed', 'speed to reach a full walk',
   + 'and out of walking; lower it and the legs snap on the instant they move.',
   0.05, 1.5).onChange(retune);
 
-// The two posture dials. They apply standing AND walking -- posture is carriage, not gait --
-// so they sit here with the rest of the body language rather than under "standing still".
 knob(fWalk, S.scale, 'headCarry', 'head carriage',
   'How high or low they hold their head. Open and confident, or down and closed — the single '
   + 'most readable posture signal there is, and completely free of leg length. Scales the whole '
@@ -1036,9 +752,6 @@ knob(fWalk, S, 'lookOver', 'look over the shoulder',
   -1, 1).onChange(() => { if (S.speed === 0) showPose(); });
 
 const fIdle = gui.addFolder('standing still');
-// NOT the same knob as the "how much they fidget" span in the variation folder, and it used to
-// carry the same name -- so moving this one changed the whole cast together and made the
-// personality link look broken when it was simply a different control.
 knob(fIdle, S.opts, 'idleAmount', 'fidgeting, whole cast',
   'Master dial over every character at once, on top of whatever their personality gives them. '
   + '0 freezes them solid — which is what the game looks like today. How much any ONE of them '
@@ -1055,7 +768,6 @@ knob(fIdle, S.opts, 'idleDuty', 'how often they fidget',
   + 'down here but neither switches off, because a character frozen absolutely solid reads as '
   + 'a dropped frame rather than as stillness.', 0.15, 1).onChange(retune);
 
-/** Paste-ready for a kit file, so lab tuning lands in source without retyping. */
 function exportRanges() {
   const body = Object.keys(BASE_MOTION_RANGES)
     .map((k) => `  ${k}: [${S.ranges[k][0].toFixed(2)}, ${S.ranges[k][1].toFixed(2)}],`)
@@ -1065,10 +777,6 @@ function exportRanges() {
   console.info(text);
 }
 
-// ---------------------------------------------------------------- keys
-
-// Keyboard shortcuts, as a table rather than an if-chain so the handler can tell whether it
-// consumed the key -- which is what decides whether to preventDefault. See below.
 const SHORTCUTS = {
   enter: () => fireInterrupt(),
   p: () => cyclePose(),
@@ -1076,7 +784,7 @@ const SHORTCUTS = {
   '.': () => { stepOnce = true; },
   ' ': () => { paused = !paused; },
   b: () => renderer.domElement.classList.toggle('squint'),
-  d: () => camera.position.copy(HOME).multiplyScalar(2.1),   // ~150px tall
+  d: () => camera.position.copy(HOME).multiplyScalar(2.1),
   f: () => camera.position.copy(HOME),
   1: () => setViewMode(group, 'felted'),
   2: () => setViewMode(group, 'grey'),
@@ -1086,21 +794,11 @@ const SHORTCUTS = {
 addEventListener('keydown', (e) => {
   if (/input|textarea/i.test(/** @type {HTMLElement} */ (e.target)?.tagName ?? '')) return;
   const k = e.key.toLowerCase();
-  // (named `k`, not `key`: `key` is the scene's directional light)
 
   const act = SHORTCUTS[k];
   if (!act) return;
   act();
 
-  // A lil-gui row is a real <button>, and a focused button activates on Enter and Space. After
-  // clicking ANY button with the mouse it keeps focus, so every later Enter ran the shortcut
-  // AND re-clicked that button -- click "next pose" once and Enter stepped the pose from then
-  // on, which is exactly what "Enter turns on a pose loop" looked like from the outside.
-  //
-  // preventDefault is what actually stops it. Blurring first was tried and measured: the button
-  // still received its click, because the activation is the keydown's DEFAULT ACTION and is
-  // aimed at whatever had focus when the key went down. The blur stays anyway, so the next key
-  // is clean too.
   e.preventDefault();
   const focused = /** @type {HTMLElement} */ (document.activeElement);
   if (focused && focused !== document.body && focused.closest?.('.lil-gui')) focused.blur();

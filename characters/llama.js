@@ -1,66 +1,46 @@
-// Llama species kit.
-//
-// The reference case for the SCALE half of "kits may ADD or SCALE, never REPLACE": the llama
-// is defined by neck length, and the neck is shared-base equipment.
-//
-// Two rules this exists to prove:
-//   1. The neck ADDS height. Torso dimensions stay identical to every other species so one
-//      sweater fits everyone, which makes the llama the tallest species rather than the one
-//      with a squashed body.
-//   2. Bipedal, not quadruped. The neck, head, ear and fluff silhouette is borrowed from
-//      quadruped reference art, then stood upright.
-
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
   addEars, addEyes, addTail, createCharacter, deriveCoatColor, touchingScallopSize,
-  feltMaterial, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh,
+  feltMaterial, POSES, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh,
 } from './npc.js';
-
-// ---------------------------------------------------------------- params
 
 export const DEFAULT_PARAMS = {
   ...BASE_PARAMS,
   name:          'Perpetua',
   footColor:     '#5d4a3c',
 
-  // A long neck bends further than a stubby one, but nothing like a bird's swivel.
-  headYawMax:    1.90,    // ~109 degrees
+  headYawMax:    1.90,
 
-  shoulderOut:   1.00,    // arms ride on the fleece surface, not inside it
+  shoulderOut:   1.00,
   shoulderLift:  0.34,
-  clampArmOut:   true,    // llama arms are visible, so never let a pose bury the elbow
+  clampArmOut:   true,
 
-  // The long neck is the whole species. Absolute, never a multiplier: a multiplier on the
-  // owl's near-concealed neck would still be near-concealed.
   neckLength:    0.380,
   neckThick:     0.052,
-  headOverlap:   0.020,   // the head does not sink; it sits on top of a visible neck
-  headRadius:    0.112,   // smaller head than the owl, so the neck reads as the long part
-  eyeFront:      0.700,   // proud of the wedge-shaped skull, or it swallows the eye white
+  headOverlap:   0.020,
+  headRadius:    0.112,
+  eyeFront:      0.700,
 
-  // species kit
-  muzzleLength:  0.215,   // a camelid snout is long and BLUNT; short plus tapered reads as a beak
+  muzzleLength:  0.215,
   muzzleThick:   0.076,
-  muzzleDrop:    0.240,   // how far below head centre the muzzle sits, as a fraction of radius
+  muzzleDrop:    0.240,
   muzzleColor:   '#efe6d5',
   noseColor:     '#141013',
-  noseSize:      0.60,    // Y arm length, as a fraction of muzzle thickness
+  noseSize:      0.60,
   earLength:     0.140,
   earWidth:      0.032,
-  earFlatten:    0.45,    // depth vs width; low values make the ear a blade, not a sausage
+  earFlatten:    0.45,
   earSpread:     0.440,
-  earTilt:       0.160,   // near-upright: banana ears are the llama tell
+  earTilt:       0.160,
 
-  // fleece uses the same scallop machinery as owl plumage, but larger and rounder: plumage is
-  // a set of plates, fleece is a mass of curls that has to read as continuous
   fleece:        true,
   fleeceColor:   '#cbb9a2',
   fleecePreset:  2,
   fleeceRows:    5,
   fleecePerRow:  9,
-  fleeceAutoSize:true,    // derive size from the counts so curls always touch
-  fleeceTouch:   1.08,    // 1.0 = exactly touching, above that = overlapping
-  fleeceSize:    0.250,   // manual override, only used when fleeceAutoSize is off
+  fleeceAutoSize:true,
+  fleeceTouch:   1.08,
+  fleeceSize:    0.250,
   fleeceFlat:    0.44,
   fleeceProud:   0.76,
   fleeceTop:     0.28,
@@ -68,11 +48,10 @@ export const DEFAULT_PARAMS = {
   fleeceStagger: true,
 
   fleeceNeck:    true,
-  fleeceNeckCoverage: 0.50,   // fraction of neck LENGTH the ruff spans
-  fleeceNeckSpread:   2.40,   // multiple of neck THICKNESS for the ruff radius
-  fleeceNeckScale:    0.85,   // curl size relative to the body's
+  fleeceNeckCoverage: 0.50,
+  fleeceNeckSpread:   2.40,
+  fleeceNeckScale:    0.85,
 
-  // A short fleecy stub, carried a little up off the rump and stiff: it bobs, it does not swing.
   tailLength:    0.085,
   tailThick:     0.036,
   tailDroop:    -0.35,
@@ -80,9 +59,6 @@ export const DEFAULT_PARAMS = {
   tailZeta:      0.45,
 };
 
-// Fewer and bigger than the owl's, and much rounder. Size is derived from the counts, so a
-// preset only chooses how many curls there are. Row counts start at 4 because with fewer than
-// that the vertical gap is so wide that touching curls would have to be absurdly large.
 export const FLEECE_PRESETS = Object.freeze([
   { fleeceRows: 4, fleecePerRow: 7,  fleeceProud: 0.80, fleeceFlat: 0.42, fleeceStagger: true,  fleeceTop: 0.32, fleeceBottom: 0.95 },
   { fleeceRows: 4, fleecePerRow: 9,  fleeceProud: 0.72, fleeceFlat: 0.44, fleeceStagger: true,  fleeceTop: 0.30, fleeceBottom: 0.96 },
@@ -101,12 +77,11 @@ export function applyFleecePreset(P, index) {
   return P;
 }
 
-// neckLength is the tier 1 carrier here, where the owl's is legHeight and tuft shape
 export const RANDOM_RANGES = Object.freeze({
   ...BASE_RANDOM_RANGES,
   neckLength:   [0.260, 0.520],
   neckThick:    [0.042, 0.066],
-  legHeight:    [0.130, 0.430],   // leggy: a stumpy llama and a stilt llama are both llamas
+  legHeight:    [0.130, 0.430],
   headRadius:   [0.098, 0.128],
   headOverlap:  [0.010, 0.045],
   muzzleLength: [0.170, 0.290],
@@ -118,23 +93,16 @@ export const RANDOM_RANGES = Object.freeze({
   earSpread:    [0.340, 0.560],
   earTilt:      [0.020, 0.320],
   fleeceTouch:        [1.020, 1.180],
-  // the ruff is the second silhouette carrier after the neck: a bare-necked llama and one in a
-  // huge collar of fleece read as different animals at 150px
   fleeceNeckCoverage: [0.360, 0.820],
   fleeceNeckSpread:   [1.800, 3.300],
-  eyeRadius:    [0.048, 0.070],   // smaller than the owl's; the neck carries identity instead
-  eyeSpread:    [0.520, 0.660],   // set wider, toward the sides of the head
+  eyeRadius:    [0.048, 0.070],
+  eyeSpread:    [0.520, 0.660],
   eyeFront:     [0.620, 0.780],
   tailLength:   [0.065, 0.110],
 });
 
-// ---------------------------------------------------------------- shell settings
-
-// narrow and deep: a llama skull is a wedge, where the owl's is a ball
 const headScale = (P) => [P.headRadius * 0.80, P.headRadius * 0.94, P.headRadius * 1.16];
 
-// Size is derived, not chosen: curls have to keep touching as the counts change, or the coat
-// stops reading as a mass and starts reading as scattered lumps.
 const curlSize = (P, shape, scale = 1) => (P.fleeceAutoSize
   ? touchingScallopSize(shape) * P.fleeceTouch * scale
   : P.fleeceSize * scale);
@@ -162,22 +130,16 @@ const neckShell = (P) => {
   };
 };
 
-// How far the fleece stands proud of the torso, in torso-radius fractions. The shared rig
-// uses this to push the shoulders out, so a thick coat does not swallow the arms.
 export const coatBulge = (P) => {
   if (!P.fleece) return 0;
   const { size, proud, flat } = torsoShell(P);
   return Math.max(0, size * (proud - flat));
 };
 
-// ---------------------------------------------------------------- kit
-
 function addHead(ctx, P) {
   ctx.head.add(part(GEO.sphere, ctx.mat.body, { scale: headScale(P) }));
 }
 
-// A tube, not a taper. The snout starts inside the skull so it reads as part of the head, and
-// ends blunt with a rounded cap -- a pointed muzzle on a round head is what reads as a beak.
 function addMuzzle(ctx, P) {
   const y = -P.headRadius * P.muzzleDrop;
   const start = P.headRadius * 0.30;
@@ -194,8 +156,6 @@ function addMuzzle(ctx, P) {
   }));
 }
 
-// The camelid philtrum: two nostril slits meeting a vertical lip split. Pieces are given extra
-// depth so the curve of the snout cap cannot swallow them at the edges.
 function addNose(ctx, P) {
   const y = -P.headRadius * P.muzzleDrop;
   const z = P.headRadius * 0.30 + P.muzzleLength + P.muzzleThick * 0.58;
@@ -223,17 +183,14 @@ function addTorsoFleece(ctx, P) {
   if (shell) ctx.chest.add(shell);
 }
 
-// A ruff at the base of the long neck, so the neck does not read as a bare pole. Both axes
-// track the neck: radius follows thickness, height follows length, so a randomised neck keeps
-// its proportions instead of growing a fixed-size collar.
 function addNeckFleece(ctx, P) {
   if (!P.fleece || !P.fleeceNeck) return;
   const half = (P.neckLength * P.fleeceNeckCoverage) / 2;
-  // capped against its own height: wider than about 1.7x reads as a flat disc collar, not fleece
+  // BODIES.md §Llama: ruff cap
   const radius = Math.min(P.neckThick * P.fleeceNeckSpread, half * 1.7);
   const shell = scallopMesh(scallopGeometry(neckShell(P)), ctx.mat.fleece, [radius, half, radius]);
   if (!shell) return;
-  shell.position.y = half;   // bottom of the ruff sits on the neck base
+  shell.position.y = half;
   ctx.neck.add(shell);
 }
 
@@ -243,7 +200,6 @@ function buildKit(ctx, P) {
   ctx.mat.nose = ctx.addMaterial(feltMaterial(P, P.noseColor));
 
   addHead(ctx, P);
-  // set wide and shallow: eyes on the sides of a narrow head, not owl-style forward discs
   addEyes(ctx, P, { squash: 1.1, head: headScale(P) });
   addMuzzle(ctx, P);
   addNose(ctx, P);
@@ -257,7 +213,6 @@ function buildKit(ctx, P) {
   addLlamaTail(ctx, P);
 }
 
-// Two curls of fleece, the second smaller and further out, so the stub tapers.
 function addLlamaTail(ctx, P) {
   const r = P.tailThick;
   addTail(ctx, P, {
@@ -268,9 +223,6 @@ function addLlamaTail(ctx, P) {
   });
 }
 
-// ---------------------------------------------------------------- randomisation
-
-/** Applies randomised llama identity onto a params object, in place. */
 export function randomiseInto(P) {
   randomiseBase(P, RANDOM_RANGES);
   applyFleecePreset(P, Math.floor(Math.random() * FLEECE_PRESETS.length));
@@ -278,12 +230,9 @@ export function randomiseInto(P) {
   return P;
 }
 
-/** A fresh randomised params object, with optional fixed overrides. */
 export function randomParams(overrides = {}) {
   return Object.assign(randomiseInto(structuredClone(DEFAULT_PARAMS)), overrides);
 }
-
-// ---------------------------------------------------------------- gui
 
 export const LLAMA_GUI = Object.freeze({
   'muzzle & ears': [
@@ -306,30 +255,15 @@ export const LLAMA_GUI = Object.freeze({
   ],
 });
 
-// ---------------------------------------------------------------- species
-
-// How much motion variation ONE llama gets. See owl.js for the shape and the reasoning.
-//
-// A llama is languid where the owl is snappy: slower idle, softer commitment, and a long neck
-// that carries a wide head arc without the head itself having to turn far. Because the neck
-// takes a fixed SHARE of a head turn, a llama's longer neck already sweeps further per radian
-// than an owl's -- so this span is wide but not as wide as the owl's, or it reads as rubbery.
+// BODIES.md §Llama
 export const MOTION_RANGES = Object.freeze({
   ...BASE_MOTION_RANGES,
   stiff:    [55, 190],
-  idleRate: [0.60, 1.60],   // languid: a llama takes its time even when it is worked up
+  idleRate: [0.60, 1.60],
   idleAmp:  [0.50, 1.50],
   headArc:  [0.90, 1.80],
-  // Tuned in the motion lab. A llama is a tall, deliberate animal: long steps, high knees, and
-  // almost no vertical -- the bounce that reads as bird-like bobbing on an owl reads as a limp
-  // on something this leggy.
   bounce:   [0.00, 0.02],
-  stride:   [1.78, 2.20],   // long steps; 2.26x leg is the geometric ceiling, so this is near it
-  // Picks its feet up, where a bird scuttles. Measured swing-foot clearance across this
-  // span: 13% of leg length at the bottom and 53% at the top, with the shin reaching 101
-  // degrees. Clearance keeps climbing past that and nothing self-intersects until about
-  // 2.20, so the ceiling here is taste rather than geometry -- a llama placing its feet,
-  // not a dressage horse.
+  stride:   [1.78, 2.20],
   kneeLift: [0.70, 1.70],
 });
 
@@ -346,6 +280,8 @@ export const llama = registerSpecies({
   randomise: randomiseInto,
   onPresetChange: applyFleecePreset,
   presetKey: 'fleecePreset',
+  // The arms vanish against the fleece, so the ears carry the cheer.
+  delighted: Object.freeze({ ...POSES.delighted, earFlap: 1 }),
 });
 
 export const createLlama = (P) => createCharacter(P, llama);

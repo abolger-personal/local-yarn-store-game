@@ -1,39 +1,53 @@
-// Self-check for the delivery script, the supplier throttle and the overnight carry-over.
 // Run: node inventory/supply.test.mjs
 import assert from 'node:assert/strict';
 import { mulberry32 } from '../characters/store/core/util.js';
 import { makeDisplay, footprint, place, topAt } from './grid.js';
-import { MIN_DELIVERY, SCRIPT, buildOrder, carryOver, choicesFor, describeSlot, resolveOrder, supplyFor, tutorialDay1 } from './supply.js';
-import { toolSuitsPattern, yarnSuitsPattern } from '../characters/wip.js';
+import { MIN_DELIVERY, SCRIPT, buildOrder, carryOver, choicesFor, describeSlot, resolveOrder, slipLine, supplyFor, tutorialDay1 } from './supply.js';
+import { WIP_STATE, stow, toolSuitsPattern, wantFor, wantsOf, yarnSuitsPattern } from '../characters/wip.js';
+import { yarnUnits } from './catalog.js';
 
 const isGoods = (it) => it.name === 'yarn' || it.name === 'pattern';
+const unitsOf = (pile) => pile.reduce((n, it) => n + (it.name === 'yarn' ? yarnUnits(it) : 1), 0);
 
-// --- day 1 is the starting pile, with one formation that works ------------------------------
 for (let seed = 1; seed <= 50; seed++) {
   const pile = resolveOrder(buildOrder(1), mulberry32(seed));
-  assert.ok(pile.length >= 24 && pile.length <= 30, `day 1 is 24-30 items, got ${pile.length}`);
-  const solvable = pile.some((pat) => pat.name === 'pattern' && pile.filter((it) => it.name === 'yarn' &&
-    it.weight === pat.weight && pat.materials.includes(it.material)).length >= pat.yarnUnits);
+  const yarn = unitsOf(pile.filter((it) => it.name === 'yarn'));
+  assert.equal(pile.filter((it) => it.name === 'pattern').length, 7, 'day 1 is the kit\'s pattern and six more');
+  assert.ok(yarn >= 16 && yarn <= 33, `and 15 units of yarn plus the kit's, got ${yarn}`);
+  const solvable = pile.some((pat) => pat.name === 'pattern' && unitsOf(pile.filter((it) => it.name === 'yarn' &&
+    it.weight === pat.weight && pat.materials.includes(it.material))) >= pat.yarnUnits);
   assert.ok(solvable, 'the starting pile holds a pattern AND every ball it needs');
 }
 
-// --- no notions until day 4; script slots carry their source ---------------------------------
 for (let day = 1; day <= 3; day++) {
   for (let seed = 1; seed <= 20; seed++) {
-    assert.ok(resolveOrder(buildOrder(day), mulberry32(seed)).every(isGoods), `day ${day} has no notions`);
+    const order = buildOrder(day).filter((s) => s.template.kind !== 'kit');
+    assert.ok(resolveOrder(order, mulberry32(seed)).every(isGoods), `day ${day} has no notions outside its kit`);
+  }
+}
+
+const kitDays = SCRIPT.flatMap((row, i) => (row.some((t) => t.kind === 'kit') ? [i + 1] : []));
+for (const day of kitDays) {
+  for (let seed = 1; seed <= 200; seed++) {
+    const kit = resolveOrder(buildOrder(day).filter((s) => s.template.kind === 'kit'), mulberry32(seed));
+    const pattern = kit[0];
+    assert.ok(kit.some((it) => toolSuitsPattern(it, pattern)), `day ${day} seed ${seed}: the kit's tool fits`);
+    for (const name of pattern.notions) assert.ok(kit.some((it) => it.name === name), `day ${day} seed ${seed}: ${name}`);
+    const npc = { wips: [{ id: 0, state: WIP_STATE.UNSTARTED, pattern: null, yarn: [], tool: null, notions: [], progress: 0 }] };
+    for (const it of kit) assert.ok(stow(npc, it, wantFor(npc, it)), `day ${day} seed ${seed}: ${it.name} is wanted`);
+    assert.deepEqual(wantsOf(npc), [], `day ${day} seed ${seed}: the kit alone completes "${pattern.title}"`);
+    assert.equal(npc.wips[0].state, WIP_STATE.IN_PROGRESS);
   }
 }
 assert.ok(resolveOrder(buildOrder(4), mulberry32(1)).some((it) => !isGoods(it)), 'notions arrive on day 4');
 assert.ok(buildOrder(5).every((s) => s.source === 'script'), 'days 1-10 are scripted');
 
-// --- a new weight is only the new weight ----------------------------------------------------
 assert.deepEqual(buildOrder(5)[0].template.weights, ['bulky'], 'day 5 introduces bulky');
 assert.ok(!buildOrder(4).some((s) => s.template.weights?.includes('bulky')), 'and nothing has it before');
 
-// --- the order's lines: the script's for two days, one of yours on night 2, then all yours ----
 SCRIPT.forEach((row, i) => {
   const day = i + 1;
-  const want = day <= 2 ? 0 : day === 3 ? 1 : row.length;
+  const want = day <= 2 ? 0 : day === 3 ? 1 : day === 4 ? 2 : row.length;
   assert.equal(buildOrder(day).filter((s) => s.playerChoosable).length, want, `day ${day} choosable slots`);
 });
 const mine = { kind: 'notion', count: 3 };
@@ -41,7 +55,6 @@ const withForm = buildOrder(7, { chosen: [mine] });
 assert.equal(withForm.filter((s) => s.source === 'player').length, 1, 'a chosen template takes one slot');
 assert.equal(withForm.find((s) => s.source === 'player').template, mine, 'and is used as given');
 
-// --- day 11+: shrinks as the shop fills, never below the minimum ----------------------------
 let last = Infinity;
 for (let occ = 0; occ <= 1.2; occ += 0.05) {
   const n = supplyFor(occ);
@@ -53,11 +66,10 @@ for (let seed = 1; seed <= 20; seed++) {
   for (const occupancy of [0, 0.5, 1]) {
     const order = buildOrder(11 + seed, { occupancy, rng: mulberry32(seed) });
     assert.ok(order.every((s) => s.source === 'supplier'), 'day 11+ is the supplier');
-    assert.equal(resolveOrder(order, mulberry32(seed)).length, supplyFor(occupancy), 'delivers what the throttle says');
+    assert.equal(unitsOf(resolveOrder(order, mulberry32(seed))), supplyFor(occupancy), 'delivers what the throttle says');
   }
 }
 
-// --- carry-over: what was there, minus what was bought, plus the delivery --------------------
 {
   const floor = { id: 'floor0', g: makeDisplay(4, 4, { headroom: 24 }) };
   const items = [];
@@ -66,9 +78,9 @@ for (let seed = 1; seed <= 20; seed++) {
     items.push({ ...it, display: floor.id, shelf: 0, c, r, keys, layers: 1,
       layer: place(floor.g, keys, items.length, 1), gone: false });
   };
-  for (let i = 0; i < 6; i++) put({ name: 'yarn', i }, i % 2, 0);   // two stacks of three
-  items[1].gone = true;                                              // bought: bottom of stack 1
-  items[4].gone = true;                                              // bought: top of stack 0
+  for (let i = 0; i < 6; i++) put({ name: 'yarn', i }, i % 2, 0);
+  items[1].gone = true;
+  items[4].gone = true;
   assert.equal(carryOver(items, [floor]), 2, 'two bought items dropped');
   assert.equal(items.length, 4, 'six minus two purchases');
   assert.deepEqual(items.map((it) => it.layer), [0, 1, 0, 1], 'what sat on a bought item drops; the rest keep their layer');
@@ -78,23 +90,45 @@ for (let seed = 1; seed <= 20; seed++) {
   assert.equal(items.length, 4 + delivery.length, 'carried stock plus the delivery');
 }
 
-// --- the packing slip: tomorrow's order in words, the player's slots marked ------------------
-// The night screen shows the order built at closing and delivers that same object, so the words
-// only have to be true to the slots: day 3's order (set on night 2), with its one line that is yours.
 assert.deepEqual(buildOrder(3).map(describeSlot), [
-  { count: 5, item: 'ball of yarn', detail: 'worsted or dk', yours: true },
-  { count: 2, item: 'pattern', detail: 'for worsted or dk', yours: false },
-  { count: 1, item: 'kit', detail: 'a pattern and its yarn, worsted or dk, one colour family', yours: false },
+  { count: 5, item: 'units of yarn', detail: 'worsted or dk', yours: true },
+  { count: 2, item: 'patterns', detail: 'for worsted or dk', yours: false },
+  { count: 1, item: 'kit', detail: 'a pattern with its yarn, tool and notions, worsted or dk, one colour family', yours: false },
 ]);
 assert.deepEqual(describeSlot(buildOrder(5)[0]),
-  { count: 5, item: 'ball of yarn', detail: 'bulky, one colour family', yours: true }, "day 5's new weight, alone");
-assert.equal(describeSlot(buildOrder(1)[0]).detail, 'a pattern and its yarn, worsted or dk, one colour family');
+  { count: 5, item: 'units of yarn', detail: 'bulky, one colour family', yours: true }, "day 5's new weight, alone");
+assert.equal(describeSlot(buildOrder(1)[0]).detail, 'a pattern with its yarn, tool and notions, worsted or dk, one colour family');
 for (let day = 1; day <= 30; day++)
   for (const slot of buildOrder(day, { occupancy: 0.4, rng: mulberry32(day) }))
     assert.equal(describeSlot(slot).yours, slot.playerChoosable, `day ${day}: a choosable slot is marked`);
 
-// --- tutorial day 1 (game.html): exactly a pot holder pattern, its hook and one ball ------------
-// The playground's day 1 is the pile above, and random stock never holds the tutorial's pot holder.
+const choosable = (order) => order.filter((s) => s.playerChoosable && s.template.kind !== 'kit');
+const sum = (order) => order.reduce((t, s) => t + s.template.count, 0);
+for (let day = 4; day <= 30; day++) {
+  for (let seed = 0; seed <= 10; seed++) {
+    const opts = { occupancy: 0.3, seed };
+    const lines = choosable(buildOrder(day, { ...opts, rng: mulberry32(day) }));
+    const plan = day <= SCRIPT.length ? SCRIPT[day - 1].filter((t) => t.kind !== 'kit') : null;
+    assert.deepEqual(lines.map((s) => s.template.count),
+      choosable(buildOrder(day, { ...opts, rng: mulberry32(day) })).map((s) => s.template.count), 'split is seeded');
+    assert.ok(lines.every((s) => s.template.count >= 1), `day ${day}: every line gets at least one`);
+    if (plan && day > 4) assert.equal(sum(lines), plan.reduce((t, x) => t + x.count, 0), `day ${day}: within the plan`);
+    if (!plan) assert.equal(sum(lines), supplyFor(0.3), `day ${day}: within the delivery budget`);
+  }
+}
+assert.equal(sum(choosable(buildOrder(4))), 6, "day 4's two lines share the yarn and pattern counts");
+assert.ok([1, 2, 3, 4, 5].some((s) => buildOrder(9, { seed: s })[0].template.count !== SCRIPT[8][0].count),
+  'counts are split, not the script\'s');
+assert.deepEqual(buildOrder(3).map(slipLine).map(({ count, item, detail }) => [count, item, detail]), [
+  [5, "supplier's choice", ''], [2, 'patterns', 'for worsted or dk'],
+  [1, 'kit', 'a pattern with its yarn, tool and notions, worsted or dk, one colour family'],
+], 'a line of the player\'s reads as the supplier\'s choice until picked');
+{
+  const [line] = buildOrder(3);
+  const picked = { ...line, template: choicesFor(line)[0], source: 'player' };
+  assert.deepEqual(slipLine(picked), { count: 5, item: 'units of yarn', detail: 'worsted', yours: true }, 'and as the pick after');
+}
+
 for (let seed = 1; seed <= 50; seed++) {
   const { table, floor } = tutorialDay1(mulberry32(seed));
   assert.equal(table.patternType, 'potholder');
@@ -104,19 +138,29 @@ for (let seed = 1; seed <= 50; seed++) {
   const [hook, ball] = floor;
   assert.ok(toolSuitsPattern(hook, table), `${hook.name} ${hook.size}mm makes "${table.title}"`);
   assert.ok(yarnSuitsPattern(ball, table), `${ball.weight} ${ball.material} makes "${table.title}"`);
+  assert.ok(yarnUnits(ball) >= table.yarnUnits, `a ${ball.shape} is enough yarn for it`);
   assert.ok(!resolveOrder(buildOrder(1), mulberry32(seed)).some((it) => it.patternType === 'potholder'),
     'no pot holder in the playground pile');
 }
 
-// --- the player's line (night 2 on): every choice resolves to that line's count, in its weights --
 {
   const line = buildOrder(3).find((s) => s.playerChoosable);
   assert.ok(line, 'day 3 has a line of the player\'s');
   for (const template of choicesFor(line)) {
     const got = resolveOrder([{ ...line, template, source: 'player' }], mulberry32(7));
-    assert.equal(got.length, line.template.count, `${describeSlot({ template }).item}: ${got.length}`);
+    assert.equal(unitsOf(got), line.template.count, `${describeSlot({ template }).item}: ${unitsOf(got)}`);
     assert.ok(got.every((it) => !it.weight || line.template.weights.includes(it.weight)), 'in the line\'s weights');
   }
+}
+
+for (let seed = 1; seed <= 50; seed++) {
+  const line = resolveOrder([{ template: { kind: 'yarn', count: 5 } }], mulberry32(seed));
+  assert.equal(unitsOf(line), 5, `seed ${seed}: "5 units of yarn" is 5 units (${line.map((y) => y.shape)})`);
+  const [pattern, ...rest] = resolveOrder([{ template: { kind: 'kit' } }], mulberry32(seed));
+  const kit = rest.filter((it) => it.name === 'yarn');
+  const units = unitsOf(kit);
+  assert.ok(units >= pattern.yarnUnits && units - yarnUnits(kit.at(-1)) < pattern.yarnUnits,
+    `seed ${seed}: a kit holds the ${pattern.yarnUnits} units its pattern takes, not a ball more (${units})`);
 }
 
 console.log('supply.test.mjs: all checks passed');

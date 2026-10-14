@@ -34,6 +34,9 @@ Measured against the code on 2026-10-03, not the specs:
 | The whole shop is rebuilt every morning | `restart()` in `store/sim/world.js` | nothing the player arranges survives the night |
 | Each day's stock is seeded with what that day's customers want | `stockTheShop` / `seedWants` | stocking can never be wrong, so it can never be right either |
 
+Since fixed: `npcCount` 2, stock carries over (`carryOver`), wants no longer seeded, ▶ rounds 12 s.
+Still true: ~100% of considered items are bought (99.4% measured).
+
 The last two are being fixed first (see §7, step 1), because no planning mechanic can be felt
 while they hold.
 
@@ -72,6 +75,12 @@ every leg's top speed, and a round waits for its last walker (12s at the least);
 multiply walking and divide the round and the departure stagger by 2 and 3, so the stagger stays
 40% of a round as on store.html. See gameSpeed in characters/store/core/config.js.
 
+The rounds and the day changeover are two independent clocks. ⏸ stops only the rounds; while
+paused nobody decides, buys or leaves, so the day clock can't start either. When the shop empties
+there is a beat (`S.dayGap`) before the next day, so the player sees who left with what. The night
+screen waits: pace changes how many chances you catch, never whether you can progress. The
+playground has no night; it opens tomorrow by itself.
+
 ---
 
 ## 4. Three merges
@@ -108,6 +117,11 @@ night (§5, "Where the order is set").
 Strangers shop fast and cannot be helped in time. Regulars hesitate longer. Friends wait at the
 counter until you get to them. The early shop is hard because nobody knows you; the late shop
 relaxes around you because you earned it.
+
+- **A friend's patience** (the tutorial friend): they do not run out of rounds while something they
+  want is out where they can notice it, or buried where they can still dig. It ends as MAX_ROUNDS
+  would once it is bought by someone else, never put out, or buried where they have already dug
+  since their last buy there (DISPLAYS.md rule 9), so a day cannot stall.
 
 ---
 
@@ -191,11 +205,8 @@ open, starts the next day, and fades back into the shop.
 - **What is shown is what arrives.** The order is built once, at closing (`planTomorrow()` in
   `store/sim/world.js`), written on the packing slip, and that same order is handed to
   `restart({ order })`; `deliver()` builds its own only when none is passed (the playground).
-- **Built today, to be replaced by the slip:** a read-only clipboard: one row per slot in plain words (*4 balls of yarn — worsted or dk*,
-  *2 patterns — for worsted or dk*, *a kit*), from `describeSlot()` in `inventory/supply.js`, with an
-  empty box against each slot that will be the player's (`playerChoosable`). Choosing is not built;
-  this is the screen it will happen on. Under the slots, one line about the day that ended
-  (*Day 3: 5 signed the Guestbook*). No stats and no money.
+- **Built:** the packing slip (`store/ui/night.js`), one row per slot, with a dropdown on each
+  player line (`choicesFor()`). Not yet: the budget, the whole-slip supplier's choice, the sample.
 - **Schedule:** the tutorial is three days. Night 1 shows the order read-only; **the first player
   line is handed over on night 2**, and from night 3 every line is the player's (`SCRIPT` in
   `supply.js`, commit 078670b).
@@ -248,9 +259,8 @@ Each step is playable on its own.
    shape, days 1–10 script, day 11+ supplier tail with the soft throttle). Today's wants are no
    longer seeded, though seeding stays as a testing toggle. *Built 2026-10-03:*
    `inventory/supply.js` (pure, `supply.test.mjs`) and `restart()` / `deliver()` in
-   `store/sim/world.js`. Still open: a fresh game fills to `stockCount` and THEN delivers day 1,
-   so day 1 is not yet §6's "pile beside empty shelves" onboarding; changing the display or chair
-   count rebuilds and loses stock; delivered items carry no provenance for destash yet.
+   `store/sim/world.js`. Still open: changing the display or chair count rebuilds and loses stock; delivered
+   items carry no provenance for destash yet.
 2. **At most 3 customers in the shop, arriving a few at a time.** Config plus a door rule; it is
    also NEAR-MISS §7's attention budget.
 3. **`miss()` and the tolerance table:** TAKE / HESITATE / PASS, replacing the 100% buy. Tune on
@@ -279,14 +289,11 @@ Steps 1, 3, 4 and 8 are pure simulation and testable in node next to `visit.test
 
 ## Open questions
 
-- **Does a break cost anything?** (a) Free: the queue waits patiently. Fits this document's rule
-  best and is the recommendation. (b) Strangers in the queue drift away, as SPIKE-FUN.md proposed.
+- ~~**Does a break cost anything?**~~ **Resolved** (TUTORIAL §3): free.
 - **Is a cap of 3 customers in the shop right?** The crowd could still appear as the queue outside
   and passers-by.
-- **How much does a failed customer tell you?** Still open in DESIGN-DECISIONS.md under Guestbook
-  hints. `puzzle.html` was built to answer it by playing at several reveal settings. It sets how
-  hard step 3 may make the puzzle.
+- ~~**How much does a failed customer tell you?**~~ **Resolved** (TUTORIAL §7.3).
 - ~~**Where does the order form appear?**~~ **Resolved:** automatically at closing time, on the
   between-days screen outside the shop at night (§5), not on the counter. It waits for the player.
 - **Can the supplier ever say no?** Out of stock and backorders add texture but also frustration.
-- **How big is the slot budget, and how does it grow?**
+- ~~**How big is the slot budget?**~~ **Resolved** (TUTORIAL §7.2): 6 + sold.

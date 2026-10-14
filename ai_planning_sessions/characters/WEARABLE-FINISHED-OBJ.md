@@ -19,6 +19,7 @@ An NPC wears at most one FO per slot. Mittens are knitted but never worn: they a
     - if the NPC is not yet wearing an FO in that object's slot (table above), the NPC stores the FO in its "worn" slot and does not offer it to the shop to lend
     - decor FOs (potholder, chair cover, cozy, amigurumi, mittens, blanket) have no slot, so they are always lent
     - At any time IN THE SHOP, the player can choose to click on an FO and "return borrowed FO to NPC", which will, off screen, move that item into the worn slot for the NPC and place any *previously offscreen* item the NPC was wearing in a pile in the shop behind the guestbook. 
+    - until the player places it (not built yet), a lent object waits on the counter beside the Guestbook, where it was handed over, stacked on any lent before it, and stays there day to day until it is returned (`showLent` in `store/sim/world.js`, drawn by `lentPiece` in `garments.js`: a pot holder lies flat, anything else as a folded knit)
     - a COMPROMISED object can deviate from this default depending on its maker: see NEAR-MISS-AND-SUBSTITUTION.md §5b
 
 ## Pattern names
@@ -28,7 +29,8 @@ Every pattern the shop sells is a named **design**: cozy, punny, leaning on the 
 - **A name is a design.** One title means one spec (type, silhouette, craft, tool size, weight, material) everywhere and always. Titles are unique across the whole set.
 - **A craft pun is that craft.** A title punning on a knitting word (purl, cable, cast off, stockinette …) is a knitting pattern; one punning on a crochet word (hook, chain, granny …) is a crochet pattern. Animal, yarn and cosy puns can be either. The word lists are `CRAFT_TERMS` in `catalog.js`.
 - **The set is finite and reused.** The shop's stock draws from these designs and nothing else, so the same pattern turns up again on later days and in more than one customer's bag. Two NPCs can both own, and both knit, the OwlyCowly.
-- **The name follows the object.** A finished object is its WIP, and the WIP keeps the pattern it was made from, so every FO (worn, lent, in the Drop Off or the back pile) still knows its pattern's title (`fo.pattern.title`). Labels lead with it: the Guestbook reads "Hazel in the OwlyCowly — scarf pattern (…)".
+- **The name follows the object.** A finished object is its WIP, and the WIP keeps the pattern it was made from, so every FO (worn, lent or in the back pile) still knows its pattern's title (`fo.pattern.title`). Labels lead with it: the Guestbook reads "Hazel in the OwlyCowly — scarf pattern (…)".
+- **Every stock yarn has a design.** Each weight and material in the shop's range has at least one named pattern written for it, so a yarn-first customer is never stuck.
 - A one-off pattern with no title can still exist (the puzzle builder makes them). It just can't be part of a trend.
 
 ### Matchies and trends (NOT YET DESIGNED)

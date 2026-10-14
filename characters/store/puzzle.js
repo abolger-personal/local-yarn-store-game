@@ -1,28 +1,7 @@
-// The puzzle bench: ONE customer, one display, and a switch on every piece of information.
-//
-// characters/store.html runs the whole shop, which is the wrong instrument for the question
-// CHARACTER-ATTRIBUTES.md actually poses — "getting to know your NPCs will help the player better
-// solve the puzzle". Ten NPCs on a three-second clock cannot be read, let alone reasoned about.
-// So this page strips the shop back to the one interaction the puzzle is made of:
-//
-//     a customer with a shopping list they do not say out loud,
-//     a display the player controls the contents and the arrangement of,
-//     and one button that asks what they make of it.
-//
-// The reveal switches are the point. Everything the sim knows is listed, and each line can be
-// given to the player or withheld, so the open question in ai_planning_sessions/SPIKE-FUN.md —
-// "when a customer leaves without what they needed, how much should the player know about why?" —
-// can be answered by playing it at several settings rather than by arguing about it.
-//
-// Nothing here is a new mechanic. Every verdict on this page comes from visit.js and wip.js, and
-// every item from catalog.js, so the bench cannot flatter the game by disagreeing with it.
-
 import * as THREE from 'three';
 
 import { BUILD, NAMES, POSES, applyPose, createCharacter, disposeCharacter, getSpecies, pick,
          setGeometryDetail, setViewMode, speciesIds } from '../npc.js';
-// Side-effect imports: these REGISTER their species. See main.js — losing one is silent until the
-// first spawn, where getSpecies() returns undefined.
 import '../owl.js';
 import '../llama.js';
 import '../lion.js';
@@ -36,8 +15,8 @@ import { EMPTY, topAt } from '../../inventory/grid.js';
 import { loadAtlas } from '../../inventory/notions.js';
 
 import { S } from './core/config.js';
-import { aim, clocks, displays, items, shop, takeViewDirty, touchView } from './core/state.js';
-import { esc } from './core/util.js';
+import { aim, clocks, displays, items, shop, simRng, takeViewDirty, touchView } from './core/state.js';
+import { esc, freshSeed } from './core/util.js';
 import { installStage, renderer, scene, camera, controls } from './scene/stage.js';
 import { buildRoomShell, cullWalls } from './scene/room.js';
 import { installSeating, buildChairs } from './scene/seating.js';
@@ -54,13 +33,9 @@ import { clearSelection } from './interact/move.js';
 import { castGroup, bodyParams, installWorld, room, sizeInstanceBuffers } from './sim/world.js';
 import { frameRoom } from './ui/framing.js';
 
-// From this module, not the page: fetch resolves against the page, and a page served below a site's
-// root (GitHub Pages' /local-yarn-store-game/) walked out of the repo.
+// Relative to this module, not the page, so a site served below its root (GitHub Pages) still finds it.
 const ATLAS_URL = new URL('../../ai_planning_sessions/inventory/illustrations/build', import.meta.url).href;
 
-// Looked up once, by literal id, the way every other store module does it — tools/selectors.mjs
-// reads those literals out of the source and checks them against the markup, so a renamed panel
-// fails the check instead of quietly becoming `null.innerHTML`.
 const panels = {
   who: document.getElementById('who'),
   palette: document.getElementById('palette'),
@@ -71,35 +46,22 @@ const panels = {
   rail: document.getElementById('rail'),
 };
 
-// ---------------------------------------------------------------- the bench
-//
-// A shelf and a table, no chairs and nobody walking. The bench is about ONE display at a time, so
-// the second one is here to test the rule that differs between them: DISPLAYS.md says a shelf's
-// wall-facing row can never be noticed and a pile's buried layers cannot either.
 S.displayCount = 2;
 S.chairCount = 0;
 S.npcCount = 1;
 
 const bench = {
   npc: null,
-  built: null,       // the body, so it can be disposed on a reroll
+  built: null,
   world: null,
-  at: 'table-a',     // which display the customer is standing at
+  at: 'table-a',
   playerView: false,
-  // What the PLAYER is told, as opposed to what the game knows. The defaults are the reading
-  // SPIKE-FUN.md landed on: the guestbook is a memory aid the player has legitimately earned, and
-  // everything about the person is inferred rather than stated.
   reveal: { traits: false, prefs: false, wips: false, wants: false, book: true },
 };
 
-/** Every item currently out on one display, newest last. */
 const stockOf = (disp) => items.map((it, i) => ({ it, i }))
   .filter(({ it }) => !it.gone && it.display === disp.id);
 
-/**
- * What is sitting ON this item, by name. The single most useful line on the page: "they cannot
- * see the 4mm hook" is a complaint, "the hook is under a ball of aran wool" is a puzzle.
- */
 function coveredBy(disp, item, index) {
   const over = new Set();
   for (let dr = 0; dr < (item.h ?? 1); dr++)
@@ -110,11 +72,9 @@ function coveredBy(disp, item, index) {
   return [...over];
 }
 
-// ---------------------------------------------------------------- the customer
 
 const standingAt = () => byId(bench.at) ?? displays[0];
 
-/** Put the customer on their feet in front of the display they are shopping. */
 function placeNpc() {
   const { npc } = bench, disp = standingAt();
   if (!npc || !disp) return;
@@ -125,22 +85,14 @@ function placeNpc() {
   bench.built.root.rotation.y = Math.atan2(disp.x - npc.x, disp.z - npc.z);
 }
 
-/**
- * A fresh customer: a rolled body and a rolled mind, exactly as world.js spawns one — minus the
- * queue, the door and the visit. `traits` and `prefs` carry over on a re-roll of the other half,
- * which is what makes "the same person with a different project" a thing you can set up.
- *
- * @param {{traits?: any, prefs?: any}} [keep]
- */
+/** @param {{traits?: any, prefs?: any}} [keep] */
 function spawnNpc({ traits, prefs } = {}) {
   if (bench.built) { castGroup.remove(bench.built.root); disposeCharacter(bench.built); }
-  const kit = getSpecies(pick(speciesIds()));
+  const kit = getSpecies(pick(speciesIds(), simRng));
   const P = bodyParams(kit, null, S);
   bench.built = createCharacter(P, kit);
-  // any: the bench adds what world.js's spawn adds (speciesId, body) to what makeNpc builds
-  const npc = /** @type {any} */ (makeNpc({ id: 'bench', name: pick(NAMES), species: kit.label, traits, prefs }));
+  const npc = /** @type {any} */ (makeNpc({ id: 'bench', name: pick(NAMES, simRng), species: kit.label, traits, prefs, rng: simRng }));
   npc.speciesId = kit.id;
-  // They are in the shop, looking. Nothing on the bench counts rounds or walks them anywhere.
   npc.state = /** @type {any} */ (STATE.BROWSE);
   npc.body = P;
   bench.npc = npc;
@@ -153,11 +105,6 @@ function spawnNpc({ traits, prefs } = {}) {
   renderNpc();
 }
 
-// ---------------------------------------------------------------- the stock palette
-//
-// One builder, two destinations. Putting a pattern on the table and HANDING a pattern to the
-// customer are the same act of authorship from opposite ends — the first is stocking, the second
-// is the "suggest a project" verb SPIKE-FUN.md works toward — so they share one form.
 
 const build = {
   kind: 'yarn', weight: 'worsted', material: 'wool', shape: 'ball', colorIndex: 7,
@@ -200,11 +147,9 @@ function renderPalette() {
   syncPalette();
 }
 
-/** Only the fields this KIND of thing actually has. A yarn has no hook size. */
 function syncPalette() {
   const shownBy = {
     yarn: ['kind', 'weight', 'material', 'shape', 'colorIndex'],
-    // A pattern names the weight and material of the yarn it wants, so it reuses those two.
     pattern: ['kind', 'patternType', 'craft', 'weight', 'material', 'toolSize'],
     notion: ['kind', 'notion', 'toolSize'],
   }[build.kind];
@@ -215,38 +160,26 @@ function syncPalette() {
       || (row.dataset.for === 'toolSize' && build.kind === 'notion'
           && !SIZED_NOTIONS.has(build.notion));
   }
-  // The button says WHERE, because the bench has two displays and the answer moves with the
-  // customer. Written into the generated markup rather than read from a static element: the
-  // palette is rebuilt wholesale, and a span in the page would be an element this file owns
-  // without the page knowing about it.
   const put = panels.palette.querySelector('[data-act="put"]');
   if (put) put.textContent = `put it on the ${bench.at}`;
 }
 
-/**
- * The thing the form describes, built by catalog.js and then overridden.
- *
- * Rolled first and overwritten rather than composed by hand, deliberately: makeYarn is what knows
- * that a weight decides a footprint (shelf space; every ball is one unit toward a pattern). A
- * literal typed out here would be a second, quietly wrong, copy of that rule.
- */
 function specOf() {
   if (build.kind === 'yarn') {
-    return Object.assign(makeYarn(Math.random, build.weight),
+    return Object.assign(makeYarn(simRng, build.weight),
                          { material: build.material, shape: build.shape,
                            colorIndex: Number(build.colorIndex) });
   }
   if (build.kind === 'pattern') {
-    return Object.assign(makePattern(Math.random, build.patternType),
+    return Object.assign(makePattern(simRng, build.patternType),
                          { craft: build.craft, weight: build.weight,
                            materials: [build.material], toolSize: Number(build.toolSize) });
   }
-  const n = makeNotion(Math.random, build.notion);
+  const n = makeNotion(simRng, build.notion);
   if (n.size != null) n.size = Number(build.toolSize);
   return n;
 }
 
-/** Put the built item out on the display the customer is standing at. */
 function putOut() {
   const disp = standingAt();
   const index = addItem(disp, disp.plane, specOf());
@@ -259,13 +192,10 @@ function putOut() {
   say(`stocked ${labelOf(items[index])} on ${disp.id}`);
 }
 
-/** Hand it straight to the customer, into the first WIP slot that has room for it. */
 function giveToNpc() {
   const spec = specOf();
   const kind = { yarn: 'yarn', pattern: 'pattern' }[spec.name]
     ?? (TOOL_NOTIONS.includes(spec.name) ? 'tool' : 'notion');
-  // stow() owns what filing an item into a project means, including starting the project when it
-  // finally has everything. A want is the shape it takes, so one is made for it.
   const slot = bench.npc.wips.find((w) => w.state !== WIP_STATE.FINISHED
     && (kind !== 'pattern' || !w.pattern));
   if (!slot) {
@@ -277,9 +207,8 @@ function giveToNpc() {
   renderNpc();
 }
 
-/** Empty the shop: fresh grids, no stock, nothing in hand. */
 function clearShop() {
-  clearSelection();   // a held piece of furniture goes home before the displays it belongs to are rebuilt
+  clearSelection();
   abortDrag();
   buildDisplays(S.displayCount);
   items.length = 0;
@@ -289,7 +218,6 @@ function clearShop() {
   say('cleared the shop');
 }
 
-// ---------------------------------------------------------------- the customer panel
 
 const numField = (key, value, max) =>
   `<label class="row"><span>${esc(key)}</span>` +
@@ -318,11 +246,6 @@ function renderNpc() {
   touchView();
 }
 
-// ---------------------------------------------------------------- what the player is told
-//
-// Every line the sim can answer about this customer, and a switch on each one. This is the whole
-// reason the bench exists: the arrangement puzzle is only as hard as the information the player is
-// missing, so the difficulty knob IS this list.
 
 /** @type {[string, string, (npc: any) => string][]} */
 const HINTS = [
@@ -358,18 +281,6 @@ function renderHints() {
     }).join('');
 }
 
-// ---------------------------------------------------------------- what they can see
-//
-// Recomputed from the live grid on every repaint, so picking a ball up and putting it down two
-// slots over re-answers the question immediately. That loop — move a thing, watch the verdict
-// change — is the thing the bench is FOR.
-
-/**
- * Why a customer would or would not take an item. `held` first: a carried item is lifted out of its
- * grid column, so it covers nothing and nothing covers it — every other branch would fall through
- * to a vague "out of reach" for what is plainly in the player's hand. It is also the one line here
- * that is a MECHANIC rather than a diagnosis: while you hold a thing, it is out of the simulation.
- */
 function whyNot(disp, it, i, seen, want) {
   if (it.held) return 'in your hand — out of the shop until you set it down';
   if (seen) return want ? 'matches a want' : 'nothing they need';
@@ -379,7 +290,6 @@ function whyNot(disp, it, i, seen, want) {
   return 'out of reach';
 }
 
-/** One stock item's line: can this customer see it, do they want it, and if not, why not. */
 function readoutLine(npc, disp, { it, i }) {
   const seen = noticeable(disp, items, i);
   const want = wantFor(npc, it);
@@ -388,7 +298,6 @@ function readoutLine(npc, disp, { it, i }) {
     + `<span class="${want ? 'wanted' : ''}">${esc(labelOf(it))}</span><span class="why">— ${why}</span></div>`;
 }
 
-/** What they would do here: pick something up, or not, and what they are already turning over. */
 function readoutVerdict(npc, considered) {
   const choice = considered.length
     ? `they would pick up <b>${esc(labelOf(items[considered[0]]))}</b>`
@@ -408,7 +317,6 @@ function renderReadout() {
   panels.readout.innerHTML = `<div class="k">${esc(disp.id)} · ${disp.kind} · ${stock.length} out</div>${lines}${verdict}`;
 }
 
-// ---------------------------------------------------------------- doing things
 
 const log = [];
 
@@ -419,16 +327,11 @@ function say(line) {
   touchView();
 }
 
-/**
- * One interaction, exactly as the shop runs it. DISPLAYS.md makes buying a two-round beat —
- * consider in one round, buy in the next — so this is pressed twice for a sale, which is the
- * whole window the player has to change their mind for them.
- */
 function look() {
   const disp = standingAt();
   bench.world.round += 1;
   const result = interact(bench.npc, disp, bench.world);
-  refreshAll();          // a buy or a tidy has rearranged the display under us
+  refreshAll();
   say(`${bench.npc.name}: ${bench.npc.note} (${result})`);
   renderNpc();
 }
@@ -439,7 +342,6 @@ function sign() {
   renderNpc();
 }
 
-// ---------------------------------------------------------------- wiring
 
 function installBench() {
   panels.palette.addEventListener('change', (e) => {
@@ -456,7 +358,6 @@ function installBench() {
   });
 }
 
-/** One delegated click handler for every button on the page: they all do one named thing. */
 function installButtons() {
   document.addEventListener('click', (e) => {
     const btn = /** @type {HTMLElement} */
@@ -471,7 +372,6 @@ function installButtons() {
   });
 }
 
-/** The customer panel's inputs: a trait, a hint's reveal, or where they are standing. */
 function onRailChange(e) {
   const t = /** @type {HTMLInputElement} */ (e.target);
   if (t.dataset.trait === 'skill') bench.npc.prefs.skill = Number(t.value);
@@ -493,8 +393,6 @@ function buildBench() {
   const steps = [
     ['stage', installStage], ['room', buildRoomShell], ['seating', installSeating],
     ['displays', installDisplays], ['placeholder art', installPlaceholderArt],
-    // No move mode: the bench has no furniture to rearrange, and installMove only wires the
-    // turn handles, which this page does not have.
     ['feedback', installFeedback], ['input', installInput],
     ['world', installWorld], ['bench', installBench],
   ];
@@ -521,26 +419,21 @@ function openTheBench(loaded) {
   buildItemMeshes(loaded);
   buildYarnMeshes();
   setGeometryDetail(S.detail);
-  buildChairs(0);                 // no seating on the bench: nobody sits down to knit here
+  buildChairs(0);
   buildDisplays(S.displayCount);
   items.length = 0;
-  bench.world = makeWorld({ displays, items, room, seats: [] });
+  bench.world = makeWorld({ displays, items, room, seats: [], seed: freshSeed() });
   shop.world = bench.world;
   aim.active = bench.at;
   spawnNpc();
   sizeInstanceBuffers();
   refreshAll();
   renderPalette();
-  frameRoom(standingAt());   // the bench is about ONE display: look at it, not at the room
+  frameRoom(standingAt());
   startLoop();
   touchView();
 }
 
-/**
- * Report a boot failure HONESTLY — see main.js, which learned this the hard way: one `.catch()`
- * over the fetch and everything after it blamed the atlas for any error in the chain, and a wrong
- * answer is worse than no answer.
- */
 function bootFailed(stage, err, hint) {
   console.error(`puzzle bench failed during ${stage}:`, err);
   panels.palette.innerHTML =
@@ -558,4 +451,4 @@ loadAtlas(ATLAS_URL)
     try { openTheBench(loaded); }
     catch (err) { bootFailed('opening the bench', err, 'the atlas loaded fine — see the console'); }
   })
-  .catch(() => { /* the atlas failure is already reported */ });
+  .catch(() => {});

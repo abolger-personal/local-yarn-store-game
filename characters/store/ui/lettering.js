@@ -1,37 +1,14 @@
-// The house lettering: the Massachusetts "bookleaf" town line signs' highway sans, as the shop's
-// own display face. Gold (brass, keylined) for large text, black for small. See
-// ai_planning_sessions/VISUAL-DESIGN-2D.md, "Type".
-//
-// No font file anywhere: no system font has these letterforms, so every glyph is drawn here as one
-// stroked centreline in a 28-unit cell (cap height 28, baseline y = 28, stroke 4.4 — the frieze's
-// proportions). Pure: no three.js, no DOM beyond the canvas context a caller hands in. Draws to a
-// canvas (the bulletin board) or to SVG markup (the front door's frieze, the info button).
-//
-// Capitals, digits and the punctuation the shop's own names use. One lowercase letter, `i`, for
-// the info button. Anything else draws as a space: a name never breaks a board. lettering.test.mjs
-// checks every customer name and pattern title is covered.
-
 export const CELL = 28;
 export const STROKE = 4.4;
-export const INK = '#1c1712';            // black, for small text
-const KEYLINE = '#4a2f0c', KEY = 1.2;   // the gold's dark outline, as the SVG #keyline filter
-const GAP = 7, SPACE = 18;               // the frieze's letter and word spacing
+export const INK = '#1c1712';
+const KEYLINE = '#4a2f0c', KEY = 1.2;
+const GAP = 7, SPACE = 18;
 const BRASS = [[0, '#fbe9a3'], [0.35, '#e0b64d'], [0.65, '#b8862b'], [1, '#7d5517']];
 
-/**
- * The gold for SVG lettering, in cell units: put GOLD_DEFS in the page once (game.js does, for the
- * info button) and letter with { gold: true }. userSpaceOnUse, never the default objectBoundingBox:
- * a straight vertical or horizontal stroke (the i's stem, I, L, T, -) has a zero-width or
- * zero-height box, and SVG paints nothing with a bounding-box gradient on one. Each glyph's own
- * transform maps 0..CELL to its cap height, so every letter is gilded top to bottom like the canvas.
- */
 export const GOLD_DEFS = `<defs><linearGradient id="letterGold" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${CELL}">`
   + `${BRASS.map(([at, c]) => `<stop offset="${at}" stop-color="${c}" />`).join('')}</linearGradient></defs>`;
 
-/**
- * width, centreline path, and optional round dots [x, y] filled at the stroke's radius. The first
- * ten (L O C A Y R N S T E) are the frieze's originals; keep them byte-for-byte or the door moves.
- */
+// VISUAL-DESIGN-2D.md, "Type"
 export const GLYPHS = {
   L: [16, 'M2.2 0 V25.8 H16'],
   O: [20, 'M10 2.2 A7.8 11.8 0 1 0 10.01 2.2'],
@@ -85,17 +62,15 @@ export const GLYPHS = {
   '—': [20, 'M2 15 H18'],
   "'": [6, 'M3 0 V8'],
   '/': [12, 'M1 28 L11 0'],
-  '×': [14, 'M2.5 10 L11.5 21 M11.5 10 L2.5 21'],   // the packing slip's "6 × ball of yarn"
+  '×': [14, 'M2.5 10 L11.5 21 M11.5 10 L2.5 21'],
   '&': [18, 'M15.5 28 L4.6 11.2 C3.6 9.6 3.2 8.4 3.2 7 C3.2 4.2 5.2 2.2 8 2.2 C10.6 2.2 12.4 4 12.4 6.4 ' +
           'C12.4 9.2 10 10.8 7.2 12.6 C4.2 14.6 2.2 16.6 2.2 20 C2.2 23.4 4.8 25.8 8.4 25.8 C12 25.8 14.6 23.6 16.2 19.4'],
-  // The dot sits clear of the stem: at the info button's cap 20 the two keylines would touch.
   i: [6.4, 'M3.2 11 V28', [[3.2, 3]]],
 };
 
-/** Each character placed: [glyph or null for a space, x offset in cell units]; and the total width. */
 export function layout(text) {
   const placed = [];
-  let x = 0, joined = false;          // joined: the last thing laid was a letter, so a gap goes next
+  let x = 0, joined = false;
   for (const ch of text) {
     const g = GLYPHS[ch];
     if (!g) { x += SPACE; joined = false; continue; }
@@ -109,20 +84,14 @@ export function layout(text) {
 
 const round = (v, places) => Number(v.toFixed(places));
 
-/** Where the line starts, its scale, from the anchor, alignment, cap height and room it may use. */
 function fit(text, x, cap, align, maxWidth) {
   const { placed, width } = layout(text);
   const k = Math.min(cap / CELL, maxWidth / width);
-  const shift = { left: 0, right: 1 }[align] ?? 0.5;   // how much of the line sits left of x
+  const shift = { left: 0, right: 1 }[align] ?? 0.5;
   const left = x - width * k * shift;
   return { placed, k, left };
 }
 
-/**
- * SVG markup for `text`, baseline at y. `paint` is any SVG paint (a colour, or a userSpaceOnUse
- * gradient: see GOLD_DEFS). `gold` paints with GOLD_DEFS' gradient; the caller wraps gold in a group
- * with `filter="url(#keyline)"`. Strokes and dots both use the paint.
- */
 export function svgLettering(text, x, y, { cap = CELL, paint = INK, gold = false, align = 'center', maxWidth = Infinity } = {}) {
   const { placed, k, left } = fit(text, x, cap, align, maxWidth);
   if (gold) paint = 'url(#letterGold)';
@@ -134,7 +103,6 @@ export function svgLettering(text, x, y, { cap = CELL, paint = INK, gold = false
   }).join('');
 }
 
-/** One pass of every glyph at one width and one paint, in cell units (the context is scaled). */
 function strokeAll(ctx, placed, width, paint) {
   ctx.strokeStyle = paint;
   ctx.fillStyle = paint;
@@ -152,14 +120,10 @@ function strokeAll(ctx, placed, width, paint) {
   }
 }
 
-/**
- * Draw `text` on a canvas, baseline at y. Gold is brass over a dark keyline, for large text; the
- * default is black ink, for small. Shrinks to `maxWidth` rather than overflowing.
- */
 export function drawLettering(ctx, text, x, y, { cap = CELL, gold = false, align = 'center', maxWidth = Infinity } = {}) {
   const { placed, k, left } = fit(text, x, cap, align, maxWidth);
   ctx.save();
-  ctx.translate(left, y - CELL * k);   // k shrinks the cap height too when the line is fitted
+  ctx.translate(left, y - CELL * k);
   ctx.scale(k, k);
   ctx.lineCap = 'butt';
   ctx.lineJoin = 'miter';

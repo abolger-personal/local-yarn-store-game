@@ -76,6 +76,20 @@ wraps (five across, four diagonal) plus a cut rim at r 57 inside the ball's r 58
 still parts from the needles on the flat plate. Full opacity; the old wraps were `#7d5517` at
 75% over the shaded ball.
 
+### Signal colours
+
+The 3D shop's yes/no signals are `#25e06a` (fits) and `#ff2d16` (no room), at 0.85 alpha. They are
+UI, not paint, so their materials skip tone mapping (`toneMapped = false`). The held item's halo
+and the drop ghost share the green so the eye pairs them (STORE-SCENE.md §Drop feedback).
+
+### Yarn colour words
+
+A ball band names its colourway like an indie dyer: a word of its own, then the nearest CSS named
+colour to the drawn swatch in OKLab (*wistful peach puff*, *sprig teal*). Grey yarn (C < 0.03) gets only
+grey names, and coloured yarn never does. Shade-modified names (dark, medium, light, pale, deep) are left out, so the adjective is the only modifier. Each of
+the 48 palette colours has its own word in the *everyday* pack (`COLOURWAY_PACKS`), none a colour itself, so no
+two share a name. A yarn's `namePack` picks another pack.
+
 ---
 
 ## Type
@@ -140,7 +154,10 @@ still parts from the needles on the flat plate. Full opacity; the old wraps were
   - 47 glyphs: A–Z, 0–9, `. , : ! ? - — ' / &`, and `i`. `lettering.test.mjs` checks every
     customer name and pattern title has its glyphs, and that LOCAL YARN STORE still measures the
     370 units the frieze was drawn at.
-  - No font file: no system font has these letterforms, and a loading screen must not wait on one.
+    - The first ten glyphs (L O C A Y R N S T E) are the frieze's originals, byte for byte, or the
+    door's lettering moves. The lowercase `i`'s dot clears its stem so the keylines don't touch at
+    the info button's cap 20.
+- No font file: no system font has these letterforms, and a loading screen must not wait on one.
   - *Unverified:* the reference image could not be loaded, so the letters follow the general
     highway-sans model of the era, not a tracing of the sign. Check against the real sign and
     correct the glyph paths if they differ.
@@ -271,15 +288,17 @@ advances it but the player opening the door.
   - **The packing slip,** `#fbf8ef` paper with the note's shadow (`#note`), taped to the top
     carton by four strips of yellowed clear tape `#efe4c4` at its corners. In the house lettering,
     black: *WOOL & CO. SUPPLY*, a rule, *FOR: LOCAL YARN STORE*, *ARRIVES: DAY N, MORNING*, a rule,
-    then one line per slot as quantity × item (*6 × BALL OF YARN*) over its limits (*WORSTED OR DK,
+    then one line per slot as quantity × item (*6 × UNITS OF YARN*: units, not balls, since yarn also comes as skeins, cakes and cones) over its limits (*WORSTED OR DK,
     ONE COLOUR FAMILY*). **No checkboxes.** Words from `describeSlot()` in `inventory/supply.js`;
     the template's words, never an item's. The `×` is its own glyph in `lettering.js`.
-  - **A slot that will be the player's** (`playerChoosable`) is a blank write-in line after its
-    quantity (*5 × ____*), its limits still under it. A native `<select>` lies see-through over
-    the blank (pointer cursor, a faint wash on hover, a focus ring): *supplier's choice* (the
-    default, the planned slot arrives) or that count of yarn, one-family yarn or patterns in a
-    weight the line allows, or notions (`choicesFor()`). The choice is lettered onto the line,
-    underlined as the player's.
+  - **A slot that will be the player's** (`playerChoosable`) is lettered as its selection,
+    underlined as the player's (`slipLine()`): *5 × SUPPLIER'S CHOICE* by default, with no limits
+    under it, then the pick's own words (*5 × UNITS OF YARN* over *WORSTED, ONE COLOUR FAMILY*).
+    A native `<select>` lies see-through over it after the quantity (pointer cursor, a faint wash
+    on hover, a focus ring): *supplier's choice* (the planned slot arrives; on the handover nights
+    it names that slot, *supplier's choice: 5 units of yarn, worsted or dk*) or that count of yarn,
+    one-family yarn or patterns in a weight the line allows, or notions (`choicesFor()`). For now
+    the counts are a seeded random split of the day's planned total, each line at least one.
   - The slip has an `aria-label` reading the same lines, since the lettering is paths.
   - The clipboard's foot line (*DAY N: 5 SIGNED THE GUESTBOOK*) went with it: a supplier's slip
     does not know who signed the book, which is the Guestbook's to say.
@@ -404,6 +423,29 @@ the pacing (`gameSpeed` in `core/config.js`): rounds advance every `S.autoSecond
 walker has arrived, and `S.dayGap` after the last
 customer leaves the game hands the changeover to the night screen (`onDayEnd` in `bootShop`); the
 playground opens tomorrow by itself.
+
+---
+
+## The label
+
+The ball band (TUTORIAL.md §7.1), in the house lettering: the heading drawn 300 units wide (150px)
+at cap 26, ruled off like a printed ball band.
+
+## The bulletin board
+
+- Customer of the Week is the 4 newest selfies across all days, newest first, as tilted polaroids
+  under the gold headline: the one place a photo shows without opening anything.
+- Pressing a polaroid opens its photo; pressing anywhere else on the board opens the Guestbook.
+
+## The selfie backdrop
+
+- Every selfie rolls its own city skyline under a day, dusk or night sky, plus the ground they
+  stand on. It is painted in 2D under the render, because the studio's tone mapping (ACES, 0.4)
+  would mute a sky, and it uses the studio camera's horizon, so a lens tilted down shows mostly
+  ground.
+- The ground is quiet: low contrast, muted, fading out about 8 world units from their feet, and
+  tinted by the sky (dusk warms, night darkens). It never pulls the eye from what they made.
+- Skyline in frame: pavement. Looking down with no skyline: pavement, floorboards or lawn at random.
 
 ---
 

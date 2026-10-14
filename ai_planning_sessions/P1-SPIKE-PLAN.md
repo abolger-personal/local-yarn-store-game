@@ -44,7 +44,7 @@ Minimum eight. Different **silhouettes** are what break clone-stamping — not d
 4. **Hank** (untwisted loop) — flattened, draped torus.
 5. **Cone** (mill end / weaving yarn) — `LatheGeometry` cone.
 6. **Mini-skein** — scaled skein variant; must read as distinct, since these come in bundles.
-7. **Pattern booklet** — thin box plus cover plane. A completely different silhouette, and therefore
+7. ~~**Pattern booklet**~~ (dropped 2026-10-12: it read as a pattern or notion box; patterns are pattern boxes, PATTERNS.md) — thin box plus cover plane. A completely different silhouette, and therefore
    excellent for visual rhythm on a dense shelf.
 8. **Notions** — needles (cylinder pairs), hooks (cylinder plus bent tip), buttons (short cylinder),
    scissors, stitch markers, tape measure.
@@ -140,11 +140,8 @@ Had we chosen skinned meshes, every garment would need rigging against every bod
 
 ### Which garments to prioritise
 
-**TODO (post-MVP): wearables need appearance attributes beyond colour.**
-
-The spike's scarf is a `TorusGeometry` placeholder — it reads as a collar, not a scarf. It has no
-length, no ends, no drape and no fringe. Colour is currently the *only* thing that varies, which is
-nowhere near enough for a game where the finished objects are the point.
+**Done (VISUAL-DESIGN-FINISHED-OBJ.md, `characters/garments.js`):** appearance comes from yarn
+weight, craft and stitch.
 
 **The key idea: derive appearance from the source yarn and pattern, do not author it per object.**
 The catalog already carries weight, fibre and colour family. A scarf knitted from bulky wool should

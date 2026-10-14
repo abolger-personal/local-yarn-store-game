@@ -3,9 +3,7 @@
 
 Yarn is a centerpiece of this game. Visually it should to come in an overwhelming variety of colors, ball bands, gradients, sizes, shapes (at least balls, cones, and skeins), sparkle level, fuzziness, and textures. Non visually, thickness, yardage, and material are also important. 
 
-Yarn as inventory is still 2.5D — a flat
-illustration facing the camera is cheaper than a model and is the only way the ink-outline look is
-affordable. Some attributes cannot be shown by color or shape at all and will need a text channel or detail channel.  
+Yarn is 3D (low-poly, matcap, ink outline; DESIGN-DECISIONS.md 'Yarn asset spike'). Notions stay 2.5D.
 Every yarn also needs a **held** design with a flat ball band, and knitting needs **two hands with the yarn on the lap**, **crochet needs 1 hand with the yarn on the lap**.
 
 > Rendering decisions and the rig constraints behind them live in `DESIGN-DECISIONS.md` in this
@@ -21,3 +19,30 @@ Every yarn also needs a **held** design with a flat ball band, and knitting need
 
 - A rigging note here is that all yarn should look "right" when held by the NPCs: knitting in particular is a 2 handed operation. It would be ok to have a specific visual design per notion of what it looks like being *held*, which could even come with a pose (sitting at a spinning wheel, holding up a drop spindle, sitting or standing knitting with 2 hands, crochet with 1 hand, etc.)
 
+## Units
+
+A yarn's units come from its shape, so a bigger-looking yarn is more yarn: **skein 1, ball 2,
+cone 4** (`SHAPE_UNITS` in `inventory/catalog.js`; `yarnUnits(item)` is the one reader).
+
+- Units are set by design and the models follow them (2026-10-12): `yarnFit` shrinks ball and cone
+  inside their footprints (`unitScale`) until their drawn volumes run 2:4. Never wider than the
+  footprint, never stretched to the layer grid.
+- The skein is exempt: it is drawn as a twisted hank half as tall as it is long (h/w 0.46–0.50,
+  2, 3 and 5 layers at 1x1, 2x2, 3x3), so a bulky skein no longer fits a wall shelf. It draws at
+  about 0.9 of its one unit; the look wins over the volume (user ruling, 2026-10-12).
+- Weight never changes units: it sets the footprint (lace/fingering/sport 1x1, dk/worsted/aran 2x2,
+  bulky 3x3), which is thicker yarn being bulkier, not more of it.
+- Everything adds units, never items: a pattern's cost, a customer's shortfall (they buy until held
+  units reach it; the leftover stays theirs), a kit (its yarn totals at least the pattern's cost), and
+  an order line ("N units of yarn" delivers exactly N, finishing with skeins).
+
+## Colour count
+
+48 distinct colours (`YARN_COLOR_COUNT`): enough for a rainbow wall, the "overwhelming variety"
+above. The catalog holds only the count; the palette lives in the renderer.
+
+## TODO
+
+- **TODO(spec):** gradients, sparkle and fuzziness are not modelled; each yarn is one flat hue
+  (`colorIndex`). Tracked in YARN-ASSET-SPIKE.md §6.
+- **TODO(spec):** pattern atlas cells are placeholder silhouettes (characters/store/goods/art.js); real illustrations to come.

@@ -119,7 +119,7 @@ Always available, from the first second of the game. It costs nothing.
 - **One control, two faces:** the speed button in the corner stack, whose fourth state ⏸ is
   pause, and **the break card on the counter**, which flips face-out ("Back after this row")
   while paused. Clicking the card toggles pause too, so a player who never opens the stack can
-  still find it in the room. *The card is to build; game.js marks where it hooks in.*
+  still find it in the room. *The card is to build; it hooks in beside `togglePause` in game.js.*
 - **Keys:** **Space** steps the button on (▶ → ▶▶ → ▶▶▶ → ⏸), **P** pauses and resumes at the
   speed it left. Game page only: on store.html Space still advances a round.
 - **The speeds:** ▶ (the default) is a stroll, slow enough to watch every customer shop; ▶▶ and
@@ -130,7 +130,7 @@ Always available, from the first second of the game. It costs nothing.
 - **The player keeps acting:** pick up, place, move furniture, change the camera. Arranging while
   paused is the point.
 - **The signals are objects:** the card, and the wall clock's pendulum stopping. No overlay.
-- Holding an item still pauses on its own; the night screen is the pause the game gives every day.
+- Holding an item should pause on its own (not built: ROADMAP F1); the night screen is the pause the game gives every day.
 
 ---
 
@@ -150,12 +150,26 @@ and SCRIPTED-EVENTS.md §4.
 - **Visits every day,** first in the queue. On their own days they are the lesson; on others they
   browse, say hello and buy something small while another customer carries the lesson.
 - **Recognisable:** theirs is the first Guestbook page, and from day 3 the pot holder is with them.
+- **As built:** skill 1, patience `friend`, Assertiveness 5, Orderliness 3, Volatility 1 (they dig
+  things out, don't tidy, don't storm off). Their one WIP starts blank, so the first thing they
+  want is the pattern. They get the kit as they walk in; on day 2 they stay until they have found
+  the hook and the ball, digging them out if buried.
 
 ### Day 0: the front door
 
 - **Teaches:** the game is a place. Click the door and it opens.
 - **Arrives as:** the front door (`index.html`), the sticky note's *"Come in, we're open!"*
 - **Success:** the door swings and the shop is behind it.
+
+### Day 1 opens: the Former Owner
+
+- A random species, wearing a finished piece in all six wear slots and carrying 3–5 pot holders.
+  They start at the Guestbook signing out (*"Shop's all yours! Make some fun stuff!"*), leave by
+  the door and never come back: no queue, no purchase, no chair. The filed photo keeps the pile.
+- The Guestbook opens by itself, top right, as day 1 opens (and every night), so the farewell is
+  seen.
+- Their farewell photo never goes on the bulletin board, so the board's first card is the
+  player's first success (day 3).
 
 ### Day 1: put the yarn by the pattern
 
@@ -173,10 +187,10 @@ and SCRIPTED-EVENTS.md §4.
   Guestbook. The Guestbook shows something new, which invites the first click.
 - **Fallback:** if the player never moves anything, the friend eventually finds the ball and hook
   on the floor themselves (floors are slow, not impossible), and the Guestbook still fills.
-- **Needs:** a fresh tutorial game that starts with only these three items (today a fresh game
-  fills to `stockCount` first); the scripted `cast` and `seed … facing` actions; pot holder as a
-  pattern type (the decor finished-object types are a TODO in `inventory/catalog.js`); the kit
-  growing to pattern + yarn + hook.
+- **Needs:** the scripted `cast` and `seed … facing` actions (built hard-coded today in
+  `openTutorial`). Every kit is pattern + yarn + the tool in the pattern's size + its notions
+  (`resolveTemplate` in `inventory/supply.js`); day 1's three things are the same set, built by
+  `tutorialDay1`.
 
 ### Night 1: what comes tomorrow
 
@@ -197,13 +211,16 @@ and SCRIPTED-EVENTS.md §4.
 
 ### Night 2: a line of your own
 
-- **Arrives as:** one line on the packing slip is blank and the player's.
+- **Arrives as:** one line on the packing slip reads *5 × SUPPLIER'S CHOICE*, and is the player's.
 - **Door note:** *"Tomorrow's order is on the packing slip. One line is yours."*
 - **Success:** the player's choice is in tomorrow's pile.
-- **Fallback:** a blank line is filled by the supplier. Never empty.
-- **Built:** a dropdown over the blank line on the slip (`store/ui/night.js`, `choicesFor()` in
-  `inventory/supply.js`); `SCRIPT` marks day 3's order (set on night 2) with the player's first
-  line, then every line from day 4. Not yet: §7.2's budget of 6 + sold as free lines, the
+- **Fallback:** a line left as the supplier's choice is filled by the supplier. Never empty.
+- **Built:** a dropdown over the line on the slip (`store/ui/night.js`, `choicesFor()` and
+  `slipLine()` in `inventory/supply.js`); the line is lettered as its selection. `SCRIPT` marks
+  one line of day 3's order (set on night 2) and two of day 4's (night 3); every line from day 5
+  (`HANDOVER_DAYS`). On nights 2 and 3 the *supplier's choice* option names what would come
+  (*supplier's choice: 5 units of yarn, worsted or dk*). For now each line's count is a seeded
+  random split of the day's planned total. Not yet: §7.2's budget of 6 + sold as free lines, the
   "supplier's choice" button for the whole slip, and the supplier sample.
 
 ### Day 3: they come back
@@ -215,21 +232,24 @@ and SCRIPTED-EVENTS.md §4.
   player's first success. Its thank-you line (PROJECTS-AND-AUTHORSHIP.md §4b) remembers day 1
   truthfully, e.g. *"First thing I ever made! The red one was right there on the floor."*, which
   quietly echoes the note. A pot holder has no wear slot (WEARABLE-FINISHED-OBJ.md: decor is
-  always lent), so they also lend it to the shop at the drop-off, and it can be displayed.
+  always lent), so they also lend it to the shop at the counter, and it can be displayed.
 - **Counter note:** *"Look who's back!"*
 - **Success:** the player sees the selfie, and places the lent pot holder somewhere they will see
   it: the arrangement verb used as the relationship verb (REGULARS §3). Small on purpose.
-- **Fallback:** the selfie stays on the board; the pot holder waits at the drop-off.
+- **Fallback:** the selfie stays on the board; the pot holder waits with the shop's lent objects,
+  on the counter beside the Guestbook (WEARABLE-FINISHED-OBJ.md §Lending).
 - **Built:** the pot holder is held short of done until day 3 (`holdAt` 90%, `wip.js`
   `progressLimit`), day 3 lifts the hold as knitted at home, and the finishing push (`visit.js`,
   ROADMAP I1) sits the friend down to finish it: round 3 of day 3, about half a minute at ▶
   (`store/walk.test.mjs` §6).
+- **As built:** the hold is 90%, one beginner round from done. Day 3 lifts it even if the kit is
+  incomplete, and the friend finishes it for any traits.
 - **Needs:** pot holder as a
   renderable decor finished object; the selfie path (`store/ui/photo.js`, the board) taking a
   decor object in hand.
 
 **After day 3** the tutorial is over without announcing it. The friend keeps visiting as a
-regular. From night 3 the whole packing slip is the player's; what the supplier fills blank lines
+regular. Night 3 hands over a second line, and from night 4 the whole packing slip is the player's; what the supplier fills blank lines
 with still introduces new weights and notions gradually (DESIGN-DECISIONS.md §6), which is pacing
 the player never notices, not tutorial.
 
@@ -292,12 +312,16 @@ Found by playing `game.html`. Each answer is an object, not a panel.
   or touch). It stays after the item is set down, until something else is hovered, picked up or
   clicked, so it can be read while arranging.
 - **Shows only what a shopper could read off the real object:**
-  - yarn: weight, fibre, colour family, shape (ball, cone, skein), and its units (1 UNIT, the word
+  - yarn: weight, fibre, colour family, shape (ball, cone, skein), and its units (from its shape: a skein is 1 UNIT, a ball 2, a cone 4; the word
     a pattern counts in);
   - pattern: title, what it makes, craft, needle or hook size, the yarn weight and how many units it takes;
   - notion: what it is, and its size.
+  - A yarn's band and a pattern's use the same words (UNITS, the weight), so the player can match
+    one to the other.
 - **Clicking a customer** swaps it for their **tag: their name and the items they have bought.**
   Never their hidden wants: inferring those is the puzzle.
+- **As built:** a press that moves more than 8px is an orbit drag, not a click. The tag grows as
+  they buy. Pointing at a customer without clicking counts as watching them (§7.3).
 
 ### 7.2 The night order reads as a delivery, not a task
 
@@ -365,6 +389,8 @@ these off", a clipboard is what jobs come on, and "ORDER FOR DAY N" does not say
     knitted (🪑), what was said in a chat (§7.4). *Witnessed* = the customer was on screen and
     reasonably close to the camera when it happened, or the player was hovering or had clicked
     them.
+    As built: on screen and within 12 units of the camera at the start of the round, or pointed
+    at since the last round.
   - **Missed behaviour leaves a gist, without detail:** "chatted with Bramble about a project",
     "turned something over and put it back". The gist is what teaches the player what is worth
     watching; the detail is the reward for having watched.
@@ -372,6 +398,10 @@ these off", a clipboard is what jobs come on, and "ORDER FOR DAY N" does not say
     the regulars come back, so a missed clue comes round again.
 - This answers DESIGN-DECISIONS.md's open "hints in Guestbook entries" question: entries record
   observed behaviour (a memory aid), never hidden state (a solution).
+- **As built:** the counter book opens at today and pages back through every day (LYS.md 5c).
+  Entries expand as native `<details>`, so the keyboard works. Every finished day's page is kept; a
+  photo entry stores the signer as they looked that day. A new game wipes the pages and resets the
+  day counter.
 
 ### 7.4 Overheard chat: picture bubbles, like The Sims
 
@@ -447,5 +477,10 @@ any language, with the mood in the icons.
   because it is the game. At five to ten minutes that may be fine; a second game might still want
   a faster start.
 - **Where does a "new game" live** without a menu? See §6.
+- TODO(spec): §7.3's 🎁 rows (gifts, swaps, treats) wait on stash swaps and the treat tin; the
+  per-customer "who they give to" list waits on those rows.
+- TODO(spec): a witnessed chat should be put into words (§7.4); until chat topics and picture
+  bubbles exist, every chat is its gist.
+- TODO(spec): REGULARS-AND-SHOP-CHARACTER.md's taste-change lines wait on tastes changing at all.
 - ~~How much does a disappointed customer tell you?~~ **Resolved (§7.3):** what they picked up
   and put back; never what they wanted.

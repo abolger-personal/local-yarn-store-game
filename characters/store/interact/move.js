@@ -1,6 +1,3 @@
-// Move mode: picking up the SHOP and setting it down elsewhere, rather than the stock.
-//
-// Extracted from the single 3,200-line module that used to live inline in store.html.
 
 import { activeDisplay, hoverTarget, raycaster, setRayFromEvent } from './pointer.js';
 import { FLAT_Q, dropMarker } from './glow.js';
@@ -16,23 +13,8 @@ import { applyProp, propGroup } from '../scene/props.js';
 import { STAND_HALF, STAND_OFF, WALL_INSET, applyTransform, boxIsClear, buildFurniture, cellHalf, cellIsClear, roomObstacles } from '../scene/displays.js';
 import { refreshAll } from '../goods/paint.js';
 
-// ---------------------------------------------------------------- moving the shop
-//
-// DISPLAYS.md rule 10: the player may pick up a whole display and put it somewhere else. Chairs
-// move by the same verb — they are shop furniture the player arranges, and having one of the two
-// things on the floor be immovable reads as a bug rather than a rule.
-//
-// This is the SHOP-LAYOUT verb, as opposed to the stock-arranging verb above, and the two share a
-// pointer, so they are separated by a mode (M) rather than by a modifier key — holding a chord down
-// while moving furniture around is exactly the hand strain DESIGN-DECISIONS.md §7 already
-// rejected. And the same CLICK-to-pick, click-to-place as the stock, for the same reason: a
-// press-drag-release held the button down for the whole move.
-//
-// Inventory needs no special handling at all: see applyTransform.
-export const YAW_STEP = Math.PI / 4;   // MVP detent, per rule 10
+export const YAW_STEP = Math.PI / 4;   // DISPLAYS.md rule 10
 
-// A movable is a display, a chair, or a prop (a pot, side table or lamp). A display owns a slot grid
-// and the other two do not, so `!m.g` is the "small free-standing thing" test; a prop says so.
 const isFree = (m) => !m.g;
 const isProp = (m) => m.prop === true;
 const isSeat = (m) => isFree(m) && !isProp(m);
@@ -44,25 +26,17 @@ const moveSize = (m) => {
 
 export const movePose = (m) => ({ x: m.x, z: m.z, yaw: isSeat(m) ? m.facing : m.yaw });
 
-// `m` is what is in hand RIGHT NOW; `sel` is what stays chosen after it is set down. Same verb as
-// picking up a box — click to lift, it follows the pointer, click again to set it down — except that
-// furniture set down stays selected, which is what gives the on-screen rotate handles something to
-// point at.
 export 
 const _floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
 const _floorHit = new THREE.Vector3();
 
-/** Where on the shop floor the pointer is. Moving furniture is a plan-view act, so this is the one
- *  cast that does not care which display or shelf level is under the cursor. */
 export function floorPoint(event) {
   setRayFromEvent(event);
   if (!raycaster.ray.intersectPlane(_floorPlane, _floorHit)) return null;
   return { x: _floorHit.x, z: _floorHit.z };
 }
 
-/** Put a chair somewhere. The sim keeps its OWN copy of the seat list (makeWorld clones it, so that
- *  occupancy lives in the sim and not in the scene), so both have to be told. */
 export function applySeat(s, x, z, yaw) {
   s.x = x; s.z = z; s.facing = yaw;
   s.mesh.position.set(x, 0, z);
@@ -78,63 +52,26 @@ const applierOf = (m) => {
 
 export const moveApply = (m, x, z, yaw) => applierOf(m)(m, x, z, yaw);
 
-/**
- * Rule 10's per-type restrictions, as a pose filter:
- *   - EVERYTHING stays inside the room. The pose is clamped, not merely refused, because
- *     proposeMove puts the real record wherever this says and only setting it down puts it back: a
- *     display followed the pointer straight through the wall, and a release that never arrived (a
- *     pointercancel, a second grab) left it outside — out of sight, and carried over every night
- *     after, stock and all. Clamped, there is no "outside" for it to be stranded in.
- *   - a SHELF stands anywhere it fits, wall or no wall: two back to back in the middle of the room
- *     is a fine shop. Its back panel is its "wall", so its wall row means the same thing wherever it
- *     stands (DISPLAYS.md rule 10).
- *   - a FLOOR PILE stays on the floor, which it does by construction: its plinth height is 0 and
- *     nothing in the move path touches Y at all.
- *   - yaw is on 45° detents.
- * A peg board would have to snap to a wall, at wall height. Deferred with the rest of DISPLAYS.md
- * type C.
- *
- * One rule for every movable: whatever the player has turned sits on a detent. A chair therefore
- * snaps out of its authored decorative angle the first time it is touched, which is the honest
- * trade for not having two different rotation rules in the same gesture.
- */
 export function constrainPose(m, x, z, yaw) {
   yaw = Math.round(yaw / YAW_STEP) * YAW_STEP;
   const clamp = (v, limit) => Math.max(-limit, Math.min(limit, v));
 
   if (isFree(m)) {
-    const edge = moveSize(m).w * Math.SQRT1_2 + WALL_INSET;   // a turned one needs its diagonal
+    const edge = moveSize(m).w * Math.SQRT1_2 + WALL_INSET;
     return { x: clamp(x, HALF_W - edge), z: clamp(z, HALF_D - edge), yaw };
   }
-  // A display is clamped by its SLOTS' reach — the very boxes canPlaceAt tests against the walls —
-  // so it can be pushed flush to a wall and still be green there. Any other footprint either leaves
-  // it red against every wall (the old wall-snap bug) or lets the outer slots through the wall.
   const half = cellHalf(yaw) + WALL_INSET + 1e-6;
   const lx = ((m.g.cols - 1) / 2) * CELL, lz = ((m.g.rows - 1) / 2) * CELL * Math.cos(m.tilt ?? 0);
   const sin = Math.abs(Math.sin(yaw)), cos = Math.abs(Math.cos(yaw));
   return { x: clamp(x, HALF_W - half - (lx * cos + lz * sin)), z: clamp(z, HALF_D - half - (lx * sin + lz * cos)), yaw };
 }
 
-/**
- * May this stand here? For a display, every slot it still HAS must be clear of the walls, the
- * counter, the chairs, the doorway and every other display. Testing the slots rather than a
- * bounding box is what lets an L-shaped display (one already carved by the counter) tuck into a
- * spot its full rectangle would never fit — and it reuses the exact predicate the masking uses, so
- * the two cannot disagree. A chair is just its own box.
- *
- * Level 0 only: the mask ignores the shelf index by construction, so every level has the same holes.
- *
- * ponytail: a chair is tested against a display's full RECTANGLE, not its usable slots, so a chair
- * cannot tuck into the notch a display had carved out of it. Displays get the finer test because
- * they are the ones that come out funny shapes.
- */
+// ponytail: a chair is tested against a display's full rectangle, so it cannot tuck into a carved notch.
 export function canPlaceAt(m, pose) {
   if (isFree(m)) {
     return boxIsClear(pose.x, pose.z, moveSize(m).w * Math.SQRT1_2,
       roomObstacles(displays, seats.filter((s) => s !== m), props.filter((p) => p !== m)));
   }
-  // Somebody has to be able to stand in front of it to browse. Only a wall can take that spot away
-  // outright, and only now that a shelf may be turned to face one.
   if (!boxIsClear(pose.x + Math.sin(pose.yaw) * STAND_OFF, pose.z + Math.cos(pose.yaw) * STAND_OFF, STAND_HALF, []))
     return false;
   const probe = { ...pose, cols: m.g.cols, rows: m.g.rows, tilt: m.tilt ?? 0 };
@@ -145,7 +82,6 @@ export function canPlaceAt(m, pose) {
   return true;
 }
 
-/** The footprint preview: green where it may land, red where it may not. */
 function paintMoveGhost(m) {
   const { w, d: depth } = moveSize(m);
   const pose = movePose(m);
@@ -159,11 +95,6 @@ function paintMoveGhost(m) {
   dropMarker.scale.set(w * 1.06, depth * 1.06, 1);
 }
 
-/**
- * Move it there and say whether that was legal. It goes to the pose either way, so a blocked spot
- * is something the player can SEE their shelf sitting in rather than an invisible wall that stops
- * the piece dead; dropMovable() is what refuses it.
- */
 export function proposeMove(m, x, z, yaw) {
   const pose = constrainPose(m, x, z, yaw);
   moveApply(m, pose.x, pose.z, pose.yaw);
@@ -174,22 +105,6 @@ export function proposeMove(m, x, z, yaw) {
   return mover.ok;
 }
 
-/**
- * Re-cut the holes for a display that has landed somewhere new — otherwise a shelf carved to fit
- * beside the counter keeps that bite out of it for the rest of the game. Safe by the order it runs
- * in: canPlaceAt has already proved every slot the display currently has is clear here, so this can
- * only ever open holes back up, and remask() refuses to revoke an occupied slot regardless.
- */
-/**
- * Remask a display that has moved, AND the floor underneath it.
- *
- * The floor is masked against every other display, so anything that moves opens a hole where it
- * has gone and fills the one where it was. Forgetting the second half leaves a display's ghost
- * punched through the floor grid for the rest of the session.
- *
- * Every floor tile, not "the floor": a shelf dragged across the room lands on one tile and leaves
- * another, and remasking only one of them is the ghost this exists to prevent.
- */
 function remaskMoved(d) {
   remaskDisplay(d);
   for (const o of displays) if (o.solid === false && o !== d) remaskDisplay(o);
@@ -199,22 +114,13 @@ function remaskDisplay(d) {
   const probe = { x: d.x, z: d.z, yaw: d.yaw, cols: d.g.cols, rows: d.g.rows, tilt: d.tilt ?? 0 };
   const others = roomObstacles(displays.filter((o) => o !== d));
   remask(d.g, (s, c, r) => cellIsClear(probe, c, r, others));
-  // makeGridLines draws only the usable cells, so the lattice has to be rebuilt to match.
   clearGroup(d.group);
   d.lines = []; d.panels = [];
   buildFurniture(d);
   touchView();
 }
 
-/**
- * Anyone stood at — or already walking to — a display that just moved goes with it. The cast tween
- * reads the sim position live on every frame, so retargeting here makes them turn and walk after
- * their shelf instead of miming at the empty floor it used to be on.
- *
- * ponytail: no re-separation, so two customers followed to the same shelf can briefly overlap.
- * advanceRound() relaxes them apart on the next round, which is soon enough for furniture the
- * player only moves between rounds anyway.
- */
+// ponytail: no re-separation, so customers following one shelf can overlap until the next round relaxes them.
 function followDisplay(d) {
   for (const npc of shop.world?.npcs ?? []) {
     if (npc.atDisplay !== d.id) continue;
@@ -224,26 +130,19 @@ function followDisplay(d) {
   }
 }
 
-/** Whoever is IN a moved chair rides it. Somebody still walking to it is left to walk — the tween
- *  reads the sim position live, so they simply re-aim at wherever the chair ended up. */
 function followSeat(s) {
   for (const rec of cast) {
     if (rec.npc.seat !== s.id) continue;
     rec.npc.x = s.x; rec.npc.z = s.z; rec.npc.facing = s.facing;
     if (rec.moveT < 1) continue;
-    // Seated, so they move WITH the chair rather than walking to it. fromX/fromZ too, or the
-    // in-flight tween drags them straight back to where the chair used to be.
     rec.fromX = rec.built.root.position.x = s.x;
     rec.fromZ = rec.built.root.position.z = s.z;
     rec.built.root.rotation.y = s.facing;
   }
 }
 
-/** The chair or prop under the pointer, if any. Tried before displays: they are small, exact to
- *  raycast, and usually standing on top of some display's slot plane (the floor's). */
 function freeAt(event) {
   setRayFromEvent(event);
-  // Recursive: each is a group of parts, and the record is on the group.
   const hit = raycaster.intersectObjects([...chairGroup.children, ...propGroup.children], true)[0];
   for (let n = hit?.object; n; n = n.parent) {
     const found = n.userData.seat ?? n.userData.prop;
@@ -253,17 +152,14 @@ function freeAt(event) {
 }
 
 export function grabMovable(event) {
-  // Anything still in hand from a gesture whose release never came is settled first — committed or
-  // put back by the same rule as any drop — rather than abandoned wherever the pointer left it.
   if (mover.m) dropMovable();
   const p = floorPoint(event);
-  // You cannot pick up the floor. Everything else in the room is fair game (DISPLAYS.md rule 10).
   const under = hoverTarget(event)?.disp;
   const m = p ? (freeAt(event) ?? (under?.solid === false ? null : under)) : null;
-  if (!m) { clearSelection(); return false; }   // a press on bare floor deselects and orbits
+  if (!m) { clearSelection(); return false; }
   mover.m = m;
   mover.from = movePose(m);
-  mover.ox = m.x - p.x;   // grab offset, so the thing does not snap its centre to the cursor
+  mover.ox = m.x - p.x;
   mover.oz = m.z - p.z;
   if (!isFree(m)) { aim.active = aim.hovered = m.id; touchView(); }
   const pose = movePose(m);
@@ -271,9 +167,6 @@ export function grabMovable(event) {
   return true;
 }
 
-/** Set down: a legal pose sticks, an illegal one goes back where it came from — as a box clicked
- *  down where it has no room goes home. Either way the piece stays selected, so the rotate handles
- *  are still on it. */
 export function dropMovable() {
   const { m } = mover;
   mover.m = null;
@@ -283,30 +176,24 @@ export function dropMovable() {
     mover.ok = canPlaceAt(m, mover.from);
   } else if (isFree(m)) {
     if (isSeat(m)) followSeat(m);
-    // A chair or prop that has moved away frees the slots it was masking out of every display near
-    // it. Safe in this direction only: canPlaceAt refused to let it land on a display at all, so
-    // this can add slots back but never revoke one.
     for (const d of displays) remaskDisplay(d);
   } else {
     remaskMoved(m);
     followDisplay(m);
   }
   mover.sel = m;
-  paintMoveGhost(m);            // the footprint stays under the selection rather than blinking out
+  paintMoveGhost(m);
   refreshAll();
   touchHud();
   touchView();
 }
 
-/** Put what is in hand back where it was picked up, wherever it is now (Escape, leaving move mode). */
 export function cancelMove() {
   if (!mover.m) return;
   mover.ok = false;
   dropMovable();
 }
 
-/** Deselect. A piece still in hand is put back first: it can be anywhere, red, by now — and every
- *  caller (leaving move mode, a new day's restart) is about to forget it. */
 export function clearSelection() {
   cancelMove();
   mover.sel = null;
@@ -314,17 +201,10 @@ export function clearSelection() {
   touchView();
 }
 
-/**
- * Turn by one detent. In hand it just turns the thing in hand, to be set down later; otherwise it is its own little
- * move, committed or reverted on the spot. Driven by Q/E and by the on-screen handles, which are
- * the same call — so the touch path cannot drift from the keyboard one.
- */
 export function rotateMovable(step) {
   const m = mover.m ?? mover.sel ?? activeDisplay();
   if (!m) return;
   const from = movePose(m);
-  // Proposed before the early exit on purpose: a piece in hand still turns, it just is not settled
-  // here.
   if (mover.m) {
     proposeMove(m, from.x, from.z, from.yaw + step);
     return;
@@ -341,24 +221,9 @@ export function rotateMovable(step) {
   paintMoveGhost(m);
 }
 
-// ---- the on-screen rotate handles
 const turnBtns = /** @type {HTMLButtonElement[]} */
   ([...document.querySelectorAll('#furnBtns .turn')]);
 
-/** Park the handles over the selection. Projected every frame because the camera orbits freely and
- *  a handle left behind on screen points at the wrong thing. */
-/**
- * Enable the turn handles only when there is something to turn.
- *
- * They used to float above the selected piece, projected from world space every frame. Two
- * problems with that: they sat under the finger doing the dragging, and a selection behind the
- * camera projects to a mirrored on-screen point, so they had to be hidden exactly when you most
- * wanted them. A fixed cluster is always in the same place and always reachable.
- *
- * Hidden OUT of furniture mode (they mean nothing there) but merely dimmed inside it with nothing
- * selected — so the cluster does not change width as you select and deselect, which would move
- * the buttons out from under the finger reaching for them.
- */
 export function syncFurnitureButtons() {
   const selected = S.moveMode ? (mover.m ?? mover.sel) : null;
   for (const b of turnBtns) {
@@ -367,12 +232,8 @@ export function syncFurnitureButtons() {
   }
 }
 
-/** Everything this module does ONCE, at boot. Called from main.js, in order. */
 export function installMove() {
   for (const b of turnBtns) {
-    // pointerdown, not click: onPointerDown is a window CAPTURE listener, so a click here would
-    // otherwise be preceded by the canvas handler clearing the very selection being rotated. It
-    // bails on `event.target !== renderer.domElement`, but stopping here is what makes that certain.
     b.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       rotateMovable(Number(b.dataset.step) * YAW_STEP);

@@ -131,6 +131,84 @@ PATTERNS.md's old `["stripes", "star", "pom pom", "fringe"]` hint list:
 - **Cost:** 1–2k triangles more than before (the band has thickness where the strips didn't). A
   cable long scarf is 7.6–9.2k.
 
+**Shape rules per type (held by `garments.test.mjs`).**
+- **Every silhouette builds on every species at both fit extremes,** and fits off the real rig.
+- **Hats** rest on the skull, never through it. Fit 1 hugs the skull (a lion's hat is sized to its
+  head, not out on its mane). Eyes and ears under a hat are not drawn, and the mane under it is
+  pressed in and cut away; a fitted hat keeps the eyes. The face is not a coat: brims are solid over
+  it. A slouch's fold hangs behind the head. Knit in the round has no seam: a whole number of
+  repeats goes round. A pixie's point is fabric, folding over behind with its tip near plumb and its
+  pom-pom hanging off the tip. A headband's pom-pom sits at a temple, about half a beanie's.
+- **Pom-poms** are their own size, whatever the stitch size, and on a scarf hang off the end.
+- **Buttons** come in rows and sit on the fabric, never sunk in it. A **scalloped** edge lies in
+  the fabric and hangs past the edge, not a frill standing out.
+- **Lace** holes are big enough to read (at least a fifth of the body's quads cut) and are
+  straight-edged triangles, never staircased circles; a fold never stretches them into stripes.
+- **Every stitch's relief survives sampling,** even at lace weight; relief under 1.5px at the
+  game's size is not built (§2b).
+- **Scarves** (with the scarf shapes above): a neck item starts above the llama's ruff. Wrapped, it
+  is a strip snug round the neck, standing upright, not a tube out to the arms. A kerchief's
+  triangle hangs from its band, its top tucked inside the band at the front, with no shelf over a
+  ruff. A trailing scarf's floor run lies on the floor, bends onto it gradually, and stays there as
+  the body leans, pliés or rises. Draped with both ends behind, it is flung back over both
+  shoulders. Every scarf takes every accessory: a pom-pom or tassel hangs off an end or point, or a
+  loop's or cowl's bottom edge; flowers and buttons are on the scarf, touching its stitches. A
+  fine-yarn scarf has fine stitches (lace about three times super bulky's, around and along). The
+  band never shears between rows.
+- **A scarf the wrong size reads as wrong:** too big, it slides down onto the shoulders and slumps
+  to one side (on an owl, held up by its wings, it hangs from the back of the neck and droops in
+  front); too small, it is a ribbon pulled tight high under the chin.
+- **Sweaters** too small get shorter, never tighter: the smallest is a collar, still outside the
+  coat. A fitted sweater covers the coat it goes over on every species. Every sweater but a
+  turtleneck (its collar is its neckline) has a neckline band in the trim colour; a cardigan's runs
+  on down both fronts to the hem as a button band. A sleeve is closed at the shoulder; only the
+  cuff is open. The body stays on the chest, pushed off a raised arm.
+- **Bags:** a strap is flat (at least three times as wide as thick; a drawstring's cords are
+  cords), both ends inside the bag, its middle outside the torso. It is knitted at the bag's gauge,
+  so a bigger fit is a wider strap and a longer drop. A cross strap goes round the body, never
+  through it, and comes down to the bag's top at the hip.
+- **Shawls** go over the shoulders and arms, never under them (no armhole), and drape over an arm
+  rather than cuffing it. An open shawl's top edge rolls over the collarbone with no corner. A shawl
+  is draped or tied and takes a pin (a shawl's alone): across the front edges draped, on one
+  shoulder tied or on a shrug. A stole is a band, far shorter round the back than its ends. Its side
+  panels lift with the arms like a cape, the cloth on the shoulder stays on it, the edging stays on
+  its hem, and it is the same shawl whatever pose it was put on in.
+- **Socks:** an over-knee sock is one piece over the knee and bends with it.
+- **A pattern's random colours are the shop's yarn:** muted mid tones up to pastel, mostly bold and
+  muted with pastels a minority (`inventory/yarn-look.js` families), never one pastel band.
+
+**More shape rules (from `garments.js`).**
+- **Hats** are worn pushed back off the brow (35°), crown towards the nape; a beret sits flat and
+  leans sideways instead. A hat's seat ring rests where the head is as wide as it: too small perches
+  higher, too big drops, and past the widest point it slips to one side. Knit has no stiffness: the
+  fabric above the seat slumps back under its own weight (more in fluid fibre) and wobbles in soft
+  lobes, fading out at the seat. Ears go up through an open-top hat (headband) and out of a
+  fisherman's; a hood keeps the eyes out of its face opening.
+- **Pom-poms and buttons are sized from the body part they sit on,** never from the stitch size: a
+  pom-pom is wound to the size wanted. A torso button is about 12% of the torso's width, big enough
+  to read at 150px. Neither is smaller than the fabric is thick.
+- **Lace on a tube** (a scarf's band, a loop) is cut through both faces, or the far face backs each
+  eyelet and the lace reads solid. Eyelets are about two stitches wide.
+- **Scarf accessories:** tassels and pom-poms past the tips; a flower high on one end just below the
+  neck, buttons down that end on its outer face. On a loop, a flower on the band at the front, off
+  to one side, and on an infinity scarf a row of buttons there. A kerchief's buttons run down its
+  triangle, and its pom-pom or tassel hangs off the point, unless its band all but covers it; then
+  the band carries them.
+- **Shawls** come down the arm to the top of the triceps (small) or the elbow (big), and hang on
+  past the arm's underside. A stole's ends hang long in front, its back no deeper than its band. A
+  capelet is a 3/4 circle: closed round the shoulders it is a cone, with soft folds round its hem.
+  A pin goes across the front edges when draped, on the left shoulder when tied or on a shrug.
+- **Sweaters:** fit moves the hem (and a big one stands off the body) and the sleeve length: a small
+  sweater's sleeves stop short, a big one's run down over the hands. Sleeves go over the owl's wings.
+  Each sleeve is closed at the top by a low dome cap, as a set-in sleeve is.
+- **Bags** are sized from the torso (width and depth from its width, height from its height); fit is
+  the bag's size, and its drop from the shoulder grows with it. Its top stays under the arm, its
+  bottom off the floor. A backpack's straps run over each shoulder, under the arm and back into its
+  lower corners, on the body all the way.
+- **Held pieces** (decor, never worn): a pot holder lies flat on the upturned free paw like a tray,
+  its loop at the far corner, resting on whatever is highest under it (an owl's wing). An armful of
+  finished pieces is a pile of folded knits on the forearm, each in its own fabric.
+
 Fringe is an **edge**, not an accessory. These additions (edge, form, marled) come from P1-SPIKE-PLAN.md's `WearableAppearance` sketch.
 
 **Knit vs crochet (decided 2026-09-27, see §2b):**
@@ -165,6 +243,22 @@ there is one source of truth. There are no shop-level thumbnails, since they wou
 - **Decor objects use the merchandise look:** matcap, ink outline and hatching, the same as the
   yarn on the shelf beside them. They do not use knit sheen.
 
+**How the generator is built (`characters/garments.js`).** Three rules shape it:
+
+1. **Fit is measured, never authored per species.** Head, torso and arm clearances are read off
+   whatever the species kit hung on those joints (mane, fleece, wings), so a garment is authored
+   once and a new species needs no code. Ears and tufts are joints of their own, so they poke
+   through a hat: the ear hole, for free.
+2. **Every piece is one parametric sheet over (u, v)** (v along the rows, u across the stitches).
+   Relief, colourwork, lace holes and hatching all read the same (u, v), so no piece needs code of
+   its own for any of them. Stitch counts come from the sheet's real size; knit in the round casts
+   on a whole number of repeats.
+3. **One mesh per joint,** whatever is worn there, in one shared material with colour in the
+   vertices: a shawl, a sweater and a bag on the chest cost one draw between them.
+
+Garments are dressed after the character is built, on an un-merged rig, in the rest pose; the merge
+comes after. A merged body cannot be re-dressed; it is rebuilt.
+
 **Performance.** What each look choice costs, estimated and measured, is tracked in
 `WEARABLE-LOOK-VS-PERFORMANCE.md`. Check it before committing to a look.
 
@@ -192,7 +286,8 @@ relief pattern), **sheen**, and **drape**.
    - **Sheen:** silk and mercerised cotton are reflective. **Not modelled yet:** every garment shares
      one material. **To do:** a cheap per-fibre sheen, for example a vertex attribute the shared
      shader reads, rather than a material per fibre.
-   - **Drape:** on hold, because it is hard to model cheaply. **To do:** find a cheap way.
+   - **Drape:** revisit later: drape vs performance needs more work once NPC movement is more
+     complex. Today a single `DRAPE` scalar (garments.js).
    - **Pilling or halo, and durability:** not a game mechanic now, and not planned.
    - **Washability and care:** may become a mechanic later, since washing could shrink or felt a
      garment. Not now.
@@ -265,8 +360,8 @@ object comes out relative to the pattern's intended size.
   the player stocked the tool size and yarn weight the pattern asks for, where the NPC could find
   them together.
 - **Decor items scale freely** from the same inputs, with no "fit".
-- The fit limits, and how far off the tool and yarn have to be to reach them, are **(open)**:
-  tune on the rig.
+- The fit limits are **decided**: `FIT_RANGE` [0.2, 1.6] (garments.js), reached through the tool
+  and yarn's real stitch width.
 
 ### Colour
 
@@ -285,7 +380,8 @@ object comes out relative to the pattern's intended size.
   size/fit. Weight also shares everything tool size drives (§2b).
 - **Fibre sets sheen; its drape is on hold** (§2b). Where drape is drawn today, it picks among a few
   pre-shaped drape meshes, from stiff (linen, cotton) to fluid (alpaca, silk, mohair), with no
-  cloth simulation. The fibre-to-drape order stays **(proposed)** until a cheap drape model exists.
+  cloth simulation. The fibre-to-drape order stays **(proposed)**: revisit later, once NPC movement is more complex;
+  today a single `DRAPE` scalar (garments.js).
 
 ### NPC skill
 
@@ -350,8 +446,8 @@ A swatch is **both a crafting step and a leftover object**.
 
 While an NPC knits or carries a WIP, it shows as **needles (or a hook) plus a partial object that
 grows with progress**. It starts as a swatch-sized piece and builds toward the finished silhouette.
-It is the same generator as the FO, clipped by progress, in the WIP's yarn colours. Holding it needs
-the two-handed knitting pose that NOTIONS.md flags.
+It is the same generator as the FO, clipped by progress, in the WIP's yarn colours. Holding it uses
+the two-handed knitting pose in `craft-anim.js`.
 
 - [ ] **TODO(spec): the full sit-and-knit piece.** The draft (`characters/craft-anim.js`, test page
   `characters/sit-and-knit.html`, commit 94be68a) draws the work as a plain one-colour rectangle,
@@ -377,7 +473,6 @@ payoff. This supersedes P1-SPIKE-PLAN.md's "species + fur + signature accessory"
 
 ## 5. Open questions
 
-- **Size-to-fit tuning:** the fit limits, and how far tool and yarn may be off before each end.
 - **Yarn per WIP:** NPCs buy by units, and may end up with the wrong colour when matching units are
   not stocked together. The rules come from skill and personality; not specified yet.
 - **Who swatches, and what a swatch changes:** the swatch as a step.
@@ -400,9 +495,9 @@ Listed so nothing is missed; struck through where done.
     for the six wearables, at PATTERNS.md's costs; `hints` is gone. Each named design carries its
     **silhouette** (`PATTERN_TITLES` is keyed by type and silhouette), and `wornAs` in
     `garments.js` builds the finished object as it. Still open:
-    - the **decor types** (blanket, potholder, cozy, chair cover, amigurumi, mittens). The sim
-      copes (no slot, so always lent), but nothing draws a decor FO, in the shop or in the
-      Guestbook photo, and they have no cover icon.
+    - the **decor types** other than the potholder (blanket, cozy, chair cover, amigurumi,
+      mittens): not in `PATTERN_TYPES` yet. The potholder is drawn, photographed and has a cover
+      icon.
     - a design's **texture, colourwork, edge, form and accessory**. A shop FO is still the
       silhouette's defaults, with stripes when it is knitted in more than one colour.
   - ~~`yarnUnits`: **1 per yarn item**, not footprint.~~ Done 2026-10-03. Pattern costs are 1–8 items of the pattern's weight (PATTERNS.md), and a wrong-weight item is a near-miss, not a conversion.

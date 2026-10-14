@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Donut fighters — choose</title>
+<link rel="stylesheet" href="spinoff.css" />
+</head>
+<body class="choose">
+<main id="stage"></main>
+<aside id="side">
+  <div id="panel"></div>
+  <div class="actions">
+    <button id="dice" aria-label="surprise me"><span class="emoji">🎲</span></button>
+    <button id="done" aria-label="done, go play"><span class="emoji">✅</span></button>
+  </div>
+</aside>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.186.1/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.186.1/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="choose.js"></script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+# Selfies
+
+The Guestbook selfie: a character's photo of themselves with what they made, taken by
+`characters/selfie.js` (pose and framing, DOM-free so node tests run the game's own code) and
+rendered by `characters/selfie-studio.js` (shared by the shop's Guestbook and the crowd page's selfie
+sheet, so the picture checked on a crowd is the picture the game takes).
+
+## 1. What makes it read as a selfie
+
+In order of how much it matters:
+
+1. **One arm reaching toward the lens.** Arm 0 (the -x one) swings out and up: at armSwing -1.0 the
+   hand is level with the shoulder and forward of the face on all three species; past -1.2 it folds
+   back toward the head.
+2. **The lens above eye level,** off to that arm's side, looking down.
+3. **A wide lens held close:** the face big, the body falling away. The face spans about half the
+   frame's width (the owl's shot, tuned by eye). Framing head-to-chest left a llama's small head on its
+   long neck at a quarter of the frame.
+4. **A horizon that is not level:** the held-out phone is rolled -0.15. A shot someone else takes is
+   level.
+
+## 2. The shot rules
+
+Every shot, searched or authored, is held to these:
+
+1. **The phone hand is cropped.** The phone is in the raised hand, so all of that hand in the frame
+   would put the phone in too and break the illusion that the lens is the phone. Cut by the edge is
+   fine. A sleeve is not part of the hand.
+2. **The owl's wing is cropped.** The wing wraps its arm, paw and all, so the wing is what shows and
+   what must be cut.
+3. **The eyes are in,** at least 10% of them seen, and the pupils turned to the lens (slid 0.45 of the
+   white's radius toward it; side-set eyes, a llama's, look out of their front edge).
+4. **What they made is in,** not just its edge: aimed a quarter of the way down from its top; at
+   least 30% of it seen in the scored search (10% for a searched style, since a hat's back half faces
+   away from any lens: the owl's own hat shot shows 15-30%).
+5. **Facing the lens:** with the eyes in, the face points at the lens at cos 0.7 or more. Every
+   authored shot faces it at 0.73 and up.
+6. **The body centred and big:** the whole of them covers at least half the frame and its middle is
+   at most 0.4 frame-halves off centre (authored shots: covers 0.55-0.98, 0.38 off at most). The head
+   itself may sit well off to the side; a bag shot's does.
+7. **The crown is in** (searched styles).
+
+"Seen" is what the picture shows: an ID buffer the photo's own width (240px), so what a pixel can hide
+is what the picture hides. An eye under a hat is hidden.
+
+## 3. How a shot is chosen
+
+1. **An authored shot** (`SHOTS`) when there is one, taken as written.
+2. Otherwise **the styles, searched** (`takeSelfie`), tried in order:
+   - **close:** face lifted into a wide lens held close (the owl's, tuned by eye). Flat faces only: a
+     snout longer than the head is wide comes out enormous down a close wide lens.
+   - **high:** nose down, lens up (the crown faces it), narrower and further back, which takes out
+     most of the big-nose distortion. Lower only when the hand would be in front of the face.
+   - **neck:** chin up and turned aside, a lower lens, so a cowl on a long neck shows its throat.
+
+   Each style searches framings face-big first, then sliding the aim toward what they made and away
+   from the arm, and zooming out last. The close shot is kept whenever it shows both the eyes and what
+   they made; otherwise the style with the best lesser of the two. If no framing keeps the hand out,
+   the face plainly, hand and all.
+
+**Holding it:** when what they made is in the other paw, that arm swings straight out in front so the
+piece reads the way it is built. **A bag's selfie shows it held up** in the free paw: at the hip or on
+the back no lens finds it. Selfies build every stitch's relief, as a close-up, not the crowd's cut.
+
+**From behind** (a shot's `behind`, the shawl's): someone else takes it, no phone. Both arms straight
+out to the sides to spread what is on their back, the body twisted against the head's turn (67-79% of
+the eyes seen on every species; twisting with it left a lion's at 0%). How far the head turns is the
+species' own: an owl looks straight back, a lion over its shoulder. The camera stands on the side the
+head turns to.
+
+## 4. Authored shots
+
+`SHOTS` is keyed by what the selfie is of (a garment type, a held decor type, or `pile`), optionally
+`type:silhouette`, then by species (`owl`, `llama`, `lion`, else `all`). A species set to null opts out
+of `all` and is searched. A silhouette key falls back to the type's where it has nothing for the
+species. A shot is the head's turn and lift, the lens `fov`, and a framing: `up` lens height (below 0:
+under the face looking up), `k` distance (1 = the face framing), `drop`/`off` how far the aim slides
+down toward what they made and away from the phone arm, in frame halves.
+
+The table is generated by `tools/selfie-tuning/tune-shots.mjs` (report beside it): per species and
+silhouette, the shot with the best mean score over 6 random bodies, each passing the floors
+`garments.test.mjs` sets an authored shot. Each entry's comment is that mean and its worst body;
+`flagged` means under 0.4 after 10 seeds. The shawl's shots are the hand-tuned ones. The hand-tuned
+table it replaced is kept in `shots-hand-tuned.js`; it is also the scored search's training set.
+
+## 5. The scored search
+
+An authoring tool, not the game's: it frames the way the authored shots were framed by eye. The crowd
+page shows its pick beside each selfie ("compare scored search"), and a click takes the pick into the
+tuner to keep as a `SHOTS` entry.
+
+- **Rules, not rewards:** §2 rules 1, 3, 4 (30%), 5 and 6 reject a shot outright. The eyes and the
+  face's aim are rules because the search, free to, turned faces away; the body rule because it put a
+  small owl down in a corner.
+- **Rewards:** what they made in view (0.37), the face at its species' share of the frame width (owl
+  0.56, llama 0.43, lion 0.55; weight 0.37), the made thing's outline filling the frame (0.21), and
+  centred (0.04).
+- **Fit:** fitted to the nine front-facing hand-tuned shots. Of ~350 shots sampled round each, it puts
+  the authored one ahead of 89% of those that pass the rules (80% fitting on eight, ranking the ninth):
+  about one shot in five scores higher than the eye's pick, and only looking says whether those are as
+  good.
+- **Search:** every authored shot first (good framings where random draws can miss), then 300 drawn
+  across the ranges, then three rounds narrowing round the best. Seeded, so a character's scored shot
+  is the same each time.
+
+## 6. The studio
+
+One body, dressed, posed and framed, rendered once over a painted backdrop (`store/ui/backdrop.js`)
+and thrown away; only the 240x300 picture is kept. Lit as the shop is (warm key, cool rim, sky, room
+environment) plus **the phone screen's glow** along the lens at 1.5: without it a lens at the chest or
+below saw undersides nothing lit, and a fifth of the authored shots lit what they made under 70% as
+well as the shop shows it. At 1.5 nothing those shots see is lit brighter than the rest can light
+anything. The backdrop follows the shot: the roll, the horizon at the lens's height, and the floor
+and shadow under their feet.
+
+## Open questions
+
+- [ ] The `flagged` authored shots (mean under 0.4): retune by eye, or accept?
+- [ ] About one scored pick in five beats the hand-picked shot on score; only looking says whether it
+      is as good.

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Donut fighters — play</title>
+<link rel="stylesheet" href="spinoff.css" />
+</head>
+<body class="lobby">
+<header class="bar">
+  <div id="code" class="code" aria-label="room code"></div>
+</header>
+<main id="stage"></main>
+<footer>
+  <div id="start" class="start">
+    <button id="edit" aria-label="change my fighter"><span class="emoji">✏️</span></button>
+    <button id="host" aria-label="start a game"><span class="emoji">🏠</span></button>
+    <button id="join" aria-label="join a game"><span class="emoji">🔑</span></button>
+  </div>
+  <div id="keypad" class="keypad hidden" aria-label="type the code"></div>
+  <div id="inroom" class="bar hidden">
+    <button id="exit" aria-label="leave the game"><span class="emoji">🚪</span></button>
+  </div>
+</footer>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.186.1/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.186.1/examples/jsm/",
+    "trystero": "https://esm.sh/trystero@0.26.0"
+  }
+}
+</script>
+<script type="module" src="lobby.js"></script>
+</body>
+</html>

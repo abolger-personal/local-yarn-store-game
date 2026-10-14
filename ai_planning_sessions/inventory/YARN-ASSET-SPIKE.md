@@ -141,6 +141,10 @@ Reads as *storybook illustration* rather than *soft object*. Risk: hard bands ac
 read as plastic. Wants a deliberately soft ramp to stay cosy. Cheaper than standard, not as cheap
 as matcap.
 
+Built: the ramp is biased toward the lit band (0.34 + 0.66·x^0.72) so the shadow reads as an
+accent; an even split makes a round object look half in shadow, dramatic rather than cosy.
+`NearestFilter` is required, or linear filtering smooths the steps back into a gradient.
+
 ### C. Baked vertex-colour AO, unlit
 
 Bake AO/curvature into vertex colours at build time, render `basic`. No lights, no textures, tiny
@@ -188,8 +192,7 @@ discipline. Six levers, cheapest first:
    before any asset work exists.
 
 2. **Exaggerate the proportion axes past realism.** Ball = round and tall; cake = squat, wide, flat
-   top; cone = tall triangle; skein = long horizontal twisted bone; hank = thin flat ring; booklet
-   = hard-edged rectangle. Cartoon proportion is what makes them nameable at 40px.
+   top; cone = tall triangle; skein = long horizontal twisted bone; hank = thin flat ring. Cartoon proportion is what makes them nameable at 40px.
 
 3. **The ball band is the single largest readability win** and the DDR already reached this
    conclusion (*"a second family… keeps the band's colour independent of the yarn's, which is the
@@ -198,6 +201,8 @@ discipline. Six levers, cheapest first:
 
 4. **Orientation per family, which is free** — it lives in the instance matrix. Cones stand, cakes
    sit, skeins lie down, hanks hang. In a grid this reads strongly.
+   The ball is slightly oblate (y × 0.92): a perfect sphere reads as a bouncy ball, a squashed one
+   as something soft that has sat on a shelf. There is no booklet family: a hard-edged box read as a pattern or notion box, so it was dropped (2026-10-12); patterns are drawn as pattern boxes (PATTERNS.md).
 
 5. **Winding direction as texture or normal, never geometry.** The strand direction is what says
    *yarn* instead of *ball*. At low poly this has to be shading; object-space direction in the
@@ -249,9 +254,6 @@ Two open layout questions:
 - `YARN.md` wants "overwhelming variety… gradients, sparkle, fuzziness, ball bands". Gradients and
   sparkle are per-instance-able; **fuzziness is not**, and becomes a family/tier split. Is 2–3 fuzz
   tiers enough variety, or is mohair its own family?
-- Does the flat-notion / 3D-yarn contrast still read as deliberate once yarn is genuinely 3D? The
-  DDR argues it separates *tools* from *stock* at a glance. That argument gets stronger, not
-  weaker — worth confirming with eyes.
 
 ---
 
@@ -306,9 +308,7 @@ Four things the write-up above got wrong, all caught by `scratchpad/tm/yarncheck
 
 ### Still open
 
-- **Nothing here has been seen.** No visual verification was possible from this side — the browser
-  extension is unavailable, so every claim above is measured or structural, never "it looks good".
-  The silhouette test in particular is a *judgement*, and the tooling only sets it up.
+- ~~**Nothing here has been seen.**~~ **Seen:** §8, §10, §15.
 - **The matcap is generated, not painted.** Good for tuning, and a real painted matcap will beat it.
 - ~~**`trueVolume` exposes a live layout conflict.**~~ **RESOLVED — see §12.** A 3×3×3 ball drawn at true volume is
   `3 × cell × 0.9` tall — **0.70 units** at the demo's default 0.26 cell — against a 0.22 shelf
@@ -318,8 +318,7 @@ Four things the write-up above got wrong, all caught by `scratchpad/tm/yarncheck
   notions are flat so it never came up — and this is the substantive layout finding of the spike:
   either the shelf gap grows with the bulkiest yarn a display accepts, or bulk stops meaning
   height. §4 flagged the stacking half of this; the build turned it into a number.
-- **Yarn is raycast directly** in the demo, which the perf rules forbid at 1000 items. Fine at
-  demo scale, and noted in the HUD, but the production path must go back to slot-plane picking.
+- ~~**Yarn is raycast directly**~~ **Done:** §9, pick-place.js.
 
 ---
 
@@ -337,6 +336,7 @@ only kind of evidence the rest of this document cannot produce.
 - **A medium-weight ink outline beats a hairline.**
 
 Both are now the defaults (`mcRim` 1.0, `outlineWidth` 0.016).
+Superseded 2026-10-12: outline width 0.009, ink colour `#1b1418` (`YARN_LOOK` in `yarn-look.js`, see §16).
 
 ### Fix
 
@@ -788,7 +788,7 @@ camouflage against the stock (`../DESIGN-DECISIONS.md` §5, "Anti-camouflage"). 
 the one that makes it safe: the reason to constrain lightness was never "make it all one
 lightness", it was "keep merchandise out of the band the characters live in".
 
-Not yet built — recorded as a decision to take.
+Built in §14.
 
 ---
 
@@ -807,6 +807,13 @@ full spread.
   that box stays empty at every spread — which is what makes opening the rest safe rather than a
   camouflage regression. Asserted at spreads 0, 0.5 and 1.
 - Curation returns later as *themes* or *box sets*, on top of a wide range rather than instead of one.
+- **Three colour families, not one box.** Bold 45% (L 0.52–0.72, C 0.13–0.20), muted/heather 40%
+  (L 0.52–0.78, C 0–0.07), pastel 15% (L 0.80–0.93, C 0.04–0.11). A real shop is mostly saturated
+  mid tones and heathers, with pastels a minority; one box makes any light, slightly chromatic
+  colour a pastel and the wall reads as Easter. garments.test.mjs holds the bold and pastel shares.
+- **A colour inside `characterRange` is nudged to its nearer lightness edge, not re-rolled**, so the
+  distribution stays even. Only low-chroma colours can collide, so a saturated yarn may sit at any
+  lightness.
 
 One thing the check found: **`oklch()` clips out-of-gamut channels at zero, and clipping a channel
 rotates the hue.** At full spread, 83 of 2000 samples were landing more than 12 degrees off their
@@ -969,12 +976,18 @@ Guarded: `lookcheck.mjs` now asserts the lit midtone is above 0.72, with the old
 negative control, and separately asserts the shadow side still descends — a near-white matcap with
 no shadow would be flat, which is the opposite failure.
 
+**Retuned 2026-10-12** in the demo GUI, now `YARN_LOOK` in `yarn-look.js`, read by the demo and the shop: tier
+`med`, matcap `#d9d1c4` / `#ffffff` / `#112718`, rim 1, wrap 0.55; paper band rim 1, wrap 0.73; hatching 15
+strands at depth 0.56; ink outline 0.009, `#1b1418`. The new midtone sits below the near-white this section
+argued for; the shop's yarn bypasses tone mapping (`toneMapped = false` in `goods/yarn.js`), so exposure 0.95 stays demo-only.
+
 ### Yaw jitter, shared
 
 `scatterYaw()` and `settleYaw()` now live in `pick-place.js` beside the rest of the placement
 logic. They had drifted into three copies at three different amounts — 0.18pi in the shop, 0.22pi
 for notions in the demo, and **0.5pi for yarn**, which is nearly a quarter turn and reads as dumped
-rather than arranged. One number, one place, and yarn now gets exactly what notions get.
+rather than arranged. One number, one place, and yarn now gets exactly what notions get. Booklets
+are the exception: they stand square to the shelf like books, with no jitter.
 
 `settleYaw` accumulates rather than re-rolling, which is the property worth protecting: a thing
 never lands quite as it was lifted, but repeated pick-ups must not erase an arrangement.
@@ -995,7 +1008,7 @@ What moved, and what deliberately did not:
 
 | | demo | shop |
 |---|---|---|
-| families | 6 (`ball cake skein cone mini booklet`) | the 3 the catalog sells |
+| families | 5 (`ball cake skein cone mini`) | the 3 the catalog sells |
 | footprint | from the GEOMETRY (`familyFootprint`, skein 2x1) | from `catalog.js` — a yarn's WEIGHT |
 | layer pitch | `cell/8`, fine | `BOX_H` 0.055, coarse and already tuned for notions |
 | colour | rolled per item | a fixed index the sim carries (`colorIndex`) |

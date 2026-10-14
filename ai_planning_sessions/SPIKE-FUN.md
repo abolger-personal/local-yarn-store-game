@@ -83,7 +83,7 @@ Round 1 of response:
   B5. The FROG PILE, finally. A WIP abandoned too long gets frogged, and the yarn comes back to your shop as recycled yarn carrying its story ("this was going to be a sweater"). Supply source + emotional beat + a
   failure state that isn't punishing.
 
-  B6. Lent finished objects become furniture. Already half-specced (Drop Off exists, docs say gifted FOs can satisfy formations). Let the player hang them — a shawl over a chair, hats on a rack. Your shop gets
+  B6. Lent finished objects become furniture. Already half-specced (lending exists, docs say gifted FOs can satisfy formations). Let the player hang them — a shawl over a chair, hats on a rack. Your shop gets
   literally prettier as a function of NPCs succeeding. That's the reward loop you're asking for and it's mostly built.
 
   B7. Mastery tracks. Skill caps at 5; make hitting 5 turn an NPC into a Teacher. A visible per-regular track — "Marguerite is one sweater from mastering" — gives every returning customer a reason to matter.

@@ -1,77 +1,32 @@
-// Pose data and pose maths: the channel list, the named poses, the interpolators, the idle
-// layer and the walk cycle.
-//
-// Pure: no three.js, no DOM, no scene. Same rule as visit.js and wip.js, and for the same
-// reason -- characters/motion.test.mjs runs this under bare `node`. npc.js imports three AND
-// three/addons, so anything testable that way cannot live there. npc.js re-exports the pose
-// data from here, so no existing import site had to change.
-//
-// THE INVARIANT, and everything here depends on it:
-//
-//   cur[] and vel[] hold the COMMANDED pose only. The idle layer, the walk layer,
-//   clampArmOut and groundCharacter are read-only consumers DOWNSTREAM of it.
-//   Nothing downstream is ever written back upstream.
-//
-// Five things break if that is violated. A filter that reads its own output is an oscillator,
-// so the spring would chase the idle and emit a phase-lagged second copy of it (reads as a
-// tremor). Idle amplitude would become trait-dependent by accident, because a spring's response
-// to a sinusoid depends on the idle frequency over sqrt(stiff) -- a stiff character would
-// breathe DEEPER than a withdrawn one, the opposite of the intent and undebuggable from the
-// amplitude constant. The interrupt handover would stop being reproducible, so the motion lab
-// could never hit the same interrupt twice. A blink is a ~120ms snap and through a 0.35s spring
-// becomes a slow droop. And clampArmOut forces armOut UP, so fed back it would ratchet: a llama
-// resting near the body ellipsoid gets pushed out, starts the next frame from the pushed value,
-// gets pushed again -- arms rising over a minute, and nobody would ever find it.
-
-// ---------------------------------------------------------------- channels
-
-// The interpolated channels. `holdItem` is NOT here -- it is a boolean, and Boolean(0.37) is
-// true, so interpolating it would show a carried item at 37% of the way through a blend. It
-// rides as the derived `hold` scalar in MOTION_KEYS instead. `blink` is not here either: it is
-// a ~120ms snap the idle layer writes straight into the output, and pushing it through an
-// interpolator is what turns a blink into a droop.
+// Rules and invariant: ai_planning_sessions/characters/MOTION.md
 export const POSE_KEYS = [
   'armSwing', 'armSwingAlt', 'armOut', 'armOutAlt', 'elbowBend', 'legSwing', 'kneeBend',
   'hipFlex', 'spineBend', 'spineRoll', 'spineTwist', 'earPerk', 'earSplay',
-  'headYaw', 'headPitch', 'headTilt', 'tailLift', 'tailWag',
+  'headYaw', 'headPitch', 'headTilt', 'tailLift', 'tailWag', 'earFlap',
 ];
 
-// What the interpolator actually integrates: every pose channel, plus `hold`.
 export const MOTION_KEYS = [...POSE_KEYS, 'hold'];
 
 const HOLD = MOTION_KEYS.indexOf('hold');
 const TAU = Math.PI * 2;
 
-// armSwing applies to BOTH arms identically (npc.js applyPose), so the rig has no counter-swing
-// channel at all -- and counter-swing is the single biggest readability cue in a walk. armSwingAlt
-// is the anti-symmetric partner: positive is contralateral to positive legSwing.
 export const REST_POSE = Object.freeze({
   armSwing: 0, armSwingAlt: 0, armOut: 0, armOutAlt: 0, elbowBend: 0, legSwing: 0, kneeBend: 0,
   hipFlex: 0, spineBend: 0, spineRoll: 0, spineTwist: 0, earPerk: 0, earSplay: 0,
-  headYaw: 0, headPitch: 0, headTilt: 0, tailLift: 0, tailWag: 0,
+  headYaw: 0, headPitch: 0, headTilt: 0, tailLift: 0, tailWag: 0, earFlap: 0,
   holdItem: false, blink: 0,
 });
 
-// Every pose carries every channel, even the ones it does not use. A pose missing a key makes
-// interpolation produce NaN, NaN reaches the bounding sphere, and the renderer culls the whole
-// character -- which looks like characters popping in and out rather than like a broken pose.
 const definePoses = (raw) => Object.freeze(Object.fromEntries(
   Object.entries(raw).map(([name, pose]) => [name, Object.freeze({ ...REST_POSE, ...pose })]),
 ));
 
 export const POSES = definePoses({
-  // elbowBend is NOT zero here, and that is anatomy rather than taste: an arm hanging dead
-  // straight reads as a doll. It was zero, and the only thing bending it was armTuck -- so the
-  // moment armTuck stopped being a personality trait, every character's arms locked out
-  // straight. A resting bend belongs to the POSE, where no personality decision can remove it.
   rest:   { armOut: 0.16, elbowBend: 0.22 },
   walk:   { armSwing: 0.42, armOut: 0.14, elbowBend: 0.30, legSwing: 0.30, kneeBend: 1.50 },
   carry:  { armSwing: -0.12, armOut: 0.02, elbowBend: 1.45, holdItem: true },
   reach:  { armSwing: -1.15, armOut: 0.30, elbowBend: 0.35 },
   browse: { armSwing: -0.45, armOut: 0.34, elbowBend: 0.85, spineBend: 0.14 },
-  // thighs forward to horizontal, shins dropped back to vertical: kneeBend has to match hipFlex
-  // tailLift: a chair is a cube, so a hanging tail would go into the seat. Lifted, it lies out
-  // behind instead.
   sit:    { armSwing: -0.10, armOut: 0.22, elbowBend: 0.75, kneeBend: 1.45, hipFlex: 1.45, spineBend: 0.10,
             tailLift: 1.0 },
   delighted: { armSwing: -0.30, armOut: 2.55, elbowBend: 0.55, kneeBend: 0.10, earPerk: 0.38, earSplay: 0.22,
@@ -79,52 +34,7 @@ export const POSES = definePoses({
   'walk+carry': { armSwing: -0.10, armOut: 0.03, elbowBend: 1.40, legSwing: 0.30, kneeBend: 1.50, holdItem: true },
 });
 
-// ---------------------------------------------------------------- dances
-//
-// The five in ai_planning_sessions/characters/DANCES.md, as key poses on a clock.
-//
-// A dance is DATA, not code, and that is only possible because of how integrate() already works:
-// it detects a target change by object IDENTITY and carries the channel's velocity across it. So
-// handing it a new frozen pose every so often makes the spring do all the in-betweening, with no
-// keyframe system, no curves, and no interpolator of our own. Velocity continuity is exactly what
-// stops a keyframed dance reading as a robot stepping between statues.
-//
-// Three things about this rig shape every pose below, all measured rather than assumed:
-//
-//  1. STANDING ON ONE LEG is `hipFlex = -legSwing`. legSwing is anti-symmetric (legSwing * side)
-//     and hipFlex is symmetric, so equal and opposite cancels one leg and doubles the other.
-//     hipFlex POSITIVE with legSwing negative lifts the left leg IN FRONT; hipFlex negative with
-//     legSwing positive lifts it BEHIND. Nothing else here can do it, and rig.test.mjs pins it.
-//  2. THE ARMS were mirrored by construction until armOutAlt: `rotation.z = side * armOut`. Any
-//     asymmetric line -- a port de bras, a floss -- needs armOutAlt or armSwingAlt.
-//  3. THE BODY does not turn. applyPose never writes root.rotation.y, so a pirouette's turn is a
-//     ROOT EXTRA (below) rather than a pose channel.
-
-/**
- * What a dance asks of the root, which no pose channel can express: `turn` (radians about Y),
- * `rise` (metres up, a SUSTAINED lift like a relevé), `travel` (metres forward along facing) and
- * `shift` (metres sideways -- the HIPS).
- *
- * ponytail: `shift` moves the whole root, so the feet slide with the hips instead of staying
- * planted. Real hip sway is the pelvis moving over planted feet, which needs lateral rotation at
- * the hip joint -- a channel this rig does not have, and one that grounding could not follow,
- * because lowestFoot derives height from hip and knee angles about X alone. At 0.035 units the
- * slide is a few pixels at the distance the shop draws these. Upgrade is hip abduction plus a
- * grounding that understands it, which is a bigger change than every dance put together.
- *
- * A `hop` is the fourth, and it is deliberately not one of these: it is a transient ARC within its
- * own step, up and back down to zero, rather than a position that is held. That difference is what
- * lets a LOOPING dance hop -- a sustained rise at the end of a cycle would snap back to zero at the
- * wrap, because the first step lerps from nothing. A hop has nowhere to snap back from.
- *
- * Returned as DATA and never written to the root, exactly as `built.groundOffset` already works --
- * because the root belongs to whoever placed the character. In the shop that is cast.js, which
- * owns facing and position; in the lab it is the page. Both add these on top of their own.
- *
- * A step that omits one CARRIES THE PREVIOUS VALUE FORWARD rather than falling back to zero: a
- * pirouette sets turn to 2pi as it spins and every later step should hold the new facing, not
- * unwind to where it started. Resolved once here, at module load, so the per-frame path is a lerp.
- */
+// ponytail: `shift` moves the whole root, so the feet slide with the hips; upgrade is hip abduction plus grounding that follows it.
 const resolveExtras = (steps) => {
   let cur = { turn: 0, rise: 0, travel: 0, shift: 0 };
   return steps.map((s) => {
@@ -138,15 +48,6 @@ const resolveExtras = (steps) => {
   });
 };
 
-/**
- * The walk speed for each step: the step's own, else the dance's.
- *
- * NOT carried forward like the other extras, and the difference is deliberate. turn/rise/travel are
- * POSITIONS -- where the root has got to -- so holding the last one is what stops a dance unwinding.
- * `walk` is a RATE, and a rate that carries forward means one `walk: 0` freeze silently stops the
- * walk for the rest of the dance. Falling back to the dance's own value makes each step say what it
- * is doing, which is what the Uptown Funk beat needs: step, freeze, step, freeze.
- */
 const resolveWalk = (steps, dance) => Object.freeze(steps.map((s) => s.walk ?? dance ?? 0));
 const NO_EXTRAS = Object.freeze({ turn: 0, rise: 0, travel: 0, shift: 0 });
 
@@ -159,65 +60,15 @@ const defineDances = (raw) => Object.freeze(Object.fromEntries(
   })]),
 ));
 
-// The key poses. Built through definePoses like POSES, so every one carries every channel and a
-// forgotten key cannot produce the NaN that culls a whole character.
 export const DANCE_POSES = definePoses({
-  // -- riverdance: "stiff upper body and straight arms, all in feet". The arms are pinned in and
-  // straight, the spine does NOTHING, and every bit of movement is a knee. hipFlex stays positive
-  // throughout and legSwing flips sign, which swaps which leg is up without changing that it is
-  // the FRONT leg lifting.
   'rd-left':  { armOut: 0.10, elbowBend: 0.06, legSwing: -0.95, hipFlex: 0.95, kneeBend: 1.90, headPitch: -0.05 },
   'rd-right': { armOut: 0.10, elbowBend: 0.06, legSwing: 0.95, hipFlex: 0.95, kneeBend: 1.90, headPitch: -0.05 },
-  // THE KICK. A high knee and a kick are the same leg isolation with opposite knees: the knee comes
-  // up and the shin stays tucked (kneeBend 1.90) for a march, or the leg extends and the shin comes
-  // THROUGH (kneeBend 0.15) for a kick. Without one of these the dance is all knees, which reads as
-  // marching on the spot however fast the feet go.
   'rd-kick-l': { armOut: 0.10, elbowBend: 0.06, legSwing: -0.80, hipFlex: 0.80, kneeBend: 0.15, headPitch: -0.05 },
   'rd-kick-r': { armOut: 0.10, elbowBend: 0.06, legSwing: 0.80, hipFlex: 0.80, kneeBend: 0.15, headPitch: -0.05 },
-  // THE HOP, replacing the old both-feet-down plant. Both legs together and slightly tucked, so the
-  // feet come off the ground as a pair -- the beat where the whole body leaves the floor. The lift
-  // itself is the step's `hop` arc; this is only what the legs do while airborne.
   'rd-hop': { armOut: 0.12, elbowBend: 0.06, legSwing: 0, hipFlex: 0.34, kneeBend: 0.82, headPitch: -0.05 },
-  // THE STEP-BEHIND: one foot swung back and STILL ON THE FLOOR, which is a different thing from
-  // every other beat here -- those lift a leg, this one plants both.
-  //
-  // It works because hipFlex is what breaks the legs' symmetry: at hipFlex 0 the two legs rotate
-  // about their own hips by equal and opposite angles, so both feet rise by exactly the same
-  // amount and grounding sets the body down on both. Measured on both species, straight-kneed:
-  // legSwing 0.72 puts the back foot 0.15 behind with both feet level to within a thousandth.
-  //
-  // kneeBend stays at zero, for two measured reasons rather than one. kneeAmount bends the trailing
-  // leg harder than the leading one, so a bent knee lifts the back foot off the floor: 0.041 as a
-  // static pose, though only 0.027 in the dance as it actually runs, because the spring does not
-  // fully arrive inside a 0.17s beat. And the straight-legged splay squats deeper, which is worth
-  // more than it sounds -- it takes the body's height swing from 0.097 to 0.109. Straight legs are
-  // also simply what the dance looks like.
-  //
-  // The splay lowers the hips ~0.06 on its own, which feeds the bounce for free: the body sinks
-  // into the step and the next hop throws it back up.
   'rd-behind-l': { armOut: 0.10, elbowBend: 0.06, legSwing: 0.72, hipFlex: 0, kneeBend: 0, headPitch: -0.05 },
   'rd-behind-r': { armOut: 0.10, elbowBend: 0.06, legSwing: -0.72, hipFlex: 0, kneeBend: 0, headPitch: -0.05 },
 
-  // -- floss. Built from the wikiHow breakdown rather than from memory, because the first attempt
-  // had the arms swinging fore-and-aft like a march and nothing at all happening at the hips.
-  //
-  // What the reference actually shows:
-  //   * the arms stay STRAIGHT (elbowBend ~0) and travel as a PAIR to one side of the body -- one
-  //     arm reaching away, the other crossing in front of the belly. That pairing is armOutAlt:
-  //     one shoulder abducts while the other adducts. Without it both arms mirror and the whole
-  //     dance disappears, which is exactly what was on screen.
-  //   * one of the pair passes IN FRONT of the torso and the other BEHIND it -- armSwingAlt.
-  //   * the HIPS swing the opposite way to the arms. Arms left, hips right. That counter-motion is
-  //     the joke of the dance; without it a character is just waving.
-  //
-  // So each side is: arms to one side (armOutAlt), one front one back (armSwingAlt), hips shifted
-  // the OTHER way (the step's `shift`), and the chest twisted to follow the arms while the spine
-  // leans back over the hips.
-  // Named for where the ARMS are, because that is the half you actually look at. armOutAlt positive
-  // sends BOTH arms to the character's left: the left shoulder abducts to 1.35 while the right
-  // adducts to -0.75, which is the right arm crossing the belly. The spine leans WITH the arms and
-  // the hips go the other way (the step's `shift`) -- that is the counter-motion, and having the
-  // lean and the hips agree instead was the bug: measured, they countered on 6 frames out of 247.
   'floss-l': {
     armOutAlt: 1.05, armSwingAlt: -0.55, armOut: 0.30, elbowBend: 0.04,
     spineTwist: 0.30, spineRoll: 0.26, hipFlex: 0.10, headYaw: 0.12,
@@ -227,8 +78,6 @@ export const DANCE_POSES = definePoses({
     spineTwist: -0.30, spineRoll: -0.26, hipFlex: 0.10, headYaw: -0.12,
   },
 
-  // -- attitude: standing leg planted, working leg lifted BEHIND with a bent knee, and the arms in
-  // an asymmetric line -- one high, one out -- which is what armOutAlt exists for.
   'att-prep': { armOut: 0.55, elbowBend: 0.50, hipFlex: 0.30, kneeBend: 0.75 },
   'att-hold': {
     armOut: 1.00, armOutAlt: 1.10, elbowBend: 0.45, armSwing: -0.20,
@@ -236,9 +85,6 @@ export const DANCE_POSES = definePoses({
     spineBend: 0.12, headTilt: 0.15, headPitch: -0.08, earPerk: 0.25,
   },
 
-  // -- pirouette: plie to load, passe with the arms rounded in first while the ROOT turns, then
-  // open out of it. There are no ankles on this rig, so the releve is a root `rise` rather than a
-  // foot articulation -- a stylised nod at a piqué, which is the honest ceiling here.
   'pir-plie':  { armOut: 0.70, elbowBend: 0.90, armSwing: -0.25, hipFlex: 0.35, kneeBend: 0.90 },
   'pir-turn':  {
     armOut: 0.30, elbowBend: 1.25, armSwing: -0.55,
@@ -246,28 +92,8 @@ export const DANCE_POSES = definePoses({
   },
   'pir-open':  { armOut: 0.90, armOutAlt: 0.35, elbowBend: 0.50, armSwing: -0.30, hipFlex: 0.18, kneeBend: 0.45, earPerk: 0.30 },
 
-  // -- uptown funk: STEP, FREEZE MID-STEP, SNAP, step, freeze, snap on the other side.
-  //
-  // The pause is the dance. A continuous strut is just a walk with a lean on it; what makes this
-  // read as Uptown Funk is stopping dead mid-stride and hitting a pose on the beat. So the step
-  // poses and the FREEZE poses are different: the freezes carry the big lateral lean and the arm
-  // snap, and they run with the walk layer switched off (`walk: 0` on those steps) so the legs
-  // hold wherever the stride left them instead of walking through the beat.
-  //
-  // The legs are left at zero in all four because the walk layer drives them during the step --
-  // the layers are additive, so this is a real walk cycle with a torso pose over it.
   'uf-step-l': { spineTwist: 0.22, spineRoll: -0.20, armSwingAlt: 0.40, armOut: 0.30, elbowBend: 0.60, headYaw: -0.15, earPerk: 0.20 },
   'uf-step-r': { spineTwist: -0.22, spineRoll: 0.20, armSwingAlt: -0.40, armOut: 0.30, elbowBend: 0.60, headYaw: 0.15, earPerk: 0.20 },
-  // The snap. Everything bigger and to one side: the lean nearly triples, the arms point across
-  // the body, the head turns to follow the point, ears up. spineRoll is the side-to-side, and it
-  // is the channel doing most of the work at this beat.
-  //
-  // legSwing and kneeBend are HERE, on the freeze, and that is the whole difference between
-  // "freeze mid-step" and "stop and stand still". The walk layer is not running during a snap
-  // (walk: 0), so with no leg content the character brought their feet neatly together on every
-  // beat -- measured 0.000 stride separation at the end of each freeze, which is a dancer coming
-  // to attention rather than one caught mid-stride. Positive legSwing takes the LEFT leg back, so
-  // each snap catches the leg on its own side FORWARD, matching the lean.
   'uf-snap-l': {
     spineTwist: 0.52, spineRoll: -0.58, armSwingAlt: 0.95, armOutAlt: -0.55,
     armOut: 0.62, elbowBend: 0.95, headYaw: -0.45, headTilt: -0.22, earPerk: 0.45, earSplay: 0.18,
@@ -280,34 +106,9 @@ export const DANCE_POSES = definePoses({
   },
 });
 
-/**
- * `stiff`/`zeta` per dance because a dance wants a snappier spring than a browse blend: the default
- * 150 settles in about a third of a second, which is slower than a riverdance step.
- *
- * `walk` is the speed to run the WALK LAYER at underneath the dance, not a property of the poses.
- *
- * `loop` dances must declare no root extras -- wrapping the index back to 0 would unwind the turn
- * and snap the travel back to the origin, which reads as a teleport. motion.test.mjs asserts it.
- */
 export const DANCES = defineDances({
   riverdance: {
     stiff: 520, zeta: 0.80, loop: true, walk: 0,
-    // kick -- HOP -- knee -- HOP, then the same on the other foot. Eight beats, so the dance takes
-    // a full bar to come back round and does not read as a two-frame flip.
-    //
-    // The old version alternated a high knee with a both-feet-down plant, and that plant was the
-    // problem: a beat where both feet are on the floor and the body does not move is a MARCH. The
-    // hop replaces it, so every second beat now leaves the ground -- which is where the bounce in
-    // an Irish step dance actually comes from.
-    //
-    // The hop is on the airborne beat itself and arcs back to zero within it, which is what lets a
-    // LOOPING dance use it at all. A sustained `rise` here would snap to the floor at the wrap.
-    // Two mirrored halves of five: KICK, hop, STEP-BEHIND, high knee, hop. Ten beats is a long loop
-    // for a dance, and deliberately so -- a four-beat cycle at this tempo reads as a twitch, and
-    // the whole point of a step dance is that the feet are doing something you cannot quite follow.
-    //
-    // The step-behind is the only beat with both feet on the floor, and it is what the dance was
-    // missing: without it every beat is a lift, which is a drill rather than a dance.
     steps: [
       { pose: 'rd-kick-l', hold: 0.19 },
       { pose: 'rd-hop', hold: 0.15, hop: 0.055 },
@@ -323,8 +124,6 @@ export const DANCES = defineDances({
   },
   floss: {
     stiff: 380, zeta: 0.75, loop: true, walk: 0,
-    // `shift` is OPPOSITE the arms on each beat -- arms left, hips right. Two beats only: the
-    // floss has no pause in it, and the spring carries the arms through the middle on its own.
     steps: [
       { pose: 'floss-l', hold: 0.23, shift: -0.038 },
       { pose: 'floss-r', hold: 0.23, shift: 0.038 },
@@ -347,18 +146,7 @@ export const DANCES = defineDances({
     ],
   },
   'uptown-funk': {
-    // Stiffer and lighter than the other travelling dances: a SNAP has to arrive, and a little
-    // overshoot (zeta below 1) is what makes it land like a hit rather than a glide.
     stiff: 340, zeta: 0.70, loop: false, walk: 0.85,
-    // step -- FREEZE and snap -- step -- FREEZE and snap on the other side.
-    //
-    // `walk: 0` on a freeze is the whole trick: the walk layer stops being run, so the legs hold
-    // wherever the stride left them -- caught mid-step -- instead of strolling through the beat.
-    // travel repeats on the freeze, which is what makes the character stop MOVING too: the extras
-    // lerp toward a target equal to where they already are.
-    //
-    // A step is short and a freeze is long. That ratio IS the groove -- even holds read as a
-    // march. The last freeze gets an extra beat to land on.
     steps: [
       { pose: 'uf-step-l', hold: 0.26, travel: 0.42 },
       { pose: 'uf-snap-l', hold: 0.40, travel: 0.42, walk: 0 },
@@ -372,23 +160,11 @@ export const DANCES = defineDances({
 
 export const DANCE_NAMES = Object.freeze(Object.keys(DANCES));
 
-/** Per-performance state. Cheap and disposable: one per character per dance. */
 export const makeDance = (name) => ({ name, i: 0, t: 0, done: false, looped: false });
 
-// Named `sCurve`, not `smoothstep`: smoothstep in this file is one of the three INTERPOLATORS, a
-// three-argument (m, dt, opts) thing, and two functions a screen apart with the same name and
-// different signatures is how a five-minute bug gets made.
 const sCurve = (t) => t * t * (3 - 2 * t);
 const mix = (a, b, t) => a + (b - a) * t;
 
-/**
- * Advance one performance and report what to drive the character with this frame.
- *
- * Returns the step's POSE OBJECT itself, not a copy -- integrate() compares targets by identity to
- * spot an interrupt, so handing it the frozen singleton is what makes the blend carry velocity.
- * A copy would re-fire the interrupt every frame and the spring would never get anywhere.
- */
-/** Consume elapsed time, stepping the index on. A `while`, so one long frame can cross two steps. */
 function advanceDance(d, dance, dt) {
   const { steps } = dance;
   d.t += dt;
@@ -400,12 +176,6 @@ function advanceDance(d, dance, dt) {
   }
 }
 
-/**
- * The root extras a step blends FROM. At step 0 that is the LAST step once the dance has wrapped,
- * and nothing at all on the first pass. Getting this wrong is invisible until an extra alternates:
- * a loop whose shift goes +0.035 / -0.035 would snap from -0.035 to 0 on every wrap, because the
- * first step lerped from nothing. It cost nothing while every looping dance had all-zero extras.
- */
 function extrasBefore(d, extras) {
   if (d.i > 0) return extras[d.i - 1];
   return d.looped ? extras[extras.length - 1] : NO_EXTRAS;
@@ -417,21 +187,13 @@ export function stepDance(d, dt) {
   advanceDance(d, dance, dt);
   const step = steps[d.i];
   const raw = d.done ? 1 : Math.min(1, d.t / step.hold);
-  // Eased within the step, so the root does not change speed abruptly at a key pose. The pose
-  // itself is NOT eased here -- the spring is doing that, which is the whole design.
   const u = sCurve(raw);
   const from = extrasBefore(d, extras);
   const to = extras[d.i];
-  // The hop rides the RAW progress, not the eased one: sin of an already-eased t flattens the top
-  // into a hover. A half sine from the linear progress is the ballistic shape -- fastest leaving
-  // the ground and landing, slowest at the apex -- and it is zero at both ends by construction, so
-  // it needs no continuity handling at a step boundary or at a loop wrap.
   const hop = (step.hop ?? 0) * Math.sin(Math.PI * raw);
   return {
     pose: DANCE_POSES[step.pose],
     turn: mix(from.turn, to.turn, u),
-    // Summed, so a consumer only ever adds one number to the root -- a dance can hold a relevé and
-    // hop off it at the same time without the lab or cast.js knowing there are two ideas here.
     rise: mix(from.rise, to.rise, u) + hop,
     travel: mix(from.travel, to.travel, u),
     shift: mix(from.shift, to.shift, u),
@@ -440,138 +202,49 @@ export function stepDance(d, dt) {
   };
 }
 
-// ---------------------------------------------------------------- tuning
-
 export const MOTION_DEFAULTS = Object.freeze({
-  // TEMPORARY: 'spring' | 'hermite'. Two interpolators exist only so the motion lab can hit the
-  // SAME interrupt with both, side by side, on two characters in the same frame -- which is what
-  // makes this a per-character option rather than a module-level switch. When one wins, DELETE
-  // the loser: the losing branch in integrate(), this key, and the one read of opts.mode. Three
-  // places, all grep-able as `mode`. Do not build anything on it.
-  //
-  // 'smoothstep' is the third: the behaviour this change REPLACES, kept selectable so the lab can
-  // show the defect rather than assert it. Without a baseline on screen there is nothing to judge
-  // the other two against. It goes when the winner is chosen.
   mode: /** @type {'spring' | 'hermite' | 'smoothstep'} */ ('spring'),
 
-  stiff: 150,     // spring: natural frequency is sqrt(stiff) rad/s
-  zeta:  1.00,    // spring: damping RATIO, never an absolute coefficient -- absolute damping
-                  // means every stiffness increase silently under-damps the whole cast at once
-  blend: 0.35,    // hermite: the duration cast.js used to hardcode as BLEND
+  stiff: 150,
+  zeta:  1.00,
+  blend: 0.35,
 
-  idleAmount: 1,  // master idle gain. 0 disables the layer entirely (the "reduce motion" answer,
-                  // and the A/B switch for measuring what continuous motion actually costs)
+  idleAmount: 1,
   idleAmp:  1,
   idleRate: 1,
-  // HOW OFTEN they fidget, as distinct from how far. At 1 the sway runs continuously, which
-  // reads as permanent swaying rather than as standing around; below 1 it comes in bursts with
-  // real stillness between. Amplitude and duty cycle are genuinely different knobs, and
-  // conflating them is why a continuous idle looks restless rather than alive.
   idleDuty: 0.65,
-  headArc:  1,    // MUST be here and not only in BASE_MOTION_RANGES: a caller using the defaults
-                  // alone would otherwise multiply by undefined, and NaN on a head channel
-                  // reaches the bounding sphere and culls the whole character.
+  headArc:  1,
 
-  stride:    1.80,   // stride length as a multiple of leg-chain length. The foot-lock condition
-                     // is sin(swingAmp) = stride/2, so stride is capped near 2*sinMax ~ 1.13
-                     // before the legs physically cannot reach far enough and skate begins.
-  bounce:    0.05,   // NEGATIVE cancels the free bounce; see walkLayer
-  kneeLift:  0.55,   // swing-leg knee flexion; per-species, see BASE_MOTION_RANGES
-  // How much of the lift goes to the THIGH rather than the shin. 0 is a pure butt kick, which
-  // is what this was before it existed; around 0.5 reads as a march. It is a ratio of kneeLift
-  // rather than its own amount so that "pick your feet up" stays one control -- two would drift
-  // apart and give a character a high knee with a dangling shin, or the reverse.
+  stride:    1.80,
+  bounce:    0.05,
+  kneeLift:  0.55,
   marchRatio: 0.55,
   armGain:   0.55,
-  sway:      0.075,  // lateral body lean per step. The side-to-side half of a walk.
-  attend:    0,      // lean in, paying attention; crossfades with `lean` once walking
-  headCarry: 0,      // posture, not gait: applied standing AND walking
-  headCock:  0,      // sideways head tilt held while curious; sign is per-character
+  sway:      0.075,
+  attend:    0,
+  headCarry: 0,
+  headCock:  0,
   armTuck:   0,
-  tailCarry: 0,      // tail held up (outgoing) or down (anxious); posture, like headCarry
-  lean:      0.06,   // forward lean at full speed
-  // Ground speed at which the walk layer reaches full weight. Raised from 0.35 after tuning in
-  // the lab: against a top honest walk near 1.2 this means the legs ease in over most of the
-  // range rather than snapping to a full stride the instant a character moves.
+  tailCarry: 0,
+  lean:      0.06,
   gateSpeed: 0.86,
-  // rad/s: the fastest the torso will roll, ~72 deg/s. See walkLayer.
-  //
-  // Raised from 0.70 once the idle weight shift stopped fighting the sway on the same joint.
-  // At 0.70 this cap was the binding constraint at EVERY walking speed, not just fast ones:
-  // the boldest character asked for 9.7 degrees and was delivered 9.0 at a stroll, 5.4 at a
-  // normal walk and 3.8 at anything from a brisk walk up -- so widening the sway span alone
-  // would have bought exactly nothing above about 1.4 steps/s. The cap, not the span, was the
-  // ceiling anyone tuning sway was actually hitting.
-  //
-  // 1.25 keeps the cap doing its job -- it still bites at x0.65 at a normal walk and x0.45 at
-  // full cadence, so hurrying still damps the roll -- while leaving a stroller's swagger
-  // untouched, which is the walk the cap was strangling.
   swayRateMax: 1.25,
-  cadenceMax: 3.4,   // steps/sec before stride stretches instead of cadence rising
-  // steps/sec below which stride SHORTENS instead of cadence falling. 0 is off: the lab walks at
-  // ~1.2 units/s where it never binds. The shop's slow ▶ stroll sets it (SHOP_GAIT, config.js), or
-  // a stilt llama at 0.24 units/s takes one step every 1.4 seconds.
+  cadenceMax: 3.4,
   cadenceMin: 0,
-  sinMax:    0.5646, // sin(0.6 rad): the most scissor that still reads as walking
+  sinMax:    0.5646,
 });
 
-// Per-individual spans. A species kit overrides these to say how much variation ITS individuals
-// get: the trait values pick WHERE in the span a character lands, the species owns HOW WIDE the
-// span is. A narrow span means every llama moves alike; a wide one means high individual variety.
-// Kits may narrow or widen a span -- never invent a channel. That is "ADD or SCALE, never
-// REPLACE" applied to motion, and the self-check asserts it.
 export const BASE_MOTION_RANGES = Object.freeze({
   stiff:    [60, 240],
-  // Damping RATIO, not an absolute coefficient -- absolute damping means every stiffness
-  // increase silently under-damps the whole cast at once. Below 1 overshoots.
-  //
-  // Measured overshoot on a fresh move: 0.45 -> 19.6%, 0.55 -> 11.6%, 0.65 -> 5.7%,
-  // 0.75 -> 2.0%, 0.85 -> 0.2%, and everything from 0.85 up is indistinguishable. The old
-  // [0.60, 1.50] span spent two thirds of its travel in that dead zone, which is why the
-  // bounce read as flat across a cast. This span is live end to end: a volatile character
-  // wobbles visibly, an orderly one arrives dead clean.
   zeta:     [0.45, 1.00],
   idleAmp:  [0.40, 1.60],
-  // How fast they fidget, from Neuroticism. Wide on purpose: at the old [0.75, 1.25] the most
-  // volatile character in the game was 1.67x the calmest, which is not a difference anyone
-  // reads. Across this span a jittery character shifts about every 1.1s against 5.5s for a
-  // placid one, which is the difference between tapping along to a beat and standing still.
   idleRate: [0.60, 3.00],
   stride:   [1.40, 2.24],
   bounce:   [0.00, 0.12],
-  // How high the swinging leg picks its foot up. Per-species because it is leg mechanics, not
-  // style: a leggy animal placing its feet and a stumpy one scuttling are different gaits, not
-  // different moods. Was a single global constant, which MOTION-TODO already owed.
   kneeLift: [0.35, 0.78],
   headArc:  [0.50, 1.50],
 });
 
-/**
- * How far past a shipped span the lab lets you drag, and where it refuses to go.
- *
- * The padding is the point of the control: a span you can only narrow is not a tuning tool, and
- * a kit authoring a bolder value than the base (the llama's knee lift is 1.70 against a base
- * 0.78) has to stay dialable. But padding blindly put the floor of EVERY one of these eight
- * sliders below zero, and almost none of them mean anything down there:
- *
- *   stiff  < 0   spring() takes sqrt(stiff), so the damping goes NaN, and NaN on a joint
- *                reaches the bounding sphere and culls the whole character -- the
- *                "characters popping in and out" failure npc.js warns about, from a slider.
- *   zeta   < 0   negative damping is energy INJECTION. Measured at zeta -0.5: 3x past the
- *                target after one second and still growing. It diverges.
- *   the rest     amounts. A negative amplitude is the same wobble phase-flipped, a negative
- *                rate is the same clock running backwards, and neither is distinguishable on
- *                screen from its positive twin -- so half the slider is a decoy.
- *
- * `bounce` is the exception and the reason this is a list rather than a blanket clamp: the free
- * bob comes from the legs scissoring, so a NEGATIVE bounce cancels it. That is documented in
- * walkLayer and it is a real setting.
- *
- * Zero itself is allowed and is the honest bottom of each: no wobble, no bounce, no knee lift.
- * `stiff: 0` freezes the commanded pose (the idle and walk layers keep running, since they are
- * downstream), which reads as a character who has stopped taking direction -- useless, but
- * legible, and finite.
- */
 const SIGNED_SPANS = new Set(['bounce']);
 
 export function spanBounds(k, lo, hi) {
@@ -579,94 +252,27 @@ export function spanBounds(k, lo, hi) {
   return [SIGNED_SPANS.has(k) ? lo - pad : Math.max(0, lo - pad), hi + pad];
 }
 
-/**
- * WALKING STYLE: personality only, identical for every species, NOT tunable per kit.
- *
- * All of these are ANGLES, and that is the whole reason they live apart from the table above.
- *
- * A style expressed as a LENGTH is welded to leg length -- stride has to scale with the legs or
- * the feet skate -- so it can never carry personality on its own: a stilt llama and a stumpy owl
- * of identical temperament will always differ more than two opposite temperaments on the same
- * legs. Angles have no such coupling. A 40-degree arm swing is a 40-degree arm swing on any
- * body, so these read as character rather than as size.
- *
- * Which is exactly why a species must NOT be able to touch them. The moment a kit narrows
- * `sway`, "excitable characters roll when they walk" stops being true of the game and starts
- * being true of one animal, and the reader of a walk has to know which species they are looking
- * at before they can read the temperament. These five are the part of the vocabulary that is
- * supposed to be universal.
- *
- * It is also the maintenance argument, with more kits coming: seven spans to consider per new
- * species instead of twelve, and no way to accidentally flatten a style dial in a kit and spend
- * an afternoon wondering why one species reads as having no personality.
- *
- * Measured before splitting: neither shipped kit overrode ANY of these -- between-species share
- * of variance was 0% for all five -- so this removes a capability nobody used, not a tuning.
- */
 export const STYLE_RANGES = Object.freeze({
-  armGain:   [0.20, 1.10],   // how much the arms counter-swing
-  // How far the body rolls over the planted foot. The top was 0.17 while the idle weight shift
-  // was rolling the same joint underneath it -- the two beating against each other read as a
-  // bobble-head, and the only sway that looked clean was a small one. With that gone, the roll
-  // is the only thing on the axis and can be a real swagger: 15 degrees at the top, which is
-  // big for a person and right for a stylised animal seen across a room.
+  armGain:   [0.20, 1.10],
   sway:      [0.02, 0.26],
-  lean:      [0.00, 0.17],   // how far they lean into the walk
-  headCarry: [-0.24, 0.22],  // negative = head up and open, positive = head down and closed
-  // The head COCK: a sideways tilt held while curious. Deliberately a different axis from
-  // headCarry, so confidence (pitch, up/down) and curiosity (roll, sideways) cannot be mistaken
-  // for one another -- which is exactly what happened when pitch was the only head posture
-  // there was and a confident character read as an interested one.
-  //
-  // Signed by the individual rather than always the same way: a whole cast cocking their heads
-  // to the left reads as a rigging error. The sign comes from the idle seed, so it is stable
-  // for a character -- a head that changed which way it cocked would read as a twitch.
-  headCock:  [0.00, 0.20],   // ~11 degrees at the top, which is a clear cock and not a lean
-  // LEANING IN. Conscientiousness reached nothing at all while a character stood still -- it
-  // moved zeta, stride, sway and lean, every one of which is walk-or-arrival -- so a diligent
-  // character and a careless one were identical until they set off. This is the standing tell:
-  // torso forward, paying attention. Negative at the bottom, which is a slight lean back and
-  // reads as not especially bothered.
-  //
-  // It CROSSFADES with the walking lean rather than adding to it -- see walkLayer. Both are the
-  // torso going forward, and two of them stacking would put a purposeful, focused character at
-  // 20 degrees off vertical, which reads as falling rather than as intent.
-  attend:    [-0.05, 0.18],  // ~10 degrees forward at the top; POSES.browse leans 0.14 to look
-  // ponytail: armTuck is a CONSTANT elbow offset, so it also bends the arm of a character who
-  // is reaching for a shelf -- capped low enough that this reads as "holds themselves in"
-  // rather than as a broken reach. The real fix is posture that fades out while a pose needs a
-  // specific arm shape; do that if the knitting pose ever lands.
-  armTuck:   [0.00, 0.50],   // elbows bent, arms held in against the body
-  // TAIL CARRIAGE: up and out when outgoing, down toward tucked when anxious. The same E-N read
-  // as headCarry, on the other end of the body, so the two agree -- a head held high over a
-  // tucked tail would read as two characters. An angle added to the species' own resting droop,
-  // so a lion's J and an owl's fan both lift by the same amount for the same temperament.
+  lean:      [0.00, 0.17],
+  headCarry: [-0.24, 0.22],
+  headCock:  [0.00, 0.20],
+  attend:    [-0.05, 0.18],
+  // ponytail: a constant elbow offset, so it also bends a reach; fade posture during arm poses if a knitting pose lands
+  armTuck:   [0.00, 0.50],
   tailCarry: [-0.35, 0.35],
 });
-
-// ---------------------------------------------------------------- traits -> coefficients
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const span = (range, u) => range[0] + (range[1] - range[0]) * clamp01(u);
 
 /**
- * Per-character motion coefficients, from the five Big-5 FACTORS.
- *
- * The ten assets remain the stored, spec-named truth -- CHARACTER-ATTRIBUTES.md is explicit that
- * those exact names carry the spec and that synonyms are a violation -- but motion reads the five
- * factors derived from them, because twelve coefficients hanging off ten assets is more
- * personality dials than anyone can hold while tuning. See factors().
- *
- * @param {Record<string, number>} traits the ten assets, 1-5 (visit.js randomTraits)
- * @param {Record<string, number[]>} [ranges] the species' spans
+ * @param {Record<string, number>} traits
+ * @param {Record<string, number[]>} [ranges]
  */
 export function motionOf(traits, ranges = BASE_MOTION_RANGES) {
   const u = traitPositions(traits);
-  // Written out rather than looped, so the coefficient object has a real shape for the type
-  // checker and for anything reading this to find out what a species can tune. The self-check
-  // asserts every BASE_MOTION_RANGES key still appears, so the two cannot drift apart.
-  // A species may narrow or widen anything in BASE_MOTION_RANGES. STYLE_RANGES is deliberately
-  // not consulted through `ranges` at all, so a kit cannot reach it even by passing the key.
   const pick = (k) => span(ranges[k] ?? BASE_MOTION_RANGES[k], u[k]);
   const style = (k) => span(STYLE_RANGES[k], u[k]);
   return {
@@ -679,35 +285,10 @@ export function motionOf(traits, ranges = BASE_MOTION_RANGES) {
   };
 }
 
-// A coefficient built from TWO traits lands on a triangular distribution, not a flat one: the
-// two middles cancel far more often than the ends line up, so a random cast bunches around the
-// centre of the span and the dial reads as if it were not wired to anything. Measured p10..p90
-// occupancy: 75% for every two-trait coefficient against 100% for every single-trait one.
-//
-// `d` is the deviation from the middle of the span. Single-FACTOR coefficients do not come
-// through here at all: the quantile mapping above already makes those uniform, and they reach
-// 87% occupancy, which is simply what nine discrete levels give you. Only differences need it.
-//
-// Swept with the quantile factors in place: 1.3 leaves the worst difference dial at 68%, 1.6
-// reaches 83%, and 1.9 reaches 87% -- the same ceiling the single-factor dials have, so that is
-// where it stops being the limiting factor. Past 1.9 nothing improves and the pinning keeps
-// climbing (21% at 2.2, 28% at 3.0).
+// MOTION.md §Traits to motion
 const SPREAD = 1.9;
 const pair = (d) => clamp01(0.5 + SPREAD * d);
 
-/**
- * The five FACTORS, each the mean of its two assets, on the assets' own 1..5 scale.
- *
- * Motion is tied to these rather than to the ten assets. Twelve coefficients hanging off ten
- * assets meant ten personality dials to reason about before you could predict how one character
- * would move, and no way to hold "how extraverted is this one" in your head at all.
- *
- * The pairing is DeYoung's and it is the one visit.js already documents at its TRAITS list, so
- * this invents nothing: the assets keep their exact spec names as the inputs, and the factors
- * are only a reading of them. Note that the Openness/Intellect FACTOR shares a name with the
- * Openness ASSET inside it -- that collision is DeYoung's, not ours, so the factor key spells
- * out both halves.
- */
 export function factors(t) {
   return {
     Neuroticism: (t.Volatility + t.Withdrawal) / 2,
@@ -718,21 +299,9 @@ export function factors(t) {
   };
 }
 
-// A factor is the MEAN of two independent 1..5 assets, so its nine possible values are not
-// equally likely: there are five ways to average 3 and only one to average 1. Feeding that mean
-// straight into a span would bunch a cast around the middle of every dial -- the same defect the
-// two-asset differences had, but now baked into every single coefficient as well.
-//
-// So a factor's position on a span is its QUANTILE, not its value: the share of the population
-// at or below it. That makes factor position uniform by construction, and needs no widening and
-// pins nobody at a limit. Indexed by the SUM of the two assets, 2..10.
-//
-// Measured alternative, for the record: leaving the mean raw and widening instead needs SPREAD
-// 1.9 to reach the same spread, and that pins one character in six at an end of every dial.
 const FACTOR_Q = Object.freeze([0, 0.0625, 0.1667, 0.3125, 0.5, 0.6875, 0.8333, 0.9375, 1]);
 const factorUnit = (a, b) => FACTOR_Q[a + b - 2];
 
-/** The four motion-driving factors as quantile positions, 0..1. Agreeableness drives none. */
 function factorUnits(t) {
   return {
     N: factorUnit(t.Volatility, t.Withdrawal),
@@ -742,154 +311,63 @@ function factorUnits(t) {
   };
 }
 
-/**
- * Where this character sits, 0..1, on each coefficient's span.
- *
- * Four of the five factors drive motion. Agreeableness does not, and that is not an oversight:
- * it is the factor about how you treat people, and it belongs to what an NPC DOES -- visit.js
- * already spends it -- rather than to how their body moves. Nothing says every factor has to
- * drive every system.
- */
 function traitPositions(t) {
   const { N, E, C, O } = factorUnits(t);
   return {
-    // Outgoing and settled moves like it meant it; anxious and withdrawn dawdles.
     stiff: pair(0.5 * (E - N)),
-    // Neuroticism is reactivity, so it is what un-damps; Conscientiousness pulls back toward
-    // exactly critical. Low here means overshoot.
     zeta: pair(0.5 * (C - N)),
     idleAmp: pair(0.5 * (E - N)),
     idleRate: N, stride: C, bounce: E,
-    // A diligent character picks their feet up; a careless one scuffs along.
     kneeLift: C,
     headArc: O,
-    // Arms swing when a character is outgoing and pin to the body when they are not.
     armGain: pair(0.5 * (E - N)),
-    // A conscientious character walks a tidy line; an excitable one rolls.
     sway: pair(0.5 * (E - C)),
-    // Leaning into the walk is purposefulness: outgoing AND organised.
     lean: pair(0.5 * (E + C) - 0.5),
-    // The single most readable posture signal, and completely free of leg length: head up and
-    // open, or down and closed.
     headCarry: pair(0.5 * (N - E)),
-    // Curiosity, and Openness alone: the same factor that decides how much they look around,
-    // so a curious character reads as curious standing still as well as while moving.
     headCock: O,
-    // Focus, and Conscientiousness alone. The one thing C does that is visible standing still.
     attend: C,
-    // armTuck is NOT here on purpose. Holding your arms in against your body reads as tense --
-    // as a state you are in right now, not as a way you are -- and wired to Neuroticism it made
-    // every anxious character permanently braced, which is both wrong and tiring to look at.
-    // The channel and its knob stay, for an emotional layer to drive when there is one.
-    // Personality leaves it at zero.
     armTuck: 0,
-    // Outgoing carries the tail high, anxious tucks it. Opposite sign to headCarry, whose
-    // positive is head DOWN.
     tailCarry: pair(0.5 * (E - N)),
   };
 }
 
-// ---------------------------------------------------------------- per-character state
-
-// Explicit Euler on a spring diverges once dt gets large, and store/main.js clamps dt to 0.1 --
-// which is NOT enough: at stiff 240 the bound is ~0.129s and a lab slider at 500 is already
-// outside it. Divergence gives Infinity, then NaN, then the bounding sphere, then the renderer
-// culls the character. So the clamp lives HERE rather than at the call sites: crowd.html and the
-// lab inherit it without knowing, and motion merely slows during a hitch instead of exploding.
+// MOTION.md §Integration
 const MAX_DT = 1 / 30;
 
-// The substep cap is what keeps overshoot frame-rate INDEPENDENT. Measured: a semi-implicit
-// one-liner is equally stable but its overshoot decays with dt (1.077 / 1.064 / 1.032 at
-// 60 / 30 / 10fps), so the bounce you tune on a laptop quietly flattens on a throttled tablet --
-// i.e. the personality vanishes on exactly the hardware it was for. Substepping holds it at
-// 1.089 / 1.089 / 1.089. Cost at the worst frame is ~12 substeps, on a frame already late.
 const MAX_H = 1 / 120;
 
 const WAG_W = TAU * 2.0;
-const WAG_AMP = 0.45;     // radians either side at tailWag 1
-const FLICK_DUR = 0.34;   // an ear flick is quick; slower reads as a droop
+const WAG_AMP = 0.45;
+const FLAP_AMP = 0.90;
+const FLICK_DUR = 0.34;
 const BLINK_DUR = 0.12;
-const BREATH_W = TAU * 0.25;    // ~4s per breath at idleRate 1
+const BREATH_W = TAU * 0.25;
 
-// THE FIDGET CLOCK, separate from the breath clock, and the reason is that they must not scale
-// together. A keyed-up character taps, shifts and jiggles several times faster than a placid
-// one -- but a character breathing three times faster is PANTING, which reads as distress or as
-// having just run somewhere, not as nervous energy.
-//
-// Measured before splitting: the weight shift ran at 0.17x the breath frequency, so one cycle
-// took 18.2s on a calm owl and 11.4s on the most volatile one. That is a slow drift, not a
-// fidget, and no widening of idleRate could have fixed it -- at the old 1.6x span the fastest
-// character in the game still took eleven seconds to shift their weight once.
-const FIDGET_W = TAU * 0.30;    // ~3.3s per shift at idleRate 1, ~1.1s at 3
+const FIDGET_W = TAU * 0.30;
 
-/** Breathing answers to idleRate, but only partly -- see FIDGET_W. */
 const breathRate = (r) => 0.65 + 0.35 * r;
 
-/**
- * ...and breath DEPTH answers to idleAmp only partly, for exactly the same reason.
- *
- * Breathing is not a fidget. Everyone breathes, at roughly the same depth, whatever their
- * temperament -- a calm animal breathes SLOWER, not shallower, and `breathRate` already says so.
- * Scaling depth by the raw fidget amplitude made a placid owl (idleAmp 0.30 on the owl's own
- * span) breathe 1.55 degrees peak to peak, which is a statue.
- *
- * That went unnoticed while the head was also multiplied by idleAmp -- body and head were quiet
- * together, so the character read as calm rather than as broken. Two later changes moved the
- * head off it and left the chest behind: decoupling headArc from idleAmp (right in itself: E was
- * driving the head twice) made the head 1.4x to 3.3x bigger, and the fidget-clock speed-up made
- * it ~3x faster. Measured on a calm owl afterwards: 35 degrees of head yaw against 1.6 of chest,
- * a 23:1 ratio, which is a head coming off a still body -- and the shape of the report.
- *
- * Same curve as breathRate and for the same reason, so the two stay legible side by side: the
- * quietest breather is still 65% of the liveliest, never a tenth of it.
- */
 const breathDepth = (amp) => 0.65 + 0.35 * amp;
 
 /** @typedef {ReturnType<typeof makeMotion>} Motion */
 /** @typedef {typeof MOTION_DEFAULTS & ReturnType<typeof motionOf>} MotionOpts */
 
-/** Reads a pose object into a channel array. `hold` is derived, never stored, so it cannot drift. */
 function readInto(arr, pose) {
   for (let i = 0; i < MOTION_KEYS.length; i++) arr[i] = pose[MOTION_KEYS[i]] ?? 0;
   arr[HOLD] = pose.holdItem ? 1 : 0;
   return arr;
 }
 
-/**
- * One character's motion state.
- *
- * Typed arrays indexed by MOTION_KEYS position rather than string-keyed objects: fixed shape, no
- * hidden-class churn, no megamorphic property access on the per-frame path.
- *
- * @param {Record<string, any>} pose the pose the rig was BUILT in, so frame 1 has zero error and zero
- *   velocity by construction and there is nothing to lurch from
- * @param {number} [seed] 0..1, so a crowd does not breathe in unison
- */
-/**
- * Everything about a character's idle that is decided once and never changes: the clocks, their
- * per-character rates, and the two fixed handednesses.
- *
- * The rates are deliberately incommensurate -- no two are multiples of each other -- because
- * rhythms that share a period read as one mechanism, and a visible repeat is what makes an idle
- * look like an animation rather than like life.
- */
 function rhythms(seed) {
   return {
     seed: seed * TAU,
-    idlePhase: seed * TAU,            // breathing
-    fidgetPhase: seed * TAU,          // its own clock, and a faster one: see FIDGET_W
-    // Per-character sub-rhythm rates: see idleLayer. WIDE, because these set how long each
-    // character holds a weight shift, and at the old 0.85..1.10 that was a 24% spread -- every
-    // character rolling with the same 4s period, which reads as one shared wave however offset
-    // their phases are. Incommensurate rates are what stop an idle looping visibly, and rates
-    // this close are very nearly commensurate.
-    rateA: 0.55 + seed * 1.05,        // 2.9x, so periods genuinely differ rather than beat
+    idlePhase: seed * TAU,
+    fidgetPhase: seed * TAU,
+    rateA: 0.55 + seed * 1.05,
     rateB: 0.30 + (1 - seed) * 0.55,
     blinkT: 1 + seed * 4,
-    earT: 0.7 + seed * 5,             // offset from the blink so the two never sync up
-    earWay: seed < 0.5 ? -1 : 1,      // which ear leads a flick
-    // Which way this character cocks their head. Fixed for life: a head that changed sides
-    // would read as a twitch rather than as a way of holding yourself.
+    earT: 0.7 + seed * 5,
+    earWay: seed < 0.5 ? -1 : 1,
     cockWay: seed < 0.5 ? -1 : 1,
     wagPhase: seed * TAU,
   };
@@ -900,9 +378,7 @@ export function makeMotion(pose, seed = Math.random()) {
   const m = {
     cur: new Float64Array(n), vel: new Float64Array(n),
     from: new Float64Array(n), fromVel: new Float64Array(n), to: new Float64Array(n),
-    target: null,      // identity only, for interrupt detection. NEVER read for values.
-    // The tail's own spring: [yaw, pitch, yawVel, pitchVel] at the root, then the same at the tip.
-    // Separate from cur[] and never written into it -- see tailStep.
+    target: null,
     tail: new Float64Array(8),
     t: 1,
     walkGain: 0,
@@ -913,7 +389,6 @@ export function makeMotion(pose, seed = Math.random()) {
   return m;
 }
 
-/** Snaps to a pose with zero velocity. Spawn, and the lab's reset button. */
 export function resetMotion(m, pose) {
   readInto(m.cur, pose);
   m.vel.fill(0);
@@ -928,29 +403,18 @@ export function resetMotion(m, pose) {
 export const valueOf = (m, key) => m.cur[MOTION_KEYS.indexOf(key)];
 export const velocityOf = (m, key) => m.vel[MOTION_KEYS.indexOf(key)];
 
-// ---------------------------------------------------------------- the interpolators
-
 /**
- * Advances the commanded pose toward `target`, and the idle clocks with it.
- *
- * The property both modes exist to provide: VELOCITY survives an interrupt. Today's smoothstep,
- * t*t*(3-2*t), has slope zero at both ends, so retargeting mid-blend discards the channel's speed
- * -- measured at 97% lost on a walk->browse blend interrupted by delight. Position was already
- * continuous; velocity was not, and that is the hitch.
- *
- * @param {Motion} m state from makeMotion
- * @param {Record<string, any>} target a pose object. Held by IDENTITY for interrupt detection and copied for
- *   values -- never retained for reading, or a caller passing the composed output back in would
- *   make the interpolator chase itself.
- * @param {number} dt seconds
- * @param {MotionOpts} opts MOTION_DEFAULTS merged with motionOf()
+ * @param {Motion} m
+ * @param {Record<string, any>} target
+ * @param {number} dt
+ * @param {MotionOpts} opts
  */
 export function integrate(m, target, dt, opts) {
   const step = dt > MAX_DT ? MAX_DT : dt;
   const retargeted = target !== m.target;
   if (retargeted) {
     m.from.set(m.cur);
-    m.fromVel.set(m.vel);     // the measured incoming velocity -- this is the whole fix
+    m.fromVel.set(m.vel);
     readInto(m.to, target);
     m.target = target;
     m.t = 0;
@@ -964,41 +428,19 @@ export function integrate(m, target, dt, opts) {
   return m;
 }
 
-/**
- * The three idle clocks: the breathing phase, the blink, and the ear flick.
- *
- * All advance with the REAL dt, not the clamped one -- a long frame really did take that long,
- * and a breath that stalls through a hitch reads worse than one that jumps. They run at rates
- * that are deliberately not multiples of each other: two twitch rhythms sharing a period read as
- * one mechanism, and that is what makes an idle look like an animation instead of like life.
- */
 function advanceClocks(m, dt, opts) {
   m.idlePhase += dt * BREATH_W * breathRate(opts.idleRate);
   if (m.idlePhase > TAU * 1e6) m.idlePhase %= TAU;
-  // THE GATE STOPS THE CLOCK; it does not fade the lean out.
-  //
-  // Scaling the weight shift's AMPLITUDE by the duty gate dragged every character smoothly back
-  // through upright and out again on a ~10s cycle -- a slow envelope on a slow sine, which is a
-  // swell, and the measured roll then spent 51% of its time in the middle third of its range.
-  // That envelope was most of the "seasick on an invisible boat".
-  //
-  // It is also not what a body does. When you stop shifting about you do not glide back to
-  // centre; you stay standing on whichever foot you were already on. Freezing the clock says
-  // exactly that, and it is the same line of code.
   m.fidgetPhase += dt * FIDGET_W * opts.idleRate
     * dutyGate(m.idlePhase, opts.idleDuty ?? 1, m.seed);
   if (m.fidgetPhase > TAU * 1e6) m.fidgetPhase %= TAU;
 
-  // Faster for a keyed-up character, as the fidget is -- but only partly, or an anxious lion's
-  // tail buzzes. ~2 wags a second at idleRate 1.
   m.wagPhase += dt * WAG_W * (0.7 + 0.3 * opts.idleRate);
   if (m.wagPhase > TAU * 1e6) m.wagPhase %= TAU;
 
   m.blinkT -= dt;
   if (m.blinkT < -BLINK_DUR) m.blinkT = 2 + Math.random() * 5;
 
-  // Flick rate follows how often they fidget, so one knob governs both -- but an ear is never
-  // fully stilled, for the same reason breathing is not.
   m.earT -= dt * (0.45 + 0.55 * (opts.idleDuty ?? 1));
   if (m.earT < -FLICK_DUR) {
     m.earT = 1.4 + Math.random() * 6;
@@ -1008,7 +450,7 @@ function advanceClocks(m, dt, opts) {
 
 function spring(m, dt, opts) {
   const k = opts.stiff;
-  const c = 2 * opts.zeta * Math.sqrt(k);     // hoisted: zeta is a ratio, damping is derived
+  const c = 2 * opts.zeta * Math.sqrt(k);
   const n = Math.ceil(dt / MAX_H) || 1;
   const h = dt / n;
   const { cur, vel, to } = m;
@@ -1020,32 +462,20 @@ function spring(m, dt, opts) {
   }
 }
 
-// Smoothstep IS this Hermite with m0 = m1 = 0 -- t*t*(3-2*t) is the h01 basis alone. So this is a
-// strict generalisation of what cast.js used to do, and it states the old bug in one line: m0 was
-// hard-zero, so every interrupt relaunched from a standstill.
 function hermite(m, dt, opts) {
   const dur = opts.blend;
   m.t = Math.min(1, m.t + dt / dur);
   const { t } = m, t2 = t * t, t3 = t2 * t;
-  // The h11 basis and its derivative are absent on purpose: the outgoing tangent m1 is 0, so a
-  // transition arrives at rest and both terms are multiplications by zero.
   const h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = -2 * t3 + 3 * t2;
-  // Basis derivatives, so velocity is maintained ANALYTICALLY. A finite difference would inject
-  // the frame-time jitter of a throttled tablet into the next transition's start tangent -- the
-  // one thing this whole change exists to keep clean.
   const d00 = 6 * t2 - 6 * t, d10 = 3 * t2 - 4 * t + 1, d01 = -6 * t2 + 6 * t;
   const { cur, vel, from, fromVel, to } = m;
   for (let i = 0; i < cur.length; i++) {
-    const m0 = fromVel[i] * dur;               // the MEASURED incoming velocity: the whole fix
+    const m0 = fromVel[i] * dur;
     cur[i] = h00 * from[i] + h10 * m0 + h01 * to[i];
     vel[i] = (d00 * from[i] + d10 * m0 + d01 * to[i]) / dur;
   }
 }
 
-// The OLD behaviour, for comparison only: Hermite with both tangents forced to zero. Position
-// is carried across an interrupt but velocity is not, because t*t*(3-2*t) has slope zero at
-// t = 0 -- so a channel travelling at 4 rad/s is stopped dead in a single frame and has to
-// accelerate again from rest. That is the hitch this whole module exists to remove.
 function smoothstep(m, dt, opts) {
   m.t = Math.min(1, m.t + dt / opts.blend);
   const e = m.t * m.t * (3 - 2 * m.t);
@@ -1057,13 +487,6 @@ function smoothstep(m, dt, opts) {
   }
 }
 
-// ---------------------------------------------------------------- the additive layers
-
-/**
- * Scatters the commanded pose into a plain object and sums the idle layer on top.
- *
- * Stateless and downstream: the idle offsets are never written back into cur[]. See the header.
- */
 export function compose(out, m, opts) {
   for (let i = 0; i < POSE_KEYS.length; i++) out[POSE_KEYS[i]] = m.cur[i];
   out.holdItem = m.cur[HOLD] > 0.5;
@@ -1071,69 +494,26 @@ export function compose(out, m, opts) {
   out.kneeSwing = 0;
   out.neckCurve = 0;
 
-  // POSTURE: how this character carries itself, standing or walking. It sits ABOVE the idle
-  // early-out on purpose -- posture is carriage, not fidgeting, so a character with the idle
-  // layer turned all the way down is still withdrawn or still confident. Putting it below meant
-  // "idle amount 0" silently erased personality along with the movement. Pure angles, so it
-  // reads the same on a stumpy owl and a stilt llama.
   out.headPitch += opts.headCarry ?? 0;
-  // The cock is POSTURE, not a fidget, so it sits up here with headCarry and survives the idle
-  // being turned down -- a curious character is curious whether or not they are moving.
   out.headTilt += (opts.headCock ?? 0) * m.cockWay;
   out.spineBend += opts.attend ?? 0;
   out.elbowBend += opts.armTuck ?? 0;
-  // The tail's TARGET, not its angle: tailStep is the spring that chases it, so a wag arrives
-  // with lag and overshoot and a lifted tail swings up rather than snapping. Carriage is posture,
-  // so it sits up here with headCarry and survives the idle being turned down.
   out.tailPitch = out.tailLift + (opts.tailCarry ?? 0);
   out.tailYaw = out.tailWag * WAG_AMP * Math.sin(m.wagPhase);
+  // Outward only, on the wag clock: a flap that swung inward would cross the ears over the head.
+  out.earSplay += out.earFlap * FLAP_AMP * (1 - Math.cos(m.wagPhase)) / 2;
 
-  // THE EARLY-OUT IS ON THE MASTER DIAL ONLY, and the difference between the two is the whole
-  // point of having two. `idleAmount` is "run no idle at all" -- the reduce-motion answer, and
-  // the A/B switch for measuring what continuous motion costs -- so returning here is correct
-  // and is what makes that measurement honest.
-  //
-  // `idleAmp` is "this character does not fidget", which is a temperament, not an off switch.
-  // Gating the layer on their product meant dropping the fidget dial to zero also stopped the
-  // breathing and the blinking, so a perfectly still character became a corpse. Reported right
-  // after breath depth was moved off idleAmp: the fix worked everywhere except at exactly zero,
-  // because this line never let breathDepth run at all.
-  //
-  // Below, every fidget term carries `a` (or `g`, which is `a` gated), so they all reach zero on
-  // their own. Breathing and blinking do not, which is the intent.
   if (opts.idleAmount <= 0) return out;
   const a = opts.idleAmount * opts.idleAmp;
 
   idleLayer(out, m, opts, a);
-  // Blink rides its own timer, not the phase: blinks are Poisson-ish, and a blink on a sine is
-  // metronomic in a way that reads as a machine.
   if (m.blinkT < 0) out.blink = Math.sin((1 + m.blinkT / BLINK_DUR) * Math.PI);
   return out;
 }
 
-/**
- * Is this character mid-fidget right now?
- *
- * Returns 0 while holding still and ramps to 1 through a burst. Breathing is deliberately NOT
- * gated by this -- an animal that stops breathing when it stops shifting its weight reads as
- * switched off rather than as still.
- */
-
-/**
- * Ear flicks: the idle channel the rig has always had and nothing ever drove.
- *
- * A llama's ears and an owl's tufts sat dead through every idle, which on an animal whose ears
- * are half its silhouette is the most obviously missing thing on screen.
- *
- * A flick is not a sway -- it is fast, asymmetric, and on its own clock -- so it rides a
- * Poisson-ish timer like the blink rather than the idle sine. A sine here would read as ears
- * flapping in a breeze. Both ears share one channel pair, so the asymmetry has to come from
- * splay rather than a per-ear angle; that reads as one ear cocking, which is the right shape
- * even though both are moving.
- */
 function earFlick(out, m, a) {
   if (m.earT >= 0) return;
-  const k = Math.sin((1 + m.earT / FLICK_DUR) * Math.PI);   // 0 -> 1 -> 0 across the flick
+  const k = Math.sin((1 + m.earT / FLICK_DUR) * Math.PI);
   out.earPerk += a * 0.30 * k;
   out.earSplay += a * 0.16 * k * m.earWay;
 }
@@ -1141,184 +521,54 @@ function earFlick(out, m, a) {
 function dutyGate(p, duty, seed) {
   if (duty >= 1) return 1;
   const e = Math.sin(p * 0.37 + seed * 1.7);
-  const threshold = 1 - 2 * duty;          // duty 0.5 -> half the time, 0.15 -> rarely
+  const threshold = 1 - 2 * duty;
   return Math.max(0, Math.min(1, (e - threshold) / 0.35));
 }
 
-/** Breathing, the lateral weight shift, and the wandering head. All additive, all stateless. */
 function idleLayer(out, m, opts, a) {
   const p = m.idlePhase;
   const g = a * dutyGate(p, opts.idleDuty ?? 1, m.seed);
-  // Breathing. The chest lifts and the arms follow it a little, because an arm that stays put
-  // while the ribcage moves reads as a detached limb.
-  //
-  // NOT scaled by `a`: that carries idleAmp, and breath depth is not fidget amplitude. See
-  // breathDepth. idleAmount still gates it, because that is the master dial and the answer to
-  // "reduce motion" -- a character whose idle is switched off entirely holds still.
   const breath = (opts.idleAmount ?? 1) * breathDepth(opts.idleAmp ?? 1);
   out.spineBend -= breath * 0.045 * Math.sin(p);
   out.armOut += breath * 0.022 * Math.sin(p);
 
-  // WEIGHT SHIFT -- the side-to-side one, and the reason spineRoll exists. Everything else on
-  // the rig is fore-aft (spineBend, legSwing, hipFlex all rotate about X), so without a lateral
-  // channel an idle character can only ever bob forwards and backwards, which reads as breathing
-  // hard rather than as standing around.
-  //
-  // Each sub-rhythm gets a rate derived from the character's own seed (rateA/rateB, set in
-  // makeMotion), so no two characters run the same loop at an offset -- incommensurate rates
-  // never repeat, and a visible repeat is what makes an idle read as an animation, not as life.
   const q = m.fidgetPhase;
-  // DWELL, and this is what stops a cast reading as "seasick on an invisible boat".
-  //
-  // A weight shift is not a sine. You stand on one foot, stay there a while, then move your
-  // weight across and stay on the other. A sine never stays anywhere: it is always mid-crossing,
-  // and a body whose lateral lean is a continuous smooth sinusoid is doing exactly what a boat
-  // does. Measured on a standing owl, the roll spent 55% of its time inside the middle third of
-  // its range and only 24% out near an extreme -- worse than a raw sine, because the duty gate
-  // fades it in and out THROUGH zero as well.
-  //
-  // tanh flattens the crests and steepens the crossing without changing the period or the
-  // amplitude, so it is the same shift arriving decisively instead of drifting. It is not a
-  // square wave: the transitions stay smooth, which is what keeps it a shift of weight rather
-  // than a flinch.
-  //
-  // This is NOT a synchronisation problem, which is worth recording because it looked like one.
-  // Measured pairwise correlation of spine roll across a cast of eight standing for a minute:
-  // mean |r| = 0.05, i.e. independent. They were never moving together; they were each moving
-  // in a way that reads as a wave.
+  // MOTION.md §Idle: the weight shift dwells
   const w = Math.tanh(2.2 * Math.sin(q * m.rateA + m.seed)) / Math.tanh(2.2);
 
-  // THE WEIGHT SHIFT FADES OUT AS THEY WALK, and it is not a nicety.
-  //
-  // Shifting your weight from foot to foot IS what walking is -- the standing fidget and the
-  // walk's sway are the same physical act, and running both at once puts two independent
-  // oscillators on the SAME joint at incommensurate frequencies. Measured on a lively owl:
-  // sway +/-0.166 rad once per 0.6s stride, weight shift +/-0.092 rad on a 1.6s fidget clock,
-  // so the idle was 55% of the walk's amplitude and beating against it. That is the bobble-head.
-  //
-  // `still` is one frame stale -- compose runs before walkGain each tick -- which is invisible
-  // at any frame rate and much simpler than reordering the pipeline for it.
   const still = 1 - (m.walkGain ?? 0);
-  // `a`, not `g`: the duty gate now holds the POSE by stopping the clock (see advanceClocks)
-  // rather than shrinking the lean, so gating here as well would fade it out twice.
   out.spineRoll += a * still * 0.085 * w;
 
-  // The hip part of the weight shift FADES OUT as the character folds up, and this is not a
-  // nicety. groundCharacter derives root Y from the lowest foot, whose sensitivity to hipFlex is
-  // sin(hip) -- which is ~0 standing (hip near 0) and ~1 seated (POSES.sit has hipFlex 1.45).
-  // So the identical 0.020 rad wobble is invisible on a standing character and a 100x larger
-  // whole-body bounce on a seated one. Measured over two simulated minutes: root travel 0.05mm
-  // standing against 5.20mm sitting, and still 4.38mm with the duty cycle at its lowest, which
-  // is why a sitting owl looked like it never stopped moving however far that knob came down.
-  //
-  // It is also just wrong: you do not shift your weight between your feet while sitting on them.
   const upright = clamp01(1 - Math.abs(out.hipFlex) / 0.9);
   out.hipFlex += a * upright * still * 0.020 * Math.sin(q * m.rateA * 2 + m.seed);
-  // LOOKING AROUND IS CURIOSITY, and it gets its own amount rather than riding the general
-  // fidget amplitude. These used to be multiplied -- `g` already carries idleAmp -- which let
-  // Extraversion drive head movement harder than Openness did: measured on the owl's own spans,
-  // idleAmp varies 3.67x across a cast while headArc varies only 1.83x, so two thirds of the
-  // "curious" cue was extraversion wearing Openness's name.
-  //
-  // idleAmount still gates it, because that is the master dial and the reduce-motion answer,
-  // and the duty cycle still applies, because a character who has gone still should not carry
-  // on scanning the room. idleAmp does not.
-  // The head scans LESS while walking, and keeps doing it rather than stopping: someone on the
-  // move is mostly watching where they are going, and glancing around is still what curiosity
-  // looks like. Measured on a curious owl before this: +/-23 degrees of yaw on a 1.6s clock
-  // while the body strode on a 0.6s one, which is most of the remaining bobble.
-  //
-  // Unlike the weight shift this only fades PART way -- the weight shift is the walk doing the
-  // same job twice, whereas looking around is a separate intent the walk does not cover.
   const look = (opts.idleAmount ?? 1) * opts.headArc * (0.40 + 0.60 * still)
     * dutyGate(p, opts.idleDuty ?? 1, m.seed);
-  // THE NECK'S OWN RHYTHM. Long-necked animals never hold the neck rigid -- it settles and
-  // rises continuously, on a slower beat than the head's glancing. Its own rate again, so it
-  // does not lock to the breath or the fidget and turn the whole idle into one mechanism.
-  //
-  // Free in the terms that matter: no new node, no new material, no new draw call. The neck
-  // joint already exists and applyPose already writes it every frame.
   out.neckCurve = look * 0.075 * Math.sin(q * m.rateB * 0.62 + m.seed * 5);
 
-  // The tail's idle sway, on the fidget clock so it holds still when they do. Slow and small:
-  // the species signal SPIKE-FUN.md asks for, not a wag.
   out.tailYaw += a * 0.12 * Math.sin(q * m.rateB * 0.7 + m.seed * 7);
 
-  // THE TILT IS NOT LOOKING AROUND, and scaling it as though it were is the other half of the
-  // head-coming-off report. It rides `w` -- the BODY's weight-shift wave -- so it is postural
-  // follow-through, the body's roll continuing up the spine, not a glance. Curiosity already
-  // has its own sideways tilt in `headCock`, held rather than oscillating.
-  //
-  // Driven by `look` it took its amplitude from headArc while the thing it follows took a
-  // separate one from idleAmp, so the two drifted apart: measured on a calm owl, 13.6 degrees
-  // of head tilt against 2.9 of body roll, IN PHASE on the same wave. A head swinging nearly
-  // five times as far as the shoulders it sits on does not read as calm, it reads as loose.
-  //
-  // It uses the same g * still the weight shift uses, so the head tracks the body it is attached
-  // to at any fidget amount and fades out with it when they start walking.
   out.headTilt += g * still * 0.070 * w;
   headLook(out, m, look, q);
   earFlick(out, m, a);
 }
 
-/**
- * Glancing round the room: runs at a FRACTION of the fidget clock, because looking about is a
- * slower beat than jiggling on the spot and a head whipping around at tapping speed reads as
- * alarmed rather than interested. Still incommensurate with the body rhythm, so no visible
- * repeat.
- */
 function headLook(out, m, look, q) {
   out.headYaw += look * 0.180 * Math.sin(q * m.rateB + m.seed * 2);
   out.headPitch += look * 0.055 * Math.sin(q * m.rateB * 0.8 + m.seed * 3);
 }
 
-// ---------------------------------------------------------------- the tail
-
-// The tip's spring against the root's. Softer, so the tip trails the root and a tail whips
-// rather than swinging as a stick.
 const TAIL_TIP = 0.55;
-// The tail's two springs as [stiffness, damping, substep], refilled on every step rather than
-// allocated: tailStep runs per character per frame.
 const _rootSpring = [0, 0, 0], _tipSpring = [0, 0, 0];
-// Past this a tail is folding back on itself. Clamped on the OUTPUT side of the spring state,
-// never by rewriting the target.
 const TAIL_MAX = 1.3;
-// THE COUNTER-SWING: the tail swings against the body's roll, the way a tail balances a stride.
-// Needed because inertia alone does not reach it -- measured walking, the base's own acceleration
-// moved a lion's tail under a degree. The base sits near the roll's pivot and the stride is slow
-// against the tail's frequency, so physics says it rides along rigidly. This puts the swing in
-// the TARGET, so it still arrives through the spring, lagged and overshooting.
+// MOTION.md §Tail
 const TAIL_COUNTER = 2.5;
 const tailLim = (v) => Math.min(TAIL_MAX, Math.max(-TAIL_MAX, v));
 
 /**
- * THE TAIL: a passive spring, and the one thing on the rig that is MEANT to lag.
- *
- * The header's invariant still holds -- cur[] is never touched. This is a separate filter on the
- * COMPOSED target, with its own state in m.tail, and the reasons the header gives for keeping
- * springs off the idle are exactly what a tail wants: a phase-lagged copy of the body's motion
- * is follow-through, and overshoot is the tail settling. Both are the point.
- *
- * Two inputs. The TARGET (out.tailYaw / out.tailPitch, from compose: carriage, wag, idle sway)
- * pulls it where the character wants it. The ACCELERATION of the tail's base, in the body's own
- * frame, throws it the other way -- which is what makes it passive: the walk's bob and sway, a
- * turn, a stop, a hop, a pirouette all reach the tail without anything telling it they happened.
- * npc.js measures that acceleration, because only it has the world transform.
- *
- * The forcing is a pendulum's: the component of the inertial push perpendicular to the tail,
- * over its length. `droop` is the species' resting pitch, so a tail hanging straight down swings
- * fore-aft when the body stops, and one held out level bounces with the step instead.
- *
- * Stiffness is per species and NOT per temperament, so a wag's amplitude does not depend on
- * personality by accident. An under-damped spring does amplify a wag, and the wag clock runs
- * faster for a keyed-up character, which is nearer resonance -- measured delivered/asked: lion
- * 1.35 to 1.49 across its idleRate span, owl 1.21 to 1.27, llama 1.14 to 1.20. That is a
- * species constant plus under 10% from temperament, so it is tuned through WAG_AMP, not fought.
- *
  * @param {Motion} m
- * @param {Record<string, number>} out the composed pose; tail targets in, tail angles out
- * @param {number[]} accel base acceleration [x, y, z] in the body's frame
- * @param {number} dt seconds
+ * @param {Record<string, number>} out
+ * @param {number[]} accel
+ * @param {number} dt
  * @param {{stiff: number, zeta: number, reach: number, droop: number}} tail
  */
 export function tailStep(m, out, accel, dt, { stiff, zeta, reach, droop }) {
@@ -1327,7 +577,7 @@ export function tailStep(m, out, accel, dt, { stiff, zeta, reach, droop }) {
   const s = m.tail;
   const root = springOf(_rootSpring, stiff, zeta, h), tip = springOf(_tipSpring, stiff * TAIL_TIP, zeta, h);
   const p = droop + s[1];
-  const fy = accel[0] / reach;   // yaw swings across the tail at any droop: see addTail
+  const fy = accel[0] / reach;
   const fp = -(accel[1] * Math.cos(p) + accel[2] * Math.sin(p)) / reach;
   const yaw = out.tailYaw + TAIL_COUNTER * out.spineRoll;
   for (let i = 0; i < n; i++) {
@@ -1342,7 +592,6 @@ export function tailStep(m, out, accel, dt, { stiff, zeta, reach, droop }) {
   out.tailPitchTip = tailLim(s[5]);
 }
 
-/** A critically-scaled spring of stiffness k and damping ratio zeta, substepped by h, into `sp`. */
 function springOf(sp, k, zeta, h) {
   sp[0] = k;
   sp[1] = 2 * zeta * Math.sqrt(k);
@@ -1350,57 +599,19 @@ function springOf(sp, k, zeta, h) {
   return sp;
 }
 
-/** One damped-spring substep of angle s[i], whose velocity is s[i + 2], toward `to`, pushed by `f`. */
 function chase(s, i, to, f, sp) {
   const k = sp[0], c = sp[1], h = sp[2];
   s[i + 2] += ((to - s[i]) * k - s[i + 2] * c + f) * h;
   s[i] += s[i + 2] * h;
 }
 
-/**
- * Stride phase, stride length and swing amplitude, from DISTANCE TRAVELLED rather than time.
- *
- * Time-driven would skate, and skate differently for every character: legHeight is a tier-1
- * silhouette carrier spanning 5x across the cast, and stepWalk eases every route through a
- * smoothstep so nobody moves at constant speed anyway. Distance-driven gives the ease-out free --
- * as speed approaches zero the phase freezes mid-stride with the feet planted.
- *
- * The amplitude is scale-INVARIANT and that is the point: foot-lock needs the foot's peak-to-peak
- * travel, 2*L*sin(swingAmp), to equal the strideLen the body covers, so sin(swingAmp) = stride/2
- * and the L cancels. One knob, and the lock then holds at every leg length with no per-character
- * tuning -- verified against the rig across the full 5x legHeight spread.
- *
- * `skate` is the residual once the geometric ceiling binds -- the honest report that the feet are
- * now sliding because the body is moving faster than legs that length can carry it. Real hardware
- * and real routes never match the ideal; surface the number rather than hiding it.
- *
- * @param {number} walkDist metres accumulated along the ground
- * @param {number} speed current ground speed
- * @param {number} L leg-chain length: legHeight + hipInset
- */
-/**
- * The fastest this body can honestly walk: cadence at its cap, legs at full believable scissor.
- *
- * Above this the body outruns the legs and the feet slide -- which is allowed and is what
- * `skate` reports, but it is a deliberate look ("hurrying"), not a setting to wander past by
- * accident. It is almost entirely a function of LEG LENGTH, which is why a cast of mixed
- * heights has no single safe speed: measured on owl legs, 0.40 units/s on the shortest and
- * 1.46 on the longest.
- */
 export function topSpeed(L, opts) {
   return (opts.cadenceMax * 4 * L * opts.sinMax) / 2;
 }
 
-/** Wrap any real number into [0, 1). Negative phases happen when a character backs up. */
 const wrap01 = (x) => ((x % 1) + 1) % 1;
 
-/**
- * The stride length the CADENCE demands, deliberately unbounded -- see walkPhase. Split out so
- * phaseStep can divide by the same number walkPhase reports.
- */
 export function strideFor(speed, L, opts) {
-  // A slow walker shortens the stride rather than stepping in slow motion: below cadenceMin the
-  // stride is what keeps that cadence. Floored, so a standstill is a zero cadence and not 0/0.
   const natural = opts.cadenceMin > 0
     ? Math.min(opts.stride * L, Math.max((2 * speed) / opts.cadenceMin, 1e-6))
     : opts.stride * L;
@@ -1408,215 +619,43 @@ export function strideFor(speed, L, opts) {
   return Math.max(natural, needed);
 }
 
-/**
- * The gait at a given point in the cycle. `at` is the accumulated PHASE (0..1), not a distance:
- * advance it with phaseStep.
- */
 export function walkPhase(at, speed, L, opts) {
   const ceiling = 4 * L * opts.sinMax;
-  // TWO stride lengths, and keeping them apart is the whole fix.
-  //
-  // `gaitLen` is what the CADENCE demands and is deliberately unbounded, because it is what the
-  // phase is divided by: cadence is 2*speed/gaitLen and gaitLen >= needed = 2*speed/cadenceMax,
-  // so cadence can never exceed cadenceMax. That makes the knob an actual cap.
-  //
-  // `reach` is how far the legs can physically swing, and it IS bounded by the geometry.
-  //
-  // These used to be one value clamped to the ceiling, which quietly made cadenceMax a wish
-  // rather than a limit: once the ceiling bound, the phase was divided by the ceiling and
-  // cadence ran away with speed. Measured on a short-legged owl at speed 2.5: 21.5 steps/s,
-  // i.e. 10.7 leg cycles per second, sampled at 60fps -- about 5.6 frames per cycle, which is
-  // close enough to Nyquist that the legs alias instead of animating. That is the "looks crazy",
-  // and it was worst on short legs, which is why one long-legged owl looked fine.
   const gaitLen = strideFor(speed, L, opts);
   const reach = Math.min(gaitLen, ceiling);
-  // THE FOOT-LOCK CONDITION.
-  //
-  // A phase is one CYCLE -- legSwing runs a whole sine over it -- which is TWO steps, and each
-  // leg is planted for exactly half of it. So while one foot is down the body advances
-  // strideLen/2, not strideLen, and that is the distance that foot has to cover backwards
-  // relative to the body. Its peak-to-peak fore-aft travel is 2*L*sin(swingAmp), so
-  //
-  //     2*L*sin(swingAmp) = strideLen/2   ->   sin(swingAmp) = strideLen / (4*L)
-  //
-  // A previous pass changed this to /(2*L) on the strength of a probe that measured a whole
-  // cycle of one leg instead of its stance half -- the same off-by-a-half, just on the other
-  // side. Measured over the real stance window, planted-foot slip is 10.7% of stride at /(4*L)
-  // and 55.7% at /(2*L).
   const swingAmp = Math.asin(Math.min(reach / (4 * L), opts.sinMax));
-  // The honest report: how much of the body's travel the legs are NOT accounting for. A
-  // character who outruns their own legs skates, and skating reads far better than blurring --
-  // it looks like someone hurrying, where a blur looks like a broken rig.
   const skate = gaitLen > reach ? (gaitLen - reach) / gaitLen : 0;
   return { phase: wrap01(at), strideLen: gaitLen, reach, swingAmp, skate,
            cadence: 2 * speed / gaitLen };
 }
 
-/**
- * How far the gait advances this frame, as a fraction of a cycle. Add it to the running phase.
- *
- * THE PHASE IS ACCUMULATED, NOT DIVIDED, and that is not a refactor -- dividing was wrong.
- *
- * It used to be `walkDist / gaitLen`, total distance ever walked over the current stride length.
- * That is only stable if gaitLen is constant, and gaitLen is a function of SPEED: it stretches
- * to `2 * speed / cadenceMax` so that cadence can never exceed the cap. So every time a
- * character slowed down the divisor shrank underneath a numerator that only ever grows, and the
- * phase leapt.
- *
- * Measured on an owl easing through one 2-unit move, which should be 5.3 leg cycles:
- *
- *     walkDist at start   worst phase jump per frame   cycles actually run
- *              0                  46.8%                       5.2
- *             10                  47.7%                      14.4
- *            200                  49.5%                      18.8
- *
- * Half a cycle in a single frame, getting worse the longer that character had been in the shop.
- * That is legs spinning, and it appears exactly when a walk ENDS, because that is when the
- * deceleration is sharpest.
- *
- * The motion lab could never have shown it: its speed is a slider, so gaitLen never moved.
- * Nothing was wrong with the distance-driven idea -- a stride is still tied to ground covered,
- * the feet still stay planted at any speed and any leg length -- only with doing the division
- * once at the end instead of integrating it. Accumulating confines a change in stride length to
- * the step it happens on, which is what makes deceleration smooth rather than a jump.
- */
 export function phaseStep(moved, speed, L, opts) {
   const gaitLen = strideFor(speed, L, opts);
   return gaitLen > 0 ? moved / gaitLen : 0;
 }
 
-/**
- * Sums the walk cycle into an already-composed pose.
- *
- * kneeBend deliberately gets NOTHING. npc.js's kneeAmount already derives each knee from
- * tanh(legSwing * side * 4), which gives the leading leg the full bend and straightens the
- * trailing one, flipping smoothly through the passing frame. At a typical swing that is
- * tanh(+/-1.64) = +/-0.93 -- a walk cycle for free out of machinery that already shipped.
- *
- * Torso bounce is free too: groundCharacter derives root Y from the hip and knee angles, and
- * scissored legs are geometrically shorter, so the hips drop at footfall and rise at the passing
- * pose. That is also why you cannot exaggerate it by adding root Y -- grounding writes Y
- * absolutely and would erase it. The lever is hipFlex, which shortens both legs together.
- */
 export function walkLayer(out, w, gain, opts) {
   if (gain <= 0) return out;
   const s = Math.sin(TAU * w.phase);
 
-  // THE HIP, PER LEG -- and this is the rig upgrade the ceiling note said would be needed.
-  //
-  // A march and a butt kick are the same knee bend in different places: knee up in FRONT of the
-  // hip, or heel up behind it. The knee flexion peaks at mid-swing, and at mid-swing the hip
-  // angle is exactly zero -- thigh straight down -- so bending the knee there sent the heel
-  // backwards and nothing else. More knee lift bought a harder butt kick, never a march.
-  //
-  // A march needs the thigh to come FORWARD while the knee bends, which is a per-leg hip lift,
-  // and the rig appears not to have one: applyPose computes `legSwing * side - hipFlex`, so
-  // legSwing is antisymmetric and hipFlex hits both legs.
-  //
-  // But `a + b * side` can express ANY per-leg pair. Given a shape f(p) for one leg, the other
-  // being f(p + 0.5):
-  //
-  //     legSwing = (f(p) - f(p + 0.5)) / 2
-  //     hipFlex  = -(f(p) + f(p + 0.5)) / 2
-  //
-  // and the two recombine to exactly f(p) and f(p + 0.5). The hipFlex term looks like it should
-  // disturb the stance leg -- it is applied to both -- and the legSwing term cancels it there
-  // precisely. That is what makes a rectified, swing-only hip lift possible at all.
   const lift = opts.kneeLift * (opts.marchRatio ?? 0);
   const hipOf = (ph) => w.swingAmp * Math.sin(TAU * ph)
-    // Negative is forward. max(0, -cos) is 1 at mid-swing and 0 outside the swing half, so the
-    // stance leg never sees this and the planted foot is untouched.
     - lift * Math.max(0, -Math.cos(TAU * ph));
   const near = hipOf(w.phase), far = hipOf(w.phase + 0.5);
   out.legSwing += gain * (near - far) * 0.5;
   out.hipFlex -= gain * (near + far) * 0.5;
-  // Counter-swing. applyPose does `armSwing - side * armSwingAlt`, so side +1's arm goes BACK
-  // (rotation.x positive) when armSwingAlt is positive -- which is exactly when side +1's leg is
-  // going back too. Opposite of a walk. This was `-=`, i.e. the arms swung WITH the legs.
-  // The arms keep the plain sine: they counter-swing the LEGS' travel, and a marching thigh is
-  // a lift rather than a longer stride, so folding it in here would just overswing the arms.
   out.armSwingAlt += gain * opts.armGain * w.swingAmp * s;
-  // THE SWING-LEG KNEE. Without this the legs are rigid sticks: measured swing-foot ground
-  // clearance was 5mm on a 1.0-tall character, and because two rigid legs are exact mirrors
-  // BOTH feet reach the floor at the same instant, twice a cycle. That is the stomp that reads
-  // as a limp -- there is no stance phase at all, both feet plant and lift together.
-  //
-  // applyPose rectifies this per side (`max(0, side * kneeSwing)`), so one leg gets a positive
-  // pulse over its swing half and the other gets the same pulse half a cycle later, each leg
-  // dead straight through its whole stance. (kneeAmount cannot do this job -- it sees position,
-  // not direction, and a leg at legSwing 0 is mid-swing going one way and mid-stance the other.)
-  //
-  // WHICH HALF IS SWING, since every phase below depends on it and getting it backwards is
-  // invisible in a still frame. A limb hangs along -Y, so rotating it by +rotation.x puts its
-  // far end at -Z; the character faces +Z (POSES.browse leans in with spineBend +0.14, and the
-  // spine points up, so the same sign tips the head to +Z). Positive legSwing*side therefore
-  // puts that foot BEHIND. Side +1's hip angle is swingAmp*sin(TAU*p), so its foot sits at
-  // -L*sin(angle), which travels backwards relative to a body moving +Z exactly while
-  // cos(TAU*p) > 0. So side +1 is in STANCE around phase 0 and mid-SWING at phase 0.5, and the
-  // lift needs -cos, not +cos.
-  //
-  // ponytail: KNOWN CEILING. applyPose drives both legs from one scalar as `legSwing * side`,
-  // so the two legs are exact MIRRORS -- at every phase their hip angles are equal and
-  // opposite, so with equal knees their feet sit at exactly the same height and grounding has
-  // no reason to prefer either. Only the knee breaks the tie, and a backward-bending knee only
-  // RAISES the foot while the leg is behind the hip: flexing a leg that is already forward just
-  // brings the shin back toward vertical and puts the foot down. So the lift works over the
-  // back half of the swing and does nothing over the front half. Swept over amplitude x phase,
-  // the best a one-harmonic lift reaches is 3 contact swaps per cycle instead of 2 -- one extra
-  // flicker near footstrike, where the feet are genuinely tied anyway.
-  //
-  // The upgrade path, when the gait needs to be better than "reads right at diorama distance":
-  // a per-leg shape f(p) with the other leg at f(p + 0.5) is exactly representable on the
-  // channels that already exist, because `hip = legSwing * side - hipFlex` is `a + b * side`
-  // with a = -hipFlex and b = legSwing. Set legSwing = (f(p) - f(p+0.5))/2 and
-  // hipFlex = -(f(p) + f(p+0.5))/2 and ANY stance/swing asymmetry becomes authorable -- a real
-  // 60/40 split, a fast swing, a slow stance. The knee needs the same treatment, which means
-  // replacing the rectifier in applyPose with a linear `kneeSwing + side * kneeSwingAlt` pair.
-  // Do that only if the flicker actually reads on screen; it is a redesign, not a tweak.
+  // ponytail: one rectified knee harmonic, so a flicker near footstrike remains (MOTION-TODO.md §Known ceiling)
   out.kneeSwing = -gain * opts.kneeLift * Math.cos(TAU * w.phase);
-  // Footfall is MAX SCISSOR -- phase 0.25 and 0.75 -- not phase 0. Phase 0 is the passing pose,
-  // where the legs cross and the hips are at their highest. Measured root height over a cycle:
-  // -0.0003 at phase 0, -0.0416 at phase 0.25. This term had a +cos here, so it was adding its
-  // crouch at the top of the bob and cancelling the free one; that flattening is half of why the
-  // walk read as wrong. -cos puts it at the bottom, deepening the dip as intended, and a
-  // NEGATIVE bounce now cancels instead.
-  // ponytail: hipFlex also rotates both thighs forward, so past ~0.12 the character walks in a
-  // crouch. If a deeper bob is ever wanted, it needs a real pelvis height channel, not more of this.
+  // ponytail: past ~0.12 bounce this walks in a crouch; a deeper bob needs a pelvis height channel
   out.hipFlex += gain * opts.bounce * (0.5 - 0.5 * Math.cos(2 * TAU * w.phase));
-  // CROSSFADE, not a sum. `attend` is already in `out` from compose, and both it and `lean`
-  // are the torso going forward: a focused, purposeful character would otherwise reach 20
-  // degrees off vertical, which reads as falling. So walking trades one for the other -- at
-  // rest the lean is attention, at full stride it is gait, and in between it is a blend.
   out.spineBend += gain * (opts.lean - (opts.attend ?? 0));
-  // Sway: the mass leans OVER the planted foot, once per cycle. Side +1 is planted around phase
-  // 0 and sits at +X, and applyPose negates spineRoll into rotation.z so that positive tips the
-  // head toward +X -- so +cos is right, and in phase with the knee lift's stance half.
-  //
-  // THE RATE CAP, and it is what stops a swagger turning into a shudder. Sway is an amplitude,
-  // and an amplitude says nothing about how FAST the torso gets there: peak roll RATE is
-  // amp * TAU * cadence / 2, so the same 8 degrees of lean is 26 deg/s at a stroll and 87 at a
-  // scurry. The first is a swagger and the second is a vibration, which is why the sway looked
-  // wrong at speed and looked right the moment the step rate came down.
-  //
-  // It is also true of bodies. Rolling a torso side to side is moving real mass, and a fast
-  // walker has visibly LESS lateral sway than a slow one, not the same amount faster.
-  //
-  // Capping the rate rather than scaling by cadence directly means a character who already
-  // sways gently is untouched -- the cap only binds on someone asking for more roll than they
-  // have time for.
   const rate = Math.abs(opts.sway) * TAU * w.cadence * 0.5;
   const swayCap = rate > opts.swayRateMax ? opts.swayRateMax / rate : 1;
   out.spineRoll += gain * opts.sway * swayCap * Math.cos(TAU * w.phase);
   return out;
 }
 
-/**
- * How much of the walk layer applies, 0..1, smoothed so it never pops on or off.
- *
- * At zero speed this returns exactly 0, so a standing character is bit-identical to its base
- * pose. The decay is also the "bring your feet together" beat, for free: the phase freezes where
- * it stopped and the gain closes the scissor over a few tenths.
- */
 export function walkGain(m, speed, dt, opts) {
   const want = Math.min(1, speed / opts.gateSpeed);
   const lambda = 6;

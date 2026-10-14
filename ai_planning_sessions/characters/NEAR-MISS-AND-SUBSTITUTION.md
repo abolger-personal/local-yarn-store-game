@@ -457,8 +457,7 @@ animated.
 
 - ~~Does a COMPROMISED object get lent rather than worn?~~ **Resolved in §5b**: it depends on the
   maker, and only compromised objects deviate from WEARABLE-FINISHED-OBJ.md's default. A narrow
-  exception rather than a rewrite of that rule — but it is still an exception, so that document
-  should gain a line pointing here.
+  exception rather than a rewrite of that rule.
 - **Is hue adjacency the right colour model?** It makes "these go together" computable for free,
   but a knitter's idea of a good combination is not just a small hue distance — complementary pairs
   and neutrals both break it.
@@ -469,4 +468,5 @@ animated.
   only the finished object and the guestbook. Worth confirming, because it sets the ceiling on how
   hard the puzzle can fairly be.
 - **Difficulty is not a pattern attribute yet.** `makePattern` rolls `toolSize` flat, and
-  CHARACTER-ATTRIBUTES.md wants difficulty tied to Intellect. §2's pattern row needs it to exist.
+  CHARACTER-ATTRIBUTES.md wants difficulty tied to Intellect ("crochet and needle size tiny" for a
+  high-Intellect pattern). §2's pattern row needs it to exist.

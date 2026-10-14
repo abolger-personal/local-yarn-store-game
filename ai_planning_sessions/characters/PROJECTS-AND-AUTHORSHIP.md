@@ -38,7 +38,7 @@ to buy. An attentive one gets projects completed. An organised one gets exactly 
 | **What does it need?** | The pattern's **ball band**. Clicking a knitting customer whose knitting the player has witnessed shows their pattern's requirements on the label (TUTORIAL.md §7.1): how many units of yarn, what weight, how many colours, what tool. |
 | **What have they got?** | Their **project bag**, carried: the balls they own visibly poke out, countable, in their colours. Their purchases in the Guestbook. |
 | **The gap, live: running out** | Knitting stops at the end of the yarn. They hold up the tail and glance at the yarn wall. A chatty customer's bubble shows the missing ball; a quiet one only sighs (TUTORIAL.md §7.4: explicitness is personality). |
-| **The gap, closed: ready** | The moment they have everything the project needs (their wants empty, usually right after the buy that closes the gap), a **sparkle burst** pops on them, wherever they are: at a display, walking or seated. Not part of the knitting animation. Leaving like that means they will be back with the finished object. |
+| **The gap, closed: ready** | The moment they have everything the project needs (that project's wants empty, usually right after the buy that closes the gap; ready is per project, so another WIP still wanting something does not hide this one closing), a **sparkle burst** pops on them, wherever they are: at a display, walking or seated. Not part of the knitting animation. Leaving like that means they will be back with the finished object. |
 
 **The knitting is the progress bar.** The player compares the band, the bag and the tell, and works
 out what is missing. Nothing states it.
@@ -166,6 +166,8 @@ recognise in their own shop**:
 
   Quiet characters say less but still name **one** fact, usually the place: the attentive player
   can always trace it back. Open, chatty ones name the sight and the place.
+  Quiet = Withdrawal is their voice, or Enthusiasm 2 or less; chatty = Enthusiasm or Openness 4+
+  (two facts when there are two). Volatility and Industriousness have no voice of their own.
 - **Every object gets a line, not just recipes.** The inattentive player's random sweater still
   says *"Grabbed whatever was by the door, honestly."* That is feedback too, gentle and funny,
   and it quietly teaches what the attentive player already knows. Gaps and substitutions show up
@@ -226,5 +228,8 @@ ARRANGEMENT-RECIPES.md §5):
 - **Exactly how is "big" and "small" judged for fair isle?** By yarn weight (bulky vs fingering),
   by ball size on the grid, or both?
 - ~~**Do recipes need a pattern beside them?**~~ No: see HOW-THEY-SHOP.md.
-- **How many recipes at launch?** Fourteen is the full list; five or six may be the right start.
+- **How many recipes at launch?** ARRANGEMENT-RECIPES.md lists 23; five or six may be the right start.
 - **Can recipes combine?** A fair isle hat with a pom-pom is two recipes on one object.
+- TODO(spec): the thank-you line's sight (a recipe that fired), gap (a substitution) and how it
+  started (HOW-THEY-SHOP.md §6) wait on recipes, near-miss substitution and shopping starts.
+- TODO(spec): "no repeats within the last several cards" waits on the board choosing templates.

@@ -2,6 +2,7 @@
 
 ## Appearance in Store: 
 - A pattern is a 3D box like a notion, but should be given labels on the box and possibly additional details to make it look like a BOOK. Cover icons match pattern types. 
+- **TODO(spec), design later:** today's pattern boxes don't work — they read as just another notion box. A pattern must look like a book at a glance (spine, cover, pages), distinct from both notion boxes and yarn. To be designed fully; until then the placeholder covers in `characters/store/goods/art.js` stand in. (Decided 2026-10-12, when the stash demo's yarn-coloured "booklet" family was dropped for reading as a pattern or notion box.)
 - Physical grid wise it is always 2x2x1. 
 - Clicking or inspecting a pattern shows a detail screen with the BASE finished object, an offscreen render of the same generator that builds the 3D FO (see `../characters/VISUAL-DESIGN-FINISHED-OBJ.md` §2). No shop-level thumbnail.
 
@@ -24,7 +25,7 @@ Every type in VISUAL-DESIGN-FINISHED-OBJ.md §1 except the swatch, which is a cr
 | mittens | mittens (proposed) | 2 |
 | potholder | square (proposed) | 1 |
 
-**A pattern's yarn cost is a count of yarn ITEMS (balls, cones, skeins) of the pattern's own recommended weight, never more than 8.** One item is one unit, whatever its weight.
+**A pattern's yarn cost is a count of yarn UNITS of the pattern's own recommended weight, never more than 8.** A yarn's units come from its shape, never its weight (YARN.md, "Units"; revised 2026-10-12, it was one unit per item).
 
 - Yarn weight still decides an item's size on the shelf: lace, fingering and sport are 1x1x1; dk, worsted and aran are 2x2x2; bulky and super-bulky are 3x3x3. That is space in the shop, not an amount of yarn.
 - Yarn of a different weight still counts one item each, but it is a near-miss: it moves the FO's fit and can make it COMPROMISED. See NEAR-MISS-AND-SUBSTITUTION.md and the visual doc §3.
@@ -64,3 +65,11 @@ The visual spec asks for these to be kept here as they come up.
     - mittens are a pattern and a DECOR finished object: knitted, never worn (no rendered fingers). VISUAL-DESIGN-FINISHED-OBJ.md §1 lists them under decor
     - blanket added as a decor type (6 balls, proposed): it drapes over the shop's chair backs and display tables, which record where it fits
     - ~~the code lags this table~~ Done 2026-10-03 for the wearables: `PATTERN_TYPES` in `inventory/catalog.js` makes sweater, shawl, scarf, bag, hat and socks at this table's costs, and `yarnUnits` counts one per item. Each named design carries the silhouette it makes (`silhouette`, garments.js's own words), and the finished object is built as that silhouette. The decor types are still not patterns: nothing draws a decor FO yet, so one would finish invisible; see VISUAL-DESIGN-FINISHED-OBJ.md §6
+- `yarnUnits` also sets how many rounds a project takes (WIP-AND-FINISHED-OBJ-FORMATION.md): socks are
+  a quick win, a sweater spans a visit or two. Decor types (only the pot holder so far) stay off random
+  stock and customers' patterns until something draws them; the pot holder is put out by the tutorial alone.
+
+## Open questions
+
+- **TODO(spec):** tie a pattern's tool size to its difficulty; tracked in
+  characters/NEAR-MISS-AND-SUBSTITUTION.md, open questions ("Difficulty is not a pattern attribute yet").

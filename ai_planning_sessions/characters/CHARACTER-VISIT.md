@@ -11,7 +11,7 @@ BROWSE is a set of actions with order chosen randomly. At then end of each round
 (closing sequence is entered when no more options exist )
 CLOSEOUT SEQUENCE: 
 - ALWAYS 3rd to LAST: NPC moves to sign guest book (hardcoded). Event where a picture of a finished object gets added to the LYS guestbook (always happens. If if they made a finished object while in visit or if they brought one in with them, a picture generated of them holding object. The item in the PHOTO should be the most recently finished object, and the NPC should be pictured in/with it even if they are not currently wearing it (e.g. it is being lent to the shop). Otherwise, a note about whether or not they are happy (found what they are looking for) or disappointed (did not find what they needed) is added) 
-- 2nd to LAST IF NPC HAS A FINISHED OBJECT: NPC (fancy animation here!) will all the player to borrow a finished object for display in the LYS, and place the object in a hard coded "Drop Off" Floor Display area with infinite headroom. 
+- 2nd to LAST IF NPC HAS A FINISHED OBJECT: NPC (fancy animation here!) will all the player to borrow a finished object for display in the LYS, and hand the object over at the counter, where they just signed. 
 - ALWAYS LAST: leaving through the door
 
 RETURNING VISITORS:
@@ -20,13 +20,13 @@ RETURNING VISITORS:
 - This is what lets a long project span more than one visit, and so is a primary driver of Finished Object count.
 
 GUESTBOOK ENTRY ICONS (MVP: the entry is one line with a leading icon, so a page of the book reads at a glance):
-- 📷 they made a finished object — the photo, of the most recently finished one
+- 📷 they made a finished object — the photo, of the most recently finished one. An object is photographed once: a regular who walks back in wearing yesterday's hat has nothing new to show and signs with a note instead
 - 🙂 happy: they found what they were looking for (bought something for a WIP)
-- 🙁 disappointed: they did not find what they needed
+- 🙁 disappointed: they did not find what they needed. Buying anything counts as finding it; a customer who needed nothing, or sat and worked on a WIP, is 🙂, not 🙁
 - 🧶 they bought yarn
 - 📖 they bought a pattern
 - 🪡 they bought a tool notion (hook or needles)
-- ✨ they lent a finished object to the shop (🎁 is kept for gifts between customers, TUTORIAL.md §7.3)
+- 🏁 they finished a WIP and lent it to the shop (🎁 is kept for gifts between customers, TUTORIAL.md §7.3; ✨ is the in-shop sparkle when a customer has everything a WIP needs)
 - 🧑‍🤝‍🧑 they chatted with another customer during the visit
 - 🪑 they sat and worked on a WIP in the shop
 - ⏳ they ran out of MAX_ROUNDS before finding anything
@@ -66,9 +66,10 @@ ACTIONS WITH PRESCRIPTIONS:
         
         If the NPC "walked to a display" "interacted" with a display in the last round, no new walking actions will be added to this rounds set as we want an NPC to stay at the current display. 
 
-    For each display, calculate a boolean "visible" value for each display. Keep this simple: if there's nothing intersecting the vector between the NPC and the display centroid, it's "visible". 
+    For each display, calculate a boolean "visible" value for each display. Keep this simple: if there's nothing intersecting the vector between the NPC and the display centroid, it's "visible". Exception, the shop floor: floor tiles are walked on, so they never block a sightline (or a route), and a floor tile is seen at its point nearest the NPC rather than its centroid — a tile half under a shelf or a table has its centroid hidden, and what sits on its open half must still be noticeable. 
     
     For visible displays, calculate attractiveness of each display using weights. All displays with an attractiveness of more than 50% become unique actions added to the possible set: "Walk to display A".  
+    A display (or floor tile) holding no items has attractiveness 0: nobody walks up to browse an empty place.
 
     PRESCRIBED NEXT ACTION: Interact with noticed display.
 
@@ -90,11 +91,13 @@ ACTIONS WITHOUT PRESCRIPTIONS:
         
     More than 1 "Work on a WIP" action can be added to the action set for choosing: more WIPs deliberately thus makes it more likely this action gets picked for a round.  
 
+    Every round of work is drawn as a whole round of knitting or crochet in the chair, the round that finishes the WIP included: the Guestbook's 🪑 is always something the player could have watched.
+
     PRESCRIBED NEXT ACTION: None
 
 - Wait a Round
 
-    Stay still. 
+    Stay still. Not offered on the doormat: an NPC parked there blocks the one way in and out. Drawn standing, not leaning in at the goods: a wait lands wherever a wander did, empty shelf or bare floor included.
     
     PRESCRIBED NEXT ACTION: If another NPC2 is within a small distance of NPC1, chance of "PRESCRIBED NEXT ACTION" being another 'Wait a round' to keep interacting is:
         
@@ -106,7 +109,7 @@ ACTIONS WITHOUT PRESCRIPTIONS:
 
 - Move around the store to a spot. 
     
-    Generate a random XY target not inside a display, and a path to move there. 
+    Generate a random XY target not inside a display (nor a chair, nor the doormat), and a path to move there. The shop floor's tiles don't count as displays here — the target may be anywhere on the floor, so a patient wanderer eventually sees the whole shop. 
 
     PRESCRIBED NEXT ACTION: None
 
@@ -118,3 +121,46 @@ Calculation of MAX_ROUNDS from Character attributes:
 
 
 NPC Visitors who manage to either *buy any items* or *work on a WIP* should be marked for *return* to the shop: they go on a list of returning NPCs. 
+
+## In the shop: how a visit looks (as built; code points here with `CHARACTER-VISIT.md §Section`)
+
+### Rounds and the door
+- Customers queue outside in single file and enter one at a time. Each day's round clock starts full, so the first customer comes straight in. Nobody loiters within 0.8 of the door. The day clock (`dayT`) never winds back.
+- A round lasts just over the longest staggered walk (`autoSeconds`); in the game each round also waits for its last walker, and the day ends at the door and waits for the player.
+
+### Staggered departures
+The sim is lockstep; the animation must not be.
+- Each customer starts at a random point in their gait.
+- Departures each get one shuffled slot inside `travelJitter` (stratified, not uniform), the order reshuffled every round. The customer coming in through the door is not staggered.
+- Each customer has their own pace (±25%) and their own cheer timing.
+- `travelJitter + travel·(1 + paceJitter)` must fit inside a round.
+
+### Walking
+- Speed is constant along the route, so corners don't stall; a longer route takes longer, not faster (PLAYING-AT-YOUR-PACE.md §3 for the speeds).
+- Speed is capped so the eased peak never exceeds the legs' top speed: no skating. The slowest walker clears the gait gate, and the longest legs (the stilt llama) still step at `cadenceMin`. In the shop `gateSpeed` is 0.1 and `cadenceMin` 1.5 steps/s, so a slow walk is short steps, not slow-motion strides (`speed.test.mjs`).
+- The gait phase follows distance, not time. Facing follows the leg of the route being walked.
+
+### Turning and pausing
+- Bodies turn at 8/s (a half turn in ~0.4s), never snapping. At a display they turn to face it and only reach once within 0.35 rad.
+- ⏸ eases the walk to a stop over a step or two (ease rate 4/s) and resumes along the same route at the same pace.
+
+### Sitting
+- They don't fold to sit until they've arrived. The walk ends 0.06 in front of the chair's front edge; sitting moves back onto the cushion, standing up is a step forward, not a rise straight up. Seated, they face the chair's facing.
+- Lift, fold, turn and slide are one motion, with a forward lean of 0.30 rad peaking halfway.
+- Seat height is measured per body (its lowest resting part) and calibrated on first sit, so leggy and stumpy characters sit flush on the same chair. `S.seatLift` is the gap between hip joint and cushion.
+
+### Knitting in a chair
+- A seated customer with an IN_PROGRESS WIP shows the craft: tool (needles or hook) from the pattern, the piece sized by its type, pace by skill, the running-out tell from their yarn, the ball on the floor by the chair. It starts only once they are seated (>90%). On a round change the hands go back before the craft is put away. A WIP not started, or with no pattern, shows no craft.
+- The walk-to-seat round already shows the craft of the WIP it prescribes, once seated: the rest of that round would otherwise be spent sitting idle. Progress only moves on the work round.
+
+### What they carry out
+- Nobody walks in carrying anything: "are they carrying something?" is how the player reads a successful visit.
+- The held item is the thing taken off the shelf. Yarn is a real ball at its shelf size. A notion is a shelf-sized box shrunk to one layer, labelled on the top and front only, with the mm sticker if it has a size, tipped toward the hand and never a camera billboard. ~10 customers means ~10 non-instanced meshes, which is fine.
+- A customer carries the real package or nothing; the rig's placeholder skein never shows in the shop. The package is hidden while they knit (the right paw holds a needle).
+- A finished piece shows on the wearer the same round it is finished. A dressed body costs +1 draw call; bodies are rebuilt only when the outfit changes, at most one per frame.
+
+### Celebration
+- Every purchase plays `delighted` plus decaying hops, the second and third of a visit as well as the first (keyed on `bought` growing, not on the hand going from empty to full); putting an item down never does. Delight outranks every other pose and the walk, so they stop and cheer.
+- Each customer rolls their own cheer at spawn: delay 0–0.55s, duration 0.8–1.25 × 1.6s, 2–4 whole hops (the last one lands), height 0.75–1.3 × 0.10, so customers who buy on the same frame don't cheer in unison.
+- A sparkle plays when a purchase makes one of their WIPs READY; none for a WIP already ready when they walked in.
+- TODO: the celebration is a placeholder (P1-SPIKE-PLAN): squash on landing, an ear perk at the top of the hop, and the cheer delay derived from Enthusiasm once the emotion layer exists.

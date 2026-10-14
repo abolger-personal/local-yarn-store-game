@@ -1,7 +1,3 @@
-// The lil-gui control panel.
-//
-// Extracted from the single 3,200-line module that used to live inline in store.html.
-
 import { setMoveMode } from '../interact/input.js';
 import { activeDisplay } from '../interact/pointer.js';
 import { displays, aim } from '../core/state.js';
@@ -17,10 +13,6 @@ import { buildBlobs } from '../sim/cast.js';
 import { frameRoom } from './framing.js';
 import { installControls, setCameraLock } from './controls.js';
 
-// ---------------------------------------------------------------- gui
-
-// Into the rail, not auto-placed. lil-gui's default is fixed to the top-right corner, which is
-// exactly where the timer is — it was sitting on top of the controls it shares a corner with.
 const gui = new GUI({ title: 'store', container: document.getElementById('guiSlot') });
 
 function applyQuality(name) {
@@ -33,24 +25,17 @@ function applyQuality(name) {
   gui.controllersRecursive().forEach((c) => c.updateDisplay());
 }
 
-// Counts are dropdowns, not sliders: each value is an authored layout from a fixed pool, so the
-// legal values are discrete and the list makes that obvious.
 const counts = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => [String(i + 1), i + 1]));
 
-// Capped on what the scene can carry, not on how many names exist — the name list is now deep
-// enough to serve a roster across many days and would otherwise offer a 110-entry dropdown.
 const MAX_NPCS = 8;
 
 const gPerf = gui.addFolder('performance');
 
 const gLook = gui.addFolder('look');
 
-/** The shop itself: how much of everything, and how fast a round runs. */
 function shopRows() {
   gui.add(S, 'npcCount', counts(MAX_NPCS)).name('NPCs').onChange(restart);
   gui.add(S, 'displayCount', counts(DISPLAY_SLOTS.length)).name('displays').onChange(() => restart({ rebuild: true }));
-  // 0 chairs is a legitimate case to test, not a mistake: it exercises the "went looking for a
-  // seat, all taken" fallback, which is otherwise hard to reach.
   gui.add(S, 'chairCount', { 0: 0, ...counts(SEAT_SLOTS.length) }).name('chairs').onChange(() => restart({ rebuild: true }));
   gui.add({ f: doAdvanceRound }, 'f').name('advance round  (Space)');
   gui.add({ f: () => restart() }, 'f').name('next shop.day — regulars return  (R)');
@@ -61,13 +46,10 @@ function shopRows() {
   gui.add(S, 'dayGap', 0, 20, 0.5).name('pause between days (s)');
 }
 
-/** How the cast moves. */
 function pacingRows() {
   gui.add(S, 'travel', 0.2, 4, 0.1).name('travel anim (s)');
   gui.add(S, 'travelJitter', 0, 2, 0.05).name('start stagger (s)');
   gui.add(S, 'paceJitter', 0, 0.6, 0.05).name('pace variation (±)');
-  // No onChange: the seat height is read live every frame by groundOffsetFor, so the slider
-  // moves everyone already seated without a re-seat pass.
   gui.add(S, 'seatLift', 0, 0.06, 0.002).name('sink into cushion');
 }
 
@@ -106,9 +88,6 @@ function cameraRows() {
   gui.add(S, 'lockCamera').name('lock camera  (L)').onChange(setCameraLock);
 }
 
-/** Cycle which display the player is arranging — for the ones the pointer struggles to hit.
- *  Floor tiles are skipped: they are the easiest thing in the room to point AT, and there are
- *  dozens of them, so including them would turn one keypress into forty. */
 function cycleDisplay() {
   const arrangeable = displays.filter((d) => d.solid !== false);
   if (!arrangeable.length) return;
@@ -118,13 +97,6 @@ function cycleDisplay() {
   updateHeldReadout();
 }
 
-/**
- * The debug shortcuts, as a table, merged over the player's (F, M, L, Q, E — controls.js).
- *
- * A table rather than a run of ifs because the set is the thing worth reading: this is the only
- * place that answers "what does B do", and a reader should not have to trace a branch to find out.
- * Keys are lower-cased `e.key`, so `[` and `]` sit here alongside the letters.
- */
 const KEYS = {
   1: () => setView('felted'),
   2: () => setView('grey'),
@@ -140,7 +112,6 @@ const KEYS = {
 
 function setView(v) { S.view = v; setViewMode(castGroup, v); }
 
-/** Everything this module does ONCE, at boot. Called from main.js, in order. */
 export function buildGui() {
   shopRows();
   pacingRows();

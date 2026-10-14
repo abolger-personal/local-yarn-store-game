@@ -33,7 +33,7 @@ Sizes: **S** an afternoon, **M** a day or two, **L** most of a week.
 | 2 | **A2 `test:determinism`** | The regression net for every sim change below (and there are ~40). Cheapest while the sim is small; catches stray `Math.random` and iteration-order bugs |
 | 3 | **A3 Autosave** | "No save button, ever" only works if the game saves itself. Doing it now forces every later system to stay plain data, instead of retrofitting 20 systems later |
 | 4 | **B3 `miss()` + B4 tolerance (TAKE / HESITATE / PASS)** | Today 100% of considered items are bought, so arrangement cannot change an outcome. This is the first point where it does; tutorial day 2, recipes, companions and VERDICT all sit on it |
-| 5 | **B7 The Guestbook as a witnessed event log** | The shared base for Guestbook detail, bonds, swap step 4, dance joiners, thank-you lines and gists. Entries today have no `npcId` on notes and no record of put-backs, chats or seats |
+| 5 | **B7 The Guestbook as a witnessed event log** | The shared base for Guestbook detail, bonds, swap step 4, dance joiners, thank-you lines and gists. Put-backs, seats and chats are recorded with `witnessed`; note entries still have no `npcId`, and gifts aren't recorded |
 
 ---
 
@@ -43,7 +43,7 @@ Sizes: **S** an afternoon, **M** a day or two, **L** most of a week.
 | --- | --- | --- |
 | Stock carries over between days; scripted days 1–10 + day 11+ supplier with soft throttle; deliveries land on the floor | `inventory/supply.js` (`carryOver`, `buildOrder`, `SCRIPT`), `supply.test.mjs` | 47c1638 |
 | Tidy-the-shop button (playtest shortcut, not a mechanic) | `tidyShop` in `visit.js` | 47c1638 |
-| Night screen: exterior, door opens tomorrow, read-only clipboard with `playerChoosable` boxes | `store/ui/night.js`, `ui/exterior.js` | 47c1638, c038487 |
+| Night screen: exterior, door opens tomorrow, packing slip with a dropdown on each player line | `store/ui/night.js`, `ui/exterior.js` | 47c1638, c038487, 95f8e99 |
 | Front door, house lettering (47 glyphs), worn wood shared with the shop | `index.html`, `ui/lettering.js` + test, `scene/worn-wood.js` | 2123d60 |
 | Game page: corner stack, top/side views, speed button ▶/▶▶/▶▶▶/⏸ (Space, P) | `characters/game.html`, `store/game.js`, `gameSpeed` in `core/config.js`, `speed.test.mjs` | c038487 |
 | Sit-and-knit draft (plain one-colour rectangle) and the ready sparkle | `characters/craft-anim.js` + test, `sparkle.js`, `sit-and-knit.html` | 94be68a |
@@ -52,14 +52,14 @@ Sizes: **S** an afternoon, **M** a day or two, **L** most of a week.
 | three.js 0.186.1 | `package.json`, import maps | 907fb60 |
 | Guestbook selfies, every day's pages, Customer of the Week board | `store/ui/book.js`, `board.js`, `photo.js` | fc0fbe5 |
 | Five dances as data (riverdance, floss, attitude, pirouette, uptown-funk) | `DANCES` in `characters/motion.js` | — |
-
-## In progress now (integration pass, other agents)
-
-| What | Spec | Notes |
-| --- | --- | --- |
-| Customers wearing their finished objects on `game.html` | WEARABLE-FINISHED-OBJ.md, VDFO §4c | prerequisite for recognition over recall (NM §7) |
-| Sit-and-knit wired into the store (seated customers knit, ready sparkle) | VDFO §4b, P&A §1 | the draft rectangle only; the full piece is E3 |
-| Guestbook wording updated to the specs | TUTORIAL §7.3 | wording only; the event log underneath is B7 |
+| Customers wearing their finished objects on `game.html` | `outfitOf`/`dressedCharacter` in `store/sim/world.js`, `sim/cast.js` | 2937627 |
+| Sit-and-knit wired into the store (seated customers knit, ready sparkle) | `makeCraft`/`makeSparkle` in `store/sim/cast.js` | 2954c98 |
+| Guestbook wording updated to the specs | `entryRows`/`DID` in `characters/guestbook.js` | aa836a2 |
+| **D7** Running out and ready, sim side | `runningOut`/`readyWips` in `characters/wip.js`; sparkle from `checkReady` in `sim/cast.js` | 711c4e2 |
+| **E5** Pot holder as a pattern type and a decor finished object | `PATTERN_TYPES` in `inventory/catalog.js`, `buildPotholder` in `garments.js` + test | 44499a5 |
+| **F2** The ball band label; a customer click shows their tag | `store/ui/label.js` | 593619c, 098391c |
+| **F3** Guestbook rows expand, detail or gist | `store/ui/book.js`, `entryRows` in `guestbook.js` | aa836a2 |
+| **I1** The finishing push | `finishingPush` in `characters/visit.js` | a50f243 |
 
 ---
 
@@ -72,7 +72,7 @@ met. Pure sim first (testable in node), then rendering, then content.
 
 | ID | Build | From | After | Size | Done when (the one check) |
 | --- | --- | --- | --- | --- | --- |
-| A1 | **Seeded rng in the world:** `world.rngState` is a number, `mulberry32` from `core/util.js` reads and advances it; every `rng = Math.random` default in `visit.js`, `wip.js`, `supply.js` takes the world's | DD §5 "Saving" | — | S | `visit.test.mjs`: `structuredClone` of a mid-game world compares deep-equal, and two worlds from one seed take the same first 50 decisions |
+| A1 | **Seeded rng in the world:** `world.rngState` is a number, `mulberry32` from `core/util.js` reads and advances it; every `rng = Math.random` default in `visit.js`, `wip.js`, `supply.js` takes the world's. Each morning it restarts at `hash(seed, day, attempt)`: only the dice reset, never the shop, so a day plays out from the seed and that morning's state alone. `attempt` lives in the save and goes up on every load, so a reload re-rolls the day (save-scumming is allowed, 2026-10-13) yet seed+day+attempt still replays exactly. Visual timing (pace, wait jitter, idle phase) never reads the sim's stream: it hashes `(seed, day, attempt, npc, round)`. Cosmetic-only code (npc looks, crowd, demos) keeps `Math.random`; an eslint `no-restricted-properties` rule bans `Math.random` in `characters/store/**` and the sim modules | DD §5 "Saving" | — | S | `visit.test.mjs`: `structuredClone` of a mid-game world compares deep-equal; two worlds from one seed take the same first 50 decisions; one morning run twice at one attempt matches, at attempt 0 vs 1 differs; `walk.test.mjs` no longer swaps `Math.random`. A3 adds: a load bumps `attempt` |
 | A2 | **`test:determinism`:** a headless N-day runner (visit + wip + supply, no three.js), stable-stringify + small hash, two runs same seed match, different seed differs | DD §10.2 | A1, and a pure day hand-over (see conflict X1) | M | `tools/determinism.mjs` (or `sim/determinism.test.mjs`) passes for 100 days; add to selfcheck |
 | A3 | **Autosave:** one `idb-keyval` slot, `set('save', world)` at every round boundary and on `visibilitychange`→hidden / `pagehide`; load settles walks, held items, reservations; `version` field | DD §5, §2; TUTORIAL §6 | A1 | M | `test:save`: clone round trip of a mid-game world equals, and continuing both copies a day gives the same A2 hash |
 
@@ -86,7 +86,7 @@ met. Pure sim first (testable in node), then rendering, then content.
 | B4 | **Tolerance table and bands:** `interact()` returns TAKE / HESITATE / PASS; substitutions recorded `{attribute, miss, item}` | NM §3, §8.2; PAYP §7.3 | B3 | M | test: an Orderliness 5 and an Enthusiasm 5 NPC at the same shelf diverge as §3 says. Tune on `puzzle.html` |
 | B5 | **At most 3 in the shop, a few at a time** (door rule; `npcCount` is 2 today) | PAYP §7.2; NM §7 budget | — | S | test: arrivals never put a 4th NPC inside |
 | B6 | **HESITATE as a beat:** N rounds from traits (+affinity once C1), not counted against `maxRounds`; arrangement adjacency tips the roll | PAYP §4a, §7.4; NM §3 | B4 | M | test: hesitation rounds don't shorten the visit; a near-miss beside its pattern is taken more often over 1000 seeded rolls |
-| B7 | **Guestbook as an event log:** every entry carries `npcId`; record put-backs (🙁), seated pattern (🪑), chats, gifts (🎁) with `witnessed` (on screen and near the camera, or hovered/clicked); the view shows detail if witnessed, a gist if not | TUTORIAL §7.3; REG §2 | — (render side reads camera) | M | test: an unwitnessed put-back yields the gist line, a witnessed one the item; purchases always in full |
+| B7 | **B7 rest:** `npcId` on note entries; 🎁 gift rows (put-backs, seats and chats are already recorded with `witnessed`, `visit.js`) | TUTORIAL §7.3; REG §2 | — | S | test: every note entry carries an `npcId`; a gift yields a 🎁 row |
 | B8 | **Bond = a count over the log** for a pair (chat 1/visit, in company 1/round, danced 2, swap/gift 3, treats 3) and its bands | REG §2 "Measuring it", §9.1 | B7 | S | test: a hand-built log gives the expected band for each pair |
 
 ### Phase C: who comes back (pure sim)
@@ -107,9 +107,8 @@ met. Pure sim first (testable in node), then rendering, then content.
 | D4 | **Project's worth detector** over a display grid (shared with recipe matching); add the row to RECIPES | HTS §3, §8.3; RECIPES open q. | — | M | test: 8 matching blues read as a sweater's worth, 3 as a hat's; split by a shelf, neither |
 | D5 | **Eye-catch weights** in browsing (run, new in, unlike last, first display, prefs; never the floor) | HTS §4, §8.4 | D2 | S | test: a yarn-first Openness 5 NPC picks the run over a lone ball most of the time |
 | D6 | **Recipes as formation data:** stripes, colour block, fair isle; then held double/marled (stacking) and pom-pom; one recipe per layer, nearest-the-pattern wins | P&A §5.5; RECIPES §2–§4 | D3, D4, B4 (personality gates) | M | `test:sim` (DD §10.1): each recipe fires on its arrangement and NOT on a near-miss arrangement |
-| D7 | **Running out and ready, sim side:** running out from progress vs yarn; ready when `wantsOf` empties (fires the built sparkle) | P&A §1, §5.2 | B1 | S | test: the buy that closes the gap sets `ready` exactly once |
-| D8 | **Provenance at the BUY:** display, place word, neighbours, recipe fired, who else was in, substitutions, start, giver | P&A §4b, §5.6 | D1, D6, B4 (later fields fill in as their systems land) | M | test: a buy records a place word from the display's position and its actual neighbours |
-| D9 | **Thank-you line:** pure chooser over provenance × the strongest trait; short (≤24 chars) and full forms; no template repeat in the last several cards | P&A §4b, §5.6; HTS §6 | D8 | M | test: every chosen line names at least one recorded fact, and every short form fits 24 chars |
+| D8 | **Provenance at the BUY:** display, place word, neighbours, recipe fired, who else was in, substitutions, start, giver. Partly built: place, beside, alsoIn (`provenance` in visit.js); left: start, recipe, substitutions, giver | P&A §4b, §5.6 | D1, D6, B4 (later fields fill in as their systems land) | M | test: a buy records a place word from the display's position and its actual neighbours |
+| D9 | **Thank-you line:** pure chooser over provenance × the strongest trait; short (≤24 chars) and full forms; no template repeat in the last several cards. Partly built: trait lines short and full (guestbook.js); left: the no-repeat rule and the later provenance fields | P&A §4b, §5.6; HTS §6 | D8 | M | test: every chosen line names at least one recorded fact, and every short form fits 24 chars |
 
 ### Phase E: scripts and the tutorial
 
@@ -118,22 +117,21 @@ met. Pure sim first (testable in node), then rendering, then content.
 | E1 | **Script data shape + trigger decision** (pure): given a script and an event stream, which beats fire, once each; roles stored `role → npcId` | SCRIPTED §1, §4.1 | A1 | M | test: a 3-day event stream fires each beat once, `dayStart: [1,3]` three times |
 | E2 | **The six hooks:** `scriptEvent(kind, detail)` at day start, day end, arrival, buy, sign, return | SCRIPTED §2, §4.2 | E1 | S | test: a fake script logs all six kinds over one headless day |
 | E3 | **Day-1 actions:** `cast`, `seed … facing`, `note`, `order`; **the counter note** (Needle Tips on the counter) | SCRIPTED §4.3; TUTORIAL §2 | E2 | M | test: day 1 of the tutorial script seeds the pattern on the table the friend faces |
-| E4 | **Move `SCRIPT` out of `supply.js`** into the tutorial script; tutorial day 1 is the 3-item shop (no `stockCount` fill); first player line on night 2 | SCRIPTED §4.4; TUTORIAL day 1, night 2; PAYP §5 | E3 | M | `supply.test.mjs` + a script test: day 1 holds exactly pattern + hook + ball; night 2 has one `playerChoosable` slot |
-| E5 | **Pot holder** as a pattern type and a decor finished object (renders, lends, selfies in hand) | TUTORIAL day 1/3; RECIPES §4 | — | M | `garments.test.mjs`: a pot holder builds and `slotFor` is null (always lent) |
-| E6 | **Tutorial days 1–3 end to end:** the friend role (`keep`), `returns` after 2 days, `photo`, decor selfie | TUTORIAL §4; SCRIPTED §4.5 | E4, E5, B2, C3 | M | headless test: an idle player reaches day 3 with the friend's pot holder selfie on the board |
+| E4 | **Move `SCRIPT` out of `supply.js`** into the tutorial script (day 1's 3-item shop and the night-2 line are built: `tutorialDay1`, `SCRIPT` day 3 `pick`) | SCRIPTED §4.4; TUTORIAL day 1, night 2; PAYP §5 | E3 | M | `supply.test.mjs` + a script test: day 1 holds exactly pattern + hook + ball; night 2 has one `playerChoosable` slot |
+| E6 | **Tutorial days 1–3 end to end:** the friend role (`keep`), `returns` after 2 days, `photo`, decor selfie. Built hard-coded in `world.js` (`openTutorial`, `TUTORIAL_HOLD`), checked by walk.test.mjs; what's left is moving it onto E1–E4 | TUTORIAL §4; SCRIPTED §4.5 | E4, B2, C3 | M | headless test: an idle player reaches day 3 with the friend's pot holder selfie on the board |
 
 ### Phase F: controls and information (rendering + UI)
 
 | ID | Build | From | After | Size | Done when |
 | --- | --- | --- | --- | --- | --- |
 | F1 | **Clock controls:** holding stops rounds; the wall clock's pendulum; the **break card** on the counter mirrors ⏸ ("Back after this row") | PAYP §3, §7.5; TUTORIAL §3 | speed button (built) | S | `speed.test.mjs`: holding an item and ⏸ both stop `advanceRound`, neither stops animation |
-| F2 | **The ball band label** on hover / pick-up; a customer click shows their tag (name + bought) | TUTORIAL §7.1 | — | M | test: the label fields for yarn, pattern and notion are exactly the §7.1 lists (no hidden state) |
-| F3 | **Guestbook rows expand** (bought / put back / knitting / 🎁), detail or gist per B7 | TUTORIAL §7.3 | B7 | M | test on the row builder: witnessed vs not gives detail vs gist |
 | F4 | **"Hand it to them":** click item, click customer, settles a hesitation in their favour | PAYP §7.6 | B6 | M | test: a handed item during HESITATE resolves TAKE |
 | F5 | **The order form:** the packing slip on parcels by the door, budget 6 + sold, any template, "supplier's choice", one supplier sample outside the budget | TUTORIAL §7.2; PAYP §5, §7.7 | E4 (seam `chosen` already in `buildOrder`) | M–L | `supply.test.mjs`: budget = 6 + sold; blank lines filled; sample always present and outside the count |
 | F6 | **Donation box:** player-filled, holds ≤ that night's budget, empties overnight; replaces automatic destash | TUTORIAL §7.2 | F5 | M | test: overflow stays in the box for the next night |
 | F7 | **Treats:** tin (4 servings) as an order line, serves only on a side table or the counter, +1 round, lids on elsewhere; not stock | PAYP §5 "Treats"; HTS §2d.4 | F5 | M | test: a tin on a shelf serves nobody; on the counter serves each passer once per visit |
 | F8 | **Picture bubbles** from sim state; explicitness by personality; held while paused; the `say` action | TUTORIAL §7.4; SCRIPTED actions | B7 | L | test: a chatty NPC's bubble names the exact want, a quiet one's only the project |
+| F9 | **Audit rounds against what's drawn:** for every action, does its round read on screen as what the sim did? Rounds need not be real time, and per-NPC offsets keep the shop from ticking like a clock, but with one customer in the shop every gap shows. Found so far (2026-10-12): the round that finishes a WIP drew no craft; a lent piece was never drawn; a sit round reads as "thinking" before the work round; waits leaned in at empty displays | playtests of 0.0.1 | — | M | a headless per-action table over seeded days: every action's round has a pose that shows it, no seated or standing idle longer than ~1 s before the action it leads to, and one-customer days look continuous |
+| F10 | **Seasonal colourway packs:** add-on name packs (`COLOURWAY_PACKS` in `inventory/css-colours.js`, a yarn's `namePack`), e.g. Christmas red, Spooky Spider red; TODO(spec): how a pack arrives (a seasonal order line? a supplier sample?) and whether pack yarn is a limited run | VISUAL-DESIGN-2D.md "Yarn colour words" | — | S | a yarn with `namePack: 'halloween'` reads its pack's word on the band, and every pack has one word per palette colour |
 
 ### Phase G: project bags and the hold shelf
 
@@ -160,7 +158,6 @@ met. Pure sim first (testable in node), then rendering, then content.
 
 | ID | Build | From | After | Size | Done when |
 | --- | --- | --- | --- | --- | --- |
-| I1 | **The finishing push:** ready + can finish in remaining rounds → sits and finishes | DANCES BO 1 | D7, B2, H2 | S | test: a ready NPC 90% done sits; at 30% done goes home |
 | I2 | **Dance by personality** (pure) + **clap** + **wiggle** in `DANCES` | DANCES BO 2, "To do" | — | S | `motion.test.mjs`: picker matches the table; clap and wiggle are looping with no root extras |
 | I3 | **Unison joiners:** in company + Friends-bond anywhere + Enthusiasm 4+; everyone else claps; travel zeroed without room | DANCES BO 3 | I2, H1, B8 | M | test: joiner set for a hand-built shop equals the rule |
 | I4 | **Put it on, then dance;** cast-off sparkle (bigger cousin of `sparkle.js`) | DANCES BO 4 | I1, wearing (in progress) | S | — (render; covered by I1/I3 tests) |
@@ -226,9 +223,7 @@ The ones that cross documents, so nobody builds the far end first:
 | # | Conflict or gap | Where | Proposed resolution |
 | --- | --- | --- | --- |
 | X1 | **The day loop is not headless.** `restart()`/`deliver()` live in `store/sim/world.js`, which imports three.js, the scene and module-level state (`let roster`). `test:determinism` (DD §10.2) and `structuredClone(world)` (DD §5) both assume the sim world is one plain object | DD §5, §10; code | Pull the day hand-over (close, `carryOver`, `buildOrder`, arrivals, `rejoin`) into a pure `nextDay(world)` beside `visit.js`; `world.js` calls it and rebuilds meshes. Move `roster` into the world. Part of A2 |
-| X2 | **Clipboard vs packing slip.** TUTORIAL §7.2 replaces the clipboard with parcels and a packing slip, "no checkboxes"; VD2D "The night" and PAYP §5 still specify the clipboard with empty boxes, and that is what's built | TUTORIAL §7.2; VD2D log 19; PAYP §5 | **Decided 2026-10-03: the packing slip.** A clipboard reads as a job to act on. TUTORIAL, PAYP §5 and VD2D (decision 25) now all say packing slip; build F5 as the slip |
 | X3 | **Order shape: fixed slots vs a budget.** PAYP §5: an order is fixed slots, some `playerChoosable`, holding templates. TUTORIAL §7.2: a budget of 6 + sold, "anything in the catalogue". Also: items or templates? | PAYP §5; TUTORIAL §7.2 | Budget of 6 + sold lines, each line a **template** (keeps PAYP's "surprise in the box" and rules-not-facts). The script's fixed slots become script-filled lines |
-| X4 | **Tutorial day 1 vs `SCRIPT` day 1.** Tutorial: pattern + hook + 1 ball. `SCRIPT[0]`: a kit, 15 yarn, 6 patterns, after a fresh fill to `stockCount` 100. DD §6 says 24–30 items. Also the first player line: night 2 (TUTORIAL) vs day 4 (code) — **the order handover is fixed (078670b): night 2, then every line from night 3** | TUTORIAL day 1; DD §6; `supply.js` | E4, for the day-1 pile: the tutorial script owns days 1–3 exactly; DD §6's 24–30 pile becomes day 2's delivery. Already flagged as a mismatch in PAYP §5 |
 | X5 | **Destash.** DD §6: automatic overnight destash from day 11 by `lastPlacedDay`. TUTORIAL §7.2: the player-filled donation box replaces it | DD §6; TUTORIAL §7.2 | Donation box wins. Keep `selectDestashCandidates()` unbuilt unless F6 proves too slow in play (then it only *suggests*, by putting the least-loved items in the box) |
 | X6 | **Hidden stash "immutable for the NPC's lifetime"** (DD §5 NPCs) vs stash that moves between customers (HTS §2b) and preferences that grow (REG §7) | DD §5; HTS §2b; REG §7 | Amend DD: traits and allergies are immutable; stash and prefs change only by observable events (a swap, a finish), each written to the Guestbook |
 | X7 | **Swaps need stash in the shop, but bags leave it at home.** BAGS §1: "Their other WIP slots, stash included, stay at home." HTS §2b step 2 needs the giver to *have* a stash slot in the shop | BAGS §1; HTS §2b | **Decided 2026-10-03:** stash is one WIP slot holding a pile of extra yarn, mostly at home; only the stash brought along in today's bag can be given (HTS §2, §2b step 2; BAGS §1). Was proposed: A giver can only give the stash in today's bag. Today's one project may *be* a stash bag (yarn-first with no pattern), which is exactly when they're looking. Say so in HTS §2b step 2 |
@@ -252,10 +247,10 @@ proposal yet.
 
 | Question | From | Proposal |
 | --- | --- | --- |
-| Does a break cost anything? | PAYP | ✅ Free; the queue waits patiently (TUTORIAL §3 already behaves this way) |
+| Does a break cost anything? | PAYP | Decided: TUTORIAL §3 (free) |
 | Cap of 3 customers right? | PAYP; NM §7 | ✅ Yes, crowd as the queue outside (X10) |
 | Stock growth when the player never donates | TUTORIAL | ✅ The extra 6 eases off as the shop fills (never the replacement for what sold) |
-| How big is the order budget and how does it grow? | PAYP | ✅ 6 + items sold yesterday (TUTORIAL §7.2) |
+| How big is the order budget and how does it grow? | PAYP | Decided: TUTORIAL §7.2 (6 + sold) |
 | Can the supplier say no (out of stock, backorders)? | PAYP | ❓ Suggest no for MVP: frustration with no attention payoff |
 | Donation box too slow? | TUTORIAL §7.2 | ✅ Dial: capacity 2× the budget |
 | Does the counter note exist from day 1? | TUTORIAL | ❓ |

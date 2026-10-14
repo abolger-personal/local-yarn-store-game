@@ -3,28 +3,9 @@ import globals from 'globals';
 import importX from 'eslint-plugin-import-x';
 import unicorn from 'eslint-plugin-unicorn';
 
-/**
- * The "cleaner code" tier.
- *
- * NOT eslint-config-google or airbnb: both are eslintrc-only and unmaintained (airbnb's peer
- * range stops at eslint 8), and roughly half of what they set is FORMATTING, which eslint 10
- * removed from core outright. What survives that filter from either guide is a couple of dozen
- * plain core rules, which is what this is — plus the handful from eslint-plugin-unicorn that
- * catch bug classes core has no rule for.
- *
- * Chosen by MEASURING against this codebase rather than by adopting a preset wholesale:
- * unicorn's own `recommended` reports 974 findings here, ~70% of them in four rules that are
- * actively wrong for a geometry project (`no-zero-fractions` would rewrite `CELL = 0.20`,
- * `no-null` would rewrite the sentinel this codebase uses on purpose, and `prefer-math-trunc`
- * would replace mulberry32's `| 0` — which is a 32-bit WRAP, not a truncation, and the generator
- * diverges after ~4.9M draws once its state is free to grow past 2^53).
- *
- * Every rule is an ERROR. A warning nobody has to fix is one nobody reads: there were 107 of them,
- * and the TDZ that blanked a page was one. They were fixed once, and now a new one fails the lint.
- */
+// Rule choices and why not a preset: tools/README.md. Every rule is an error.
 const CORRECTNESS = {
-  // Real bug classes. All of these are clean on this codebase today, so they cost nothing to
-  // turn on and they are guards against tomorrow rather than a refactor.
+  // Real bug classes; clean today, so they guard tomorrow.
   'array-callback-return': 'error',       // a .map/.filter callback that forgets to return
   'no-constant-binary-expression': 'error',
   'no-self-compare': 'error',
@@ -49,10 +30,7 @@ const CORRECTNESS = {
 };
 
 const MODULARITY = {
-  // Shape limits beside max-lines-per-function: they keep a function doing one thing and a helper
-  // callable. Measured before they were turned on: 120 hits, all fixed. Left out on purpose:
-  // max-lines (garments.js and npc.js are ~1800 lines -- a split, not a lint fix) and
-  // no-magic-numbers (3060 hits: this is geometry, and the numbers are the tuned constants).
+  // Left out: max-lines (a big file needs a split, not a lint fix), no-magic-numbers (geometry's tuned constants).
   complexity: ['error', 12],
   'max-depth': ['error', 4],
   'max-params': ['error', 5],             // past five, an options object reads better at the call
@@ -62,7 +40,6 @@ const MODULARITY = {
 };
 
 const SECURITY = {
-  // Nothing here uses these; the point is that nothing ever starts to.
   'no-eval': 'error',
   'no-implied-eval': 'error',
   'no-new-func': 'error',
@@ -71,7 +48,6 @@ const SECURITY = {
 };
 
 const CLEANLINESS = {
-  // Judgement calls, but cheap ones to honour: each had a handful of hits, all fixed.
   'no-shadow': 'error',
   'default-param-last': 'error',           // `(rng = Math.random, type)` cannot be called sanely
   'no-implicit-coercion': 'error',
@@ -91,8 +67,7 @@ const CLEANLINESS = {
 };
 
 const UNICORN = {
-  // Only the bug-catchers core has no equivalent for. Deliberately NOT unicorn/recommended —
-  // see the note above.
+  // Only bug-catchers core lacks; not unicorn/recommended (see tools/README.md).
   'unicorn/no-unsafe-string-replacement': 'error',  // an unescaped `$&` in a replacement string
   'unicorn/no-invalid-remove-event-listener': 'error',
   'unicorn/no-invalid-fetch-options': 'error',
@@ -130,15 +105,8 @@ export default [
       eqeqeq: ['error', 'smart'],
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'no-empty': ['error', { allowEmptyCatch: true }],
-      // A `const` read above its own declaration is a TDZ ReferenceError at module load — the
-      // whole graph fails and the page is blank white, with a stack pointing at a line that looks
-      // fine. Nothing else here catches it: it is not a cycle, not a missing export, not a type.
-      // `functions: false` because function declarations hoist and calling one earlier is normal.
-      // An error everywhere: a page script runs top to bottom at load exactly as the shop does,
-      // and the harmless cases (read inside a function that runs later) cost a line move to fix.
+      // A TDZ read at module load blanks the page; function declarations hoist, so they're allowed.
       'no-use-before-define': ['error', { functions: false, classes: true, variables: true }],
-      // A function longer than this is doing more than one thing. Comments and blanks do not
-      // count — this codebase explains itself, and prose is not complexity.
       'max-lines-per-function': ['error', { max: 20, skipComments: true, skipBlankLines: true }],
       'prefer-template': 'error',
       'object-shorthand': 'error',
@@ -150,38 +118,28 @@ export default [
     },
   },
   {
-    // The module graph, everywhere: pages, the shop, the characters, the inventory and the node
-    // self-checks. These replace hand-rolled scripts that did the same job worse: a cycle
-    // detector and an export/import linker. eslint already parses every file — it was always the
-    // right place for this. They started in the shop alone; repo-wide they had no hits.
+    // The module graph, everywhere.
     files: ['**/*.js', '**/*.mjs'],
     plugins: { 'import-x': importX },
     settings: {
-      // `three` and its addons come from a CDN import map at runtime, so they are unresolvable
-      // on disk by design. Everything relative must resolve.
-      'import-x/ignore': ['^three'],
+      // `three` and `trystero` come from a CDN import map at runtime, so they can't resolve on disk.
+      'import-x/ignore': ['^three', '^trystero'],
       'import-x/resolver': { node: { extensions: ['.js', '.mjs'] } },
     },
     rules: {
-      // The one that matters most: a cycle is not a style issue. `yarn.js` read a `const` from
-      // `items.js` while `items.js` was still evaluating `yarn.js`, which is a TDZ ReferenceError
-      // and a blank page.
+      // A cycle can read a `const` mid-evaluation: a TDZ error and a blank page.
       'import-x/no-cycle': ['error', { maxDepth: Infinity, ignoreExternal: true }],
-      // `import { x }` where the target has no `export x` is a SyntaxError in the browser and a
-      // clean lint everywhere else, because eslint checks one file at a time. Not any more.
+      // A missing named export is a SyntaxError in the browser but invisible to per-file lint.
       'import-x/named': 'error',
-      'import-x/no-unresolved': ['error', { ignore: ['^three'] }],
+      'import-x/no-unresolved': ['error', { ignore: ['^three', '^trystero'] }],
       'import-x/no-self-import': 'error',
     },
   },
   {
-    // The shop's module graph, on top of the checks above: its layering.
     files: ['characters/store/**/*.js'],
     plugins: { 'import-x': importX },
     rules: {
-      // The layering, declared rather than computed: core < scene < goods < interact < sim < ui.
-      // Each zone may only import from the ones below it. This is what stops the graph drifting
-      // back into a tangle one reasonable-looking edge at a time.
+      // The shop's layering: core < scene < goods < interact < sim < ui; each imports only from below.
       'import-x/no-restricted-paths': ['error', {
         zones: [
           { target: './characters/store/core', from: './characters/store', except: ['./core'] },
@@ -198,8 +156,15 @@ export default [
     },
   },
   {
-    // Architectural boundary from DESIGN-DECISIONS.md: the simulation must stay headless so it
-    // can be tested and run deterministically without a renderer. Inert until src/sim exists.
+    // ROADMAP A1: a day replays from its seed, day and attempt.
+    files: ['characters/store/**/*.js'],
+    rules: {
+      'no-restricted-properties': ['error', { object: 'Math', property: 'random',
+        message: 'Draw from the world: simRng for the sim, a hash for visual timing.' }],
+    },
+  },
+  {
+    // DESIGN-DECISIONS.md: the simulation stays headless. Inert until src/sim exists.
     files: ['src/sim/**/*.js', 'src/sim/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', {
@@ -209,21 +174,16 @@ export default [
     },
   },
   {
-    // The node-run self-checks (`node inventory/grid.test.mjs`). Same rules as the modules they
-    // test, but they run in node: `console` is a global there, not a browser affordance.
+    // The self-checks run under node.
     files: ['**/*.test.mjs'],
     languageOptions: { ecmaVersion: 2024, sourceType: 'module', globals: globals.node },
   },
   {
-    // Build/verification scripts run in node, not the browser. What is left in tools/ is only
-    // what no off-the-shelf rule knows about — see tools/README.md.
+    // tools/ runs under node.
     files: ['tools/**/*.js', 'tools/**/*.mjs'],
     languageOptions: { ecmaVersion: 2024, sourceType: 'module', globals: globals.node },
   },
   {
-    // The self-checks run under bare `node` too. Without this they match no block that sets
-    // globals at all — the `**/*.js` block above does not cover .mjs — so every `console.log`
-    // in visit.test.mjs, wip.test.mjs and motion.test.mjs reported as no-undef.
     files: ['**/*.test.mjs'],
     languageOptions: { ecmaVersion: 2024, sourceType: 'module', globals: globals.node },
   },

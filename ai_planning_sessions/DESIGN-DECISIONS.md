@@ -51,58 +51,47 @@ These come from the original concept and should be re-read before any design cha
 
 | Layer | Choice |
 | --- | --- |
-| Renderer | three.js |
-| Scene glue | `@react-three/fiber` + `@react-three/drei` |
-| Post FX | `@react-three/postprocessing` |
-| State | `zustand` (UI only); plain TypeScript for simulation |
-| Build | Vite + TypeScript |
-| Storage | `idb-keyval` (IndexedDB, one autosave slot) — see "Saving" in §5. Revised 2026-10-03 from `idb`, which is more than one slot needs |
-| Tests | Vitest (headless) |
+| Renderer | three.js 0.186, plain ES modules loaded from a CDN import map in each page |
+| Build | None. The repo is served as-is |
+| Framework | None. UI is DOM built in plain JS (`characters/store/ui/`) |
+| Types | JS type-checked by `tsc` via `jsconfig.json` (JSDoc plus inference, no TypeScript syntax); `three` is a devDependency only for its type definitions |
+| Lint | ESLint (`eslint.config.js`; rule choices in `tools/README.md`) |
+| Tests | Node self-check scripts (`*.test.mjs`), run by `npm run check` |
+| Hosting | GitHub Pages, serving the repo as-is (`.nojekyll`) |
+| Storage | `idb-keyval` (IndexedDB, one autosave slot), planned, not built yet — see "Saving" in §5. Revised 2026-10-03 from `idb`, which is more than one slot needs |
 
 **Deliberately not used:**
 
 - **Physics engine** — grid slots make it unnecessary.
 - **Navmesh library** (recast etc.) — one rectangular room, so grid A* suffices.
 - **ECS library** — premature at this scale.
+- **A build step or framework** — nothing here needs one, and a page that is just files is one less thing to break.
 
 Babylon.js was considered and rejected: heavier, and a smaller community in this genre.
-Vanilla three.js was considered and rejected: drei's helpers (`AccumulativeShadows`,
-`Environment`, `Instances`, camera rigs) each represent real work we would otherwise repeat.
 
 ---
 
 ## 3. Architecture
 
 ```
-src/
-  sim/     ZERO three.js imports. Headless, unit-testable. Enforced by an ESLint rule.
-    rng.ts        sfc32 seeded PRNG; every random draw traces to worldSeed
-    clock.ts      fixed 10Hz tick, day cycle
-    catalog/      item definitions, Ravelry-shaped schema
-    grid.ts       display slot model, occupancy
-    formations/   JSON rule definitions + matcher + dirty tracking
-    npc/          spawn, hidden stash, affinity, WIP, browse, purchase, craft queue
-    supply/       floor pile, delivery schedule, destash selector
-    guestbook/    signatures, observed tells, customer-of-the-week selection
-    world.ts      aggregate state + reducers
-    save.ts       IndexedDB, versioned + migrations
-  render/  Reads sim, writes matrices. NEVER owns state.
-    geometry/     procedural yarn-form builders
-    ItemInstances.tsx, NpcInstances.tsx
-    theme/        theme tokens -> materials / lights / env / postfx
-    portraits/    offscreen render-to-texture for finished-object cards
-    camera/       orbit + focus-on-display
-  ui/      React DOM overlay: tray, day indicator, morning summary
-           (Guestbook and bulletin board are DIEGETIC — in-world, not overlay)
-  data/    baked JSON catalogs
-scripts/
-  harvest-ravelry.ts   Node-only, .env key, NEVER bundled
-tests/
+characters/        the shop game and the character rig
+  visit.js, wip.js, guestbook.js   ZERO three.js imports. Headless, unit-testable sim
+  npc.js, motion.js, garments.js   rig, motion engine, worn finished objects
+  store/
+    core/      config, shared state
+    sim/       world.js (the day loop) and cast.js (sim -> characters)
+    scene/     room, displays, seating, plants, props
+    goods/     items, yarn, painting, stock
+    interact/  picking, moving, glow
+    ui/        DOM overlay: HUD, guestbook, packing slip, labels
+inventory/         catalog, grid slot model, supply, pick-and-place, yarn geometry
+tools/             lint-adjacent checks run by npm run check
 ```
 
-The `sim` / `render` split is the load-bearing decision. It makes formation rules and NPC
-behaviour testable without a browser, keeps simulation work off the React reconciler, and is
-what makes the performance rules below achievable. **Enforce it with lint, not discipline.**
+The sim / render split is the load-bearing decision. It makes formation rules and NPC
+behaviour testable without a browser and is what makes the performance rules below achievable.
+It is held by convention, not lint: `characters/store/sim/world.js` still imports three
+(ROADMAP.md X1).
 
 ---
 
@@ -126,8 +115,8 @@ hundred remembered NPCs free.
 > signal drowns in noise. At 10, each visitor is legible — which is exactly what makes a koala
 > memorable as a repeat customer.
 
-1. Simulation state **never** in React state. Per-frame motion mutates matrices in `useFrame`.
-   Putting NPC positions in React state means a re-render per NPC per frame.
+1. Simulation state **never** lives in the DOM UI. Per-frame motion mutates matrices in the render loop.
+   Driving NPC positions through the UI means DOM work per NPC per frame.
 2. Items and NPCs render via `InstancedMesh` grouped by shape family. Target **under 30 draw calls**.
 3. `instanceMatrix.needsUpdate` only on dirty.
 4. The formation matcher runs only on dirty displays.
@@ -138,7 +127,8 @@ hundred remembered NPCs free.
    *Exception:* the floor pile (≤ ~40 items) is its own small raycastable `InstancedMesh`.
 6. **Items do not cast into the shadow map.** 1000 shadow casters roughly doubles draw cost and
    reads as noise at this scale. Only the room shell and displays cast. Items get baked AO plus
-   fake contact-shadow quads.
+   fake contact-shadow quads, each sized to what is actually drawn rather than to the slot: a shadow
+   bigger than the object makes it look like it is hovering.
 7. `InstancedMesh` capacity is fixed at allocation. Allocate per family with headroom
    (`nextPow2`) plus a free-list with swap-remove repacking — **or** use `BatchedMesh`
    (three r168+), which also gives per-instance frustum culling. Decide after measuring.
@@ -528,6 +518,13 @@ feels arbitrary in play.
 > before P5 builds the craft loop**, since that is where finished objects begin being generated from
 > real purchases.
 
+### The new day
+
+- A new day carries over stock, slots, displays and chairs as the player left them, minus what sold.
+  The morning delivery lands on the floor (§6); whatever doesn't fit is reported in the log.
+- The shop is rebuilt only on first boot, on a new game, or when the furniture or counts change.
+- Tomorrow's order is planned at closing and shown before the shop opens.
+
 ### Saving: autosave, plain data
 
 TUTORIAL.md's rule stands: **autosave every round, no save button, ever.** Revised 2026-10-03
@@ -588,8 +585,8 @@ Build it once, in P2.
 ### Delivery — scripted progression, 10 days
 
 > **Revised 2026-10-03:** the tutorial is three days (TUTORIAL.md). The player owns one order line
-> on night 2 and every line from night 3; the authored days 4–10 below now only decide what fills a
-> line the player leaves blank.
+> on night 2, two on night 3 and every line from night 4; the authored days 4–10 below now only
+> decide what fills a line the player leaves as the supplier's choice.
 
 > **Updated 2026-10-03:** a delivery is now the resolution of an **order**, and the scripted days
 > 1–10 below are an order form gradually handed to the player as the ordering tutorial. Blank
@@ -606,6 +603,30 @@ Build it once, in P2.
 - Doubles as tutorial pacing: withhold notions for the first few days so the player masters
   yarn-only formations first. Invisible to the player.
 - Also testable — a fixed curve lets tests assert "by day 10 the player can build formation X".
+- Weights arrive over the script: worsted and dk on day 1, so sorting has a dimension from the
+  start; bulky on day 5 and fingering on day 8, each as a "new weight" slot.
+- Notions are held back until day 4, except inside a kit. Day 1's guaranteed formation is a kit:
+  one pattern plus every ball it needs, one weight and material, inside one colour family (colours
+  vary within it, so a multi-colour design still has its colours), plus the hook or needles in the
+  pattern's size and every notion it calls for. A kit is always complete; its pieces land scattered
+  in the delivery like other stock, for the player to put together. A colour family is one sixth
+  of the colour wheel.
+- The supplier's full delivery is day 10's size (kits excluded); the minimum delivery is 2.
+- A yarn line's count is units, not boxes (YARN.md, "Units"): "5 units of yarn" is five skeins or
+  fewer, bigger boxes, and a kit's yarn totals at least its pattern's units. So the starting pile
+  is smaller in items (14–22 boxes, mean 17) than the 24–30 above, for the same amount of yarn: decided.
+- The packing slip describes each slot's template, never the items: the catalog picks those on the
+  day. A blank line is never offered as a kit, because a kit is not "count of" anything.
+
+### The shop's range
+
+The shop carries a curated range, not one of everything: weights fingering, dk, worsted, bulky;
+materials wool, cotton, alpaca, acrylic; tool sizes 3–6 mm (`SHOP_RANGE` in `inventory/catalog.js`).
+This is game balance. Matching is strict (one weight and material out of 8×8, one tool out of
+2×12), so against uniformly random stock a shelf item meets a given want ~0.9% of the time for yarn
+and 0.5% for a tool, and almost no project would get made. Drawing stock and patterns from the same
+small range keeps the strict match playable. Every weight × material pair in the range has at least
+one named design, so a customer holding any stock yarn has a pattern to shop for.
 
 ### Homeostasis — stopping growth toward the 1000 ceiling
 
@@ -626,6 +647,9 @@ the wrong vibe.
 
 **Outflow — (a) end-of-day destash, day 11+**
 
+> **Superseded (TUTORIAL.md §7.2):** the player-filled donation box replaces (a)'s automatic
+> destash; (b) is built as `supplyFor()` in `inventory/supply.js`.
+
 - Sort by `lastPlacedDay` ascending, nulls (never organised) first. Remove N.
 - Self-balancing, and it rewards the core verb: curated arrangements are protected precisely
   *because* the player touched them.
@@ -639,7 +663,7 @@ the wrong vibe.
 - **Legibility:** needs a morning summary ("4 skeins went to the charity box"). Silent
   disappearance reads as a bug.
 
-**(c) is a re-skin of (a) — architect for it now**
+**(c) is a re-skin of (a)** *(historical: (a) is superseded, see above)*
 
 The selection logic is identical for both: *pick the least-loved items*. Whether that is narrated as
 an invisible overnight tidy-up (a) or as a Hoarder NPC or moths (c) is **presentation only**.
@@ -649,6 +673,9 @@ an invisible overnight tidy-up (a) or as a Hoarder NPC or moths (c) is **present
 
 **Both homeostasis systems stay off during days 1–10.** Throttling fights the authored curve, and
 destashing punishes new players. Clean boundary: days 1–10 pure authored, day 11+ systems on.
+
+**Decided:** stocking is the player's: the packing slip's lines are theirs from night 2 (TUTORIAL.md
+§7.2; built in `store/ui/night.js`, `choicesFor()` in `inventory/supply.js`).
 
 ---
 
@@ -670,6 +697,9 @@ like the same game recoloured), and semi-realistic (N× texture cost per theme).
   Different themes, zero new shaders, zero new geometry.
 - Hue variation **must** be palette-constrained (anchor hues plus small perceptual jitter).
   Uniform-random hue destroys the pastel read instantly.
+- Lighting is three 0.160's `RoomEnvironment` (room at y=0, overhead point light 5), pinned in
+  `inventory/room-environment.js`. Every page's brightness was tuned under it; switching to three's
+  current room needs a full brightness retune.
 
 ---
 
@@ -694,7 +724,7 @@ like the same game recoloured), and semi-realistic (N× texture cost per theme).
 
 | Phase | Contents |
 | --- | --- |
-| **P0 Foundations** | Vite/TS/R3F, sim–render split plus ESLint guard, seeded RNG, fixed tick, IndexedDB save stub, Vitest harness, GH Actions → Pages |
+| **P0 Foundations** | Plain ES modules plus CDN import map, sim–render split, seeded RNG, fixed tick, IndexedDB save stub, tsc/ESLint/node self-checks, GitHub Pages serving the repo |
 | **P1 Look & feel spike** | See [P1-SPIKE-PLAN.md](P1-SPIKE-PLAN.md). Runs parallel with P6 research |
 | **P2 Placement** | Slot model, derived jitter, pick/place, orbit + display-focus camera, tray UI, floor pile as universal inbox, jumble generator, `lastPlacedDay`, 1000-item stress test |
 | **P3 Formation engine** | Rule DSL, matcher, dirty tracking, discovery feedback, Formation Atlas UI, headless tests. Parallel with P4 |
@@ -745,7 +775,7 @@ first-person mode, Hoarder/Moth narration, multiple shipped themes (plumbing onl
 
 ## 12. Size assessment
 
-- **MVP:** roughly 10 systems, 35–45 modules, 7–10k lines of TypeScript.
+- **MVP:** roughly 10 systems, 35–45 modules, 7–10k lines of JavaScript.
 - **Full concept:** roughly 3–4× the MVP.
 - **Most expensive and riskiest:**
   1. Formation rule **content** authoring — effectively unbounded. This is design work, not

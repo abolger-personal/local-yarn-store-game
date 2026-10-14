@@ -31,7 +31,7 @@ performance"* was right, and is now proven rather than asserted.
 
 ## 2. Decision: merchandise is instanced, one `InstancedMesh` per geometry family
 
-**Seven 3D families** (skein, ball, cake, hank, cone, mini-skein, booklet) plus **one billboard
+**3D yarn families** (skein, ball, cake, hank, cone, mini-skein; the booklet was dropped 2026-10-12, see PATTERNS.md) plus **one billboard
 family** for every notion, covering the entire shop — eight nodes, eight draw calls, eight
 materials, at any item count.
 
@@ -112,7 +112,7 @@ Consequences:
 > Billboards must still be **instanced**. One `Object3D` per notion would reintroduce exactly the
 > node-count cost that dominates the character budget.
 
-### Which way does the card face — decide in P1
+### Which way the card faces
 
 The game is an **orbiting diorama**, so the camera moves and this choice is visible:
 
@@ -123,7 +123,11 @@ The game is an **orbiting diorama**, so the camera moves and this choice is visi
 | Fixed card | no rotation at all | items lying flat, seen from a limited arc |
 
 A full billboard on an item resting on a shelf looks wrong as the camera orbits — it pivots in place
-like a cardboard cutout. **Y-axis is the likely default**, with fixed cards for anything lying flat.
+like a cardboard cutout.
+
+Built: each notion is a box, for volume, with the illustrated card as a label flush on its forward
+face (standing, like a product on a shelf) and a second copy lying flat on its top, so it reads both
+from the side and from straight above.
 
 ### Flat notions next to 3D yarn is a feature, not an inconsistency
 
@@ -144,11 +148,6 @@ The character rig as built supports most of what the briefing asks, with three g
 **The rig has two hold nodes, and only one is used.** `leftHold` and `rightHold` both exist on the
 skeleton, but `buildHeldItem` attaches to one hand. Knitting is two-handed. The held-item slot needs
 to become `one-hand | two-hand | lap | none`.
-
-**`clampArmOut` will fight two-handed poses.** The clamp exists to stop a pose driving the elbow
-inside the body, and it does that by forcing arms *outward*. Bringing both hands together in front of
-the chest is the opposite motion. Either the clamp becomes pose-aware, or two-handed poses opt out of
-it. **This will look like a bug when someone first authors a knitting pose.**
 
 **A held billboard may not survive being held.** A camera-facing card in a hand pivots independently
 of the hand holding it, which reads as detached. The likely answer is that held notions leave the
@@ -188,13 +187,12 @@ nobody. Scale is a property of the *situation*, so it belongs with the situation
 
 ## 5. Open questions for P1
 
-1. **Communicating notion attributes.** A 1mm and a 30mm crochet hook cannot be distinguished by
-   silhouette at diorama scale. Non-diegetic number, an inspect panel, or colour coding? The project
-   is committed to *mostly* diegetic UI, so this needs an explicit exception, not a drift.
-2. **Fuzz tiers vs family split vs custom shader** (section 2).
-3. **Does a notion's pose belong to the notion or to the activity?** Knitting-with-needles and
-   knitting-with-a-different-needle-size are the same pose. Suggests poses attach to *activities*,
-   with notions declaring which activity they belong to.
+1. ~~Communicating notion attributes~~ **Built:** mm size printed on the box's side and top
+   (`makeSizeAtlas`, store/goods/items.js). EU/metric only.
+2. ~~Fuzz tiers vs family split vs custom shader~~ **Answered (below):** matcap, so fuzz is a
+   texture swap per tier. Unbuilt; see YARN.md TODO.
+3. ~~Does a notion's pose belong to the notion or the activity?~~ **The activity:** `CRAFT_MODES`
+   in craft-anim.js; the tool is a prop.
 
 ---
 
@@ -206,7 +204,7 @@ Back to the original scope — this is a merchandise and arrangement spike, not 
    The skein is the hero shape and deserves the most iteration.
 2. **A display with a slot grid**, and placement by raycasting the slot plane rather than the items.
 3. **The 1000-item wall**, checked for *sameyness* rather than frame rate — the perf question is
-   already answered.
+   already answered. **Passed 2026-10-12.**
 4. **A notion atlas** with 2-3 visual treatments (outline / gold / sparkle) to choose between, and
    the billboard facing mode settled against an orbiting camera.
 5. **One two-handed held notion**, purely to surface the `clampArmOut` conflict early while it is
@@ -233,7 +231,8 @@ independent of notion count. Section 2's central claim is now demonstrated rathe
 the card, delivers thickness *and* the ink outline in **one extra draw call for the whole field** —
 because it shares the main field's instance attributes rather than maintaining a synced copy. A
 fragment-stage gradient across the card adds form with no geometry at all. Billboards stay
-billboards.
+billboards. Because labels stand flush on box faces, the outline copy is biased in the depth test
+(`polygonOffset`) rather than pushed behind the card.
 
 **Picking uses a plane at the card's mid-height, not the floor.** An upright card is drawn well
 above its own footprint, so a floor hit test asks the player to click empty grid below the thing
@@ -241,17 +240,29 @@ they can see. Still one plane intersection, still O(1), still never raycasts an 
 
 **Picking is forgiving by design.** An ink drawing occupies a fraction of its slot, so an exact hit
 test feels like the item is not where it looks. `pickSlot` falls back to the nearest occupied slot
-within a grab radius.
+within a grab radius. Click to pick up, click again to put down (press-and-hold is hard on the hands
+for the core mechanic). Each occupied column is tested against its own plane at the item's middle
+height, so a tall item is grabbable over its whole body. An exact hit wins (nearest the camera);
+otherwise the nearest item within a **screen-space** grab radius (44 CSS px on touch, half for a
+mouse) measured to the item's vertical axis, so the tolerance means the same at any zoom. Among near
+misses the closest on screen wins, then the closest to the camera. Hovering to *read* uses the nearest
+item box the ray meets, buried or not, so the visible edge of a lower item shows that item.
+
+**Dropping.** A drop lands in the nearest slot the item actually *fits*, within 1.6 slots, never
+"the cell under the pointer", which is often full, and a silent no-op reads as broken. Reach is in
+slots, in the display's plane, so it does not drift with zoom. Footprints covering the pointer beat
+ones that don't; among those the most centred wins (a 3x3 centres on the pointed cell, a 2x2 takes
+the side the pointer is nearer). Each occupied column is aimed at as a solid block, floor to stack
+top, so pointing at a tall item's top or front stacks onto it. The targeted level is the nearest one
+whose lattice is under the pointer, with half a slot of slack past the edge so outer rows can be
+aimed from outside. The "display is full" warning tries the quarter turn too, per item. An item set
+back home whose column filled while it was in hand goes to the first free slot on its home display.
+
+**Placeholder art shares the one atlas.** Yarn and pattern placeholder shapes are composited into the
+notion atlas, drawn white so they recolour per instance: no extra draw calls.
 
 > `GridHelper` only draws squares. On a non-square grid it silently draws the wrong pitch, so the
 > player aims at lines that are not the slots. Use `makeGridLines`.
-
-### Awaiting the next round of visual feedback
-
-- thickness and outline settings (`edgeGrow`, `edgePush`, gradient) \u2014 all live in the GUI
-- lying flat vs upright, now that upright picking works
-- whether placeholder line weights are consistent enough to judge anything
-- notion scale against slot size
 
 ### Yarn asset spike — 2026-09-08
 
@@ -279,7 +290,7 @@ Two things the build corrected that the analysis alone had wrong: the mini-skein
 *scaled* skein (identical proportions read as the same object at shelf distance, which
 P1-SPIKE-PLAN.md warned about and a uniform scale cannot satisfy by construction), and **bulk-as-
 height clashes with the shelf gap** — a 3×3×3 ball at true volume is 0.70 units against a 0.22 gap.
-That one is unresolved and is the substantive layout question the spike surfaced.
+Resolved in YARN-ASSET-SPIKE.md §12: `trueVolume` removed; bulky yarn goes on tables and the floor.
 
 ### Pick and place is now shared — 2026-09-08
 
@@ -293,6 +304,12 @@ again.
 `fullyExposed` moved from `characters/visit.js` into `grid.js` — it is pure grid occupancy, the
 player's pick needs the same answer the NPC does, and `inventory/` must not depend on `characters/`.
 Re-exported from `visit.js`, so existing callers are unchanged.
+
+Holding an item across displays (experimental, demo only right now: stash-and-stuff): hovering onto another display activates it for the drop, with no
+key press; hovering over dead space returns to the display it came from. An incidental switch
+mid-hold never moves the camera; an explicit one (D, the dropdown, a fresh pick-up) recentres it. A
+keyboard plane or display switch re-aims the drop at once. On a click the forgiving item pick runs
+first; only if it finds nothing does the click select the display under the pointer.
 
 ### Yarn is in the shop — 2026-09-09
 
@@ -309,11 +326,11 @@ Three things worth carrying forward from it:
   eaten by the ramp. That is what decides which yarn can go on a wall, and it is now one named
   constant (`SHELF_CLEAR`) rather than a hand-typed headroom of 3.
 - **Section 4 (held notions) is half done.** An NPC carries the real ball out of the shop now,
-  sharing the shelf's geometry and cloning only the material. The rig side of section 4 — a notion
-  posed in the hand rather than a group tipped out of the fist — is still untouched.
+  sharing the shelf's geometry and cloning only the material. Seated knitters now hold needles or a hook
+  (craft-anim.js, via sim/cast.js); only the carried item is still a group tipped out of the fist.
 
 ### Not started
 
-Held notions on a character (section 4) as specified — an NPC carries real yarn now, but through
-the same tipped-group placeholder, not the rig work that section describes. And the 1000-item
-sameyness check: the tooling exists (one button in the demo), but nobody has looked at it yet.
+Carrying a notion in the hand properly (section 4).
+
+The 1000-item sameyness check **passed** (2026-10-12, by eye on the stash demo's "the 1000-item wall").

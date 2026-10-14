@@ -1,0 +1,108 @@
+import {
+  BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, animateFighter, buildFighter, disposeFighter, loadFighter, newFighter,
+  randomFighter, saveFighter, setFur,
+} from './fighter.js';
+import { makeStage } from './stage.js';
+
+const ANIMAL = { lion: '🦁', llama: '🦙', owl: '🦉' };
+const NONE = '<circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" stroke-width="4"/><path d="M13 35 35 13" stroke="currentColor" stroke-width="4"/>';
+const ICON = {
+  beanie: '<path d="M9 33C9 17 17 11 24 11s15 6 15 22Z"/><rect x="7" y="31" width="34" height="7" rx="3"/><circle cx="24" cy="9" r="4"/>',
+  pixie: '<path d="M10 36C12 22 18 12 34 5c-4 9 2 19 4 31Z"/><rect x="8" y="34" width="32" height="6" rx="3"/>',
+  beret: '<ellipse cx="24" cy="26" rx="18" ry="8"/><rect x="13" y="29" width="22" height="6" rx="3"/><rect x="22" y="14" width="4" height="6" rx="2"/>',
+  bucket: '<path d="M14 30 16 14c4-3 12-3 16 0l2 16Z"/><path d="M5 34c5-6 33-6 38 0-5 3-33 3-38 0Z"/>',
+  earflap: '<path d="M9 30C9 16 17 10 24 10s15 6 15 20Z"/><path d="M9 28h6l-1 12c-2 2-5 0-5-2Z"/><path d="M39 28h-6l1 12c2 2 5 0 5-2Z"/>',
+  cape: '<path d="M16 8h16l10 34c-12 4-24 4-36 0Z"/>',
+  capelet: '<path d="M12 10h24c6 8 8 14 8 18-12 4-28 4-40 0 0-4 2-10 8-18Z"/>',
+  backpack: '<rect x="11" y="12" width="26" height="30" rx="7"/><path d="M18 12c0-7 12-7 12 0" fill="none" stroke="currentColor" stroke-width="3"/><rect x="15" y="28" width="18" height="10" rx="3" opacity=".55"/>',
+  'drawstring bag': '<path d="M12 16c-4 14-2 26 12 26s16-12 12-26Z"/><path d="M14 16c4-6 16-6 20 0" fill="none" stroke="currentColor" stroke-width="3"/>',
+  'crossbody pouch': '<path d="M8 6 30 26" stroke="currentColor" stroke-width="3"/><rect x="18" y="22" width="24" height="18" rx="5"/>',
+};
+const svg = (body, colour) => `<svg viewBox="0 0 48 48" fill="currentColor" style="color:${colour}" aria-hidden="true">${body}</svg>`;
+
+let fighter = loadFighter() ?? newFighter('lion');
+let built = null, cheer = 0, spin = 0;
+const stage = makeStage(document.getElementById('stage'));
+const panel = document.getElementById('panel');
+
+function rebuild(reframe) {
+  if (built) { stage.scene.remove(built.root); disposeFighter(built); }
+  built = buildFighter(fighter);
+  stage.scene.add(built.root);
+  if (reframe) stage.frame([built.root], { margin: 1.5 });
+}
+
+const button = (action, value, label, inner, on) =>
+  `<button data-action="${action}" data-value="${value}" aria-label="${label}" aria-pressed="${on}">${inner}</button>`;
+
+const swatchRow = (action, list, current) => list.map(({ hex, name }) =>
+  button(action, hex, name, `<span class="dot" style="background:${hex}"></span>`, hex === current)).join('');
+
+const pickRow = (action, list, current, colour, none) => [...(none ? [null] : []), ...list].map((v) =>
+  button(action, v ?? '', v ?? 'none', svg(v ? ICON[v] : NONE, v ? colour : '#9a8f84'), v === current)).join('');
+
+const pictures = (html) => `<div class="choices pictures">${html}</div>`;
+const colours = (html) => `<div class="choices">${html}</div>`;
+
+const row = (icon, label, ...lines) => `<div class="row" role="group" aria-label="${label}">`
+  + `<span class="label" aria-hidden="true">${icon}</span><div class="lines">${lines.join('')}</div></div>`;
+
+const garment = (icon, kind, list, none) => row(icon, kind,
+  pictures(pickRow(kind, list, fighter.look[kind], fighter.look[`${kind}Color`], none)),
+  colours(swatchRow(`${kind}Color`, CLOTH, fighter.look[`${kind}Color`])));
+
+function render() {
+  const { species, look, params } = fighter;
+  panel.innerHTML = [
+    row('🐾', 'animal', pictures(SPECIES.map((s) => button('species', s, s, `<span class="emoji">${ANIMAL[s]}</span>`, s === species)).join(''))),
+    row('🎨', 'fur', colours(swatchRow('fur', FUR, params.bodyColor))),
+    garment('🎩', 'hat', HATS, true),
+    garment('🦸', 'cape', CAPES, true),
+    garment('🎒', 'bag', BAGS, false),
+    row('🥊', 'gloves', colours(swatchRow('gloves', CLOTH, look.gloves))),
+  ].join('');
+}
+
+const ACTIONS = {
+  species: (v) => { fighter = newFighter(v); return true; },
+  fur: (v) => { setFur(fighter, v); },
+  hat: (v) => { fighter.look.hat = v || null; },
+  cape: (v) => { fighter.look.cape = v || null; },
+  bag: (v) => { fighter.look.bag = v; },
+};
+
+function choose(action, value) {
+  const set = ACTIONS[action] ?? ((v) => { fighter.look[action] = v; });
+  const reframe = set(value) === true;
+  saveFighter(fighter);
+  rebuild(reframe);
+  if (reframe) cheer = 1.4;
+  render();
+}
+
+panel.addEventListener('click', (e) => {
+  const b = /** @type {HTMLElement} */ (e.target).closest('button');
+  if (b) choose(b.dataset.action, b.dataset.value);
+});
+
+document.getElementById('dice').addEventListener('click', () => {
+  fighter = randomFighter();
+  saveFighter(fighter);
+  rebuild(true);
+  cheer = 1.4;
+  render();
+});
+
+document.getElementById('done').addEventListener('click', () => {
+  saveFighter(fighter);
+  location.href = 'lobby.html';
+});
+
+rebuild(true);
+render();
+stage.run((dt) => {
+  cheer = Math.max(0, cheer - dt);
+  spin += dt;
+  built.root.rotation.y = 0.55 * Math.sin(spin * 0.5);
+  animateFighter(built, dt, cheer > 0 ? 'delighted' : 'rest');
+});

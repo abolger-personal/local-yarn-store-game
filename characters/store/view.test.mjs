@@ -1,18 +1,10 @@
-// Self-check for the game's opening camera (shopView, core/config.js). Run: node characters/store/view.test.mjs
-//
-// The game opens on the view in the user's screenshot, so day 1's Former Owner, who signs the
-// Guestbook and walks out, cannot be missed. At that screenshot's own size, the room's landmarks
-// land where the screenshot shows them; on other screens, the Guestbook and the walls round it are
-// still in frame. Coordinates are copied from scene/room.js (walls, windows, bulletin, guestbook,
-// lamp-a in props.js): those modules build meshes on a WebGL stage and cannot load in node.
-
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { SHOP_ASPECT, shopView } from './core/config.js';
 
 const W = 2000, H = 1141;
-const SHOT = {                                     // world point: where the screenshot shows it, px
+const SHOT = {
   'back-left corner, chair rail': [[-4.8, 0.9, -3.6], [1130, 268]],
   'back-left corner, floor': [[-4.8, 0, -3.6], [1130, 398]],
   'left window sill': [[-4.8, 0.9, -0.5], [690, 300]],
@@ -44,7 +36,6 @@ for (const [name, [p, [x, y]]] of Object.entries(SHOT)) {
   const off = Math.hypot(px - x, py - y);
   assert.ok(off < 30, `${name} is ${off.toFixed(0)}px from where the screenshot has it`);
 }
-// a portrait phone crops the board's near corner by a hair; the Guestbook is what must show
 for (const [aspect, names] of [[16 / 9, ['board top, front end', 'back window x=0, sill']], [4 / 3, ['board top, front end']], [9 / 16, []]]) {
   const cam = lens(aspect);
   for (const name of ['guestbook', 'back-left corner, floor', ...names]) {
@@ -52,18 +43,16 @@ for (const [aspect, names] of [[16 / 9, ['board top, front end', 'back window x=
     assert.ok(Math.abs(v.x) < 1 && Math.abs(v.y) < 1, `${name} is off screen at ${aspect.toFixed(2)}`);
   }
 }
-// Between days the Guestbook is what says what to order: the night screen opens it, and the book
-// moves into that modal dialog, or it would sit inert behind it.
 assert.match(readFileSync(new URL('ui/book.js', import.meta.url), 'utf8'), /dialog:modal/, 'the Guestbook no longer lifts into an open modal');
-// It opens by itself, top right, twice: as day 1 opens on the shop (the Former Owner signs it), and
-// every night once the screen is up, so lift() takes it in.
 const src = (f) => readFileSync(new URL(f, import.meta.url), 'utf8');
 assert.match(src('game.js'), /frame: \(\) => \{[^}]*\bopenBook\(\)/, 'day 1 no longer opens on the Guestbook');
 assert.match(/function closeForTheNight\(\) \{[\s\S]*?\n\}/.exec(src('ui/night.js'))?.[0] ?? '', /showModal\(\);[\s\S]*\bopenBook\(\)/,
   'the night screen no longer opens the Guestbook (after showModal, so it lifts into the dialog)');
 assert.match(/#book \{[^}]*\}/.exec(src('../game.html'))?.[0] ?? '', /var\(--brass\) border-box/, 'the Guestbook lost its brass rim');
-// GitHub Pages serves the game below the site's root: an asset path resolved against the page
-// walks out of the repo there while working on localhost. The atlas resolves from its module.
+for (const f of ['../game.html', '../store.html'])
+  assert.match(/#photo \{[^}]*\}/.exec(src(f))?.[0] ?? '', /width: min-content/, `${f}: the photo's caption no longer wraps at the photo's width`);
+for (const f of ['../game.html', '../store.html'])
+  assert.match(/#photo \{[^}]*\}/.exec(src(f))?.[0] ?? '', /padding: 2[4-9]px/, `${f}: the photo's close button lands on the photo`);
 for (const f of ['boot.js', 'puzzle.js', '../../inventory/stash-and-stuff.js'])
   assert.match(src(f), /ATLAS_URL = new URL\([^)]*import\.meta\.url\)/, `${f}: the atlas path is resolved against the page, which breaks on GitHub Pages`);
 

@@ -5,7 +5,7 @@ A WIP is either: UNSTARTED, IN PROGRESS, FINISHED OBJECT, (or FROGGED, a post MV
 
 An UNSTARTED WIP slot at NPC Generation time is initialized with: 
 - 0 or 1 PATTERNS
-- 0 to 1 items of YARN (1 unit = 1 yarn item. A pattern costs 1 to 8 items of its own recommended weight. See inventory/PATTERNS.md)
+- 0 to 1 items of YARN (a yarn item is 1 to 4 units by its shape, inventory/YARN.md "Units". A pattern costs 1 to 8 units of its own recommended weight. See inventory/PATTERNS.md)
 - 0 or 1 TOOL NOTIONS (crochet hook or knitting needles)
 - (POST MVP MECHANIC) 0 or 1 ACCESSORY NOTIONS (stitch markers)
 - 0 percent "progress to completion"
@@ -26,6 +26,8 @@ After a "Buy" in the game mechanic, WIPs can be moved from UNSTARTED to IN PROGR
 - 1 or more YARN units exist
 - 1 or more Tool notions exist 
 
+That is the threshold for STARTING (one unit, not the pattern's full count): they cast on with the yarn they have and buy more later. Work stops where the held yarn runs out, so a WIP short of yarn cannot finish.
+
 Yarn is bought BY UNITS (items), until the WIP has what its pattern calls for. An NPC can end up with the wrong colour if the player has not stocked matching units together. Every colour a WIP ends up holding appears in the finished object (VISUAL-DESIGN-FINISHED-OBJ.md §3). How skill and personality decide those purchases is not specified yet (open).
 
 A careful crafter may SWATCH before a WIP goes IN PROGRESS. The swatch affects whether the FO comes out well, and it leaves a 1x1x1 swatch object behind for the swatch wall (VISUAL-DESIGN-FINISHED-OBJ.md §4). Who swatches, and what exactly it changes, is not specified yet (open).
@@ -34,6 +36,8 @@ During the NPC's "Work on a WIP" action, a single round of a WIP can have progre
         1/(number of units of yarn called for by pattern) * characterWeight
 
         characterWeight = (NPC crafter skill level)/3 * Industriousness/3
+
+NOTE(spec): the increment is a fraction (1/units) but the threshold is a percentage ("over 100"). Read as a fraction of completion: at characterWeight 1 a project takes exactly its yarn-unit count in rounds (2-unit socks are a two-round job, an 8-unit sweater a visit or two). The code stores it as a percent.
 
 At the end of a "Work on a WIP" action, if progress is incremented over 100, the NPC now has a FINSIHED OBJECT they can show off in the guest book. 
 
@@ -51,3 +55,9 @@ HOW WIPs determine an NPC shopping list:
 -- A WIP that has a YARN but no pattern, then any pattern with the same yarn attributes (weight, material) will  match (at least for MVP)
 
 Crafter skill (1 to 5) also decides how closely the FO matches its pattern: below the pattern's skill level it comes out simplified, or wonky if well below (VISUAL-DESIGN-FINISHED-OBJ.md §3).
+
+## Open questions
+
+- TODO(spec): a pattern's `minColors` is an attribute it specifies too, but it belongs to the whole yarn collection, not one ball, so the per-ball match cannot check it. It wants a completeness test over the WIP's yarn once colour matters.
+- TODO(spec): the yarn match is strict for now ("we can make this a messy match later").
+- TODO: nothing refills a freed WIP slot. An NPC who finishes (and wears) a project mid-visit has room for a new one and no way to start it: the natural home for a "cast on something new" action.

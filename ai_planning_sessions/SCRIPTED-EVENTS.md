@@ -160,3 +160,6 @@ Scripts inherit the game's rules; writing one does not suspend them.
 - **Do event triggers need conditions** beyond the role and the kind ("bought a pot holder kit
   with the yarn the player placed")? Start without; add when a script needs one.
 - **Where does a script's text live** if the game is ever translated? Inline for now.
+- **TODO:** the friend role (a `keep` NPC, first in the queue) and the day-3 beat are still
+  hard-coded in `store/sim/world.js`, not scripts; knitting at home (B2) in general. (Today: the table nearest
+  the door, `openTutorial` in world.js.)

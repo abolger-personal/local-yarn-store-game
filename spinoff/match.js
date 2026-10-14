@@ -8,6 +8,7 @@ export const ROUND_SECONDS = 90;
 export const DONUTS_PER_SHELF = 12;
 export const BRICK = 0.4;
 export const HIT_DEPTH = 0.35;
+export const HITSTOP_TICKS = 5;
 
 /**
  * @typedef {'heroes'|'badGuys'} Team
@@ -66,13 +67,17 @@ export const STAGE = Object.freeze({
  * @typedef {{ id: string, team: Team, x: number, y: number, z: number, hits: number, maxHits: number,
  *             icing: string }} BrickState
  * @typedef {{ team: Team, x: number, y: number, z: number, donuts: DonutLook[] }} ShelfState
+ * @typedef {{ x: number, y: number, z: number, move: 'punch'|'kick'|'stomp', on: 'fighter'|'brick',
+ *             broke: boolean }} HitEvent
+ *   a hit that landed this tick, at its point of contact, for the page's BAM burst and shake;
+ *   both fighters freeze for HITSTOP_TICKS on contact. `broke`: the brick (or bag) gave way.
  *
  * Everything the page draws, every tick. No three.js objects, only numbers and strings, so it
  * can cross the network unchanged in milestone 2. `over` is true once the clock runs out;
  * `winner` is the team with more donuts on its shelf then, or null for a tie.
  * @typedef {{ tick: number, secondsLeft: number, over: boolean, winner: Team|null,
  *             fighters: FighterState[], donuts: LooseDonut[], bricks: BrickState[],
- *             shelves: ShelfState[] }} Snapshot
+ *             shelves: ShelfState[], hits: HitEvent[] }} Snapshot
  *
  * Who is in the match. height / width / reach come from the fighter's params (fighter.js) as plain
  * numbers; look is the donut frosting this entrant brings to its team's shelf, and the icing

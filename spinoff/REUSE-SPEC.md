@@ -877,6 +877,17 @@ bad guy grabs a donut and banks it.
      when a fighter stands at a wall it can't hop (it walked in place forever), shelves standing
      behind the fighters' floor (the lion walked into its own shelf), and the villain drizzle as a
      squiggle.
+   - **Contact you can feel** (playtest, 2026-10-13: "you don't even see any contact made";
+     punches couldn't reach at all, only kicks broke bricks). Attacks connect from a visible gap
+     (punch about 0.35 between bodies, kick about 0.5, with a short lunge), and every hit that
+     lands is cheated the way fighting games do: a comic BAM starburst at the contact point sized
+     by the hit, a sprinkle puff, **hit-stop** (both fighters freeze `HITSTOP_TICKS`), the target
+     squashing and flinching, a brick wobbling and shedding icing chunks, and a small screen
+     shake on kicks and stomps. The snapshot carries the tick's `hits` for the page.
+   - **Bricks look like gingerbread, not cubes:** upright cookie panels with rounded, bevelled
+     edges, a thick white piped-icing border, flooded team-colour icing inside with a few white
+     dots, a slight random tilt per piece, and thick dark cracks as hits drop. They still fill one
+     `BRICK` cell in the sim.
    - **Phase A, the sim** (`spinoff/sim.js`, pure, no three.js, fixed 60 Hz `tick` +
      `snapshot`): stage as platform data with jump links, shelves on `inventory/grid.js`,
      navigation (tap a point or a thing, routes with jumps, ledge stop, tap-above jump, facing

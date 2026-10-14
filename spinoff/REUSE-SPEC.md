@@ -151,6 +151,27 @@ wide stage costs nothing new.
   `spinoff/roster.js`, with `MATCH.friendlyFire` false. A kid-against-kid mode later is that one
   setting, not a rewrite (decided 2026-10-13).
 
+## Forts: build it, then knock it down
+
+Every level is two rounds (decided 2026-10-13): a **build it** round, where each team fortifies
+its own shelf, then the **knock it down** round, the 3-minute capture-the-flag match. Builders
+and smashers each get a round that is theirs.
+
+- **The build round has no timer.** It ends when both teams are ready: every hero has tapped 👍
+  and every bad-guy player has tapped 👍. Tapping 👍 again takes it back, to keep building.
+  Nobody is rushed, and a careful builder can take as long as their team lets them.
+- **CPU bad guys build their fort and are ready at once.** With no grownup bad guys, the bad
+  guys' side is ready from the start, so only the heroes decide when to go.
+- **Placement is the shop's touch picker** (`inventory/pick-place.js` on the team's
+  `inventory/grid.js` floor), with the `help` table's grab radius and snap reach for small hands.
+  This answers the old open question about whether pick-and-place has a job here.
+- **New levels add new fort pieces.** Level 1 has the plainest piece (say, a wafer wall); each
+  level after adds one (gingerbread wall, jelly bounce pad, sprinkle-slick tile, …). Pieces stay
+  unlocked for the rest of the evening's room. A new piece is the level's surprise, alongside its
+  extra bad guy.
+- **Every fort piece can be smashed** in the knock-it-down round, so a fort slows the other team
+  down without ever walling a 4-year-old out. Kicks hit fort pieces hardest.
+
 ## Handicap: one `help` number per player
 
 Players are 4–6 year olds and grownups in the same match. Each player has one number, `help`,
@@ -523,6 +544,8 @@ bad guy grabs a donut and banks it.
   stronger, slower moves), or only how it looks while moving?
 - **The owl.** It is already a species in the code. Its wings are the one set of arms that
   would read, which makes it a natural third move set.
-- **Does pick-and-place have a job in this mode?** Banking is automatic. The touch picker could
-  run a short setup phase to arrange your shelf or place obstacles in front of it (the earlier
-  obstacle-building idea), or stay out of this mode.
+- **A hero who never taps 👍.** With no timer, a 4-year-old who has wandered off holds up the
+  whole room. Does a grownup on the heroes' team get a long-press to call the team ready, or does
+  the host's tablet?
+- **How many pieces per team?** A fixed number per level, more with each level, or a budget where
+  stronger pieces cost more?

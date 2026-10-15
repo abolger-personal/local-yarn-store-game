@@ -6,6 +6,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 
 ### Getting in
 - The game's plain address now opens the fighter chooser, so there's nothing to type after it.
+- The score and clock are much smaller, and the 🥊 🦶 ⏸️ 👋 buttons shrink to fit small tablets.
 
 ### Play together
 - **Play a match together.** In a room, the tablet that opened it (🏠) has ▶️: tap it and every

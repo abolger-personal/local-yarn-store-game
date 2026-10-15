@@ -66,18 +66,19 @@ body.lobby { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
 body.play { display: block; touch-action: none; -webkit-touch-callout: none; }
 body.play #stage { position: absolute; inset: 0; }
 body.play #stage canvas { touch-action: none; }
-.hud { position: absolute; top: 16px; left: 24px; right: 24px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
-.hud .clock, .hud .count { font-size: 52px; font-weight: 800; background: var(--panel); border-radius: 28px; padding: 4px 22px; border: 5px solid #e7d6c1; }
-.hud .count { display: flex; gap: 10px; align-items: center; }
+.hud { position: absolute; top: 10px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
+.hud .clock, .hud .count { font-size: min(30px, 4.5vmin); font-weight: 800; background: var(--panel); border-radius: 18px; padding: 2px 12px; border: 3px solid #e7d6c1; }
+.hud .count { display: flex; gap: 6px; align-items: center; }
 .hud .count.heroes { border-color: #ff9ad5; }
 .hud .count.badGuys { border-color: #5b2a86; }
-.hud .emoji { font-size: 48px; }
-.hud button { pointer-events: auto; width: 84px; height: 84px; }
-.hud .corner { display: flex; gap: 14px; }
+.hud .emoji { font-size: min(28px, 4.5vmin); }
+.hud button { pointer-events: auto; width: min(68px, 10vmin); height: min(68px, 10vmin); }
+.hud button .emoji { font-size: min(34px, 5vmin); }
+.hud .corner { display: flex; gap: 10px; }
 .end .card.paused { grid-template-columns: 1fr; justify-items: center; }
-.moves { position: absolute; right: 56px; bottom: 56px; display: flex; gap: 32px; }
-.moves button { width: 132px; height: 132px; border-width: 6px; touch-action: none; -webkit-touch-callout: none; }
-.moves .emoji { font-size: 68px; }
+.moves { position: absolute; right: min(56px, 5vmin); bottom: min(56px, 5vmin); display: flex; gap: min(32px, 4vmin); }
+.moves button { width: min(112px, 15vmin); height: min(112px, 15vmin); border-width: 5px; touch-action: none; -webkit-touch-callout: none; }
+.moves .emoji { font-size: min(58px, 8vmin); }
 .moves button.down { background: #ffd21a; border-color: var(--ring); transform: scale(1.1); }
 .end { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(74, 58, 48, .45); }
 .end[hidden] { display: none; }

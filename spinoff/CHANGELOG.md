@@ -6,6 +6,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 
 ### Small tablets
 - The score and clock are much smaller, and the 🥊 🦶 ⏸️ 👋 buttons shrink to fit small tablets.
+- The end card and pause card shrink to fit a small tablet turned sideways.
 - **Tap 🍩👆 to play.** The game starts with one big button: tap it and the game fills the whole screen, and stays that way from the fighter chooser to the lobby to the match. Add the game to the home screen to hide the browser's bars for good.
 
 ### Play together

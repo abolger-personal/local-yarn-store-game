@@ -82,14 +82,14 @@ body.play #stage canvas { touch-action: none; }
 .moves button.down { background: #ffd21a; border-color: var(--ring); transform: scale(1.1); }
 .end { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(74, 58, 48, .45); }
 .end[hidden] { display: none; }
-.end .card { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 48px; padding: 28px 48px; background: var(--panel); border-radius: 40px; border: 6px solid #e7d6c1; }
-.end .side { display: flex; flex-direction: column; align-items: center; gap: 8px; opacity: .55; transform: scale(.85); }
+.end .card { display: grid; grid-template-columns: 1fr 1fr; gap: min(24px, 2.5vmin) min(48px, 6vmin); padding: min(28px, 3vmin) min(48px, 6vmin); max-height: 96vh; background: var(--panel); border-radius: min(40px, 5vmin); border: 5px solid #e7d6c1; }
+.end .side { display: flex; flex-direction: column; align-items: center; gap: min(8px, 1vmin); opacity: .55; transform: scale(.85); }
 .end .side.won { opacity: 1; transform: scale(1.1); }
-.end .trophy { font-size: 72px; visibility: hidden; }
+.end .trophy { font-size: min(72px, 10vmin); visibility: hidden; }
 .end .won .trophy { visibility: visible; }
 .end .pics { display: flex; gap: 10px; }
-.end .donut { width: 96px; height: 96px; border-radius: 50%; background: radial-gradient(circle, transparent 0 20%, var(--frost) 21% 58%, var(--dough) 60%); }
-.end .big { font-size: 120px; font-weight: 800; line-height: 1; }
+.end .donut { width: min(96px, 11vmin); height: min(96px, 11vmin); border-radius: 50%; background: radial-gradient(circle, transparent 0 20%, var(--frost) 21% 58%, var(--dough) 60%); }
+.end .big { font-size: min(120px, 15vmin); font-weight: 800; line-height: 1; }
 .end .again { grid-column: 1 / -1; display: flex; justify-content: center; gap: 48px; }
-.end .again button { width: 132px; height: 132px; border-width: 6px; }
-.end .again .emoji { font-size: 68px; }
+.end .again button { width: min(112px, 15vmin); height: min(112px, 15vmin); border-width: 5px; }
+.end .again .emoji { font-size: min(58px, 8vmin); }

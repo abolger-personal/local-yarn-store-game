@@ -1056,6 +1056,25 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       fling = Math.max(fling, Math.abs(stepMotion(jump, POSES.rest, 1 / 60, o).tailYaw));
     }
     assert.ok(fling < 1e-9, `${id}: a teleport (spawn, reset) must not fling the tail -- peak ${fling.toFixed(3)}`);
+    for (const [dt, hop] of [[1 / 60, 1], [1 / 10, 4]]) {
+      const hopped = build(id);
+      let kick = 0;
+      for (let i = 0; i < 20; i++) {
+        if (i === 10) hopped.root.position.x = hop;
+        kick = Math.max(kick, Math.abs(stepMotion(hopped, POSES.rest, dt, o).tailYaw));
+      }
+      assert.ok(kick < 1e-9, `${id}: a ${hop}-unit jump in one ${dt.toFixed(3)} s step is a teleport -- peak ${kick.toFixed(3)}`);
+    }
+    for (const dt of [1 / 120, 1 / 60, 1 / 10]) {
+      const launch = build(id);
+      let flight = 0;
+      for (let t = 0, x = 0; t < 1; t += dt) {
+        if (t > 0.2 && t < 0.4) x += 25 * dt;
+        launch.root.position.x = x;
+        flight = Math.max(flight, Math.abs(stepMotion(launch, POSES.rest, dt, o).tailYaw));
+      }
+      assert.ok(flight > 0.1, `${id}: a 25 units/s launch at dt ${dt.toFixed(3)} must swing the tail -- peak ${flight.toFixed(3)}`);
+    }
     const cruise = build(id);
     let drift = 0;
     for (let i = 0; i < 30; i++) {

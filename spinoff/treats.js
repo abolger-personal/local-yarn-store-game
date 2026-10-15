@@ -110,8 +110,7 @@ export function brickMesh(b) {
   tilt.add(new THREE.Mesh(BRICK_GEO.panel, mat(GINGER[b.team], 0.8)), new THREE.Mesh(BRICK_GEO.piping, mat(PIPING, 0.5)), flood, ...cracks);
   tilt.rotation.set(0, ((h % 5) - 2) * 0.04, (((h >> 3) % 7) - 3) * 0.025);
   g.add(tilt);
-  const bits = [mat(PIPING, 0.5), mat(b.icing, 0.45)];
-  return { g, tilt, flood, cracks, hits: -1, wobble: 0, bits, crumbs: [mat(GINGER[b.team], 0.8), ...bits] };
+  return { g, tilt, flood, cracks, hits: -1, wobble: 0 };
 }
 
 /** Cracks and missing icing as hits drop; only when they change. @param {BrickState} b */
@@ -149,8 +148,7 @@ export function pancakeMesh(b) {
     return cake;
   });
   g.add(tilt);
-  const bits = [cream, mat('#fffaf0', 0.45)];
-  return { g, tilt, cakes, hits: -1, wobble: 0, bits, crumbs: [mat(BATTER[b.team], 0.75), ...bits] };
+  return { g, tilt, cakes, hits: -1, wobble: 0 };
 }
 
 /** The top pancake slides off and the stack leans as hits drop. @param {BrickState} b */

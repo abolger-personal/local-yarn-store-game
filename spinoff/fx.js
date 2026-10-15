@@ -56,20 +56,21 @@ function stepBam(b, dt) {
   });
 }
 
-const CHUNK = new THREE.BoxGeometry(1, 1, 1);
+// REUSE-SPEC.md §Theme: treats house style: every burst is sprinkles. Unit length, so `size` is the sprinkle's length.
+const SPRINKLE = new THREE.CapsuleGeometry(0.19, 0.62, 2, 6), SPRINKLE_R = 0.19;
 
 function makeBit(scene) {
-  const mesh = new THREE.Mesh(CHUNK);
+  const mesh = new THREE.Mesh(SPRINKLE);
   mesh.visible = false;
   scene.add(mesh);
-  return { mesh, v: new THREE.Vector3(), t: Infinity, floor: 0, size: 0.06 };
+  return { mesh, v: new THREE.Vector3(), t: Infinity, floor: 0, size: 0.16 };
 }
 
 function stepBit(b, dt) {
   b.t += dt;
   b.mesh.visible = b.t < BIT_LIFE;
   if (!b.mesh.visible) return;
-  const p = b.mesh.position, half = b.size / 2;
+  const p = b.mesh.position, half = b.size * SPRINKLE_R;
   if (p.y > b.floor + half) {
     b.v.y -= GRAVITY * dt;
     p.addScaledVector(b.v, dt);
@@ -118,7 +119,8 @@ function spawnBit(fx, at, color, speed) {
   b.mesh.material = color;
   b.mesh.position.set(at.x, at.y, at.z);
   b.v.set(Math.cos(a) * speed, speed * (1.2 + Math.random()), Math.sin(a) * speed * 0.6 + speed * 0.3);
-  Object.assign(b, { t: 0, floor: floorTop(at.x, at.z, at.y) ?? -3, size: 0.04 + Math.random() * 0.05 });
+  b.mesh.rotation.set(Math.random() * 3, Math.random() * 3, 0);
+  Object.assign(b, { t: 0, floor: floorTop(at.x, at.z, at.y) ?? -3, size: 0.13 + Math.random() * 0.06 });
 }
 
 /** A BAM sized by the move, and the screen shake that goes with it. @param {HitEvent} h */

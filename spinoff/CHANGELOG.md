@@ -29,7 +29,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   through, or smash the wall instead.
 - Tap where you want to go, 🥊 to punch and 🦶 to kick. Hits land with a BAM, a little freeze and
   a wobble; knock down the bad guys' wall of pancake stacks, stuck together with purple whipped
-  cream, or find the gap in it.
+  cream (they burst into sprinkles), or find the gap in it.
 - Grab a donut and it flies into your bag. Steal one from the bad guys' shelf for a happy dance, then run it home for
   confetti. Your bag holds one donut: try for a second and your fighter shakes its head.
 - ⏸ pauses the game, clock and all; ▶️ plays on. Leaving the screen pauses it too, and the screen

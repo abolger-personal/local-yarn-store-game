@@ -244,8 +244,8 @@ function brickHit(h) {
   const m = closestTo(bricks.values(), h, posOf, 1);
   if (!m) return;
   m.wobble = 1;
-  fx.burst(h, m.bits, 4, 1.4);
-  if (h.broke) fx.burst(h, m.crumbs, 14, 2.2);
+  fx.burst(h, confettiMats, 4, 1.4);
+  if (h.broke) fx.burst(h, confettiMats, 14, 2.2);
 }
 
 function onFullBag(e) {

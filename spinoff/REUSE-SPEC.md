@@ -374,6 +374,17 @@ and smashers each get a round that is theirs.
   guys' side is ready from the start, so only the heroes decide when to go.
 - **Placement is the shop's touch picker** (`inventory/pick-place.js` on the team's
   `inventory/grid.js` floor), with the `help` table's grab radius and snap reach for small hands.
+- **Stages and difficulty are separate** (decided 2026-10-14). Past the tutorial, a *stage* is a
+  place with its own look and terrain rules, and *difficulty* is how hard the match is (bad-guy
+  count, fort pile, moves, generated terrain problems). Anything tried at several difficulties
+  must be playable on every stage. For now there are two stages, **breakfast** and **cake**, and
+  the "Level 1 / Level 2" entries below are really the tutorial and the cake stage. Each stage's
+  terrain rule makes it play differently, not just look different:
+  - **Breakfast:** syrup slows you (built), **butter makes you slippery** (decided): on a butter
+    patch a fighter keeps sliding the way it was going, takes longer to stop and turn, and
+    overshoots where it was tapped to stop.
+  - **Cake: spongy** (open). What spongy does is undecided: bouncier jumps, soft landings, hits
+    soaked up, or something else.
 - **Each level has its own treat theme** (decided 2026-10-14, replacing "World 1 is Gingerbread
   World"). The theme dresses the stage and the fort pieces; the rules underneath don't change.
   `spinoff/scenery.js` `THEMES` holds one entry per theme, and `play.html?level=2` shows a later

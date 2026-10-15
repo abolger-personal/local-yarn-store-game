@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { POSES, applyPose } from '../characters/npc.js';
+import { POSES, applyPose, setGeometryDetail } from '../characters/npc.js';
 import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import {
-  BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, buildFighter, disposeFighter, gloveAnchors, isBadGuyCloth, isBadGuyFur,
-  newFighter, randomFighter, readFighter, setFur,
+  BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, buildFighter, disposeFighter, gloveAnchors, isBadGuyCloth, isBadGuyFur,
+  newFighter, randomFighter, readFighter, seatDrop, setFur, wobbleAt,
 } from './fighter.js';
 import { wingShape } from '../characters/owl.js';
+import { floorGrid } from './roster.js';
 
+const SHOP_VIEW_PX = LOOK.viewPx;
 LOOK.viewPx = 0;
 
 const at = (o) => o.getWorldPosition(new THREE.Vector3());
@@ -93,7 +95,7 @@ for (const species of SPECIES) for (const cape of CAPES) {
   assert.equal(readFighter(null), null);
   assert.equal(readFighter({ species: 'dragon' }), null, 'only the three animals');
   const junk = readFighter({ species: 'llama', params: { headRadius: 'big', bodyColor: 'red;}', legHeight: Number.NaN, view: '<script>' },
-    look: { hat: 'crown', hatColor: '#000000', cape: null, bag: 'suitcase', gloves: 12 } });
+    look: { hat: 'crown', hatColor: '#000000', hatStitch: 'linen stitch', cape: null, bag: 'suitcase', gloves: 12 } });
   const fresh = newFighter('llama');
   assert.equal(junk.params.headRadius, fresh.params.headRadius, 'a non-number size is ignored');
   assert.equal(junk.params.legHeight, fresh.params.legHeight, 'NaN is ignored');
@@ -103,12 +105,85 @@ for (const species of SPECIES) for (const cape of CAPES) {
   assert.equal(junk.look.cape, null, 'no cape is a real choice');
   assert.ok(BAGS.includes(junk.look.bag) && CLOTH.some((s) => s.hex === junk.look.gloves), 'unknown bag and glove colour fall back');
   assert.ok(CLOTH.some((s) => s.hex === junk.look.hatColor), 'black is not a kid\'s hat colour, even from another tablet');
+  assert.ok(TEXTURES.includes(junk.look.hatStitch), 'linen stitch is too heavy for a tablet, even from another tablet');
+}
+
+{
+  const triangles = (stitch) => {
+    const f = newFighter('lion');
+    f.look = { ...f.look, hat: 'beanie', hatStitch: stitch, cape: 'cape', capeStitch: stitch };
+    const built = buildFighter(f);
+    const n = built.garments.filter((m) => /hat|shawl/.test(m.userData.worn)).reduce((sum, m) => sum + m.geometry.index.count / 3, 0);
+    disposeFighter(built);
+    return n;
+  };
+  const smooth = triangles('stockinette');
+  for (const stitch of TEXTURES) {
+    assert.ok(triangles(stitch) <= smooth * 5, `${stitch} hat and cape cost ${triangles(stitch)} triangles, over 5× smooth (${smooth})`);
+  }
 }
 
 {
   const f = setFur(newFighter('llama'), FUR[3].hex);
   assert.equal(f.params.bodyColor, FUR[3].hex);
   assert.notEqual(f.params.fleeceColor, newFighter('llama').params.fleeceColor, 'the fleece follows a new fur colour');
+}
+
+{
+  const { cell } = floorGrid();
+  // ponytail: sampled, since species randomise() is Math.random only; 1.4 vs 1.26 widest of 600 is the margin
+  for (let i = 0; i < 40; i++) {
+    const f = randomFighter();
+    f.look = { ...f.look, cape: 'capelet', bag: 'crossbody pouch' };
+    const built = buildFighter(f);
+    built.root.updateMatrixWorld(true);
+    const size = new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3());
+    assert.ok(size.x < cell && size.z < cell, `a ${built.species.id} (${size.x.toFixed(2)} × ${size.z.toFixed(2)}) spills out of its ${cell} lobby square`);
+    disposeFighter(built);
+  }
+}
+
+{
+  setGeometryDetail('med');
+  LOOK.viewPx = SHOP_VIEW_PX;
+  const relief = (species, stitch) => {
+    const f = newFighter(species);
+    f.look = { ...f.look, hat: 'beanie', hatStitch: stitch, cape: 'cape', capeStitch: stitch };
+    const built = buildFighter(f);
+    const n = built.garments.filter((m) => /hat|shawl/.test(m.userData.worn)).reduce((sum, m) => sum + m.geometry.index.count / 3, 0);
+    disposeFighter(built);
+    return n;
+  };
+  for (const species of SPECIES) {
+    const smooth = relief(species, 'stockinette');
+    for (const stitch of TEXTURES.slice(1)) assert.ok(relief(species, stitch) > smooth, `a ${species}'s ${stitch} is drawn smooth at match size`);
+  }
+  LOOK.viewPx = 0;
+  setGeometryDetail('high');
+}
+
+for (const species of SPECIES) {
+  const built = buildFighter(newFighter(species)), drop = seatDrop(built);
+  assert.ok(drop > 0.05 && drop < built.params.legHeight + built.params.hipInset + 0.05,
+    `${species} sits down by part of its leg length, not through the floor or not at all (${drop})`);
+  disposeFighter(built);
+}
+
+{
+  const wobble = (percent) => {
+    let peak = 0, swings = 0, was = 0;
+    for (let i = 0; i < 120; i++) {
+      const { z } = wobbleAt(percent, i / 120);
+      peak = Math.max(peak, Math.abs(z));
+      if (z * was < 0) swings++;
+      was = z;
+    }
+    return { peak, swings };
+  };
+  assert.deepEqual(wobbleAt(0, 0.3), { x: 0, z: 0 }, 'an unhit fighter stands still');
+  const some = wobble(15), lots = wobble(80);
+  assert.ok(some.peak > 0.12, `a few hits already show (${some.peak} rad)`);
+  assert.ok(lots.peak > 0.35 && lots.swings >= 8, `a ready-to-fly fighter wobbles hard and fast (${lots.peak} rad, ${lots.swings} swings a second)`);
 }
 
 console.log('fighter ok');

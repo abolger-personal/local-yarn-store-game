@@ -13,11 +13,35 @@ export const isCode = (code) => Array.isArray(code) && code.length === CODE_LENG
 
 export const roomName = (code) => `donut-${code.join('')}`;
 
+// REUSE-SPEC.md §Multiplayer: tablets only ever talk across the home network
+const HOME = [/^10\./, /^192\.168\./, /^172\.(1[6-9]|2\d|3[01])\./, /^169\.254\./, /^f[cd][0-9a-f]{2}:/i, /^fe[89ab][0-9a-f]:/i];
+
+/** @param {unknown} address */
+export const isHomeAddress = (address) => typeof address === 'string'
+  && (address.endsWith('.local') || HOME.some((re) => re.test(address)));
+
+/** The far end of a connection's chosen route, from `RTCPeerConnection.getStats()`. */
+export function remoteOf(stats) {
+  const all = [...stats.values()];
+  const transport = all.find((s) => s.type === 'transport' && s.selectedCandidatePairId);
+  const pair = transport ? stats.get(transport.selectedCandidatePairId)
+    : all.find((s) => s.type === 'candidate-pair' && s.state === 'succeeded' && s.nominated);
+  return pair ? stats.get(pair.remoteCandidateId) : undefined;
+}
+
+/** A route counts only if its far end is a home-network address (or a hidden one, on a direct host route). */
+export function isHomeRoute(remote) {
+  if (!remote) return false;
+  const address = remote.address ?? remote.ip;
+  return isHomeAddress(address) || (!address && remote.candidateType === 'host');
+}
+
 // REUSE-SPEC.md §Mode: kids can't hit each other for now, but it is a match setting, not a rule baked in
 export const MATCH = Object.freeze({ friendlyFire: false });
 export const canHit = (a, b, match = MATCH) => a.id !== b.id && (a.team !== b.team || match.friendlyFire);
 
-export const floorGrid = () => makeDisplay(7, 2, { cell: 0.62 });
+// a cell holds the widest fighter, gloves and cape included (fighter.test.mjs)
+export const floorGrid = () => makeDisplay(7, 2, { cell: 1.4 });
 
 function centreOut(g) {
   const cells = [];

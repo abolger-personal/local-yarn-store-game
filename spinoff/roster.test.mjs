@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { MATCH, MAX_FIGHTERS, ROOM_TREATS, canHit, floorGrid, isCode, randomCode, roomName, standingSpots } from './roster.js';
+import {
+  MATCH, MAX_FIGHTERS, ROOM_TREATS, canHit, floorGrid, isCode, isHomeAddress, isHomeRoute, randomCode, remoteOf, roomName,
+  standingSpots,
+} from './roster.js';
 
 {
   const ids = ['peer-c', 'peer-a', 'self', 'peer-b'];
@@ -35,6 +38,25 @@ import { MATCH, MAX_FIGHTERS, ROOM_TREATS, canHit, floorGrid, isCode, randomCode
   assert.ok(canHit(kid('a'), bad) && canHit(bad, kid('a')), 'kids and bad guys can hit each other');
   assert.ok(canHit(kid('a'), kid('c'), { ...MATCH, friendlyFire: true }), 'a kid-vs-kid mode is one setting away');
   assert.ok(!canHit(kid('a'), kid('a'), { friendlyFire: true }), 'nobody hits themselves');
+}
+
+{
+  for (const a of ['192.168.0.102', '10.0.0.7', '172.20.1.4', '169.254.3.3', 'fd12:3456::1', 'fe80::1c2b', 'a1b2c3d4-0000.local']) {
+    assert.ok(isHomeAddress(a), `${a} is on the home network`);
+  }
+  for (const a of ['8.8.8.8', '172.32.0.1', '100.64.0.1', '2001:db8::1', '2600:1700::5', '', undefined]) {
+    assert.ok(!isHomeAddress(a), `${a} is not on the home network`);
+  }
+  const stats = (remote) => new Map([
+    ['t', { type: 'transport', selectedCandidatePairId: 'p' }],
+    ['p', { type: 'candidate-pair', state: 'succeeded', nominated: true, remoteCandidateId: 'r' }],
+    ['r', { type: 'remote-candidate', ...remote }],
+  ]);
+  assert.ok(isHomeRoute(remoteOf(stats({ address: '192.168.0.40', candidateType: 'prflx' }))), 'a tablet on the same Wi-Fi is accepted');
+  assert.ok(isHomeRoute(remoteOf(stats({ candidateType: 'host' }))), 'a direct route with a hidden address is the home network');
+  assert.ok(!isHomeRoute(remoteOf(stats({ address: '2600:1700::5', candidateType: 'prflx' }))), 'a public IPv6 tablet is hung up on');
+  assert.ok(!isHomeRoute(remoteOf(stats({ address: '81.2.69.160', candidateType: 'srflx' }))), 'a tablet across the internet is hung up on');
+  assert.ok(!isHomeRoute(remoteOf(new Map())), 'no route yet is not a home route');
 }
 
 console.log('roster ok');

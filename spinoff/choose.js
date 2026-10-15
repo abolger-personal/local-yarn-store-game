@@ -1,5 +1,5 @@
 import {
-  BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, animateFighter, buildFighter, disposeFighter, loadFighter, newFighter,
+  BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, animateFighter, buildFighter, disposeFighter, loadFighter, newFighter,
   randomFighter, saveFighter, setFur,
 } from './fighter.js';
 import { makeStage } from './stage.js';
@@ -18,6 +18,20 @@ const ICON = {
   'drawstring bag': '<path d="M12 16c-4 14-2 26 12 26s16-12 12-26Z"/><path d="M14 16c4-6 16-6 20 0" fill="none" stroke="currentColor" stroke-width="3"/>',
   'crossbody pouch': '<path d="M8 6 30 26" stroke="currentColor" stroke-width="3"/><rect x="18" y="22" width="24" height="18" rx="5"/>',
 };
+const INK = 'stroke="rgba(0,0,0,.3)" stroke-width="1.6" fill="none"';
+const PATTERN = {
+  rib: `<path d="M3 0v6" ${INK}/>`,
+  garter: `<path d="M0 3h6" ${INK}/>`,
+  cable: `<path d="M0 0c3 2 3 4 6 6M6 0C3 2 3 4 0 6" ${INK}/>`,
+  'single crochet': '<circle cx="3" cy="3" r="1.2" fill="rgba(0,0,0,.3)"/>',
+  waffle: `<rect x="1" y="1" width="4" height="4" ${INK}/>`,
+  lace: '<circle cx="3" cy="3" r="1.5" fill="rgba(255,255,255,.75)"/>',
+};
+const patternId = (stitch) => `t-${stitch.replace(' ', '-')}`;
+document.body.insertAdjacentHTML('beforeend', `<svg width="0" height="0" aria-hidden="true"><defs>${Object.entries(PATTERN).map(([stitch, ink]) =>
+  `<pattern id="${patternId(stitch)}" width="6" height="6" patternUnits="userSpaceOnUse">${ink}</pattern>`).join('')}</defs></svg>`);
+const textured = (body, stitch) => (PATTERN[stitch] ? `${body}<g fill="url(#${patternId(stitch)})">${body}</g>` : body);
+
 const svg = (body, colour) => `<svg viewBox="0 0 48 48" fill="currentColor" style="color:${colour}" aria-hidden="true">${body}</svg>`;
 
 let fighter = loadFighter() ?? newFighter('lion');
@@ -38,8 +52,14 @@ const button = (action, value, label, inner, on) =>
 const swatchRow = (action, list, current) => list.map(({ hex, name }) =>
   button(action, hex, name, `<span class="dot" style="background:${hex}"></span>`, hex === current)).join('');
 
-const pickRow = (action, list, current, colour, none) => [...(none ? [null] : []), ...list].map((v) =>
-  button(action, v ?? '', v ?? 'none', svg(v ? ICON[v] : NONE, v ? colour : '#9a8f84'), v === current)).join('');
+/** @param {string} kind @param {readonly string[]} list @param {boolean} none */
+function pickRow(kind, list, none) {
+  const { look } = /** @type {{ look: Record<string, string> }} */ (/** @type {unknown} */ (fighter));
+  const { [kind]: current, [`${kind}Color`]: colour, [`${kind}Stitch`]: stitch } = look;
+  return [...(none ? [null] : []), ...list].map((v) =>
+    button(kind, v ?? '', v === current && stitch ? `${v}, ${stitch}, tap again to change` : v ?? 'none',
+      svg(v ? textured(ICON[v], stitch) : NONE, v ? colour : '#9a8f84'), v === current)).join('');
+}
 
 const pictures = (html) => `<div class="choices pictures">${html}</div>`;
 const colours = (html) => `<div class="choices">${html}</div>`;
@@ -48,7 +68,7 @@ const row = (icon, label, ...lines) => `<div class="row" role="group" aria-label
   + `<span class="label" aria-hidden="true">${icon}</span><div class="lines">${lines.join('')}</div></div>`;
 
 const garment = (icon, kind, list, none) => row(icon, kind,
-  pictures(pickRow(kind, list, fighter.look[kind], fighter.look[`${kind}Color`], none)),
+  pictures(pickRow(kind, list, none)),
   colours(swatchRow(`${kind}Color`, CLOTH, fighter.look[`${kind}Color`])));
 
 function render() {
@@ -63,11 +83,18 @@ function render() {
   ].join('');
 }
 
+// REUSE-SPEC.md §Fighter chooser: tapping the hat you already wear knits it in the next stitch
+function pickOrRestitch(kind, v) {
+  const { look } = fighter, key = `${kind}Stitch`;
+  if (v && v === look[kind]) look[key] = TEXTURES[(TEXTURES.indexOf(look[key]) + 1) % TEXTURES.length];
+  else look[kind] = v || null;
+}
+
 const ACTIONS = {
   species: (v) => { fighter = newFighter(v); return true; },
   fur: (v) => { setFur(fighter, v); },
-  hat: (v) => { fighter.look.hat = v || null; },
-  cape: (v) => { fighter.look.cape = v || null; },
+  hat: (v) => pickOrRestitch('hat', v),
+  cape: (v) => pickOrRestitch('cape', v),
   bag: (v) => { fighter.look.bag = v; },
 };
 

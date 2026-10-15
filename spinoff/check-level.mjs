@@ -1,4 +1,5 @@
 // The playability checks every stage passes, hand-made (levels.test.mjs) or generated (generate.test.mjs).
+// Syrup, butter and trampolines are all round patches lying on a floor top.
 import assert from 'node:assert/strict';
 import { BRICK, TICK_HZ, groundOf, outside } from './match.js';
 import { createMatch, snapshot, tick } from './sim.js';
@@ -44,9 +45,10 @@ export function checkLevel(stage, at, breakIn = false) {
   assert.equal(raised.length, stage.floors.length - 1, `${at}: the ground is the lowest floor`);
   for (const sh of stage.shelves)
     assert.ok(stage.floors.some((f) => f.y === sh.y && outside(f, sh.x, sh.z) === 0), `${at}: the ${sh.team} shelf stands on a floor`);
-  for (const p of stage.puddles) {
-    assert.ok(outside(ground, p.x, p.z) === 0, `${at}: puddle at ${p.x},${p.z} is on the ground`);
-    assert.ok(raised.every((f) => outside(f, p.x, p.z) >= p.r), `${at}: puddle at ${p.x},${p.z} is clear of raised floors`);
+  for (const p of [...stage.puddles, ...stage.butter ?? [], ...stage.springs ?? []]) {
+    const y = p.y ?? ground.y;
+    assert.ok(stage.floors.some((f) => f.y === y && outside(f, p.x, p.z) === 0), `${at}: patch at ${p.x},${p.z} lies on a floor ${y} high`);
+    assert.ok(stage.floors.every((f) => f.y <= y || outside(f, p.x, p.z) >= p.r), `${at}: patch at ${p.x},${p.z} is clear of higher floors`);
   }
   for (const b of stage.bricks)
     assert.ok(raised.every((f) => b.y >= f.y || !overlaps(b, f)), `${at}: brick at ${b.x},${b.y},${b.z} is not inside a raised floor`);

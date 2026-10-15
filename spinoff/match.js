@@ -32,13 +32,18 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  *   a walkable top: the rectangle x0..x1 by z0..z1 at height y, its corners rounded by `round`
  * @typedef {{ team: Team, x: number, z: number, y: number }} ShelfSpot  centre of the shelf's front
  * @typedef {{ team: Team, x0: number, x1: number }} BuildZone
- * @typedef {{ x: number, z: number, r: number }} Puddle a round patch of sticky syrup on the ground
+ * @typedef {{ x: number, z: number, r: number, y?: number }} Patch
+ *   a round patch lying on the floor top at height y (the ground if left out): syrup, butter or a trampoline
+ * @typedef {Patch} Puddle a round patch of sticky syrup
  * @typedef {{ team: Team, x: number, z: number, y: number, hits: number }} BrickSpot
  *   a BRICK cube with its bottom-left-back corner at (x, y, z)
  * @typedef {{ x0: number, x1: number, z1: number, y: number }} RingOut  leave this box and you are out
  * @typedef {{ floors: readonly Floor[], backWall: number, shelves: readonly ShelfSpot[], zones: readonly BuildZone[],
- *             puddles: readonly Puddle[], ringOut: RingOut, bricks: readonly BrickSpot[] }} Stage
- *   one level's layout (spinoff/levels.js): exactly one 'ground' floor, the lowest; the back edge is a wall at z = backWall
+ *             puddles: readonly Puddle[], ringOut: RingOut, bricks: readonly BrickSpot[],
+ *             butter?: readonly Patch[], springs?: readonly Patch[], bounce?: number }} Stage
+ *   one layout (spinoff/levels.js): exactly one 'ground' floor, the lowest; the back edge is a wall at z = backWall.
+ *   Terrain rules (REUSE-SPEC.md §Stages and difficulty are separate): `butter` is slippery, `springs` are trampolines,
+ *   and `bounce` multiplies how high every jump goes (cake's sponge; 1 if left out)
  */
 
 /**

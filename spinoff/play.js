@@ -24,8 +24,10 @@ const LOOSE_R = 0.2, FACE_CAMERA = -0.5, FLY_ARC = 0.6, GRAB_FROM_Y = 0.4;
 const level = levelFor(location.search), ground = groundOf(level.stage);
 const CAMERA = { pitch: THREE.MathUtils.degToRad(35), viewW: 7, viewH: 4.8, xMin: ground.x0 + 3, xMax: ground.x1 - 3 };
 const BACK = new THREE.Vector3(0, Math.sin(CAMERA.pitch), Math.cos(CAMERA.pitch));
-const TIMERS = { squash: 0.22, no: 0.6, joy: 0.9, pop: 0.35, pulse: 0.45, wobble: 0.35, hop: 0.4 };
-const FIGHTER_TIMERS = ['squash', 'no', 'joy', 'pop', 'pulse'];
+const TIMERS = { squash: 0.22, no: 0.6, joy: 0.9, pop: 0.35, pulse: 0.45, wobble: 0.35, hop: 0.4, land: 0.5, pad: 0.45 };
+const FIGHTER_TIMERS = ['squash', 'no', 'joy', 'pop', 'pulse', 'land'];
+// REUSE-SPEC.md §Stages and difficulty are separate: on a spongy stage every landing springs
+const SPONGY = (level.stage.bounce ?? 1) > 1;
 const NONE = Object.freeze([]);
 const _v = new THREE.Vector3(), _goal = new THREE.Vector3();
 
@@ -69,7 +71,8 @@ function fillShelf(s) {
   return g;
 }
 
-scene.add(...theme.scenery(level.stage), ...level.stage.shelves.map(shelfFrame));
+const scenery = theme.scenery(level.stage), pads = scenery.filter((o) => o.userData.spring != null);
+scene.add(...scenery, ...level.stage.shelves.map(shelfFrame));
 
 let frame = 0, now = 0;
 
@@ -115,7 +118,25 @@ function placeFighter(m, f, dt) {
   m.g.rotation.set(tilt.x, m.yaw + Math.sin(no * 26) * 0.3 * no, tilt.z, 'ZXY');
   m.down += ((f.move === 'sit' ? 1 : 0) - m.down) * Math.min(1, dt * 6);
   m.g.position.set(f.x + m.recoil.x * s, f.y - m.seat * m.down, f.z + m.recoil.z * s);
-  m.g.scale.set(1 + 0.2 * s, 1 - 0.28 * s, 1 + 0.2 * s);
+  const spring = 0.3 * m.t.land * Math.sin(m.t.land * Math.PI * 3);
+  m.g.scale.set(1 + 0.2 * s + 0.6 * spring, 1 - 0.28 * s - spring, 1 + 0.2 * s + 0.6 * spring);
+}
+
+/** A trampoline you take off from squashes and springs back; on a spongy stage you squish on landing. @param {FighterState} f */
+function bounces(m, f) {
+  if (f.vy > Math.max(0, m.vy) + 1) {
+    const pad = pads.find((p) => Math.hypot(f.x - p.position.x, f.z - p.position.z) < p.userData.r && Math.abs(f.y - p.position.y) < 0.2);
+    if (pad) pad.userData.t = 1;
+  }
+  if (SPONGY && f.onGround && !m.ground) m.t.land = 1;
+  Object.assign(m, { vy: f.vy, ground: f.onGround });
+}
+
+function drawPads(dt) {
+  for (const p of pads) {
+    const t = (p.userData.t = Math.max(0, (p.userData.t ?? 0) - dt / TIMERS.pad)), k = t * Math.sin(t * Math.PI * 2.5);
+    p.scale.set(1 + 0.12 * k, 1 - 0.7 * k, 1 + 0.12 * k);
+  }
 }
 
 function carry(m, look) {
@@ -140,6 +161,7 @@ function placeCarried(m) {
 /** @param {FighterState} f */
 function drawFighter(m, f, dt) {
   tickDown(m.t, FIGHTER_TIMERS, dt);
+  bounces(m, f);
   placeFighter(m, f, dt);
   stepFighter(m.built, dt, poseOf(m, f), f.onGround && f.move !== 'blocked' ? Math.hypot(f.vx, f.vz) : 0);
   carry(m, f.carrying);
@@ -203,6 +225,7 @@ function draw(snap, dt) {
     hud(s.team, s.donuts.length);
   }
   hud('clock', Math.ceil(snap.secondsLeft));
+  drawPads(dt);
   follow(snap.fighters.find((f) => f.id === ME), dt);
   fx.step(dt);
 }
@@ -308,7 +331,7 @@ function cast() {
     g.add(built.root);
     scene.add(g);
     const t = Object.fromEntries(FIGHTER_TIMERS.map((k) => [k, 0]));
-    fighters.set(id, { g, built, team, t, yaw: 0, recoil: new THREE.Vector3(), pose: {}, seat: seatDrop(built), down: 0, seed: fighters.size * 2.1, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
+    fighters.set(id, { g, built, team, t, vy: 0, ground: true, yaw: 0, recoil: new THREE.Vector3(), pose: {}, seat: seatDrop(built), down: 0, seed: fighters.size * 2.1, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
     endPicture(entrant);
     return entrant;
   });

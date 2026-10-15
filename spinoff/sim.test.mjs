@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, ROUND_SECONDS, TICK_HZ, outside } from './match.js';
-import { LEVELS } from './levels.js';
-import { CALM_DRAIN, CALM_TICKS, DUMMY, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
+import { STAGES, TUTORIAL } from './levels.js';
+import { CALM_DRAIN, CALM_TICKS, DUMMY, SPRING_LIFT, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
+import { BOUNCE } from './generate.js';
 
-// Level 1's layout and syrup with the gapped wall (Level 2's fort), so routing has gaps to find
-const STAGE = { ...LEVELS[1].stage, bricks: LEVELS[2].stage.bricks };
+// The tutorial's layout and syrup with the gapped wall (the hand-made stages' fort), so routing has gaps to find
+const STAGE = { ...TUTORIAL.stage, bricks: STAGES.breakfast.stage.bricks };
 const LOOK = { dough: '#e8c48a', frosting: '#14c4e0', stripe: false };
 const BAD = { dough: '#2a1a14', frosting: '#7a2bbf', stripe: true };
 const body = { height: 0.9, width: 0.45, reach: 0.38 };
@@ -418,6 +419,60 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
   assert.ok(!me(snap).carrying && snap.donuts.length === 1, 'a donut landing on you stays put until you tap it');
   snap = run(m, 30, once({ target: { thing: 'donut', id: 'dropped' } }));
   assert.ok(me(snap).carrying && snap.donuts.length === 0, 'tapping a donut you are standing on picks it up');
+}
+
+// REUSE-SPEC.md §Stages and difficulty are separate: butter is slippery
+{
+  const BUTTER = [{ x: -4.2, z: 0.5, r: 1 }], edge = BUTTER[0].x - BUTTER[0].r;
+  const slide = (butter) => {
+    const m = createMatch([hero], { ...STAGE, butter });
+    run(m, 300, tap(-7, 0.5));
+    let past = 0;
+    const snap = run(m, 400, tap(-4.2, 0.5), (x) => { past = Math.max(past, me(x).x + 4.2); });
+    return { past, f: me(snap) };
+  };
+  const plain = slide([]), slick = slide(BUTTER);
+  assert.ok(plain.past < 0.01 && slick.past > 0.1, `on butter you slide past where you stop (${slick.past.toFixed(2)} past, ${plain.past.toFixed(3)} on plain floor)`);
+  assert.ok(near(slick.f.x, -4.2) && near(slick.f.z, 0.5) && slick.f.move === 'idle', 'and come back to stand on the spot');
+  const turn = (butter) => {
+    const m = createMatch([hero], { ...STAGE, butter });
+    run(m, 300, tap(-7, 0.5));
+    let snap = run(m, 1, tap(-2, 0.5)), ticks = 0;
+    while (me(snap).x < -4.2) snap = run(m, 1);
+    let prev = me(snap);
+    const offGrip = [];
+    snap = run(m, 300, tap(-7, 0.5), (x) => {
+      if (me(x).vx >= 0 && !offGrip.length) ticks++;
+      if (prev.x < edge) offGrip.push(me(x).vx);
+      prev = me(x);
+    });
+    return { ticks, offGrip, f: me(snap) };
+  };
+  const plainTurn = turn([]), slickTurn = turn(BUTTER);
+  assert.ok(plainTurn.ticks <= 1 && slickTurn.ticks >= 10, `turning round on butter is slow (${slickTurn.ticks} ticks, ${plainTurn.ticks} on plain floor)`);
+  assert.ok(slickTurn.offGrip.length > 10 && slickTurn.offGrip.slice(0, 10).every((vx) => near(vx, -WALK_SPEED, 1e-9)), 'stepping off butter, you have your grip back at once');
+}
+
+// REUSE-SPEC.md §Stages and difficulty are separate: cake is spongy, and its icing trampolines launch you
+{
+  const { stage: CAKE } = STAGES.cake, SPOT = { x: -4, z: 1.2 };
+  const apex = (stage, target) => {
+    const m = createMatch([hero], stage);
+    run(m, 300, tap(SPOT.x, SPOT.z));
+    let top = 0, ups = 0, was = me(snapshot(m));
+    const snap = run(m, 200, once({ target }), (x) => { top = Math.max(top, me(x).y); if (me(x).vy > Math.max(0, was.vy) + 1) ups++; was = me(x); });
+    return { top, ups, f: me(snap) };
+  };
+  const hop = { ...SPOT, y: 5 }, breakfast = apex(STAGE, hop).top, cake = apex(CAKE, hop).top;
+  assert.ok(near(cake / breakfast, BOUNCE.cake, 0.05), `a jump on cake goes ${BOUNCE.cake}× as high (${cake.toFixed(2)} vs ${breakfast.toFixed(2)})`);
+  const [, pad] = CAKE.springs, bounce = apex(CAKE, { x: pad.x, z: pad.z, y: 0 });
+  assert.ok(near(bounce.top / cake, SPRING_LIFT, 0.05), `a trampoline launches you ${SPRING_LIFT}× as high again (${bounce.top.toFixed(2)})`);
+  assert.ok(bounce.ups === 1 && bounce.f.move === 'idle' && near(bounce.f.x, pad.x), 'once: landing back on it, you stay put');
+  const tower = CAKE.floors.find((f) => f.y > 3), top = { x: 0, z: (tower.z0 + tower.z1) / 2, y: tower.y };
+  const climb = (stage) => run(createMatch([hero], { ...stage, bricks: [] }), 600, tap(top.x, top.z, top.y)).fighters[0];
+  const up = climb(CAKE), noPad = climb({ ...CAKE, springs: [] });
+  assert.ok(up.y === tower.y && up.move === 'idle' && near(up.x, top.x) && near(up.z, top.z), `tapped onto the ${tower.y} high tower, a hero bounces up off the icing pad`);
+  assert.ok(noPad.y < tower.y, 'which is the only way up');
 }
 
 console.log('sim ok');

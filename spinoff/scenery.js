@@ -1,4 +1,4 @@
-// Each treat theme's stage dressing and fort pieces (REUSE-SPEC.md §Forts); levels.js says which level wears which.
+// Each stage's dressing and fort pieces (REUSE-SPEC.md §Forts, §Stages and difficulty are separate); levels.js says which layout wears which.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RIOT } from './fx.js';
@@ -52,6 +52,23 @@ function groundTreats(ground) {
   return [sprinkles, drips];
 }
 
+// REUSE-SPEC.md §Stages and difficulty are separate: a trampoline is always icing, never a mechanical thing: a flooded disc
+// in a loud colour (plain cake icing is near-white) with a piped rim. userData.spring marks it for play.js to squash when used.
+const PAD = { flood: '#14c4e0', rim: '#ff3b7f', thick: 0.05, pipe: 0.045 };
+/** @param {readonly import('./match.js').Patch[]} springs */
+function icingPads(springs) {
+  return springs.map((p, i) => {
+    const g = new THREE.Group(), disc = new THREE.Mesh(new THREE.CylinderGeometry(p.r, p.r, PAD.thick, 40), mat(PAD.flood, 0.35));
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(p.r - PAD.pipe, PAD.pipe, 8, 40).rotateX(Math.PI / 2), mat(PAD.rim, 0.4));
+    disc.position.y = PAD.thick / 2;
+    rim.position.y = PAD.thick;
+    g.add(disc, rim);
+    g.position.set(p.x, p.y ?? 0, p.z);
+    g.userData = { spring: i, r: p.r };
+    return g;
+  });
+}
+
 function cakeBackdrop(backWall) {
   const wall = box(26, 7, 0.4, '#f7bcd6');
   wall.position.set(0, 2.8, backWall - 0.2);
@@ -63,7 +80,9 @@ function cakeBackdrop(backWall) {
 // Breakfast
 const WAFFLE = { cell: 0.5, ridge: 0.09, deep: 0.07, dough: '#e2a24e', pocket: '#a8651f' };
 const SYRUP = new THREE.MeshStandardMaterial({ color: '#c0560c', roughness: 0.08, transparent: true, opacity: 0.6, depthWrite: false });
-const HILL = { cakes: 4, nudge: [[0.05, -0.03], [-0.04, 0.03], [0.02, 0.02], [0, 0]], browned: '#c47a2c', butter: '#ffe680' };
+const HILL = { cakes: 4, nudge: [[0.05, -0.03], [-0.04, 0.03], [0.02, 0.02], [0, 0]], browned: '#c47a2c' };
+// Butter: a pale, glossy, opaque slick with a pat in the middle, so it never reads as the dark see-through syrup
+const BUTTER = { slick: new THREE.MeshStandardMaterial({ color: '#fff4b0', roughness: 0.08, metalness: 0.05 }), pat: '#ffe680' };
 
 /** A waffle slab w × d, its ridges topping out at y, solid down `base`. */
 function waffle(w, d, y, base) {
@@ -99,6 +118,19 @@ function syrupPools(puddles) {
   });
 }
 
+/** The stage's slippery butter, melted into a slick over the floor with the pat on top. @param {readonly import('./match.js').Patch[]} butter */
+function butterSlicks(butter) {
+  return butter.map(({ x, z, r, y = 0 }, i) => {
+    const g = new THREE.Group(), slick = new THREE.Mesh(new THREE.ShapeGeometry(puddle(r, i * 2.3 + 1)).rotateX(-Math.PI / 2), BUTTER.slick);
+    const pat = new THREE.Mesh(slabGeometry(0.34, 0.26, 0.08, 0.05, 0.03), mat(BUTTER.pat, 0.3));
+    slick.position.y = 0.008;
+    pat.rotation.y = 0.4 + i;
+    g.add(slick, pat);
+    g.position.set(x, y, z);
+    return g;
+  });
+}
+
 /** Syrup drips hanging off the front edge of the stage. */
 function syrupDrips(ground) {
   const w = ground.x1 - ground.x0;
@@ -110,7 +142,7 @@ function syrupDrips(ground) {
   return drips;
 }
 
-/** The middle hill: big pancakes, the top one exactly the floor you stand on, the ones under it a little bigger. @param {import('./match.js').Floor} f */
+/** The middle hill: big pancakes, the top one exactly the floor you stand on, the ones under it a little bigger; any butter on top is real (butterSlicks). @param {import('./match.js').Floor} f */
 function pancakeHill(f) {
   const w = f.x1 - f.x0, d = f.z1 - f.z0, g = new THREE.Group(), cake = f.y / HILL.cakes;
   HILL.nudge.forEach(([x, z], i) => {
@@ -119,13 +151,8 @@ function pancakeHill(f) {
     g.add(m);
   });
   const top = new THREE.Mesh(slabGeometry(w - 0.3, d - 0.3, 0.012, (f.round ?? 0) - 0.15, 0.004), mat(HILL.browned, 0.7));
-  const syrup = new THREE.Mesh(new THREE.ShapeGeometry(puddle(0.75, 2)).rotateX(-Math.PI / 2), SYRUP);
-  const butter = new THREE.Mesh(slabGeometry(0.34, 0.26, 0.08, 0.05, 0.03), mat(HILL.butter, 0.35));
   top.position.y = f.y - 0.008;
-  syrup.position.set(0.1, f.y + 0.012, 0);
-  butter.position.set(-0.35, f.y, -0.2);
-  butter.rotation.y = 0.4;
-  g.add(top, syrup, butter);
+  g.add(top);
   return g;
 }
 
@@ -162,8 +189,9 @@ function breakfastBackdrop(backWall) {
 }
 
 /** @typedef {import('./match.js').Stage} Stage */
-const breakfast = (stage) => [...stage.floors.map(breakfastFloor), ...syrupPools(stage.puddles), syrupDrips(groundOf(stage)), ...breakfastBackdrop(stage.backWall)];
-const cake = (stage) => [...stage.floors.map(floorMesh), ...groundTreats(groundOf(stage)), ...cakeBackdrop(stage.backWall)];
+const breakfast = (stage) => [...stage.floors.map(breakfastFloor), ...syrupPools(stage.puddles), ...butterSlicks(stage.butter ?? []),
+  syrupDrips(groundOf(stage)), ...breakfastBackdrop(stage.backWall)];
+const cake = (stage) => [...stage.floors.map(floorMesh), ...icingPads(stage.springs ?? []), ...groundTreats(groundOf(stage)), ...cakeBackdrop(stage.backWall)];
 
 /**
  * @typedef {{ background: string, scenery: (stage: Stage) => THREE.Object3D[], brick: (b: import('./match.js').BrickState) => any,

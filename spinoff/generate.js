@@ -1,4 +1,4 @@
-// Generated stages (GENERATED-LEVELS.md): a pure function of (seed, difficulty), so the host sends two numbers and
+// Generated stages (GENERATED-LEVELS.md): a pure function of (seed, difficulty, stage), so the host sends that and
 // every tablet rebuilds the same Stage. Terrain is mirrored; the bad guys' pre-placed fort is on their side only.
 import { BRICK } from './match.js';
 
@@ -14,6 +14,10 @@ export function rng(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+/** @typedef {'breakfast'|'cake'} StageName */
+/** How much higher than breakfast each stage's jumps go (REUSE-SPEC.md §Stages and difficulty are separate): cake is spongy. */
+export const BOUNCE = Object.freeze({ breakfast: 1, cake: 1.5 });
 
 /** The difficulty each problem kind is first met at: the hand-made level that teaches it (GENERATED-LEVELS.md §Problem kinds). */
 export const UNLOCK = Object.freeze({ hill: 1, tall: 1, syrup: 1, moat: 1, choke: 3, stepUp: 5 });
@@ -54,7 +58,7 @@ function choke(r) {
   return [...both(back), ...both({ ...back, z0: r1(z + gap / 2), z1: 2 })];
 }
 
-/** @returns {Puddle[]} a syrup puddle in each half of the field */
+/** @returns {Puddle[]} a syrup puddle (on cake, a trampoline) in each half of the field */
 function syrup(r) {
   const p = { x: pick(r, 2, 2.6), z: pick(r, -1.4, 1.4), r: pick(r, 0.4, 0.55) };
   return [p, { ...p, x: -p.x }];
@@ -70,11 +74,29 @@ function fort(r, d, has) {
   return { bricks: [...zs.map((z) => ({ team: 'badGuys', x: 4.6, z, y: 0, hits: 2 })), ...tall], moat };
 }
 
-/** A playable stage for this seed at this difficulty (1 and up). @param {number} seed @param {number} difficulty @returns {Stage} */
-export function generateStage(seed, difficulty) {
+/** @returns {Puddle[]} a butter slick in front of each deck, and one on the hill top if there is a hill */
+function butter(r, top) {
+  const p = { x: pick(r, 6.2, 7), z: pick(r, 0.7, 1.3), r: pick(r, 0.4, 0.5) };
+  const onTop = top ? [{ x: 0, z: r1((top.z0 + top.z1) / 2), r: r1(Math.min(top.x1 - top.x0, top.z1 - top.z0) / 4), y: top.y }] : [];
+  return [p, { ...p, x: -p.x }, ...onTop];
+}
+
+/** Breakfast's syrup and butter, or cake's trampolines and taller everything: heights scale with the jump, so every top stays reachable. */
+function dress(stage, r, name) {
+  if (name === 'breakfast') return { ...stage, butter: butter(r, stage.floors.find((f) => f.kind === 'hill')) };
+  const lift = (o) => ({ ...o, y: r1(o.y * BOUNCE.cake) });
+  return { ...stage, floors: stage.floors.map((f) => (f.kind === 'ground' ? f : lift(f))), shelves: stage.shelves.map(lift),
+    puddles: [], springs: stage.puddles.filter((p) => Math.abs(p.x) < 3), bounce: BOUNCE.cake };
+}
+
+/**
+ * A playable stage for this seed at this difficulty (1 and up), on breakfast or cake.
+ * @param {number} seed @param {number} difficulty @param {StageName} [name] @returns {Stage}
+ */
+export function generateStage(seed, difficulty, name = 'breakfast') {
   const r = rng(seed), d = Math.max(1, Math.floor(difficulty)), has = problems(r, d), end = ends(r, has.has('stepUp'));
   const wall = fort(r, d, has);
-  return {
+  return dress({
     floors: [{ kind: 'ground', x0: -9, x1: 9, z0: -2, z1: 2, y: 0 }, ...end.floors, ...(has.has('hill') ? [hill(r)] : []),
       ...(has.has('choke') ? choke(r) : [])],
     backWall: -2,
@@ -83,5 +105,5 @@ export function generateStage(seed, difficulty) {
     puddles: [...(has.has('syrup') ? syrup(r) : []), ...wall.moat],
     ringOut: { x0: -11, x1: 11, z1: 3.5, y: -3 },
     bricks: /** @type {import('./match.js').BrickSpot[]} */ (wall.bricks),
-  };
+  }, r, name);
 }

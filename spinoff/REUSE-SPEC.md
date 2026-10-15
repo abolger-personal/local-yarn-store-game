@@ -134,8 +134,8 @@ shadow on the floor so kids can see who is lined up with whom. The camera looks 
 floor at an angle and follows your fighter.
 
 - **Tap a place:** the fighter goes to the nearest spot it can stand on there. A tap on a higher
-  platform jumps there on its own: the host keeps a small map of the stage's platforms with jump
-  links between them and walks the route. A tap straight above the fighter is a jump; another
+  platform jumps there on its own (or bounces up off a trampoline): the host keeps a small map of
+  the stage's platforms with jump links between them and walks the route. A tap straight above the fighter is a jump; another
   tap higher, in the air, is the next mid-air jump. There is no jump button.
 - **Tap a thing:** the fighter goes to it and acts. A bad guy: chase them. A loose donut: pick it
   up. The enemy shelf: grab. Your own shelf: bank. The fighter **ends facing what was tapped**.
@@ -297,13 +297,18 @@ over 3 minutes.
 - **So every top a donut can land on must be reachable** (playtest 2026-10-14: a generated
   difficulty-5 stage dropped a donut on a pillar too tall to jump, and it was lost for the match).
   The playability check (`check-level.mjs`, every hand-made and generated level) taps a hero onto
-  every raised top and fails the level if one can't be stood on. Today that means no top higher
-  than one jump (`JUMP_UP` 1.3) above something you can stand on.
+  every raised top and fails the level if one can't be stood on. That means no top higher than
+  the stage's jump reaches above something you can stand on, or a trampoline's launch reaches
+  above a trampoline touching its edge. Route-finding takes both from the physics (`reachUp` in
+  `sim.js`: `JUMP_MARGIN` 0.78 of the jump's height v²/2g, leaving time to get over the edge):
+  1.3 on breakfast, 1.95 on cake, 3.9 off a cake trampoline.
 - **Terrain height and movement scale together** (decided 2026-10-14). Taller terrain only comes
   with a way up that every kid has: a double jump the route-finding plans (today a second jump
   exists only by tapping above yourself mid-air, and routes never use it), or a flight goodie.
   Raising one without the other just makes lost donuts. Whichever comes first sets the new
-  height limit in the playability check.
+  height limit in the playability check. Cake's spongy jumps and icing trampolines are the first
+  such way up (Stages and difficulty are separate, below): cake stages go taller because every
+  kid jumps higher there.
 
 ## Mode: donut capture the flag
 
@@ -316,7 +321,7 @@ wide stage costs nothing new.
 | Zone | Terrain | Forts |
 | --- | --- | --- |
 | Heroes' third | A raised deck against the back wall with their shelf on it | Heroes build here only |
-| Middle third | A hill in the middle of the band, to jump on or walk around (Level 1: a stack of big pancakes) | Nobody builds: always open ground to fight over |
+| Middle third | A hill in the middle of the band, to jump on or walk around (breakfast: a stack of big pancakes) | Nobody builds: always open ground to fight over |
 | Bad guys' third | The mirror of the heroes' third | Bad guys build here only |
 
 The band is wide enough to walk around things, so one wall never closes a side: a fort is a ring
@@ -377,37 +382,59 @@ and smashers each get a round that is theirs.
 - **Stages and difficulty are separate** (decided 2026-10-14). Past the tutorial, a *stage* is a
   place with its own look and terrain rules, and *difficulty* is how hard the match is (bad-guy
   count, fort pile, moves, generated terrain problems). Anything tried at several difficulties
-  must be playable on every stage. For now there are two stages, **breakfast** and **cake**, and
-  the "Level 1 / Level 2" entries below are really the tutorial and the cake stage. Each stage's
-  terrain rule makes it play differently, not just look different:
-  - **Breakfast:** syrup slows you (built), **butter makes you slippery** (decided): on a butter
-    patch a fighter keeps sliding the way it was going, takes longer to stop and turn, and
-    overshoots where it was tapped to stop.
-  - **Cake: spongy** (open). What spongy does is undecided: bouncier jumps, soft landings, hits
-    soaked up, or something else.
-- **Each level has its own treat theme** (decided 2026-10-14, replacing "World 1 is Gingerbread
-  World"). The theme dresses the stage and the fort pieces; the rules underneath don't change.
-  `spinoff/scenery.js` `THEMES` holds one entry per theme, and `play.html?level=2` shows a later
-  look before levels exist.
-- **Level 1 makes you break in** (decided 2026-10-14). It's the tutorial, so the bad guys' fort
+  must be playable on every stage. For now there are two stages, **breakfast** and **cake**,
+  plus the tutorial (on breakfast). Each stage's terrain rule makes it play differently, not
+  just look different. Terrain lives in the `Stage` data (`butter`, `springs`, `bounce`), so it is
+  deterministic and crosses the network with the stage.
+  - **Breakfast:** syrup slows you, **butter makes you slippery** (built): on a butter patch
+    (`Stage.butter`, round patches on any top, like syrup) a fighter's velocity only eases
+    toward the one it wants (`BUTTER_GRIP` of the gap a tick), so it keeps sliding the way it was
+    going, takes longer to stop and turn round (about 13 ticks to reverse, against 1), and slides
+    past where it was tapped to stop, then comes back. Once it has slid past, the comeback stops
+    on the spot, so a small slick can't keep it sliding off and back forever; it only counts as
+    arrived once it has stopped, and stepping off butter gives your grip back at once. Butter is
+    drawn as a pale, glossy, opaque slick with a pat in the middle, never like the dark,
+    see-through syrup. The hand-made breakfast stage has a slick in front of each deck (you jump
+    up off a slide) and one on the pancake hill; generated breakfast stages get the same.
+  - **Cake: spongy** (decided and built 2026-10-14). **Bouncy sponge:** every jump on cake goes
+    `BOUNCE.cake` (1.5×) as high (`Stage.bounce`), and landings squish and spring back on the
+    page (drawing only: the sim never bounces you on its own). **Icing trampolines**
+    (`Stage.springs`): round patches on a top, drawn as a flooded icing disc with a piped rim in
+    a loud colour different from the plain cake icing, always icing, never a mechanical
+    trampoline; it squashes when used. Stepping or landing on one launches you `SPRING_LIFT`
+    (2×) as high as a cake jump; landing back on the one that just launched you doesn't, so a
+    bounce settles instead of looping. Route-finding bounces off a trampoline to reach a top it
+    touches the edge of. **Cake stages can be crazy tall,** because higher jumps and trampolines
+    are a way up every kid has (Terrain height and movement scale together, above): the
+    hand-made cake stage's decks are 1.8 high (a sponge jump, out of reach on breakfast) and
+    its middle tower is 3.6 high, reached only off the icing pad at its foot. The playability
+    check still proves every top can be stood on.
+- **Each stage has its own treat theme** (decided 2026-10-14, replacing "World 1 is Gingerbread
+  World"). The theme dresses the stage and the fort pieces. `spinoff/scenery.js` `THEMES` holds
+  one entry per stage. While there's no stage button, the address picks: `play.html` is the
+  tutorial, `play.html?stage=cake` (or `breakfast`) a hand-made stage, and adding `&seed=8` (and
+  `&difficulty=1` to `5`) a generated one on that stage. `?level=` is gone.
+- **The tutorial makes you break in** (decided 2026-10-14). It's the tutorial, so the bad guys' fort
   shuts their end off completely: a wall right across the band, two high (too tall to hop), no
   gap at the front or back. Walking round it can't teach that forts break; this way the first
   steal needs a punch or a kick. One broken brick drops the one above it to hop height, so one
   good kick opens a way. `breakIn: true` on the level makes the playability check prove both
   halves in the real sim: no route to the shelf without breaking, and a hero who kicks when it
-  stands blocked gets in (about 7 s, 3 bricks). Level 2 goes back to the wall with gaps.
-- **Levels are data** (2026-10-14): `spinoff/levels.js` `LEVELS` maps each level number to a
-  layout (a `Stage`: floors, each a `ground`, `deck` or `hill` that the theme dresses by kind,
-  the back wall, shelves, zones, ring-out, bricks and syrup) and the name of its theme. The stage
-  is passed in, never imported: `createMatch(entrants, stage)`, and the page's taps, shadows and
-  scenery take the same stage. `spinoff/levels.test.mjs` plays every level in the real sim (a
-  hero tapped to the bad guys' shelf gets there) and checks shelves stand on floors, syrup lies
-  on open ground and no brick starts inside a raised floor.
-  - **Level 1, breakfast:** a waffle floor (golden ridges, dark pockets on a 0.5 grid); each
+  stands blocked gets in (about 7 s, 3 bricks). The hand-made stages go back to the wall with gaps.
+- **Levels are data** (2026-10-14): `spinoff/levels.js` holds `TUTORIAL` and `STAGES` (one
+  hand-made layout per stage), each a layout (a `Stage`: floors, each a `ground`, `deck` or
+  `hill` that the theme dresses by kind, the back wall, shelves, zones, ring-out, bricks, syrup,
+  butter, trampolines and bounce) and the name of its stage; `levelFor` reads the address. The
+  stage is passed in, never imported: `createMatch(entrants, stage)`, and the page's taps,
+  shadows and scenery take the same stage. `spinoff/levels.test.mjs` plays the tutorial and
+  every stage in the real sim (a hero tapped to the bad guys' shelf gets there, every top can be
+  stood on) and checks shelves stand on floors, every patch lies on a floor clear of higher ones
+  and no brick starts inside a raised floor.
+  - **Breakfast:** a waffle floor (golden ridges, dark pockets on a 0.5 grid); each
     deck is a stack of waffles; translucent syrup drips off the front edge; the middle hill is a
-    stack of big pancakes with butter and syrup on top, its corners rounded in the rules too
-    (`Floor.round`), so you never stand on thin air past the drawn pancake. The top layer of a
-    stack is always exactly the floor you stand on.
+    stack of big pancakes, its corners rounded in the rules too
+    (`Floor.round`), so you never stand on thin air past the drawn pancake. Any butter drawn on
+    it is real butter. The top layer of a stack is always exactly the floor you stand on.
   - **Sticky syrup** (decided 2026-10-14): round puddles (the stage's `puddles`) slow anyone walking
     on the ground through them to `SYRUP_SLOW` (0.45×) of walking speed; jumping over is full
     speed. Placed to make choices: one in each gap round the bad guys' wall (smash through the
@@ -417,13 +444,14 @@ and smashers each get a round that is theirs.
     cream layer above each, the cream wider than the pancakes so the colour shows from any side.
     Bad guys' stacks are chocolate pancakes with dark purple cream. Damage slides the top
     pancake off and leans the stack.
-  - **Level 2, cake and sprinkles:** the first playtest's stage, kept as it was: gingerbread with
-    an icing top, the house-style sprinkles (Theme: treats), white icing drips, the green gumdrop
-    hill, and gingerbread-panel fort pieces (cookie panel, piped border, flooded icing, cracks).
-    The playtest said the hill and panels don't read as baked yet; fix them when Level 2 is built.
+  - **Cake and sprinkles:** the first playtest's look: gingerbread with an icing top, the
+    house-style sprinkles (Theme: treats), white icing drips, the green gumdrop hill (now the
+    3.6-high tower), icing trampolines, and gingerbread-panel fort pieces (cookie panel, piped
+    border, flooded icing, cracks). The playtest said the hill and panels don't read as baked
+    yet; fix them when the cake stage gets its own pieces.
   - Gingerbread as its own theme, and worlds beyond, wait until there are more levels.
 - **Fort pieces are coloured by their topping, in the builder's colour** (decided 2026-10-13;
-  whipped cream on Level 1, icing on Level 2), flooded big enough to read at tablet size (thin
+  whipped cream on breakfast, icing on cake), flooded big enough to read at tablet size (thin
   piped lines would just look brown). One material per kind, colour per piece, so a many-coloured
   fort draws in a few batches. Kinds differ by shape, one new kind per level, unlocked for the
   rest of the game. The table below was written for gingerbread; later rows get re-dressed in

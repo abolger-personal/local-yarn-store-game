@@ -13,6 +13,20 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - The bad guys' wall in practice now goes all the way across and is too tall to jump: punch or
   kick a brick out of it to get to their shelf.
 - Surprise stages never put a donut somewhere you can't reach: the pillars are a hop high now.
+- **Two stages, breakfast and cake, each at any difficulty.** While there's no button for it,
+  pick one in the address: `play.html?stage=breakfast` or `play.html?stage=cake`, and add
+  `&seed=` with a number and `&difficulty=1` to `5` for a surprise stage there (for example
+  `play.html?stage=cake&difficulty=3&seed=8`). Plain `play.html` is still the practice stage
+  where you break into the bad guys' fort.
+- **Butter is slippery.** On breakfast, step on a shiny yellow butter slick and you slide: it's
+  hard to stop and turn, and you skid past where you tapped, then come back.
+- **Cake is bouncy.** Every jump on cake goes half as high again, and you squish when you land.
+- **Icing trampolines.** Bright blue icing pads with a pink rim on cake launch you way up when
+  you step or land on one, and squash when they do.
+- **A crazy tall cake stage,** with high decks you can only reach with a cake jump and a giant
+  gumdrop tower in the middle you can only get up by bouncing off the trampoline in front of it.
+- The butter and syrup that were only painted on the pancake hill are gone, so any butter you
+  see is real and slippery.
 
 ## 0.0.1 — 2026-10-14: Fun to hit, one tablet
 

@@ -607,6 +607,11 @@ have no controller rumble, so a short freeze of everyone involved (`HITSTOP_TICK
 landing a hit, a brick breaking, knocking a donut loose, a steal, a power move going off, a
 ring-out. Keep it short, and in the sim so every tablet freezes on the same tick.
 
+**Grabs fly into the bag, keep it** (playtest 2026-10-14: "Love the flying donut"). A grabbed
+donut arcs from where it lay (or off the shelf) into the bag, growing to carried size, in about a
+third of a second (`placeCarried` in `play.js`). Good things show the thing travelling to you;
+never stars round a head, which reads as dazed (a hit).
+
 Keep `felted` (the shop look, free), or try `toon` / `matcap` shading from
 `inventory/yarn-look.js` `SHADING` for a punchier arcade read. `setViewMode(root, 'silhouette')`
 gives a "who's that?" character-select reveal. Stages from the bakery: a giant cake, a stack of

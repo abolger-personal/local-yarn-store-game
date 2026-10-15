@@ -1,5 +1,5 @@
 // A stand-in for sim.js with the same MatchApi and no physics, so play.js can draw before the sim lands.
-import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, HIT_DEPTH, ROUND_SECONDS, STAGE, TICK_HZ } from './match.js';
+import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, HIT_DEPTH, ROUND_SECONDS, TICK_HZ } from './match.js';
 
 /** @typedef {import('./match.js').Entrant} Entrant @typedef {import('./match.js').Input} Input */
 /** @typedef {import('./match.js').Target} Target @typedef {import('./match.js').Snapshot} Snapshot */
@@ -11,7 +11,7 @@ const START = { heroes: { x: -4.5, z: 0.6 }, badGuys: { x: 3, z: 0 } };
 const GRAB = 0.45, SHELF_GRAB = 0.9;
 const IDLE = Object.freeze({ target: null, punch: false, kick: false });
 
-const floorY = (x, z) => Math.max(0, ...STAGE.floors.filter((f) => x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1).map((f) => f.y));
+const floorY = (stage, x, z) => Math.max(0, ...stage.floors.filter((f) => x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1).map((f) => f.y));
 
 /** @param {Entrant} e */
 const fighterOf = (e, carrying) => ({
@@ -19,18 +19,18 @@ const fighterOf = (e, carrying) => ({
   onGround: true, move: 'idle', step: 0, percent: 0, carrying, invincible: false, target: null, touching: null,
 });
 
-/** @param {Entrant[]} entrants */
-export function createMatch(entrants) {
+/** @param {Entrant[]} entrants @param {import('./match.js').Stage} stage */
+export function createMatch(entrants, stage) {
   const heroLooks = entrants.filter((e) => e.team === 'heroes').map((e) => e.look);
   const badLook = entrants.find((e) => e.team === 'badGuys')?.look;
   const heroDonuts = Array.from({ length: DONUTS_PER_SHELF }, (_, i) => heroLooks[i % heroLooks.length]);
   const [stolen, ...dropped] = heroDonuts.splice(0, 3);
   return {
-    tick: 0, over: false, winner: null, frozen: 0, hits: [], fullBag: [], donutEvents: [],
+    stage, tick: 0, over: false, winner: null, frozen: 0, hits: [], fullBag: [], donutEvents: [],
     fighters: entrants.map((e) => fighterOf(e, e.dummy ? stolen : null)),
     donuts: dropped.map((look, i) => ({ id: `d${i}`, x: -2.5 + i * 0.8, y: 0, z: i ? -1.2 : 1.2, look })),
-    bricks: STAGE.bricks.map((b, i) => ({ id: `b${i}`, team: b.team, x: b.x, y: b.y, z: b.z, hits: b.hits, maxHits: b.hits, icing: badLook.frosting })),
-    shelves: STAGE.shelves.map((s) => ({ ...s, donuts: s.team === 'heroes' ? heroDonuts : Array(DONUTS_PER_SHELF).fill(badLook) })),
+    bricks: stage.bricks.map((b, i) => ({ id: `b${i}`, team: b.team, x: b.x, y: b.y, z: b.z, hits: b.hits, maxHits: b.hits, icing: badLook.frosting })),
+    shelves: stage.shelves.map((s) => ({ ...s, donuts: s.team === 'heroes' ? heroDonuts : Array(DONUTS_PER_SHELF).fill(badLook) })),
   };
 }
 
@@ -78,13 +78,13 @@ function act(state, f, input) {
   return false;
 }
 
-function walk(f, still) {
+function walk(state, f, still) {
   const dx = f.target ? f.target.x - f.x : 0, dz = f.target ? f.target.z - f.z : 0, d = Math.hypot(dx, dz);
   if (d < 1e-6) f.target = null;
   const s = still || d < 1e-6 ? 0 : Math.min(d, WALK / TICK_HZ) / d;
   Object.assign(f, { x: f.x + dx * s, z: f.z + dz * s, vx: dx * s * TICK_HZ, vz: dz * s * TICK_HZ });
   if (s) f.facing = Math.atan2(dz, dx);
-  f.y = floorY(f.x, f.z);
+  f.y = floorY(state.stage, f.x, f.z);
   if (f.target) f.target.y = f.y;
   if (!(f.move in MOVE_SECONDS)) f.move = s ? 'walk' : 'idle';
 }
@@ -121,7 +121,7 @@ function touchShelf(state, f) {
 /** @param {Input} input */
 function stepFighter(state, f, input) {
   if (input.target) f.target = aimOf(state, f, input.target);
-  walk(f, act(state, f, input));
+  walk(state, f, act(state, f, input));
   f.touching = touchDonut(state, f) ?? touchShelf(state, f);
 }
 

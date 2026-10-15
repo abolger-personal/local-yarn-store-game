@@ -4,9 +4,10 @@ import { attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
 import { MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter, wobbleAt } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
-import { BRICK, STAGE, TICK_HZ } from './match.js';
+import { BRICK, TICK_HZ, groundOf } from './match.js';
+import { levelFor } from './levels.js';
 import { makeStage } from './stage.js';
-import { themeFor } from './scenery.js';
+import { THEMES } from './scenery.js';
 import { box, donutMesh, sameLook } from './treats.js';
 
 /** @typedef {import('./match.js').Snapshot} Snapshot @typedef {import('./match.js').FighterState} FighterState */
@@ -20,7 +21,8 @@ setGeometryDetail('med');
 const ME = 'me', DUMMY = 'dummy';
 const SHELF = { cols: 6, gap: 0.3, row: 0.32, rows: 4, r: 0.13, depth: 0.26 };
 const LOOSE_R = 0.2, FACE_CAMERA = -0.5, FLY_ARC = 0.6, GRAB_FROM_Y = 0.4;
-const CAMERA = { pitch: THREE.MathUtils.degToRad(35), viewW: 7, viewH: 4.8, xMax: 6 };
+const level = levelFor(location.search), ground = groundOf(level.stage);
+const CAMERA = { pitch: THREE.MathUtils.degToRad(35), viewW: 7, viewH: 4.8, xMin: ground.x0 + 3, xMax: ground.x1 - 3 };
 const BACK = new THREE.Vector3(0, Math.sin(CAMERA.pitch), Math.cos(CAMERA.pitch));
 const TIMERS = { squash: 0.22, no: 0.6, joy: 0.9, pop: 0.35, pulse: 0.45, wobble: 0.35, hop: 0.4 };
 const FIGHTER_TIMERS = ['squash', 'no', 'joy', 'pop', 'pulse'];
@@ -30,10 +32,10 @@ const _v = new THREE.Vector3(), _goal = new THREE.Vector3();
 const mine = loadFighter();
 if (!mine) location.replace('choose.html');
 
-const theme = themeFor(location.search);
+const theme = THEMES[level.theme];
 const stage = makeStage(document.getElementById('stage'), { background: theme.background });
 const { scene, camera } = stage;
-const fx = createFx(scene, camera);
+const fx = createFx(scene, camera, level.stage);
 
 function badGuyFighter() {
   const f = setFur(newFighter('lion'), '#8f8f96');
@@ -67,7 +69,7 @@ function fillShelf(s) {
   return g;
 }
 
-scene.add(...theme.scenery(), ...STAGE.shelves.map(shelfFrame));
+scene.add(...theme.scenery(level.stage), ...level.stage.shelves.map(shelfFrame));
 
 let frame = 0, now = 0;
 
@@ -142,7 +144,7 @@ function drawFighter(m, f, dt) {
   stepFighter(m.built, dt, poseOf(m, f), f.onGround && f.move !== 'blocked' ? Math.hypot(f.vx, f.vz) : 0);
   carry(m, f.carrying);
   if (m.carried) placeCarried(m);
-  placeShadow(m.shadow, f.x, f.y, f.z, 0.42);
+  placeShadow(level.stage, m.shadow, f, 0.42);
 }
 
 function newLoose(d) {
@@ -156,7 +158,7 @@ function drawLoose(m, d, dt) {
   const hop = Math.sin(Math.PI * m.hop) * 0.35;
   m.g.position.set(d.x, d.y + LOOSE_R * 1.1 + hop, d.z);
   m.g.rotation.set(FACE_CAMERA, Math.sin(now * 2 + d.x) * 0.5, 0);
-  placeShadow(m.shadow, d.x, d.y + hop, d.z, LOOSE_R * 1.2);
+  placeShadow(level.stage, m.shadow, { x: d.x, y: d.y + hop, z: d.z }, LOOSE_R * 1.2);
 }
 
 function newBrick(b) {
@@ -170,7 +172,7 @@ function drawBrick(m, b, dt) {
   m.wobble = Math.max(0, m.wobble - dt / TIMERS.wobble);
   m.g.position.set(b.x + BRICK / 2, b.y + BRICK / 2, b.z + BRICK / 2);
   m.g.rotation.z = Math.sin(m.wobble * 40) * 0.15 * m.wobble;
-  placeShadow(m.shadow, m.g.position.x, b.y, m.g.position.z, BRICK * 0.6);
+  placeShadow(level.stage, m.shadow, { x: m.g.position.x, y: b.y, z: m.g.position.z }, BRICK * 0.6);
 }
 
 function drawShelf(m, s) {
@@ -209,7 +211,7 @@ const aim = new THREE.Vector3(-4.5, 0.8, 0.1);
 
 /** Down at the floor at CAMERA.pitch, following your fighter in x and z, about a third of the stage wide. */
 function follow(me, dt) {
-  if (me) aim.lerp(_goal.set(THREE.MathUtils.clamp(me.x, -CAMERA.xMax, CAMERA.xMax), 0.8 + me.y * 0.4, -0.1 + me.z * 0.4), Math.min(1, dt * 4));
+  if (me) aim.lerp(_goal.set(THREE.MathUtils.clamp(me.x, CAMERA.xMin, CAMERA.xMax), 0.8 + me.y * 0.4, -0.1 + me.z * 0.4), Math.min(1, dt * 4));
   const vFov = THREE.MathUtils.degToRad(camera.fov) / 2, hFov = Math.atan(Math.tan(vFov) * camera.aspect);
   const dist = Math.max(CAMERA.viewW / 2 / Math.tan(hFov), CAMERA.viewH / 2 / Math.tan(vFov));
   camera.position.copy(aim).addScaledVector(BACK, dist);
@@ -326,8 +328,8 @@ document.getElementById('resume').addEventListener('click', () => setPaused(fals
 document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); });
 
 function play() {
-  const state = api.createMatch(cast(), STAGE.bricks, theme.puddles);
-  const controls = createControls(ME);
+  const state = api.createMatch(cast(), level.stage);
+  const controls = createControls(ME, level.stage);
   const button = (id) => document.getElementById(id);
   attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: button('punch'), kick: button('kick') } });
   let snap = api.snapshot(state), acc = 0;

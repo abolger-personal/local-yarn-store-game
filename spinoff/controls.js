@@ -1,10 +1,10 @@
 // Taps to Inputs (REUSE-SPEC.md §Navigation: tap to move). Classification is pure; the DOM glue is thin.
 import * as THREE from 'three';
-import { BRICK, STAGE, outside } from './match.js';
+import { BRICK, outside } from './match.js';
 
 /** @typedef {import('./match.js').Snapshot} Snapshot @typedef {import('./match.js').Target} Target */
 /** @typedef {import('./match.js').Input} Input @typedef {import('./match.js').FighterState} FighterState */
-/** @typedef {{ x: number, y: number, z: number }} P3 @typedef {{ origin: P3, direction: P3 }} Ray */
+/** @typedef {import('./match.js').Stage} Stage @typedef {{ x: number, y: number, z: number }} P3 @typedef {{ origin: P3, direction: P3 }} Ray */
 
 export const TAP_RADIUS = { donut: 0.55, foe: 0.55, me: 0.35, shelf: 0.75, brick: 0.4 };
 export const DONUT_UP = 0.2;
@@ -12,29 +12,29 @@ export const SHELF_UP = 0.65;
 
 const inside = (f, x, z) => outside(f, x, z) === 0;
 
-/** The highest floor top at (x, z) no higher than maxY, or null off the stage. */
-export function floorTop(x, z, maxY = Infinity) {
+/** The highest floor top at (x, z) no higher than maxY, or null off the stage. @param {Stage} stage */
+export function floorTop(stage, x, z, maxY = Infinity) {
   let top = null;
-  for (const f of STAGE.floors) if (f.y <= maxY && inside(f, x, z) && (top === null || f.y > top)) top = f.y;
+  for (const f of stage.floors) if (f.y <= maxY && inside(f, x, z) && (top === null || f.y > top)) top = f.y;
   return top;
 }
 
-/** The nearest floor top a ray crosses. @param {Ray} ray */
-function topHit({ origin: o, direction: d }) {
+/** The nearest floor top a ray crosses. @param {Stage} stage @param {Ray} ray */
+function topHit(stage, { origin: o, direction: d }) {
   let best = null;
-  for (const f of STAGE.floors) {
+  for (const f of stage.floors) {
     const t = (f.y - o.y) / d.y, x = o.x + d.x * t, z = o.z + d.z * t;
     if (t > 0 && inside(f, x, z) && !(best && best.t < t)) best = { t, x, z };
   }
   return best;
 }
 
-/** Where a ray lands: the nearest floor top it crosses (a raised floor's side counts as its top), else the ground plane. @param {Ray} ray @returns {P3|null} */
-export function floorPoint(ray) {
+/** Where a ray lands: the nearest floor top it crosses (a raised floor's side counts as its top), else the ground plane. @param {Stage} stage @param {Ray} ray @returns {P3|null} */
+export function floorPoint(stage, ray) {
   const { origin: o, direction: d } = ray;
   if (d.y >= 0) return null;
-  const t = -o.y / d.y, hit = topHit(ray) ?? { x: o.x + d.x * t, z: o.z + d.z * t };
-  return { x: hit.x, z: hit.z, y: floorTop(hit.x, hit.z) ?? 0 };
+  const t = -o.y / d.y, hit = topHit(stage, ray) ?? { x: o.x + d.x * t, z: o.z + d.z * t };
+  return { x: hit.x, z: hit.z, y: floorTop(stage, hit.x, hit.z) ?? 0 };
 }
 
 /** Closest approach of a ray to a point. @param {Ray} ray */
@@ -59,15 +59,15 @@ function closest(list, dist, r) {
   return best;
 }
 
-/** @param {Ray} ray @returns {Target|null} */
-function pointTarget(ray) {
-  const p = floorPoint(ray);
+/** @param {Stage} stage @param {Ray} ray @returns {Target|null} */
+function pointTarget(stage, ray) {
+  const p = floorPoint(stage, ray);
   if (!p) return null;
   return p.y > 0 ? { x: p.x, z: p.z, y: p.y } : { x: p.x, z: p.z };
 }
 
-/** The thing a tap along `ray` means, else the floor point under it. @param {Snapshot} snap @param {Ray} ray @returns {Target|null} */
-export function pickTarget(snap, ray, myId) {
+/** The thing a tap along `ray` means, else the floor point under it. @param {Stage} stage @param {Snapshot} snap @param {Ray} ray @returns {Target|null} */
+export function pickTarget(stage, snap, ray, myId) {
   const me = snap.fighters.find((f) => f.id === myId);
   const donut = closest(snap.donuts, (d) => rayDist(ray, d.x, d.y + DONUT_UP, d.z), TAP_RADIUS.donut);
   if (donut) return { thing: 'donut', id: donut.id };
@@ -78,11 +78,11 @@ export function pickTarget(snap, ray, myId) {
   if (shelf) return { thing: 'shelf', team: shelf.team };
   const brick = closest(snap.bricks, (b) => brickDist(ray, b), TAP_RADIUS.brick);
   if (brick) return { thing: 'brick', id: brick.id };
-  return pointTarget(ray);
+  return pointTarget(stage, ray);
 }
 
-/** Pointer state per finger, turned into one Input per tick by `take`. */
-export function createControls(myId) {
+/** Pointer state per finger, turned into one Input per tick by `take`. @param {Stage} stage */
+export function createControls(myId, stage) {
   const s = { finger: null, aim: null, fresh: false, punch: false, kick: false };
   return {
     /** @param {'stage'|'punch'|'kick'} on @param {Ray|null} ray */
@@ -95,7 +95,7 @@ export function createControls(myId) {
     up(pointerId) { if (pointerId === s.finger) s.finger = null; },
     /** @param {Snapshot} snap @returns {Input} */
     take(snap) {
-      const input = { target: s.fresh && s.aim ? pickTarget(snap, s.aim, myId) : null, punch: s.punch, kick: s.kick };
+      const input = { target: s.fresh && s.aim ? pickTarget(stage, snap, s.aim, myId) : null, punch: s.punch, kick: s.kick };
       Object.assign(s, { fresh: false, punch: false, kick: false });
       return input;
     },

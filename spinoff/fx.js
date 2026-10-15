@@ -105,9 +105,9 @@ export function makeShadow(scene) {
   return m;
 }
 
-/** Puts a shadow on the floor under (x, y, z), smaller the higher the thing is. */
-export function placeShadow(m, x, y, z, r) {
-  const top = floorTop(x, z, y + 0.05);
+/** Puts a shadow on the stage's floor under p, smaller the higher the thing is. @param {import('./match.js').Stage} stage */
+export function placeShadow(stage, m, { x, y, z }, r) {
+  const top = floorTop(stage, x, z, y + 0.05);
   m.visible = top !== null;
   if (top === null) return;
   m.position.set(x, top + 0.03, z);
@@ -120,7 +120,7 @@ function spawnBit(fx, at, color, speed) {
   b.mesh.position.set(at.x, at.y, at.z);
   b.v.set(Math.cos(a) * speed, speed * (1.2 + Math.random()), Math.sin(a) * speed * 0.6 + speed * 0.3);
   b.mesh.rotation.set(Math.random() * 3, Math.random() * 3, 0);
-  Object.assign(b, { t: 0, floor: floorTop(at.x, at.z, at.y) ?? -3, size: 0.13 + Math.random() * 0.06 });
+  Object.assign(b, { t: 0, floor: floorTop(fx.stage, at.x, at.z, at.y) ?? -3, size: 0.13 + Math.random() * 0.06 });
 }
 
 /** A BAM sized by the move, and the screen shake that goes with it. @param {HitEvent} h */
@@ -139,9 +139,9 @@ const pools = (scene) => ({
   next: { bam: 0, bit: 0 }, shake: 0, shakeT: 0,
 });
 
-/** @param {THREE.Scene} scene @param {THREE.Camera} camera */
-export function createFx(scene, camera) {
-  const fx = pools(scene);
+/** @param {THREE.Scene} scene @param {THREE.Camera} camera @param {import('./match.js').Stage} stage */
+export function createFx(scene, camera, stage) {
+  const fx = { ...pools(scene), stage };
   return {
     /** @param {HitEvent} h */
     bam(h) { startBam(fx, h); },

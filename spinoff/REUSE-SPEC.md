@@ -79,7 +79,9 @@ reused: `inventory/grid.js` for the lobby floor, team shelves and forts, and
   at 4.5 times a second by 80% (`wobbleAt` in `fighter.js`), about where a hit starts ringing a
   fighter out (measured: punches ~60%, kicks ~96%); a few hits already rock it ~7°. It tilts the
   whole body, so it shows while walking too. Not the idle layer: scaling that up (tried first)
-  sped up its head tilts and read as puzzled (playtest 2026-10-14). Movement reads at any size
+  sped up its head tilts and read as puzzled (playtest 2026-10-14). **Keep it** (playtest 2026-10-14:
+  "incredibly satisfying and cartoon-like. It looks like a spring"); springy whole-body motion is
+  the house style for showing a fighter's state. Movement reads at any size
   where fur detail wouldn't. A ring-out resets percent, so the wobble stops. Damage pops sprinkles (`sparkle.js` recoloured). A ring-out
   costs donuts, never playing time (see Scoring).
 - **Kicking is required** (the kids' own ask, 2026-10-13). Punch and kick are the two core

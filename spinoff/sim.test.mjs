@@ -405,4 +405,16 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
   assert.equal(me(snap, 'dummy').percent, 0, 'left alone for a few seconds, it steadies right down');
 }
 
+{
+  const m = createMatch([hero, dummy]);
+  let snap = run(m, 300, tap(-4, 0.5));
+  const held = m.fighters.find((f) => f.id === 'dummy');
+  m.donuts.push({ id: 'dropped', x: me(snap).x, y: 0, z: me(snap).z, vx: 0, vy: 0, vz: 0, look: held.carrying });
+  held.carrying = null;
+  snap = run(m, 30);
+  assert.ok(!me(snap).carrying && snap.donuts.length === 1, 'a donut landing on you stays put until you tap it');
+  snap = run(m, 30, once({ target: { thing: 'donut', id: 'dropped' } }));
+  assert.ok(me(snap).carrying && snap.donuts.length === 0, 'tapping a donut you are standing on picks it up');
+}
+
 console.log('sim ok');

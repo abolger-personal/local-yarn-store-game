@@ -671,8 +671,8 @@ const event = (f, p) => ({ fighter: f.id, x: p.x, y: p.y, z: p.z });
 function touchDonuts(s, f) {
   const now = s.donuts.filter((d) => touching(f, d));
   for (const d of now) {
-    if (f.touching.includes(d.id)) continue;
-    if (f.carrying) s.fullBag.push(event(f, d));
+    // A full bag says so once per touch; a tapped donut is picked up even if it landed on you first
+    if (f.carrying) { if (!f.touching.includes(d.id)) s.fullBag.push(event(f, d)); }
     else if (f.target?.thing === 'donut' && f.target.id === d.id) {
       f.carrying = d.look;
       s.donuts = s.donuts.filter((o) => o !== d);

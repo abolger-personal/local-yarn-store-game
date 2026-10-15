@@ -84,8 +84,8 @@ body.play #stage canvas { touch-action: none; }
 .end .card { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 48px; padding: 28px 48px; background: var(--panel); border-radius: 40px; border: 6px solid #e7d6c1; }
 .end .side { display: flex; flex-direction: column; align-items: center; gap: 8px; opacity: .55; transform: scale(.85); }
 .end .side.won { opacity: 1; transform: scale(1.1); }
-.end .crown { font-size: 72px; visibility: hidden; }
-.end .won .crown { visibility: visible; }
+.end .trophy { font-size: 72px; visibility: hidden; }
+.end .won .trophy { visibility: visible; }
 .end .pics { display: flex; gap: 10px; }
 .end .donut { width: 96px; height: 96px; border-radius: 50%; background: radial-gradient(circle, transparent 0 20%, var(--frost) 21% 58%, var(--dough) 60%); }
 .end .big { font-size: 120px; font-weight: 800; line-height: 1; }

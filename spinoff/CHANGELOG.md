@@ -37,5 +37,5 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   confetti. Your bag holds one donut: try for a second and your fighter shakes its head.
 - ⏸ pauses the game, clock and all; ▶️ plays on. Leaving the screen pauses it too, and the screen
   stays awake while you play.
-- When time runs out, a card shows who has more donuts, with ▶️ to play again and 👋 back to the
+- When time runs out, a card shows who has more donuts and gives the winners a 🏆, with ▶️ to play again and 👋 back to the
   lobby.

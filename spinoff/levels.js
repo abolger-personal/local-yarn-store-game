@@ -3,7 +3,8 @@
 import { BRICK } from './match.js';
 import { generateStage } from './generate.js';
 
-/** @typedef {import('./match.js').Stage} Stage @typedef {import('./match.js').Floor} Floor @typedef {{ theme: 'breakfast'|'cake', stage: Stage }} Level */
+/** @typedef {import('./match.js').Stage} Stage @typedef {import('./match.js').Floor} Floor @typedef {{ theme: 'breakfast'|'cake', stage: Stage, breakIn?: boolean }} Level
+ *   breakIn: the bad guys' shelf is walled in, so the only way to it is to punch and kick through */
 
 const wall = (team, x, z, y = 0) => ({ team, x, z, y, hits: 2 });
 
@@ -33,9 +34,14 @@ const TABLE = Object.freeze({
   ]),
 });
 
+// REUSE-SPEC.md §Forts: Level 1 teaches breaking in. The wall runs right across the band two high, too
+// tall to hop, so there is no way round or over; one broken brick drops the one above it to hop height.
+const SHUT_IN = Object.freeze([-2, -1.6, -1.2, -0.8, -0.4, 0, 0.4, 0.8, 1.2, 1.6]
+  .flatMap((z) => [wall('badGuys', 4.6, z), wall('badGuys', 4.6, z, BRICK)]));
+
 /** @type {Readonly<Record<number, Level>>} */
 export const LEVELS = Object.freeze({
-  1: { theme: 'breakfast', stage: TABLE },
+  1: { theme: 'breakfast', stage: Object.freeze({ ...TABLE, bricks: SHUT_IN }), breakIn: true },
   2: { theme: 'cake', stage: Object.freeze({ ...TABLE, puddles: Object.freeze([]) }) },
 });
 

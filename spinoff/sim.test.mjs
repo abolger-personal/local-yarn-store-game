@@ -3,7 +3,8 @@ import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, ROUND_SECONDS, TICK_HZ, outside
 import { LEVELS } from './levels.js';
 import { CALM_DRAIN, CALM_TICKS, DUMMY, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
 
-const STAGE = LEVELS[1].stage;
+// Level 1's layout and syrup with the gapped wall (Level 2's fort), so routing has gaps to find
+const STAGE = { ...LEVELS[1].stage, bricks: LEVELS[2].stage.bricks };
 const LOOK = { dough: '#e8c48a', frosting: '#14c4e0', stripe: false };
 const BAD = { dough: '#2a1a14', frosting: '#7a2bbf', stripe: true };
 const body = { height: 0.9, width: 0.45, reach: 0.38 };

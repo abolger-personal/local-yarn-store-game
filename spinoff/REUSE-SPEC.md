@@ -378,6 +378,13 @@ and smashers each get a round that is theirs.
   World"). The theme dresses the stage and the fort pieces; the rules underneath don't change.
   `spinoff/scenery.js` `THEMES` holds one entry per theme, and `play.html?level=2` shows a later
   look before levels exist.
+- **Level 1 makes you break in** (decided 2026-10-14). It's the tutorial, so the bad guys' fort
+  shuts their end off completely: a wall right across the band, two high (too tall to hop), no
+  gap at the front or back. Walking round it can't teach that forts break; this way the first
+  steal needs a punch or a kick. One broken brick drops the one above it to hop height, so one
+  good kick opens a way. `breakIn: true` on the level makes the playability check prove both
+  halves in the real sim: no route to the shelf without breaking, and a hero who kicks when it
+  stands blocked gets in (about 7 s, 3 bricks). Level 2 goes back to the wall with gaps.
 - **Levels are data** (2026-10-14): `spinoff/levels.js` `LEVELS` maps each level number to a
   layout (a `Stage`: floors, each a `ground`, `deck` or `hill` that the theme dresses by kind,
   the back wall, shelves, zones, ring-out, bricks and syrup) and the name of its theme. The stage

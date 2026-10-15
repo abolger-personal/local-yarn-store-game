@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { newFighter } from './fighter.js';
-import { LEVELS } from './levels.js';
+import { STAGES, TUTORIAL } from './levels.js';
 import { ROUND_SECONDS, TICK_HZ } from './match.js';
 import { EVENT_TICKS, HOST_GONE_SECONDS, SNAP_HZ, createGuest, createHost, readInput, readSnap, readStart, rosterOf } from './multiplayer.js';
 import { createMatch, snapshot, tick } from './sim.js';
@@ -46,7 +46,7 @@ function guestOf(net, id) {
     { ...IDLE, target: { thing: 'shelf', team: 'everyone' } }, { ...IDLE, target: { thing: 'fighter', id: 'x'.repeat(500) } }, { ...IDLE, away: 'yes' }])
     assert.equal(readInput(bad), null, `a malformed input is ignored: ${JSON.stringify(bad)}`);
 
-  const start = { theme: 'breakfast', stage: LEVELS[1].stage, roster: rosterOf('H', newFighter('owl'), new Map([['G1', newFighter('lion')]])), settings: { seconds: 90 } };
+  const start = { theme: 'breakfast', stage: TUTORIAL.stage, roster: rosterOf('H', newFighter('owl'), new Map([['G1', newFighter('lion')]])), settings: { seconds: 90 } };
   const sent = JSON.parse(JSON.stringify(start));
   assert.ok(readStart(sent, 'G1', THEMES), 'a good start is taken');
   assert.equal(readStart(sent, 'G9', THEMES), null, 'a start without me in it is not mine');
@@ -63,13 +63,13 @@ function guestOf(net, id) {
 const net = network();
 // G3 is only there to drop out
 const guests = new Map([['G1', newFighter('lion')], ['G2', newFighter('llama')], ['G3', newFighter('owl')]]);
-const start = { theme: 'cake', stage: LEVELS[1].stage, roster: rosterOf('H', newFighter('owl'), guests), settings: { seconds: ROUND_SECONDS } };
+const start = { theme: 'cake', stage: STAGES.cake.stage, roster: rosterOf('H', newFighter('owl'), guests), settings: { seconds: ROUND_SECONDS } };
 const [g1, g2] = ['G1', 'G2'].map((id) => guestOf(net, id));
 guestOf(net, 'G3');
 const host = createHost(net.link('H'), start, 'H');
 net.flush();
 const [s1, s2] = await Promise.all([g1.started, g2.started]);
-assert.deepEqual(s1.stage, LEVELS[1].stage, 'the level travels as data, unchanged');
+assert.deepEqual(s1.stage, STAGES.cake.stage, 'the level travels as data, unchanged');
 assert.equal(s1.theme, 'cake');
 assert.deepEqual(s2.roster.map((s) => s.id), ['H', 'G1', 'G2', 'G3', 'dummy'], 'every player is a hero, the dummy the bad guys');
 

@@ -965,14 +965,14 @@ scary, for 4–6 year olds.
     | Finishes | Reward |
     | --- | --- |
     | 1 | The stamp **and** a small dress-up |
-    | 5 | A goodie |
-    | 10 | A second dress-up |
-    | 25 | A second goodie |
+    | 10, 30, 60, 80 | A dress-up |
+    | 20, 40, 70, 90 | A goodie |
     | 50 | A trick |
     | 100 | The big trick (pancakes: the magic spatula) |
 
-    Cheap looks come first and tricks last, so a kid who plays more gets prettier before they get
-    stronger. The end card presses the stamp, pops the reward out of it, and shows the next
+    **Every 10 finishes, evenly** (decided 2026-10-14): kids don't respond well to rewards that
+    get further and further apart, so the gap never grows. Tricks sit at 50 and 100, so a kid who
+    plays more gets prettier before they get stronger. Past 100 is open. The end card presses the stamp, pops the reward out of it, and shows the next
     milestone's reward as a shadow with its number, so more is visibly coming.
     Open: how often goodies turn up and tricks charge, which is where `help` (Handicap) can even out a kid with a big card.
   - Open (2026-10-14): whether stamps open levels (a stamp on N opens N+1) or every level can be

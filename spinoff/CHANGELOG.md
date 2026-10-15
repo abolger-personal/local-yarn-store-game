@@ -23,6 +23,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - ▶️ in the lobby plays by yourself against a training dummy on a breakfast stage you can walk
   all around: across the waffle floor, toward the camera, away from it, and up onto the stacks
   of waffles and the big stack of pancakes in the middle.
+- You can't walk through bad guys any more: bump into one and you shove them aside.
 - Sticky syrup puddles slow you down. There's one in each gap around the bad guys' wall: wade
   through, or smash the wall instead.
 - Tap where you want to go, 🥊 to punch and 🦶 to kick. Hits land with a BAM, a little freeze and

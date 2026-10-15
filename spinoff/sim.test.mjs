@@ -349,4 +349,17 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
   assert.ok(near(sticky - dry, wade * TICK_HZ, 3), `syrup slows the walk across it (${dry} dry, ${sticky} sticky ticks)`);
 }
 
+{
+  const closest = (team) => {
+    const m = createMatch([hero, { ...dummy, team }]);
+    let d = Infinity;
+    const snap = run(m, 300, tap(-1.6, 0.3), (x) => { d = Math.min(d, Math.hypot(me(x).x - me(x, 'dummy').x, me(x).z - me(x, 'dummy').z)); });
+    return { d, past: me(snap).x > me(snap, 'dummy').x };
+  };
+  const foe = closest('badGuys'), mate = closest('heroes');
+  assert.ok(foe.d >= 2 * R - 1e-9, `a foe is solid: never closer than two radii (${foe.d})`);
+  assert.ok(foe.past, 'but you shoulder past them to where you tapped');
+  assert.ok(mate.d < R, 'a teammate you can walk straight through');
+}
+
 console.log('sim ok');

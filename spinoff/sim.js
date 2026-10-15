@@ -418,7 +418,7 @@ function stuckCheck(f, moved) {
   else if (++f.stuck >= STUCK_TICKS) fail(f);
 }
 
-// ponytail: A* doesn't cost syrup, so routes wade straight through; weight syrup cells when NPCs should go round
+// REUSE-SPEC.md §Mode: players wade straight through; ponytail: weight syrup cells in A* if NPCs should go round
 const inSyrup = (s, f) => f.y < STEP && s.puddles.some((p) => Math.hypot(f.x - p.x, f.z - p.z) < p.r);
 
 function walkStep(s, f) {
@@ -495,6 +495,25 @@ function moveFighter(s, f) {
   lungeStep(s, f);
   if (f.stun === 0 && Math.hypot(f.vx, f.vz) > TURN_SPEED) f.facing = Math.atan2(f.vz, f.vx);
   ringOut(s, f);
+}
+
+const overlapY = (a, b) => a.y < b.y + b.h - STEP && b.y < a.y + a.h - STEP;
+
+/** Foes are solid to each other (teammates pass through): each overlapping pair is pushed apart, half each, then off any wall. */
+function separate(s) {
+  const fs = s.fighters;
+  for (let i = 0; i < fs.length; i++) {
+    for (let j = i + 1; j < fs.length; j++) {
+      const a = fs[i], b = fs[j], dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), gap = a.r + b.r - d;
+      if (a.team === b.team || gap <= 0 || !overlapY(a, b)) continue;
+      const [ux, uz] = d > EPS ? [dx / d, dz / d] : [a.team === 'heroes' ? 1 : -1, 0];
+      for (const [f, sign] of [[a, -1], [b, 1]]) {
+        f.x += (sign * ux * gap) / 2;
+        f.z += (sign * uz * gap) / 2;
+        pushOut(s.solids, f, f.r, f.h);
+      }
+    }
+  }
 }
 
 // --- attacks --------------------------------------------------------------------------------
@@ -762,6 +781,7 @@ export function tick(s, inputs) {
   Object.assign(s, { hits: [], fullBag: [], donutEvents: [] });
   for (const f of s.fighters) if (!f.dummy) applyInput(s, f, inputs[f.id]);
   for (const f of s.fighters) moveFighter(s, f);
+  separate(s);
   for (const f of s.fighters) attackStep(s, f);
   settleBricks(s);
   refresh(s);

@@ -311,6 +311,13 @@ Later levels can bring new hand-made stages.
   in `DISPLAY_SLOTS` (`characters/store/scene/displays.js`), standing against the back wall on its
   team's deck: columns across, shelves up, facing the camera. The grab and bank rules are pure `grid.js` calls with no three.js, so they run in the node
   sim test.
+- **Foes are solid, teammates aren't** (decided 2026-10-14, playtest: "fighter can walk straight
+  through another fighter on the other team"). Bodies on different teams push each other apart,
+  half each, so walking into a bad guy shoulders them aside rather than passing through; a jump
+  over is clear once your feet are above their head. Teammates overlap freely, so six heroes never
+  jam a doorway.
+- **Wading, not routing round** (decided 2026-10-14): a fighter tapped past a syrup puddle walks
+  straight through it and is slowed; getting round it is the player's call.
 - **Friendly fire is off, as a setting.** Teammates pass through each other's attacks. Every
   fighter carries a `team`, and whether one fighter can hit another is `canHit(a, b, match)` in
   `spinoff/roster.js`, with `MATCH.friendlyFire` false. A kid-against-kid mode later is that one

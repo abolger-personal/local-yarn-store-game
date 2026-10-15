@@ -362,4 +362,21 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
   assert.ok(mate.d < R, 'a teammate you can walk straight through');
 }
 
+{
+  const turnedInAir = (to) => {
+    const m = createMatch([hero]), deck = STAGE.shelves[0];
+    run(m, 300, tap(deck.x, -1.1, deck.y));
+    let first = null, worst = 0;
+    run(m, 200, tap(to.x, to.z), (s) => {
+      const f = me(s);
+      if (f.onGround) return;
+      first ??= f.facing;
+      worst = Math.max(worst, Math.abs(Math.atan2(Math.sin(f.facing - first), Math.cos(f.facing - first))));
+    });
+    return worst;
+  };
+  for (const to of [{ x: -5.8, z: -0.6 }, { x: -7.6, z: -0.6 }, { x: -5.8, z: -1.2 }, { x: -4, z: 1.5 }])
+    assert.ok(turnedInAir(to) < 0.01, `walking off the deck toward ${to.x}, ${to.z} holds its facing all the way down`);
+}
+
 console.log('sim ok');

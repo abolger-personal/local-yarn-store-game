@@ -373,6 +373,7 @@ function arrive(f) {
 }
 
 function jump(f, to) {
+  if (flat(f, to) > EPS) f.facing = Math.atan2(to.z - f.z, to.x - f.x);
   f.vy = JUMP_SPEED;
   f.onGround = false;
   f.airTo = to;
@@ -493,7 +494,8 @@ function moveFighter(s, f) {
   if (f.onGround) walkStep(s, f);
   else airStep(s, f);
   lungeStep(s, f);
-  if (f.stun === 0 && Math.hypot(f.vx, f.vz) > TURN_SPEED) f.facing = Math.atan2(f.vz, f.vx);
+  // Facing is set on the ground and by a jump, then held in the air: drifting back toward a ledge mustn't spin you round
+  if (f.onGround && f.stun === 0 && Math.hypot(f.vx, f.vz) > TURN_SPEED) f.facing = Math.atan2(f.vz, f.vx);
   ringOut(s, f);
 }
 

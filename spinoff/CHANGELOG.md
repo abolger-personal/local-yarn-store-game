@@ -24,7 +24,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   all around: across the waffle floor, toward the camera, away from it, and up onto the stacks
   of waffles and the big stack of pancakes in the middle.
 - You can't walk through bad guys any more: bump into one and you shove them aside.
-- Sticky syrup puddles slow you down. There's one in each gap around the bad guys' wall: wade
+- Sticky syrup puddles slow you down.
+- Falling off a waffle stack, you keep facing the way you walked off instead of spinning round. There's one in each gap around the bad guys' wall: wade
   through, or smash the wall instead.
 - Tap where you want to go, 🥊 to punch and 🦶 to kick. Hits land with a BAM, a little freeze and
   a wobble; knock down the bad guys' wall of pancake stacks, stuck together with purple whipped

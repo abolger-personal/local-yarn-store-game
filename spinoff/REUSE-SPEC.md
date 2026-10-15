@@ -189,6 +189,14 @@ so the two ladders can't drift apart. A first ladder, for tuning:
 | 8 | Wall-kick jump; charged swing (hold 🥊) |
 | 9+ | The rest of the gesture table, one per level |
 
+**Idea: a falling attack off something tall** (playtest 2026-10-14, kept for later). The owl
+falling off a tall waffle stack swung round toward the stack on the way down. That was a facing
+bug, now fixed (facing holds in the air), but the swing looked like a wind-up, so keep it as a
+move: press 🦶 while falling from a height and the fighter turns, tucks and drops onto whatever
+is below, landing harder the further it fell (a bigger BAM, a longer hit-stop, knocks fort
+pieces loose). It's the big brother of the air stomp (Level 3 below), so it slots in as a later
+unlock or a power move.
+
 Candidate gestures (brainstorm, 2026-10-13; first ones to try are marked ★):
 
 | Gesture | Power | For |

@@ -80,7 +80,17 @@ stage at difficulty 3 plays with 3 CPU bad guys, 3 fort pieces each and Level 3'
 Plus the wall, always. A newly unlocked kind is always in on its debut difficulty, like the fort pile
 "newest first". The real difficulty dial stays the bad-guy count and, later, auto-scaling by donut
 margin: terrain is for variety, not for being harder. The proof of concept bears this out (raid
-times below). When auto-scaling exists, the same donut margin can pick the *next* generated
+times below).
+
+**But that is only true for an empty stage run by today's AI** (user, 2026-10-14). Once both
+teams build forts, and grownups play the bad guys against the kids, the terrain is what each side
+builds *with*: a choke point is worth walling, a high deck is worth defending, a syrup gap is
+worth leaving open for the raiders to wade. Then terrain does change difficulty, through how
+the players use it. The raid-time numbers here measure a lone hero on a bare stage, so they can't
+see that. Two follow-ups: CPU bad guys need to use terrain too (build their fort at the choke
+points, defend from the high deck, route raids round syrup), or terrain only ever helps the
+humans; and a generated stage should be judged with forts on it, e.g. raid time through each
+side's best fort at that difficulty's pile size, not only bare. When auto-scaling exists, the same donut margin can pick the *next* generated
 difficulty: a big win steps it up by one, never past the highest hand-made level the room has
 finished; a loss keeps it (the spec never drops a level).
 

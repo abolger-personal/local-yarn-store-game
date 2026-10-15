@@ -2,6 +2,15 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
+## 0.0.2 — in progress
+
+### Practice
+- **Surprise stages, for testing.** Add `?seed=` and a number to the play page's address (for
+  example `play.html?seed=123&difficulty=2`) for a made-up breakfast stage: walls, gaps, syrup and
+  hills laid out fresh from the number, the same stage every time for the same number, and fair
+  to both sides. `difficulty` runs 1 to 5 and adds narrower gaps, choke points and a higher deck.
+  There's no button for it yet.
+
 ## 0.0.1 — 2026-10-14: Fun to hit, one tablet
 
 ### Choose a fighter

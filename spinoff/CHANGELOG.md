@@ -4,7 +4,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 
 ## 0.0.2 — in progress
 
-### Getting in
+### Small tablets
 - The score and clock are much smaller, and the 🥊 🦶 ⏸️ 👋 buttons shrink to fit small tablets.
 
 ### Play together

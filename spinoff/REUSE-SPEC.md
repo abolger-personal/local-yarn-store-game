@@ -938,8 +938,14 @@ scary, for 4–6 year olds.
     two exactly alike. The ×2, ×3 tally is stamped beside it the same way. The card is a grid of the levels' places; an unwon level's place is empty.
   - **The save is level number → times finished** (e.g. `{ "1": 3, "2": 1 }`), checked on the way in
     like the fighter: keys are whole levels from 1 to the last level, counts whole numbers from 1
-    (capped, say at 99); anything else is dropped. A guest sends its
+    (capped at 999, so the 100th finish still counts); anything else is dropped. A guest sends its
     card with its fighter when it joins.
+  - **Tally milestones unlock themed special items** (idea, 2026-10-14). Each stamp's count is a
+    ladder: finishing a level enough times unlocks an item themed on that level, e.g. the pancake
+    level's 100th finish gives a **magic spatula**. Items belong to the player like the card (they
+    survive re-rolling the fighter). The card is the one record, so items need no save of their
+    own: what you have is worked out from the counts. Open: the milestone steps (say 5, 10, 25, 50,
+    100), and whether items are looks (held props, hats) or play (a move, a power), or both.
   - Open (2026-10-14): whether stamps open levels (a stamp on N opens N+1) or every level can be
     picked from the start; whether unlocked moves and fort pieces follow the chosen level or the
     card; whether winning should show on the stamp too; whether grownup bad-guy players have

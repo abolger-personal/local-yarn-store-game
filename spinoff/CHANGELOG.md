@@ -6,6 +6,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 
 ### Small tablets
 - The score and clock are much smaller, and the 🥊 🦶 ⏸️ 👋 buttons shrink to fit small tablets.
+- The first tap on each screen hides the browser's bars and fills the whole screen. Add the game to the home screen to keep the bars hidden for good.
 
 ### Play together
 - **Play a match together.** In a room, the tablet that opened it (🏠) has ▶️: tap it and every

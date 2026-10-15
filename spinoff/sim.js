@@ -14,9 +14,17 @@ export const AIR_SPEED = 4;
 /** Walking speed is multiplied by this while standing in syrup (REUSE-SPEC.md §Forts, Level 1). */
 export const SYRUP_SLOW = 0.45;
 export const JUMP_SPEED = 10;
+/** A route jumps up at most this share of a jump's height (v²/2g), leaving time to get over the edge: 1.3 at JUMP_SPEED. */
+export const JUMP_MARGIN = 0.78;
+/** A trampoline's launch goes this many times as high as the stage's jump (REUSE-SPEC.md §Stages and difficulty are separate). */
+export const SPRING_LIFT = 2;
+/** On butter the velocity closes this share of the gap to the wanted one each tick, so you slide on and turn slowly... */
+export const BUTTER_GRIP = 0.05;
+/** ...and the wanted speed toward the target is at most distance × this a second, so you overshoot a little and come back. */
+export const BUTTER_BRAKE = 2.5;
+const SETTLE = 0.1;
 export const LEDGE_MARGIN = 0.05;
 export const CELL = 0.2;
-export const JUMP_UP = 1.3;
 const JUMP_REACH = 1.2;
 const JUMP_COST = 2;
 const DROP_COST = 0.5;
@@ -82,12 +90,17 @@ const OPEN = 0, SOFT = 1, HOP = 2, BLOCKED = 3;
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+/** The highest rise a route jumps for at this take-off speed. */
+export const reachUp = (speed) => (JUMP_MARGIN * speed * speed) / (2 * GRAVITY);
 const flat = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const inXZ = (b, x, z) => outside(b, x, z) === 0;
 const toBox = outside;
 const floorBox = (f) => ({ x0: f.x0, x1: f.x1, z0: f.z0, z1: f.z1, y0: -Infinity, y1: f.y, round: f.round, kind: 'floor' });
 const brickBox = (b) => ({ x0: b.x, x1: b.x + BRICK, z0: b.z, z1: b.z + BRICK, y0: b.y, y1: b.y + BRICK, kind: 'brick' });
 const shelfBox = (z0) => (sh) => ({ x0: sh.x - sh.half, x1: sh.x + sh.half, z0, z1: sh.z, y0: sh.y, y1: sh.y + SHELF_H, kind: 'shelf' });
+/** The index of the patch in `list` that (x, z) on the top at y stands in, or within `grow` of; -1 if none. */
+const patchAt = (s, list, p, grow = 0) => (list ?? []).findIndex((q) => Math.abs(p.y - (q.y ?? s.band.y)) <= STEP
+  && Math.hypot(p.x - q.x, p.z - q.z) < q.r + grow);
 const shelfOf = (s, team) => s.shelves.find((sh) => sh.team === team);
 const inStage = ({ band }, p) => {
   p.x = clamp(p.x, band.x0 + LEDGE_MARGIN, band.x1 - LEDGE_MARGIN);
@@ -162,12 +175,17 @@ function cellKind(s, x, z, top, body) {
   return soft ? SOFT : OPEN;
 }
 
-/** Each cell's floor top and whether a body of radius r fits there (open), hugs a raised floor (soft), must hop a one-high brick wall, or can't. */
+/** Each cell's floor top and whether a body of radius r fits there (open), hugs a raised floor (soft), must hop a one-high brick wall, or can't;
+ *  how high a jump from it rises (a trampoline's launch, or the stage's jump); and which trampoline it is on or next to (index + 1, else 0). */
 function buildGrid(s, body) {
-  const { nx, nz } = s.band, g = { ...s.band, top: new Float64Array(nx * nz), kind: new Uint8Array(nx * nz) };
-  for (let n = 0; n < nx * nz; n++) {
-    g.top[n] = supportAt(s.floorBoxes, cellX(g, n), cellZ(g, n), Infinity);
-    g.kind[n] = cellKind(s, cellX(g, n), cellZ(g, n), g.top[n], body);
+  const { nx, nz } = s.band, size = nx * nz;
+  const g = { ...s.band, top: new Float64Array(size), kind: new Uint8Array(size), up: new Float64Array(size), spring: new Uint8Array(size), jumpUp: s.jump.up };
+  for (let n = 0; n < size; n++) {
+    const p = { x: cellX(g, n), y: supportAt(s.floorBoxes, cellX(g, n), cellZ(g, n), Infinity), z: cellZ(g, n) };
+    g.top[n] = p.y;
+    g.kind[n] = cellKind(s, p.x, p.z, p.y, body);
+    g.up[n] = patchAt(s, s.stage.springs, p) < 0 ? s.jump.up : s.jump.springUp;
+    g.spring[n] = patchAt(s, s.stage.springs, p, CELL) + 1;
   }
   return g;
 }
@@ -180,8 +198,8 @@ function navGrid(s, f) {
 
 function stepCost(g, a, b, len) {
   const hopping = g.kind[b] === HOP && g.kind[a] !== HOP, rise = g.top[b] - g.top[a];
-  if (g.kind[b] === BLOCKED || rise + (hopping ? BRICK : 0) > JUMP_UP) return Infinity;
-  const hop = hopping ? HOP_COST : 0;
+  if (g.kind[b] === BLOCKED || rise + (hopping ? BRICK : 0) > g.up[a]) return Infinity;
+  const hop = (hopping ? HOP_COST : 0) + (g.spring[b] && !g.spring[a] ? HOP_COST : 0);
   const climb = (rise > STEP ? JUMP_COST : 0) + (rise < -STEP ? DROP_COST : 0);
   return len * CELL * (g.kind[b] === SOFT ? SOFT_COST : 1) + hop + climb;
 }
@@ -269,14 +287,15 @@ function goalCell(g, p) {
   return best;
 }
 
-/** Cells to waypoints: a waypoint reached across a hop or up onto a higher top is a jump. */
+/** Cells to waypoints: a waypoint reached across a hop or up onto a higher top is a jump; `spring` names the trampoline it bounces up from. */
 function waypoints(g, cells) {
   const out = [];
   let hopped = false;
-  for (const n of cells.slice(1)) {
+  for (let i = 1; i < cells.length; i++) {
+    const n = cells[i];
     if (g.kind[n] === HOP) { hopped = true; continue; }
-    const below = out.at(-1)?.y ?? g.top[cells[0]];
-    out.push({ x: cellX(g, n), y: g.top[n], z: cellZ(g, n), jump: hopped || g.top[n] > below + STEP });
+    const a = cells[i - 1], up = g.top[n] > (out.at(-1)?.y ?? g.top[cells[0]]) + STEP;
+    out.push({ x: cellX(g, n), y: g.top[n], z: cellZ(g, n), jump: hopped || up, spring: up && g.up[a] > g.jumpUp ? g.spring[a] - 1 : -1 });
     hopped = false;
   }
   return out;
@@ -286,7 +305,7 @@ function clearLine(g, a, b) {
   const n = Math.ceil(flat(a, b) / (CELL / 2));
   for (let t = 1; t <= n; t++) {
     const c = cellOf(g, a.x + ((b.x - a.x) * t) / n, a.z + ((b.z - a.z) * t) / n);
-    if (g.kind[c] !== OPEN || Math.abs(g.top[c] - a.y) > STEP) return false;
+    if (g.kind[c] !== OPEN || g.spring[c] || Math.abs(g.top[c] - a.y) > STEP) return false;
   }
   return true;
 }
@@ -350,7 +369,7 @@ function plan(s, f) {
   const found = f.fails >= MAX_FAILS ? { cells: [start], reached: false } : search(g, start, end);
   const wps = waypoints(g, found.cells);
   const exact = found.reached && Math.hypot(goal.x - cellX(g, end), goal.z - cellZ(g, end)) <= CELL;
-  if (exact) wps.push({ x: goal.x, y: goal.y, z: goal.z, jump: goal.y > (wps.at(-1)?.y ?? f.y) + STEP });
+  if (exact) wps.push({ x: goal.x, y: goal.y, z: goal.z, jump: goal.y > (wps.at(-1)?.y ?? f.y) + STEP, spring: -1 });
   f.nav = { goal: { x: goal.x, y: goal.y, z: goal.z }, wps: pull(g, f, wps), k: 0, done: false, failed: false,
     blocked: !found.reached, at: s.tick, bricks: s.brickKey, end: null };
 }
@@ -372,42 +391,61 @@ function fail(f) {
 
 function arrive(f) {
   const n = f.nav, face = n.blocked ? f.dest : f.dest.face;
+  if (f.slick) Object.assign(f, { vx: 0, vz: 0 });
+  f.passed = false;
   n.done = true;
   n.end = { x: f.x, y: f.y, z: f.z };
   if (face && flat(f, face) > EPS) f.facing = Math.atan2(face.z - f.z, face.x - f.x);
 }
 
-function jump(f, to) {
+/** A jump from a trampoline is its launch (REUSE-SPEC.md §Stages and difficulty are separate); `sprung` remembers which one. */
+function jump(s, f, to) {
   if (flat(f, to) > EPS) f.facing = Math.atan2(to.z - f.z, to.x - f.x);
-  f.vy = JUMP_SPEED;
+  f.sprung = patchAt(s, s.stage.springs, f);
+  f.vy = f.sprung < 0 ? s.jump.speed : s.jump.spring;
   f.onGround = false;
   f.airTo = to;
 }
 
-function follow(f) {
+function leapTo(s, f, w) {
+  const n = f.nav;
+  n.k = n.wps.indexOf(w);
+  w.jump = false;
+  f.navJump = w;
+  jump(s, f, w);
+}
+
+/** Stepping or landing on trampoline p launches you: up to the top the route bounces to from it, if that is the next jump, else on where you were going. */
+function launch(s, f, p) {
+  const n = f.nav, up = n && !n.done ? n.wps.slice(n.k).find((w) => w.jump) : null;
+  if (up?.spring === p) leapTo(s, f, up);
+  else jump(s, f, f.walkTo ?? { x: f.x, z: f.z });
+}
+
+// On butter you arrive only once you've stopped sliding; a bounce up from a trampoline is only taken standing on it
+const arrived = (f, n, wp) => !wp || (n.k === n.wps.length - 1 && !wp.jump && flat(f, wp) < (n.blocked ? WP_ARRIVE : ARRIVE)
+  && (!f.slick || f.passed || Math.hypot(f.vx, f.vz) < SETTLE));
+const canLeap = (s, f, w) => w?.jump && flat(f, w) < JUMP_REACH && (w.spring < 0 || patchAt(s, s.stage.springs, f) === w.spring);
+
+function follow(s, f) {
   const n = f.nav;
   if (n.done) return;
-  while (n.k < n.wps.length - 1 && !n.wps[n.k].jump && flat(f, n.wps[n.k]) < WP_ARRIVE) n.k++;
+  while (n.k < n.wps.length - 1 && !n.wps[n.k].jump && n.wps[n.k + 1].spring < 0 && flat(f, n.wps[n.k]) < WP_ARRIVE) n.k++;
   const wp = n.wps[n.k];
-  if (!wp || (n.k === n.wps.length - 1 && !wp.jump && flat(f, wp) < (n.blocked ? WP_ARRIVE : ARRIVE))) { arrive(f); return; }
-  const leap = [wp, n.wps[n.k + 1]].find((w) => w?.jump && flat(f, w) < JUMP_REACH);
-  if (leap && !f.attack) {
-    n.k = n.wps.indexOf(leap);
-    leap.jump = false;
-    f.navJump = leap;
-    jump(f, leap);
-    return;
-  }
-  f.walkTo = wp;
+  if (arrived(f, n, wp)) { arrive(f); return; }
+  const leap = [wp, n.wps[n.k + 1]].find((w) => canLeap(s, f, w));
+  if (leap && !f.attack) leapTo(s, f, leap);
+  else f.walkTo = wp;
 }
 
 function navigate(s, f) {
+  f.slick = f.onGround && patchAt(s, s.stage.butter, f) >= 0;
   f.walkTo = null;
   f.dest = f.dummy || !f.target ? null : resolve(s, f);
   if (!f.dest) { f.nav = null; return; }
   if (!f.onGround || f.stun > 0) return;
   if (stale(s, f)) plan(s, f);
-  follow(f);
+  follow(s, f);
 }
 
 // --- physics --------------------------------------------------------------------------------
@@ -419,30 +457,51 @@ function slide(s, f, dx, dz) {
   if (f.onGround) inStage(s, f);
 }
 
+/** Stuck: barely moving for STUCK_TICKS. On butter, barely moving for the speed it's sliding at, since it slows right down to settle. */
 function stuckCheck(f, moved) {
-  if (moved == null || moved >= WALK_SPEED * DT * 0.2) f.stuck = 0;
+  if (moved == null || moved >= DT * 0.2 * (f.slick ? Math.hypot(f.vx, f.vz) : WALK_SPEED)) f.stuck = 0;
   else if (++f.stuck >= STUCK_TICKS) fail(f);
 }
 
 // REUSE-SPEC.md §Mode: players wade straight through; ponytail: weight syrup cells in A* if NPCs should go round
-const inSyrup = (s, f) => f.y < STEP && s.stage.puddles.some((p) => Math.hypot(f.x - p.x, f.z - p.z) < p.r);
+/**
+ * The velocity toward `to`: slowed in syrup; on butter it eases there from the one it had, so you slide past and come back.
+ * Once you've slid past, the comeback stops on the spot: otherwise a small slick could keep you sliding off, walking back and
+ * sliding off again. ponytail: routing ignores butter too.
+ */
+function walkVelocity(s, f, to) {
+  const dx = to ? to.x - f.x : 0, dz = to ? to.z - f.z : 0, d = Math.hypot(dx, dz);
+  const top = WALK_SPEED * (patchAt(s, s.stage.puddles, f) < 0 ? 1 : SYRUP_SLOW);
+  const v = d > EPS ? Math.min(top, f.slick ? d * BUTTER_BRAKE : d / DT) / d : 0;
+  if (!f.slick) { Object.assign(f, { vx: dx * v, vy: 0, vz: dz * v }); return d; }
+  if (dx * f.vx + dz * f.vz < 0) f.passed = true;
+  Object.assign(f, { vx: f.vx + (dx * v - f.vx) * BUTTER_GRIP, vy: 0, vz: f.vz + (dz * v - f.vz) * BUTTER_GRIP });
+  const over = f.passed ? (Math.hypot(f.vx, f.vz) * DT) / Math.max(d, EPS) : 0;
+  if (over > 1) Object.assign(f, { vx: f.vx / over, vz: f.vz / over });
+  return d;
+}
 
 function walkStep(s, f) {
   const paused = f.stun > 0 || (f.attack && !MOVES[f.attack.id].walks);
-  const to = paused ? null : f.walkTo;
-  const dx = to ? to.x - f.x : 0, dz = to ? to.z - f.z : 0, d = Math.hypot(dx, dz);
-  const v = d > EPS ? Math.min(WALK_SPEED * (inSyrup(s, f) ? SYRUP_SLOW : 1), d / DT) / d : 0, x0 = f.x, z0 = f.z;
-  Object.assign(f, { vx: dx * v, vy: 0, vz: dz * v });
+  const to = paused ? null : f.walkTo, x0 = f.x, z0 = f.z, was = patchAt(s, s.stage.springs, f);
+  const d = walkVelocity(s, f, to);
   slide(s, f, f.vx * DT, f.vz * DT);
   stuckCheck(f, to && !f.attack && d > ARRIVE ? Math.hypot(f.x - x0, f.z - z0) : null);
   const top = supportAt(s.solids, f.x, f.z, f.y);
-  if (top < f.y - STEP) { f.onGround = false; f.airTo = f.walkTo; } else f.y = top;
+  if (top < f.y - STEP) { f.onGround = false; f.airTo = f.walkTo; return; }
+  f.y = top;
+  const p = patchAt(s, s.stage.springs, f);
+  if (p >= 0 && p !== was) launch(s, f, p);
 }
 
-function land(f, top) {
+/** Landing on a trampoline launches you, unless it's the one that just did, so a bounce settles rather than looping. */
+function land(s, f, top) {
   Object.assign(f, { y: top, vx: 0, vy: 0, vz: 0, onGround: true, jumps: 1, airTo: null });
   if (f.navJump && top < f.navJump.y - STEP) fail(f);
   f.navJump = null;
+  const p = patchAt(s, s.stage.springs, f);
+  if (p >= 0 && p !== f.sprung) launch(s, f, p);
+  else f.sprung = -1;
 }
 
 function airStep(s, f) {
@@ -458,7 +517,7 @@ function airStep(s, f) {
   const prevY = f.y;
   f.y += f.vy * DT;
   const top = f.vy <= 0 ? supportAt(s.solids, f.x, f.z, prevY) : -Infinity;
-  if (top >= f.y) land(f, top);
+  if (top >= f.y) land(s, f, top);
 }
 
 function drop(s, f, d) {
@@ -706,29 +765,29 @@ function shelfStep(s, f) {
 
 // --- input ----------------------------------------------------------------------------------
 
-function tapAbove(f, t) {
+function tapAbove(s, f, t) {
   if (t.y == null || f.stun > 0 || t.y <= f.y + f.h || Math.hypot(t.x - f.x, t.z - f.z) > f.w) return;
-  if (f.onGround) jump(f, { x: f.x, z: f.z });
-  else if (f.jumps > 0) { f.jumps--; f.vy = JUMP_SPEED; }
+  if (f.onGround) jump(s, f, { x: f.x, z: f.z });
+  else if (f.jumps > 0) { f.jumps--; f.vy = s.jump.speed; }
 }
 
-function aim(f, t) {
-  Object.assign(f, { target: 'stop' in t ? null : { ...t }, nav: null, fails: 0, shelfDone: false, stuck: 0 });
-  if ('x' in t) tapAbove(f, t);
+function aim(s, f, t) {
+  Object.assign(f, { target: 'stop' in t ? null : { ...t }, nav: null, fails: 0, shelfDone: false, stuck: 0, passed: false });
+  if ('x' in t) tapAbove(s, f, t);
 }
 
 const busy = (f) => Boolean(f.attack || f.stun > 0 || f.freeze > 0 || f.pending);
 
-function setAway(f, away) {
+function setAway(s, f, away) {
   if (away == null || away === f.away) return;
   f.away = away;
-  if (away) aim(f, { stop: true });
+  if (away) aim(s, f, { stop: true });
 }
 
 function applyInput(s, f, input) {
-  setAway(f, input?.away);
+  setAway(s, f, input?.away);
   if (f.away) return;
-  if (input?.target) aim(f, input.target);
+  if (input?.target) aim(s, f, input.target);
   if (busy(f) || !(input?.kick || input?.punch)) return;
   let id = 'punch';
   if (input.kick) id = f.onGround ? 'kick' : 'stomp';
@@ -760,7 +819,7 @@ function spawnSpot(s, e, cursor) {
 function newFighter(e, at, y) {
   return { id: e.id, team: e.team, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
     x: at.x, y, z: at.z, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, onGround: true, jumps: 1,
-    target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, fails: 0, stuck: 0, away: false,
+    target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, fails: 0, stuck: 0, away: false, slick: false, passed: false, sprung: -1,
     attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, percent: 0, calm: 0,
     carrying: null, touching: [], shelfDone: false };
 }
@@ -771,9 +830,15 @@ function refresh(s) {
   if (key !== s.brickKey) { s.brickKey = key; s.grids.clear(); }
 }
 
+/** How fast a jump and a trampoline launch take off on this stage, and the rise a route jumps for with each. */
+function jumpsOn(stage) {
+  const speed = JUMP_SPEED * Math.sqrt(stage.bounce ?? 1), spring = speed * Math.sqrt(SPRING_LIFT);
+  return { speed, up: reachUp(speed), spring, springUp: reachUp(spring) };
+}
+
 /** @param {import('./match.js').Entrant[]} entrants @param {import('./match.js').Stage} stage a level's (levels.js) */
 export function createMatch(entrants, stage) {
-  const s = { stage, band: bandOf(stage), floorBoxes: stage.floors.map(floorBox), tick: 0, nextDonut: 0, fighters: [], donuts: [], shelves: [], solids: [], grids: new Map(), brickKey: '',
+  const s = { stage, band: bandOf(stage), jump: jumpsOn(stage), floorBoxes: stage.floors.map(floorBox), tick: 0, nextDonut: 0, fighters: [], donuts: [], shelves: [], solids: [], grids: new Map(), brickKey: '',
     hits: [], fullBag: [], donutEvents: [],
     bricks: stage.bricks.map((b, i) => ({ id: `b${i}`, team: b.team, x: b.x, y: b.y, z: b.z, vy: 0, hits: b.hits,
       maxHits: b.hits, icing: icingOf(entrants, b.team) })) };

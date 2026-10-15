@@ -16,8 +16,21 @@ fun still needs a tablet and a kid.
 
 ## What a generator outputs, and what it must guarantee
 
-Output: a `Stage` (`match.js`), exactly the shape of `LEVELS[n].stage`, plus a theme. Nothing else
-in the sim, the page or the scenery changes; `scenery.js` dresses any floor by its kind.
+Output: a `Stage` (`match.js`), exactly the shape of a hand-made `STAGES[name].stage` in `levels.js`,
+on the stage it was asked for. Nothing else in the sim, the page or the scenery changes; `scenery.js`
+dresses any floor by its kind.
+
+**Generation takes a stage** (2026-10-14, `REUSE-SPEC.md` §Stages and difficulty are separate):
+`generateStage(seed, difficulty, stage)`, with `stage` `breakfast` (the default) or `cake`. The layout
+is drawn the same for both, then dressed with the stage's terrain rules, drawing last so a seed's
+breakfast layout is unchanged:
+
+- **Breakfast** keeps the syrup and adds butter: a mirrored slick in front of each deck and one on
+  the hill top when there is a hill.
+- **Cake** has no syrup: the field syrup becomes a pair of icing trampolines and the moat is left
+  out. Jumps go 1.5× as high (`BOUNCE.cake`), so every raised floor and shelf is 1.5× as high too:
+  heights scale with the jump, which keeps every top exactly as reachable (the reach scales with
+  the jump's height). The tallest generated cake top is the step-up deck, 2.7 high.
 
 | Guarantee | How the proof of concept gets it |
 | --- | --- |
@@ -25,8 +38,8 @@ in the sim, the page or the scenery changes; `scenery.js` dresses any floor by i
 | Shelves stand on a floor | by construction; `checkLevel` |
 | Syrup on open ground, clear of raised floors; no brick inside a raised floor | by construction (pieces live in fixed x slots, below); `checkLevel` |
 | Every shelf reachable | `checkLevel` runs a hero from spawn to the bad guys' shelf in the real sim |
-| The middle third (\|x\| < 3) never holds fort pieces | bricks only at x 4.6; only the hill and field syrup in the middle, as in Level 1 |
-| Fair sides | terrain mirrored in x by construction (tested); the bad guys' pre-placed fort is on their side only, as in Level 1, since the heroes build theirs in the build round |
+| The middle third (\|x\| < 3) never holds fort pieces | bricks only at x 4.6; only the hill, field syrup or trampolines and hill-top butter in the middle, as in the hand-made stages |
+| Fair sides | terrain mirrored in x by construction (tested); the bad guys' pre-placed fort is on their side only, as in the hand-made stages, since the heroes build theirs in the build round |
 | Readable at tablet size (camera ~7 units wide, ~150 px fighters) | every gap a fighter must use is at least 0.8 (about two fighter widths); at most 4 problems per stage; fixed slots so nothing crowds |
 | Same stage on every tablet | a pure function of `(seed, difficulty)` with its own PRNG (mulberry32, integer maths), numbers rounded to 0.1; no `Math.random` |
 
@@ -43,7 +56,7 @@ every seed's stage.
 ## Problem kinds
 
 Each kind is one thing a 4–7 year old has to read and answer. The stage always has the deck-and-shelf
-at each end and the bad guys' wall with gaps (the Level 1 fort); the kinds are layered on top.
+at each end and the bad guys' wall with gaps (the hand-made stages' fort); the kinds are layered on top.
 
 | Kind | What the kid meets | Shape | First met | In the PoC |
 | --- | --- | --- | --- | --- |
@@ -51,16 +64,17 @@ at each end and the bad guys' wall with gaps (the Level 1 fort); the kinds are l
 | Hill | A bump in the middle to jump on or walk round | `hill`, 1.8–2.4 wide, 0.5–0.8 high | Level 1 | yes |
 | Wall with a gap | The bad guys' wall across the band; go round through a gap or smash it | one-high bricks at x 4.6, back and front gaps 0.8–1.4 | Level 1 | always |
 | Tall middle | Two bricks stacked where the wall is thickest, so hopping isn't the answer there | second layer on the middle two bricks | Level 1 | yes |
-| Moat | Syrup in the wall's gaps: wade slow, or smash through | puddle r 0.45 in each gap | Level 1 | yes |
-| Field syrup | A sticky patch in each half of the field | mirrored puddle, r 0.4–0.55, \|x\| 2–2.6 | Level 1 | yes |
-| Choke point | Two pillars in each team's third leave one gap at ground level | `deck` pillars 1.2 high (a hop up, never above `JUMP_UP`: a donut can land on top), gap 1.0–1.4 | Level 3 (proposed) | yes |
+| Moat | Syrup in the wall's gaps: wade slow, or smash through (breakfast only) | puddle r 0.45 in each gap | Level 1 | yes |
+| Field syrup | A sticky patch in each half of the field (on cake, a trampoline) | mirrored puddle, r 0.4–0.55, \|x\| 2–2.6 | Level 1 | yes |
+| Choke point | Two pillars in each team's third leave one gap at ground level | `deck` pillars 1.2 high (a hop up, never above the stage's jump reach: a donut can land on top), gap 1.0–1.4 | Level 3 (proposed) | yes |
 | Step up | The shelf deck is too high to jump to from the ground; a step beside it | deck 1.8 high, step 0.9 | Level 5 (proposed) | yes |
 | Split route | A long low deck in a third: over it or round the front | `deck` 0.6 high along the band | later | no |
 
 **A kind is first met in a hand-made level.** The rule that keeps generated stages fair to a kid:
 a hand-made level introduces each kind on a stage a grown-up designed to teach it, and the generator
-may use a kind only at or after that level. `UNLOCK` in `generate.js` is that table. Levels 1 and 2
-already use every Level 1 kind, so choke points and step ups wait for hand-made Levels 3 and 5.
+may use a kind only at or after that level. `UNLOCK` in `generate.js` is that table. The tutorial and
+the hand-made stages already use every Level 1 kind, so choke points and step ups wait for hand-made
+Levels 3 and 5.
 
 ### Difficulty table
 
@@ -137,8 +151,8 @@ known wart: the training dummy spawns at x −3, right against a choke pillar's 
   kind-to-difficulty table. ESLint and typecheck clean.
 - `spinoff/check-level.mjs`: the checks from `levels.test.mjs`, moved into `checkLevel(stage, at)`
   and `ticksToShelf(stage, team)` so both tests share them. `levels.test.mjs` is now three lines.
-- `spinoff/generate.test.mjs` (in `npm run selfcheck`): 40 seeds × difficulties 1–5 by default,
-  `SEEDS=` for more.
+- `spinoff/generate.test.mjs` (in `npm run selfcheck`): 20 seeds × difficulties 1–5 × both stages by
+  default, `SEEDS=` for more. With 200 seeds each, every stage × difficulty passes 200/200.
 
 | Measure | Result |
 | --- | --- |
@@ -156,8 +170,9 @@ failures. That's the right design for a kids' game, but it means the test is gua
 future edits, not proving the generator clever.
 
 **Try one on the tablet:** `play.html?seed=123&difficulty=2` (hill-less, tall middle and moat) or
-`play.html?seed=8&difficulty=5` (hill, choke points, step up, syrup). `levelFor` in `levels.js` builds
-the stage from the query string in the breakfast theme; without `seed` nothing changes.
+`play.html?seed=8&difficulty=5` (hill, choke points, step up, syrup), and `&stage=cake` for the same
+layout on cake. `levelFor` in `levels.js` builds the stage from the query string, on breakfast unless
+`stage` says otherwise; without `seed` it's the stage's hand-made layout, or the tutorial.
 
 ## Recommendation
 

@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { createControls, floorPoint, floorTop, pickTarget } from './controls.js';
 import { createMatch, snapshot, tick } from './fake-match.js';
 import { ROUND_SECONDS, TICK_HZ } from './match.js';
-import { LEVELS } from './levels.js';
+import { TUTORIAL } from './levels.js';
 
-const { stage: STAGE } = LEVELS[1];
+const { stage: STAGE } = TUTORIAL;
 
 const look = (frosting) => ({ dough: '#e8c48e', frosting, stripe: false });
 const fighter = (id, team, x, z) => ({

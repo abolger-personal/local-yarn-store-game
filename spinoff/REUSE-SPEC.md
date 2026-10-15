@@ -82,7 +82,11 @@ reused: `inventory/grid.js` for the lobby floor, team shelves and forts, and
   sped up its head tilts and read as puzzled (playtest 2026-10-14). **Keep it** (playtest 2026-10-14:
   "incredibly satisfying and cartoon-like. It looks like a spring"); springy whole-body motion is
   the house style for showing a fighter's state. Movement reads at any size
-  where fur detail wouldn't. A ring-out resets percent, so the wobble stops. Damage pops sprinkles (`sparkle.js` recoloured). A ring-out
+  where fur detail wouldn't. A ring-out resets percent, so the wobble stops.
+  **Percent steadies** (decided 2026-10-14): a fighter nobody has hit for 1.5 s drains 30% a
+  second (`CALM_TICKS`, `CALM_DRAIN` in `sim.js`), so a full wobble is gone about 4 s after the
+  last hit. It drains in the sim, so the wobble and the real launch stay in step: wobbly always
+  means easy to launch. Keep hitting to build it. Damage pops sprinkles (`sparkle.js` recoloured). A ring-out
   costs donuts, never playing time (see Scoring).
 - **Kicking is required** (the kids' own ask, 2026-10-13). Punch and kick are the two core
   attacks, each with its own button, so a 4-year-old never needs a combo to kick.

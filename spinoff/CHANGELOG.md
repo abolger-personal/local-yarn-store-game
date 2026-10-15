@@ -28,7 +28,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - Falling off a waffle stack, you keep facing the way you walked off instead of spinning round. There's one in each gap around the bad guys' wall: wade
   through, or smash the wall instead.
 - The more hits a fighter takes, the more it wobbles, and the further your next hit sends it.
-  Knock a really wobbly one off the stage to spill its donut.
+  Knock a really wobbly one off the stage to spill its donut. Leave it alone for a few seconds
+  and it steadies again.
 - Tap where you want to go, 🥊 to punch and 🦶 to kick. Hits land with a BAM, a little freeze and
   a wobble; knock down the bad guys' wall of pancake stacks, stuck together with purple whipped
   cream (they burst into sprinkles), or find the gap in it.

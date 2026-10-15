@@ -38,6 +38,9 @@ export const RESPAWN_Y = 3;
 const RESPAWN_DZ = 0.6;
 export const INVINCIBLE_TICKS = 2 * TICK_HZ;
 export const LAUNCH_SPEED = 5;
+/** Untouched this long, a fighter steadies: percent (and its wobble) drains at CALM_DRAIN a second. */
+export const CALM_TICKS = 1.5 * TICK_HZ;
+export const CALM_DRAIN = 30;
 export const STUN_TICKS = 8;
 export const STUN_PER_SPEED = 2;
 export const POP = Object.freeze({ vx: 1.5, vy: 6 });
@@ -469,7 +472,7 @@ function ringOut(s, f) {
   drop(s, f, { x, y: supportAt(s.solids, x, z, Infinity), z, vx: 0, vy: 0, vz: 0 });
   const sh = shelfOf(s, f.team);
   Object.assign(f, { x: sh.x, y: sh.y + RESPAWN_Y, z: sh.z + RESPAWN_DZ, vx: 0, vy: 0, vz: 0, onGround: false,
-    jumps: 1, airTo: null, attack: null, stun: 0, pending: null, freeze: 0, percent: 0, inv: INVINCIBLE_TICKS,
+    jumps: 1, airTo: null, attack: null, stun: 0, pending: null, freeze: 0, percent: 0, calm: 0, inv: INVINCIBLE_TICKS,
     nav: null, navJump: null, stuck: 0 });
 }
 
@@ -571,6 +574,7 @@ function strike(s, f, o, p) {
   const m = MOVES[f.attack.id], u = ahead(f), broke = Boolean(o.carrying);
   drop(s, o, { x: o.x, y: o.y + o.h, z: o.z, vx: u.x * POP.vx, vy: POP.vy, vz: u.z * POP.vx });
   o.percent += m.damage;
+  o.calm = 0;
   const speed = m.kb.base + m.kb.growth * o.percent, a = (m.kb.angle * Math.PI) / 180, along = Math.cos(a) * speed;
   const up = o.onGround ? Math.abs(Math.sin(a) * speed) : Math.sin(a) * speed;
   o.pending = { vx: u.x * along, vy: up, vz: u.z * along, stun: Math.round(STUN_TICKS + STUN_PER_SPEED * speed) };
@@ -755,7 +759,7 @@ function newFighter(e, at) {
   return { id: e.id, team: e.team, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
     x: at.x, y: GROUND.y, z: at.z, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, onGround: true, jumps: 1,
     target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, fails: 0, stuck: 0, away: false,
-    attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, percent: 0,
+    attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, percent: 0, calm: 0,
     carrying: null, touching: [], shelfDone: false };
 }
 
@@ -802,6 +806,7 @@ export function tick(s, inputs) {
     if (f.still) continue;
     f.stun = Math.max(0, f.stun - 1);
     f.inv = Math.max(0, f.inv - 1);
+    if (++f.calm > CALM_TICKS) f.percent = Math.max(0, f.percent - CALM_DRAIN / TICK_HZ);
   }
   s.tick++;
 }

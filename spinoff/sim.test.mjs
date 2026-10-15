@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, ROUND_SECONDS, STAGE, TICK_HZ, outside } from './match.js';
-import { DUMMY, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
+import { CALM_DRAIN, CALM_TICKS, DUMMY, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
 
 const LOOK = { dough: '#e8c48a', frosting: '#14c4e0', stripe: false };
 const BAD = { dough: '#2a1a14', frosting: '#7a2bbf', stripe: true };
@@ -391,6 +391,18 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
   assert.notEqual(me(snap).move, 'sit', 'coming back stands up');
   snap = run(m, 200, tap(-3, 1));
   assert.ok(near(me(snap).x, -3) && near(me(snap).z, 1), 'and plays on');
+}
+
+{
+  const m = createMatch([hero, dummy]);
+  run(m, 300, once({ target: { thing: 'fighter', id: 'dummy' } }));
+  let snap = run(m, 200, (_, i) => say({ punch: i % 30 === 0 }));
+  const hit = me(snap, 'dummy').percent;
+  assert.ok(hit > 20, `the dummy has taken hits (${hit}%)`);
+  snap = run(m, CALM_TICKS - 30);
+  assert.equal(me(snap, 'dummy').percent, hit, 'a short pause keeps the damage');
+  snap = run(m, Math.ceil((hit / CALM_DRAIN) * TICK_HZ) + 40);
+  assert.equal(me(snap, 'dummy').percent, 0, 'left alone for a few seconds, it steadies right down');
 }
 
 console.log('sim ok');

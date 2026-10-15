@@ -1,6 +1,6 @@
-import { joinRoom, selfId } from 'trystero';
+import { getRelaySockets, joinRoom, selfId } from 'trystero';
 import { readFighter } from './fighter.js';
-import { isHomeRoute, remoteOf, roomName } from './roster.js';
+import { isHomeRoute, netProblem, remoteOf, roomName, routeNote } from './roster.js';
 
 export const APP_ID = 'lys-donut-fighters';
 export { selfId };
@@ -11,8 +11,30 @@ const roomConfig = (code) => ({
   appId: APP_ID, password: roomName(code), rtcConfig: { iceServers: [] }, maxReceiveBytes: 64 * 1024,
 });
 
+/** What `?debug=1` shows about why tablets do or don't meet. */
+const seen = { peers: 0, homes: 0, notes: [] };
+
+/** Puts a status line on the page that refreshes every second (lobby.html?debug=1). */
+export function showDebug() {
+  const line = document.body.appendChild(document.createElement('pre'));
+  line.className = 'debug';
+  addEventListener('unhandledrejection', (e) => { seen.notes.push(String(e.reason)); });
+  setInterval(() => {
+    const relays = Object.values(getRelaySockets()).filter((s) => s.readyState === WebSocket.OPEN).length;
+    const s = { ...seen, subtle: Boolean(globalThis.crypto?.subtle), relays };
+    line.textContent = [`secure ${isSecureContext} subtle ${s.subtle} relays ${relays} peers ${s.peers} home ${s.homes}`,
+      ...seen.notes.slice(-8), netProblem(s)].join('\n');
+  }, 1000);
+}
+
 /** @param {RTCPeerConnection|undefined} pc */
-const onHomeNetwork = async (pc) => Boolean(pc) && isHomeRoute(remoteOf(await pc.getStats()));
+async function onHomeNetwork(pc) {
+  const remote = pc && remoteOf(await pc.getStats());
+  seen.peers++;
+  seen.notes.push(routeNote(remote));
+  if (isHomeRoute(remote)) seen.homes++;
+  return isHomeRoute(remote);
+}
 
 // Nothing is sent to a tablet, or accepted from it, until its route is checked; a fighter that
 // arrives first is held until then.
@@ -65,7 +87,7 @@ function linkOf(room, home) {
  * @param {string} [place] '-play' for a match's room, apart from the lobby's
  */
 export function openRoom(code, mine, { onFighter, onLeave }, place = '') {
-  const room = joinRoom(roomConfig(code), roomName(code) + place);
+  const room = joinRoom(roomConfig(code), roomName(code) + place, { onJoinError: (e) => { seen.notes.push(e.error); } });
   const peers = homeOnly(room.makeAction('fighter'), mine, onFighter);
   room.onPeerJoin = async (peerId) => {
     const pc = room.getPeers()[peerId];

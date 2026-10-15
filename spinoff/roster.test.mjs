@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {
-  MATCH, MAX_FIGHTERS, ROOM_TREATS, canHit, floorGrid, isCode, isHomeAddress, isHomeRoute, randomCode, remoteOf, roomName,
+  MATCH, MAX_FIGHTERS, ROOM_TREATS, canHit, floorGrid, isCode, isHomeAddress, isHomeRoute, netProblem, randomCode, remoteOf, roomName, routeNote,
   standingSpots,
 } from './roster.js';
 
@@ -57,6 +57,18 @@ import {
   assert.ok(!isHomeRoute(remoteOf(stats({ address: '2600:1700::5', candidateType: 'prflx' }))), 'a public IPv6 tablet is hung up on');
   assert.ok(!isHomeRoute(remoteOf(stats({ address: '81.2.69.160', candidateType: 'srflx' }))), 'a tablet across the internet is hung up on');
   assert.ok(!isHomeRoute(remoteOf(new Map())), 'no route yet is not a home route');
+}
+
+{
+  const fine = { subtle: true, relays: 3, peers: 2, homes: 1 };
+  assert.equal(netProblem(fine), 'ok');
+  assert.match(netProblem({ ...fine, subtle: false, relays: 0 }), /https/, 'plain http over the LAN is named first');
+  assert.match(netProblem({ ...fine, relays: 0 }), /relay/);
+  assert.match(netProblem({ ...fine, peers: 0, homes: 0 }), /no other tablet/);
+  assert.match(netProblem({ ...fine, homes: 0 }), /hung up/);
+  assert.equal(routeNote({ candidateType: 'host', address: 'ab12.local' }), 'host ab12.local home');
+  assert.equal(routeNote({ candidateType: 'prflx', address: '' }), 'prflx hidden hung up', 'a hidden peer-reflexive route is hung up on');
+  assert.equal(routeNote(undefined), 'no route hidden hung up');
 }
 
 console.log('roster ok');

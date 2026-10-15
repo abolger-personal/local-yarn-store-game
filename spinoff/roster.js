@@ -36,6 +36,18 @@ export function isHomeRoute(remote) {
   return isHomeAddress(address) || (!address && remote.candidateType === 'host');
 }
 
+/** One `?debug=1` line per tablet met: the route and what the home check made of it. */
+export const routeNote = (remote) =>
+  `${remote?.candidateType ?? 'no route'} ${remote?.address || remote?.ip || 'hidden'} ${isHomeRoute(remote) ? 'home' : 'hung up'}`;
+
+/** The first thing keeping tablets apart, for `?debug=1`. */
+export function netProblem({ subtle, relays, peers, homes }) {
+  if (!subtle) return 'no crypto.subtle: tablets only meet on https (or localhost)';
+  if (!relays) return 'no relay reached';
+  if (!peers) return 'no other tablet yet';
+  return homes ? 'ok' : 'every tablet hung up on by the home check';
+}
+
 // REUSE-SPEC.md §Mode: kids can't hit each other for now, but it is a match setting, not a rule baked in
 export const MATCH = Object.freeze({ friendlyFire: false });
 export const canHit = (a, b, match = MATCH) => a.id !== b.id && (a.team !== b.team || match.friendlyFire);

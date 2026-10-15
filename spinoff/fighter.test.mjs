@@ -5,7 +5,7 @@ import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import {
   BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, buildFighter, disposeFighter, gloveAnchors, isBadGuyCloth, isBadGuyFur,
-  newFighter, randomFighter, readFighter, seatDrop, setFur, stepFighter,
+  newFighter, randomFighter, readFighter, seatDrop, setFur, wobbleAt,
 } from './fighter.js';
 import { wingShape } from '../characters/owl.js';
 import { floorGrid } from './roster.js';
@@ -170,17 +170,20 @@ for (const species of SPECIES) {
 }
 
 {
-  const sway = (percent) => {
-    const built = buildFighter(newFighter('lion'));
-    let lo = Infinity, hi = -Infinity;
-    for (let i = 0; i < 720; i++) {
-      const { spineRoll } = stepFighter(built, 1 / 60, POSES.rest, 0, percent);
-      if (i > 120) [lo, hi] = [Math.min(lo, spineRoll), Math.max(hi, spineRoll)];
+  const wobble = (percent) => {
+    let peak = 0, swings = 0, was = 0;
+    for (let i = 0; i < 120; i++) {
+      const { z } = wobbleAt(percent, i / 120);
+      peak = Math.max(peak, Math.abs(z));
+      if (z * was < 0) swings++;
+      was = z;
     }
-    disposeFighter(built);
-    return hi - lo;
+    return { peak, swings };
   };
-  assert.ok(sway(80) > 3 * sway(0), `a fighter who has taken hits wobbles much more (${sway(0)} -> ${sway(80)})`);
+  assert.deepEqual(wobbleAt(0, 0.3), { x: 0, z: 0 }, 'an unhit fighter stands still');
+  const some = wobble(15), lots = wobble(80);
+  assert.ok(some.peak > 0.12, `a few hits already show (${some.peak} rad)`);
+  assert.ok(lots.peak > 0.35 && lots.swings >= 8, `a ready-to-fly fighter wobbles hard and fast (${lots.peak} rad, ${lots.swings} swings a second)`);
 }
 
 console.log('fighter ok');

@@ -219,23 +219,24 @@ const IDLE = Object.freeze({ ...MOTION_DEFAULTS });
 export const animateFighter = (built, dt, pose = 'rest') => stepMotion(built, POSES[pose], dt, IDLE);
 
 /** Rest pose plus the walk layer at `speed`, the way characters/dress-up.js walks. */
-// REUSE-SPEC.md §Scoring: the hits a fighter has taken show as a bigger, faster idle wobble, full by the
-// percent a kick starts ringing it out (measured: ~60% for punches, ~96% for kicks), and no health bar.
-const WOBBLE = { full: 80, amp: 4, rate: 2.5 };
-/** The idle motion options for a fighter at `percent`. */
-export function wobbleFor(percent) {
+// REUSE-SPEC.md §What the fighter needs: hits taken show as a fast wobble on the feet, growing to full by
+// the percent a hit starts ringing a fighter out (measured: ~60% for punches, ~96% for kicks). No health bar.
+const WOBBLE = { full: 80, tilt: 0.38, hz: [2, 4.5] };
+/** A fighter's tilt in radians about world x (toward the camera) and z (sideways), `t` seconds in. */
+export function wobbleAt(percent, t, seed = 0) {
   const k = Math.min(1, Math.max(0, percent) / WOBBLE.full);
-  if (k === 0) return IDLE;
-  return { ...IDLE, idleAmp: IDLE.idleAmp * (1 + (WOBBLE.amp - 1) * k), idleRate: IDLE.idleRate * (1 + (WOBBLE.rate - 1) * k) };
+  if (k === 0) return { x: 0, z: 0 };
+  const a = WOBBLE.tilt * Math.sqrt(k), w = 2 * Math.PI * (WOBBLE.hz[0] + (WOBBLE.hz[1] - WOBBLE.hz[0]) * k) * t + seed;
+  return { x: 0.5 * a * Math.cos(w * 0.9), z: a * Math.sin(w) };
 }
 
-export function stepFighter(built, dt, pose, speed, percent = 0) {
-  const opts = wobbleFor(percent), L = built.params.legHeight + built.params.hipInset;
+export function stepFighter(built, dt, pose, speed) {
+  const L = built.params.legHeight + built.params.hipInset;
   const at = built.walkAt ?? 0;
-  const w = walkPhase(at, speed, L, opts);
-  const gain = walkGain(built.motion, speed, dt, opts);
-  built.walkAt = (at + phaseStep(speed * dt, speed, L, opts)) % 1;
-  return stepMotion(built, pose, dt, opts, gain > 0 ? (out) => walkLayer(out, w, gain, opts) : null);
+  const w = walkPhase(at, speed, L, IDLE);
+  const gain = walkGain(built.motion, speed, dt, IDLE);
+  built.walkAt = (at + phaseStep(speed * dt, speed, L, IDLE)) % 1;
+  return stepMotion(built, pose, dt, IDLE, gain > 0 ? (out) => walkLayer(out, w, gain, IDLE) : null);
 }
 
 const posed = (p) => Object.freeze({ ...POSES.rest, ...p });

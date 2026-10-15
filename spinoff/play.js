@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { POSES, setGeometryDetail } from '../characters/npc.js';
 import { attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
-import { MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter } from './fighter.js';
+import { MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter, wobbleAt } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
 import { BRICK, STAGE, TICK_HZ } from './match.js';
 import { makeStage } from './stage.js';
@@ -109,7 +109,8 @@ function poseOf(m, f) {
 function placeFighter(m, f, dt) {
   const { squash: s, no } = m.t;
   m.yaw += turn(Math.PI / 2 - f.facing - m.yaw) * Math.min(1, dt * 14);
-  m.g.rotation.y = m.yaw + Math.sin(no * 26) * 0.3 * no;
+  const tilt = wobbleAt(f.percent, now, m.seed);
+  m.g.rotation.set(tilt.x, m.yaw + Math.sin(no * 26) * 0.3 * no, tilt.z, 'ZXY');
   m.down += ((f.move === 'sit' ? 1 : 0) - m.down) * Math.min(1, dt * 6);
   m.g.position.set(f.x + m.recoil.x * s, f.y - m.seat * m.down, f.z + m.recoil.z * s);
   m.g.scale.set(1 + 0.2 * s, 1 - 0.28 * s, 1 + 0.2 * s);
@@ -138,7 +139,7 @@ function placeCarried(m) {
 function drawFighter(m, f, dt) {
   tickDown(m.t, FIGHTER_TIMERS, dt);
   placeFighter(m, f, dt);
-  stepFighter(m.built, dt, poseOf(m, f), f.onGround && f.move !== 'blocked' ? Math.hypot(f.vx, f.vz) : 0, f.percent);
+  stepFighter(m.built, dt, poseOf(m, f), f.onGround && f.move !== 'blocked' ? Math.hypot(f.vx, f.vz) : 0);
   carry(m, f.carrying);
   if (m.carried) placeCarried(m);
   placeShadow(m.shadow, f.x, f.y, f.z, 0.42);
@@ -305,7 +306,7 @@ function cast() {
     g.add(built.root);
     scene.add(g);
     const t = Object.fromEntries(FIGHTER_TIMERS.map((k) => [k, 0]));
-    fighters.set(id, { g, built, team, t, yaw: 0, recoil: new THREE.Vector3(), pose: {}, seat: seatDrop(built), down: 0, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
+    fighters.set(id, { g, built, team, t, yaw: 0, recoil: new THREE.Vector3(), pose: {}, seat: seatDrop(built), down: 0, seed: fighters.size * 2.1, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
     endPicture(entrant);
     return entrant;
   });

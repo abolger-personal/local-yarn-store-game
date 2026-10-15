@@ -75,10 +75,12 @@ reused: `inventory/grid.js` for the lobby floor, team shelves and forts, and
 - **Percent and knockback:** hits raise a fighter's percent; knockback grows with it; leaving
   the stage bounds is a ring-out. **No health bar** (decided 2026-10-14): nobody is ever knocked
   out, so a bar running down would promise an ending that never comes. Percent shows as
-  **wobble** instead: the idle weight-shift sway grows from ~10° to ~39° and speeds up 2.5× by
-  80% (`wobbleFor` in `fighter.js`), about where a kick starts ringing a fighter out (measured:
-  punches ~60%, kicks ~96%). Movement reads at any size where fur detail wouldn't. A ring-out
-  resets percent, so the wobble stops. Damage pops sprinkles (`sparkle.js` recoloured). A ring-out
+  **wobble** instead: the whole fighter rocks on its feet like a Weeble, growing to ~22° each way
+  at 4.5 times a second by 80% (`wobbleAt` in `fighter.js`), about where a hit starts ringing a
+  fighter out (measured: punches ~60%, kicks ~96%); a few hits already rock it ~7°. It tilts the
+  whole body, so it shows while walking too. Not the idle layer: scaling that up (tried first)
+  sped up its head tilts and read as puzzled (playtest 2026-10-14). Movement reads at any size
+  where fur detail wouldn't. A ring-out resets percent, so the wobble stops. Damage pops sprinkles (`sparkle.js` recoloured). A ring-out
   costs donuts, never playing time (see Scoring).
 - **Kicking is required** (the kids' own ask, 2026-10-13). Punch and kick are the two core
   attacks, each with its own button, so a 4-year-old never needs a combo to kick.

@@ -612,6 +612,11 @@ donut arcs from where it lay (or off the shelf) into the bag, growing to carried
 third of a second (`placeCarried` in `play.js`). Good things show the thing travelling to you;
 never stars round a head, which reads as dazed (a hit).
 
+**Banking bursts sprinkles off the shelf, keep it** (playtest 2026-10-14). Banking a donut at
+home throws 30 sprinkle bits in the riot colours up from the shelf (`fx.burst` with
+`confettiMats` in `play.js` `onDonut`) and bounces the team's HUD count. It matches the house
+sprinkles, so celebrations reuse it.
+
 Keep `felted` (the shop look, free), or try `toon` / `matcap` shading from
 `inventory/yarn-look.js` `SHADING` for a punchier arcade read. `setViewMode(root, 'silhouette')`
 gives a "who's that?" character-select reveal. Stages from the bakery: a giant cake, a stack of

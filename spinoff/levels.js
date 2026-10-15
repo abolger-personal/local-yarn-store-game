@@ -1,6 +1,7 @@
 // Every level: a stage layout and the treat theme that dresses it (REUSE-SPEC.md §Forts). Pure data, checked by levels.test.mjs.
 // Bad guys, the fort pile and moves per level are formulas of the level number (§Bad guys, §Forts, §Power moves), not data here.
 import { BRICK } from './match.js';
+import { generateStage } from './generate.js';
 
 /** @typedef {import('./match.js').Stage} Stage @typedef {import('./match.js').Floor} Floor @typedef {{ theme: 'breakfast'|'cake', stage: Stage }} Level */
 
@@ -38,5 +39,9 @@ export const LEVELS = Object.freeze({
   2: { theme: 'cake', stage: Object.freeze({ ...TABLE, puddles: Object.freeze([]) }) },
 });
 
-/** `?level=N` for a level that exists, else Level 1. */
-export const levelFor = (search) => LEVELS[Number(new URLSearchParams(search).get('level'))] ?? LEVELS[1];
+/** `?seed=S&difficulty=D` for a generated stage (GENERATED-LEVELS.md), else `?level=N` for a level that exists, else Level 1. @returns {Level} */
+export function levelFor(search) {
+  const q = new URLSearchParams(search);
+  if (q.has('seed')) return { theme: 'breakfast', stage: generateStage(Number(q.get('seed')), Number(q.get('difficulty')) || 1) };
+  return LEVELS[Number(q.get('level'))] ?? LEVELS[1];
+}

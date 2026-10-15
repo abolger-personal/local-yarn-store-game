@@ -219,13 +219,23 @@ const IDLE = Object.freeze({ ...MOTION_DEFAULTS });
 export const animateFighter = (built, dt, pose = 'rest') => stepMotion(built, POSES[pose], dt, IDLE);
 
 /** Rest pose plus the walk layer at `speed`, the way characters/dress-up.js walks. */
-export function stepFighter(built, dt, pose, speed) {
-  const L = built.params.legHeight + built.params.hipInset;
+// REUSE-SPEC.md §Scoring: the hits a fighter has taken show as a bigger, faster idle wobble, full by the
+// percent a kick starts ringing it out (measured: ~60% for punches, ~96% for kicks), and no health bar.
+const WOBBLE = { full: 80, amp: 4, rate: 2.5 };
+/** The idle motion options for a fighter at `percent`. */
+export function wobbleFor(percent) {
+  const k = Math.min(1, Math.max(0, percent) / WOBBLE.full);
+  if (k === 0) return IDLE;
+  return { ...IDLE, idleAmp: IDLE.idleAmp * (1 + (WOBBLE.amp - 1) * k), idleRate: IDLE.idleRate * (1 + (WOBBLE.rate - 1) * k) };
+}
+
+export function stepFighter(built, dt, pose, speed, percent = 0) {
+  const opts = wobbleFor(percent), L = built.params.legHeight + built.params.hipInset;
   const at = built.walkAt ?? 0;
-  const w = walkPhase(at, speed, L, IDLE);
-  const gain = walkGain(built.motion, speed, dt, IDLE);
-  built.walkAt = (at + phaseStep(speed * dt, speed, L, IDLE)) % 1;
-  return stepMotion(built, pose, dt, IDLE, gain > 0 ? (out) => walkLayer(out, w, gain, IDLE) : null);
+  const w = walkPhase(at, speed, L, opts);
+  const gain = walkGain(built.motion, speed, dt, opts);
+  built.walkAt = (at + phaseStep(speed * dt, speed, L, opts)) % 1;
+  return stepMotion(built, pose, dt, opts, gain > 0 ? (out) => walkLayer(out, w, gain, opts) : null);
 }
 
 const posed = (p) => Object.freeze({ ...POSES.rest, ...p });

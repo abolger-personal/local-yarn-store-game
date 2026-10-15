@@ -138,7 +138,7 @@ function placeCarried(m) {
 function drawFighter(m, f, dt) {
   tickDown(m.t, FIGHTER_TIMERS, dt);
   placeFighter(m, f, dt);
-  stepFighter(m.built, dt, poseOf(m, f), f.onGround && f.move !== 'blocked' ? Math.hypot(f.vx, f.vz) : 0);
+  stepFighter(m.built, dt, poseOf(m, f), f.onGround && f.move !== 'blocked' ? Math.hypot(f.vx, f.vz) : 0, f.percent);
   carry(m, f.carrying);
   if (m.carried) placeCarried(m);
   placeShadow(m.shadow, f.x, f.y, f.z, 0.42);

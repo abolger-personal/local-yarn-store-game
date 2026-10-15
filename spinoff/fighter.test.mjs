@@ -5,7 +5,7 @@ import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import {
   BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, buildFighter, disposeFighter, gloveAnchors, isBadGuyCloth, isBadGuyFur,
-  newFighter, randomFighter, readFighter, seatDrop, setFur,
+  newFighter, randomFighter, readFighter, seatDrop, setFur, stepFighter,
 } from './fighter.js';
 import { wingShape } from '../characters/owl.js';
 import { floorGrid } from './roster.js';
@@ -167,6 +167,20 @@ for (const species of SPECIES) {
   assert.ok(drop > 0.05 && drop < built.params.legHeight + built.params.hipInset + 0.05,
     `${species} sits down by part of its leg length, not through the floor or not at all (${drop})`);
   disposeFighter(built);
+}
+
+{
+  const sway = (percent) => {
+    const built = buildFighter(newFighter('lion'));
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < 720; i++) {
+      const { spineRoll } = stepFighter(built, 1 / 60, POSES.rest, 0, percent);
+      if (i > 120) [lo, hi] = [Math.min(lo, spineRoll), Math.max(hi, spineRoll)];
+    }
+    disposeFighter(built);
+    return hi - lo;
+  };
+  assert.ok(sway(80) > 3 * sway(0), `a fighter who has taken hits wobbles much more (${sway(0)} -> ${sway(80)})`);
 }
 
 console.log('fighter ok');

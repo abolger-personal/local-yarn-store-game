@@ -943,9 +943,13 @@ scary, for 4–6 year olds.
   - **Tally milestones unlock themed special items** (idea, 2026-10-14). Each stamp's count is a
     ladder: finishing a level enough times unlocks an item themed on that level, e.g. the pancake
     level's 100th finish gives a **magic spatula**. Items belong to the player like the card (they
-    survive re-rolling the fighter). The card is the one record, so items need no save of their
-    own: what you have is worked out from the counts. Open: the milestone steps (say 5, 10, 25, 50,
-    100), and whether items are looks (held props, hats) or play (a move, a power), or both.
+    survive re-rolling the fighter) and **go with them to every level** (decided 2026-10-14): the
+    spatula earned on pancakes works on the cake stage too. The theme only says where an item is
+    earned, not where it can be used. The card is the one record, so items need no save of their
+    own: what you have is worked out from the counts. Items are used in play (you *use* the
+    spatula), so a kid with a big card arrives stronger; the per-player `help` (Handicap) is what
+    evens a family game out, and may need to count items. Open: the milestone steps (say 5, 10,
+    25, 50, 100), and whether an item also shows on the fighter.
   - Open (2026-10-14): whether stamps open levels (a stamp on N opens N+1) or every level can be
     picked from the start; whether unlocked moves and fort pieces follow the chosen level or the
     card; whether winning should show on the stamp too; whether grownup bad-guy players have

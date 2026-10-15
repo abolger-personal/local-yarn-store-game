@@ -1,10 +1,9 @@
 import * as THREE from 'three';
 import { POSES, setGeometryDetail } from '../characters/npc.js';
-import { playSparkle, stepSparkle } from '../characters/sparkle.js';
 import { attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
 import { MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, setFur, stepFighter } from './fighter.js';
-import { confettiMats, createFx, makeShadow, placeShadow, riotSparkleOn } from './fx.js';
+import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
 import { BRICK, STAGE, TICK_HZ } from './match.js';
 import { makeStage } from './stage.js';
 import { themeFor } from './scenery.js';
@@ -20,7 +19,7 @@ setGeometryDetail('med');
 
 const ME = 'me', DUMMY = 'dummy';
 const SHELF = { cols: 6, gap: 0.3, row: 0.32, rows: 4, r: 0.13, depth: 0.26 };
-const LOOSE_R = 0.2, FACE_CAMERA = -0.5;
+const LOOSE_R = 0.2, FACE_CAMERA = -0.5, FLY_ARC = 0.6, GRAB_FROM_Y = 0.4;
 const CAMERA = { pitch: THREE.MathUtils.degToRad(35), viewW: 7, viewH: 4.8, xMax: 6 };
 const BACK = new THREE.Vector3(0, Math.sin(CAMERA.pitch), Math.cos(CAMERA.pitch));
 const TIMERS = { squash: 0.22, no: 0.6, joy: 0.9, pop: 0.35, pulse: 0.45, wobble: 0.35, hop: 0.4 };
@@ -94,7 +93,6 @@ function tickDown(t, keys, dt) {
 }
 
 const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a));
-const backOut = (p) => 1 + 2.70158 * (p - 1) ** 3 + 1.70158 * (p - 1) ** 2;
 
 function poseOf(m, f) {
   if (m.t.joy > 0) return POSES.delighted;
@@ -123,14 +121,15 @@ function carry(m, look) {
   if (m.carried) scene.add(m.carried);
 }
 
-/** REUSE-SPEC.md §Mode: oversized, out of the bag over the shoulder, facing the camera. */
+/** REUSE-SPEC.md §Mode: oversized, out of the bag over the shoulder, facing the camera; a grabbed one flies there in an arc, growing. */
 function placeCarried(m) {
-  const P = m.built.params, { pop, pulse } = m.t;
+  const P = m.built.params, { pop, pulse } = m.t, k = 1 - pop * pop;
   m.g.updateMatrixWorld(true);
   m.built.chest.localToWorld(_v.set(0, P.torsoH * 1.1, -(P.torsoD + m.carryR)));
-  m.carried.position.set(_v.x, _v.y + 0.4 * pop, _v.z);
+  m.carried.position.copy(pop > 0 ? _goal.copy(m.from).lerp(_v, k) : _v);
+  m.carried.position.y += FLY_ARC * Math.sin(Math.PI * k);
   m.carried.quaternion.copy(camera.quaternion);
-  m.carried.scale.setScalar(m.carryR * (1 + 0.8 * Math.sin(Math.PI * pulse)) * backOut(1 - pop));
+  m.carried.scale.setScalar(THREE.MathUtils.lerp(LOOSE_R, m.carryR, k) * (1 + 0.8 * Math.sin(Math.PI * pulse)));
 }
 
 /** @param {FighterState} f */
@@ -141,7 +140,6 @@ function drawFighter(m, f, dt) {
   carry(m, f.carrying);
   if (m.carried) placeCarried(m);
   placeShadow(m.shadow, f.x, f.y, f.z, 0.42);
-  if (m.sparkle) stepSparkle(m.sparkle, dt);
 }
 
 function newLoose(d) {
@@ -262,11 +260,10 @@ function bounce(team) {
 /** @param {DonutEvent} e */
 function onDonut(e) {
   const m = fighters.get(e.fighter);
-  if (e.kind === 'steal') fx.sparkle(e.x, e.y + 0.7, e.z, 4);
   if (e.kind === 'bank') fx.burst({ x: e.x, y: e.y + 1.6, z: e.z }, confettiMats, 30, 2.4);
   if (e.kind === 'bank') bounce(m?.team);
   if (!m) return;
-  if (e.kind === 'pickup') playSparkle((m.sparkle ??= riotSparkleOn(m.built)));
+  if (e.kind !== 'bank') m.from = new THREE.Vector3(e.x, e.y + GRAB_FROM_Y, e.z);
   Object.assign(m.t, { pop: e.kind === 'bank' ? 0 : 1, joy: e.kind === 'pickup' ? m.t.joy : 1 });
 }
 

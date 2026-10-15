@@ -1,6 +1,5 @@
-// Contact you can feel (REUSE-SPEC.md §Milestones 1): BAM bursts, icing chunks and confetti, sparkles, screen shake, floor shadows.
+// Contact you can feel (REUSE-SPEC.md §Milestones 1): BAM bursts, icing chunks and confetti, screen shake, floor shadows.
 import * as THREE from 'three';
-import { makeSparkle, stepSparkle } from '../characters/sparkle.js';
 import { floorTop } from './controls.js';
 
 /** @typedef {import('./match.js').HitEvent} HitEvent */
@@ -80,32 +79,6 @@ function stepBit(b, dt) {
   b.mesh.scale.setScalar(b.size * Math.min(1, (BIT_LIFE - b.t) * 4));
 }
 
-let riotSparkle = null;
-
-/** characters/sparkle.js's stars, each in a colour from the riot. */
-function recolour(mesh) {
-  if (!riotSparkle) {
-    const geo = mesh.geometry.clone(), n = geo.attributes.position.count, colour = new THREE.Color();
-    const rgb = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) colour.set(RIOT[Math.floor((i / n) * 5)]).toArray(rgb, i * 3);
-    geo.setAttribute('color', new THREE.BufferAttribute(rgb, 3));
-    riotSparkle = { geo, mat: new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, toneMapped: false }) };
-  }
-  Object.assign(mesh, { geometry: riotSparkle.geo, material: riotSparkle.mat });
-}
-
-/** A sparkle.js burst that follows `built`'s head, or stands wherever its holder is put. */
-export function riotSparkleOn(built) {
-  const s = makeSparkle(built);
-  recolour(s.mesh);
-  return s;
-}
-
-function makeWorldSparkle(scene) {
-  const root = new THREE.Group();
-  scene.add(root);
-  return riotSparkleOn({ root });
-}
 
 const SHADOW_GEO = new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2);
 let shadowMat = null;
@@ -161,8 +134,7 @@ function startBam(fx, h) {
 const pools = (scene) => ({
   bams: Array.from({ length: 6 }, () => makeBam(scene)),
   debris: Array.from({ length: 64 }, () => makeBit(scene)),
-  sparkles: Array.from({ length: 3 }, () => makeWorldSparkle(scene)),
-  next: { bam: 0, bit: 0, sparkle: 0 }, shake: 0, shakeT: 0,
+  next: { bam: 0, bit: 0 }, shake: 0, shakeT: 0,
 });
 
 /** @param {THREE.Scene} scene @param {THREE.Camera} camera */
@@ -173,12 +145,6 @@ export function createFx(scene, camera) {
     bam(h) { startBam(fx, h); },
     /** n bits flying out of `at`, each in one of `colors` (materials). */
     burst(at, colors, n, speed = 1.6) { for (let i = 0; i < n; i++) spawnBit(fx, at, colors[i % colors.length], speed); },
-    sparkle(x, y, z, scale) {
-      const s = fx.sparkles[fx.next.sparkle++ % fx.sparkles.length];
-      s.built.root.position.set(x, y, z);
-      s.built.root.scale.setScalar(scale);
-      s.t = 0;
-    },
     step(dt) { stepAll(fx, camera, dt); },
   };
 }
@@ -189,7 +155,6 @@ function stepAll(fx, camera, dt) {
     stepBam(b, dt);
   }
   for (const b of fx.debris) stepBit(b, dt);
-  for (const s of fx.sparkles) stepSparkle(s, dt);
   fx.shakeT += dt;
   const k = fx.shake * Math.max(0, 1 - fx.shakeT / 0.25);
   camera.position.x += Math.sin(fx.shakeT * 90) * k;

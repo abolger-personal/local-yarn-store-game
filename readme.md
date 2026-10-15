@@ -16,6 +16,9 @@ body changes and *fatal* when a module gains an export — the importing module 
 page renders blank white. `serve.py` sends `no-store` and purges the origin cache on each document
 load.
 
+With `cert.pem` and `key.pem` beside it (gitignored; the `openssl` line is in `serve.py`) it serves
+https, which tablets need for Donut Fighters rooms.
+
 Every viewer logs a build marker on startup:
 
 ```

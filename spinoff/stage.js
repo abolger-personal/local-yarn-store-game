@@ -22,9 +22,6 @@ function followSize(container, renderer, camera) {
   fit();
 }
 
-// Fullscreen ends on every page load, so each page asks again on its next tap.
-const fullScreen = () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {}); };
-
 export function makeStage(container, { background = '#f6e7d4' } = {}) {
   const renderer = makeRenderer(container);
   const scene = new THREE.Scene();
@@ -33,7 +30,6 @@ export function makeStage(container, { background = '#f6e7d4' } = {}) {
   const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 100);
   scene.add(camera, ...studioLights(camera));
   followSize(container, renderer, camera);
-  document.addEventListener('pointerup', fullScreen);
 
   const clock = new THREE.Timer();
   const run = (step) => renderer.setAnimationLoop(() => {

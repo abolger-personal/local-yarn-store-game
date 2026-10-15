@@ -46,11 +46,11 @@ function hill(r) {
   return { kind: 'hill', x0: -w / 2, x1: w / 2, z0: -d / 2, z1: d / 2, y: pick(r, 0.5, 0.8), round: r1(Math.min(w, d) / 3) };
 }
 
-/** Two pillars too tall to jump, front and back, leaving one gap to squeeze through, in each team's third. */
+/** Two pillars front and back, leaving one gap at ground level, in each team's third. A hop high, not more: every top must be reachable (a donut can land there). */
 function choke(r) {
   const gap = pick(r, 1, 1.4), z = pick(r, -0.6, 0.6);
   /** @type {Floor} */
-  const back = { kind: 'deck', x0: -3.8, x1: -3.2, z0: -2, z1: r1(z - gap / 2), y: 1.5 };
+  const back = { kind: 'deck', x0: -3.8, x1: -3.2, z0: -2, z1: r1(z - gap / 2), y: 1.2 };
   return [...both(back), ...both({ ...back, z0: r1(z + gap / 2), z1: 2 })];
 }
 

@@ -18,6 +18,18 @@ export function ticksToShelf(stage, team = 'heroes') {
   return Infinity;
 }
 
+/** Whether a hero tapped from its spawn onto the middle of `floor`'s top ends up standing there within 20 seconds. */
+function reachesTop(stage, floor) {
+  const m = createMatch([{ id: 'kid', team: 'heroes', height: 0.9, width: 0.45, reach: 0.38, look: LOOK }], stage);
+  const x = (floor.x0 + floor.x1) / 2, z = (floor.z0 + floor.z1) / 2;
+  for (let i = 0; i < 20 * TICK_HZ; i++) {
+    tick(m, i === 0 ? { kid: { target: { x, z, y: floor.y }, punch: false, kick: false } } : {});
+    const [f] = snapshot(m).fighters;
+    if (f.onGround && f.y === floor.y && outside(floor, f.x, f.z) === 0 && f.move === 'idle') return true;
+  }
+  return false;
+}
+
 const overlaps = (b, f) => b.x < f.x1 && b.x + BRICK > f.x0 && b.z < f.z1 && b.z + BRICK > f.z0;
 
 /** Asserts a stage is playable; `at` names it in failures. */
@@ -34,5 +46,7 @@ export function checkLevel(stage, at) {
   }
   for (const b of stage.bricks)
     assert.ok(raised.every((f) => b.y >= f.y || !overlaps(b, f)), `${at}: brick at ${b.x},${b.y},${b.z} is not inside a raised floor`);
+  // REUSE-SPEC.md §Mode: dropped donuts stay where they land, so any top one can land on must be reachable
+  for (const f of raised) assert.ok(reachesTop(stage, f), `${at}: the ${f.kind} top at x ${f.x0}..${f.x1}, y ${f.y} can be reached, or a donut landing there is lost`);
   assert.ok(ticksToShelf(stage) < Infinity, `${at}: a hero tapped from its spawn to the bad guys' shelf gets there`);
 }

@@ -53,7 +53,7 @@ at each end and the bad guys' wall with gaps (the Level 1 fort); the kinds are l
 | Tall middle | Two bricks stacked where the wall is thickest, so hopping isn't the answer there | second layer on the middle two bricks | Level 1 | yes |
 | Moat | Syrup in the wall's gaps: wade slow, or smash through | puddle r 0.45 in each gap | Level 1 | yes |
 | Field syrup | A sticky patch in each half of the field | mirrored puddle, r 0.4–0.55, \|x\| 2–2.6 | Level 1 | yes |
-| Choke point | Two tall pillars in each team's third leave one gap to squeeze through | `deck` pillars 1.5 high (above `JUMP_UP`), gap 1.0–1.4 | Level 3 (proposed) | yes |
+| Choke point | Two pillars in each team's third leave one gap at ground level | `deck` pillars 1.2 high (a hop up, never above `JUMP_UP`: a donut can land on top), gap 1.0–1.4 | Level 3 (proposed) | yes |
 | Step up | The shelf deck is too high to jump to from the ground; a step beside it | deck 1.8 high, step 0.9 | Level 5 (proposed) | yes |
 | Split route | A long low deck in a third: over it or round the front | `deck` 0.6 high along the band | later | no |
 

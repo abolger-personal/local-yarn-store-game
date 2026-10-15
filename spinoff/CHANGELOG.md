@@ -10,6 +10,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   hills laid out fresh from the number, the same stage every time for the same number, and fair
   to both sides. `difficulty` runs 1 to 5 and adds narrower gaps, choke points and a higher deck.
   There's no button for it yet.
+- Surprise stages never put a donut somewhere you can't reach: the pillars are a hop high now.
 
 ## 0.0.1 — 2026-10-14: Fun to hit, one tablet
 

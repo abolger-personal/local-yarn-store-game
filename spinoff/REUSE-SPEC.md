@@ -294,6 +294,16 @@ over 3 minutes.
 - **Dropped donuts stay where they land** (decided 2026-10-13), as many as pile up, until someone
   taps one and picks it up (see Navigation: tap a thing). Scrambling for a loose donut is a real
   tactic, like a fumble in football; nothing rolls home on its own.
+- **So every top a donut can land on must be reachable** (playtest 2026-10-14: a generated
+  difficulty-5 stage dropped a donut on a pillar too tall to jump, and it was lost for the match).
+  The playability check (`check-level.mjs`, every hand-made and generated level) taps a hero onto
+  every raised top and fails the level if one can't be stood on. Today that means no top higher
+  than one jump (`JUMP_UP` 1.3) above something you can stand on.
+- **Terrain height and movement scale together** (decided 2026-10-14). Taller terrain only comes
+  with a way up that every kid has: a double jump the route-finding plans (today a second jump
+  exists only by tapping above yourself mid-air, and routes never use it), or a flight goodie.
+  Raising one without the other just makes lost donuts. Whichever comes first sets the new
+  height limit in the playability check.
 
 ## Mode: donut capture the flag
 

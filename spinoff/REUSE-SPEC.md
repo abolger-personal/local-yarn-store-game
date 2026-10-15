@@ -946,10 +946,16 @@ scary, for 4–6 year olds.
     survive re-rolling the fighter) and **go with them to every level** (decided 2026-10-14): the
     spatula earned on pancakes works on the cake stage too. The theme only says where an item is
     earned, not where it can be used. The card is the one record, so items need no save of their
-    own: what you have is worked out from the counts. Items are used in play (you *use* the
-    spatula), so a kid with a big card arrives stronger; the per-player `help` (Handicap) is what
-    evens a family game out, and may need to count items. Open: the milestone steps (say 5, 10,
-    25, 50, 100), and whether an item also shows on the fighter.
+    own: what you have is worked out from the counts. Two kinds (decided 2026-10-14), and **no
+    equipment**: nothing is equipped, loaded out or slotted.
+    - **Looks items** join the fighter chooser as extra pictures the kid toggles on and off, like
+      hats and capes.
+    - **Play items** are never equipped: they **appear on the level** during a match, as things
+      to grab and use there (the spatula shows up on the stage). Owning one is what makes it turn
+      up, on any level.
+    Open: the milestone steps (say 5, 10, 25, 50, 100); whether a play item appears only for its
+    owner or for anyone to grab (a scramble, like loose donuts); how often it turns up, which is
+    where `help` (Handicap) can even out a kid with a big card.
   - Open (2026-10-14): whether stamps open levels (a stamp on N opens N+1) or every level can be
     picked from the start; whether unlocked moves and fort pieces follow the chosen level or the
     card; whether winning should show on the stamp too; whether grownup bad-guy players have

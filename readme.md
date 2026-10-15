@@ -28,7 +28,7 @@ If that value looks old, the browser is running cached code and nothing you chan
 
 | Page | Question it answers |
 | --- | --- |
-| `index.html` | Opens Donut Fighters' fighter chooser (`spinoff/choose.html`). |
+| `index.html` | A one-line redirect to the front door (`store.html`); point it at `spinoff/choose.html` locally for Donut Fighters. |
 | `store.html` | The yarn store's front door: the game's entrance and loading screen. See `ai_planning_sessions/VISUAL-DESIGN-2D.md`. |
 | `characters/species-checker.html` | Do two species read as different animals? Tuning surface, one character at a time. |
 | `characters/crowd.html` | Does the randomiser make a cast or a zoo? Performance instrumentation lives here. |

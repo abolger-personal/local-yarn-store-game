@@ -953,8 +953,13 @@ scary, for 4–6 year olds.
     - **Play items** are never equipped: they **appear on the level** during a match, as things
       to grab and use there (the spatula shows up on the stage). Owning one is what makes it turn
       up, on any level.
-    Open: the milestone steps (say 5, 10, 25, 50, 100); whether a play item appears only for its
-    owner or for anyone to grab (a scramble, like loose donuts); how often it turns up, which is
+    - **Or play items are moves** (alternative, 2026-10-14): owning the spatula adds a move to
+      that player's set, wherever they play, and the move's animation shows the item (the spatula
+      pops into the glove, flips a bad guy, and vanishes). Still no equipment: it is a move like
+      the others in the move table, fired the usual way (a button or a gesture behind the power
+      bar), just only for the player who earned it.
+    Open: spawned items or item moves (or both); the milestone steps (say 5, 10, 25, 50, 100);
+    whether a spawned play item appears only for its owner or for anyone to grab (a scramble, like loose donuts); how often it turns up, which is
     where `help` (Handicap) can even out a kid with a big card.
   - Open (2026-10-14): whether stamps open levels (a stamp on N opens N+1) or every level can be
     picked from the start; whether unlocked moves and fort pieces follow the chosen level or the

@@ -282,8 +282,7 @@ it from start to finish.
   A bigger bag comes later, as an unlock (see Open questions). Bad guys follow the same limit.
 
 Starting numbers to tune: 12 donuts per shelf, one donut per bag, a ring-out spills the whole bag,
-a **90-second** match to start (decided 2026-10-13; the kids will say if it's too short; the
-build runs 45 s for now so playtests reach the end card faster), never
+a **90-second** match to start (decided 2026-10-13; the kids will say if it's too short), never
 over 3 minutes.
 - **How donuts look** (decided 2026-10-13). Heroes' donuts are beige dough with frosting in the
   heroes' own colours: the shelf's donuts share out the fur colours of the heroes in the room, so
@@ -998,7 +997,7 @@ bad guy grabs a donut and banks it.
 
 ## Milestones
 
-1. **Fun to hit, one tablet** (planned 2026-10-13). On one tablet, your fighter on the stage in
+1. **Fun to hit, one tablet** (planned 2026-10-13; released as 0.0.1, 2026-10-14). On one tablet, your fighter on the stage in
    thirds against a training dummy: tap to move, 🥊 and 🦶, knock the dummy's donut loose and
    scramble for it, grab from the enemy shelf and bank on yours, and kick through a few
    **pre-placed gingerbread bricks** (no build round yet) that fall when the one under them

@@ -2,7 +2,7 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
-## 0.0.1 — 2026-10-13
+## 0.0.1 — 2026-10-14: Fun to hit, one tablet
 
 ### Choose a fighter
 - Pick a lion, a llama or an owl, then its fur from twelve loud colours.

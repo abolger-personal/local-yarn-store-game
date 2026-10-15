@@ -4,8 +4,7 @@
 // the back wall (negative) toward the camera (positive), y is up. A fighter is about 0.75-1.2 tall.
 
 export const TICK_HZ = 60;
-// ponytail: 45 s while playtesting (2026-10-14); the spec's starting length is 90 s
-export const ROUND_SECONDS = 45;
+export const ROUND_SECONDS = 90;
 export const DONUTS_PER_SHELF = 12;
 export const BRICK = 0.4;
 export const HIT_DEPTH = 0.35;

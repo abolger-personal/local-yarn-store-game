@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { setGeometryDetail } from '../characters/npc.js';
 import { makeGridLines } from '../inventory/notions.js';
 import { animateFighter, buildFighter, disposeFighter, loadFighter } from './fighter.js';
-import { openRoom, selfId } from './net.js';
+import { openRoom, selfId, showDebug } from './net.js';
 import { CODE_LENGTH, ROOM_TREATS, floorGrid, isCode, randomCode, standingSpots } from './roster.js';
 import { makeStage } from './stage.js';
 
@@ -110,6 +110,7 @@ on('play', () => { location.href = 'play.html'; });
 on('exit', exit);
 on('go', go);
 buildKeypad();
+if (new URLSearchParams(location.search).get('debug') === '1') showDebug();
 
 if (mine) {
   arrive(selfId, mine);

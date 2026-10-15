@@ -170,7 +170,9 @@ a gesture.
   like its species: the lion's slap is a roar, the llama's a stomp, the owl's a wing gust.
 
 **Heroes unlock lots of moves by level** (decided 2026-10-13). Level 1 is 🥊, 🦶 and the
-whole-hand slap. Every level after adds one or two: a new power gesture, a situational move (dash
+whole-hand slap. The air stomp is on from Level 1 too (decided 2026-10-14), because kids press
+🦶 mid-jump anyway, but nothing teaches or highlights it, and early stages have nothing tall
+enough to make jumping down onto people the obvious play. Every level after adds one or two: a new power gesture, a situational move (dash
 punch, air stomp, wall-kick jump, charged swing) or a species extra (the llama's headbutt, the
 lion's roar, the owl's glide). A locked gesture falls back to the slap, so a full bar always does
 something. Unlocks are per game like everything else, and a game that starts on a high level
@@ -179,9 +181,9 @@ so the two ladders can't drift apart. A first ladder, for tuning:
 
 | Level | New for heroes |
 | --- | --- |
-| 1 | 🥊 punch, 🦶 kick, whole-hand slap |
+| 1 | 🥊 punch, 🦶 kick, whole-hand slap; air stomp (🦶 in the air), there but not taught |
 | 2 | Two-finger swipe: donut roll |
-| 3 | Air stomp (🦶 in the air) |
+| 3 | Open: the next gesture from the table below |
 | 4 | Pinch on a bad guy: grab and throw |
 | 5 | Species extra: headbutt / roar / glide |
 | 6 | Spread: gust; dash punch (🥊 while running) |
@@ -194,7 +196,7 @@ falling off a tall waffle stack swung round toward the stack on the way down. Th
 bug, now fixed (facing holds in the air), but the swing looked like a wind-up, so keep it as a
 move: press 🦶 while falling from a height and the fighter turns, tucks and drops onto whatever
 is below, landing harder the further it fell (a bigger BAM, a longer hit-stop, knocks fort
-pieces loose). It's the big brother of the air stomp (Level 3 below), so it slots in as a later
+pieces loose). It's the big brother of the air stomp (Level 1 below), so it slots in as a later
 unlock or a power move.
 
 Candidate gestures (brainstorm, 2026-10-13; first ones to try are marked ★):

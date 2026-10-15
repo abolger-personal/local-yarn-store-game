@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { createControls, floorPoint, floorTop, pickTarget } from './controls.js';
 import { createMatch, snapshot, tick } from './fake-match.js';
-import { ROUND_SECONDS, STAGE, TICK_HZ } from './match.js';
+import { ROUND_SECONDS, TICK_HZ } from './match.js';
+import { LEVELS } from './levels.js';
+
+const { stage: STAGE } = LEVELS[1];
 
 const look = (frosting) => ({ dough: '#e8c48e', frosting, stripe: false });
 const fighter = (id, team, x, z) => ({
@@ -24,29 +27,29 @@ const close = (got, want, what) => {
   assert.deepEqual(Object.keys(got).sort(), Object.keys(want).sort(), `${what}: keys`);
 };
 
-close(pickTarget(snap, tap(-1.5, 0, 1.6), 'me'), { x: -1.5, z: 1.6 }, 'a tap on the floor is an x/z point');
-close(pickTarget(snap, tap(-7, 1.1, -1.1), 'me'), { x: -7, z: -1.1, y: 1.1 }, 'a tap on the raised deck carries its y');
-assert.equal(pickTarget(snap, tap(-7, 0.5, -0.8), 'me').y, 1.1, "a tap on the deck's side means its top");
-close(pickTarget(snap, tap(0, 0.6, 0.2), 'me'), { x: 0, z: 0.2, y: 0.6 }, 'a tap on the gumdrop hill');
-close(floorPoint(tap(12, 0, 1)), { x: 12, z: 1, y: 0 }, 'a tap past the end still gives a point, for the sim to clamp');
-assert.equal(pickTarget(snap, { origin: { x: 0, y: 5, z: 7 }, direction: { x: 0, y: 0.2, z: -1 } }, 'me'), null, 'a tap in the sky is nothing');
-assert.equal(floorTop(-7.5, -1.5), 1.1, 'the deck is the top under the shelf');
-assert.equal(floorTop(-7.5, -1.5, 0.5), 0, 'below it, the ground');
+close(pickTarget(STAGE, snap, tap(-1.5, 0, 1.6), 'me'), { x: -1.5, z: 1.6 }, 'a tap on the floor is an x/z point');
+close(pickTarget(STAGE, snap, tap(-7, 1.1, -1.1), 'me'), { x: -7, z: -1.1, y: 1.1 }, 'a tap on the raised deck carries its y');
+assert.equal(pickTarget(STAGE, snap, tap(-7, 0.5, -0.8), 'me').y, 1.1, "a tap on the deck's side means its top");
+close(pickTarget(STAGE, snap, tap(0, 0.6, 0.2), 'me'), { x: 0, z: 0.2, y: 0.6 }, 'a tap on the gumdrop hill');
+close(floorPoint(STAGE, tap(12, 0, 1)), { x: 12, z: 1, y: 0 }, 'a tap past the end still gives a point, for the sim to clamp');
+assert.equal(pickTarget(STAGE, snap, { origin: { x: 0, y: 5, z: 7 }, direction: { x: 0, y: 0.2, z: -1 } }, 'me'), null, 'a tap in the sky is nothing');
+assert.equal(floorTop(STAGE, -7.5, -1.5), 1.1, 'the deck is the top under the shelf');
+assert.equal(floorTop(STAGE, -7.5, -1.5, 0.5), 0, 'below it, the ground');
 
-assert.deepEqual(pickTarget(snap, tap(-2, 0.2, 1), 'me'), { thing: 'donut', id: 'd0' }, 'a tap on a loose donut');
-assert.deepEqual(pickTarget(snap, tap(-1.7, 0.4, 1.1), 'me'), { thing: 'donut', id: 'd0' }, 'a tap near a loose donut');
-assert.deepEqual(pickTarget(snap, tap(2.5, 0.6, 0), 'me'), { thing: 'fighter', id: 'dummy' }, 'a tap on the dummy chases it');
-assert.deepEqual(pickTarget(snap, tap(2.5, 1, 0), 'me'), { thing: 'fighter', id: 'dummy' }, "a tap on the dummy's head");
-assert.deepEqual(pickTarget(snap, tap(-4, 0.6, 0.5), 'me'), { stop: true }, 'a tap on myself stops');
-assert.ok('x' in pickTarget(snap, tap(-3, 0.6, -1), 'me'), 'a teammate is not a foe');
+assert.deepEqual(pickTarget(STAGE, snap, tap(-2, 0.2, 1), 'me'), { thing: 'donut', id: 'd0' }, 'a tap on a loose donut');
+assert.deepEqual(pickTarget(STAGE, snap, tap(-1.7, 0.4, 1.1), 'me'), { thing: 'donut', id: 'd0' }, 'a tap near a loose donut');
+assert.deepEqual(pickTarget(STAGE, snap, tap(2.5, 0.6, 0), 'me'), { thing: 'fighter', id: 'dummy' }, 'a tap on the dummy chases it');
+assert.deepEqual(pickTarget(STAGE, snap, tap(2.5, 1, 0), 'me'), { thing: 'fighter', id: 'dummy' }, "a tap on the dummy's head");
+assert.deepEqual(pickTarget(STAGE, snap, tap(-4, 0.6, 0.5), 'me'), { stop: true }, 'a tap on myself stops');
+assert.ok('x' in pickTarget(STAGE, snap, tap(-3, 0.6, -1), 'me'), 'a teammate is not a foe');
 for (const s of snap.shelves) {
-  assert.deepEqual(pickTarget(snap, tap(s.x + 0.4, s.y + 0.9, s.z - 0.1), 'me'), { thing: 'shelf', team: s.team }, `the ${s.team} shelf`);
+  assert.deepEqual(pickTarget(STAGE, snap, tap(s.x + 0.4, s.y + 0.9, s.z - 0.1), 'me'), { thing: 'shelf', team: s.team }, `the ${s.team} shelf`);
 }
 const front = snap.bricks.find((b) => b.z === 0.8 && b.y === 0);
-assert.deepEqual(pickTarget(snap, tap(front.x + 0.2, 0.2, front.z + 0.2), 'me'), { thing: 'brick', id: front.id }, 'a tap on a brick');
+assert.deepEqual(pickTarget(STAGE, snap, tap(front.x + 0.2, 0.2, front.z + 0.2), 'me'), { thing: 'brick', id: front.id }, 'a tap on a brick');
 
 {
-  const c = createControls('me');
+  const c = createControls('me', STAGE);
   c.down(7, 'punch', null);
   c.move(7, tap(0, 0, 0));
   c.up(7);
@@ -55,7 +58,7 @@ assert.deepEqual(pickTarget(snap, tap(front.x + 0.2, 0.2, front.z + 0.2), 'me'),
 }
 
 {
-  const c = createControls('me');
+  const c = createControls('me', STAGE);
   c.down(1, 'stage', tap(-1.5, 0, 1.6));
   c.down(2, 'kick', null);
   const first = c.take(snap);
@@ -73,7 +76,7 @@ assert.deepEqual(pickTarget(snap, tap(front.x + 0.2, 0.2, front.z + 0.2), 'me'),
     { id: 'me', team: 'heroes', height: 1, width: 0.6, reach: 0.4, look: look('#ff3b7f') },
     { id: 'dummy', team: 'badGuys', height: 1, width: 0.6, reach: 0.4, look: look('#7b2fbf'), dummy: true },
   ];
-  const state = createMatch(entrants);
+  const state = createMatch(entrants, STAGE);
   const count = (s) => s.donuts.length + s.shelves.reduce((n, sh) => n + sh.donuts.length, 0) + s.fighters.filter((f) => f.carrying).length;
   assert.equal(count(snapshot(state)), 24, 'the stand-in match holds all 24 donuts');
   const me = () => snapshot(state).fighters.find((f) => f.id === 'me');
@@ -97,9 +100,9 @@ assert.deepEqual(pickTarget(snap, tap(front.x + 0.2, 0.2, front.z + 0.2), 'me'),
 
 {
   const hill = STAGE.floors.find((f) => f.round);
-  assert.equal(floorTop((hill.x0 + hill.x1) / 2, (hill.z0 + hill.z1) / 2), hill.y, 'the middle of the rounded hill is its top');
-  assert.equal(floorTop(hill.x1 - 0.05, hill.z1 - 0.05), 0, 'its rounded-off corner is ground, not thin air');
-  assert.equal(floorTop(hill.x1 - 0.05, (hill.z0 + hill.z1) / 2), hill.y, 'its straight side still reaches the edge');
+  assert.equal(floorTop(STAGE, (hill.x0 + hill.x1) / 2, (hill.z0 + hill.z1) / 2), hill.y, 'the middle of the rounded hill is its top');
+  assert.equal(floorTop(STAGE, hill.x1 - 0.05, hill.z1 - 0.05), 0, 'its rounded-off corner is ground, not thin air');
+  assert.equal(floorTop(STAGE, hill.x1 - 0.05, (hill.z0 + hill.z1) / 2), hill.y, 'its straight side still reaches the edge');
 }
 
 console.log('controls ok');

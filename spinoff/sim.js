@@ -1,6 +1,6 @@
 // The match host: one fixed tick of pure logic, no three.js, no Math.random. REUSE-SPEC.md §Milestones 1.
 // The stage is a depth band (§Navigation): fighters walk in x/z on floor tops and jump in y.
-import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, HIT_DEPTH, ROUND_SECONDS, STAGE, TICK_HZ, coreOf, outside } from './match.js';
+import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, HIT_DEPTH, ROUND_SECONDS, TICK_HZ, coreOf, groundOf, outside } from './match.js';
 import { EMPTY, anySlot, footprint, gridSize, lift, makeDisplay, place, topAt } from '../inventory/grid.js';
 import { canHit } from './roster.js';
 
@@ -78,10 +78,6 @@ export const MOVES = Object.freeze({
     kb: { base: 4, growth: 0.1, angle: -60 }, brick: 2, walks: true, dive: 6, shows: 'kick' },
 });
 
-const GROUND = STAGE.floors.reduce((g, p) => (p.y < g.y ? p : g));
-const Z0 = STAGE.backWall;
-const NX = Math.round((GROUND.x1 - GROUND.x0) / CELL);
-const NZ = Math.round((GROUND.z1 - Z0) / CELL);
 const OPEN = 0, SOFT = 1, HOP = 2, BLOCKED = 3;
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
@@ -89,14 +85,20 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const flat = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const inXZ = (b, x, z) => outside(b, x, z) === 0;
 const toBox = outside;
-const FLOOR_BOXES = STAGE.floors.map((f) => ({ x0: f.x0, x1: f.x1, z0: f.z0, z1: f.z1, y0: -Infinity, y1: f.y, round: f.round, kind: 'floor' }));
+const floorBox = (f) => ({ x0: f.x0, x1: f.x1, z0: f.z0, z1: f.z1, y0: -Infinity, y1: f.y, round: f.round, kind: 'floor' });
 const brickBox = (b) => ({ x0: b.x, x1: b.x + BRICK, z0: b.z, z1: b.z + BRICK, y0: b.y, y1: b.y + BRICK, kind: 'brick' });
-const shelfBox = (sh) => ({ x0: sh.x - sh.half, x1: sh.x + sh.half, z0: Z0, z1: sh.z, y0: sh.y, y1: sh.y + SHELF_H, kind: 'shelf' });
+const shelfBox = (z0) => (sh) => ({ x0: sh.x - sh.half, x1: sh.x + sh.half, z0, z1: sh.z, y0: sh.y, y1: sh.y + SHELF_H, kind: 'shelf' });
 const shelfOf = (s, team) => s.shelves.find((sh) => sh.team === team);
-const inStage = (p) => {
-  p.x = clamp(p.x, GROUND.x0 + LEDGE_MARGIN, GROUND.x1 - LEDGE_MARGIN);
-  p.z = Math.min(p.z, GROUND.z1 - LEDGE_MARGIN);
+const inStage = ({ band }, p) => {
+  p.x = clamp(p.x, band.x0 + LEDGE_MARGIN, band.x1 - LEDGE_MARGIN);
+  p.z = Math.min(p.z, band.z1 - LEDGE_MARGIN);
 };
+
+/** The ground's x/z extent from the back wall, its height, and its floor grid's size. @param {import('./match.js').Stage} stage */
+function bandOf(stage) {
+  const g = groundOf(stage), z0 = stage.backWall;
+  return { x0: g.x0, x1: g.x1, z0, z1: g.z1, y: g.y, nx: Math.round((g.x1 - g.x0) / CELL), nz: Math.round((g.z1 - z0) / CELL) };
+}
 
 /** The highest top under (x, z) no higher than maxY. */
 function supportAt(list, x, z, maxY) {
@@ -111,9 +113,9 @@ function escapeBox(p, b, r) {
   p[axis] = v;
 }
 
-function pushOnce(list, p, r, h) {
+function pushOnce(s, p, r, h) {
   let moved = false;
-  for (const b of list) {
+  for (const b of s.solids) {
     if (p.y >= b.y1 - STEP || p.y + h <= b.y0) continue;
     const q = coreOf(b, p.x, p.z), d = Math.hypot(p.x - q.x, p.z - q.z);
     if (d >= r + q.r) continue;
@@ -123,33 +125,33 @@ function pushOnce(list, p, r, h) {
       p.z = q.z + ((p.z - q.z) / d) * (r + q.r);
     } else escapeBox(p, b, r);
   }
-  p.z = Math.max(p.z, Z0 + r);
+  p.z = Math.max(p.z, s.band.z0 + r);
   return moved;
 }
 
 // ponytail: a few passes, so a body wedged between many boxes could still end inside one; a proper depenetration solve if forts get dense
 /** Pushes a body (circle r in x/z, h tall, feet at p.y) out of every solid it overlaps, and off the back wall. */
-function pushOut(list, p, r, h) {
-  for (let pass = 0; pass < PUSH_PASSES; pass++) if (!pushOnce(list, p, r, h)) return;
+function pushOut(s, p, r, h) {
+  for (let pass = 0; pass < PUSH_PASSES; pass++) if (!pushOnce(s, p, r, h)) return;
 }
 
-function floorFor(x, z, y) {
+function floorFor(s, x, z, y) {
   let best = null;
-  for (const fl of STAGE.floors)
+  for (const fl of s.stage.floors)
     if (inXZ(fl, x, z) && (!best || Math.abs(fl.y - y) < Math.abs(best.y - y))) best = fl;
-  return best ? best.y : GROUND.y;
+  return best ? best.y : s.band.y;
 }
 
 // --- the floor grid -------------------------------------------------------------------------
 
-const cellX = (n) => GROUND.x0 + ((n % NX) + 0.5) * CELL;
-const cellZ = (n) => Z0 + (Math.floor(n / NX) + 0.5) * CELL;
-const cellOf = (x, z) => clamp(Math.floor((z - Z0) / CELL), 0, NZ - 1) * NX + clamp(Math.floor((x - GROUND.x0) / CELL), 0, NX - 1);
+const cellX = (g, n) => g.x0 + ((n % g.nx) + 0.5) * CELL;
+const cellZ = (g, n) => g.z0 + (Math.floor(n / g.nx) + 0.5) * CELL;
+const cellOf = (g, x, z) => clamp(Math.floor((z - g.z0) / CELL), 0, g.nz - 1) * g.nx + clamp(Math.floor((x - g.x0) / CELL), 0, g.nx - 1);
 
-function cellKind(list, x, z, top, body) {
-  if (z < Z0 + body.r - EPS) return BLOCKED;
+function cellKind(s, x, z, top, body) {
+  if (z < s.band.z0 + body.r - EPS) return BLOCKED;
   let soft = false, bricks = -Infinity;
-  for (const b of list) {
+  for (const b of s.solids) {
     if (b.y1 <= top + STEP || b.y0 >= top + body.h || toBox(b, x, z) >= body.r) continue;
     if (b.kind === 'shelf') return BLOCKED;
     if (b.kind === 'floor') soft = true;
@@ -161,18 +163,18 @@ function cellKind(list, x, z, top, body) {
 }
 
 /** Each cell's floor top and whether a body of radius r fits there (open), hugs a raised floor (soft), must hop a one-high brick wall, or can't. */
-function buildGrid(list, body) {
-  const top = new Float64Array(NX * NZ), kind = new Uint8Array(NX * NZ);
-  for (let n = 0; n < NX * NZ; n++) {
-    top[n] = supportAt(FLOOR_BOXES, cellX(n), cellZ(n), Infinity);
-    kind[n] = cellKind(list, cellX(n), cellZ(n), top[n], body);
+function buildGrid(s, body) {
+  const { nx, nz } = s.band, g = { ...s.band, top: new Float64Array(nx * nz), kind: new Uint8Array(nx * nz) };
+  for (let n = 0; n < nx * nz; n++) {
+    g.top[n] = supportAt(s.floorBoxes, cellX(g, n), cellZ(g, n), Infinity);
+    g.kind[n] = cellKind(s, cellX(g, n), cellZ(g, n), g.top[n], body);
   }
-  return { top, kind };
+  return g;
 }
 
 function navGrid(s, f) {
   const key = `${f.r}/${f.h}`;
-  if (!s.grids.has(key)) s.grids.set(key, buildGrid(s.solids, f));
+  if (!s.grids.has(key)) s.grids.set(key, buildGrid(s, f));
   return s.grids.get(key);
 }
 
@@ -184,14 +186,14 @@ function stepCost(g, a, b, len) {
   return len * CELL * (g.kind[b] === SOFT ? SOFT_COST : 1) + hop + climb;
 }
 
-const onGrid = (i, j) => i >= 0 && j >= 0 && i < NX && j < NZ;
+const onGrid = (g, i, j) => i >= 0 && j >= 0 && i < g.nx && j < g.nz;
 
 function edges(g, n) {
-  const i = n % NX, j = (n - i) / NX, out = [];
+  const i = n % g.nx, j = (n - i) / g.nx, out = [];
   for (const [di, dj] of DIRS) {
-    if (!onGrid(i + di, j + dj)) continue;
-    if (di && dj && (g.kind[n + di] === BLOCKED || g.kind[n + dj * NX] === BLOCKED)) continue;
-    const m = n + di + dj * NX, c = stepCost(g, n, m, di && dj ? Math.SQRT2 : 1);
+    if (!onGrid(g, i + di, j + dj)) continue;
+    if (di && dj && (g.kind[n + di] === BLOCKED || g.kind[n + dj * g.nx] === BLOCKED)) continue;
+    const m = n + di + dj * g.nx, c = stepCost(g, n, m, di && dj ? Math.SQRT2 : 1);
     if (c < Infinity) out.push([m, c]);
   }
   return out;
@@ -239,7 +241,7 @@ function trace(from, n) {
 function search(g, start, goal) {
   const n = g.top.length, cost = new Float64Array(n).fill(Infinity), from = new Int32Array(n).fill(-1);
   const done = new Uint8Array(n), heap = [];
-  const away = (c) => Math.hypot(cellX(c) - cellX(goal), cellZ(c) - cellZ(goal));
+  const away = (c) => Math.hypot(cellX(g, c) - cellX(g, goal), cellZ(g, c) - cellZ(g, goal));
   let best = start;
   cost[start] = 0;
   heapPush(heap, [away(start), start]);
@@ -257,11 +259,11 @@ function search(g, start, goal) {
 
 /** The walkable cell at the goal's height nearest the goal point. */
 function goalCell(g, p) {
-  const c = cellOf(p.x, p.z), ci = c % NX, cj = (c - ci) / NX;
+  const c = cellOf(g, p.x, p.z), ci = c % g.nx, cj = (c - ci) / g.nx;
   let best = c, bestD = Infinity;
-  for (let j = Math.max(0, cj - GOAL_SEARCH); j <= Math.min(NZ - 1, cj + GOAL_SEARCH); j++)
-    for (let i = Math.max(0, ci - GOAL_SEARCH); i <= Math.min(NX - 1, ci + GOAL_SEARCH); i++) {
-      const n = j * NX + i, d = Math.hypot(cellX(n) - p.x, cellZ(n) - p.z);
+  for (let j = Math.max(0, cj - GOAL_SEARCH); j <= Math.min(g.nz - 1, cj + GOAL_SEARCH); j++)
+    for (let i = Math.max(0, ci - GOAL_SEARCH); i <= Math.min(g.nx - 1, ci + GOAL_SEARCH); i++) {
+      const n = j * g.nx + i, d = Math.hypot(cellX(g, n) - p.x, cellZ(g, n) - p.z);
       if (g.kind[n] < HOP && Math.abs(g.top[n] - p.y) <= STEP && d < bestD) { best = n; bestD = d; }
     }
   return best;
@@ -274,7 +276,7 @@ function waypoints(g, cells) {
   for (const n of cells.slice(1)) {
     if (g.kind[n] === HOP) { hopped = true; continue; }
     const below = out.at(-1)?.y ?? g.top[cells[0]];
-    out.push({ x: cellX(n), y: g.top[n], z: cellZ(n), jump: hopped || g.top[n] > below + STEP });
+    out.push({ x: cellX(g, n), y: g.top[n], z: cellZ(g, n), jump: hopped || g.top[n] > below + STEP });
     hopped = false;
   }
   return out;
@@ -283,7 +285,7 @@ function waypoints(g, cells) {
 function clearLine(g, a, b) {
   const n = Math.ceil(flat(a, b) / (CELL / 2));
   for (let t = 1; t <= n; t++) {
-    const c = cellOf(a.x + ((b.x - a.x) * t) / n, a.z + ((b.z - a.z) * t) / n);
+    const c = cellOf(g, a.x + ((b.x - a.x) * t) / n, a.z + ((b.z - a.z) * t) / n);
     if (g.kind[c] !== OPEN || Math.abs(g.top[c] - a.y) > STEP) return false;
   }
   return true;
@@ -305,11 +307,11 @@ function pull(g, from, wps) {
 
 /** The nearest spot a body can stand at (x, z), on the floor whose top is nearest y. */
 function pointGoal(s, f, x, z, y) {
-  const p = { x, y: 0, z: Math.max(z, Z0) };
-  inStage(p);
-  p.y = floorFor(p.x, p.z, y ?? GROUND.y);
-  pushOut(s.solids, p, f.r, f.h);
-  inStage(p);
+  const p = { x, y: 0, z: Math.max(z, s.band.z0) };
+  inStage(s, p);
+  p.y = floorFor(s, p.x, p.z, y ?? s.band.y);
+  pushOut(s, p, f.r, f.h);
+  inStage(s, p);
   return p;
 }
 
@@ -344,10 +346,10 @@ function resolve(s, f) {
 // --- following a route ----------------------------------------------------------------------
 
 function plan(s, f) {
-  const g = navGrid(s, f), goal = f.dest, start = cellOf(f.x, f.z), end = goalCell(g, goal);
+  const g = navGrid(s, f), goal = f.dest, start = cellOf(g, f.x, f.z), end = goalCell(g, goal);
   const found = f.fails >= MAX_FAILS ? { cells: [start], reached: false } : search(g, start, end);
   const wps = waypoints(g, found.cells);
-  const exact = found.reached && Math.hypot(goal.x - cellX(end), goal.z - cellZ(end)) <= CELL;
+  const exact = found.reached && Math.hypot(goal.x - cellX(g, end), goal.z - cellZ(g, end)) <= CELL;
   if (exact) wps.push({ x: goal.x, y: goal.y, z: goal.z, jump: goal.y > (wps.at(-1)?.y ?? f.y) + STEP });
   f.nav = { goal: { x: goal.x, y: goal.y, z: goal.z }, wps: pull(g, f, wps), k: 0, done: false, failed: false,
     blocked: !found.reached, at: s.tick, bricks: s.brickKey, end: null };
@@ -413,8 +415,8 @@ function navigate(s, f) {
 function slide(s, f, dx, dz) {
   f.x += dx;
   f.z += dz;
-  pushOut(s.solids, f, f.r, f.h);
-  if (f.onGround) inStage(f);
+  pushOut(s, f, f.r, f.h);
+  if (f.onGround) inStage(s, f);
 }
 
 function stuckCheck(f, moved) {
@@ -423,7 +425,7 @@ function stuckCheck(f, moved) {
 }
 
 // REUSE-SPEC.md §Mode: players wade straight through; ponytail: weight syrup cells in A* if NPCs should go round
-const inSyrup = (s, f) => f.y < STEP && s.puddles.some((p) => Math.hypot(f.x - p.x, f.z - p.z) < p.r);
+const inSyrup = (s, f) => f.y < STEP && s.stage.puddles.some((p) => Math.hypot(f.x - p.x, f.z - p.z) < p.r);
 
 function walkStep(s, f) {
   const paused = f.stun > 0 || (f.attack && !MOVES[f.attack.id].walks);
@@ -466,9 +468,9 @@ function drop(s, f, d) {
 }
 
 function ringOut(s, f) {
-  const r = STAGE.ringOut;
+  const r = s.stage.ringOut;
   if (f.x >= r.x0 && f.x <= r.x1 && f.z <= r.z1 && f.y >= r.y) return;
-  const x = clamp(f.x, GROUND.x0 + DONUT_EDGE, GROUND.x1 - DONUT_EDGE), z = clamp(f.z, Z0 + DONUT_EDGE, GROUND.z1 - DONUT_EDGE);
+  const b = s.band, x = clamp(f.x, b.x0 + DONUT_EDGE, b.x1 - DONUT_EDGE), z = clamp(f.z, b.z0 + DONUT_EDGE, b.z1 - DONUT_EDGE);
   drop(s, f, { x, y: supportAt(s.solids, x, z, Infinity), z, vx: 0, vy: 0, vz: 0 });
   const sh = shelfOf(s, f.team);
   Object.assign(f, { x: sh.x, y: sh.y + RESPAWN_Y, z: sh.z + RESPAWN_DZ, vx: 0, vy: 0, vz: 0, onGround: false,
@@ -515,7 +517,7 @@ function separate(s) {
       for (const [f, sign] of [[a, -1], [b, 1]]) {
         f.x += (sign * ux * gap) / 2;
         f.z += (sign * uz * gap) / 2;
-        pushOut(s.solids, f, f.r, f.h);
+        pushOut(s, f, f.r, f.h);
       }
     }
   }
@@ -615,7 +617,7 @@ function attackStep(s, f) {
 // --- bricks and donuts ----------------------------------------------------------------------
 
 function brickFloor(s, b) {
-  let floor = supportAt(FLOOR_BOXES, b.x + BRICK / 2, b.z + BRICK / 2, b.y);
+  let floor = supportAt(s.floorBoxes, b.x + BRICK / 2, b.z + BRICK / 2, b.y);
   for (const o of s.bricks)
     if (o !== b && Math.abs(o.x - b.x) < BRICK - EPS && Math.abs(o.z - b.z) < BRICK - EPS && o.y + BRICK <= b.y + EPS)
       floor = Math.max(floor, o.y + BRICK);
@@ -632,10 +634,10 @@ function settleBricks(s) {
 }
 
 function stepDonut(s, d) {
-  const prev = { x: d.x, y: d.y, z: d.z };
+  const prev = { x: d.x, y: d.y, z: d.z }, { band } = s;
   d.vy -= GRAVITY * DT;
-  d.x = clamp(d.x + d.vx * DT, GROUND.x0 + DONUT_EDGE, GROUND.x1 - DONUT_EDGE);
-  d.z = clamp(d.z + d.vz * DT, Z0 + DONUT_EDGE, GROUND.z1 - DONUT_EDGE);
+  d.x = clamp(d.x + d.vx * DT, band.x0 + DONUT_EDGE, band.x1 - DONUT_EDGE);
+  d.z = clamp(d.z + d.vz * DT, band.z0 + DONUT_EDGE, band.z1 - DONUT_EDGE);
   d.y += d.vy * DT;
   if (s.solids.some((b) => inXZ(b, d.x, d.z) && prev.y < b.y1 - STEP && d.y < b.y1 && !inXZ(b, prev.x, prev.z)))
     Object.assign(d, { x: prev.x, z: prev.z, vx: 0, vz: 0 });
@@ -755,34 +757,30 @@ function spawnSpot(s, e, cursor) {
   return { x: sh.x + dir * SPAWN_GAP * (1 + (k % SPAWN_ROW)), z: SPAWN_Z + SPAWN_GAP * Math.floor(k / SPAWN_ROW) };
 }
 
-function newFighter(e, at) {
+function newFighter(e, at, y) {
   return { id: e.id, team: e.team, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
-    x: at.x, y: GROUND.y, z: at.z, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, onGround: true, jumps: 1,
+    x: at.x, y, z: at.z, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, onGround: true, jumps: 1,
     target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, fails: 0, stuck: 0, away: false,
     attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, percent: 0, calm: 0,
     carrying: null, touching: [], shelfDone: false };
 }
 
 function refresh(s) {
-  s.solids = [...FLOOR_BOXES, ...s.shelves.map(shelfBox), ...s.bricks.map(brickBox)];
+  s.solids = [...s.floorBoxes, ...s.shelves.map(shelfBox(s.band.z0)), ...s.bricks.map(brickBox)];
   const key = s.bricks.map((b) => `${b.id}@${b.y.toFixed(3)}`).join(',');
   if (key !== s.brickKey) { s.brickKey = key; s.grids.clear(); }
 }
 
-/**
- * @param {import('./match.js').Entrant[]} entrants
- * @param {readonly import('./match.js').BrickSpot[]} [bricks] for tests: a fort other than STAGE.bricks
- * @param {readonly import('./match.js').Puddle[]} [puddles] the level's syrup
- */
-export function createMatch(entrants, bricks = STAGE.bricks, puddles = STAGE.puddles) {
-  const s = { tick: 0, puddles, nextDonut: 0, fighters: [], donuts: [], shelves: [], solids: [], grids: new Map(), brickKey: '',
+/** @param {import('./match.js').Entrant[]} entrants @param {import('./match.js').Stage} stage a level's (levels.js) */
+export function createMatch(entrants, stage) {
+  const s = { stage, band: bandOf(stage), floorBoxes: stage.floors.map(floorBox), tick: 0, nextDonut: 0, fighters: [], donuts: [], shelves: [], solids: [], grids: new Map(), brickKey: '',
     hits: [], fullBag: [], donutEvents: [],
-    bricks: bricks.map((b, i) => ({ id: `b${i}`, team: b.team, x: b.x, y: b.y, z: b.z, vy: 0, hits: b.hits,
+    bricks: stage.bricks.map((b, i) => ({ id: `b${i}`, team: b.team, x: b.x, y: b.y, z: b.z, vy: 0, hits: b.hits,
       maxHits: b.hits, icing: icingOf(entrants, b.team) })) };
-  s.shelves = STAGE.shelves.map((spot) => makeShelf(spot, teamLooks(entrants, spot.team)));
+  s.shelves = stage.shelves.map((spot) => makeShelf(spot, teamLooks(entrants, spot.team)));
   refresh(s);
   const cursor = { dummies: 0 };
-  s.fighters = entrants.map((e) => newFighter(e, spawnSpot(s, e, cursor)));
+  s.fighters = entrants.map((e) => newFighter(e, spawnSpot(s, e, cursor), s.band.y));
   for (const f of s.fighters) if (f.dummy) f.carrying = grab(shelfOf(s, f.team));
   return s;
 }

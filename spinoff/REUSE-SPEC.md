@@ -367,14 +367,21 @@ and smashers each get a round that is theirs.
   `inventory/grid.js` floor), with the `help` table's grab radius and snap reach for small hands.
 - **Each level has its own treat theme** (decided 2026-10-14, replacing "World 1 is Gingerbread
   World"). The theme dresses the stage and the fort pieces; the rules underneath don't change.
-  `spinoff/scenery.js` `THEMES` holds one entry per level, and `play.html?level=2` shows a later
+  `spinoff/scenery.js` `THEMES` holds one entry per theme, and `play.html?level=2` shows a later
   look before levels exist.
+- **Levels are data** (2026-10-14): `spinoff/levels.js` `LEVELS` maps each level number to a
+  layout (a `Stage`: floors, each a `ground`, `deck` or `hill` that the theme dresses by kind,
+  the back wall, shelves, zones, ring-out, bricks and syrup) and the name of its theme. The stage
+  is passed in, never imported: `createMatch(entrants, stage)`, and the page's taps, shadows and
+  scenery take the same stage. `spinoff/levels.test.mjs` plays every level in the real sim (a
+  hero tapped to the bad guys' shelf gets there) and checks shelves stand on floors, syrup lies
+  on open ground and no brick starts inside a raised floor.
   - **Level 1, breakfast:** a waffle floor (golden ridges, dark pockets on a 0.5 grid); each
     deck is a stack of waffles; translucent syrup drips off the front edge; the middle hill is a
     stack of big pancakes with butter and syrup on top, its corners rounded in the rules too
     (`Floor.round`), so you never stand on thin air past the drawn pancake. The top layer of a
     stack is always exactly the floor you stand on.
-  - **Sticky syrup** (decided 2026-10-14): round puddles (`STAGE.puddles`) slow anyone walking
+  - **Sticky syrup** (decided 2026-10-14): round puddles (the stage's `puddles`) slow anyone walking
     on the ground through them to `SYRUP_SLOW` (0.45×) of walking speed; jumping over is full
     speed. Placed to make choices: one in each gap round the bad guys' wall (smash through the
     wall, or wade round it) and one in each half of the field. Routing ignores syrup for now.
@@ -997,8 +1004,8 @@ bad guy grabs a donut and banks it.
    **pre-placed gingerbread bricks** (no build round yet) that fall when the one under them
    breaks. Built as the host from day one: the sim takes per-player inputs per tick and produces
    a snapshot, and the page draws only from snapshots.
-   - **The contract is `spinoff/match.js`** (2026-10-13): the stage layout (`STAGE`), and the
-     `Input`, `Snapshot` and `Entrant` types both phases build against, so Phase A and Phase B run
+   - **The contract is `spinoff/match.js`** (2026-10-13): the stage layout's shape (`Stage`; the
+     layouts themselves are in `spinoff/levels.js`), and the `Input`, `Snapshot` and `Entrant` types both phases build against, so Phase A and Phase B run
      in parallel and the type checker catches any drift. The snapshot is also what milestone 2
      sends over the network.
    - **First playtest (2026-10-13), and the rework it caused.** The flat x/y version felt like "2D

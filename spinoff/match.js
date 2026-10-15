@@ -23,43 +23,24 @@ export function outside(b, x, z) {
   return Math.max(0, Math.hypot(x - c.x, z - c.z) - c.r);
 }
 
+/** The stage's one 'ground' floor. @param {Stage} stage */
+export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground');
+
 /**
  * @typedef {'heroes'|'badGuys'} Team
- * @typedef {{ x0: number, x1: number, z0: number, z1: number, y: number, round?: number }} Floor
+ * @typedef {'ground'|'deck'|'hill'} FloorKind  what a floor is for; a theme dresses each kind its own way
+ * @typedef {{ kind: FloorKind, x0: number, x1: number, z0: number, z1: number, y: number, round?: number }} Floor
  *   a walkable top: the rectangle x0..x1 by z0..z1 at height y, its corners rounded by `round`
  * @typedef {{ team: Team, x: number, z: number, y: number }} ShelfSpot  centre of the shelf's front
  * @typedef {{ team: Team, x0: number, x1: number }} BuildZone
  * @typedef {{ x: number, z: number, r: number }} Puddle a round patch of sticky syrup on the ground
  * @typedef {{ team: Team, x: number, z: number, y: number, hits: number }} BrickSpot
  *   a BRICK cube with its bottom-left-back corner at (x, y, z)
+ * @typedef {{ x0: number, x1: number, z1: number, y: number }} RingOut  leave this box and you are out
+ * @typedef {{ floors: readonly Floor[], backWall: number, shelves: readonly ShelfSpot[], zones: readonly BuildZone[],
+ *             puddles: readonly Puddle[], ringOut: RingOut, bricks: readonly BrickSpot[] }} Stage
+ *   one level's layout (spinoff/levels.js): exactly one 'ground' floor, the lowest; the back edge is a wall at z = backWall
  */
-
-const wall = (team, x, z, y = 0) => ({ team, x, z, y, hits: 2 });
-
-// REUSE-SPEC.md §Mode: the stage in thirds, mirrored, as a depth band. The middle third is never
-// built on. The back edge is a wall; the front and the two ends are drops (ring-out).
-export const STAGE = Object.freeze({
-  /** @type {readonly Floor[]} */
-  floors: Object.freeze([
-    { x0: -9, x1: 9, z0: -2, z1: 2, y: 0 },
-    { x0: -9, x1: -6, z0: -2, z1: -0.8, y: 1.1 },
-    { x0: 6, x1: 9, z0: -2, z1: -0.8, y: 1.1 },
-    { x0: -1.2, x1: 1.2, z0: -0.9, z1: 0.9, y: 0.6, round: 0.6 },
-  ]),
-  backWall: -2,
-  /** @type {readonly ShelfSpot[]} the shelves stand against the back wall on each end's raised deck */
-  shelves: Object.freeze([{ team: 'heroes', x: -7.5, z: -1.7, y: 1.1 }, { team: 'badGuys', x: 7.5, z: -1.7, y: 1.1 }]),
-  /** @type {readonly BuildZone[]} */
-  zones: Object.freeze([{ team: 'heroes', x0: -9, x1: -3 }, { team: 'badGuys', x0: 3, x1: 9 }]),
-  /** @type {readonly Puddle[]} Level 1's syrup: in both gaps round the bad guys' wall (smash through or wade), and one in each half of the field */
-  puddles: Object.freeze([{ x: 4.8, z: 1.6, r: 0.45 }, { x: 4.8, z: -1.6, r: 0.45 }, { x: -2.6, z: 1.3, r: 0.6 }, { x: 2.4, z: -1.2, r: 0.55 }]),
-  ringOut: Object.freeze({ x0: -11, x1: 11, z1: 3.5, y: -3 }),
-  /** @type {readonly BrickSpot[]} milestone 1's pre-placed bad-guy fort: a wall across the band, two high in the middle, with gaps at the back and front */
-  bricks: Object.freeze([
-    ...[-1.2, -0.8, -0.4, 0, 0.4, 0.8].map((z) => wall('badGuys', 4.6, z)),
-    ...[-0.4, 0].map((z) => wall('badGuys', 4.6, z, BRICK)),
-  ]),
-});
 
 /**
  * @typedef {{ dough: string, frosting: string, stripe: boolean }} DonutLook
@@ -111,7 +92,7 @@ export const STAGE = Object.freeze({
  *             look: DonutLook, dummy?: boolean }} Entrant
  *
  * The sim's whole API, which sim.js implements:
- * @typedef {{ createMatch: (entrants: Entrant[], bricks?: readonly BrickSpot[], puddles?: readonly Puddle[]) => any,
+ * @typedef {{ createMatch: (entrants: Entrant[], stage: Stage) => any,
  *             tick: (state: any, inputs: Record<string, Input>) => void,
  *             snapshot: (state: any) => Snapshot }} MatchApi
  */

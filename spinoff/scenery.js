@@ -1,23 +1,23 @@
-// Each level's stage dressing and fort pieces (REUSE-SPEC.md §Forts: one treat theme per level).
+// Each treat theme's stage dressing and fort pieces (REUSE-SPEC.md §Forts); levels.js says which level wears which.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RIOT } from './fx.js';
-import { STAGE } from './match.js';
+import { groundOf } from './match.js';
 import { BATTER, GINGER, box, brickMesh, damageBrick, damagePancake, mat, pancakeMesh, slabGeometry } from './treats.js';
 
 const ICING = '#fff3f8';
 const _v = new THREE.Vector3(), _goal = new THREE.Vector3();
 
-// Level 2: cake and sprinkles (the first playtest stage, kept as it was)
-/** Gingerbread with an icing top, or the gumdrop hill; raised floors are solid to the ground. */
-function floorMesh(f, i) {
+// Cake and sprinkles (the first playtest stage, kept as it was)
+/** Gingerbread with an icing top, or the gumdrop hill; raised floors are solid to the ground. @param {import('./match.js').Floor} f */
+function floorMesh(f) {
   const w = f.x1 - f.x0, d = f.z1 - f.z0, g = new THREE.Group();
   g.position.set((f.x0 + f.x1) / 2, 0, (f.z0 + f.z1) / 2);
-  if (f.y > 0 && f.z0 > STAGE.backWall) {
+  if (f.kind === 'hill') {
     g.add(new THREE.Mesh(slabGeometry(w, d, f.y, 0.7, 0.22), mat('#2fd17a', 0.3)));
     return g;
   }
-  const base = i === 0 ? 0.7 : f.y;
+  const base = f.kind === 'ground' ? 0.7 : f.y;
   const body = new THREE.Mesh(slabGeometry(w, d, base, 0.12), mat(GINGER.heroes, 0.8));
   const top = new THREE.Mesh(slabGeometry(w + 0.08, d + 0.08, 0.08, 0.16, 0.03), mat(ICING, 0.45));
   body.position.y = f.y - base;
@@ -38,8 +38,8 @@ function scatter(geometry, material, n, place) {
   return mesh;
 }
 
-function groundTreats() {
-  const [ground] = STAGE.floors, w = ground.x1 - ground.x0;
+function groundTreats(ground) {
+  const w = ground.x1 - ground.x0;
   const sprinkles = scatter(new THREE.CapsuleGeometry(0.03, 0.1, 2, 6), mat('#ffffff', 0.5), 110, (m, i, u, v) => {
     m.position.set(ground.x0 + 0.2 + u * (w - 0.4), 0.025, ground.z0 + 0.2 + v * (ground.z1 - ground.z0 - 0.4));
     m.rotation.set(Math.PI / 2, 0, i * 2.4);
@@ -52,15 +52,15 @@ function groundTreats() {
   return [sprinkles, drips];
 }
 
-function cakeBackdrop() {
+function cakeBackdrop(backWall) {
   const wall = box(26, 7, 0.4, '#f7bcd6');
-  wall.position.set(0, 2.8, STAGE.backWall - 0.2);
+  wall.position.set(0, 2.8, backWall - 0.2);
   const skirting = box(26, 0.5, 0.2, GINGER.heroes);
-  skirting.position.set(0, 0.25, STAGE.backWall - 0.05);
+  skirting.position.set(0, 0.25, backWall - 0.05);
   return [wall, skirting];
 }
 
-// Level 1: breakfast
+// Breakfast
 const WAFFLE = { cell: 0.5, ridge: 0.09, deep: 0.07, dough: '#e2a24e', pocket: '#a8651f' };
 const SYRUP = new THREE.MeshStandardMaterial({ color: '#c0560c', roughness: 0.08, transparent: true, opacity: 0.6, depthWrite: false });
 const HILL = { cakes: 4, nudge: [[0.05, -0.03], [-0.04, 0.03], [0.02, 0.02], [0, 0]], browned: '#c47a2c', butter: '#ffe680' };
@@ -90,9 +90,9 @@ function puddle(r, k) {
   return new THREE.Shape(pts);
 }
 
-/** The level's sticky syrup (STAGE.puddles), lying in the waffle pockets with the ridges poking through. */
-function syrupPools() {
-  return STAGE.puddles.map(({ x, z, r }, i) => {
+/** The stage's sticky syrup, lying in the waffle pockets with the ridges poking through. @param {readonly import('./match.js').Puddle[]} puddles */
+function syrupPools(puddles) {
+  return puddles.map(({ x, z, r }, i) => {
     const m = new THREE.Mesh(new THREE.ShapeGeometry(puddle(r, i * 1.7)).rotateX(-Math.PI / 2), SYRUP);
     m.position.set(x, -WAFFLE.deep + 0.035, z);
     return m;
@@ -100,8 +100,8 @@ function syrupPools() {
 }
 
 /** Syrup drips hanging off the front edge of the stage. */
-function syrupDrips() {
-  const [ground] = STAGE.floors, w = ground.x1 - ground.x0;
+function syrupDrips(ground) {
+  const w = ground.x1 - ground.x0;
   const drips = new THREE.InstancedMesh(new THREE.SphereGeometry(0.1, 10, 8), SYRUP, Math.floor(w / 0.7));
   for (let i = 0; i < drips.count; i++) {
     _goal.set(ground.x0 + 0.4 + i * 0.7 + (i % 2) * 0.15, -0.08, ground.z1 + 0.02);
@@ -145,34 +145,32 @@ function waffleStack(f) {
 }
 
 /** A waffle ground, waffle-stack decks and the pancake hill; raised floors are solid to the ground. */
-function breakfastFloor(f, i) {
-  if (i === 0) {
-    const g = waffle(f.x1 - f.x0, f.z1 - f.z0, f.y, 0.7);
-    g.position.set((f.x0 + f.x1) / 2, 0, (f.z0 + f.z1) / 2);
-    return g;
-  }
-  const g = f.z0 > STAGE.backWall ? pancakeHill(f) : waffleStack(f);
+/** @param {import('./match.js').Floor} f */
+function breakfastFloor(f) {
+  const make = { ground: (o) => waffle(o.x1 - o.x0, o.z1 - o.z0, o.y, 0.7), deck: waffleStack, hill: pancakeHill }[f.kind];
+  const g = make(f);
   g.position.set((f.x0 + f.x1) / 2, 0, (f.z0 + f.z1) / 2);
   return g;
 }
 
-function breakfastBackdrop() {
+function breakfastBackdrop(backWall) {
   const wall = box(26, 7, 0.4, '#fff1c9');
-  wall.position.set(0, 2.8, STAGE.backWall - 0.2);
+  wall.position.set(0, 2.8, backWall - 0.2);
   const skirting = box(26, 0.5, 0.2, WAFFLE.dough);
-  skirting.position.set(0, 0.25, STAGE.backWall - 0.05);
+  skirting.position.set(0, 0.25, backWall - 0.05);
   return [wall, skirting];
 }
 
+/** @typedef {import('./match.js').Stage} Stage */
+const breakfast = (stage) => [...stage.floors.map(breakfastFloor), ...syrupPools(stage.puddles), syrupDrips(groundOf(stage)), ...breakfastBackdrop(stage.backWall)];
+const cake = (stage) => [...stage.floors.map(floorMesh), ...groundTreats(groundOf(stage)), ...cakeBackdrop(stage.backWall)];
+
 /**
- * @typedef {{ background: string, scenery: () => THREE.Object3D[], puddles: readonly import('./match.js').Puddle[], brick: (b: import('./match.js').BrickState) => any,
+ * @typedef {{ background: string, scenery: (stage: Stage) => THREE.Object3D[], brick: (b: import('./match.js').BrickState) => any,
  *   damage: (m: any, b: import('./match.js').BrickState) => void }} Theme
- * @type {Record<number, Theme>}
+ * @type {Record<import('./levels.js').Level['theme'], Theme>}
  */
 export const THEMES = {
-  1: { background: '#fff6e0', scenery: () => [...STAGE.floors.map(breakfastFloor), ...syrupPools(), syrupDrips(), ...breakfastBackdrop()], puddles: STAGE.puddles, brick: pancakeMesh, damage: damagePancake },
-  2: { background: '#ffe3f0', scenery: () => [...STAGE.floors.map(floorMesh), ...groundTreats(), ...cakeBackdrop()], puddles: [], brick: brickMesh, damage: damageBrick },
+  breakfast: { background: '#fff6e0', scenery: breakfast, brick: pancakeMesh, damage: damagePancake },
+  cake: { background: '#ffe3f0', scenery: cake, brick: brickMesh, damage: damageBrick },
 };
-
-/** ?level=2 shows a later level's look; anything else is Level 1. */
-export const themeFor = (search) => THEMES[Number(new URLSearchParams(search).get('level'))] ?? THEMES[1];

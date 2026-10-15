@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
-import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, ROUND_SECONDS, STAGE, TICK_HZ, outside } from './match.js';
+import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, ROUND_SECONDS, TICK_HZ, outside } from './match.js';
+import { LEVELS } from './levels.js';
 import { CALM_DRAIN, CALM_TICKS, DUMMY, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
 
+const STAGE = LEVELS[1].stage;
 const LOOK = { dough: '#e8c48a', frosting: '#14c4e0', stripe: false };
 const BAD = { dough: '#2a1a14', frosting: '#7a2bbf', stripe: true };
 const body = { height: 0.9, width: 0.45, reach: 0.38 };
@@ -55,7 +57,7 @@ function jumpsDuring(m, n, inputs, id = 'kid') {
 }
 
 {
-  const m = createMatch([hero]);
+  const m = createMatch([hero], STAGE);
   let snap = run(m, 400, tap(-4, 1.5));
   assert.ok(near(me(snap).x, -4) && near(me(snap).z, 1.5) && me(snap).y === 0, 'a floor tap walks there in x and z');
   assert.equal(me(snap).move, 'idle', 'and stops');
@@ -68,7 +70,7 @@ function jumpsDuring(m, n, inputs, id = 'kid') {
 }
 
 {
-  const m = createMatch([hero]);
+  const m = createMatch([hero], STAGE);
   const deck = STAGE.shelves[0];
   let { jumps, snap } = jumpsDuring(m, 400, tap(deck.x, -1.1, deck.y));
   assert.ok(near(me(snap).x, deck.x) && near(me(snap).z, -1.1) && me(snap).y === deck.y && me(snap).onGround, 'a deck tap gets up there');
@@ -78,7 +80,7 @@ function jumpsDuring(m, n, inputs, id = 'kid') {
 }
 
 {
-  const m = createMatch([hero]);
+  const m = createMatch([hero], STAGE);
   let low = Infinity, snap = run(m, 400, tap(-4, 10), (s) => { low = Math.min(low, me(s).y); });
   assert.ok(near(me(snap).z, STAGE.floors[0].z1, 0.06) && me(snap).z < STAGE.floors[0].z1 && me(snap).onGround, 'a tap past the front edge stops at it');
   snap = run(m, 600, tap(-20, 0), (s) => { low = Math.min(low, me(s).y); });
@@ -87,7 +89,7 @@ function jumpsDuring(m, n, inputs, id = 'kid') {
 }
 
 {
-  const m = createMatch([hero]);
+  const m = createMatch([hero], STAGE);
   let crossings = 0, overlaps = 0;
   const watchHill = (s) => {
     if (inHill(me(s))) overlaps++;
@@ -101,17 +103,17 @@ function jumpsDuring(m, n, inputs, id = 'kid') {
 }
 
 {
-  const m = createMatch([hero]);
+  const m = createMatch([hero], STAGE);
   const zs = [];
   const { jumps, snap } = jumpsDuring(m, 900, tap(7, 0));
-  run(createMatch([hero]), 900, tap(7, 0), (s) => { if (Math.abs(me(s).x - WALL_X - BRICK / 2) < BRICK / 2) zs.push(me(s).z); });
+  run(createMatch([hero], STAGE), 900, tap(7, 0), (s) => { if (Math.abs(me(s).x - WALL_X - BRICK / 2) < BRICK / 2) zs.push(me(s).z); });
   assert.ok(near(me(snap).x, 7) && near(me(snap).z, 0) && me(snap).move === 'idle', 'a tap behind the bad-guy wall gets there');
   assert.ok(zs.length && zs.every((z) => z < -1.2 - R + 1e-6 || z > 1.2 + R - 1e-6), 'through a gap');
   assert.equal(jumps, 0, 'without hopping');
 }
 
 {
-  const m = createMatch([hero], CLOSED);
+  const m = createMatch([hero], { ...STAGE, bricks: CLOSED });
   let { snap, inPlace } = jumpsDuring(m, 900, tap(7, 0));
   assert.equal(me(snap).move, 'blocked', 'a closed wall leaves the fighter blocked');
   assert.ok(inPlace <= 5, `without walking in place first (${inPlace} ticks)`);
@@ -126,7 +128,7 @@ function jumpsDuring(m, n, inputs, id = 'kid') {
 }
 
 {
-  const m = createMatch([hero]);
+  const m = createMatch([hero], STAGE);
   let snap = run(m, 20, tap(4, 0));
   const { x } = me(snap);
   snap = run(m, 60, once({ target: { stop: true } }));
@@ -144,7 +146,7 @@ function jumpsDuring(m, n, inputs, id = 'kid') {
     ['a deck walled in by a brick rim', [hero], { thing: 'shelf', team: 'heroes' }, RIM, 'blocked'],
   ];
   for (const [what, who, target, bricks, ends] of awkward) {
-    const m = createMatch(who, bricks);
+    const m = createMatch(who, bricks ? { ...STAGE, bricks } : STAGE);
     const { jumps, inPlace, snap } = jumpsDuring(m, 10 * TICK_HZ, once({ target }));
     assert.ok(jumps <= 3, `${what}: ${jumps} jumps`);
     assert.ok(inPlace <= 5, `${what}: never walks in place (${inPlace} ticks)`);
@@ -153,7 +155,7 @@ function jumpsDuring(m, n, inputs, id = 'kid') {
 }
 
 {
-  const m = createMatch([hero]);
+  const m = createMatch([hero], STAGE);
   let low = Infinity, high = -Infinity;
   const snap = run(m, 900, (s, i) => say({ target: i === 0 ? { x: 4.2, z: 1, y: 0 } : null, kick: i % 60 === 5 }),
     (s) => { low = Math.min(low, me(s).y); high = Math.max(high, me(s).y); });
@@ -163,7 +165,7 @@ function jumpsDuring(m, n, inputs, id = 'kid') {
 
 /** Puts the kid `gap` from the dummy's body (and `dz` deeper), facing it, and swings until the first hit lands. */
 function swing(button, gap, dz = 0) {
-  const m = createMatch([hero, dummy]);
+  const m = createMatch([hero, dummy], STAGE);
   run(m, 600, tap(DUMMY.x - 2 * R - gap, DUMMY.z + dz));
   run(m, 5, tap(DUMMY.x - 2 * R - gap + 0.01, DUMMY.z + dz));
   let at = run(m, 1, once({ [button]: true }));
@@ -216,7 +218,7 @@ function launch(button) {
 }
 
 {
-  const m = createMatch([hero, dummy]);
+  const m = createMatch([hero, dummy], STAGE);
   const speeds = [];
   let last = 0, inside = 0, nearHill = 0;
   run(m, 900, (s, i) => say({ target: i === 0 ? { thing: 'fighter', id: 'dummy' } : null, punch: i % 40 === 39 }), (s) => {
@@ -248,7 +250,7 @@ function launch(button) {
 }
 
 {
-  const m = createMatch([hero, dummy, dummy2]);
+  const m = createMatch([hero, dummy, dummy2], STAGE);
   run(m, 400, once({ target: { thing: 'fighter', id: 'dummy' } }));
   run(m, 60, once({ punch: true }));
   run(m, 400, once({ target: { thing: 'donut', id: snapshot(m).donuts[0].id } }));
@@ -264,7 +266,7 @@ function launch(button) {
 const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).donuts.length;
 
 {
-  const m = createMatch([hero]);
+  const m = createMatch([hero], STAGE);
   const before = [shelfCount(snapshot(m), 'heroes'), shelfCount(snapshot(m), 'badGuys')];
   const events = [];
   const log = (s) => events.push(...s.donutEvents.map((e) => e.kind), ...s.fullBag.map(() => 'full'));
@@ -278,7 +280,7 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
 }
 
 {
-  const m = createMatch([hero, brute]);
+  const m = createMatch([hero, brute], STAGE);
   run(m, 400, tap(-4, 10));
   run(m, 400, once({ target: { x: -4, z: -1, y: 0 } }, 'brute'));
   run(m, 400, once({ target: { x: -4, z: 1.2, y: 0 } }, 'brute'));
@@ -295,7 +297,7 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
 }
 
 {
-  const m = createMatch([hero]);
+  const m = createMatch([hero], STAGE);
   run(m, 600, tap(4, -1));
   run(m, 300, once({ target: { thing: 'brick', id: 'b0' } }));
   const hits = [];
@@ -313,24 +315,24 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
   assert.deepEqual(hits.map((h) => [h.target, h.move, h.broke]), [['b2', 'kick', true]], 'and says so');
   const fell = snap.bricks.find((b) => b.id === 'b6');
   assert.deepEqual([fell.y, fell.hits, fell.x, fell.z], [0, 2, STAGE.bricks[6].x, STAGE.bricks[6].z], 'the brick above fell straight down and stayed whole');
-  assert.equal(fell.icing, snapshot(createMatch([hero])).bricks[0].icing, 'bad-guy bricks keep the bad-guy icing');
+  assert.equal(fell.icing, snapshot(createMatch([hero], STAGE)).bricks[0].icing, 'bad-guy bricks keep the bad-guy icing');
 }
 
 {
-  const m = createMatch([hero, dummy]);
+  const m = createMatch([hero, dummy], STAGE);
   let snap = run(m, ROUND_SECONDS * TICK_HZ, (s, i) => (i === 0 ? say({ target: { x: -4, z: 0, y: 0 } }) : {}));
   assert.ok(snap.over && snap.secondsLeft === 0, 'the clock runs out');
   assert.equal(snap.winner, 'heroes', 'the team with more donuts home wins');
   const end = snap;
   snap = run(m, 60, (s, i) => say({ target: { x: 0, z: 0, y: 0 }, punch: i % 2 === 0 }));
   assert.deepEqual(snap, end, 'and nothing moves after');
-  const tie = createMatch([hero]);
+  const tie = createMatch([hero], STAGE);
   assert.equal(run(tie, ROUND_SECONDS * TICK_HZ).winner, null, 'equal shelves are a tie');
 }
 
 {
   const play = () => {
-    const m = createMatch([hero, dummy]);
+    const m = createMatch([hero, dummy], STAGE);
     run(m, 300, once({ target: { thing: 'fighter', id: 'dummy' } }));
     return run(m, 300, (_, i) => say({ punch: i % 25 === 0, kick: i % 60 === 7 }));
   };
@@ -339,7 +341,7 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
 
 {
   const [p] = STAGE.puddles, cross = (puddles) => {
-    const m = createMatch([hero], STAGE.bricks, puddles);
+    const m = createMatch([hero], { ...STAGE, puddles });
     run(m, 400, tap(p.x - 1.2, p.z));
     let ticks = 0;
     run(m, 600, tap(p.x + 1.2, p.z), (s) => { if (me(s).move === 'walk') ticks++; });
@@ -351,7 +353,7 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
 
 {
   const closest = (team) => {
-    const m = createMatch([hero, { ...dummy, team }]);
+    const m = createMatch([hero, { ...dummy, team }], STAGE);
     let d = Infinity;
     const snap = run(m, 300, tap(-1.6, 0.3), (x) => { d = Math.min(d, Math.hypot(me(x).x - me(x, 'dummy').x, me(x).z - me(x, 'dummy').z)); });
     return { d, past: me(snap).x > me(snap, 'dummy').x };
@@ -364,7 +366,7 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
 
 {
   const turnedInAir = (to) => {
-    const m = createMatch([hero]), deck = STAGE.shelves[0];
+    const m = createMatch([hero], STAGE), deck = STAGE.shelves[0];
     run(m, 300, tap(deck.x, -1.1, deck.y));
     let first = null, worst = 0;
     run(m, 200, tap(to.x, to.z), (s) => {
@@ -380,7 +382,7 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
 }
 
 {
-  const m = createMatch([hero]);
+  const m = createMatch([hero], STAGE);
   run(m, 20, tap(-3, 1));
   let snap = run(m, 5, once({ away: true }));
   const sat = me(snap);
@@ -394,7 +396,7 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
 }
 
 {
-  const m = createMatch([hero, dummy]);
+  const m = createMatch([hero, dummy], STAGE);
   run(m, 300, once({ target: { thing: 'fighter', id: 'dummy' } }));
   let snap = run(m, 200, (_, i) => say({ punch: i % 30 === 0 }));
   const hit = me(snap, 'dummy').percent;
@@ -406,7 +408,7 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
 }
 
 {
-  const m = createMatch([hero, dummy]);
+  const m = createMatch([hero, dummy], STAGE);
   let snap = run(m, 300, tap(-4, 0.5));
   const held = m.fighters.find((f) => f.id === 'dummy');
   m.donuts.push({ id: 'dropped', x: me(snap).x, y: 0, z: me(snap).z, vx: 0, vy: 0, vz: 0, look: held.carrying });

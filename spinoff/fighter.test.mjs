@@ -5,7 +5,7 @@ import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import {
   BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, buildFighter, disposeFighter, gloveAnchors, isBadGuyCloth, isBadGuyFur,
-  newFighter, randomFighter, readFighter, setFur,
+  newFighter, randomFighter, readFighter, seatDrop, setFur,
 } from './fighter.js';
 import { wingShape } from '../characters/owl.js';
 import { floorGrid } from './roster.js';
@@ -160,6 +160,13 @@ for (const species of SPECIES) for (const cape of CAPES) {
   }
   LOOK.viewPx = 0;
   setGeometryDetail('high');
+}
+
+for (const species of SPECIES) {
+  const built = buildFighter(newFighter(species)), drop = seatDrop(built);
+  assert.ok(drop > 0.05 && drop < built.params.legHeight + built.params.hipInset + 0.05,
+    `${species} sits down by part of its leg length, not through the floor or not at all (${drop})`);
+  disposeFighter(built);
 }
 
 console.log('fighter ok');

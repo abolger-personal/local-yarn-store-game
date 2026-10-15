@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-  BASE_PARAMS, DANCE_POSES, MOTION_DEFAULTS, NAMES, POSES, createCharacter, deriveCoatColor, disposeCharacter, getSpecies, mergeCharacter,
-  phaseStep, stepMotion, walkGain, walkLayer, walkPhase,
+  BASE_PARAMS, DANCE_POSES, MOTION_DEFAULTS, NAMES, POSES, applyPose, createCharacter, deriveCoatColor, disposeCharacter, getSpecies, mergeCharacter,
+  lowestResting, phaseStep, stepMotion, walkGain, walkLayer, walkPhase,
 } from '../characters/npc.js';
 import { deriveManeColor } from '../characters/lion.js';
 import { CRAFTS, STITCHES_BY_CRAFT, defaultItem, dress, undress, usualTool } from '../characters/garments.js';
@@ -239,7 +239,17 @@ export const MOVE_POSES = Object.freeze({
   kick: Object.freeze({ 1: DANCE_POSES['rd-kick-r'], [-1]: DANCE_POSES['rd-kick-l'] }),
   hurt: posed({ armSwing: -0.5, armOut: 0.9, elbowBend: 1.2, spineBend: -0.2, headPitch: 0.25, kneeBend: 0.3 }),
   air: posed({ armOut: 0.9, elbowBend: 0.4, kneeBend: 0.9, hipFlex: 0.6 }),
+  // REUSE-SPEC.md §Network gotchas: a guest who leaves the screen sits on the floor, legs out in front
+  sit: posed({ ...POSES.sit, kneeBend: 0.15 }),
 });
+
+/** How far a fighter's root drops for its seat to rest on the floor in MOVE_POSES.sit. */
+export function seatDrop(built) {
+  applyPose(built, MOVE_POSES.sit);
+  const drop = lowestResting(built) - built.root.position.y;
+  applyPose(built, POSES.rest);
+  return drop;
+}
 
 // REUSE-SPEC.md §Mode: how donuts look
 export const HERO_DOUGH = '#e8c48e';

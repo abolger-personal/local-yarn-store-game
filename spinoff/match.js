@@ -65,12 +65,13 @@ export const STAGE = Object.freeze({
  * @typedef {{ x: number, z: number, y?: number } | { thing: 'donut'|'brick'|'fighter', id: string }
  *           | { thing: 'shelf', team: Team } | { stop: true }} Target
  *   a point on the stage (y given when the tap landed on a raised top), a thing, or stop where you are
- * @typedef {'idle'|'walk'|'jump'|'fall'|'punch'|'kick'|'hurt'|'launched'|'blocked'} MoveId
- *   'blocked': standing at a wall it can't hop, facing it
+ * @typedef {'idle'|'walk'|'jump'|'fall'|'punch'|'kick'|'hurt'|'launched'|'blocked'|'sit'} MoveId
+ *   'blocked': standing at a wall it can't hop, facing it; 'sit': away from the screen, sitting where it stopped
  *
  * One player's input for one tick. `target` is sent only when it changes (null keeps the last
- * one); `punch` / `kick` are true on the tick the button went down.
- * @typedef {{ target: Target|null, punch: boolean, kick: boolean }} Input
+ * one); `punch` / `kick` are true on the tick the button went down. `away` is sent when a guest's
+ * screen is hidden (true) or back (false), and kept between: the fighter stops and sits.
+ * @typedef {{ target: Target|null, punch: boolean, kick: boolean, away?: boolean }} Input
  *
  * @typedef {{ id: string, team: Team, x: number, y: number, z: number, vx: number, vy: number, vz: number,
  *             facing: number, height: number, onGround: boolean, move: MoveId, step: number,

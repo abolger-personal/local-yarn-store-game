@@ -573,8 +573,22 @@ rollback or replays possible later.
 
 - **Client isolation.** Guest networks and some mesh Wi-Fi systems block devices from reaching
   each other. Symptom: everyone joins the room but no data channel opens. Use the main network.
-- **Host leaves, match ends.** `ponytail:` no host migration; the room shows "host left" and
-  everyone rejoins. Add migration only if it happens often.
+- **Leaving the screen** (decided 2026-10-14). A browser stops running a page that isn't on screen
+  (background tabs are throttled, then frozen; a dark screen stops everything), and the game only
+  runs on the host, so who leaves matters:
+  - **Screens stay on in a match:** every tablet holds a screen wake lock (`navigator.wakeLock`)
+    during a round, re-asked on every resume, so a tablet never dims and sleeps mid-fight.
+  - **A guest who leaves sits down.** The page sends `away: true` on `visibilitychange`; the
+    fighter drops its target and sits on the floor where it stopped (move `'sit'`, the shop's sit
+    pose with legs out), ignoring taps and buttons, until `away: false`. The match carries on
+    round them; they can still be hit and still carry.
+  - **The host can pause everyone.** ⏸ beside 👋 stops the match and the clock on every tablet;
+    every screen shows the ⏸ card, and ▶️ on the host plays on. The host leaving the screen pauses
+    the same way: the page gets a moment's notice when it's hidden, enough to send "paused"
+    first. In milestone 2 the snapshot carries `paused`, and guests show the card without a ▶️.
+- **Host gone for good, match ends.** `ponytail:` no host migration; if the host stays away (a
+  minute, to tune) or its connection drops, the room shows "host left" and everyone rejoins. Add
+  migration only if it happens often.
 - **The room code is a label, not a lock.** Random, shown on the host, not a word. The home-network
   rules above keep strangers out; 1,296 picture codes only need to keep one house's games apart.
 

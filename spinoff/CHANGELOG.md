@@ -32,5 +32,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   cream, or find the gap in it.
 - Grab a donut and it flies into your bag. Steal one from the bad guys' shelf for a happy dance, then run it home for
   confetti. Your bag holds one donut: try for a second and your fighter shakes its head.
+- ⏸ pauses the game, clock and all; ▶️ plays on. Leaving the screen pauses it too, and the screen
+  stays awake while you play.
 - When time runs out, a card shows who has more donuts, with ▶️ to play again and 👋 back to the
   lobby.

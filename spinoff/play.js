@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { POSES, setGeometryDetail } from '../characters/npc.js';
 import { attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
-import { MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, setFur, stepFighter } from './fighter.js';
+import { MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
 import { BRICK, STAGE, TICK_HZ } from './match.js';
 import { makeStage } from './stage.js';
@@ -95,6 +95,7 @@ function tickDown(t, keys, dt) {
 const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 function poseOf(m, f) {
+  if (f.move === 'sit') return MOVE_POSES.sit;
   if (m.t.joy > 0) return POSES.delighted;
   if (f.move === 'punch' || f.move === 'kick') return f.step < 0.7 ? MOVE_POSES[f.move][Math.cos(f.facing) >= 0 ? 1 : -1] : POSES.rest;
   if (f.move === 'hurt' || f.move === 'launched') return MOVE_POSES.hurt;
@@ -109,7 +110,8 @@ function placeFighter(m, f, dt) {
   const { squash: s, no } = m.t;
   m.yaw += turn(Math.PI / 2 - f.facing - m.yaw) * Math.min(1, dt * 14);
   m.g.rotation.y = m.yaw + Math.sin(no * 26) * 0.3 * no;
-  m.g.position.set(f.x + m.recoil.x * s, f.y, f.z + m.recoil.z * s);
+  m.down += ((f.move === 'sit' ? 1 : 0) - m.down) * Math.min(1, dt * 6);
+  m.g.position.set(f.x + m.recoil.x * s, f.y - m.seat * m.down, f.z + m.recoil.z * s);
   m.g.scale.set(1 + 0.2 * s, 1 - 0.28 * s, 1 + 0.2 * s);
 }
 
@@ -303,11 +305,24 @@ function cast() {
     g.add(built.root);
     scene.add(g);
     const t = Object.fromEntries(FIGHTER_TIMERS.map((k) => [k, 0]));
-    fighters.set(id, { g, built, team, t, yaw: 0, recoil: new THREE.Vector3(), pose: {}, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
+    fighters.set(id, { g, built, team, t, yaw: 0, recoil: new THREE.Vector3(), pose: {}, seat: seatDrop(built), down: 0, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
     endPicture(entrant);
     return entrant;
   });
 }
+
+// REUSE-SPEC.md §Network gotchas: the host pauses everyone, clock and all; leaving the screen pauses too.
+let paused = false;
+// The browser drops the lock whenever the page is hidden, so it's asked for again on every resume.
+const keepAwake = () => navigator.wakeLock?.request('screen').catch(() => {});
+function setPaused(on) {
+  paused = on;
+  document.getElementById('paused').hidden = !on;
+  if (!on) keepAwake();
+}
+document.getElementById('pause').addEventListener('click', () => setPaused(true));
+document.getElementById('resume').addEventListener('click', () => setPaused(false));
+document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); });
 
 function play() {
   const state = api.createMatch(cast(), STAGE.bricks, theme.puddles);
@@ -315,8 +330,10 @@ function play() {
   const button = (id) => document.getElementById(id);
   attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: button('punch'), kick: button('kick') } });
   let snap = api.snapshot(state), acc = 0;
+  keepAwake();
   stage.run((dt) => {
     if (snap.over) { showEnd(snap); return; }
+    if (paused) { acc = 0; return; }
     for (acc += dt; acc >= 1 / TICK_HZ; acc -= 1 / TICK_HZ) {
       api.tick(state, { [ME]: controls.take(snap) });
       snap = api.snapshot(state);
@@ -329,5 +346,6 @@ function play() {
 const goTo = (href) => () => { location.href = href; };
 document.getElementById('leave').addEventListener('click', goTo('lobby.html'));
 document.getElementById('bye').addEventListener('click', goTo('lobby.html'));
+document.getElementById('quit').addEventListener('click', goTo('lobby.html'));
 document.getElementById('again').addEventListener('click', goTo(`play.html${location.search}`));
 if (mine) play();

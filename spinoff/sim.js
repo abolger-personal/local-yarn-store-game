@@ -713,7 +713,15 @@ function aim(f, t) {
 
 const busy = (f) => Boolean(f.attack || f.stun > 0 || f.freeze > 0 || f.pending);
 
+function setAway(f, away) {
+  if (away == null || away === f.away) return;
+  f.away = away;
+  if (away) aim(f, { stop: true });
+}
+
 function applyInput(s, f, input) {
+  setAway(f, input?.away);
+  if (f.away) return;
   if (input?.target) aim(f, input.target);
   if (busy(f) || !(input?.kick || input?.punch)) return;
   let id = 'punch';
@@ -746,7 +754,7 @@ function spawnSpot(s, e, cursor) {
 function newFighter(e, at) {
   return { id: e.id, team: e.team, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
     x: at.x, y: GROUND.y, z: at.z, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, onGround: true, jumps: 1,
-    target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, fails: 0, stuck: 0,
+    target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, fails: 0, stuck: 0, away: false,
     attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, percent: 0,
     carrying: null, touching: [], shelfDone: false };
 }
@@ -814,6 +822,7 @@ function moveOf(f) {
   if (f.pending || f.stun > 0) return f.hitMove;
   if (f.attack) return MOVES[f.attack.id].shows;
   if (!f.onGround) return f.vy > 0 ? 'jump' : 'fall';
+  if (f.away) return 'sit';
   if (f.nav?.done && f.nav.blocked) return 'blocked';
   return Math.hypot(f.vx, f.vz) > TURN_SPEED ? 'walk' : 'idle';
 }

@@ -379,4 +379,18 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
     assert.ok(turnedInAir(to) < 0.01, `walking off the deck toward ${to.x}, ${to.z} holds its facing all the way down`);
 }
 
+{
+  const m = createMatch([hero]);
+  run(m, 20, tap(-3, 1));
+  let snap = run(m, 5, once({ away: true }));
+  const sat = me(snap);
+  assert.equal(sat.move, 'sit', 'a guest who leaves the screen sits down');
+  snap = run(m, 120, (_, i) => say({ target: { x: 3, z: 0, y: 0 }, punch: i % 10 === 0 }));
+  assert.ok(me(snap).move === 'sit' && me(snap).x === sat.x && me(snap).z === sat.z, 'and stays put, whatever arrives, until back');
+  snap = run(m, 5, once({ away: false }));
+  assert.notEqual(me(snap).move, 'sit', 'coming back stands up');
+  snap = run(m, 200, tap(-3, 1));
+  assert.ok(near(me(snap).x, -3) && near(me(snap).z, 1), 'and plays on');
+}
+
 console.log('sim ok');

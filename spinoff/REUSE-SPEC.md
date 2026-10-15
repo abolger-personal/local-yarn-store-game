@@ -928,12 +928,15 @@ scary, for 4–6 year olds.
   it: kids get bored of a look but keep their card. Everything else still starts over each game
   (`help`, earned moves, power bars).
   - **A stamp for winning a level.** When the heroes win a level, every hero in the room gets that
-    level's stamp. One stamp per level, kept for good; winning it again adds nothing.
+    level's stamp, kept for good. **Winning it again counts on the stamp** (decided 2026-10-14):
+    the stamp gains a number, ×2, ×3 and up, like a sticker with a tally, so replaying a favourite
+    level still fills the card.
   - **A stamp looks like a real postage stamp:** the same picture that shows the level in the level
     picker, in sepia, with a perforated edge (a small slant and a cancellation squiggle would sell
     it). The card is a grid of the levels' places; an unwon level's place is empty.
-  - **The save is a list of whole level numbers,** checked on the way in like the fighter (whole
-    numbers from 1 to the last level, no repeats); anything else is dropped. A guest sends its
+  - **The save is level number → times won** (e.g. `{ "1": 3, "2": 1 }`), checked on the way in
+    like the fighter: keys are whole levels from 1 to the last level, counts whole numbers from 1
+    (capped, say at 99); anything else is dropped. A guest sends its
     card with its fighter when it joins.
   - Open (2026-10-14): whether stamps open levels (a stamp on N opens N+1) or every level can be
     picked from the start; whether unlocked moves and fort pieces follow the chosen level or the

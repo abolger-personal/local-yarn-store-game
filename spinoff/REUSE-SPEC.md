@@ -959,8 +959,22 @@ scary, for 4–6 year olds.
       and use there, like a loose donut. Owning one is what makes it turn up, on any level.
       **Anyone can grab a goodie** (decided 2026-10-14), teammate or bad guy, not only its owner:
       sharing and passing need that, and teamwork rewards for them may come later.
-    Open: the milestone steps (say 5, 10, 25, 50, 100); how often goodies turn up and tricks
-    charge, which is where `help` (Handicap) can even out a kid with a big card.
+    **Starting ladder, per level** (2026-10-14, to tune). The very first finish already gives
+    something besides the stamp, so a kid learns at once that the card hands out stuff:
+
+    | Finishes | Reward |
+    | --- | --- |
+    | 1 | The stamp **and** a small dress-up |
+    | 5 | A goodie |
+    | 10 | A second dress-up |
+    | 25 | A second goodie |
+    | 50 | A trick |
+    | 100 | The big trick (pancakes: the magic spatula) |
+
+    Cheap looks come first and tricks last, so a kid who plays more gets prettier before they get
+    stronger. The end card presses the stamp, pops the reward out of it, and shows the next
+    milestone's reward as a shadow with its number, so more is visibly coming.
+    Open: how often goodies turn up and tricks charge, which is where `help` (Handicap) can even out a kid with a big card.
   - Open (2026-10-14): whether stamps open levels (a stamp on N opens N+1) or every level can be
     picked from the start; whether unlocked moves and fort pieces follow the chosen level or the
     card; whether winning should show on the stamp too; whether grownup bad-guy players have

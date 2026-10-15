@@ -5,7 +5,7 @@ import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import {
   BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, buildFighter, disposeFighter, gloveAnchors, isBadGuyCloth, isBadGuyFur,
-  newFighter, randomFighter, readFighter, seatDrop, setFur, wobbleAt,
+  newFighter, randomFighter, readFighter, seatDrop, setFur, wobbleAt, wobbleHz,
 } from './fighter.js';
 import { wingShape } from '../characters/owl.js';
 import { floorGrid } from './roster.js';
@@ -173,7 +173,7 @@ for (const species of SPECIES) {
   const wobble = (percent) => {
     let peak = 0, swings = 0, was = 0;
     for (let i = 0; i < 120; i++) {
-      const { z } = wobbleAt(percent, i / 120);
+      const { z } = wobbleAt(percent, wobbleHz(percent) * i / 120);
       peak = Math.max(peak, Math.abs(z));
       if (z * was < 0) swings++;
       was = z;
@@ -184,6 +184,15 @@ for (const species of SPECIES) {
   const some = wobble(15), lots = wobble(80);
   assert.ok(some.peak > 0.12, `a few hits already show (${some.peak} rad)`);
   assert.ok(lots.peak > 0.35 && lots.swings >= 8, `a ready-to-fly fighter wobbles hard and fast (${lots.peak} rad, ${lots.swings} swings a second)`);
+  let cycles = 0, was = wobbleAt(80, 0).z, jump = 0;
+  for (let i = 1; i < 60 * 90; i++) {
+    const percent = Math.min(80, 80 - (i - 3600) * 0.5);
+    cycles += wobbleHz(percent) / 60;
+    const { z } = wobbleAt(percent, cycles);
+    jump = Math.max(jump, Math.abs(z - was));
+    was = z;
+  }
+  assert.ok(jump < 0.2, `a calming fighter never snaps, however late in the round (${jump} rad in one frame)`);
 }
 
 console.log('fighter ok');

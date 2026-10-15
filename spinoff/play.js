@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { POSES, setGeometryDetail } from '../characters/npc.js';
 import { attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
-import { MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter, wobbleAt } from './fighter.js';
+import { MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
 import { BRICK, TICK_HZ, groundOf } from './match.js';
 import { levelFor } from './levels.js';
@@ -117,7 +117,8 @@ function poseOf(m, f) {
 function placeFighter(m, f, dt) {
   const { squash: s, no } = m.t;
   m.yaw += turn(Math.PI / 2 - f.facing - m.yaw) * Math.min(1, dt * 14);
-  const tilt = wobbleAt(f.percent, now, m.seed);
+  m.cycles += wobbleHz(f.percent) * dt;
+  const tilt = wobbleAt(f.percent, m.cycles);
   m.g.rotation.set(tilt.x, m.yaw + Math.sin(no * 26) * 0.3 * no, tilt.z, 'ZXY');
   m.down += ((f.move === 'sit' ? 1 : 0) - m.down) * Math.min(1, dt * 6);
   m.g.position.set(f.x + m.recoil.x * s, f.y - m.seat * m.down, f.z + m.recoil.z * s);
@@ -333,7 +334,7 @@ function cast(roster) {
     g.add(built.root);
     scene.add(g);
     const t = Object.fromEntries(FIGHTER_TIMERS.map((k) => [k, 0]));
-    fighters.set(id, { g, built, team, t, vy: 0, ground: true, yaw: 0, recoil: new THREE.Vector3(), pose: {}, seat: seatDrop(built), down: 0, seed: fighters.size * 2.1, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
+    fighters.set(id, { g, built, team, t, vy: 0, ground: true, yaw: 0, recoil: new THREE.Vector3(), pose: {}, seat: seatDrop(built), down: 0, cycles: fighters.size * 0.33, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
     endPicture(entrant);
     return entrant;
   });

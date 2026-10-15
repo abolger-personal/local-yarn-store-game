@@ -222,11 +222,14 @@ export const animateFighter = (built, dt, pose = 'rest') => stepMotion(built, PO
 // REUSE-SPEC.md §What the fighter needs: hits taken show as a fast wobble on the feet, growing to full by
 // the percent a hit starts ringing a fighter out (measured: ~60% for punches, ~96% for kicks). No health bar.
 const WOBBLE = { full: 80, tilt: 0.38, hz: [2, 4.5] };
-/** A fighter's tilt in radians about world x (toward the camera) and z (sideways), `t` seconds in. */
-export function wobbleAt(percent, t, seed = 0) {
-  const k = Math.min(1, Math.max(0, percent) / WOBBLE.full);
+const wobbleK = (percent) => Math.min(1, Math.max(0, percent) / WOBBLE.full);
+/** Wobbles a second; add it up each frame (cycles += wobbleHz × dt) so a change in percent never jumps the phase. */
+export const wobbleHz = (percent) => WOBBLE.hz[0] + (WOBBLE.hz[1] - WOBBLE.hz[0]) * wobbleK(percent);
+/** A fighter's tilt in radians about world x (toward the camera) and z (sideways), `cycles` wobbles in. */
+export function wobbleAt(percent, cycles) {
+  const k = wobbleK(percent);
   if (k === 0) return { x: 0, z: 0 };
-  const a = WOBBLE.tilt * Math.sqrt(k), w = 2 * Math.PI * (WOBBLE.hz[0] + (WOBBLE.hz[1] - WOBBLE.hz[0]) * k) * t + seed;
+  const a = WOBBLE.tilt * Math.sqrt(k), w = 2 * Math.PI * cycles;
   return { x: 0.5 * a * Math.cos(w * 0.9), z: a * Math.sin(w) };
 }
 

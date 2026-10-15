@@ -931,9 +931,10 @@ scary, for 4–6 year olds.
     level's stamp, kept for good. **Winning it again counts on the stamp** (decided 2026-10-14):
     the stamp gains a number, ×2, ×3 and up, like a sticker with a tally, so replaying a favourite
     level still fills the card.
-  - **A stamp looks like a real postage stamp:** the same picture that shows the level in the level
-    picker, in sepia, with a perforated edge (a small slant and a cancellation squiggle would sell
-    it). The card is a grid of the levels' places; an unwon level's place is empty.
+  - **A stamp looks like a kid's craft rubber stamp** (decided 2026-10-14; not a postage stamp):
+    the same picture that shows the level in the level picker, pressed in one sepia ink. Simple
+    bold shapes, ink patchy where the stamp didn't press evenly, soft edges, a little crooked, never
+    two exactly alike. The ×2, ×3 tally is stamped beside it the same way. The card is a grid of the levels' places; an unwon level's place is empty.
   - **The save is level number → times won** (e.g. `{ "1": 3, "2": 1 }`), checked on the way in
     like the fighter: keys are whole levels from 1 to the last level, counts whole numbers from 1
     (capped, say at 99); anything else is dropped. A guest sends its

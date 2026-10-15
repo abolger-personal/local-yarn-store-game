@@ -1076,3 +1076,4 @@ bad guy grabs a donut and banks it.
   some level on, everyone's bag holds 2, then 3), or a power (a full bar or a gesture gives a big
   bag for a while)? Either way, the hit table (punch knocks 1 loose, kick 2, powers the whole bag)
   only matters once bags hold more than one.
+- **Generated levels.** Whether stages could be generated per difficulty, and how they'd stamp: see `GENERATED-LEVELS.md`.

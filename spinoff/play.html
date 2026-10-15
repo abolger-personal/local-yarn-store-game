@@ -40,11 +40,21 @@
     </div>
   </div>
 </div>
+<div id="wait" class="end" hidden>
+  <div class="card paused"><div class="big emoji" aria-label="waiting for everyone">⏳</div></div>
+</div>
+<div id="gone" class="end" hidden>
+  <div class="card paused">
+    <div class="big emoji" aria-label="the host left">🏠💨</div>
+    <div class="again"><button id="gone-bye" aria-label="wave bye, back to the lobby"><span class="emoji">👋</span></button></div>
+  </div>
+</div>
 <script type="importmap">
 {
   "imports": {
     "three": "https://unpkg.com/three@0.186.1/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.186.1/examples/jsm/"
+    "three/addons/": "https://unpkg.com/three@0.186.1/examples/jsm/",
+    "trystero": "https://esm.sh/trystero@0.26.0"
   }
 }
 </script>

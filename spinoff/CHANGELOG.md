@@ -4,6 +4,16 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 
 ## 0.0.2 — in progress
 
+### Play together
+- **Play a match together.** In a room, the tablet that opened it (🏠) has ▶️: tap it and every
+  tablet in the room goes to the same stage, everyone a hero against the training dummy. ⏳
+  shows while everyone arrives. Only the host can start.
+- Each tablet's camera follows its own fighter.
+- ⏸ on the host pauses everyone. Leaving the screen on the host pauses everyone too; leaving it
+  on another tablet makes that fighter sit down until you're back.
+- If the host leaves, everyone else sees 🏠💨 and 👋 back to the lobby.
+- When time runs out, the end card shows on every tablet; ▶️ on the host plays again together.
+
 ### Practice
 - **Surprise stages, for testing.** Add `?seed=` and a number to the play page's address (for
   example `play.html?seed=123&difficulty=2`) for a made-up breakfast stage: walls, gaps, syrup and

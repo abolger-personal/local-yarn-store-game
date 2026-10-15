@@ -20,7 +20,7 @@ stage.scene.add(floor);
 
 /** @type {Map<string, {built: any, cheer: number}>} */
 const cast = new Map();
-let room = null, typed = [];
+let room = null, typed = [], roomCode = [];
 
 function place() {
   const spots = standingSpots([...cast.keys()], grid);
@@ -55,14 +55,23 @@ function showCode(code) {
   document.getElementById('code').innerHTML = `${code.map(treat).join('')}${'<span></span>'.repeat(CODE_LENGTH - code.length)}`;
 }
 
-function enter(code) {
+// REUSE-SPEC.md §Multiplayer: only the tablet that opened the room starts the match, and everyone in it goes along
+function enter(next, hosting = false) {
   room?.leave();
   for (const id of cast.keys()) if (id !== selfId) leave(id);
-  room = openRoom(code, mine, { onFighter: arrive, onLeave: leave });
-  showCode(code);
+  roomCode = next;
+  room = openRoom(next, mine, { onFighter: arrive, onLeave: leave });
+  room.on('go', () => { location.href = `play.html?room=${next.join('')}`; });
+  showCode(next);
   show('start', false);
   show('keypad', false);
   show('inroom', true);
+  show('go', hosting);
+}
+
+function go() {
+  room.send('go', true);
+  setTimeout(() => { location.href = `play.html?room=${roomCode.join('')}&host=${cast.size - 1}`; }, 300);
 }
 
 function exit() {
@@ -94,11 +103,12 @@ function buildKeypad() {
 }
 
 const on = (id, fn) => document.getElementById(id).addEventListener('click', fn);
-on('host', () => enter(randomCode()));
+on('host', () => enter(randomCode(), true));
 on('join', () => { typed = []; showCode([]); show('start', false); show('keypad', true); });
 on('edit', () => { location.href = 'choose.html'; });
 on('play', () => { location.href = 'play.html'; });
 on('exit', exit);
+on('go', go);
 buildKeypad();
 
 if (mine) {

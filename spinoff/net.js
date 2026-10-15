@@ -33,19 +33,39 @@ function homeOnly(fighter, mine, onFighter) {
     early.delete(peerId);
   };
   const forget = (peerId) => { home.delete(peerId); early.delete(peerId); };
-  return { welcome, forget };
+  return { welcome, forget, home };
+}
+
+/** Typed messages to and from home-checked tablets only: multiplayer.js's Link. @param {Set<string>} home */
+function linkOf(room, home) {
+  const actions = new Map();
+  const action = (type) => {
+    if (!actions.has(type)) actions.set(type, room.makeAction(type));
+    return actions.get(type);
+  };
+  return {
+    send(type, data, to = [...home]) {
+      const target = to.filter((id) => home.has(id));
+      if (target.length) action(type).send(data, { target }).catch(() => {});
+    },
+    on(type, fn) { action(type).onMessage = (data, { peerId }) => { if (home.has(peerId)) fn(data, peerId); }; },
+  };
 }
 
 /**
  * Joins a room and swaps fighters with everyone in it (REUSE-SPEC.md §Multiplayer). A tablet whose
  * connection doesn't run over the home network is hung up on before anything is sent or accepted.
- * ponytail: every tablet tells every other; the host-authoritative star arrives with the match sim.
+ * ponytail: every tablet tells every other its fighter, in a match too; only the host uses them.
+ * ponytail: Trystero 0.26 has no per-action channel options; every action, snapshots too, rides its one
+ * reliable, ordered data channel, so one lost packet holds the stream up for a resend. If that stutters,
+ * open a negotiated `{ ordered: false, maxRetransmits: 0 }` channel on `room.getPeers()[id]` for snapshots.
  * @param {number[]} code
  * @param {import('./fighter.js').Fighter} mine
  * @param {{ onFighter: (id: string, f: import('./fighter.js').Fighter) => void, onLeave: (id: string) => void }} on
+ * @param {string} [place] '-play' for a match's room, apart from the lobby's
  */
-export function openRoom(code, mine, { onFighter, onLeave }) {
-  const room = joinRoom(roomConfig(code), roomName(code));
+export function openRoom(code, mine, { onFighter, onLeave }, place = '') {
+  const room = joinRoom(roomConfig(code), roomName(code) + place);
   const peers = homeOnly(room.makeAction('fighter'), mine, onFighter);
   room.onPeerJoin = async (peerId) => {
     const pc = room.getPeers()[peerId];
@@ -57,5 +77,5 @@ export function openRoom(code, mine, { onFighter, onLeave }) {
     pc?.close();
   };
   room.onPeerLeave = (peerId) => { peers.forget(peerId); onLeave(peerId); };
-  return { leave: () => room.leave() };
+  return { leave: () => room.leave(), ...linkOf(room, peers.home) };
 }

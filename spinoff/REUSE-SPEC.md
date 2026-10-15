@@ -549,8 +549,57 @@ Check: the milestone 1 node test runs the same scripted hit against fighters at 
 ### Where things stand
 
 The game ships as static files on GitHub Pages. The lobby's networking is built
-(`spinoff/net.js`, Trystero; see Lobby): every tablet swaps fighters with every other. Inputs,
-snapshots and the host are not built yet. The yarn store's seeded rng (ROADMAP A1) draws from
+(`spinoff/net.js`, Trystero; see Lobby): every tablet swaps fighters with every other. Shared
+matches are built too (0.0.2): `spinoff/multiplayer.js` is the host and guest logic over any
+link (`send(type, data, to)` / `on(type, fn)`), `spinoff/together.js` is the play page's glue,
+and `spinoff/multiplayer.test.mjs` runs a host and guests over an in-memory link that loses and
+reorders snapshots. What was built, and what the build decided (2026-10-14, to confirm):
+
+- **Starting together.** In a room, the tablet that opened it (🏠) gets ▶️; the others don't.
+  ▶️ sends `go` to everyone in the room, and every tablet loads `play.html?room=CODE` (the host's
+  with `&host=N`, N the guests it expects). A page load drops the lobby's connections, so the
+  match has its own Trystero room (`donut-CODE-play`), apart from the lobby's; everyone rejoins it
+  with the same home-network check. The host waits for its N guests' fighters (15 s at most,
+  `ponytail:`, then it starts with whoever came), then sends `start` once. ⏳ shows meanwhile.
+- **`start`** (host → each guest, once): the level as data (`theme` and the whole `Stage`,
+  opaque: the guest never rebuilds it), the roster (`id`, `team`, and each player's fighter save,
+  or `dummy: true` for the training dummy, which every tablet dresses the same), and the round
+  settings (`seconds`). Ids are Trystero peer ids. Every player is a hero; the dummy is the bad
+  guys, as in practice. The guest checks it: a known theme, exactly one ground floor, floors with
+  numbers, shelves with a team, every number finite, each fighter through `readFighter`, and
+  itself in the roster; anything else is ignored. The sender of the first good `start` is the
+  host from then on; `snap` and `again` from anyone else are ignored.
+- **`input`** (guest → host, reliable): the `Input` from `controls.take`, sent only when it says
+  something (a new target, a 🥊 / 🦶 press, or `away`). The host keys it by the sender's peer id,
+  never by anything in the message, so no tablet can steer another's fighter, and ignores
+  senders outside the roster and malformed or absurd inputs (non-finite or huge numbers, unknown
+  teams or things, over-long ids). Inputs arriving between ticks merge: the last target, any press.
+- **`snap`** (host → guests, 30 Hz): the `Snapshot` with numbers rounded to 3 decimals, plus
+  `seq`, `paused`, and `events`. The host keeps sending while paused and on the end card, which
+  doubles as its heartbeat. A guest keeps a snapshot only if its `seq` is newer than the last.
+  Bricks and shelves (over half the bytes) are left out unless they changed in the last half
+  second, and sent anyway every 15th snapshot; guests carry the last ones over. Measured: 2
+  fighters about 0.9 KB on average (3.9 KB with bricks and shelves), 8 fighters about 2.5 KB
+  (5.8 KB); `start` is about 3.6 KB for 2 and 16 KB for 8 (the fighter saves).
+- **Events survive a lost snapshot:** every snapshot repeats the last half second's hits,
+  `fullBag` and `donutEvents`, each group tagged with its tick, and a guest plays only the
+  groups newer than the newest tick it has seen. So a guest that loses up to about seven
+  snapshots in a row still gets every BAM and steal, exactly once.
+- **Guests draw:** no sim; other fighters are drawn one to two snapshots back (2–4 ticks),
+  between the two snapshots either side, position and facing; a guest's own fighter, and
+  everything else, comes from the newest snapshot. Each tablet's camera follows its own fighter.
+- **Channel, as built:** Trystero 0.26 has no per-action channel options: every action rides one
+  reliable, ordered data channel, snapshots too. `ponytail:` a negotiated
+  `{ ordered: false, maxRetransmits: 0 }` channel on the peer connection if snapshots stutter.
+  The design above doesn't depend on reliability, so the switch is local to `net.js`.
+- **Pause, away, gone:** see Network gotchas. A guest who drops out mid-match sits where it stopped
+  for the rest of the round (the sim can't take a fighter out, and a sitting fighter can still
+  be hit and still drops its donut). Its tablet can't rejoin that match.
+- **Again:** ▶️ on the host's end card sends `again`; every tablet reloads into a fresh match the
+  same way it started (rejoin, ⏳, `start`). Guests' ▶️ on the end card and the ⏸ card is hidden,
+  and so is their ⏸. 👋 goes back to the lobby's first screen, out of the room.
+
+The yarn store's seeded rng (ROADMAP A1) draws from
 `world.rngState` (`draw` in `characters/store/core/util.js`); the spinoff doesn't depend on it.
 
 ### Design: one host tablet, star topology
@@ -633,10 +682,12 @@ rollback or replays possible later.
   - **The host can pause everyone.** ⏸ beside 👋 stops the match and the clock on every tablet;
     every screen shows the ⏸ card, and ▶️ on the host plays on. The host leaving the screen pauses
     the same way: the page gets a moment's notice when it's hidden, enough to send "paused"
-    first. In milestone 2 the snapshot carries `paused`, and guests show the card without a ▶️.
+    first. The snapshot carries `paused`, and guests show the card without a ▶️ (built, 0.0.2).
 - **Host gone for good, match ends.** `ponytail:` no host migration; if the host stays away (a
   minute, to tune) or its connection drops, the room shows "host left" and everyone rejoins. Add
-  migration only if it happens often.
+  migration only if it happens often. Built (0.0.2): a guest that has had no snapshot for 60 s
+  (`HOST_GONE_SECONDS`), whose host peer leaves, or whose `start` never comes, shows 🏠💨 with 👋
+  back to the lobby.
 - **The room code is a label, not a lock.** Random, shown on the host, not a word. The home-network
   rules above keep strangers out; 1,296 picture codes only need to keep one house's games apart.
 
@@ -810,10 +861,12 @@ Built: `spinoff/lobby.html` (page) on `spinoff/net.js` and `spinoff/roster.js`.
   arrangement whatever order people joined in: front row first, from the middle out, 7 × 2
   cells, room for 14 (6 heroes, 8 bad guys).
 - A newcomer arrives with a cheer. 👋 waves bye and leaves the room (not a door: a door reads as going in as much as out); ✏️ goes back to the chooser.
+- In a room, the tablet that opened it also has ▶️, which takes everyone in the room into one
+  match (see Multiplayer, Where things stand); ▶️ outside a room still plays by yourself.
 - Network: Trystero 0.26 over Nostr, loaded from esm.sh through the import map, a devDependency
   for its types only (the same arrangement as `three`). Each tablet sends its fighter to each
-  newcomer (`maxReceiveBytes` 64 KB). `ponytail:` every tablet talks to every other in the lobby;
-  the host-authoritative star from §Multiplayer arrives with the match sim.
+  newcomer (`maxReceiveBytes` 64 KB). `ponytail:` every tablet talks to every other in the lobby,
+  and swaps fighters in a match's room too; in a match only the host's star carries play.
 
 ## Bad guys
 
@@ -1087,8 +1140,11 @@ bad guy grabs a donut and banks it.
    - Out of scope: networking, the build round, bad-guy behaviour, powers, levels, `help`
      changes, team combos.
 2. **Two tablets.** Done: the fighter chooser, the room code and the join handshake, with
-   everyone standing on the lobby floor. Still to do: inputs up, snapshots down, interpolation,
-   per-tablet camera.
+   everyone standing on the lobby floor. Done in 0.0.2 (see Multiplayer, Where things stand):
+   the host's ▶️ starts one match for the whole room, the level and roster travel as data, inputs
+   up, snapshots down at 30 Hz with events that survive a lost one, interpolation, a per-tablet
+   camera, pause / away / host-left, and ▶️ again for everyone. Tested in node only; still to
+   try on real tablets on home Wi-Fi.
 3. **Kids vs bad guys.** Up to eight tablets (six heroes, two played bad guys), the bad-guy team from its 8 presets,
    `ninja` hat and AI, two shelves on a stage wider than a screen, edge markers, the match timer
    and team shelf score, donut pickups, a results screen with `selfie.js` portraits.

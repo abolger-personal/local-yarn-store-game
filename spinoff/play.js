@@ -9,6 +9,8 @@ import { levelFor } from './levels.js';
 import { makeStage } from './stage.js';
 import { THEMES } from './scenery.js';
 import { box, donutMesh, sameLook } from './treats.js';
+import { rosterOf } from './multiplayer.js';
+import { joinMatch } from './together.js';
 
 /** @typedef {import('./match.js').Snapshot} Snapshot @typedef {import('./match.js').FighterState} FighterState */
 /** @typedef {import('./match.js').HitEvent} HitEvent @typedef {import('./match.js').DonutEvent} DonutEvent */
@@ -18,19 +20,20 @@ const api = match;
 
 setGeometryDetail('med');
 
-const ME = 'me', DUMMY = 'dummy';
 const SHELF = { cols: 6, gap: 0.3, row: 0.32, rows: 4, r: 0.13, depth: 0.26 };
 const LOOSE_R = 0.2, FACE_CAMERA = -0.5, FLY_ARC = 0.6, GRAB_FROM_Y = 0.4;
-const level = levelFor(location.search), ground = groundOf(level.stage);
+const mine = loadFighter();
+if (!mine) location.replace('choose.html');
+// REUSE-SPEC.md §Multiplayer: in a room the host's level arrives as data, and each tablet is its own player
+const net = mine ? await joinMatch(location.search, mine, levelFor(location.search)) : null;
+const level = net?.start ?? levelFor(location.search), ground = groundOf(level.stage);
+const ME = net?.me ?? 'me';
 const CAMERA = { pitch: THREE.MathUtils.degToRad(35), viewW: 7, viewH: 4.8, xMin: ground.x0 + 3, xMax: ground.x1 - 3 };
 const BACK = new THREE.Vector3(0, Math.sin(CAMERA.pitch), Math.cos(CAMERA.pitch));
 const TIMERS = { squash: 0.22, no: 0.6, joy: 0.9, pop: 0.35, pulse: 0.45, wobble: 0.35, hop: 0.4 };
 const FIGHTER_TIMERS = ['squash', 'no', 'joy', 'pop', 'pulse'];
 const NONE = Object.freeze([]);
 const _v = new THREE.Vector3(), _goal = new THREE.Vector3();
-
-const mine = loadFighter();
-if (!mine) location.replace('choose.html');
 
 const theme = THEMES[level.theme];
 const stage = makeStage(document.getElementById('stage'), { background: theme.background });
@@ -299,11 +302,10 @@ function showEnd(snap) {
   card.hidden = false;
 }
 
-function cast() {
-  /** @type {{ id: string, team: import('./match.js').Team, f: import('./fighter.js').Fighter, dummy: boolean }[]} */
-  const roster = [{ id: ME, team: 'heroes', f: mine, dummy: false }, { id: DUMMY, team: 'badGuys', f: badGuyFighter(), dummy: true }];
-  return roster.map(({ id, team, f, dummy }) => {
-    const built = buildFighter(f), g = new THREE.Group();
+/** @param {import('./multiplayer.js').Seat[]} roster */
+function cast(roster) {
+  return roster.map(({ id, team, fighter, dummy = false }) => {
+    const f = dummy ? badGuyFighter() : fighter, built = buildFighter(f), g = new THREE.Group();
     const entrant = entrantOf(f, built, { id, team, dummy });
     g.add(built.root);
     scene.add(g);
@@ -320,35 +322,61 @@ let paused = false;
 const keepAwake = () => navigator.wakeLock?.request('screen').catch(() => {});
 function setPaused(on) {
   paused = on;
+  net?.host?.post(on);
   document.getElementById('paused').hidden = !on;
   if (!on) keepAwake();
 }
 document.getElementById('pause').addEventListener('click', () => setPaused(true));
 document.getElementById('resume').addEventListener('click', () => setPaused(false));
-document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); });
+// A guest leaving the screen sits down instead, and asks for the lock again when back.
+document.addEventListener('visibilitychange', () => {
+  if (!net?.guest) { if (document.hidden) setPaused(true); return; }
+  net.guest.input({ target: null, punch: false, kick: false, away: document.hidden });
+  if (!document.hidden) keepAwake();
+});
 
-function play() {
-  const state = api.createMatch(cast(), level.stage);
-  const controls = createControls(ME, level.stage);
-  const button = (id) => document.getElementById(id);
-  attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: button('punch'), kick: button('kick') } });
+function host(state, controls) {
   let snap = api.snapshot(state), acc = 0;
-  keepAwake();
   stage.run((dt) => {
+    net?.host.post(paused, dt);
     if (snap.over) { showEnd(snap); return; }
     if (paused) { acc = 0; return; }
     for (acc += dt; acc >= 1 / TICK_HZ; acc -= 1 / TICK_HZ) {
-      api.tick(state, { [ME]: controls.take(snap) });
+      api.tick(state, { ...net?.host.inputs(), [ME]: controls.take(snap) });
       snap = api.snapshot(state);
+      net?.host.seen(snap);
       react(snap);
     }
     draw(snap, dt);
   });
 }
 
+/** REUSE-SPEC.md §Multiplayer: a guest runs no sim; it draws the host's snapshots and sends its taps. */
+function guest(controls) {
+  stage.run((dt) => {
+    const snap = net.guest.frame(dt);
+    if (!snap) return;
+    if (snap.paused !== paused) setPaused(snap.paused);
+    if (snap.over) { showEnd(snap); return; }
+    react(snap);
+    draw(snap, dt);
+    net.guest.input(controls.take(snap));
+  });
+}
+
+function play() {
+  const entrants = cast(net?.start.roster ?? rosterOf(ME, mine));
+  const controls = createControls(ME, level.stage);
+  const button = (id) => document.getElementById(id);
+  attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: button('punch'), kick: button('kick') } });
+  keepAwake();
+  if (net?.guest) guest(controls);
+  else host(api.createMatch(entrants, level.stage), controls);
+}
+
 const goTo = (href) => () => { location.href = href; };
 document.getElementById('leave').addEventListener('click', goTo('lobby.html'));
 document.getElementById('bye').addEventListener('click', goTo('lobby.html'));
 document.getElementById('quit').addEventListener('click', goTo('lobby.html'));
-document.getElementById('again').addEventListener('click', goTo(`play.html${location.search}`));
+document.getElementById('again').addEventListener('click', net?.again ?? goTo(`play.html${location.search}`));
 if (mine) play();

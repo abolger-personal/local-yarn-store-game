@@ -957,9 +957,10 @@ scary, for 4–6 year olds.
       or a gesture behind the power bar), only for the player who earned it.
     - **Goodies** (things on the level): a goodie appears on the stage during a match, to grab
       and use there, like a loose donut. Owning one is what makes it turn up, on any level.
-    Open: the milestone steps (say 5, 10, 25, 50, 100); whether a goodie appears only for its
-    owner or for anyone to grab (a scramble, like loose donuts); how often goodies turn up and
-    tricks charge, which is where `help` (Handicap) can even out a kid with a big card.
+      **Anyone can grab a goodie** (decided 2026-10-14), teammate or bad guy, not only its owner:
+      sharing and passing need that, and teamwork rewards for them may come later.
+    Open: the milestone steps (say 5, 10, 25, 50, 100); how often goodies turn up and tricks
+    charge, which is where `help` (Handicap) can even out a kid with a big card.
   - Open (2026-10-14): whether stamps open levels (a stamp on N opens N+1) or every level can be
     picked from the start; whether unlocked moves and fort pieces follow the chosen level or the
     card; whether winning should show on the stamp too; whether grownup bad-guy players have

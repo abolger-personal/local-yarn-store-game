@@ -570,7 +570,7 @@ The split follows the A1 plan: gameplay is one authority, cosmetics are local.
 
 | Crosses | Stays local on each tablet |
 | --- | --- |
-| Join: the `lys.fighter.v1` save (species, params, outfit, gloves) and the saved highest level (`lys.level.v1`, see Bad guys, Saving progress), about 2 KB of JSON sent once; never `help`, which the host sets; or, for a bad-guy player, only "bad guy" (the preset comes from the sorted ids) | Building the character from those params (`createCharacter` is deterministic from params; randomness lives only in `randomise*`) |
+| Join: the `lys.fighter.v1` save (species, params, outfit, gloves) and the sticker card (`lys.stamps.v1`, see Bad guys, Saving progress), about 2 KB of JSON sent once; never `help`, which the host sets; or, for a bad-guy player, only "bad guy" (the preset comes from the sorted ids) | Building the character from those params (`createCharacter` is deterministic from params; randomness lives only in `randomise*`) |
 | Inputs, guest → host | Spring rig, idle layer, blinks, ear flicks, tail sway (`motion.js` `Math.random`) |
 | Snapshots, host → guest: move id + step drives the guest's rig toward that move's pose | Camera, edge markers, sparkle effects, sound |
 
@@ -840,7 +840,7 @@ scary, for 4–6 year olds.
   move in the pool.
 - **Everybody starts over each new game** (decided 2026-10-13). Moves earned in a game (a room,
   from 🏠 to leaving) last only for that game. Next game night, grownup bad guys start again from
-  the first moves. The one thing kept is the heroes' highest level (see Saving progress).
+  the first moves. The one thing kept is each player's sticker card (see Saving progress).
 - **Starting high gives grownup bad guys that level's moves** (decided 2026-10-13). A game that
   starts on a high level hands every grownup bad guy the moves of that level's tier up front, the
   same moves CPU bad guys have there. Either the grownup knows how to use them or they figure it
@@ -922,18 +922,22 @@ scary, for 4–6 year olds.
   Two grownups on level 3 face the kids with 2 CPU bad guys beside them; no grownups on level 3
   is 3 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
   drops it.
-- **Saving progress: only the highest level** (decided 2026-10-13). Each tablet saves one number,
-  the highest level its kid has unlocked (by winning the level before it), under its own key
-  (`lys.level.v1`), apart from the fighter so changing animals never loses it. Everything else
-  starts over each game: `help`, earned moves, power bars. When a room forms, its heroes send
-  their saved level with their fighter, and the room can start at the **highest level every hero
-  has reached** (the lowest of their saved levels). A kid who is new to the game brings the
-  room's start down to where they are. Before the first build round every tablet shows **two
-  pictures**, "1" and the shared level (decided 2026-10-13); the first tap chooses for the room
-  (the host settles two taps at once). When the shared level is 1, there is nothing to choose and
-  the pictures are skipped. Bad-guy players don't count: the level is the heroes'
-  progress. The number is checked on the way in, like the fighter: a whole number from 1 to the
-  last level.
+- **Saving progress: a sticker card per player** (decided 2026-10-14, replacing "only the highest
+  level"). Every player has a stamp card, saved on their own tablet under its own key
+  (`lys.stamps.v1`), apart from the fighter, so re-rolling or re-dressing a fighter never touches
+  it: kids get bored of a look but keep their card. Everything else still starts over each game
+  (`help`, earned moves, power bars).
+  - **A stamp for winning a level.** When the heroes win a level, every hero in the room gets that
+    level's stamp. One stamp per level, kept for good; winning it again adds nothing.
+  - **A stamp looks like a real postage stamp:** the same picture that shows the level in the level
+    picker, in sepia, with a perforated edge (a small slant and a cancellation squiggle would sell
+    it). The card is a grid of the levels' places; an unwon level's place is empty.
+  - **The save is a list of whole level numbers,** checked on the way in like the fighter (whole
+    numbers from 1 to the last level, no repeats); anything else is dropped. A guest sends its
+    card with its fighter when it joins.
+  - Open (2026-10-14): whether stamps open levels (a stamp on N opens N+1) or every level can be
+    picked from the start; whether unlocked moves and fort pieces follow the chosen level or the
+    card; whether ties or losses give anything; whether grownup bad-guy players have cards.
 - **No difficulty setting** (decided 2026-10-13). CPU bad guys play at `help 0`; the level (how
   many of them) is the only dial for now. `ponytail:` auto-scaling comes later: nudge the CPU bad
   guys' `help` (between `-0.5` and `0.5`, below the kids' safety bounce at `0.75`) from the

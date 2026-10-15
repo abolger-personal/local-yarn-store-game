@@ -2,12 +2,13 @@
 // for the N tablets the lobby sent along, `play.html?room=CODE` joins it. multiplayer.js does the talking.
 import { ROUND_SECONDS } from './match.js';
 import { HOST_GONE_SECONDS, createGuest, createHost, rosterOf } from './multiplayer.js';
-import { openRoom, selfId } from './net.js';
+import { openRoom, selfId, showDebug } from './net.js';
 import { isCode } from './roster.js';
 import { THEMES } from './scenery.js';
 
-// ponytail: the host waits this long for a tablet that doesn't arrive, then starts without it
-const WAIT_FOR_GUESTS_MS = 15000;
+// ponytail: the host waits this long for a tablet that doesn't arrive, then starts without it; a tablet that
+// arrives later can't join, so this matches how long a guest waits for the host (HOST_GONE_SECONDS)
+const WAIT_FOR_GUESTS_MS = HOST_GONE_SECONDS * 1000;
 // a page about to go somewhere else gives its last message this long to leave
 const SEND_MS = 300;
 
@@ -63,6 +64,7 @@ async function guest(code, mine) {
 export async function joinMatch(search, mine, level) {
   const q = new URLSearchParams(search), code = [...(q.get('room') ?? '')].map(Number);
   if (!isCode(code)) return null;
+  if (q.get('debug') === '1') showDebug();
   el('wait').hidden = false;
   const match = q.has('host') ? await host(code, mine, level, Number(q.get('host')) || 0) : await guest(code, mine);
   el('wait').hidden = true;

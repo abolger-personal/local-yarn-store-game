@@ -11,6 +11,7 @@ setGeometryDetail('med');
 
 const mine = loadFighter();
 if (!mine) location.replace('choose.html');
+const debug = new URLSearchParams(location.search).get('debug') === '1' ? '&debug=1' : '';
 
 const stage = makeStage(document.getElementById('stage'));
 const grid = floorGrid();
@@ -61,7 +62,7 @@ function enter(next, hosting = false) {
   for (const id of cast.keys()) if (id !== selfId) leave(id);
   roomCode = next;
   room = openRoom(next, mine, { onFighter: arrive, onLeave: leave });
-  room.on('go', () => { location.href = `play.html?room=${next.join('')}`; });
+  room.on('go', () => { location.href = `play.html?room=${next.join('')}${debug}`; });
   showCode(next);
   show('start', false);
   show('keypad', false);
@@ -71,7 +72,7 @@ function enter(next, hosting = false) {
 
 function go() {
   room.send('go', true);
-  setTimeout(() => { location.href = `play.html?room=${roomCode.join('')}&host=${cast.size - 1}`; }, 300);
+  setTimeout(() => { location.href = `play.html?room=${roomCode.join('')}&host=${cast.size - 1}${debug}`; }, 300);
 }
 
 function exit() {
@@ -110,7 +111,7 @@ on('play', () => { location.href = 'play.html'; });
 on('exit', exit);
 on('go', go);
 buildKeypad();
-if (new URLSearchParams(location.search).get('debug') === '1') showDebug();
+if (debug) showDebug();
 
 if (mine) {
   arrive(selfId, mine);

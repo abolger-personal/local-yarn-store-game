@@ -628,6 +628,18 @@ reorders snapshots. What was built, and what the build decided (2026-10-14, to c
 - **Again:** ▶️ on the host's end card sends `again`; every tablet reloads into a fresh match the
   same way it started (rejoin, ⏳, `start`). Guests' ▶️ on the end card and the ⏸ card is hidden,
   and so is their ⏸. 👋 goes back to the lobby's first screen, out of the room.
+- **Late joiners play the next round** (0.0.3). The roster stays fixed for a round. Once `start` is
+  out, the host's match page also joins the lobby room (`donut-CODE`, same `openRoom`, same home
+  check; opened after `start` so its relay hellos don't land with the guests', and once per round,
+  as the page reloads). A tablet that arrives there gets `playing` from the host, once, and its
+  lobby shows ⏳ beside 👋 (its own fighter and the host's stand on the floor) until `go`, or until
+  the host leaves the lobby room. ▶️ on the host's end card sends `go` to every late joiner still
+  there (`lateJoiners` in `multiplayer.js`) and counts them into the next round's `host=N`, so they
+  load the match like any guest. `playing` is the only extra message: a joiner learns the room is
+  mid-match from the host answering it, not from anything announced. One that taps 🔑 while the
+  host is still on ⏳ (before `start`) sees nobody until `start` goes out. `?debug=1` on the host
+  notes each `lobby: XXXX waits for next round`. The room code (the lobby's treats) shows on the end,
+  ⏸ and ⏳ cards, never on the in-play HUD.
 
 The yarn store's seeded rng (ROADMAP A1) draws from
 `world.rngState` (`draw` in `characters/store/core/util.js`); the spinoff doesn't depend on it.

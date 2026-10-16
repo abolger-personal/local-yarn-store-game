@@ -11,7 +11,9 @@ export const randomCode = (rng = Math.random) =>
 export const isCode = (code) => Array.isArray(code) && code.length === CODE_LENGTH
   && code.every((i) => Number.isInteger(i) && i >= 0 && i < ROOM_TREATS.length);
 
-export const roomName = (code) => `donut-${code.join('')}`;
+export const codeHtml = (code) => code.map((i) => `<span>${ROOM_TREATS[i]}</span>`).join('');
+
+export const roomName =(code) => `donut-${code.join('')}`;
 
 // REUSE-SPEC.md §Multiplayer: tablets only ever talk across the home network
 const HOME = [/^10\./, /^192\.168\./, /^172\.(1[6-9]|2\d|3[01])\./, /^169\.254\./, /^f[cd][0-9a-f]{2}:/i, /^fe[89ab][0-9a-f]:/i];

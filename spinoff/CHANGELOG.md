@@ -4,6 +4,13 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 
 ## 0.0.3 — in progress
 
+### Play together
+- **Late friends play the next round.** Tap 🔑 and the room's code while a match is on: your
+  fighter waits in the lobby with ⏳ (👋 to leave), and when the host taps ▶️ on the end card you
+  come along into the next round.
+- The room's code (🍩🧁🍪🍒🍓🍰) shows on the end card, the ⏸ card and the ⏳ card, so a late friend
+  can find it.
+
 ## 0.0.2 — 2026-10-15: Play together
 
 ### Play together

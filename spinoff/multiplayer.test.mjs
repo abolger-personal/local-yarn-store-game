@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { newFighter } from './fighter.js';
 import { STAGES, TUTORIAL } from './levels.js';
 import { ROUND_SECONDS, TICK_HZ } from './match.js';
-import { EVENT_TICKS, HOST_GONE_SECONDS, SNAP_HZ, createGuest, createHost, readInput, readSnap, readStart, rosterOf } from './multiplayer.js';
+import { EVENT_TICKS, HOST_GONE_SECONDS, SNAP_HZ, createGuest, createHost, lateJoiners, readInput, readSnap, readStart, rosterOf } from './multiplayer.js';
 import { createMatch, snapshot, tick } from './sim.js';
 
 const THEMES = ['breakfast', 'cake'];
@@ -205,6 +205,23 @@ function play(n, hostInput = IDLE) {
   assert.equal(g2.seen.gone, 0, 'another guest leaving is not the host leaving');
   g2.left('H');
   assert.equal(g2.seen.gone, 1, 'the host\'s connection dropping is the host leaving');
+}
+
+// --- late joiners: the host's match page listening in the lobby room -------------------------------
+{
+  const lobby = network(), heard = { L1: [], L2: [] };
+  for (const id of ['L1', 'L2']) for (const type of ['playing', 'go']) lobby.link(id).on(type, () => heard[id].push(type));
+  const late = lateJoiners(lobby.link('H'));
+  late.arrive('L1');
+  late.arrive('L2');
+  late.arrive('L1');
+  late.left('L2');
+  lobby.flush();
+  assert.deepEqual(heard.L2, ['playing'], 'a tablet arriving mid-match hears the room is playing');
+  assert.equal(late.go(), 1, 'the next round waits for each late joiner still there, once');
+  lobby.flush();
+  assert.equal(heard.L1.at(-1), 'go', '▶️ again takes a late joiner along');
+  assert.deepEqual(heard.L2, ['playing'], 'and not one that left');
 }
 
 console.log('multiplayer: ok');

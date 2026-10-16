@@ -3,7 +3,7 @@ import { setGeometryDetail } from '../characters/npc.js';
 import { makeGridLines } from '../inventory/notions.js';
 import { animateFighter, buildFighter, disposeFighter, loadFighter } from './fighter.js';
 import { debugging, openRoom, selfId, showDebug } from './net.js';
-import { CODE_LENGTH, ROOM_TREATS, floorGrid, isCode, randomCode, standingSpots } from './roster.js';
+import { CODE_LENGTH, ROOM_TREATS, codeHtml, floorGrid, isCode, randomCode, standingSpots } from './roster.js';
 import { makeStage } from './stage.js';
 
 // REUSE-SPEC.md §Performance: up to 14 small fighters on screen; 'high' is for the chooser's close-up
@@ -20,7 +20,7 @@ stage.scene.add(floor);
 
 /** @type {Map<string, {built: any, cheer: number}>} */
 const cast = new Map();
-let room = null, typed = [], roomCode = [];
+let room = null, typed = [], roomCode = [], playingHost = null;
 
 function place() {
   const spots = standingSpots([...cast.keys()], grid);
@@ -40,6 +40,7 @@ function arrive(id, fighter) {
 }
 
 function leave(id) {
+  if (id === playingHost) waitForRound(null);
   const f = cast.get(id);
   if (!f) return;
   stage.scene.remove(f.built.root);
@@ -49,10 +50,15 @@ function leave(id) {
 }
 
 const show = (id, on) => document.getElementById(id).classList.toggle('hidden', !on);
-const treat = (i) => `<span>${ROOM_TREATS[i]}</span>`;
 
 function showCode(code) {
-  document.getElementById('code').innerHTML = `${code.map(treat).join('')}${'<span></span>'.repeat(CODE_LENGTH - code.length)}`;
+  document.getElementById('code').innerHTML = `${codeHtml(code)}${'<span></span>'.repeat(CODE_LENGTH - code.length)}`;
+}
+
+// REUSE-SPEC.md §Multiplayer, Late joiners: the room is mid-match; its host sends `go` for the next round
+function waitForRound(host) {
+  playingHost = host;
+  show('playing', Boolean(host));
 }
 
 // REUSE-SPEC.md §Multiplayer: only the tablet that opened the room starts the match, and everyone in it goes along
@@ -62,6 +68,8 @@ function enter(next, hosting = false) {
   roomCode = next;
   room = openRoom(next, mine, { onFighter: arrive, onLeave: leave });
   room.on('go', () => { location.href = `play.html?room=${next.join('')}`; });
+  room.on('playing', (_, from) => waitForRound(from));
+  waitForRound(null);
   showCode(next);
   show('start', false);
   show('keypad', false);
@@ -79,6 +87,7 @@ function go() {
 function exit() {
   room?.leave();
   room = null;
+  waitForRound(null);
   for (const id of cast.keys()) if (id !== selfId) leave(id);
   typed = [];
   showCode([]);

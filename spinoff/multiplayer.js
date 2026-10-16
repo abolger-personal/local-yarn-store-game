@@ -139,6 +139,22 @@ export function createHost(link, start, me) {
   };
 }
 
+/**
+ * The host's ear in the lobby room during a match: a tablet that arrives there hears `playing`, waits, and gets
+ * `go` with the guests' `again`, so it plays the next round.
+ * ponytail: no cap, as in the lobby; past MAX_FIGHTERS every guest refuses `start`. Cap here if rooms get that full.
+ * @param {Link} link the lobby room's
+ */
+export function lateJoiners(link) {
+  const late = new Set();
+  return {
+    arrive(id) { late.add(id); link.send('playing', true, [id]); },
+    left(id) { late.delete(id); },
+    /** @returns {number} how many more tablets the next round waits for */
+    go() { link.send('go', true, [...late]); return late.size; },
+  };
+}
+
 const lerp = (a, b, k) => a + (b - a) * k;
 const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const between = (a, b, k) => (a && b ? { ...b, x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k), z: lerp(a.z, b.z, k), facing: a.facing + turn(b.facing - a.facing) * k } : b);

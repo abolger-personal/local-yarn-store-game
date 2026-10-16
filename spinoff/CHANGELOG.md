@@ -2,6 +2,8 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
+## 0.0.3 — in progress
+
 ## 0.0.2 — 2026-10-15: Play together
 
 ### Play together

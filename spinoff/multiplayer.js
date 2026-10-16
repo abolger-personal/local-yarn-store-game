@@ -159,12 +159,14 @@ const lerp = (a, b, k) => a + (b - a) * k;
 const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const between = (a, b, k) => (a && b ? { ...b, x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k), z: lerp(a.z, b.z, k), facing: a.facing + turn(b.facing - a.facing) * k } : b);
 
-/** The latest snapshot, with the other fighters drawn `t` ticks in, between the snapshots either side. @param {Drawn[]} buf */
-function blend(buf, t, me) {
+// A guest's own fighter too: drawn straight from the newest snapshot it moved only every other frame, and in
+// jumps when snapshots came in clumps; a tap-to-walk fighter a snapshot or two behind is hard to notice.
+/** The latest snapshot, with every fighter drawn `t` ticks in, between the snapshots either side. @param {Drawn[]} buf */
+function blend(buf, t) {
   const last = buf.at(-1), b = buf.find((s) => s.tick >= t) ?? last, a = [...buf].reverse().find((s) => s.tick <= t) ?? b;
   const k = b.tick > a.tick ? (t - a.tick) / (b.tick - a.tick) : 1;
   const from = new Map(a.fighters.map((f) => [f.id, f])), to = new Map(b.fighters.map((f) => [f.id, f]));
-  return { ...last, fighters: last.fighters.map((f) => (f.id === me ? f : between(from.get(f.id), to.get(f.id), k) ?? f)) };
+  return { ...last, fighters: last.fighters.map((f) => between(from.get(f.id), to.get(f.id), k) ?? f) };
 }
 
 const noEvents = () => ({ hits: [], fullBag: [], donutEvents: [] });
@@ -196,7 +198,7 @@ export function createGuest(link, me, themes, on) {
     /** What to draw this frame, with the events not seen before; null until the first snapshot. @returns {Drawn|null} */
     frame(dt) {
       if ((g.quiet += dt) > HOST_GONE_SECONDS) goneNow();
-      return g.buf.length ? drawn(g, dt, me) : null;
+      return g.buf.length ? drawn(g, dt) : null;
     },
     /** @param {Input} input */
     input(input) { if (g.host && (input.target || input.punch || input.kick || input.away !== undefined)) link.send('input', input, [g.host]); },
@@ -212,10 +214,10 @@ function keep(g, raw) {
   Object.assign(g, { seq: snap.seq, seen: Math.max(g.seen, snap.tick), quiet: 0, buf: [...g.buf.filter((s) => s.tick < snap.tick), snap].slice(-KEEP) });
 }
 
-function drawn(g, dt, me) {
+function drawn(g, dt) {
   const { tick } = g.buf.at(-1);
   g.t = Math.min(tick - BEHIND / 2, Math.max(tick - BEHIND, g.t + dt * TICK_HZ));
-  const out = { ...blend(g.buf, g.t, me), ...g.fresh };
+  const out = { ...blend(g.buf, g.t), ...g.fresh };
   g.fresh = noEvents();
   return out;
 }

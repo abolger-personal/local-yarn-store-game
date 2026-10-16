@@ -5,6 +5,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 ## 0.0.3 — in progress
 
 ### Play together
+- Your own fighter walks smoothly on every tablet, not just the host's: it no longer stutters and
+  jumps when the Wi-Fi is busy.
 - **Late friends play the next round.** Tap 🔑 and the room's code while a match is on: your
   fighter waits in the lobby with ⏳ (👋 to leave), and when the host taps ▶️ on the end card you
   come along into the next round.

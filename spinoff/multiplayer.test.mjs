@@ -95,12 +95,13 @@ function play(n, hostInput = IDLE) {
   net.flush();
   const walking = play(20), seen = at(drawn.G2, 'G1').x;
   assert.ok(seen < at(walking, 'G1').x - 0.07 && seen > at(walking, 'G1').x - 0.3, 'other guests draw a walking fighter a snapshot or two behind');
-  assert.ok(Math.abs(at(drawn.G1, 'G1').x - at(walking, 'G1').x) < 0.07, 'its own guest draws it from the latest snapshot, no further behind');
+  const own = at(drawn.G1, 'G1').x;
+  assert.ok(own < at(walking, 'G1').x - 0.07 && own > at(walking, 'G1').x - 0.3, 'its own guest draws it smoothly, a snapshot or two behind too');
   const after = play(70);
   assert.ok(at(after, 'G1').x > at(before, 'G1').x + 1.5, 'a guest\'s input moves its fighter on the host');
   assert.ok(Math.abs(at(after, 'G2').x - at(before, 'G2').x) < 0.05, 'and only its own fighter');
   const sent = JSON.parse(JSON.stringify(at(after, 'G1'), (_, v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v)));
-  assert.deepEqual(at(drawn.G1, 'G1'), sent, 'a guest draws its own fighter from the latest snapshot');
+  assert.deepEqual(at(drawn.G1, 'G1'), sent, 'a guest\'s own fighter that has stopped is drawn exactly where the host has it');
   assert.ok(net.snaps.some((d) => !('bricks' in d)), 'snapshots leave out bricks and shelves that stood still');
   assert.deepEqual([drawn.G2.bricks.length, drawn.G2.shelves.length], [after.bricks.length, 2], 'and guests keep drawing them');
   assert.ok(after.tick - drawn.G2.tick < TICK_HZ / SNAP_HZ, 'everything else on a guest is the host\'s latest snapshot');

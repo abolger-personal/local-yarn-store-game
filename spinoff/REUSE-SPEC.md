@@ -615,9 +615,10 @@ reorders snapshots. What was built, and what the build decided (2026-10-14, to c
   `fullBag` and `donutEvents`, each group tagged with its tick, and a guest plays only the
   groups newer than the newest tick it has seen. So a guest that loses up to about seven
   snapshots in a row still gets every BAM and steal, exactly once.
-- **Guests draw:** no sim; other fighters are drawn one to two snapshots back (2–4 ticks),
-  between the two snapshots either side, position and facing; a guest's own fighter, and
-  everything else, comes from the newest snapshot. Each tablet's camera follows its own fighter.
+- **Guests draw:** no sim; every fighter, the guest's own too, is drawn one to two snapshots back
+  (2–4 ticks), between the two snapshots either side, position and facing; everything else comes
+  from the newest snapshot. (Drawn from the newest snapshot, a guest's own fighter moved only every
+  other frame, and jumped when snapshots arrived in clumps: decided 2026-10-15.) Each tablet's camera follows its own fighter.
 - **Channel, as built:** Trystero 0.26 has no per-action channel options: every action rides one
   reliable, ordered data channel, snapshots too. `ponytail:` a negotiated
   `{ ordered: false, maxRetransmits: 0 }` channel on the peer connection if snapshots stutter.

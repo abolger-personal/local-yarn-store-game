@@ -42,15 +42,25 @@ export function isHomeRoute(remote) {
   return isHomeAddress(address) || (!address && HIDDEN_OK.has(remote.candidateType));
 }
 
+// A relay only passes a subscriber the messages stamped after the subscriber's own "now", so a tablet whose clock
+// runs behind another's goes unheard by it until its clock catches up; Trystero's messages are ephemeral (never
+// stored), so asking from earlier costs nothing.
+// ponytail: tablets whose clocks are more than CLOCK_SLACK_S apart still miss each other's first minute
+export const CLOCK_SLACK_S = 600;
+
+/** A relay subscription (`["REQ", id, filter]`) asking from CLOCK_SLACK_S earlier; any other frame unchanged. */
+export const clockSlack = (frame) => (typeof frame === 'string' && frame.startsWith('["REQ"')
+  ? frame.replace(/"since":(\d+)/, (_, s) => `"since":${Number(s) - CLOCK_SLACK_S}`) : frame);
+
 /** One `?debug=1` line per tablet met: the route and what the home check made of it. */
 export const routeNote = (remote) =>
   `${remote?.candidateType ?? 'no route'} ${remote?.address || remote?.ip || 'hidden'} ${isHomeRoute(remote) ? 'home' : 'hung up'}`;
 
 /** The first thing keeping tablets apart, for `?debug=1`. */
-export function netProblem({ subtle, relays, peers, homes }) {
+export function netProblem({ subtle, relays, heard, peers, homes }) {
   if (!subtle) return 'no crypto.subtle: tablets only meet on https (or localhost)';
   if (!relays) return 'no relay reached';
-  if (!peers) return 'no other tablet yet';
+  if (!peers) return heard ? 'heard other tablets but none connected' : 'no other tablet heard yet';
   return homes ? 'ok' : 'every tablet hung up on by the home check';
 }
 

@@ -75,6 +75,7 @@ export async function joinMatch(search, mine, level) {
   if (!isCode(code)) return null;
   if (q.get('debug') === '1') showDebug();
   el('wait').hidden = false;
+  el('wait-bye').addEventListener('click', toLobby);
   const match = q.has('host') ? await host(code, mine, level, Number(q.get('host')) || 0) : await guest(code, mine);
   el('wait').hidden = true;
   return match;

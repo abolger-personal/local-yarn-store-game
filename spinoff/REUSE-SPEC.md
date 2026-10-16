@@ -587,8 +587,9 @@ reorders snapshots. What was built, and what the build decided (2026-10-14, to c
   ▶️ sends `go` to everyone in the room, and every tablet loads `play.html?room=CODE` (the host's
   with `&host=N`, N the guests it expects). A page load drops the lobby's connections, so the
   match has its own Trystero room (`donut-CODE-play`), apart from the lobby's; everyone rejoins it
-  with the same home-network check. The host waits for its N guests' fighters (15 s at most,
-  `ponytail:`, then it starts with whoever came), then sends `start` once. ⏳ shows meanwhile.
+  with the same home-network check. The host waits for its N guests' fighters (60 s at most,
+  `ponytail:`, then it starts with whoever came), then sends `start` once. ⏳ shows meanwhile,
+  with 👋 back to the lobby.
 - **`start`** (host → each guest, once): the level as data (`theme` and the whole `Stage`,
   opaque: the guest never rebuilds it), the roster (`id`, `team`, and each player's fighter save,
   or `dummy: true` for the training dummy, which every tablet dresses the same), and the round
@@ -696,6 +697,14 @@ rollback or replays possible later.
 
 ### Network gotchas
 
+- **Clocks that disagree** (found 2026-10-15). A Nostr relay only passes a subscriber the messages
+  stamped after the subscriber's own "now", so a tablet whose clock runs behind another's goes
+  unheard by it until its clock catches up. After its first 7 s Trystero announces only once a
+  minute, so tablets that join together (every match start) and are more than a few seconds apart
+  missed each other for a minute; the lobby hid it, because its tablets join minutes apart.
+  `net.js` asks the relays from 10 minutes earlier (`clockSlack`; the messages are never stored, so
+  nothing old comes back). `?debug=1` shows each tablet's clock (UTC) to compare side by side, and
+  `heard` (tablets whose relay messages arrived) apart from `peers` (tablets connected).
 - **Client isolation.** Guest networks and some mesh Wi-Fi systems block devices from reaching
   each other. Symptom: everyone joins the room but no data channel opens. Use the main network.
 - **Leaving the screen** (decided 2026-10-14). A browser stops running a page that isn't on screen

@@ -19,6 +19,9 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   on another tablet makes that fighter sit down until you're back.
 - If the host leaves, everyone else sees 🏠💨 and 👋 back to the lobby.
 - When time runs out, the end card shows on every tablet; ▶️ on the host plays again together.
+- Tablets whose clocks don't quite agree now find each other straight away when a match starts,
+  instead of a minute later or not at all.
+- ⏳ has 👋 too, so no screen is a dead end.
 
 ### Practice
 - **Surprise stages, for testing.** Add `?seed=` and a number to the play page's address (for

@@ -1,6 +1,6 @@
 import { getRelaySockets, joinRoom, selfId } from 'trystero';
 import { readFighter } from './fighter.js';
-import { isHomeRoute, netProblem, remoteOf, roomName, routeNote } from './roster.js';
+import { clockSlack, isHomeRoute, netProblem, remoteOf, roomName, routeNote } from './roster.js';
 
 export const APP_ID = 'lys-donut-fighters';
 export { selfId };
@@ -11,37 +11,71 @@ const roomConfig = (code) => ({
   appId: APP_ID, password: roomName(code), rtcConfig: { iceServers: [] }, maxReceiveBytes: 64 * 1024,
 });
 
-/** What `?debug=1` shows about why tablets do or don't meet. */
-const seen = { peers: 0, homes: 0, notes: [] };
+/** What `?debug=1` shows about why tablets do or don't meet; `heard`, the tablets whose relay messages arrived. */
+const seen = { peers: 0, homes: 0, notes: [], heard: new Set() };
 
 /** A line for `?debug=1`'s notes. */
 export const note = (text) => { seen.notes.push(text); };
+const short = (id) => String(id ?? '?').slice(0, 4);
+
+const senderOf = (frame) => {
+  try { return JSON.parse(JSON.parse(frame)[2]?.content ?? 'null')?.peerId; } catch { return undefined; }
+};
+const listening = new WeakSet();
+function listen(socket) {
+  if (listening.has(socket)) return;
+  listening.add(socket);
+  socket.addEventListener('message', (e) => {
+    const id = senderOf(String(e.data));
+    if (typeof id === 'string' && id !== selfId) seen.heard.add(id);
+  });
+}
+
+// Trystero's relays are the page's only sockets: every subscription asks from earlier (clockSlack), and ?debug=1
+// counts the tablets heard on them.
+if (globalThis.WebSocket) {
+  const { send } = WebSocket.prototype;
+  WebSocket.prototype.send = function sendSlack(data) {
+    listen(this);
+    send.call(this, clockSlack(data));
+  };
+}
+
+function noteWarnings() {
+  const { warn } = console;
+  console.warn = (...args) => {
+    if (String(args[0]).startsWith('Trystero')) note(String(args[0]).slice(10, 100));
+    warn(...args);
+  };
+}
 
 /** Puts a status line on the page that refreshes every second (lobby.html?debug=1). */
 export function showDebug() {
   const line = document.body.appendChild(document.createElement('pre'));
   line.className = 'debug';
   addEventListener('unhandledrejection', (e) => { seen.notes.push(String(e.reason)); });
+  noteWarnings();
   setInterval(() => {
     const relays = Object.values(getRelaySockets()).filter((s) => s.readyState === WebSocket.OPEN).length;
-    const s = { ...seen, subtle: Boolean(globalThis.crypto?.subtle), relays };
-    line.textContent = [`secure ${isSecureContext} subtle ${s.subtle} relays ${relays} peers ${s.peers} home ${s.homes}`,
-      ...seen.notes.slice(-8), netProblem(s)].join('\n');
+    const s = { ...seen, subtle: Boolean(globalThis.crypto?.subtle), relays, heard: seen.heard.size };
+    // the clock (UTC) is there to compare tablets side by side: see clockSlack
+    line.textContent = [`me ${short(selfId)} ${new Date().toISOString().slice(11, 19)} secure ${isSecureContext} subtle ${s.subtle}`,
+      `relays ${relays} heard ${s.heard} peers ${s.peers} home ${s.homes}`, ...seen.notes.slice(-10), netProblem(s)].join('\n');
   }, 1000);
 }
 
 /** @param {RTCPeerConnection|undefined} pc */
-async function onHomeNetwork(pc) {
+async function onHomeNetwork(pc, peerId) {
   const remote = pc && remoteOf(await pc.getStats());
   seen.peers++;
-  seen.notes.push(routeNote(remote));
+  note(`${short(peerId)} ${routeNote(remote)}`);
   if (isHomeRoute(remote)) seen.homes++;
   return isHomeRoute(remote);
 }
 
 // Nothing is sent to a tablet, or accepted from it, until its route is checked; a fighter that
 // arrives first is held until then.
-function homeOnly(fighter, mine, onFighter) {
+export function homeOnly(fighter, mine, onFighter) {
   const home = new Set(), early = new Map();
   const accept = (peerId, data) => {
     const f = readFighter(data);
@@ -90,17 +124,21 @@ function linkOf(room, home) {
  * @param {string} [place] '-play' for a match's room, apart from the lobby's
  */
 export function openRoom(code, mine, { onFighter, onLeave }, place = '') {
-  const room = joinRoom(roomConfig(code), roomName(code) + place, { onJoinError: (e) => { seen.notes.push(e.error); } });
+  const room = joinRoom(roomConfig(code), roomName(code) + place, { onJoinError: (e) => { note(`${short(e.peerId)} ${e.error}`); } });
   const peers = homeOnly(room.makeAction('fighter'), mine, onFighter);
   room.onPeerJoin = async (peerId) => {
     const pc = room.getPeers()[peerId];
-    if (await onHomeNetwork(pc)) {
+    if (await onHomeNetwork(pc, peerId)) {
       peers.welcome(peerId);
       return;
     }
     peers.forget(peerId);
     pc?.close();
   };
-  room.onPeerLeave = (peerId) => { peers.forget(peerId); onLeave(peerId); };
+  room.onPeerLeave = (peerId) => {
+    note(`${short(peerId)} left`);
+    peers.forget(peerId);
+    onLeave(peerId);
+  };
   return { leave: () => room.leave(), ...linkOf(room, peers.home) };
 }

@@ -14,6 +14,17 @@ const roomConfig = (code) => ({
 /** What `?debug=1` shows about why tablets do or don't meet; `heard`, the tablets whose relay messages arrived. */
 const seen = { peers: 0, homes: 0, notes: [], heard: new Set() };
 
+/** `?debug=1` (or `=0`) anywhere in this tab sticks until the tab closes, through every page in between. */
+export function debugging() {
+  const flag = new URLSearchParams(location.search).get('debug');
+  try {
+    if (flag !== null) sessionStorage.setItem('donut.debug', flag);
+    return sessionStorage.getItem('donut.debug') === '1';
+  } catch {
+    return flag === '1';
+  }
+}
+
 /** A line for `?debug=1`'s notes. */
 export const note = (text) => { seen.notes.push(text); };
 const short = (id) => String(id ?? '?').slice(0, 4);

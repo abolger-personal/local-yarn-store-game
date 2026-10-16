@@ -16,6 +16,8 @@
 <!-- The game runs in the frame, so going from screen to screen inside it never leaves fullscreen. -->
 <button id="tap" aria-label="tap to play">🍩👆</button>
 <script>
+  const debug = new URLSearchParams(location.search).get('debug');
+  try { if (debug !== null) sessionStorage.setItem('donut.debug', debug); } catch { /* private mode */ }
   document.getElementById('tap').addEventListener('click', (e) => {
     document.documentElement.requestFullscreen?.().catch(() => {});
     e.currentTarget.outerHTML = '<iframe src="choose.html" allow="fullscreen; screen-wake-lock"></iframe>';

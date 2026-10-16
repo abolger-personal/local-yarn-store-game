@@ -416,10 +416,10 @@ and smashers each get a round that is theirs.
   (CPU raiders or grownup bad guys). That level teaches building the way level 1 teaches punching
   through: a small pile, an obvious gap in front of your shelf, and the first raider walking into
   your wall.
-- **Open: patching mid-match.** Carried blocks don't strictly need their own round: a kid could
-  grab a block during the match and plug a hole the bad guys just opened, and a hit could knock
-  it loose like a donut. Keep the build round as the calm opening either way; decide once building
-  is played.
+- **Later: patching mid-match** (decided 2026-10-15: wanted, not at first). A kid grabs a block
+  during the match and plugs a hole the bad guys just opened; a hit knocks it loose like a donut.
+  Not in the first version of building, because it puts ⬇️ beside 🥊 and 🦶 in the match: more
+  buttons. The build round stays the calm opening either way.
 - **Stages and difficulty are separate** (decided 2026-10-14). Past the tutorial, a *stage* is a
   place with its own look and terrain rules, and *difficulty* is how hard the match is (bad-guy
   count, fort pile, moves, generated terrain problems). Anything tried at several difficulties

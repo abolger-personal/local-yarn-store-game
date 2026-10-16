@@ -15,6 +15,9 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - When time runs out, the score shows on its own first; tap it to get ▶️ and 👋, with the room's
   code underneath.
 
+### Fixes
+- Fighters' legs keep up when they run: no more feet skating along under a gliding body.
+
 ## 0.0.2 — 2026-10-15: Play together
 
 ### Play together

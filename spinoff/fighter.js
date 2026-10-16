@@ -212,8 +212,9 @@ export function disposeFighter(built) {
   disposeCharacter(built);
 }
 
-// REUSE-SPEC.md §Tier 3: no personalities, so one idle style for everyone
-const IDLE = Object.freeze({ ...MOTION_DEFAULTS });
+// REUSE-SPEC.md §Tier 3: no personalities, so one idle style for everyone. Fighters run at WALK_SPEED on short
+// legs; the shop's stroll cap of 3.4 steps a second left their feet skating three quarters of every stride.
+export const IDLE = Object.freeze({ ...MOTION_DEFAULTS, cadenceMax: 12 });
 
 /** @param {keyof typeof POSES} [pose] */
 export const animateFighter = (built, dt, pose = 'rest') => stepMotion(built, POSES[pose], dt, IDLE);

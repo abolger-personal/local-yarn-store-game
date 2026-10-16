@@ -5,10 +5,12 @@ import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import {
   BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, buildFighter, disposeFighter, gloveAnchors, isBadGuyCloth, isBadGuyFur,
-  newFighter, randomFighter, readFighter, seatDrop, setFur, wobbleAt, wobbleHz,
+  IDLE, newFighter, randomFighter, readFighter, seatDrop, setFur, wobbleAt, wobbleHz,
 } from './fighter.js';
 import { wingShape } from '../characters/owl.js';
 import { floorGrid } from './roster.js';
+import { walkPhase } from '../characters/motion.js';
+import { SYRUP_SLOW, WALK_SPEED } from './sim.js';
 
 const SHOP_VIEW_PX = LOOK.viewPx;
 LOOK.viewPx = 0;
@@ -193,6 +195,15 @@ for (const species of SPECIES) {
     was = z;
   }
   assert.ok(jump < 0.2, `a calming fighter never snaps, however late in the round (${jump} rad in one frame)`);
+}
+
+{
+  const built = buildFighter(newFighter('owl')), L = built.params.legHeight + built.params.hipInset;
+  for (const speed of [WALK_SPEED, WALK_SPEED * SYRUP_SLOW]) {
+    const { skate } = walkPhase(0, speed, L, IDLE);
+    assert.ok(skate < 0.2, `feet keep up with the body at ${speed} m/s (skating ${skate.toFixed(2)} of each stride)`);
+  }
+  disposeFighter(built);
 }
 
 console.log('fighter ok');

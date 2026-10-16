@@ -19,7 +19,7 @@ const roomConfig = (code) => ({
 /** What `?debug=1` shows about why tablets do or don't meet; `heard`, the tablets whose relay messages arrived. */
 const seen = { peers: 0, homes: 0, notes: [], heard: new Set() };
 
-/** `?debug=1` (or `=0`) anywhere in this tab sticks until the tab closes, through every page in between. */
+/** `?debug=1` (or `=0`) sticks through every page after it, until the tap page opens again without it. */
 export function debugging() {
   const flag = new URLSearchParams(location.search).get('debug');
   try {
@@ -65,10 +65,12 @@ function noteWarnings() {
   };
 }
 
-/** Puts a status line on the page that refreshes every second (see `debugging`). */
+/** Puts a status line on the page, collapsed under 🐞, that refreshes every second (see `debugging`). */
 export function showDebug() {
-  const line = document.body.appendChild(document.createElement('pre'));
-  line.className = 'debug';
+  const box = document.body.appendChild(document.createElement('details'));
+  box.className = 'debug';
+  box.innerHTML = '<summary>🐞</summary>';
+  const line = box.appendChild(document.createElement('pre'));
   addEventListener('unhandledrejection', (e) => { seen.notes.push(String(e.reason)); });
   noteWarnings();
   setInterval(() => {

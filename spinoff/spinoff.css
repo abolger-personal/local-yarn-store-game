@@ -98,4 +98,6 @@ body.play #stage canvas { touch-action: none; }
 .end .code { grid-column: 1 / -1; justify-content: center; gap: min(6px, 1vmin); font-size: min(36px, 5vmin); min-height: 0; }
 .end .code:empty { display: none; }
 .end .code span { width: min(52px, 7.5vmin); height: min(52px, 7.5vmin); border-radius: min(14px, 2vmin); }
-.debug { position: fixed; top: 0; left: 0; z-index: 9; margin: 0; padding: 4px; font: 11px/1.3 monospace; white-space: pre-wrap; background: #fffd; pointer-events: none; }
+.debug { position: fixed; top: 0; left: 0; z-index: 9; padding: 4px; font: 11px/1.3 monospace; background: #fffd; }
+.debug summary { cursor: pointer; list-style: none; }
+.debug pre { margin: 0; white-space: pre-wrap; pointer-events: none; }

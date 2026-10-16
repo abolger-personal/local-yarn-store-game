@@ -70,8 +70,10 @@ function enter(next, hosting = false) {
 }
 
 function go() {
+  // counted before 'go': guests leave the lobby the moment it arrives, and their fighters leave the cast with them
+  const match = `play.html?room=${roomCode.join('')}&host=${cast.size - 1}`;
   room.send('go', true);
-  setTimeout(() => { location.href = `play.html?room=${roomCode.join('')}&host=${cast.size - 1}`; }, 300);
+  setTimeout(() => { location.href = match; }, 300);
 }
 
 function exit() {

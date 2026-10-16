@@ -1,11 +1,14 @@
 import { POSES } from '../characters/npc.js';
-import { HITSTOP_TICKS } from './match.js';
 import { MOVES } from './sim.js';
 
 // Look only: the sim's punch is one move; each tablet draws it as the next of these for every punch that has landed.
-export const COMBO = Object.freeze(['jab', 'cross', 'hook', 'hook', 'uppercut', 'uppercut']);
-/** Punch starts this many ticks apart or fewer keep the string going; the gap a kid tapping twice a second leaves. */
-export const COMBO_TICKS = MOVES.punch.steps + HITSTOP_TICKS + 20;
+// No hook (2026-10-15): from the side-on camera its sweep across the body read the same as a cross.
+export const COMBO = Object.freeze(['jab', 'cross', 'uppercut', 'uppercut']);
+/**
+ * Punch starts this many ticks apart or fewer keep the string going: long enough to chase a target a hit knocked
+ * back (about a second against the dummy), so a pause, not the chase, starts again at jab.
+ */
+export const COMBO_TICKS = 150;
 
 const REST = Object.freeze({ hit: 0, guard: 0, hitOut: POSES.rest.armOut, guardOut: POSES.rest.armOut, elbow: POSES.rest.elbowBend });
 const key = (t, p) => Object.freeze([t, Object.freeze({ ...REST, twist: 0, roll: 0, lean: 0, knee: 0, hip: 0, pitch: 0, ...p })]);
@@ -24,11 +27,6 @@ export const PUNCHES = Object.freeze({
     { hit: 0.8, guard: -0.6, hitOut: 0.35, guardOut: 0.3, elbow: 1.2, twist: -0.8, lean: -0.15 },
     { hit: -1.8, guard: 0.95, hitOut: 0.1, guardOut: 0.55, elbow: 0, twist: 1.1, lean: 0.4, hip: 0.15, pitch: -0.15 },
     { hit: -1.7, guard: 0.85, hitOut: 0.12, guardOut: 0.5, elbow: 0.1, twist: 1, lean: 0.35, hip: 0.12, pitch: -0.12 },
-  ),
-  hook: timeline(
-    { hit: 0.1, guard: -0.9, hitOut: 1.2, guardOut: 0.2, elbow: 1.6, twist: -0.8, roll: 0.15, lean: 0.05 },
-    { hit: -1, guard: -0.9, hitOut: 1, guardOut: 0.2, elbow: 2.3, twist: 1.6, roll: -0.2, lean: 0.15 },
-    { hit: -0.95, guard: -0.85, hitOut: 1, guardOut: 0.2, elbow: 2.2, twist: 1.5, roll: -0.18, lean: 0.12 },
   ),
   uppercut: timeline(
     { hit: 0.5, guard: -0.8, hitOut: 0.3, guardOut: 0.2, elbow: 1.5, twist: -0.5, roll: -0.2, lean: 0.4, knee: 1, hip: 0.5, pitch: 0.15 },

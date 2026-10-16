@@ -16,7 +16,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   👋, with the room's code underneath.
 
 ### Fighting
-- **Punches look like punches**, and every punch that lands on a bad guy, the dummy or a fort brick moves you along a string: jab, cross, hook, hook, uppercut, uppercut, and round again. A miss waits; a pause starts you again at jab.
+- **Punches look like punches**, and every punch that lands on a bad guy, the dummy or a fort brick moves you along a string: jab, cross, uppercut, uppercut, and round again. A miss waits; only a pause of a couple of seconds starts you again at jab, so chasing a bad guy you knocked back keeps your string going.
 
 ### Fixes
 - A fighter whose bag is full shakes its head again when it tries for another donut.

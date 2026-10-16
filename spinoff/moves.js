@@ -8,7 +8,7 @@ import { makeStage } from './stage.js';
 
 // A look at the punches (punches.js) on every species, from play.js's camera pitch, each punch landing and looping.
 setGeometryDetail('med');
-const ROWS = ['jab', 'cross', 'hook', 'uppercut', 'string'];
+const ROWS = ['jab', 'cross', 'uppercut', 'string'];
 const SLOW = Number(new URLSearchParams(location.search).get('slow')) || 1;
 const PERIOD = MOVES.punch.steps + HITSTOP_TICKS + 12;
 const PITCH = THREE.MathUtils.degToRad(35), VIEW = new THREE.Vector3(0, Math.sin(PITCH), Math.cos(PITCH));

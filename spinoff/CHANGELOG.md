@@ -2,41 +2,45 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
-## 0.0.2 — in progress
-
-### Small tablets
-- The score and clock are much smaller, and the 🥊 🦶 ⏸️ 👋 buttons shrink to fit small tablets.
-- The end card and pause card shrink to fit a small tablet turned sideways.
-- The hit wobble no longer goes glitchy-fast late in a round, or as a fighter calms down.
-- **Tap 🍩👆 to play.** The game starts with one big button: tap it and the game fills the whole screen, and stays that way from the fighter chooser to the lobby to the match. Add the game to the home screen to hide the browser's bars for good.
+## 0.0.2 — 2026-10-15: Play together
 
 ### Play together
 - **Play a match together.** In a room, the tablet that opened it (🏠) has ▶️: tap it and every
   tablet in the room goes to the same stage, everyone a hero against the training dummy. ⏳
-  shows while everyone arrives. Only the host can start.
+  shows while everyone arrives, with 👋 to go back. Only the host can start.
+- Tablets find each other within a few seconds when a match starts, even when their clocks are a
+  little apart and lots of tablets share one home Wi-Fi.
 - Each tablet's camera follows its own fighter.
 - ⏸ on the host pauses everyone. Leaving the screen on the host pauses everyone too; leaving it
   on another tablet makes that fighter sit down until you're back.
 - If the host leaves, everyone else sees 🏠💨 and 👋 back to the lobby.
 - When time runs out, the end card shows on every tablet; ▶️ on the host plays again together.
-- Tablets whose clocks don't quite agree now find each other straight away when a match starts,
-  instead of a minute later or not at all.
-- ⏳ has 👋 too, so no screen is a dead end.
 
-### Practice
-- **Surprise stages, for testing.** Add `?seed=` and a number to the play page's address (for
-  example `play.html?seed=123&difficulty=2`) for a made-up breakfast stage: walls, gaps, syrup and
+### Playing at home
+- **Tap 🍩👆 to play.** The game starts with one big button: tap it and the game fills the whole
+  screen, and stays that way from the fighter chooser to the lobby to the match. Add the game to
+  the home screen to hide the browser's bars for good.
+- Pinching and double-tapping no longer zoom the game. (Triple-tap zoom is a tablet accessibility
+  setting; turn it off in the tablet's settings if it gets in the way.)
+- Served from a computer at home, the game needs its `https://` address so tablets can find each
+  other; the first time, each tablet asks you to trust it once. An old `http://` link goes to the
+  `https://` one.
+
+### Small tablets
+- The score and clock are much smaller, and the 🥊 🦶 ⏸️ 👋 buttons shrink to fit small tablets.
+- The end card and pause card shrink to fit a small tablet turned sideways.
+
+### Stages
+- **Two stages, breakfast and cake.** While there's no button for it, pick one in the address:
+  `play.html?stage=breakfast` or `play.html?stage=cake`. Plain `play.html` is still the practice
+  stage where you break into the bad guys' fort.
+- **Surprise stages, for testing.** Add `&seed=` with a number, and `&difficulty=1` to `5`, for a
+  made-up stage (for example `play.html?stage=cake&difficulty=3&seed=8`): walls, gaps, syrup and
   hills laid out fresh from the number, the same stage every time for the same number, and fair
-  to both sides. `difficulty` runs 1 to 5 and adds narrower gaps, choke points and a higher deck.
-  There's no button for it yet.
+  to both sides. Higher difficulty adds narrower gaps, choke points and a higher deck. Surprise
+  stages never put a donut somewhere you can't reach.
 - The bad guys' wall in practice now goes all the way across and is too tall to jump: punch or
   kick a brick out of it to get to their shelf.
-- Surprise stages never put a donut somewhere you can't reach: the pillars are a hop high now.
-- **Two stages, breakfast and cake, each at any difficulty.** While there's no button for it,
-  pick one in the address: `play.html?stage=breakfast` or `play.html?stage=cake`, and add
-  `&seed=` with a number and `&difficulty=1` to `5` for a surprise stage there (for example
-  `play.html?stage=cake&difficulty=3&seed=8`). Plain `play.html` is still the practice stage
-  where you break into the bad guys' fort.
 - **Butter is slippery.** On breakfast, step on a shiny yellow butter slick and you slide: it's
   hard to stop and turn, and you skid past where you tapped, then come back.
 - **Cake is bouncy.** Every jump on cake goes half as high again, and you squish when you land.
@@ -46,6 +50,9 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   gumdrop tower in the middle you can only get up by bouncing off the trampoline in front of it.
 - The butter and syrup that were only painted on the pancake hill are gone, so any butter you
   see is real and slippery.
+
+### Fixes
+- The hit wobble no longer goes glitchy-fast late in a round, or as a fighter calms down.
 
 ## 0.0.1 — 2026-10-14: Fun to hit, one tablet
 

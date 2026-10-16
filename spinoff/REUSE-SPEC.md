@@ -585,9 +585,10 @@ reorders snapshots. What was built, and what the build decided (2026-10-14, to c
 
 - **Starting together.** In a room, the tablet that opened it (🏠) gets ▶️; the others don't.
   ▶️ sends `go` to everyone in the room, and every tablet loads `play.html?room=CODE` (the host's
-  with `&host=N`, N the guests it expects). A page load drops the lobby's connections, so the
+  with `&host=N`, N the guests it expects, counted before `go` goes out: the guests leave the lobby
+  the moment it arrives, and a count taken after it found none, so the host waited for nobody). A page load drops the lobby's connections, so the
   match has its own Trystero room (`donut-CODE-play`), apart from the lobby's; everyone rejoins it
-  with the same home-network check. The host waits for its N guests' fighters (60 s at most,
+  with the same home-network check, guests a random 0–2 s apart (see Relay rate limits). The host waits for its N guests' fighters (60 s at most,
   `ponytail:`, then it starts with whoever came), then sends `start` once. ⏳ shows meanwhile,
   with 👋 back to the lobby.
 - **`start`** (host → each guest, once): the level as data (`theme` and the whole `Stage`,
@@ -705,6 +706,22 @@ rollback or replays possible later.
   `net.js` asks the relays from 10 minutes earlier (`clockSlack`; the messages are never stored, so
   nothing old comes back). `?debug=1` shows each tablet's clock (UTC) to compare side by side, and
   `heard` (tablets whose relay messages arrived) apart from `peers` (tablets connected).
+- **Only on https** (found 2026-10-15). Trystero hashes room names and scrambles the hellos with
+  `crypto.subtle`, which browsers only give a secure page: https, or `localhost`. On plain
+  `http://192.168.…` joining fails without an error and the lobby just never sees anyone. GitHub
+  Pages is https; at home `serve.py` serves https when a home-made `cert.pem`/`key.pem` sits beside
+  it (each tablet taps past the warning once), and redirects a plain http request to https.
+- **Relay rate limits** (found 2026-10-15). Every tablet in a home reaches the public relays from
+  one internet address, and each announces 5 times in its first ~9 s in a room. Three tablets
+  starting a match together, after an evening of reloads, got `rate-limited`, and Trystero skips a
+  relay that limits it for a minute or more. Rooms use 10 relays (`relayConfig.redundancy`; a
+  hello needs only one), and guests join a match's room up to 2 s apart. `ponytail:` signalling
+  through `serve.py` would keep even the hellos at home, but GitHub Pages players would still need
+  the relays.
+- **Hidden addresses** (found 2026-10-15). Browsers hide a tablet's own addresses behind `.local`
+  names. A tablet that connects by resolving the other's `.local` name shows up as a peer-reflexive
+  route with no address; that only works on the same network, so the home check accepts it (and
+  still hangs up on a hidden server-reflexive or relayed route, or a visible non-home address).
 - **Client isolation.** Guest networks and some mesh Wi-Fi systems block devices from reaching
   each other. Symptom: everyone joins the room but no data channel opens. Use the main network.
 - **Leaving the screen** (decided 2026-10-14). A browser stops running a page that isn't on screen

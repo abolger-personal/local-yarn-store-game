@@ -65,7 +65,7 @@ function noteWarnings() {
   };
 }
 
-/** Puts a status line on the page that refreshes every second (lobby.html?debug=1). */
+/** Puts a status line on the page that refreshes every second (see `debugging`). */
 export function showDebug() {
   const line = document.body.appendChild(document.createElement('pre'));
   line.className = 'debug';

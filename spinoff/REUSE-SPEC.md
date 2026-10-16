@@ -373,6 +373,13 @@ Later levels can bring new hand-made stages.
   `spinoff/roster.js`, with `MATCH.friendlyFire` false. A kid-against-kid mode later is that one
   setting, not a rewrite (decided 2026-10-13).
 
+## Buttons mean one thing everywhere
+
+(Decided 2026-10-15.) A picture means the same thing on every screen, so a kid learns it once.
+👍 moves you on to the next screen or step (done choosing a fighter, ready to start a round); there
+is no ✅ anywhere. ▶️ plays or plays on, 👋 leaves (back to the lobby), ⏸ pauses, 🏠 opens a room
+and 🔑 joins one.
+
 ## Forts: build it, then knock it down
 
 Every level is two rounds (decided 2026-10-13): a **build it** round, where each team fortifies
@@ -937,7 +944,7 @@ only, pictures and colour, no words needed; every button has an `aria-label` for
    already wear knits it in the next stitch; the icon shows the stitch as a pattern. Each tap rebuilds the fighter
    (about 17 ms) on a gently turning preview.
 4. **Surprise me.** 🎲 runs the species' `randomise` plus a random outfit.
-5. **Done.** ✅ saves `{ species, params, look }` to `localStorage` under `lys.fighter.v1` and
+5. **Done.** 👍 saves `{ species, params, look }` to `localStorage` under `lys.fighter.v1` and
    goes to the lobby. That same object is what the join handshake sends.
 
 Saving: there is no save button. Every tap overwrites the one saved fighter (about 2 KB) in

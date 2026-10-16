@@ -22,6 +22,9 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - A fighter whose bag is full shakes its head again when it tries for another donut.
 - Fighters' legs keep up when they run: no more feet skating along under a gliding body.
 
+### Buttons
+- 👍 means "done, next" everywhere: the fighter chooser's ✅ is now 👍.
+
 ## 0.0.2 — 2026-10-15: Play together
 
 ### Play together

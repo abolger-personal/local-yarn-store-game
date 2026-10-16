@@ -400,6 +400,11 @@ function play() {
 
 const goTo = (href) => () => { location.href = href; };
 document.getElementById('leave').addEventListener('click', goTo('lobby.html'));
+// The score first; a tap on it brings up what's next: play again or leave, and the room code for a late friend.
+document.getElementById('score').addEventListener('click', () => {
+  document.getElementById('score').hidden = true;
+  document.getElementById('next').hidden = false;
+});
 document.getElementById('bye').addEventListener('click', goTo('lobby.html'));
 document.getElementById('quit').addEventListener('click', goTo('lobby.html'));
 document.getElementById('again').addEventListener('click', net?.again ?? goTo(`play.html${location.search}`));

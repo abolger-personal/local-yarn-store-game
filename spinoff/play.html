@@ -24,14 +24,16 @@
   <button id="kick" aria-label="kick"><span class="emoji">🦶</span></button>
 </div>
 <div id="end" class="end" hidden>
-  <div class="card">
+  <div id="score" class="card" role="button" tabindex="0" aria-label="the score: tap for what's next">
     <div class="side heroes"><span class="trophy emoji">🏆</span><div id="end-pics-heroes" class="pics"></div><div id="end-count-heroes" class="big"></div></div>
     <div class="side badGuys"><span class="trophy emoji">🏆</span><div id="end-pics-badGuys" class="pics"></div><div id="end-count-badGuys" class="big"></div></div>
-    <div class="code" aria-label="room code"></div>
+  </div>
+  <div id="next" class="card paused" hidden>
     <div class="again">
       <button id="again" aria-label="play again"><span class="emoji">▶️</span></button>
       <button id="bye" aria-label="wave bye, back to the lobby"><span class="emoji">👋</span></button>
     </div>
+    <div class="code" aria-label="room code"></div>
   </div>
 </div>
 <div id="paused" class="end" hidden>

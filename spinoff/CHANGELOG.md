@@ -12,6 +12,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   come along into the next round.
 - The room's code (🍩🧁🍪🍒🍓🍰) shows on the end card, the ⏸ card and the ⏳ card, so a late friend
   can find it.
+- When time runs out, the score shows on its own first; tap it to get ▶️ and 👋, with the room's
+  code underneath.
 
 ## 0.0.2 — 2026-10-15: Play together
 

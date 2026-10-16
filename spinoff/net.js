@@ -14,6 +14,9 @@ const roomConfig = (code) => ({
 /** What `?debug=1` shows about why tablets do or don't meet. */
 const seen = { peers: 0, homes: 0, notes: [] };
 
+/** A line for `?debug=1`'s notes. */
+export const note = (text) => { seen.notes.push(text); };
+
 /** Puts a status line on the page that refreshes every second (lobby.html?debug=1). */
 export function showDebug() {
   const line = document.body.appendChild(document.createElement('pre'));

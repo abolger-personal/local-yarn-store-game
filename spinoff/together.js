@@ -2,7 +2,7 @@
 // for the N tablets the lobby sent along, `play.html?room=CODE` joins it. multiplayer.js does the talking.
 import { ROUND_SECONDS } from './match.js';
 import { HOST_GONE_SECONDS, createGuest, createHost, rosterOf } from './multiplayer.js';
-import { openRoom, selfId, showDebug } from './net.js';
+import { note, openRoom, selfId, showDebug } from './net.js';
 import { isCode } from './roster.js';
 import { THEMES } from './scenery.js';
 
@@ -21,18 +21,21 @@ function hostGone() {
   el('gone-bye').addEventListener('click', toLobby);
 }
 
+const noteGuest = (id, n, expected, late) => note(`host: fighter ${id.slice(0, 4)}, ${n} of ${expected}${late ? ' (late)' : ''}`);
+
 /** @param {number[]} code @param {import('./fighter.js').Fighter} mine @param {import('./levels.js').Level} level */
 async function host(code, mine, level, expected) {
   const guests = new Map();
   let h = null, ready;
   const full = new Promise((r) => { ready = r; });
   const room = openRoom(code, mine, {
-    onFighter: (id, f) => { if (!h) guests.set(id, f); if (guests.size >= expected) ready(); },
+    onFighter: (id, f) => { if (!h) guests.set(id, f); noteGuest(id, guests.size, expected, h); if (guests.size >= expected) ready(); },
     onLeave: (id) => { guests.delete(id); h?.left(id); },
   }, '-play');
   await Promise.race([expected > 0 ? full : null, sleep(WAIT_FOR_GUESTS_MS)]);
   const start = { theme: level.theme, stage: level.stage, roster: rosterOf(selfId, mine, guests), settings: { seconds: ROUND_SECONDS } };
   h = createHost(room, start, selfId);
+  note(`host: start sent to ${guests.size}`);
   const again = () => {
     h.again();
     const q = new URLSearchParams(location.search);
@@ -46,7 +49,13 @@ async function host(code, mine, level, expected) {
 async function guest(code, mine) {
   let g = null;
   const room = openRoom(code, mine, { onFighter: () => {}, onLeave: (id) => g?.left(id) }, '-play');
-  g = createGuest(room, selfId, Object.keys(THEMES), { gone: hostGone, again: () => location.reload() });
+  const heard = new Set(), link = { ...room, on: (type, fn) => room.on(type, (data, from) => {
+    if (!heard.has(type)) note(`guest: first ${type} from ${from.slice(0, 4)}`);
+    heard.add(type);
+    fn(data, from);
+  }) };
+  g = createGuest(link, selfId, Object.keys(THEMES), { gone: hostGone, again: () => location.reload() });
+  g.started.then(() => note('guest: start accepted'));
   const start = await Promise.race([g.started, sleep(HOST_GONE_SECONDS * 1000)]);
   if (!start) {
     hostGone();

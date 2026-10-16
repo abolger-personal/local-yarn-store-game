@@ -62,7 +62,7 @@ charm: a fighter's alternate costumes are outfits. `selfie.js` is the victory sc
 
 Not reusable: the store sim, displays, pathing, puzzle, stock and HUD. The inventory grid is
 reused: `inventory/grid.js` for the lobby floor, team shelves and forts, and
-`inventory/pick-place.js` for fort placement (see Forts).
+`inventory/pick-place.js` was the plan for fort placement; forts are now built by carrying blocks (see Forts).
 
 ## What the fighter needs
 
@@ -389,8 +389,37 @@ and smashers each get a round that is theirs.
   ordinary tap from setting it off.
 - **CPU bad guys build their fort and are ready at once.** With no grownup bad guys, the bad
   guys' side is ready from the start, so only the heroes decide when to go.
-- **Placement is the shop's touch picker** (`inventory/pick-place.js` on the team's
-  `inventory/grid.js` floor), with the `help` table's grab radius and snap reach for small hands.
+- **Building is carrying blocks** (decided 2026-10-15, not built yet; replaces the shop's touch
+  picker). One rule runs both rounds: **a tap moves you, a button acts where you stand.**
+  - **The pile is the inventory.** Each team's fort pieces start as a small heap beside its shelf
+    (6–10 to begin with; the level's *fort pile*, in the `Stage` data). How many are left is how
+    big the heap is; nothing to read.
+  - **Tap a block in the pile** and your fighter runs over and grabs it; it flies into their arms
+    with the donut grab's arc. One block per trip to start; if a playtest drags, a fighter carries
+    a stack of 2–3 (the `help` table can give little kids the bigger stack).
+  - **⬇️ puts it down in front of you.** A faint outline of the block shows in the grid cell you
+    face (`inventory/grid.js`), moving as you walk and turn: on the floor, or on top of the stack
+    already there. At the level's height limit the outline greys and ⬇️ only gets a head-shake.
+  - **What's in your hands decides what a tap on a block does.** Carrying: tap a block and you walk
+    up to it and face it, so ⬇️ stacks on top. Empty-handed: tap one of *your own* blocks on top of
+    a stack and you pick it back up. That is the take-back: only a top block (nothing floats), only
+    your colour (nobody undoes a teammate's work), and no history, so nothing goes stale when
+    teammates build on your blocks.
+  - **The buttons swap with the round.** In the build round the corner shows ⬇️ and 👍 where 🥊 and
+    🦶 sit; when the match starts they drop away and 🥊 🦶 pop in with the hit-stop freeze. The
+    camera follows your fighter as in a match, so big levels need nothing extra.
+  - **Two players at one cell:** the host applies inputs a tick at a time, so one lands first and
+    every tablet draws the result.
+- **Level 1 has no build round** (decided 2026-10-15). Its only opponent is the training dummy,
+  which never comes for your shelf, so there is nothing to defend; the tutorial teaches the other
+  half, breaking in. The build round starts on the first level where something raids your shelf
+  (CPU raiders or grownup bad guys). That level teaches building the way level 1 teaches punching
+  through: a small pile, an obvious gap in front of your shelf, and the first raider walking into
+  your wall.
+- **Open: patching mid-match.** Carried blocks don't strictly need their own round: a kid could
+  grab a block during the match and plug a hole the bad guys just opened, and a hit could knock
+  it loose like a donut. Keep the build round as the calm opening either way; decide once building
+  is played.
 - **Stages and difficulty are separate** (decided 2026-10-14). Past the tutorial, a *stage* is a
   place with its own look and terrain rules, and *difficulty* is how hard the match is (bad-guy
   count, fort pile, moves, generated terrain problems). Anything tried at several difficulties
@@ -824,7 +853,7 @@ spinoff gets its own small `spinoff/treats.js` and reuses the generic parts.
 | Existing | Treats use | Change |
 | --- | --- | --- |
 | `inventory/grid.js` | Team shelves (grab and bank), obstacle and platform placement | None. Its `round` rule (a round item must rest on centres) stacks donuts and donut holes as it stacks yarn balls |
-| `inventory/pick-place.js` | Touch placement of treat obstacles | None |
+| `inventory/pick-place.js` | Not for forts any more: blocks are carried and put down in front of you (see Forts) | None |
 | `inventory/yarn-look.js` | `matcap` / `toon` shading, `oklch` frosting palette, `bakeVertexAO`, `makeHull` outlines, `CHARACTER_RANGE` (keeps treats from matching fur colours) | None; skip `applyHatching`, which is the yarn texture |
 | `inventory/notions.js` + `notion_processing.py --theme` | Flat treat pickups and icons (sprinkles, cookies, cherries) from black line art; colour is applied at runtime | A new `treats` theme of line-art PNGs next to `themes/cottage/` |
 | `inventory/yarn-geometry.js` | The pattern: a profile per family, lathed or tubed, seated on the floor | Copy the pattern into `treats.js`; the yarn file stays yarn |

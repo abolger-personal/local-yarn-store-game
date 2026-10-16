@@ -377,8 +377,9 @@ Later levels can bring new hand-made stages.
 
 (Decided 2026-10-15.) A picture means the same thing on every screen, so a kid learns it once.
 👍 moves you on to the next screen or step (done choosing a fighter, ready to start a round); there
-is no ✅ anywhere. ▶️ plays or plays on, 👋 leaves (back to the lobby), ⏸ pauses, 🏠 opens a room
-and 🔑 joins one.
+is no ✅ anywhere. ▶️ plays or plays on (in a room only the host starts a round), 👋 leaves (back
+to the lobby), ⏸ pauses, 🏠 opens a room and 🔑 joins one. **A screen never shows both ▶️ and 👍**,
+so there is never a question which one goes forward.
 
 ## Forts: build it, then knock it down
 

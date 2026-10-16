@@ -167,7 +167,8 @@ floor at an angle and follows your fighter.
   don't count, and a stomp shows the string's next kick). The kick is a quick front kick; the
   thrust (the 300 well kick) sinks and chambers, then drives the leg out straight at hip height
   or above with the torso thrown far back, arms flung back, head back, and the drawn body lunging
-  forward along the facing (draw only; the sim doesn't move). Both use the leg nearer the camera.
+  forward along the facing (draw only; the sim doesn't move). This look is approved after play-testing
+  (2026-10-16): keep the deep lean, the flung arms and the lunge when retuning. Both use the leg nearer the camera.
   Keyframed over the kick's `step` like the punches (`spinoff/kicks.js`): the motion spring
   needs ~0.3 s to reach a pose, longer than the kick.
 - **Fort walls: around if there's a way, stop if there isn't** (depth band, 2026-10-13). On a

@@ -17,7 +17,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 
 ### Fighting
 - **Punches look like punches**, and every punch that lands on a bad guy, the dummy or a fort brick moves you along a string: jab, cross, uppercut, uppercut, and round again. A miss waits; only a pause of a couple of seconds starts you again at jab, so chasing a bad guy you knocked back keeps your string going.
-- **Kicks come in twos**: a quick front kick, and once it lands, a big thrust kick, leaning way back and driving the foot in. Then round again; a miss waits, a pause starts again.
+- **Kicks come in twos**: a quick front kick, and once it lands, a big movie-style thrust kick: the fighter throws its whole body way back, arms and head flung behind, and lunges in foot-first. Then round again; a miss waits, a pause starts again.
 
 ### Fixes
 - A fighter whose bag is full shakes its head again when it tries for another donut.

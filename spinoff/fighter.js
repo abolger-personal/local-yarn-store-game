@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-  BASE_PARAMS, DANCE_POSES, MOTION_DEFAULTS, NAMES, POSES, applyPose, createCharacter, deriveCoatColor, disposeCharacter, getSpecies, mergeCharacter,
+  BASE_PARAMS, MOTION_DEFAULTS, NAMES, POSES, applyPose, createCharacter, deriveCoatColor, disposeCharacter, getSpecies, mergeCharacter,
   lowestResting, phaseStep, stepMotion, walkGain, walkLayer, walkPhase,
 } from '../characters/npc.js';
 import { deriveManeColor } from '../characters/lion.js';
@@ -10,6 +10,7 @@ import { oklchOf } from '../inventory/yarn-look.js';
 import '../characters/llama.js';
 import { wingShape } from '../characters/owl.js';
 import { GLOVE, punchLayer, sample } from './punches.js';
+import { kickLayer, kickLunge } from './kicks.js';
 
 export const FIGHTER_KEY = 'lys.fighter.v1';
 export const SPECIES = Object.freeze(['lion', 'llama', 'owl']);
@@ -246,25 +247,27 @@ export function squashGloves(built, punch) {
   });
 }
 
-/** @param {import('./punches.js').Punch|null} [punch] layered over the walk */
-export function stepFighter(built, dt, pose, speed, punch = null) {
+/** @param {import('./punches.js').Punch|import('./kicks.js').Kick|null} [strike] layered over the walk */
+export function stepFighter(built, dt, pose, speed, strike = null) {
   const L = built.params.legHeight + built.params.hipInset;
   const at = built.walkAt ?? 0;
   const w = walkPhase(at, speed, L, IDLE);
   const gain = walkGain(built.motion, speed, dt, IDLE);
   built.walkAt = (at + phaseStep(speed * dt, speed, L, IDLE)) % 1;
+  const kick = strike && 'leg' in strike ? strike : null, punch = strike && 'arm' in strike ? strike : null;
   squashGloves(built, punch);
+  built.root.position.z = kick ? kickLunge(built.params, kick) : 0;
   return stepMotion(built, pose, dt, IDLE, (out) => {
     if (gain > 0) walkLayer(out, w, gain, IDLE);
     if (punch) punchLayer(out, punch);
+    if (kick) kickLayer(out, kick);
   });
 }
 
 const posed = (p) => Object.freeze({ ...POSES.rest, ...p });
 
-// Keyed by facing, so the leg nearer the camera kicks; punches are timelines layered over the walk (punches.js).
+// Punches and kicks are timelines layered over the walk (punches.js, kicks.js).
 export const MOVE_POSES = Object.freeze({
-  kick: Object.freeze({ 1: DANCE_POSES['rd-kick-r'], [-1]: DANCE_POSES['rd-kick-l'] }),
   hurt: posed({ armSwing: -0.5, armOut: 0.9, elbowBend: 1.2, spineBend: -0.2, headPitch: 0.25, kneeBend: 0.3 }),
   air: posed({ armOut: 0.9, elbowBend: 0.4, kneeBend: 0.9, hipFlex: 0.6 }),
   // REUSE-SPEC.md §Network gotchas: a guest who leaves the screen sits on the floor, legs out in front

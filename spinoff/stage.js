@@ -41,14 +41,19 @@ export function makeStage(container, { background = '#f6e7d4' } = {}) {
 
 const VIEW = new THREE.Vector3(0, 0.28, 1).normalize();
 
-/** Fits the camera to everything in `objects`, seen slightly from above. */
+/** Fits the camera to every corner of the box around `objects`, seen from `view` (slightly above by default). */
 export function frame(camera, objects, { margin = 1.2, view = VIEW } = {}) {
   const box = new THREE.Box3();
   for (const o of objects) box.expandByObject(o);
   if (box.isEmpty()) return;
-  const centre = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
-  const vFov = THREE.MathUtils.degToRad(camera.fov), hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
-  const dist = margin * Math.max(size.y / (2 * Math.tan(vFov / 2)), size.x / (2 * Math.tan(hFov / 2))) + size.z / 2;
+  const centre = box.getCenter(new THREE.Vector3()), half = box.getSize(new THREE.Vector3()).multiplyScalar(0.5);
+  const right = new THREE.Vector3(0, 1, 0).cross(view).normalize(), up = view.clone().cross(right);
+  const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2), tanH = tanV * camera.aspect, o = new THREE.Vector3();
+  let dist = 0;
+  for (let i = 0; i < 8; i++) {
+    o.set(i & 1 ? half.x : -half.x, i & 2 ? half.y : -half.y, i & 4 ? half.z : -half.z);
+    dist = Math.max(dist, o.dot(view) + margin * Math.max(Math.abs(o.dot(up)) / tanV, Math.abs(o.dot(right)) / tanH));
+  }
   camera.position.copy(centre).addScaledVector(view, dist);
   camera.lookAt(centre);
 }

@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { POSES, setGeometryDetail } from '../characters/npc.js';
 import { attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
-import { COMBO, countPunch, landPunch, newCombo, punchArm, puncherOf } from './punches.js';
+import { countStrike, landHit, newCombo, strikerOf } from './punches.js';
+import { KICK_COMBO, strikeOf } from './kicks.js';
 import { MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
 import { BRICK, TICK_HZ, groundOf } from './match.js';
@@ -106,7 +107,6 @@ const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 function poseOf(m, f) {
   if (f.move === 'sit') return MOVE_POSES.sit;
   if (m.t.joy > 0) return POSES.delighted;
-  if (f.move === 'kick') return f.step < 0.7 ? MOVE_POSES.kick[Math.cos(f.facing) >= 0 ? 1 : -1] : POSES.rest;
   if (f.move === 'hurt' || f.move === 'launched') return MOVE_POSES.hurt;
   const base = f.onGround ? POSES.rest : MOVE_POSES.air;
   if (!m.t.no) return base;
@@ -163,10 +163,10 @@ function placeCarried(m) {
   m.carried.scale.setScalar(THREE.MathUtils.lerp(LOOSE_R, m.carryR, k) * (1 + 0.8 * Math.sin(Math.PI * pulse)));
 }
 
-/** REUSE-SPEC.md §Navigation: a punch is upper body only (an uppercut dips the knees too) and layers over the walk. */
-function punchOf(m, f, tick) {
-  const n = countPunch(m.combo, f, tick);
-  return f.move === 'punch' && !m.t.joy ? { name: COMBO[n], arm: punchArm(f.facing, n), step: f.step } : null;
+/** REUSE-SPEC.md §Navigation: a punch is upper body only (an uppercut dips the knees too) and layers over the walk; a kick takes the legs. */
+function strikeNow(m, f, tick) {
+  const n = { punch: countStrike(m.combo.punch, f, tick), kick: countStrike(m.combo.kick, f, tick) }[f.move];
+  return n === undefined || m.t.joy ? null : strikeOf(f.move, n, f.facing, f.step);
 }
 
 /** @param {FighterState} f */
@@ -175,7 +175,7 @@ function drawFighter(m, f, dt, tick) {
   bounces(m, f);
   placeFighter(m, f, dt);
   const speed = f.onGround && f.move !== 'blocked' ? Math.hypot(f.vx, f.vz) : 0;
-  stepFighter(m.built, dt, poseOf(m, f), speed, punchOf(m, f, tick));
+  stepFighter(m.built, dt, poseOf(m, f), speed, strikeNow(m, f, tick));
   carry(m, f.carrying);
   if (m.carried) placeCarried(m);
   placeShadow(level.stage, m.shadow, f, 0.42);
@@ -268,8 +268,8 @@ const posOf = (m) => m.g.position;
 /** @param {HitEvent} h @param {Snapshot} snap */
 function onHit(h, snap) {
   fx.bam(h);
-  const by = puncherOf(h, snap.fighters), puncher = by && fighters.get(by.id);
-  if (puncher) landPunch(puncher.combo);
+  const by = strikerOf(h, snap.fighters), combo = by && fighters.get(by.id)?.combo[h.move];
+  if (combo) landHit(combo);
   if (h.on === 'brick') { brickHit(h); return; }
   const hurt = snap.fighters.filter((f) => f.move === 'hurt' || f.move === 'launched');
   const f = closestTo(hurt.length ? hurt : snap.fighters, h, (o) => o);
@@ -344,7 +344,7 @@ function cast(roster) {
     g.add(built.root);
     scene.add(g);
     const t = Object.fromEntries(FIGHTER_TIMERS.map((k) => [k, 0]));
-    fighters.set(id, { g, built, team, t, vy: 0, ground: true, yaw: 0, recoil: new THREE.Vector3(), combo: newCombo(), seat: seatDrop(built), down: 0, cycles: fighters.size * 0.33, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
+    fighters.set(id, { g, built, team, t, vy: 0, ground: true, yaw: 0, recoil: new THREE.Vector3(), combo: { punch: newCombo(), kick: newCombo('kick', KICK_COMBO.length) }, seat: seatDrop(built), down: 0, cycles: fighters.size * 0.33, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
     endPicture(entrant);
     return entrant;
   });

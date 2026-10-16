@@ -162,6 +162,14 @@ floor at an angle and follows your fighter.
   the combo's odd punches use the far arm. One elbow drives both arms, so in a jab or cross the
   straight-armed guard swings back as a counterweight, and in an uppercut the bent one is a
   guard by the chin. `spinoff/moves.html` loops them on every species.
+- **The kick string is look only too** (decided 2026-10-15): kick, thrust, and round again, counted
+  exactly like the punch string (same counter, same `COMBO_TICKS`, landed kicks only; a stomp's hits
+  don't count, and a stomp shows the string's next kick). The kick is a quick front kick; the
+  thrust (the 300 well kick) sinks and chambers, then drives the leg out straight at hip height
+  or above with the torso thrown far back, arms flung back, head back, and the drawn body lunging
+  forward along the facing (draw only; the sim doesn't move). Both use the leg nearer the camera.
+  Keyframed over the kick's `step` like the punches (`spinoff/kicks.js`): the motion spring
+  needs ~0.3 s to reach a pose, longer than the kick.
 - **Fort walls: around if there's a way, stop if there isn't** (depth band, 2026-10-13). On a
   floor you can walk around things, so a tap behind a wall routes through a gap if one exists.
   If the fort is closed, the fighter goes as close as it can and stands `'blocked'`, facing the

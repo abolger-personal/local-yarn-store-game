@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Donut fighters — punches</title>
+<title>Donut fighters — moves</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #f6e7d4; font: 16px system-ui, sans-serif; }
-  #stage { position: absolute; inset: 0; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #f6e7d4; font: 14px system-ui, sans-serif; }
+  #stage { position: absolute; inset: 2.6em 0 0 0; }
   #stage canvas { display: block; }
-  p { position: absolute; margin: 0; top: 8px; left: 12px; right: 12px; }
+  p { position: absolute; margin: 0; top: 6px; left: 12px; right: 12px; }
 </style>
 </head>
 <body>
 <main id="stage"></main>
-<p>Top to bottom: jab, cross, uppercut, then the string (every punch landing, facing the other way). <code>?slow=4</code> slows it down.</p>
+<p>Every move landing; the strings face the other way. <code>?slow=4</code> slows it down.</p>
 <script type="importmap">
 {
   "imports": {

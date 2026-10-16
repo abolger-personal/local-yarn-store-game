@@ -74,39 +74,36 @@ export function punchLayer(out, { name, arm, step }) {
   return out;
 }
 
-const LAST_ACTIVE = MOVES.punch.active[1] / MOVES.punch.steps;
-
-/** @typedef {{ move: string, step: number, at: number, hits: number, ahead: number, n: number }} ComboCount */
-/** @returns {ComboCount} */
-export const newCombo = () => ({ move: '', step: 0, at: -Infinity, hits: 0, ahead: 0, n: 0 });
+/** @typedef {{ of: string, length: number, move: string, step: number, at: number, hits: number, ahead: number, n: number }} ComboCount */
+/** A count of landed `of` moves (punch or kick) for a string `length` long. @returns {ComboCount} */
+export const newCombo = (of = 'punch', length = COMBO.length) => ({ of, length, move: '', step: 0, at: -Infinity, hits: 0, ahead: 0, n: 0 });
 
 /**
- * Who threw the punch behind hit event `h`: the nearest puncher to the contact point not on the target's team
+ * Who threw hit event `h`: the nearest fighter showing that move to the contact point not on the target's team
  * (friendly fire is off), or failing that, as a guest draws a few ticks behind, the nearest such fighter.
  * @param {import('./match.js').HitEvent} h @param {import('./match.js').FighterState[]} fighters
  */
-export function puncherOf(h, fighters) {
-  if (h.move !== 'punch') return null;
+export function strikerOf(h, fighters) {
   const team = h.on === 'fighter' ? fighters.find((f) => f.id === h.target)?.team : null;
-  const by = (f) => (f.move === 'punch' ? 0 : 1e3) + Math.hypot(f.x - h.x, f.z - h.z);
+  const by = (f) => (f.move === MOVES[h.move].shows ? 0 : 1e3) + Math.hypot(f.x - h.x, f.z - h.z);
   return fighters.filter((f) => f.team !== team).sort((a, b) => by(a) - by(b))[0] ?? null;
 }
 
-/** A punch connected; one this tablet hasn't drawn the start of yet counts once it has. */
-export function landPunch(c) {
-  if (c.move === 'punch' && c.step <= LAST_ACTIVE) c.hits++;
+/** A hit landed; one this tablet hasn't drawn the start of yet counts once it has. */
+export function landHit(c) {
+  if (c.move === c.of && c.step <= MOVES[c.of].active[1] / MOVES[c.of].steps) c.hits++;
   else c.ahead++;
 }
 
 /**
- * The combo index of the punch `f` is showing, from hits landed before it started. A punch starts when the move
- * turns to punch or its step goes back; one starting more than COMBO_TICKS after the last starts the string again.
+ * The string index of the move `f` is showing, from hits landed before it started. A move starts when `f` turns to
+ * it or its step goes back; one starting more than COMBO_TICKS after the last starts the string again.
  */
-export function countPunch(c, f, tick) {
-  if (f.move === 'punch' && (c.move !== 'punch' || f.step < c.step)) {
-    const at = tick - Math.round(f.step * MOVES.punch.steps);
+export function countStrike(c, f, tick) {
+  if (f.move === c.of && (c.move !== c.of || f.step < c.step)) {
+    const at = tick - Math.round(f.step * MOVES[c.of].steps);
     if (at - c.at > COMBO_TICKS) c.hits = 0;
-    Object.assign(c, { n: c.hits % COMBO.length, hits: c.hits + c.ahead, ahead: 0, at });
+    Object.assign(c, { n: c.hits % c.length, hits: c.hits + c.ahead, ahead: 0, at });
   }
   Object.assign(c, { move: f.move, step: f.step });
   return c.n;

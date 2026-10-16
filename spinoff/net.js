@@ -7,8 +7,13 @@ export { selfId };
 
 // REUSE-SPEC.md §Multiplayer: no STUN servers, so a tablet only knows its home-network addresses and
 // can't connect across the internet; the room code scrambles the introductions on the public relays
+// Every tablet in a home shares one internet address, and a relay that rate-limits it is skipped for a minute or
+// more; a hello only needs one relay to get through, so more relays ride out a few that refuse.
+// ponytail: still public relays; a signalling relay in serve.py would keep even the hellos at home
+const RELAYS = 10;
 const roomConfig = (code) => ({
   appId: APP_ID, password: roomName(code), rtcConfig: { iceServers: [] }, maxReceiveBytes: 64 * 1024,
+  relayConfig: { redundancy: RELAYS },
 });
 
 /** What `?debug=1` shows about why tablets do or don't meet; `heard`, the tablets whose relay messages arrived. */

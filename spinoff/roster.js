@@ -29,11 +29,17 @@ export function remoteOf(stats) {
   return pair ? stats.get(pair.remoteCandidateId) : undefined;
 }
 
-/** A route counts only if its far end is a home-network address (or a hidden one, on a direct host route). */
+// With no STUN a hidden far end is a host candidate, or a peer-reflexive one: a tablet that reached this one
+// by resolving its `.local` name, which only works on the same network.
+// ponytail: trusts the browser to keep hiding host addresses behind `.local`; a browser with that turned off
+// shows its real address instead, which the address check still covers.
+const HIDDEN_OK = new Set(['host', 'prflx']);
+
+/** A route counts only if its far end is a home-network address, or a hidden one reached directly. */
 export function isHomeRoute(remote) {
   if (!remote) return false;
   const address = remote.address ?? remote.ip;
-  return isHomeAddress(address) || (!address && remote.candidateType === 'host');
+  return isHomeAddress(address) || (!address && HIDDEN_OK.has(remote.candidateType));
 }
 
 /** One `?debug=1` line per tablet met: the route and what the home check made of it. */

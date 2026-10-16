@@ -67,7 +67,9 @@ import {
   assert.match(netProblem({ ...fine, peers: 0, homes: 0 }), /no other tablet/);
   assert.match(netProblem({ ...fine, homes: 0 }), /hung up/);
   assert.equal(routeNote({ candidateType: 'host', address: 'ab12.local' }), 'host ab12.local home');
-  assert.equal(routeNote({ candidateType: 'prflx', address: '' }), 'prflx hidden hung up', 'a hidden peer-reflexive route is hung up on');
+  assert.equal(routeNote({ candidateType: 'prflx', address: '' }), 'prflx hidden home', 'a tablet that found this one by its .local name is home');
+  assert.equal(routeNote({ candidateType: 'relay', address: '' }), 'relay hidden hung up', 'a hidden relayed route is hung up on');
+  assert.equal(routeNote({ candidateType: 'srflx' }), 'srflx hidden hung up', 'a hidden route through the internet is hung up on');
   assert.equal(routeNote(undefined), 'no route hidden hung up');
 }
 

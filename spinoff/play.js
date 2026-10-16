@@ -110,8 +110,8 @@ function poseOf(m, f) {
   if (f.move === 'hurt' || f.move === 'launched') return MOVE_POSES.hurt;
   const base = f.onGround ? POSES.rest : MOVE_POSES.air;
   if (!m.t.no) return base;
-  Object.assign(m.pose, base).headYaw = Math.sin(m.t.no * 28) * 0.8;
-  return m.pose;
+  // a new object each frame: the motion only takes up a target that is a different object
+  return { ...base, headYaw: Math.sin(m.t.no * 28) * 0.8 };
 }
 
 /** @param {FighterState} f */
@@ -344,7 +344,7 @@ function cast(roster) {
     g.add(built.root);
     scene.add(g);
     const t = Object.fromEntries(FIGHTER_TIMERS.map((k) => [k, 0]));
-    fighters.set(id, { g, built, team, t, vy: 0, ground: true, yaw: 0, recoil: new THREE.Vector3(), pose: {}, combo: newCombo(), seat: seatDrop(built), down: 0, cycles: fighters.size * 0.33, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
+    fighters.set(id, { g, built, team, t, vy: 0, ground: true, yaw: 0, recoil: new THREE.Vector3(), combo: newCombo(), seat: seatDrop(built), down: 0, cycles: fighters.size * 0.33, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
     endPicture(entrant);
     return entrant;
   });

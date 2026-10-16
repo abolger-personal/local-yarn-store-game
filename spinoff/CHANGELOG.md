@@ -19,6 +19,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **Punches look like punches**, and every punch that lands on a bad guy, the dummy or a fort brick moves you along a string: jab, cross, hook, hook, uppercut, uppercut, and round again. A miss waits; a pause starts you again at jab.
 
 ### Fixes
+- A fighter whose bag is full shakes its head again when it tries for another donut.
 - Fighters' legs keep up when they run: no more feet skating along under a gliding body.
 
 ## 0.0.2 — 2026-10-15: Play together

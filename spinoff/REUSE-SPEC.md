@@ -150,6 +150,18 @@ floor at an angle and follows your fighter.
   carries on to where it was going, so nobody has to re-tap after every hit.
 - **Attacking on the move.** A punch is layered on the upper body over the walk on the legs, so
   the fighter keeps going. A kick needs the legs: the fighter pauses for the kick and walks on.
+- **The punch string is look only** (decided 2026-10-15). The sim has one punch; each tablet draws
+  it as the next of jab, cross, hook, hook, uppercut, uppercut (then round again), counting the
+  punches that landed: hit events on an enemy fighter, the dummy or a fort brick, credited to the
+  nearest puncher not on the target's team. The move is picked when the punch starts, from the
+  hits landed before it, so a miss shows the move that's next and leaves the count waiting; a
+  punch starting more than `COMBO_TICKS` (41) after the last starts again at jab. No network data:
+  every tablet counts from the same snapshots and once-only hit events (`spinoff/punches.js`).
+  Each move is a keyframed timeline over the punch's `step` (wind-up, strike by the first active
+  step, held through hitstop, recovery), arms taking over from the walk, torso and legs adding on;
+  the combo's odd punches use the far arm. One elbow drives both arms, so in a jab or cross the
+  straight-armed guard swings back as a counterweight, and in a hook or uppercut the bent one is a
+  guard by the chin. `spinoff/moves.html` loops them on every species.
 - **Fort walls: around if there's a way, stop if there isn't** (depth band, 2026-10-13). On a
   floor you can walk around things, so a tap behind a wall routes through a gap if one exists.
   If the fort is closed, the fighter goes as close as it can and stands `'blocked'`, facing the

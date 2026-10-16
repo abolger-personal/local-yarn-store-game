@@ -15,6 +15,9 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - When time runs out, the score shows on its own first; tap it to get ▶️ and 👋, with the room's
   code underneath.
 
+### Fighting
+- **Punches look like punches**, and every punch that lands on a bad guy, the dummy or a fort brick moves you along a string: jab, cross, hook, hook, uppercut, uppercut, and round again. A miss waits; a pause starts you again at jab.
+
 ### Fixes
 - Fighters' legs keep up when they run: no more feet skating along under a gliding body.
 

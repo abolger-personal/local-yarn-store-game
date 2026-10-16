@@ -1,0 +1,115 @@
+import { POSES } from '../characters/npc.js';
+import { HITSTOP_TICKS } from './match.js';
+import { MOVES } from './sim.js';
+
+// Look only: the sim's punch is one move; each tablet draws it as the next of these for every punch that has landed.
+export const COMBO = Object.freeze(['jab', 'cross', 'hook', 'hook', 'uppercut', 'uppercut']);
+/** Punch starts this many ticks apart or fewer keep the string going; the gap a kid tapping twice a second leaves. */
+export const COMBO_TICKS = MOVES.punch.steps + HITSTOP_TICKS + 20;
+
+const REST = Object.freeze({ hit: 0, guard: 0, hitOut: POSES.rest.armOut, guardOut: POSES.rest.armOut, elbow: POSES.rest.elbowBend });
+const key = (t, p) => Object.freeze([t, Object.freeze({ ...REST, twist: 0, roll: 0, lean: 0, knee: 0, hip: 0, pitch: 0, ...p })]);
+const WIND = 0.14, STRIKE = 0.25, HOLD = 0.5;
+const timeline = (wind, strike, hold) => Object.freeze([key(0, {}), key(WIND, wind), key(STRIKE, strike), key(HOLD, hold), key(1, {})]);
+
+// hit/guard: each arm's forward swing (negative is forward); twist brings the hitting shoulder forward, roll lifts it;
+// one elbow for both arms
+export const PUNCHES = Object.freeze({
+  jab: timeline(
+    { hit: 0.2, guard: -0.3, hitOut: 0.25, guardOut: 0.3, elbow: 1.3, twist: -0.35, lean: -0.05 },
+    { hit: -1.75, guard: 0.7, hitOut: 0.12, guardOut: 0.45, elbow: 0, twist: 0.6, lean: 0.2, pitch: -0.1 },
+    { hit: -1.65, guard: 0.6, hitOut: 0.14, guardOut: 0.4, elbow: 0.1, twist: 0.5, lean: 0.18, pitch: -0.08 },
+  ),
+  cross: timeline(
+    { hit: 0.8, guard: -0.6, hitOut: 0.35, guardOut: 0.3, elbow: 1.2, twist: -0.8, lean: -0.15 },
+    { hit: -1.8, guard: 0.95, hitOut: 0.1, guardOut: 0.55, elbow: 0, twist: 1.1, lean: 0.4, hip: 0.15, pitch: -0.15 },
+    { hit: -1.7, guard: 0.85, hitOut: 0.12, guardOut: 0.5, elbow: 0.1, twist: 1, lean: 0.35, hip: 0.12, pitch: -0.12 },
+  ),
+  hook: timeline(
+    { hit: 0.1, guard: -0.9, hitOut: 1.2, guardOut: 0.2, elbow: 1.6, twist: -0.8, roll: 0.15, lean: 0.05 },
+    { hit: -1, guard: -0.9, hitOut: 1, guardOut: 0.2, elbow: 2.3, twist: 1.6, roll: -0.2, lean: 0.15 },
+    { hit: -0.95, guard: -0.85, hitOut: 1, guardOut: 0.2, elbow: 2.2, twist: 1.5, roll: -0.18, lean: 0.12 },
+  ),
+  uppercut: timeline(
+    { hit: 0.5, guard: -0.8, hitOut: 0.3, guardOut: 0.2, elbow: 1.5, twist: -0.5, roll: -0.2, lean: 0.4, knee: 1, hip: 0.5, pitch: 0.15 },
+    { hit: -2.9, guard: 0.6, hitOut: 0.2, guardOut: 0.5, elbow: 0.15, twist: 0.4, roll: 0.45, lean: -0.3, hip: -0.15, pitch: -0.35 },
+    { hit: -2.8, guard: 0.5, hitOut: 0.2, guardOut: 0.45, elbow: 0.2, twist: 0.35, roll: 0.4, lean: -0.25, hip: -0.1, pitch: -0.3 },
+  ),
+});
+
+// stretch along the forearm (negative squashes) and overall size of the hitting glove
+export const GLOVE = Object.freeze([
+  key(0, { stretch: 0, size: 1 }), key(WIND, { stretch: -0.3, size: 1.1 }), key(0.2, { stretch: 0.9, size: 1.3 }),
+  key(0.27, { stretch: -0.45, size: 1.45 }), key(HOLD, { stretch: 0.15, size: 1.3 }), key(1, { stretch: 0, size: 1 }),
+]);
+
+const ease = (k) => k * k * (3 - 2 * k);
+
+/** The keyframe values at progress t, eased between the keys either side. @returns {Record<string, number>} */
+export function sample(keys, t) {
+  const i = Math.max(1, keys.findIndex(([at]) => at >= Math.min(1, t)));
+  const [[t0, a], [t1, b]] = [keys[i - 1], keys[i]];
+  const k = ease(Math.min(1, Math.max(0, (t - t0) / (t1 - t0))));
+  return Object.fromEntries(Object.keys(b).map((n) => [n, a[n] + (b[n] - a[n]) * k]));
+}
+
+/** @typedef {{ name: string, arm: number, step: number }} Punch  arm: the hitting arm's joint side, -1 or 1 */
+
+/** The facing-keyed hitting arm: the one nearer the camera, or the far one on the combo's odd punches. */
+export const punchArm = (facing, n = 0) => (Math.cos(facing) >= 0 ? 1 : -1) * (n % 2 ? 1 : -1);
+
+/** Writes punch `p` over a pose that already has the walk in it: arms take over, torso and legs add on. */
+export function punchLayer(out, { name, arm, step }) {
+  const s = sample(PUNCHES[name], step), w = Math.min(1, step / WIND, (1 - step) / (1 - HOLD));
+  const mix = (k, v) => { out[k] = v + (out[k] - POSES.rest[k]) * (1 - w); };
+  mix('armSwing', (s.hit + s.guard) / 2);
+  mix('armSwingAlt', (-arm * (s.hit - s.guard)) / 2);
+  mix('armOut', (s.hitOut + s.guardOut) / 2);
+  mix('armOutAlt', (arm * (s.hitOut - s.guardOut)) / 2);
+  mix('elbowBend', s.elbow);
+  out.spineTwist -= arm * s.twist;
+  out.spineRoll -= arm * s.roll;
+  out.spineBend += s.lean;
+  out.kneeBend += s.knee;
+  out.hipFlex += s.hip;
+  out.headPitch += s.pitch;
+  return out;
+}
+
+const LAST_ACTIVE = MOVES.punch.active[1] / MOVES.punch.steps;
+
+/** @typedef {{ move: string, step: number, at: number, hits: number, ahead: number, n: number }} ComboCount */
+/** @returns {ComboCount} */
+export const newCombo = () => ({ move: '', step: 0, at: -Infinity, hits: 0, ahead: 0, n: 0 });
+
+/**
+ * Who threw the punch behind hit event `h`: the nearest puncher to the contact point not on the target's team
+ * (friendly fire is off), or failing that, as a guest draws a few ticks behind, the nearest such fighter.
+ * @param {import('./match.js').HitEvent} h @param {import('./match.js').FighterState[]} fighters
+ */
+export function puncherOf(h, fighters) {
+  if (h.move !== 'punch') return null;
+  const team = h.on === 'fighter' ? fighters.find((f) => f.id === h.target)?.team : null;
+  const by = (f) => (f.move === 'punch' ? 0 : 1e3) + Math.hypot(f.x - h.x, f.z - h.z);
+  return fighters.filter((f) => f.team !== team).sort((a, b) => by(a) - by(b))[0] ?? null;
+}
+
+/** A punch connected; one this tablet hasn't drawn the start of yet counts once it has. */
+export function landPunch(c) {
+  if (c.move === 'punch' && c.step <= LAST_ACTIVE) c.hits++;
+  else c.ahead++;
+}
+
+/**
+ * The combo index of the punch `f` is showing, from hits landed before it started. A punch starts when the move
+ * turns to punch or its step goes back; one starting more than COMBO_TICKS after the last starts the string again.
+ */
+export function countPunch(c, f, tick) {
+  if (f.move === 'punch' && (c.move !== 'punch' || f.step < c.step)) {
+    const at = tick - Math.round(f.step * MOVES.punch.steps);
+    if (at - c.at > COMBO_TICKS) c.hits = 0;
+    Object.assign(c, { n: c.hits % COMBO.length, hits: c.hits + c.ahead, ahead: 0, at });
+  }
+  Object.assign(c, { move: f.move, step: f.step });
+  return c.n;
+}

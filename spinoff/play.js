@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { POSES, setGeometryDetail } from '../characters/npc.js';
 import { attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
+import { COMBO, countPunch, landPunch, newCombo, punchArm, puncherOf } from './punches.js';
 import { MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
 import { BRICK, TICK_HZ, groundOf } from './match.js';
@@ -105,7 +106,7 @@ const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 function poseOf(m, f) {
   if (f.move === 'sit') return MOVE_POSES.sit;
   if (m.t.joy > 0) return POSES.delighted;
-  if (f.move === 'punch' || f.move === 'kick') return f.step < 0.7 ? MOVE_POSES[f.move][Math.cos(f.facing) >= 0 ? 1 : -1] : POSES.rest;
+  if (f.move === 'kick') return f.step < 0.7 ? MOVE_POSES.kick[Math.cos(f.facing) >= 0 ? 1 : -1] : POSES.rest;
   if (f.move === 'hurt' || f.move === 'launched') return MOVE_POSES.hurt;
   const base = f.onGround ? POSES.rest : MOVE_POSES.air;
   if (!m.t.no) return base;
@@ -162,12 +163,19 @@ function placeCarried(m) {
   m.carried.scale.setScalar(THREE.MathUtils.lerp(LOOSE_R, m.carryR, k) * (1 + 0.8 * Math.sin(Math.PI * pulse)));
 }
 
+/** REUSE-SPEC.md §Navigation: a punch is upper body only (an uppercut dips the knees too) and layers over the walk. */
+function punchOf(m, f, tick) {
+  const n = countPunch(m.combo, f, tick);
+  return f.move === 'punch' && !m.t.joy ? { name: COMBO[n], arm: punchArm(f.facing, n), step: f.step } : null;
+}
+
 /** @param {FighterState} f */
-function drawFighter(m, f, dt) {
+function drawFighter(m, f, dt, tick) {
   tickDown(m.t, FIGHTER_TIMERS, dt);
   bounces(m, f);
   placeFighter(m, f, dt);
-  stepFighter(m.built, dt, poseOf(m, f), f.onGround && f.move !== 'blocked' ? Math.hypot(f.vx, f.vz) : 0);
+  const speed = f.onGround && f.move !== 'blocked' ? Math.hypot(f.vx, f.vz) : 0;
+  stepFighter(m.built, dt, poseOf(m, f), speed, punchOf(m, f, tick));
   carry(m, f.carrying);
   if (m.carried) placeCarried(m);
   placeShadow(level.stage, m.shadow, f, 0.42);
@@ -220,7 +228,7 @@ function hud(key, n) {
 function draw(snap, dt) {
   frame++;
   now += dt;
-  for (const f of snap.fighters) drawFighter(fighters.get(f.id), f, dt);
+  for (const f of snap.fighters) drawFighter(fighters.get(f.id), f, dt, snap.tick);
   sync(donuts, snap.donuts, newLoose, drawLoose, dt);
   sync(bricks, snap.bricks, newBrick, drawBrick, dt);
   for (const s of snap.shelves) {
@@ -260,6 +268,8 @@ const posOf = (m) => m.g.position;
 /** @param {HitEvent} h @param {Snapshot} snap */
 function onHit(h, snap) {
   fx.bam(h);
+  const by = puncherOf(h, snap.fighters), puncher = by && fighters.get(by.id);
+  if (puncher) landPunch(puncher.combo);
   if (h.on === 'brick') { brickHit(h); return; }
   const hurt = snap.fighters.filter((f) => f.move === 'hurt' || f.move === 'launched');
   const f = closestTo(hurt.length ? hurt : snap.fighters, h, (o) => o);
@@ -334,7 +344,7 @@ function cast(roster) {
     g.add(built.root);
     scene.add(g);
     const t = Object.fromEntries(FIGHTER_TIMERS.map((k) => [k, 0]));
-    fighters.set(id, { g, built, team, t, vy: 0, ground: true, yaw: 0, recoil: new THREE.Vector3(), pose: {}, seat: seatDrop(built), down: 0, cycles: fighters.size * 0.33, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
+    fighters.set(id, { g, built, team, t, vy: 0, ground: true, yaw: 0, recoil: new THREE.Vector3(), pose: {}, combo: newCombo(), seat: seatDrop(built), down: 0, cycles: fighters.size * 0.33, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
     endPicture(entrant);
     return entrant;
   });

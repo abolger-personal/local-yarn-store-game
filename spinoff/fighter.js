@@ -9,6 +9,7 @@ import { CRAFTS, STITCHES_BY_CRAFT, defaultItem, dress, undress, usualTool } fro
 import { oklchOf } from '../inventory/yarn-look.js';
 import '../characters/llama.js';
 import { wingShape } from '../characters/owl.js';
+import { GLOVE, punchLayer, sample } from './punches.js';
 
 export const FIGHTER_KEY = 'lys.fighter.v1';
 export const SPECIES = Object.freeze(['lion', 'llama', 'owl']);
@@ -183,6 +184,7 @@ export function addGloves(built, color) {
   built.gloves = gloveAnchors(built).map(({ parent, at, r }) => {
     const glove = new THREE.Mesh(gloveGeometry(), material);
     glove.scale.setScalar(r);
+    glove.userData.r = r;
     glove.position.set(...at);
     glove.castShadow = true;
     parent.add(glove);
@@ -234,23 +236,34 @@ export function wobbleAt(percent, cycles) {
   return { x: 0.5 * a * Math.cos(w * 0.9), z: a * Math.sin(w) };
 }
 
-export function stepFighter(built, dt, pose, speed) {
+/** The hitting glove stretches along the arm as it flies and squashes on landing; gloves are in joint-side order. */
+export function squashGloves(built, punch) {
+  const { stretch, size } = sample(GLOVE, punch?.step ?? 1);
+  built.gloves.forEach((glove, i) => {
+    const { r } = glove.userData, hits = punch && (i === 0) === (punch.arm < 0);
+    if (hits) glove.scale.set(r * size * (1 - 0.3 * stretch), r * size * (1 + 0.6 * stretch), r * size * (1 - 0.3 * stretch));
+    else glove.scale.setScalar(r);
+  });
+}
+
+/** @param {import('./punches.js').Punch|null} [punch] layered over the walk */
+export function stepFighter(built, dt, pose, speed, punch = null) {
   const L = built.params.legHeight + built.params.hipInset;
   const at = built.walkAt ?? 0;
   const w = walkPhase(at, speed, L, IDLE);
   const gain = walkGain(built.motion, speed, dt, IDLE);
   built.walkAt = (at + phaseStep(speed * dt, speed, L, IDLE)) % 1;
-  return stepMotion(built, pose, dt, IDLE, gain > 0 ? (out) => walkLayer(out, w, gain, IDLE) : null);
+  squashGloves(built, punch);
+  return stepMotion(built, pose, dt, IDLE, (out) => {
+    if (gain > 0) walkLayer(out, w, gain, IDLE);
+    if (punch) punchLayer(out, punch);
+  });
 }
 
 const posed = (p) => Object.freeze({ ...POSES.rest, ...p });
 
-const jab = (side) => posed({ armSwing: -0.75, armSwingAlt: -0.8 * side, armOut: 0.05, elbowBend: 0, spineTwist: 0.4 * side });
-
-// REUSE-SPEC.md §Navigation: a punch is upper body only, so it layers over the walk. Keyed by facing,
-// so the arm and leg nearer the camera do the hitting.
+// Keyed by facing, so the leg nearer the camera kicks; punches are timelines layered over the walk (punches.js).
 export const MOVE_POSES = Object.freeze({
-  punch: Object.freeze({ 1: jab(1), [-1]: jab(-1) }),
   kick: Object.freeze({ 1: DANCE_POSES['rd-kick-r'], [-1]: DANCE_POSES['rd-kick-l'] }),
   hurt: posed({ armSwing: -0.5, armOut: 0.9, elbowBend: 1.2, spineBend: -0.2, headPitch: 0.25, kneeBend: 0.3 }),
   air: posed({ armOut: 0.9, elbowBend: 0.4, kneeBend: 0.9, hipFlex: 0.6 }),

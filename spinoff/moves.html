@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Donut fighters — punches</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #f6e7d4; font: 16px system-ui, sans-serif; }
+  #stage { position: absolute; inset: 0; }
+  #stage canvas { display: block; }
+  p { position: absolute; margin: 0; top: 8px; left: 12px; right: 12px; }
+</style>
+</head>
+<body>
+<main id="stage"></main>
+<p>Top to bottom: jab, cross, hook, uppercut, then the string (every punch landing, facing the other way). <code>?slow=4</code> slows it down.</p>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.186.1/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.186.1/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="moves.js"></script>
+</body>
+</html>

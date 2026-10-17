@@ -567,7 +567,10 @@ function moveFighter(s, f) {
 
 const overlapY = (a, b) => a.y < b.y + b.h - STEP && b.y < a.y + a.h - STEP;
 
-/** Foes are solid to each other (teammates pass through): each overlapping pair is pushed apart, half each, then off any wall. */
+/**
+ * Foes are solid to each other (teammates pass through): each overlapping pair is pushed apart, half each, then off
+ * any wall. A guard holds its ground, so only a hit moves it.
+ */
 function separate(s) {
   const fs = s.fighters;
   for (let i = 0; i < fs.length; i++) {
@@ -575,9 +578,11 @@ function separate(s) {
       const a = fs[i], b = fs[j], dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), gap = a.r + b.r - d;
       if (a.team === b.team || gap <= 0 || !overlapY(a, b)) continue;
       const [ux, uz] = d > EPS ? [dx / d, dz / d] : [a.team === 'heroes' ? 1 : -1, 0];
-      for (const [f, sign] of [[a, -1], [b, 1]]) {
-        f.x += (sign * ux * gap) / 2;
-        f.z += (sign * uz * gap) / 2;
+      const held = [guarding(s, a), guarding(s, b)];
+      for (const [f, sign, k] of [[a, -1, 0], [b, 1, 1]]) {
+        const share = held[k] ? 0 : held[1 - k] ? 1 : 0.5;
+        f.x += sign * ux * gap * share;
+        f.z += sign * uz * gap * share;
         pushOut(s, f, f.r, f.h);
       }
     }
@@ -748,6 +753,8 @@ function touchDonuts(s, f) {
 
 const standingAt = (f, sh, reach = SHELF_REACH) => f.onGround && Math.abs(f.y - sh.y) <= STEP
   && Math.abs(f.x - sh.x) < sh.half && f.z >= sh.z && f.z - sh.z < f.r + reach;
+/** REUSE-SPEC.md §Mode: a guard blocks the grab. */
+const guarding = (s, f) => standingAt(f, shelfOf(s, f.team), GUARD_REACH);
 
 function shelfStep(s, f) {
   const sh = s.shelves.find((o) => standingAt(f, o));
@@ -761,7 +768,7 @@ function shelfStep(s, f) {
   }
   if (f.shelfDone || f.target?.thing !== 'shelf' || f.target.team !== sh.team) return;
   // REUSE-SPEC.md §Mode: a guard blocks the grab until they're out of the way; the guard shakes "no" like a full bag
-  const guard = s.fighters.find((o) => o.team === sh.team && standingAt(o, sh, GUARD_REACH));
+  const guard = s.fighters.find((o) => o.team === sh.team && guarding(s, o));
   if (guard) {
     if (!f.blocked) s.fullBag.push(event(guard, guard));
     f.blocked = true;

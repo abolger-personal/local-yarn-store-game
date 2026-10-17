@@ -391,8 +391,9 @@ Later levels can bring new hand-made stages.
   own shelf, within about a step of it (`GUARD_REACH` in `sim.js`, deep enough for where a ring-out
   drops them in), guards the whole shelf: nobody can grab from
   it until the guard is fought or shoved out of there. Only where the guard stands counts, so
-  a knockback or a ring-out clears the way; walking into them (foes are solid) doesn't
-  shove them far enough, so a kid has to fight. A grab that
+  a knockback or a ring-out clears the way. A guard holds its ground: walking into them doesn't
+  shove them at all (foes are otherwise pushed apart half each), so a kid has to fight (playtest:
+  the dummy got shouldered aside with no hits). A grab that
   is blocked isn't used up: a fighter still standing there with the shelf tapped grabs the moment
   the guard is gone. The blocked grab shows on the guard, so a kid sees *who* is in the way
   (the guard shakes "no" as a full bag does; the arms spreading is brainstorm 2026-10-16). It works the

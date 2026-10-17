@@ -435,6 +435,10 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
   run(m, 600, beside);
   snap = run(m, 600, shelf, log);
   assert.ok(!me(snap).carrying, 'shouldering in from beside the shelf still grabs nothing');
+  const guard = me(snap, 'dummy'), sh = snap.shelves.find((o) => o.team === 'badGuys');
+  run(m, 600, tap(sh.x + 0.6, guard.z, 1.1));
+  snap = run(m, 600, tap(guard.x, guard.z, 1.1));
+  assert.ok(near(me(snap, 'dummy').x, guard.x) && near(me(snap, 'dummy').z, guard.z), 'walking into a guard never moves it');
   assert.deepEqual(said, ['dummy', 'dummy'], 'and the guard says no again');
   run(m, 200, once({ target: { thing: 'fighter', id: 'dummy' } }));
   run(m, 60, once({ kick: true }));

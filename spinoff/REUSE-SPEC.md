@@ -10,14 +10,14 @@ other paths are from the repo root.
 
 Not everything in this doc is settled. Each idea is one of three kinds:
 
-- **Decided** (marked `decided DATE`): agreed with the players or the designer. Code follows it, and
-  changing it is a new decision with a new date. Everything built and in `CHANGELOG.md` is decided.
-  A change to a decided idea updates its label rather than editing it silently: `decided DATE,
-  amended DATE` keeps the first date and adds each amendment's, with a short reason after a colon
-  when the text doesn't already say what changed (`decided 2026-10-15, amended 2026-10-15: no hook`).
-- **Planned** (marked `planned DATE`, or `decided DATE, not built yet`): the design is agreed, but it isn't built yet and the details may
-  still move when it is. For now nothing is planned (2026-10-16): anything not built is brainstorm
-  until a true-up pass promotes it.
+- **Decided** (marked `decided DATE`): agreed with the players or the designer. Code follows it.
+  Everything built and in `CHANGELOG.md` is decided, except a built proof of concept in an
+  exploration doc (`GENERATED-LEVELS.md`). A decision changed on a later day adds `amended DATE`
+  (`decided 2026-10-14, amended 2026-10-16: a room per round`); a change the same day just edits it.
+  Text that isn't accurate any more is removed, not kept as history: git has the history.
+- **Planned** (marked `planned DATE`): agreed, not built yet, and the details may still move when
+  it is. Only the designer promotes an idea to planned; one that was specified but never built is
+  brainstorm until then.
 - **Brainstorm** (marked `brainstorm DATE`, or in an Open questions list): unbaked ideas to choose
   from. Nothing is built from these until they're decided, and most will be dropped or changed.
 
@@ -97,7 +97,7 @@ reused: `inventory/grid.js` for the lobby floor, team shelves and forts, and
 
 ### New
 
-- **Physics in a depth band** (decided 2026-10-13, amended 2026-10-13, replacing the earlier flat x/y plane): fighters
+- **Physics in a depth band** (decided 2026-10-13): fighters
   walk in x (along the stage) and z (toward and away from the camera), and jump in y onto raised
   floors. Gravity, jumps, raised floors, ring-out off the front and the two ends; the back is a
   wall. Add/multiply only; no physics library (see Determinism below for why add/multiply).
@@ -157,7 +157,7 @@ follows, so punches are fine as signature moves (checked by eye on dozens of ran
 No joystick (decided 2026-10-13). Tap where you want to go and your fighter goes there. The only
 buttons are 🥊 punch and 🦶 kick, which attack where the fighter is, while it keeps moving.
 
-**It's a depth band, not a flat line** (decided 2026-10-13, amended 2026-10-13, after the first playtest felt like "2D
+**It's a depth band, not a flat line** (decided 2026-10-13, after the first playtest felt like "2D
 with 3D graphics"). The stage is a floor you walk around on, like a belt-scrolling brawler: a
 tap on the floor is a spot in x and z, and raised floors (decks, the middle hill) are reached
 by jumping. Facing is a direction on the floor (a yaw), not just left or right. Hits only land on
@@ -182,7 +182,7 @@ floor at an angle and follows your fighter.
   carries on to where it was going, so nobody has to re-tap after every hit.
 - **Attacking on the move.** A punch is layered on the upper body over the walk on the legs, so
   the fighter keeps going. A kick needs the legs: the fighter pauses for the kick and walks on.
-- **The punch string is look only** (decided 2026-10-15, amended 2026-10-15: no hook). The sim has one punch; each tablet draws
+- **The punch string is look only** (decided 2026-10-15). The sim has one punch; each tablet draws
   it as the next of jab, cross, uppercut, uppercut (then round again; the hook was dropped 2026-10-15, as from the side-on camera it read the same as a cross), counting the
   punches that landed: hit events on an enemy fighter, the dummy or a fort brick, credited to the
   nearest puncher not on the target's team. The move is picked when the punch starts, from the
@@ -203,7 +203,7 @@ floor at an angle and follows your fighter.
   (2026-10-16): keep the deep lean, the flung arms and the lunge when retuning. Both use the leg nearer the camera.
   Keyframed over the kick's `step` like the punches (`spinoff/kicks.js`): the motion spring
   needs ~0.3 s to reach a pose, longer than the kick.
-- **Fort walls: around if there's a way, stop if there isn't** (decided 2026-10-13, amended 2026-10-13: depth band). On a
+- **Fort walls: around if there's a way, stop if there isn't** (decided 2026-10-13). On a
   floor you can walk around things, so a tap behind a wall routes through a gap if one exists.
   If the fort is closed, the fighter goes as close as it can and stands `'blocked'`, facing the
   wall, and the kid smashes through. (In the flat version it always stopped; with a depth band
@@ -499,8 +499,7 @@ and smashers each get a round that is theirs.
     hand-made cake stage's decks are 1.8 high (a sponge jump, out of reach on breakfast) and
     its middle tower is 3.6 high, reached only off the icing pad at its foot. The playability
     check still proves every top can be stood on.
-- **Each stage has its own treat theme** (decided 2026-10-13, amended 2026-10-14, replacing "World 1 is Gingerbread
-  World"). The theme dresses the stage and the fort pieces. `spinoff/scenery.js` `THEMES` holds
+- **Each stage has its own treat theme** (decided 2026-10-13, amended 2026-10-14). The theme dresses the stage and the fort pieces. `spinoff/scenery.js` `THEMES` holds
   one entry per stage. While there's no stage button, the address picks: `play.html` is the
   tutorial, `play.html?stage=cake` (or `breakfast`) a hand-made stage, and adding `&seed=8` (and
   `&difficulty=1` to `5`) a generated one on that stage. `?level=` is gone.
@@ -885,8 +884,7 @@ species `randomise` only uses `Math.random`).
 have to be a natural colour: a hot-pink lion and a cyan owl are the point. Quiet, natural and
 grey colours belong to the bad guys.
 
-**Hit-stop is our rumble** (decided 2026-10-14 for landing a hit; the other moments below are
-brainstorm 2026-10-14; playtest: "that little freeze feels AWESOME"). Tablets
+**Hit-stop is our rumble** (decided 2026-10-14 for landing a hit; planned 2026-10-16 for the other moments below; playtest: "that little freeze feels AWESOME"). Tablets
 have no controller rumble, so a short freeze of everyone involved (`HITSTOP_TICKS`, 5 ticks at
 60 Hz, about 80 ms) is how an impact is felt. Use it more, scaled by how big the moment is:
 landing a hit, a brick breaking, knocking a donut loose, a steal, a power move going off, a

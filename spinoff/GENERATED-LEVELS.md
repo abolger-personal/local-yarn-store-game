@@ -1,8 +1,8 @@
 # Generated levels: an exploration
 
 Can Donut Fighters make its own stages, for replayability, so that a stage at difficulty N only
-holds the kinds of problem a kid has already met by then? (2026-10-14; an exploration:
-brainstorm 2026-10-14 unless marked decided. The rules it builds on are in `REUSE-SPEC.md`.)
+holds the kinds of problem a kid has already met by then? (brainstorm 2026-10-14, still an exploration as of 2026-10-16, even where the proof of concept
+(`?seed=`) is built and its labels below say decided. The rules it builds on are in `REUSE-SPEC.md`.)
 
 ## Verdict
 

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { BRICK, ROUND_SECONDS, TICK_HZ } from './match.js';
 import { levelOf, matchOptions } from './levels.js';
-import { GUARD_REACH, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
+import { AIR_SPEED, GUARD_REACH, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
 import { ATTACK_TICKS, REACT_TICKS, createCpu, modeOf } from './cpu.js';
 
 const level = /** @type {import('./levels.js').Level} */ (levelOf('breakfast', 2));
@@ -84,14 +84,16 @@ const me = (s) => s.fighters.find((f) => f.id === 'cpu1');
 
 {
   // level 2 is a tutorial: the raider walks at a fifth of a kid's speed, slow enough to catch, and still gets home in a round
-  let fastest = 0, stole = -1, banked = -1;
+  let fastest = 0, flew = 0, stole = -1, banked = -1;
   play(level.stage, ROUND_SECONDS, (s) => {
     const f = me(s);
     if (f.onGround) fastest = Math.max(fastest, Math.hypot(f.vx, f.vz));
+    else if (f.move !== 'hurt' && f.move !== 'launched') flew = Math.max(flew, Math.hypot(f.vx, f.vz));
     if (stole < 0 && steals(s)) stole = s.tick;
     if (banked < 0 && banks(s)) banked = s.tick;
   }, () => null, matchOptions(level));
   assert.ok(fastest <= 0.2 * WALK_SPEED + 1e-9, `the raider never walks faster than a fifth of a kid (${fastest.toFixed(2)})`);
+  assert.ok(flew > 0 && flew <= 0.4 * AIR_SPEED + 1e-9, `and its hops are slow too, not a dodge (${flew.toFixed(2)} in the air)`);
   assert.ok(stole > 0 && banked > stole, `and still steals and banks within the round (stole ${stole}, banked ${banked})`);
 }
 

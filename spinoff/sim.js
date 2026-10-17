@@ -457,10 +457,19 @@ function launch(s, f, p) {
   else jump(s, f, f.walkTo ?? { x: f.x, z: f.z });
 }
 
+/** The share of WALK_SPEED a fighter walks at: the level's `badGuyPace` for bad guys (REUSE-SPEC.md §Forts, Level 2). */
+const paceOf = (s, f) => (f.team === 'badGuys' ? s.rules.badGuyPace ?? 1 : 1);
+
+// ponytail: a slowed fighter's jumps slow too, but no further than this share, which still lands a route's hop onto a
+// deck (it takes off nearer); a slower jump would need a shorter take-off than a fighter's body allows against the wall
+const SLOWEST_JUMP = 0.4;
+/** The share of a full jump's reach and air speed a fighter jumps with: slowed with its pace, down to SLOWEST_JUMP. */
+const jumpPace = (s, f) => Math.max(paceOf(s, f), SLOWEST_JUMP);
+
 // On butter you arrive only once you've stopped sliding; a bounce up from a trampoline is only taken standing on it
 const arrived = (f, n, wp) => !wp || (n.k === n.wps.length - 1 && !wp.jump && flat(f, wp) < (n.blocked ? WP_ARRIVE : ARRIVE)
   && (!f.slick || f.passed || Math.hypot(f.vx, f.vz) < SETTLE));
-const canLeap = (s, f, w) => w?.jump && flat(f, w) < JUMP_REACH && (w.spring < 0 || patchAt(s, s.stage.springs, f) === w.spring);
+const canLeap = (s, f, w) => w?.jump && flat(f, w) < JUMP_REACH * jumpPace(s, f) && (w.spring < 0 || patchAt(s, s.stage.springs, f) === w.spring);
 
 function follow(s, f) {
   const n = f.nav;
@@ -491,9 +500,6 @@ function slide(s, f, dx, dz) {
   pushOut(s, f, f.r, f.h);
   if (f.onGround) inStage(s, f);
 }
-
-/** The share of WALK_SPEED a fighter walks at: the level's `badGuyPace` for bad guys (REUSE-SPEC.md §Forts, Level 2). */
-const paceOf = (s, f) => (f.team === 'badGuys' ? s.rules.badGuyPace ?? 1 : 1);
 
 /** Stuck: barely moving for STUCK_TICKS. On butter, barely moving for the speed it's sliding at, since it slows right down to settle. */
 function stuckCheck(s, f, moved) {
@@ -545,7 +551,7 @@ function land(s, f, top) {
 function airStep(s, f) {
   const to = f.stun > 0 ? null : f.airTo;
   if (to) {
-    const d = flat(f, to), v = d > EPS ? Math.min(AIR_SPEED, d / DT) / d : 0;
+    const d = flat(f, to), v = d > EPS ? Math.min(AIR_SPEED * jumpPace(s, f), d / DT) / d : 0;
     f.vx = (to.x - f.x) * v;
     f.vz = (to.z - f.z) * v;
   }

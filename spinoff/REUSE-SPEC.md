@@ -495,6 +495,9 @@ and smashers each get a round that is theirs.
     shelf, Mode: a guard blocks the grab) once it holds one or more. So the kids' first job is
     to wall their shelf, and the moment the raider scores, the game flips to breaking in, which
     level 1 taught.
+  - **Raiders break blocks on level 2** (planned 2026-10-17, required; Bad guys: CPU bad guys break
+    walls). Without it a complete wall stops the raider for good: it never scores, never turns to
+    defend, and level 2 would only teach walling.
   - **No bad guy hits a kid on level 2** (planned 2026-10-17 for the CPU). Bad guys only forage
     (raid, kicking walls on the way, grab and run home) or defend (stand guard); they never attack
     a hero, so the fairness rules (Bad guys) only start to matter on the level that brings Chase.
@@ -509,8 +512,8 @@ and smashers each get a round that is theirs.
   during the match and plugs a hole the bad guys just opened; a hit knocks it loose like a donut.
   Not in the first version of building, because it puts ⬇️ beside 🥊 and 🦶 in the match: more
   buttons. The build round stays the calm opening either way.
-- **Lost blocks probably don't matter** (brainstorm 2026-10-17). Once raiders break walls (Bad guys:
-  CPU bad guys break walls, not built yet), a broken block is gone for the rest of the match. A
+- **Lost blocks probably don't matter** (brainstorm 2026-10-17). Raiders break blocks from level 2
+  (Level 2, above), and a broken block is gone for the rest of the match. A
   match is short (90 s to start), so that's fine: this is short-term strategy, not a long siege.
   Revisit only if a playtest shows kids upset at their wall being gone.
 - **The breakfast stage is the tutorial stage** (decided 2026-10-17). The tutorial levels all play

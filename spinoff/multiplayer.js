@@ -213,7 +213,8 @@ export function createGuest(link, me, themes, on) {
     started,
     /** What to draw this frame, with the events not seen before; null until the first snapshot. @returns {Drawn|null} */
     frame(dt) {
-      if ((g.quiet += dt) > HOST_GONE_SECONDS) goneNow();
+      // on the end card the host may be dressing up (REUSE-SPEC.md §Lobby): only leaving the room is gone
+      if (!g.buf.at(-1)?.over && (g.quiet += dt) > HOST_GONE_SECONDS) goneNow();
       return g.buf.length ? drawn(g, dt) : null;
     },
     /** @param {Input} input */

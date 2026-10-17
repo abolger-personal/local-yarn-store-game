@@ -20,10 +20,16 @@ const roomConfig = (code) => ({
 
 /**
  * @typedef {{ onFighter: (id: string, raw: unknown) => void, onLeave: (id: string) => void }} Page
- * @typedef {{ room: any, home: Set<string>, actions: Map<string, any>, handlers: Map<string, Function>, page: Page|null }} Kept
+ * @typedef {{ room: any, home: Set<string>, actions: Map<string, any>, handlers: Map<string, Function>, page: Page|null,
+ *   mine: unknown, fighter: any, fighters: Map<string, unknown> }} Kept
  */
 /** Every room joined this visit, by name. @type {Map<string, Kept>} */
 const kept = new Map();
+/** The room this visit is in, if any (REUSE-SPEC.md §Lobby, A room session outlasts every screen). @type {{ code: number[], hosting: boolean }|null} */
+let session = null;
+export const inRoom = () => session;
+/** @param {{ code: number[], hosting: boolean }|null} s */
+export const setRoom = (s) => { session = s; };
 
 /** What `?debug=1` shows about why tablets do or don't meet; `heard`, the tablets whose relay messages arrived. */
 const seen = { peers: 0, homes: 0, notes: [], heard: new Set() };
@@ -83,6 +89,7 @@ async function onHomeNetwork(pc, peerId) {
 
 // Nothing is sent to a tablet, or accepted from it, until its route is checked; a fighter that
 // arrives first is held until then.
+/** @param {any} fighter @param {() => unknown} mine @param {(id: string, raw: unknown) => void} onFighter */
 export function homeOnly(fighter, mine, onFighter) {
   const home = new Set(), early = new Map();
   fighter.onMessage = (data, { peerId }) => {
@@ -91,7 +98,7 @@ export function homeOnly(fighter, mine, onFighter) {
   };
   const welcome = (peerId) => {
     home.add(peerId);
-    fighter.send(mine, { target: peerId });
+    fighter.send(mine(), { target: peerId });
     if (early.has(peerId)) onFighter(peerId, early.get(peerId));
     early.delete(peerId);
   };
@@ -103,8 +110,8 @@ export function homeOnly(fighter, mine, onFighter) {
 function keep(code, mine) {
   const room = joinRoom(roomConfig(code), roomName(code), { onJoinError: (e) => { note(`${short(e.peerId)} ${e.error}`); } });
   /** @type {Kept} */
-  const k = { room, home: new Set(), actions: new Map(), handlers: new Map(), page: null };
-  const peers = homeOnly(room.makeAction('fighter'), mine, (id, raw) => k.page?.onFighter(id, raw));
+  const k = { room, home: new Set(), actions: new Map(), handlers: new Map(), page: null, mine, fighter: room.makeAction('fighter'), fighters: new Map() };
+  const peers = homeOnly(k.fighter, () => k.mine, (id, raw) => { k.fighters.set(id, raw); k.page?.onFighter(id, raw); });
   k.home = peers.home;
   room.onPeerJoin = async (peerId) => {
     const pc = room.getPeers()[peerId];
@@ -115,7 +122,7 @@ function keep(code, mine) {
     peers.forget(peerId);
     pc?.close();
   };
-  room.onPeerLeave = (peerId) => { note(`${short(peerId)} left`); peers.forget(peerId); k.page?.onLeave(peerId); };
+  room.onPeerLeave = (peerId) => { note(`${short(peerId)} left`); peers.forget(peerId); k.fighters.delete(peerId); k.page?.onLeave(peerId); };
   return k;
 }
 
@@ -126,6 +133,12 @@ function action(k, type) {
     k.actions.set(type, a);
   }
   return k.actions.get(type);
+}
+
+/** Tells every tablet in `k` this page's fighter again, and hands `page` the fighters already met. @param {Kept} k @param {Page} page */
+function hello(k, page) {
+  if (k.home.size) k.fighter.send(k.mine, { target: [...k.home] }).catch(() => {});
+  for (const [id, raw] of k.fighters) if (k.home.has(id)) page.onFighter(id, raw);
 }
 
 /**
@@ -141,7 +154,7 @@ export function attach(code, mine, page) {
   const name = roomName(code);
   if (!kept.has(name)) kept.set(name, keep(code, mine));
   const k = /** @type {Kept} */ (kept.get(name));
-  Object.assign(k, { page, handlers: new Map() });
+  Object.assign(k, { page, handlers: new Map(), mine });
   return {
     send(type, data, to = [...k.home]) {
       const target = to.filter((id) => k.home.has(id));
@@ -149,6 +162,7 @@ export function attach(code, mine, page) {
     },
     on(type, fn) { action(k, type); k.handlers.set(type, fn); },
     peers: () => [...k.home],
+    hello: () => hello(k, page),
     detach() { if (k.page === page) Object.assign(k, { page: null, handlers: new Map() }); },
     leave() {
       if (kept.get(name) === k) kept.delete(name);
@@ -161,4 +175,5 @@ export function attach(code, mine, page) {
 export function leaveAll() {
   for (const k of kept.values()) k.room.leave();
   kept.clear();
+  session = null;
 }

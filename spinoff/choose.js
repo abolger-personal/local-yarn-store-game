@@ -3,6 +3,7 @@ import {
   randomFighter, saveFighter, setFur, showOffTrick, stepFighter,
 } from './fighter.js';
 import { POSES } from '../characters/npc.js';
+import { inRoom, openRoom } from './net.js';
 import { levelsBeaten } from './progress.js';
 import { STRIKE } from './punches.js';
 import { makeStage } from './stage.js';
@@ -53,6 +54,14 @@ let fighter = allowed(loadFighter() ?? newFighter('lion'));
 let built = null, cheer = 0, spin = 0, swing = 1, landed = Infinity, shows = -1;
 const SHOW_MOVES = ['jab', 'cross', 'uppercut'];
 const panel = document.getElementById('panel');
+
+// REUSE-SPEC.md §Lobby, A room session outlasts every screen: dressing up in a room stays in it, and a match
+// starting meanwhile doesn't wait for this tablet; the lobby's `hello` brings it back
+const session = inRoom();
+if (session) {
+  const room = openRoom(session.code, fighter, { onFighter: () => {}, onLeave: () => {} });
+  room.on('go', (_, from) => room.send('dressing', true, [from]));
+}
 
 const button = (action, value, label, inner, on) =>
   `<button data-action="${action}" data-value="${value}" aria-label="${label}" aria-pressed="${on}">${inner}</button>`;

@@ -1250,21 +1250,35 @@ Built: `spinoff/lobby.html` (page) on `spinoff/net.js` and `spinoff/roster.js` (
 
 ### A room session outlasts every screen
 
-Planned 2026-10-17, from a playtest: changing your dress-up meant leaving the room, which split the
+Decided 2026-10-17, from a playtest: changing your dress-up meant leaving the room, which split the
 kids up. Being in a room (the *session*) is not a screen: it lives on the tap page with the kept
 rooms (Multiplayer, Kept rooms), and moving between the lobby, the chooser, the pickers and a
-match never ends it. Only 👋 leaves.
+match never ends it. Only 👋 leaves. Built: the session (the room's code, and whether this tablet
+opened it) is `inRoom` / `setRoom` in `spinoff/rooms.js`; every 👋 (lobby, end card, ⏸, ⏳, 🏠💨)
+calls `leaveRooms`, which ends it, and the lobby opens back into it.
 
 - **✏️ works in a room, in the lobby and between rounds** (on the end card), never during a match:
   changing outfits mid-fight would be silly. It opens the chooser without leaving; 👍 there brings
-  you back where you came from (the room's lobby, or the end card), still in the room.
-- **A new look reaches everyone.** Saving a changed fighter in a room sends it to every tablet
-  there, and their lobby redraws you.
-- **The host can dress up too.** While the host is in the chooser, nobody can start (only the
-  host has 👍 and ▶️), so guests just wait.
+  you back where you came from (the room's lobby, or the end card), still in the room (decided
+  2026-10-17). Built: 👍 always goes to the room's lobby, and the lobby takes a guest on from there:
+  the host's end-card page still has the guest in its round, so it answers with `go`, the guest's
+  play page says `ready`, gets that round's `start` again and shows its end card. The host's own
+  end card can't come back (its page held the match), so the host comes back to its lobby, with 👍.
+- **A new look reaches everyone** (decided 2026-10-17). Saving a changed fighter in a room sends it
+  to every tablet there, and their lobby redraws you. Built: each page that attaches to a kept room
+  sets the fighter it sends (newcomers get the latest), and the lobby's `hello` sends it to every
+  home-checked tablet through the same `fighter` action, so `readFighter` and the route check still
+  apply; `hello` also hands the lobby the fighters the room already met (the room keeps the last one
+  from each tablet), since they were sent only once.
+- **The host can dress up too** (decided 2026-10-17). While the host is in the chooser, nobody can
+  start (only the host has 👍 and ▶️), so guests just wait. On the end card a guest stops counting
+  the host's quiet time (Pause, away, gone): only the host leaving the room is 🏠💨 there.
 - **If a match starts while you're dressing up,** you are a late friend (Late joiners): ⏳, and
-  you play from the next round.
-- The lobby's first screen (🏠 🔑) is still out of every room: you get there only by 👋.
+  you play from the next round (decided 2026-10-17). Built: the chooser in a room answers `go` with
+  `dressing`, and the host's play page stops waiting for that tablet; when its lobby says `hello`,
+  the host's page sends it `playing` again, and the next round's `go` brings it along. A dresser
+  whose lobby says `hello` before `start` is waited for again.
+- The lobby's first screen (🏠 🔑) is still out of every room: you get there only by 👋 (decided 2026-10-17).
 
 ### After the lobby: pick a stage, then a level
 

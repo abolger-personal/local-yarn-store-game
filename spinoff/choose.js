@@ -36,15 +36,7 @@ const svg = (body, colour) => `<svg viewBox="0 0 48 48" fill="currentColor" styl
 
 let fighter = loadFighter() ?? newFighter('lion');
 let built = null, cheer = 0, spin = 0;
-const stage = makeStage(document.getElementById('stage'));
 const panel = document.getElementById('panel');
-
-function rebuild(reframe) {
-  if (built) { stage.scene.remove(built.root); disposeFighter(built); }
-  built = buildFighter(fighter);
-  stage.scene.add(built.root);
-  if (reframe) stage.frame([built.root], { margin: 1.5 });
-}
 
 const button = (action, value, label, inner, on) =>
   `<button data-action="${action}" data-value="${value}" aria-label="${label}" aria-pressed="${on}">${inner}</button>`;
@@ -107,6 +99,18 @@ function choose(action, value) {
   render();
 }
 
+// The choices are painted before the 3D stage and fighter are built, so there's something to see straight away
+render();
+await new Promise((r) => { requestAnimationFrame(() => setTimeout(r)); });
+const stage = makeStage(document.getElementById('stage'));
+
+function rebuild(reframe) {
+  if (built) { stage.scene.remove(built.root); disposeFighter(built); }
+  built = buildFighter(fighter);
+  stage.scene.add(built.root);
+  if (reframe) stage.frame([built.root], { margin: 1.5 });
+}
+
 panel.addEventListener('click', (e) => {
   const b = /** @type {HTMLElement} */ (e.target).closest('button');
   if (b) choose(b.dataset.action, b.dataset.value);
@@ -126,7 +130,6 @@ document.getElementById('done').addEventListener('click', () => {
 });
 
 rebuild(true);
-render();
 stage.run((dt) => {
   cheer = Math.max(0, cheer - dt);
   spin += dt;

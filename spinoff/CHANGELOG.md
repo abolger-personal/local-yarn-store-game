@@ -20,6 +20,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **Matches come up faster, and you see ⏳ straight away.** After ▶️ the ⏳ shows at once instead of a
   blank screen. While it waits for the other tablets, your tablet already sets up the stage and your
   fighter, so the match starts sooner once everyone's there, and the first moment of play doesn't stutter.
+  On the dress-up page the choices show up straight away, before your fighter appears.
 
 ## 0.0.3 — 2026-10-16: Combos, and playing together that holds
 

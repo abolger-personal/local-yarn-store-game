@@ -22,8 +22,8 @@ export function outside(b, x, z) {
   return Math.max(0, Math.hypot(x - c.x, z - c.z) - c.r);
 }
 
-/** Rectangles seen from above overlap. @param {{x0: number, x1: number, z0: number, z1: number}} a @param {{x0: number, x1: number, z0: number, z1: number}} b */
-export const overlaps = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.z0 < b.z1 && b.z0 < a.z1;
+/** Rectangles seen from above overlap by more than a rounding error. @param {{x0: number, x1: number, z0: number, z1: number}} a @param {{x0: number, x1: number, z0: number, z1: number}} b */
+export const overlaps = (a, b, e = 1e-9) => a.x0 < b.x1 - e && b.x0 < a.x1 - e && a.z0 < b.z1 - e && b.z0 < a.z1 - e;
 
 // REUSE-SPEC.md §Forts, Start spots come first
 export const MAX_HEROES = 6;

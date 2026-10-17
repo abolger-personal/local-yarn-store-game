@@ -5,8 +5,9 @@ import { BRICK } from './match.js';
 import { BOUNCE, generateStage } from './generate.js';
 
 /** @typedef {import('./match.js').Stage} Stage @typedef {import('./match.js').Floor} Floor @typedef {import('./generate.js').StageName} StageName
- * @typedef {{ theme: StageName, stage: Stage, breakIn?: boolean }} Level
- *   breakIn: the bad guys' shelf is walled in, so the only way to it is to punch and kick through */
+ * @typedef {{ theme: StageName, stage: Stage, breakIn?: boolean, number?: number }} Level
+ *   breakIn: the bad guys' shelf is walled in, so the only way to it is to punch and kick through; number: its place in
+ *   the stage's run of levels (LEVELS), for the ones the level dial picks */
 
 const wall = (team, x, z, y = 0) => ({ team, x, z, y, hits: 2 });
 
@@ -44,7 +45,32 @@ const SHUT_IN = Object.freeze([-2, -1.6, -1.2, -0.8, -0.4, 0, 0.4, 0.8, 1.2, 1.6
   .flatMap((z) => [wall('badGuys', 4.6, z), wall('badGuys', 4.6, z, BRICK)]));
 
 /** @type {Level} */
-export const TUTORIAL = Object.freeze({ theme: 'breakfast', stage: Object.freeze({ ...TABLE, bricks: SHUT_IN }), breakIn: true });
+export const TUTORIAL = Object.freeze({ theme: 'breakfast', stage: Object.freeze({ ...TABLE, bricks: SHUT_IN }), breakIn: true, number: 1 });
+
+// REUSE-SPEC.md §Forts, Level 2: the building tutorial. A tall waffle fence (too high to jump onto from the ground, a step
+// up from the deck) closes off the yard in front of each shelf but for one obvious gap at the front, two blocks wide;
+// the kids start outside theirs with their piles. The bad guys' fort comes with the level: a two-high wall in front of
+// their deck, leaving its corner by the fence open, so the raider's way out is that corner and their gap.
+const FENCE = /** @type {const} */ ({ kind: 'deck', x0: -6, x1: -5.6, z0: -2, z1: 1.2, y: 1.8 });
+/** @type {Level} */
+const BUILDING = Object.freeze({ theme: 'breakfast', number: 2, stage: Object.freeze({
+  ...TABLE,
+  floors: Object.freeze([...TABLE.floors, FENCE, { ...FENCE, x0: -FENCE.x1, x1: -FENCE.x0 }]),
+  puddles: Object.freeze([]),
+  starts: Object.freeze([{ x: -5.2, z: 1.6 }, { x: -5.2, z: 0.8 }, { x: -4, z: 1.6 }, { x: -4, z: 0.8 }, { x: -5.2, z: 0 }, { x: -4, z: 0 }]),
+  bricks: Object.freeze([
+    ...[6.8, 7.2, 7.6, 8, 8.4].flatMap((x) => [wall('badGuys', x, -0.8), wall('badGuys', x, -0.8, BRICK)]),
+  ]),
+}) });
+
+/** Each stage's levels in order, the dial's numbers (REUSE-SPEC.md §After the lobby). @type {Readonly<Partial<Record<StageName, readonly Level[]>>>} */
+export const LEVELS = Object.freeze({ breakfast: Object.freeze([TUTORIAL, BUILDING]) });
+
+/** Level `n` of a stage, or null if there isn't one. @param {string} name @returns {Level|null} */
+export const levelOf = (name, n) => (Object.hasOwn(LEVELS, name) && LEVELS[name][n - 1]) || null;
+
+/** REUSE-SPEC.md §Forts, Pieces are fixed by level: each player's pile; CPU bad guys aren't limited. */
+export const piecesEach = (level) => Math.min(6, 4 + Math.floor((level - 1) / 2));
 
 // Cake is spongy, so it goes crazy tall: decks a sponge jump high (too high on breakfast), and a tower in the
 // middle only a trampoline gets you up, from the icing pad at its foot. Each pad is a way up only where it touches the top's edge.
@@ -68,12 +94,15 @@ export const STAGES = Object.freeze({
 });
 
 /**
- * `?stage=breakfast|cake&difficulty=D&seed=S`: with a seed, a generated stage (GENERATED-LEVELS.md) at that difficulty
- * on that stage (breakfast if none); without, the stage's hand-made layout (difficulty changes nothing there yet); no stage, the tutorial.
+ * `?stage=breakfast&level=N`: that stage's level N (LEVELS), as the level dial picks. Else `?stage=breakfast|cake&difficulty=D&seed=S`:
+ * with a seed, a generated stage (GENERATED-LEVELS.md) at that difficulty on that stage (breakfast if none); without, the
+ * stage's hand-made layout (difficulty changes nothing there yet); no stage, the tutorial.
  * @returns {Level}
  */
 export function levelFor(search) {
   const q = new URLSearchParams(search), name = Object.hasOwn(STAGES, q.get('stage')) ? /** @type {StageName} */ (q.get('stage')) : null;
+  const numbered = q.has('level') && levelOf(name ?? 'breakfast', Number(q.get('level')));
+  if (numbered) return numbered;
   if (q.has('seed')) return { theme: name ?? 'breakfast', stage: generateStage(Number(q.get('seed')), Number(q.get('difficulty')) || 1, name ?? 'breakfast') };
   return name ? STAGES[name] : TUTORIAL;
 }

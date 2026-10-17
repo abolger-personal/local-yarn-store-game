@@ -491,15 +491,22 @@ and smashers each get a round that is theirs.
   obvious gap in front of your shelf, and the first raider walking into your wall.
 - **Level 2: the building tutorial** (planned 2026-10-17). Still a tutorial level, on the breakfast
   stage:
-  - **Layout** (planned 2026-10-17): like the tutorial's, the two shelves at opposite ends of the
+  - **Layout** (decided 2026-10-17): like the tutorial's, the two shelves at opposite ends of the
     stage, with the pancake hill kept in the middle to jump on. The rest can change from level 1's
     layout (the bad guys' shut-in wall, for one), to leave an obvious gap in front of the kids'
-    shelf and room for the start spots and piles.
+    shelf and room for the start spots and piles. Built: a tall waffle fence (1.8 high, so not a
+    jump from the ground, but a step up from the deck) runs from the back wall along the inner end of
+    each deck and out in front of it, closing off the yard in front of each shelf except a gap two
+    blocks wide at the front edge. Two blocks two high (one kid's pile) plug it. The kids start
+    outside their fence, between it and the middle; from inside, they can still hop out over the
+    fence from the deck. No syrup or butter, like the tutorial. Mirrored, so the bad guys' end is the same.
   - The first build round (above), with each hero's pile next to them.
-  - **The bad guys' fort comes with the level** (planned 2026-10-17), already built when the round
+  - **The bad guys' fort comes with the level** (decided 2026-10-17), already built when the round
     starts and as big as the level wants (Pieces are fixed by level: CPU bad guys aren't limited). The
-    fort leaves the raider a way out, so it never has to kick through its own blocks (planned
-    2026-10-17).
+    fort leaves the raider a way out, so it never has to kick through its own blocks (decided
+    2026-10-17). Built: 10 blocks, a wall two high on the ground in front of their deck, leaving the
+    deck's corner by the fence open; the way out is that corner and their fence's gap, which is also
+    the kids' way in (or they kick through the wall).
   - **One CPU bad guy**, whatever `badGuys(level, grownups)` says (Bad guys): level 2 is still
     teaching, so the kids meet a single raider.
   - **4 fort pieces per hero** (8 for two kids): `piecesEach(2)`, the base rule.
@@ -534,8 +541,9 @@ and smashers each get a round that is theirs.
   (Level 2, above), and a broken block is gone for the rest of the match. A
   match is short (90 s to start), so that's fine: this is short-term strategy, not a long siege.
   Revisit only if a playtest shows kids upset at their wall being gone.
-- **The breakfast stage is the tutorial stage** (planned 2026-10-17). The tutorial levels all play
-  on breakfast, and between them they teach every basic mechanic once: breaking in, building,
+- **The breakfast stage is the tutorial stage** (decided 2026-10-17). The tutorial levels all play
+  on breakfast (`LEVELS.breakfast`: level 1 breaking in, level 2 building and defending; the goody
+  and tool levels aren't made yet), and between them they teach every basic mechanic once: breaking in, building,
   defending, and earning a goody and using a tool. They don't need every goody or tool, only one
   of each to teach how earning and using works.
 - **Stages and difficulty are separate** (decided 2026-10-14). Past the tutorial, a *stage* is a
@@ -570,9 +578,10 @@ and smashers each get a round that is theirs.
     its middle tower is 3.6 high, reached only off the icing pad at its foot. The playability
     check still proves every top can be stood on.
 - **Each stage has its own treat theme** (decided 2026-10-13, amended 2026-10-14). The theme dresses the stage and the fort pieces. `spinoff/scenery.js` `THEMES` holds
-  one entry per stage. While there's no stage button, the address picks: `play.html` is the
+  one entry per stage. The level dial's ▶️ goes to `play.html?stage=breakfast&level=2`, a stage's
+  numbered level (After the lobby). The address still picks the rest by hand: `play.html` is the
   tutorial, `play.html?stage=cake` (or `breakfast`) a hand-made stage, and adding `&seed=8` (and
-  `&difficulty=1` to `5`) a generated one on that stage. `?level=` is gone.
+  `&difficulty=1` to `5`) a generated one on that stage.
 - **The tutorial makes you break in** (decided 2026-10-14). It's the tutorial, so the bad guys' fort
   shuts their end off completely: a wall right across the band, two high (too tall to hop), no
   gap at the front or back. Walking round it can't teach that forts break; this way the first
@@ -581,7 +590,8 @@ and smashers each get a round that is theirs.
   halves in the real sim: no route to the shelf without breaking, and a hero who kicks when it
   stands blocked gets in (about 7 s, 3 bricks). The hand-made stages go back to the wall with gaps.
 - **Levels are data** (decided 2026-10-14): `spinoff/levels.js` holds `TUTORIAL` and `STAGES` (one
-  hand-made layout per stage), each a layout (a `Stage`: floors, each a `ground`, `deck` or
+  hand-made layout per stage), and `LEVELS`, each stage's levels by number (decided 2026-10-17:
+  `levelOf('breakfast', 2)`; breakfast's are the tutorial and level 2), each a layout (a `Stage`: floors, each a `ground`, `deck` or
   `hill` that the theme dresses by kind, the back wall, shelves, zones, ring-out, bricks, syrup,
   butter, trampolines and bounce) and the name of its stage; `levelFor` reads the address. The
   stage is passed in, never imported: `createMatch(entrants, stage)`, and the page's taps,

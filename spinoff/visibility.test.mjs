@@ -5,7 +5,7 @@ import { studioLights } from '../characters/selfie-studio.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import { BAD_DONUT, BAD_GUY_FUR, FUR, HERO_DOUGH } from './fighter.js';
 import { generateStage } from './generate.js';
-import { STAGES, TUTORIAL } from './levels.js';
+import { LEVELS as NUMBERED, STAGES, TUTORIAL } from './levels.js';
 import { SHELF_WOOD, THEMES } from './scenery.js';
 import { BAD_ICING } from './sim.js';
 import { ROOM_SH } from './stage.js';
@@ -154,7 +154,8 @@ function visibilityFailures({ theme: name, stage }, rules = RULES) {
 }
 
 /** @type {[string, Level][]} */
-const LEVELS = [['tutorial', TUTORIAL], ...Object.entries(STAGES).map(([n, l]) => /** @type {[string, Level]} */ ([`${n} stage`, l]))];
+const LEVELS = [['tutorial', TUTORIAL], ...Object.entries(STAGES).map(([n, l]) => /** @type {[string, Level]} */ ([`${n} stage`, l])),
+  ...Object.entries(NUMBERED).flatMap(([n, ls]) => ls.slice(1).map((l) => /** @type {[string, Level]} */ ([`${n} level ${l.number}`, l])))];
 for (const theme of /** @type {Level['theme'][]} */ (Object.keys(THEMES))) for (let seed = 1; seed <= 20; seed++)
   LEVELS.push([`${theme} seed ${seed} difficulty ${1 + (seed % 5)}`, { theme, stage: generateStage(seed, 1 + (seed % 5), theme) }]);
 

@@ -1097,7 +1097,10 @@ like that keeps the big cape a choice rather than a handicap.
     then sweeps it flat across the front at chest height, with a white fan behind the blade. The **upward
     stab** crouches with the blade low and level, then thrusts up and forward until the blade points at
     the sky, with the speed lines. The sim is untouched: hit timing, hit spheres and damage are the
-    punches', and the reach is measured from the glove spots (`fighter.test.mjs` checks it).
+    punches', and the reach is measured from the glove spots (`fighter.test.mjs` checks it). The
+    sword does make the body wider (Dress-up can change how you play), so its hits land a little
+    further out and it is a bigger target; kept on purpose (decided 2026-10-17). Only what shows is
+    measured: a hidden swoosh, speed line or trick never makes a fighter bigger.
   - **A full 360 spin with the sword: a later power move (brainstorm 2026-10-17).** It hits all around
     you, which normal hits don't, so it belongs on the power-bar ladder.
 - **Tricks: tap the picked gloves or sword again** (decided 2026-10-17), the way a hat changes stitch.

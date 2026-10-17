@@ -298,4 +298,17 @@ for (const [hands, trick] of [['sword', 'sparkle'], ['sword', 'flame'], ['gloves
   disposeFighter(built);
 }
 
+// REUSE-SPEC.md §Costumes: the body is the outfit you see; a hidden swoosh or trick never makes it bigger
+{
+  const f = newFighter('lion'), built = buildFighter(f), who = { id: 'a', team: /** @type {const} */ ('heroes') };
+  const { width, height } = entrantOf(f, built, who);
+  const far = new THREE.Mesh(new THREE.BoxGeometry(5, 5, 5));
+  far.visible = false;
+  built.root.add(far);
+  assert.deepEqual([entrantOf(f, built, who).width, entrantOf(f, built, who).height], [width, height], 'a hidden part is not measured');
+  far.visible = true;
+  assert.ok(entrantOf(f, built, who).width > width + 1, 'a shown part is');
+  disposeFighter(built);
+}
+
 console.log('fighter ok');

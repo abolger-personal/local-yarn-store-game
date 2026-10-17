@@ -470,10 +470,24 @@ export const BAD_DONUT = Object.freeze({ dough: '#241a1d', frosting: '#7b2fbf', 
  * @param {Fighter} f @param {{ id: string, team: import('./match.js').Team, dummy?: boolean }} who
  * @returns {import('./match.js').Entrant}
  */
+const part = new THREE.Box3();
+
+/** The box around what shows: a hidden swoosh, speed line or trick never makes a fighter bigger (REUSE-SPEC.md §Costumes). */
+function visibleBox(root) {
+  const box = new THREE.Box3();
+  root.traverseVisible((o) => {
+    if (!o.geometry) return;
+    if (o.boundingBox !== undefined) o.computeBoundingBox();
+    else if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    box.union(part.copy(o.boundingBox ?? o.geometry.boundingBox).applyMatrix4(o.matrixWorld));
+  });
+  return box;
+}
+
 export function entrantOf(f, built, who) {
   const { id, team, dummy = false } = who;
   built.root.updateMatrixWorld(true);
-  const size = new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3());
+  const size = visibleBox(built.root).getSize(new THREE.Vector3());
   const chest = built.chest.getWorldPosition(new THREE.Vector3());
   const tip = ({ parent, at, r }) => parent.localToWorld(new THREE.Vector3(...at)).distanceTo(chest) + r;
   const look = team === 'heroes' ? { dough: HERO_DOUGH, frosting: f.params.bodyColor, stripe: false } : BAD_DONUT;

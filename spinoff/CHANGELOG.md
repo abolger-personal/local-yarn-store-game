@@ -7,7 +7,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 ### Dress up
 - **Swords!** Beat level 1 and a sword shows up next to the 🥊 boxing gloves on the dress-up page. Pick
   one or the other, in any colour. It's a chunky toy sword with its own moves: 🥊 stabs straight
-  ahead, then slashes across, then stabs up at the sky, with a whoosh. It hits just like the gloves do.
+  ahead, then slashes across, then stabs up at the sky, with a whoosh. A sword makes you a bit wider, so
+  your hits land a little further out, and you're a little easier to hit.
 - **Tricks.** Tap your gloves or your sword again for a ✨ sparkle, 🫧 bubbles or a 🔥 flame that pops out
   when your punch lands. Tap again for the next one.
 

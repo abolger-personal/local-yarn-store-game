@@ -4,12 +4,12 @@ import { attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
 import { countStrike, landHit, newCombo, strikerOf } from './punches.js';
 import { KICK_COMBO, strikeOf } from './kicks.js';
-import { MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
+import { BAD_GUY_FUR, MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
 import { BRICK, TICK_HZ, groundOf } from './match.js';
 import { levelFor } from './levels.js';
 import { makeStage } from './stage.js';
-import { THEMES } from './scenery.js';
+import { SHELF_WOOD, THEMES } from './scenery.js';
 import { box, donutMesh, sameLook } from './treats.js';
 import { rosterOf } from './multiplayer.js';
 import { joinMatch } from './together.js';
@@ -45,18 +45,18 @@ const { scene, camera } = stage;
 const fx = createFx(scene, camera, level.stage);
 
 function badGuyFighter() {
-  const f = setFur(newFighter('lion'), '#8f8f96');
+  const f = setFur(newFighter('lion'), BAD_GUY_FUR);
   f.look = { ...f.look, hatColor: '#2a2030', capeColor: '#3b2152', bagColor: '#1d1a20', gloves: '#4b2a6b' };
   return f;
 }
 
 function shelfFrame(s) {
   const w = SHELF.cols * SHELF.gap + 0.14, h = SHELF.rows * SHELF.row + 0.1, g = new THREE.Group();
-  const back = box(w, h, 0.06, '#9a5b2c');
+  const back = box(w, h, 0.06, SHELF_WOOD.back);
   back.position.set(0, h / 2, 0.03 - SHELF.depth);
   g.add(back);
   for (let row = 0; row <= SHELF.rows; row++) {
-    const plank = box(w, 0.06, SHELF.depth, '#7a4520');
+    const plank = box(w, 0.06, SHELF.depth, SHELF_WOOD.plank);
     plank.position.set(0, row * SHELF.row + 0.03, -SHELF.depth / 2);
     g.add(plank);
   }

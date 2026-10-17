@@ -954,6 +954,32 @@ Keep `felted` (the shop look, free; decided 2026-10-13), or try `toon` / `matcap
 gives a "who's that?" character-select reveal. Stages from the bakery: a giant cake, a stack of
 pancakes, a donut-shop counter, a cookie jar (brainstorm 2026-10-13).
 
+### Stage visibility rules
+
+(decided 2026-10-17, designer: syrup didn't stand out from the waffle on cheap, low-res tablets.) Things that play
+differently must read as different at tablet size by **colour value and hue alone, never texture**: on a small or
+cheap screen the waffle grid, glossiness and sprinkles stop helping, and about 1 in 12 boys is red-green colour-blind,
+so lightness carries the most weight. `spinoff/visibility.test.mjs` runs the tutorial, every hand-made stage and 20
+generated seeds per stage through these rules, so a new stage or theme is checked the day it's added: each theme in
+`scenery.js` lists its `surfaces` (what each floor, edge, hazard and brick shows) and fails the check until it does.
+
+Colours are judged **as they land on screen**, not as hexes: each surface is lit by the studio lights and the room
+map, tone mapped (neutral, exposure 0.75) and turned into 8-bit sRGB; a see-through one (syrup) is blended over
+what's under it as the canvas does. Distances are in OKLab, where about 0.02 is the smallest difference anyone can
+see (a JND), so each minimum below is a number of JNDs a kid sees at a glance.
+
+| Pair | Judged | Minimum | Why |
+| --- | --- | --- | --- |
+| Hazard (syrup, butter, icing trampoline) vs the floor it lies on | the hazard against **each** colour of that floor | ΔL 0.10 and ΔE 0.12 | A flat patch has no silhouette or shadow, only its colour, and it must not match any part of the floor's pattern; 5 JNDs of lightness so it survives colour blindness and a washed-out panel |
+| Walkable floor vs a drop-off and the background | the ground's top vs its edge band, that band vs the background, every floor vs the back wall | ΔE 0.08 | An edge is a long line across the whole screen, so 4 JNDs is enough to see where the floor ends |
+| Bricks, shelves, donuts vs their surroundings | the object as a whole vs the floor or wall | ΔE 0.12 | Objects have shape, but you have to find them fast mid-fight: 6 JNDs |
+| Fighters (all 12 kids' fur colours, the bad guys' grey) vs every floor | fur vs the floor as a whole | ΔE 0.08 | A fighter is big, moves and stands on its shadow, so 4 JNDs |
+| Heroes' vs bad guys' donuts | dough vs dough | ΔL 0.30 | Light vs dark dough says whose donut it is; frosting is the kid's colour and may match anything |
+
+The on-screen model (the `ponytail:` note in the test) leaves out highlights and reflections, shadows, curved
+and side faces, and per-tablet GPU and panel differences, so a pair near its minimum is worth an eyeball on a
+real tablet.
+
 ## Theme: treats
 
 The spinoff is about donuts, not yarn (decided 2026-10-13). The yarn store keeps its `inventory/` untouched; the

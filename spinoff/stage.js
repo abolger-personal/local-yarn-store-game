@@ -36,7 +36,7 @@ function followSize(container, renderer, camera) {
 }
 
 /** roomEnvironment()'s irradiance as L2 spherical harmonics (grey), from LightProbeGenerator on an M3. */
-const ROOM_SH = [1.496, 1.488, 1.152, 0.093, 0.122, 1.25, 0.657, -0.232, -0.479];
+export const ROOM_SH = [1.496, 1.488, 1.152, 0.093, 0.122, 1.25, 0.657, -0.232, -0.479];
 
 // ponytail: tablet GPUs prefilter the PMREM room map differently (mediump), so the room is a light probe plus a camera fill that the material shader evaluates like the other lights; loses the map's soft reflections; tuned to the map's look with colors.html.
 function roomLights(camera, strength) {

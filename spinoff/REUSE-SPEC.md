@@ -473,7 +473,8 @@ and smashers each get a round that is theirs.
     up to it and face it, so ⬇️ stacks on top. Empty-handed: tap one of *your own* blocks on top of
     a stack and you pick it back up. That is the take-back: only a top block (nothing floats), only
     your colour (nobody undoes a teammate's work), and no history, so nothing goes stale when
-    teammates build on your blocks.
+    teammates build on your blocks. A block of yours with a teammate's on top is stuck there for
+    the round (decided 2026-10-17).
   - **The buttons swap with the round.** In the build round the corner shows ⬇️ and 👍 where 🥊 and
     🦶 sit; when the match starts they drop away and 🥊 🦶 pop in with the hit-stop freeze. The
     camera follows your fighter as in a match, so big levels need nothing extra.
@@ -615,9 +616,10 @@ and smashers each get a round that is theirs.
   | 5 | Gingerbread-man shield | A gingerbread man standing guard; takes extra hits |
   | 6+ | More house parts | Windows, doors, chimneys |
 
-- **Heroes place only their own pieces** (brainstorm 2026-10-13). Every hero's pieces carry their
-  fur colour (plus a small pattern when two kids share a colour). A hero can place and move only
-  their own pieces, never a teammate's, and can stack on anything: their own or a teammate's.
+- **Heroes place only their own pieces** (planned 2026-10-17 for owning and moving them; the colours
+  are brainstorm 2026-10-13). Every hero's pieces carry their fur colour (plus a small pattern when
+  two kids share a colour). A hero can place and move only their own pieces, never a teammate's,
+  and can stack on anything: their own or a teammate's.
   Nothing forces teamwork; the kids find it.
 - **Mixed walls are tougher, and look it** (brainstorm 2026-10-13). Where a hero's piece rests on a
   teammate's piece of another colour, both pieces in that joint take one extra hit. A piece

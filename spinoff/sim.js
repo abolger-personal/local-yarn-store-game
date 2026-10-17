@@ -104,6 +104,11 @@ const shelfBox = (z0) => (sh) => ({ x0: sh.x - sh.half, x1: sh.x + sh.half, z0, 
 const patchAt = (s, list, p, grow = 0) => (list ?? []).findIndex((q) => Math.abs(p.y - (q.y ?? s.band.y)) <= STEP
   && Math.hypot(p.x - q.x, p.z - q.z) < q.r + grow);
 const shelfOf = (s, team) => s.shelves.find((sh) => sh.team === team);
+const standingAt = (f, sh, reach = SHELF_REACH) => f.onGround && Math.abs(f.y - sh.y) <= STEP
+  && Math.abs(f.x - sh.x) < sh.half && f.z >= sh.z && f.z - sh.z < f.r + reach;
+/** REUSE-SPEC.md §Mode: a guard blocks the grab. */
+const guarding = (s, f) => standingAt(f, shelfOf(s, f.team), GUARD_REACH);
+const guardOf = (s, team) => s.fighters.find((o) => o.team === team && guarding(s, o));
 const inStage = ({ band }, p) => {
   p.x = clamp(p.x, band.x0 + LEDGE_MARGIN, band.x1 - LEDGE_MARGIN);
   p.z = Math.min(p.z, band.z1 - LEDGE_MARGIN);
@@ -587,7 +592,7 @@ function separate(s) {
       const [ux, uz] = d > EPS ? [dx / d, dz / d] : [a.team === 'heroes' ? 1 : -1, 0];
       const held = [guarding(s, a), guarding(s, b)];
       for (const [f, sign, k] of [[a, -1, 0], [b, 1, 1]]) {
-        const share = held[k] ? 0 : held[1 - k] ? 1 : 0.5;
+        const share = held[k] ? 0 : (1 + Number(held[1 - k])) / 2;
         f.x += sign * ux * gap * share;
         f.z += sign * uz * gap * share;
         pushOut(s, f, f.r, f.h);
@@ -758,22 +763,18 @@ function touchDonuts(s, f) {
   f.touching = now.map((d) => d.id);
 }
 
-const standingAt = (f, sh, reach = SHELF_REACH) => f.onGround && Math.abs(f.y - sh.y) <= STEP
-  && Math.abs(f.x - sh.x) < sh.half && f.z >= sh.z && f.z - sh.z < f.r + reach;
-/** REUSE-SPEC.md §Mode: a guard blocks the grab. */
-const guarding = (s, f) => standingAt(f, shelfOf(s, f.team), GUARD_REACH);
-const guardOf = (s, team) => s.fighters.find((o) => o.team === team && guarding(s, o));
+
+/** Walking up to a guarded shelf: the guard shakes "no" (the full-bag event) once each time. True while guarded. */
+function guardStep(s, f) {
+  const t = f.target, guard = t?.thing === 'shelf' && t.team !== f.team && guardOf(s, t.team);
+  const by = Boolean(guard) && f.onGround && flat(f, guard) < f.r + guard.r + FOLLOW_GAP + WP_ARRIVE;
+  if (by && !f.blocked) s.fullBag.push(event(guard, guard));
+  f.blocked = by;
+  return Boolean(guard);
+}
 
 function shelfStep(s, f) {
-  const t = f.target, guard = t?.thing === 'shelf' && t.team !== f.team && guardOf(s, t.team);
-  if (guard) {
-    // the guard shakes "no" (the full-bag event) once each time someone walks up for its donuts
-    const by = f.onGround && flat(f, guard) < f.r + guard.r + FOLLOW_GAP + WP_ARRIVE;
-    if (by && !f.blocked) s.fullBag.push(event(guard, guard));
-    f.blocked = by;
-    return;
-  }
-  f.blocked = false;
+  if (guardStep(s, f)) return;
   const sh = s.shelves.find((o) => standingAt(f, o));
   if (!sh) { f.shelfDone = false; return; }
   if (sh.team === f.team) {

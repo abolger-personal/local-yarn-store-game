@@ -732,8 +732,13 @@ connect every time):
   The design above doesn't depend on reliability, so the switch is local to `net.js`.
 - **Pause, away, gone:** see Network gotchas. A guest who drops out mid-match sits where it stopped
   for the rest of the round (the sim can't take a fighter out, and a sitting fighter can still
-  be hit and still drops its donut). Its tablet can't rejoin that match. A guest whose page reloads but
-  whose tablet stays in the room says `ready` again and gets `start` again, so it picks the match back up.
+  be hit and still drops its donut). A tablet keeps its id for the whole visit (Kept rooms), so it can
+  come back (decided 2026-10-16): a guest that goes back to the lobby (👋) and types the code again gets
+  `go`, is back in the match it left, and its fighter stands up. A guest whose page reloads says `ready`
+  again, gets `start` again and picks the match back up, standing up if it was sitting. A host whose
+  page reloads mid-match sends `again` with `go`, so every guest that was playing starts a new round
+  with it (a guest still waiting for `start` ignores `again`). A host that leaves the room ends it for
+  everyone (🏠💨), as before: ▶️ belongs to the tablet that opened the room.
 - **Again** (decided 2026-10-14, amended 2026-10-16: kept rooms): ▶️ on the host's end card sends `again`;
   every tablet's page reloads into a fresh match the same way it started (`ready`, ⏳, `start`), in
   the same room. The host's old page detaches as it sends `again`, so a guest that reloads first

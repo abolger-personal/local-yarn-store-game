@@ -58,8 +58,9 @@ function readyGuests(room, guests, start) {
 
 /**
  * Every tablet in the room plays: one still in the lobby, or that arrives before `start`, gets `go`, and the
- * host waits for each to say `ready`. One that arrives after is a late joiner (REUSE-SPEC.md §Multiplayer,
- * Late joiners), and gets `go` with the next round's page.
+ * host waits for each to say `ready`. A player that left and comes back into the room gets `go` and is in the
+ * match again; any other that arrives after `start` is a late joiner (REUSE-SPEC.md §Multiplayer, Late
+ * joiners), and gets `go` with the next round's page.
  * @param {number[]} code @param {import('./fighter.js').Fighter} mine @param {import('./levels.js').Level} level
  */
 async function host(code, mine, level) {
@@ -67,12 +68,15 @@ async function host(code, mine, level) {
   let h = null, late = null, start = null, recheck = () => {};
   const playing = (id) => start?.roster.some((s) => s.id === id);
   const room = openRoom(code, mine, {
-    onFighter: (id) => { if (!start) room.send('go', true, [id]); else if (!playing(id)) late?.arrive(id); },
+    // before `start` everyone comes along; a player that left and came back goes back into the match
+    onFighter: (id) => { if (start && !playing(id)) late?.arrive(id); else { h?.back(id); room.send('go', true, [id]); } },
     onLeave: (id) => { guests.delete(id); recheck(); late?.left(id); h?.left(id); },
   });
   const ready = readyGuests(room, guests, () => start);
   recheck = ready.check;
+  // everyone in the room comes along: the lobby's tablets, and guests still playing a match this page took over from
   room.send('go', true);
+  room.send('again', true);
   await ready.everyone;
   start = { theme: level.theme, stage: level.stage, roster: rosterOf(selfId, mine, guests), settings: { seconds: ROUND_SECONDS } };
   h = createHost(room, start, selfId);
@@ -94,12 +98,18 @@ function noted(room) {
 
 /** Says `ready` until the host's `start` comes. @param {number[]} code @param {import('./fighter.js').Fighter} mine */
 async function guest(code, mine) {
-  let g = null;
+  let g = null, playing = false;
   const room = openRoom(code, mine, { onFighter: () => {}, onLeave: (id) => g?.left(id) });
-  g = createGuest(noted(room), selfId, Object.keys(THEMES), { gone: hostGone, again: () => location.reload() });
+  // a guest still waiting for `start` is on the next round's page already
+  g = createGuest(noted(room), selfId, Object.keys(THEMES), { gone: hostGone, again: () => { if (playing) location.reload(); } });
   room.send('ready', mine);
   const saying = setInterval(() => room.send('ready', mine), READY_MS);
-  g.started.then(() => note('guest: start accepted'));
+  g.started.then(() => {
+    playing = true;
+    note('guest: start accepted');
+    // the host may have this fighter sitting from a page before this one (Pause, away, gone)
+    g.input({ target: null, punch: false, kick: false, away: Boolean(document.hidden) });
+  });
   const start = await Promise.race([g.started, sleep(HOST_GONE_SECONDS * 1000)]);
   clearInterval(saying);
   if (!start) {

@@ -182,6 +182,8 @@ function play(n, hostInput = IDLE) {
   assert.notEqual(at(play(5), 'G1').move, 'sit', 'and gets up when back');
   host.left('G3');
   assert.equal(at(play(5), 'G3').move, 'sit', 'a guest who drops sits where it stopped');
+  host.back('G3');
+  assert.notEqual(at(play(5), 'G3').move, 'sit', 'and stands up when it comes back into the room');
 }
 
 {

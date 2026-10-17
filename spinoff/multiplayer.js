@@ -110,14 +110,24 @@ function seen(h, snap) {
   if (scenery !== h.scenery) Object.assign(h, { scenery, changed: snap.tick });
 }
 
+/** Counts down to the next snapshot; when it's due, `send` it (`h.out` holds its sequence, events and stillness). */
+function post(h, send, dt) {
+  h.wait -= dt;
+  if (!h.latest || h.wait > 1e-6) return;
+  h.wait = Math.max(h.wait, 0) + 1 / SNAP_HZ;
+  const still = ++h.seq % REFRESH !== 1 && h.latest.tick - h.changed >= EVENT_TICKS;
+  h.out = { seq: h.seq, events: h.events, still };
+  send();
+}
+
 /**
  * The host's side: sends `start` to the guests, collects their inputs, posts snapshots at SNAP_HZ.
  * @param {Link} link @param {Start} start @param {string} me the host's own id
  */
 export function createHost(link, start, me) {
-  const guests = new Set(start.roster.filter((s) => !s.dummy && s.id !== me).map((s) => s.id));
+  const players = start.roster.filter((s) => !s.dummy && s.id !== me).map((s) => s.id), guests = new Set(players);
   const pending = new Map();
-  const h = { latest: null, events: [], seq: 0, wait: 0, scenery: '', changed: 0 };
+  const h = { latest: null, events: [], seq: 0, wait: 0, scenery: '', changed: 0, out: null };
   link.on('input', (raw, from) => { if (guests.has(from) && readInput(raw)) pending.set(from, merge(readInput(raw), pending.get(from))); });
   link.send('start', start, [...guests]);
   return {
@@ -126,15 +136,11 @@ export function createHost(link, start, me) {
     /** Every tick's snapshot, for its events. @param {Snapshot} snap */
     seen(snap) { seen(h, snap); },
     /** Sends the latest snapshot at SNAP_HZ as frames pass; with no `dt`, now. */
-    post(paused, dt = 1) {
-      h.wait -= dt;
-      if (!h.latest || h.wait > 1e-6) return;
-      h.wait = Math.max(h.wait, 0) + 1 / SNAP_HZ;
-      const still = ++h.seq % REFRESH !== 1 && h.latest.tick - h.changed >= EVENT_TICKS;
-      link.send('snap', wire(h.latest, { paused, seq: h.seq, events: h.events, still }), [...guests]);
-    },
+    post(paused, dt = 1) { post(h, () => link.send('snap', wire(h.latest, { paused, ...h.out }), [...guests]), dt); },
     /** A guest dropped: its fighter sits where it stopped (the sim has no way to take one out). */
     left(id) { if (guests.delete(id)) pending.set(id, { ...IDLE, away: true }); },
+    /** A guest that left came back into the room: it plays on, and its fighter stands up. */
+    back(id) { if (players.includes(id) && !guests.has(id)) { guests.add(id); pending.set(id, { ...IDLE, away: false }); } },
     again() { link.send('again', true, [...guests]); },
   };
 }

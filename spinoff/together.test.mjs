@@ -74,6 +74,7 @@ async function visit({ code, hosting, slow = 0, quit = false }) {
   const { joinMatch } = await import('./together.js');
   const { randomFighter } = await import('./fighter.js');
   const { TUTORIAL } = await import('./levels.js');
+  const { leaveRooms } = await import('./net.js');
   const mine = randomFighter();
   pageStubs('', () => {});
   let page = await lobby(code, mine, hosting, quit);
@@ -86,8 +87,13 @@ async function visit({ code, hosting, slow = 0, quit = false }) {
     const match = await joinMatch(page, mine, TUTORIAL);
     parentPort.postMessage({ me: match.me, roster: match.start.roster.map((s) => s.id), joined: [...globalThis.joined] });
     parentPort.removeAllListeners('message');
-    parentPort.on('message', () => match.again());
+    // 'again': the host's ▶️; 'bye': 👋 back to the lobby, which leaves the room, and the code typed again
+    parentPort.on('message', (m) => ({ bye: () => leave(null), reload: () => leave(page), again: () => match.again() })[m]());
     page = await left;
+    if (page === null) {
+      leaveRooms();
+      page = await lobby(code, mine, 0);
+    }
     parentPort.postMessage({ next: page });
   }
 }
@@ -151,6 +157,20 @@ async function main() {
   await played([first, slow, retyped], [1, 1, 1], 'a tablet that typed the code while the host waited joining the match');
   for (const t of [first, slow, retyped]) t.worker.terminate();
   console.log('together ok (a tablet that comes in through the lobby while the host waits plays this round)');
+
+  // a guest goes back to the lobby mid-match and types the code again: it's back in the match it left
+  const [keeper, leaver] = [open([1, 3, 2, 4], 1), open([1, 3, 2, 4])];
+  const [was] = await played([keeper, leaver], [1, 1], 'two tablets starting a match');
+  leaver.worker.postMessage('bye');
+  const back = await within(15000, leaver.said('roster', 2), 'a guest that left coming back into its match');
+  assert.deepEqual(back.roster, was.roster, 'it rejoins the match it left, not a new one');
+  console.log('together ok (a guest that leaves and types the code again is back in its match)');
+
+  // the host's page reloads mid-match (the browser reloaded the frame): everyone starts the round again
+  keeper.worker.postMessage('reload');
+  await played([keeper, leaver], [2, 3], 'everyone starting again after the host\'s page reloaded');
+  for (const t of [keeper, leaver]) t.worker.terminate();
+  console.log('together ok (a host whose page reloads mid-match takes everyone into a new round)');
 
   // the only other tablet leaves the room (👋) instead of coming along: the host stops waiting for it
   const alone = open([4, 1, 2, 3], 1), gone = open([4, 1, 2, 3], 0, 0, true);

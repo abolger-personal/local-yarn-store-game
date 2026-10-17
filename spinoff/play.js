@@ -6,7 +6,7 @@ import { countStrike, landHit, newCombo, strikerOf } from './punches.js';
 import { KICK_COMBO, strikeOf } from './kicks.js';
 import { BAD_DONUT, BAD_GUY_FUR, MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
-import { BRICK, TICK_HZ, groundOf } from './match.js';
+import { BRICK, SHELF, SHELF_WIDTH, TICK_HZ, groundOf } from './match.js';
 import { levelBefore, levelFor, matchOptions } from './levels.js';
 import { outcomeOf, recordOutcome } from './progress.js';
 import { facedCell, fortGrid } from './build.js';
@@ -26,7 +26,6 @@ const api = match;
 
 setGeometryDetail('med');
 
-const SHELF = { cols: 6, gap: 0.3, row: 0.32, rows: 4, r: 0.13, depth: 0.26 };
 const LOOSE_R = 0.2, FACE_CAMERA = -0.5, FLY_ARC = 0.6, GRAB_FROM_Y = 0.4;
 const mine = loadFighter();
 if (!mine) location.replace('choose.html');
@@ -65,7 +64,7 @@ function badGuyFighter() {
 }
 
 function shelfFrame(s) {
-  const w = SHELF.cols * SHELF.gap + 0.14, h = SHELF.rows * SHELF.row + 0.1, g = new THREE.Group();
+  const w = SHELF_WIDTH, h = SHELF.rows * SHELF.row + 0.1, g = new THREE.Group();
   const back = box(w, h, 0.06, SHELF_WOOD.back);
   back.position.set(0, h / 2, 0.03 - SHELF.depth);
   g.add(back);

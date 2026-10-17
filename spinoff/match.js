@@ -6,6 +6,10 @@
 export const TICK_HZ = 60;
 export const ROUND_SECONDS = 90;
 export const DONUTS_PER_SHELF = 12;
+/** How a shelf is drawn (play.js): columns of donuts `gap` apart, `rows` planks `row` apart. */
+export const SHELF = Object.freeze({ cols: 6, gap: 0.3, row: 0.32, rows: 4, r: 0.13, depth: 0.26 });
+/** A shelf's width with its trim: the sim's shelf is as wide as the drawn one, so the whole front you see banks. */
+export const SHELF_WIDTH = SHELF.cols * SHELF.gap + 0.14;
 export const BRICK = 0.4;
 export const HIT_DEPTH = 0.35;
 export const HITSTOP_TICKS = 5;

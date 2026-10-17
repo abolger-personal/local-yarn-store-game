@@ -1,6 +1,6 @@
 // The level 2 raider in the real sim, played through the same inputs a tablet sends (REUSE-SPEC.md §Bad guys).
 import assert from 'node:assert/strict';
-import { BRICK, ROUND_SECONDS, TICK_HZ } from './match.js';
+import { BRICK, ROUND_SECONDS, SHELF_WIDTH, TICK_HZ } from './match.js';
 import { levelOf, matchOptions } from './levels.js';
 import { AIR_SPEED, GUARD_REACH, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
 import { ATTACK_TICKS, REACT_TICKS, createCpu, modeOf } from './cpu.js';
@@ -39,7 +39,7 @@ const me = (s) => s.fighters.find((f) => f.id === 'cpu1');
     if (stole < 0 && steals(s)) stole = s.tick;
     if (banked < 0 && banks(s)) banked = s.tick;
     const f = me(s), shelf = s.shelves.find((x) => x.team === 'badGuys');
-    if (banked >= 0 && f.onGround && Math.abs(f.y - shelf.y) < 0.01 && f.z - shelf.z < GUARD_REACH && Math.abs(f.x - shelf.x) < 0.6) guarding++;
+    if (banked >= 0 && f.onGround && Math.abs(f.y - shelf.y) < 0.01 && f.z - shelf.z < GUARD_REACH && Math.abs(f.x - shelf.x) < SHELF_WIDTH / 2) guarding++;
     if (f.move === 'kick' && s.tick - last > 1) { kicks++; closest = Math.min(closest, s.tick - last); last = s.tick; }
   });
   assert.ok(stole > 0 && banked > stole, `on an open level the raider grabs a donut and runs home to bank it (stole ${stole}, banked ${banked})`);

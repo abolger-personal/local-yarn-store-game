@@ -1,6 +1,6 @@
 // The build round in the real sim, on level 2 (REUSE-SPEC.md §Forts): piles, ⬇️, the height limit, take-backs, 👍.
 import assert from 'node:assert/strict';
-import { BRICK, PILE_DX, ROUND_SECONDS } from './match.js';
+import { BRICK, PILE_DX, ROUND_SECONDS, SHELF_WIDTH } from './match.js';
 import { TUTORIAL, levelOf, piecesEach } from './levels.js';
 import { createMatch, snapshot, tick } from './sim.js';
 import { HEIGHT_LIMIT, facedCell, fortGrid } from './build.js';
@@ -149,12 +149,22 @@ assert.equal(snapshot(createMatch([A], TUTORIAL.stage)).phase, 'play', 'level 1 
   const m4 = createMatch([{ ...A, width: 0.8 }], stage, { pieces: 4 });
   const [shelf] = snapshot(m4).shelves;
   fetch(m4, 'A');
-  act(m4, 'A', { target: { thing: 'shelf', team: 'heroes' } }, (s) => who(s, 'A').move === 'idle' && Math.abs(who(s, 'A').x - shelf.x) < 0.01);
+  act(m4, 'A', { target: { thing: 'shelf', team: 'heroes' } }, (s) => who(s, 'A').move === 'idle' && who(s, 'A').y === shelf.y && who(s, 'A').z < shelf.z + 1);
   act(m4, 'A', { drop: true });
   for (let i = 0; i < 60; i++) tick(m4, {});
   const [b] = snapshot(m4).bricks.filter((o) => o.team === 'heroes');
-  assert.ok(b && b.y === shelf.y && Math.abs(b.x + BRICK / 2 - shelf.x) <= BRICK && b.z > shelf.z && b.z < shelf.z + BRICK, `the block goes in front of the shelf (${JSON.stringify(b)})`);
+  assert.ok(b && b.y === shelf.y && Math.abs(b.x + BRICK / 2 - shelf.x) < SHELF_WIDTH / 2 && b.z > shelf.z && b.z < shelf.z + BRICK, `the block goes in front of the shelf (${JSON.stringify(b)})`);
   assert.equal(who(snapshot(m4), 'A').y, shelf.y, 'and the fighter is still on the deck');
+}
+
+// Blocks in front of the middle of your shelf (playtest screenshot): the drawn shelf's open ends still bank, and a tap on the shelf
+// takes you to one
+for (const from of [{ x: -7.4, z: -0.9 }, { x: -6.6, z: -1 }]) {
+  const m5 = createMatch([{ ...A, width: 0.68 }], stage, { pieces: 4 });
+  act(m5, 'A', { go: true });
+  for (const x of [-8, -7.6, -7.2]) for (const y of [1.1, 1.1 + BRICK]) m5.bricks.push({ id: `t${x}/${y}`, team: 'heroes', owner: 'A', x, y, z: -1.6, vy: 0, hits: 2, maxHits: 2, icing: A.look.frosting });
+  Object.assign(m5.fighters[0], { ...from, y: 1.1, onGround: true, carrying: A.look });
+  act(m5, 'A', { target: { thing: 'shelf', team: 'heroes' } }, () => !m5.fighters[0].carrying);
 }
 
 console.log('build ok');

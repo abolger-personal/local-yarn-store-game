@@ -1,6 +1,6 @@
 // The build round's floor grid (REUSE-SPEC.md §Forts, Building is carrying blocks): a team's third cut into BRICK cells
 // on inventory/grid.js, rebuilt from the bricks standing there, so the sim and the page find the same cells.
-import { BRICK, PILE_DX, groundOf, outside, overlaps, spotRect } from './match.js';
+import { BRICK, PILE_DX, SHELF_WIDTH, groundOf, outside, overlaps, spotRect } from './match.js';
 import { dropLayer, fits, footprint, makeDisplay, place, topAt } from '../inventory/grid.js';
 
 /** Blocks a stack may hold: two is as tall as level 1's wall, which nobody hops (the playability check proves it). */
@@ -9,8 +9,6 @@ export const HEIGHT_LIMIT = 2;
 export const PLACE_AHEAD = 0.225;
 /** ...or, where that one can't take a block (a deck, the fence, the edge), the one this far in front, at your feet. */
 export const PLACE_NEAR = 0.2;
-// ponytail: wider than any shelf (sim.js makes them about 1.04 wide); measure the shelf if one gets bigger
-const SHELF_KEEP = 0.6;
 const EDGE = 0.01;
 
 /** @typedef {{ x: number, y: number, z: number }} P3 */
@@ -43,7 +41,7 @@ export function fortGrid(stage, team, bricks, piles) {
   const zone = stage.zones.find((z) => z.team === team), ground = groundOf(stage);
   const ox = Math.ceil(zone.x0 / BRICK - 1e-9) * BRICK, oz = stage.backWall;
   const cols = Math.floor((zone.x1 - ox) / BRICK + 1e-9), rows = Math.floor((ground.z1 - oz) / BRICK + 1e-9);
-  const keep = [...piles.map((p) => spotRect({ x: p.x - PILE_DX, z: p.z })), ...stage.shelves.map((sh) => ({ x0: sh.x - SHELF_KEEP, x1: sh.x + SHELF_KEEP, z0: oz, z1: sh.z + EDGE }))];
+  const keep = [...piles.map((p) => spotRect({ x: p.x - PILE_DX, z: p.z })), ...stage.shelves.map((sh) => ({ x0: sh.x - SHELF_WIDTH / 2, x1: sh.x + SHELF_WIDTH / 2, z0: oz, z1: sh.z + EDGE }))];
   const tops = Array.from({ length: cols * rows }, (_, k) => {
     const x0 = ox + (k % cols) * BRICK, z0 = oz + Math.floor(k / cols) * BRICK;
     const rect = { x0, x1: x0 + BRICK, z0, z1: z0 + BRICK };

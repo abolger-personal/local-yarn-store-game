@@ -67,6 +67,9 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **Big fighters fit everywhere.** A big fighter could get stuck at level 2's fence gap, beside a step up
   or between a pillar and a trampoline. The gaps are wider now, and a big fighter finds a way round, or
   tries again, instead of pushing on the spot. Every level is now checked with the biggest fighter before it ships.
+- **You can bank anywhere along your shelf.** With blocks in front of the middle of it, the open ends
+  bank too, and tapping the shelf walks you to the nearest open spot. The shelf is also solid all the
+  way to its ends now.
 - **Fighters fit where they look like they fit.** A tail, a capelet or a sword no longer makes a fighter
   bump into things from further away. You can stand on your deck behind a block in front of your shelf
   without being pushed off.

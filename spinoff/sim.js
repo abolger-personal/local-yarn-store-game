@@ -1,7 +1,7 @@
 // The match host: one fixed tick of pure logic, no three.js, no Math.random. REUSE-SPEC.md §Milestones 1.
 // The stage is a depth band (§Navigation): fighters walk in x/z on floor tops and jump in y.
-import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, HIT_DEPTH, PILE_DX, ROUND_SECONDS, TICK_HZ, coreOf, groundOf, outside } from './match.js';
-import { EMPTY, anySlot, footprint, gridSize, lift, makeDisplay, place, topAt } from '../inventory/grid.js';
+import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, HIT_DEPTH, PILE_DX, ROUND_SECONDS, SHELF_WIDTH, TICK_HZ, coreOf, groundOf, outside } from './match.js';
+import { EMPTY, anySlot, footprint, lift, makeDisplay, place, topAt } from '../inventory/grid.js';
 import { MATCH, canHit } from './roster.js';
 import { facedCell, fortGrid, onTop } from './build.js';
 
@@ -113,10 +113,12 @@ const shelfBox = (z0) => (sh) => ({ x0: sh.x - sh.half, x1: sh.x + sh.half, z0, 
 const patchAt = (s, list, p, grow = 0) => (list ?? []).findIndex((q) => Math.abs(p.y - (q.y ?? s.band.y)) <= STEP
   && Math.hypot(p.x - q.x, p.z - q.z) < q.r + grow);
 const shelfOf = (s, team) => s.shelves.find((sh) => sh.team === team);
-const standingAt = (f, sh, reach = SHELF_REACH) => f.onGround && Math.abs(f.y - sh.y) <= STEP
-  && Math.abs(f.x - sh.x) < sh.half && f.z >= sh.z && f.z - sh.z < f.r + reach;
-/** REUSE-SPEC.md §Mode: a guard blocks the grab. */
-const guarding = (s, f) => standingAt(f, shelfOf(s, f.team), GUARD_REACH);
+/** In front of the shelf, touching it anywhere along its front (`side` f.r: an end left open beside a block banks too, playtest)
+ * or, with `side` 0, with your middle in front of it. */
+const standingAt = (f, sh, reach = SHELF_REACH, side = f.r) => f.onGround && Math.abs(f.y - sh.y) <= STEP
+  && Math.abs(f.x - sh.x) < sh.half + side && f.z >= sh.z && f.z - sh.z < f.r + reach;
+/** REUSE-SPEC.md §Mode: a guard standing in front of its shelf blocks the grab; one knocked to its end doesn't. */
+const guarding = (s, f) => standingAt(f, shelfOf(s, f.team), GUARD_REACH, 0);
 const guardOf = (s, team) => s.fighters.find((o) => o.team === team && guarding(s, o));
 const inStage = ({ band }, p) => {
   p.x = clamp(p.x, band.x0 + LEDGE_MARGIN, band.x1 - LEDGE_MARGIN);
@@ -385,13 +387,27 @@ function facingGoal(s, f, it) {
   return { ...pointGoal(s, f, it.x + ux * away, it.z + uz * away, it.y), face: it };
 }
 
+/** The nearest spot where you touch the shelf's front, so blocks in front of its middle leave you an open end (playtest);
+ * empty-handed at your own shelf you're going to guard it, so right in front of it if there's room. Picked once a tap,
+ * and again when the blocks change or your hands do. */
+function shelfGoal(s, f, sh) {
+  const why = `${sh.team}/${s.brickKey}/${Boolean(f.carrying)}`;
+  if (f.shelfSpot?.why === why) return f.shelfSpot.goal;
+  const z = sh.z + f.r + SHELF_GAP, n = Math.ceil((sh.half + f.r) / CELL), at = (p) => ({ ...p, r: f.r, onGround: true });
+  const off = (p) => Number(sh.team === f.team && !f.carrying && !standingAt(at(p), sh, SHELF_REACH, 0));
+  const spots = Array.from({ length: 2 * n + 1 }, (_, i) => pointGoal(s, f, sh.x + (i - n) * CELL, z, sh.y))
+    .filter((p) => standingAt(at(p), sh))
+    .sort((a, b) => off(a) - off(b) || flat(f, a) - flat(f, b));
+  f.shelfSpot = { why, goal: { ...(spots[0] ?? pointGoal(s, f, sh.x, z, sh.y)), face: sh } };
+  return f.shelfSpot.goal;
+}
+
 function thingGoal(s, f, t) {
   if (t.thing === 'shelf') {
     // REUSE-SPEC.md §Mode: a guarded shelf walks you up to the guard instead, facing it
     const guard = t.team !== f.team && guardOf(s, t.team);
     if (guard) return besideGoal(s, f, guard);
-    const sh = shelfOf(s, t.team);
-    return { ...pointGoal(s, f, sh.x, sh.z + f.r + SHELF_GAP, sh.y), face: sh };
+    return shelfGoal(s, f, shelfOf(s, t.team));
   }
   if (t.thing === 'pile') {
     const pile = s.piles.find((p) => p.owner === t.id);
@@ -934,7 +950,7 @@ function tapAbove(s, f, t) {
 }
 
 function aim(s, f, t) {
-  Object.assign(f, { target: 'stop' in t ? null : { ...t }, nav: null, fails: 0, shelfDone: false, stuck: 0, passed: false });
+  Object.assign(f, { target: 'stop' in t ? null : { ...t }, shelfSpot: null, nav: null, fails: 0, shelfDone: false, stuck: 0, passed: false });
   if ('x' in t) tapAbove(s, f, t);
 }
 
@@ -973,7 +989,7 @@ const icingOf = (entrants, team) => (team === 'badGuys' ? BAD_ICING : teamLooks(
 function makeShelf(spot, looks) {
   const levels = Math.ceil((2 * DONUTS_PER_SHELF) / SHELF_COLS);
   const g = makeDisplay(SHELF_COLS, 1, { shelves: levels, headroom: 1 });
-  const shelf = { team: spot.team, x: spot.x, y: spot.y, z: spot.z, half: gridSize(g).w / 2, g, items: [] };
+  const shelf = { team: spot.team, x: spot.x, y: spot.y, z: spot.z, half: SHELF_WIDTH / 2, g, items: [] };
   for (let i = 0; i < DONUTS_PER_SHELF; i++) bank(shelf, looks[i % looks.length]);
   return shelf;
 }
@@ -992,7 +1008,7 @@ function newFighter(e, at, y) {
     x: at.x, y, z: at.z, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, onGround: true, jumps: 1,
     target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, fails: 0, stuck: 0, gain: 0, away: false, slick: false, passed: false, sprung: -1,
     attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, out: 0, percent: 0, calm: 0,
-    carrying: null, touching: [], shelfDone: false, blocked: false };
+    carrying: null, touching: [], shelfDone: false, shelfSpot: null, blocked: false };
 }
 
 function refresh(s) {

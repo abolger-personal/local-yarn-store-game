@@ -24,6 +24,15 @@ Not everything in this doc is settled. Each idea is one of three kinds:
 Whole brainstorm docs sit beside this one, such as `STAGE-IDEAS.md`. Ideas move from there into this
 doc when they're decided, not before.
 
+## Things are as big as they look
+
+Everything in the sim is the size and shape it's drawn (decided 2026-10-17, from the designer,
+after playtests found a shelf and fighters bigger or smaller in the sim than on screen): if it
+looks like you fit, you fit; if it looks like you touch it, you touch it. A sim size that differs
+from the drawn one needs its own decided rule in this doc saying so and why. Where the sim and the
+drawing both need a size, they read it from one place (`match.js`), never two numbers kept in step
+by hand.
+
 ## Layout
 
 Keep the spinoff **in this repo** (decided 2026-10-13), as pages under `spinoff/`, importing `../characters/npc.js`
@@ -438,6 +447,13 @@ Later levels can bring new hand-made stages.
 - **Bank:** touch your own shelf. Everything in your bag goes onto it on its own: `anySlot` finds
   the spot and `place` puts it there, both in `inventory/grid.js`. No dragging, so a 4-year-old
   banks by running home.
+- **Touching the shelf is anywhere along its front** (decided 2026-10-17, playtest: blocks in front of
+  the middle of the shelf left open ends that looked like they'd bank but didn't). The shelf is as wide
+  in the sim as it's drawn (`SHELF_WIDTH` in `match.js`), any part of your body in front of it counts
+  for banking and grabbing, and tapping a shelf walks you to the nearest spot along its front you can
+  reach. A guard has to stand in front of the shelf (its middle inside the shelf's width), so one
+  knocked to the end, just overlapping it, no longer blocks; empty-handed at your own shelf you're
+  going to guard, so a tap takes you right in front of it where there's room.
 - **A carried donut is oversized** (decided 2026-10-13): about two-thirds of head size, poking out
   of the top of the bag over the shoulder, so who is carrying reads from anywhere on screen (a
   donut drawn at bag scale would be ~10 px at tablet size). It's the house rule from

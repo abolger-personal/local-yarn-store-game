@@ -472,11 +472,13 @@ const paceOf = (s, f) => (f.team === 'badGuys' ? s.rules.badGuyPace ?? 1 : 1);
 const SLOWEST_JUMP = 0.4;
 /** The share of a full jump's reach and air speed a fighter jumps with: slowed with its pace, down to SLOWEST_JUMP. */
 const jumpPace = (s, f) => Math.max(paceOf(s, f), SLOWEST_JUMP);
+/** How near a route's jump a fighter takes off: slowed fighters nearer, measured from the front of the body, which can't get closer. */
+const leapReach = (s, f) => (paceOf(s, f) < 1 ? f.r + (JUMP_REACH - f.r) * jumpPace(s, f) : JUMP_REACH);
 
 // On butter you arrive only once you've stopped sliding; a bounce up from a trampoline is only taken standing on it
 const arrived = (f, n, wp) => !wp || (n.k === n.wps.length - 1 && !wp.jump && flat(f, wp) < (n.blocked ? WP_ARRIVE : ARRIVE)
   && (!f.slick || f.passed || Math.hypot(f.vx, f.vz) < SETTLE));
-const canLeap = (s, f, w) => w?.jump && flat(f, w) < JUMP_REACH * jumpPace(s, f) && (w.spring < 0 || patchAt(s, s.stage.springs, f) === w.spring);
+const canLeap = (s, f, w) => w?.jump && flat(f, w) < leapReach(s, f) && (w.spring < 0 || patchAt(s, s.stage.springs, f) === w.spring);
 
 function follow(s, f) {
   const n = f.nav;

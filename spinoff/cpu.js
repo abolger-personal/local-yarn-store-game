@@ -9,8 +9,8 @@ import { BRICK, TICK_HZ } from './match.js';
 /** Fair to 4-year-olds: about half a second before acting on anything new, and at most one attack every 0.8 s. */
 export const REACT_TICKS = Math.round(0.5 * TICK_HZ);
 export const ATTACK_TICKS = Math.round(0.8 * TICK_HZ);
-/** A kick lands on a block whose nearest side is this close to the fighter's middle. */
-const KICK_NEAR = 0.6;
+/** A kick lands on a block whose nearest side is this close to the front of the fighter's body. */
+const KICK_NEAR = 0.375;
 /** Blocks this close to the nearest one count as "in its way": it kicks the weakest of them. */
 const WALL_NEAR = 0.9;
 const IDLE = Object.freeze({ target: null, punch: false, kick: false });
@@ -48,7 +48,7 @@ function aimFor(b, snap, me) {
 /** Kicks the block it came for once it stands at it, no sooner than ATTACK_TICKS after the last kick. */
 function kickNow(b, snap, me) {
   const brick = b.brick && snap.bricks.find((x) => x.id === b.brick);
-  if (!brick || !me.onGround || me.move === 'walk' || gapTo(me, brick) > KICK_NEAR || snap.tick < b.nextKick) return false;
+  if (!brick || !me.onGround || me.move === 'walk' || gapTo(me, brick) > me.width / 2 + KICK_NEAR || snap.tick < b.nextKick) return false;
   b.nextKick = snap.tick + ATTACK_TICKS;
   return true;
 }

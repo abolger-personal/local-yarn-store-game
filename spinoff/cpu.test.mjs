@@ -8,7 +8,8 @@ import { ATTACK_TICKS, REACT_TICKS, createCpu, modeOf } from './cpu.js';
 const level = /** @type {import('./levels.js').Level} */ (levelOf('breakfast', 2));
 const body = { height: 0.9, width: 0.45, reach: 0.38 };
 const kid = { id: 'kid', team: 'heroes', ...body, look: { dough: '#e8c48a', frosting: '#ff3b7f', stripe: false } };
-const raider = { id: 'cpu1', team: 'badGuys', ...body, look: { dough: '#241a1d', frosting: '#7b2fbf', stripe: true } };
+// the bad guy's real size (play.js's lion in its cape): a narrower one hid a hop it couldn't make
+const raider = { id: 'cpu1', team: 'badGuys', ...body, width: 0.75, height: 0.97, look: { dough: '#241a1d', frosting: '#7b2fbf', stripe: true } };
 
 // the raider's choices, at full speed so they come quickly; level 2's slow pace has its own check below
 const fullPace = { ...matchOptions(level), match: { ...level.match, badGuyPace: 1 } };
@@ -56,7 +57,7 @@ const me = (s) => s.fighters.find((f) => f.id === 'cpu1');
     const k = s.hits.find((h) => h.on === 'brick' && s.fighters.find((f) => f.id === 'cpu1')?.move === 'kick');
     if (k) { kicked++; gap = Math.min(gap, s.tick - last); last = s.tick; }
     return steals(s);
-  }, (s) => (s.tick === 2 ? { target: { x: -5.4, z: 1.6 }, punch: false, kick: false } : null));
+  }, (s) => (s.tick === 2 ? { target: { x: -6.6, z: 1.6 }, punch: false, kick: false } : null));
   assert.ok(steals(end), 'the raider breaks through the kids\' wall and steals');
   assert.ok(kicked >= 1 && end.bricks.filter((b) => b.team === 'heroes').length < plug.length, `kicking their blocks (${kicked} kicks)`);
   assert.ok(gap >= ATTACK_TICKS, `no more than one kick every 0.8 s (closest ${gap} ticks)`);

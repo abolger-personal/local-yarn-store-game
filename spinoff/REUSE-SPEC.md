@@ -572,8 +572,9 @@ and smashers each get a round that is theirs.
     raider was far too fast. It moves without waiting on a tap or a screen scroll, on a perfect
     path, so a kid could never catch it). The level's `match` rule `badGuyPace: 0.2`, read by
     `sim.js`. Its hops slow too (playtest: a full-speed hop dodged a kid's punch), but only to
-    0.4 of a full jump's air speed, taking off that much nearer: any slower and it can't get
-    near enough to the edge to make the hop onto a deck. The raider steals around 25 s and banks
+    0.4 of a full jump's air speed, taking off that much nearer, measured from the front of its
+    body (a lion in a cape is 0.75 wide: measured from its middle, it could never get near enough
+    to hop onto a deck, and stood stuck in front of one). Any slower and it can't make the hop. The raider steals around 25 s and banks
     around 50 s of a 90 s round; `spinoff/cpu.test.mjs` checks the speeds and both.
 - **Start spots come first** (decided 2026-10-17). Step 1 of making any level, hand-made or
   generated, on every stage: pick pseudo-random start spots for up to 6 heroes,

@@ -29,8 +29,9 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 ### Fixes
 - A fighter whose bag is full shakes its head again when it tries for another donut.
 - Fighters' legs keep up when they run: no more feet skating along under a gliding body.
-- **Fighters are the colour you picked.** The colour buttons on the fighter screen now match the 3D
-  fighter, and loud colours like hot pink stay hot pink instead of fading to pastel, sprinkles too.
+- **Brighter colours, as you picked them.** Fighters, treats and sprinkles were coming out washed out
+  and pastel. Now loud colours like hot pink stay hot pink, and the colour buttons on the fighter
+  screen match the 3D fighter.
 - The colour buttons go in rainbow order, and no two look alike any more (the two blues and the two
   pinks moved apart). A colour you already picked moves to the nearest new one.
 

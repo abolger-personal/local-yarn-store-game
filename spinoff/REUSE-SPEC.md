@@ -672,7 +672,9 @@ The game ships as static files on GitHub Pages. The lobby's networking is built
 matches are built too (0.0.2): `spinoff/multiplayer.js` is the host and guest logic over any
 link (`send(type, data, to)` / `on(type, fn)`), `spinoff/together.js` is the play page's glue,
 and `spinoff/multiplayer.test.mjs` runs a host and guests over an in-memory link that loses and
-reorders snapshots. What was built, and what the build decided (decided 2026-10-14, to confirm):
+reorders snapshots. What was built, and what the build decided (decided 2026-10-14, amended 2026-10-16: played on the
+tablets; the flow is right and 4-year-olds follow it straight away; what's left is making it
+connect every time):
 
 - **Starting together.** In a room, the tablet that opened it (🏠) gets ▶️; the others don't.
   ▶️ sends `go` to everyone in the room, and every tablet loads `play.html?room=CODE` (the host's

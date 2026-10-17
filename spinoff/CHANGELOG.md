@@ -2,6 +2,13 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
+## 0.0.4 (in progress)
+
+### Fighting
+- **Bad guys guard their donuts.** A bad guy standing in front of their shelf shakes "no" when you
+  try to grab, so knock them out of the way first. Kick the dummy off the stage and it pops back in
+  right in front of its donuts.
+
 ## 0.0.3 — 2026-10-16: Combos, and playing together that holds
 
 ### Play together

@@ -79,7 +79,8 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  *   (`bank`), or picked up off the floor (`pickup`), at that spot, for the page's celebrations.
  * @typedef {{ fighter: string, x: number, y: number, z: number }} FullBagEvent
  *   a fighter already carrying a donut touched a loose donut or reached the enemy shelf this tick,
- *   at that donut or shelf, so the page can show "your bag holds one".
+ *   at that donut or shelf, so the page can show "your bag holds one"; or a guard (the fighter, where
+ *   they stand) kept someone from grabbing off their shelf.
  *
  * Everything the page draws, every tick. No three.js objects, only numbers and strings, so it
  * can cross the network unchanged in milestone 2. `over` is true once the clock runs out;

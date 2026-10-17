@@ -421,6 +421,27 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
   assert.ok(me(snap).carrying && snap.donuts.length === 0, 'tapping a donut you are standing on picks it up');
 }
 
+// REUSE-SPEC.md §Mode: a guard blocks the grab; a ring-out drops the dummy in on guard
+{
+  const m = createMatch([hero, dummy], STAGE);
+  const held = m.fighters.find((f) => f.id === 'dummy');
+  held.y = -50;
+  const said = [];
+  const log = (s) => said.push(...s.fullBag.map((e) => e.fighter));
+  const shelf = once({ target: { thing: 'shelf', team: 'badGuys' } }), beside = tap(8.6, -1.2, 1.1);
+  let snap = run(m, 1500, shelf, log);
+  assert.ok(!me(snap).carrying, 'walking up to a guarded shelf grabs nothing');
+  assert.deepEqual(said, ['dummy'], 'the guard says no, once');
+  run(m, 600, beside);
+  snap = run(m, 600, shelf, log);
+  assert.ok(!me(snap).carrying, 'shouldering in from beside the shelf still grabs nothing');
+  assert.deepEqual(said, ['dummy', 'dummy'], 'and the guard says no again');
+  run(m, 200, once({ target: { thing: 'fighter', id: 'dummy' } }));
+  run(m, 60, once({ kick: true }));
+  snap = run(m, 400, once({ target: { thing: 'shelf', team: 'badGuys' } }));
+  assert.ok(me(snap).carrying, 'one kick moves the guard out of the way, then the grab works');
+}
+
 // REUSE-SPEC.md §Stages and difficulty are separate: butter is slippery
 {
   const BUTTER = [{ x: -4.2, z: 0.5, r: 1 }], edge = BUTTER[0].x - BUTTER[0].r;

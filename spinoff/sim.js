@@ -55,6 +55,8 @@ export const POP = Object.freeze({ vx: 1.5, vy: 6 });
 const DONUT_REACH = 0.25;
 const DONUT_EDGE = 0.1;
 export const SHELF_REACH = 0.3;
+/** How far in front of their shelf a foe stands guard: deep enough for where a ring-out drops them in. */
+export const GUARD_REACH = 1;
 const SHELF_GAP = 0.05;
 const SHELF_H = 2;
 const SHELF_COLS = 4;
@@ -744,12 +746,12 @@ function touchDonuts(s, f) {
   f.touching = now.map((d) => d.id);
 }
 
-const standingAt = (f, sh) => f.onGround && Math.abs(f.y - sh.y) <= STEP && Math.abs(f.x - sh.x) < sh.half
-  && f.z >= sh.z && f.z - sh.z < f.r + SHELF_REACH;
+const standingAt = (f, sh, reach = SHELF_REACH) => f.onGround && Math.abs(f.y - sh.y) <= STEP
+  && Math.abs(f.x - sh.x) < sh.half && f.z >= sh.z && f.z - sh.z < f.r + reach;
 
 function shelfStep(s, f) {
   const sh = s.shelves.find((o) => standingAt(f, o));
-  if (!sh) { f.shelfDone = false; return; }
+  if (!sh) { f.shelfDone = false; f.blocked = false; return; }
   if (sh.team === f.team) {
     if (f.carrying && bank(sh, f.carrying)) {
       f.carrying = null;
@@ -758,6 +760,13 @@ function shelfStep(s, f) {
     return;
   }
   if (f.shelfDone || f.target?.thing !== 'shelf' || f.target.team !== sh.team) return;
+  // REUSE-SPEC.md §Mode: a guard blocks the grab until they're out of the way; the guard shakes "no" like a full bag
+  const guard = s.fighters.find((o) => o.team === sh.team && standingAt(o, sh, GUARD_REACH));
+  if (guard) {
+    if (!f.blocked) s.fullBag.push(event(guard, guard));
+    f.blocked = true;
+    return;
+  }
   f.shelfDone = true;
   if (f.carrying) s.fullBag.push(event(f, sh));
   else if ((f.carrying = grab(sh))) s.donutEvents.push({ ...event(f, sh), kind: 'steal' });
@@ -821,7 +830,7 @@ function newFighter(e, at, y) {
     x: at.x, y, z: at.z, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, onGround: true, jumps: 1,
     target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, fails: 0, stuck: 0, away: false, slick: false, passed: false, sprung: -1,
     attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, percent: 0, calm: 0,
-    carrying: null, touching: [], shelfDone: false };
+    carrying: null, touching: [], shelfDone: false, blocked: false };
 }
 
 function refresh(s) {

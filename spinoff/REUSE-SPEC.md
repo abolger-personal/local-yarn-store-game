@@ -387,18 +387,20 @@ Later levels can bring new hand-made stages.
   kid can score something in a match, not only whoever reaches a single flag first.
 - **Grab:** tap the enemy shelf (see Navigation); on arrival the fighter grabs. The top donut there is taken off the shelf
   (`lift` in `inventory/grid.js`) into your bag.
-- **A guard blocks the grab** (planned 2026-10-16). A foe standing on the ground in front of their
-  own shelf, in the strip where a grab would happen, guards the whole shelf: nobody can grab from
-  it until the guard is fought or shoved out of that strip. Only where the guard stands counts, so
-  a knockback, a ring-out or shouldering them aside (foes are solid) all clear the way. A grab that
+- **A guard blocks the grab** (decided 2026-10-16). A foe standing on the ground in front of their
+  own shelf, within about a step of it (`GUARD_REACH` in `sim.js`, deep enough for where a ring-out
+  drops them in), guards the whole shelf: nobody can grab from
+  it until the guard is fought or shoved out of there. Only where the guard stands counts, so
+  a knockback or a ring-out clears the way; walking into them (foes are solid) doesn't
+  shove them far enough, so a kid has to fight. A grab that
   is blocked isn't used up: a fighter still standing there with the shelf tapped grabs the moment
   the guard is gone. The blocked grab shows on the guard, so a kid sees *who* is in the way
-  (brainstorm 2026-10-16: the full-bag "can't" signal, or the guard's arms spreading). It works the
+  (the guard shakes "no" as a full bag does; the arms spreading is brainstorm 2026-10-16). It works the
   same for both teams. Level 1 teaches it with no new behaviour: a ring-out drops the dummy back in
   above its own shelf (Scoring), so a kid who kicks it off finds it guarding the donuts and has to
   knock it out of the way to grab. Guarding is also what the CPU's Defend state (Bad guys) is for.
   Later levels can give a team more than one shelf, so one guard can't cover all its donuts
-  (brainstorm 2026-10-16). A guard who was just hit but is still in the strip keeps blocking, since
+  (brainstorm 2026-10-16). A guard who was just hit but is still there keeps blocking, since
   there is no knockout short of a ring-out; a knocked-down state that lets the grab through could
   come later and reach level 1 then (brainstorm 2026-10-16; it would need to square with "nobody
   is ever knocked out" under Percent and knockback).

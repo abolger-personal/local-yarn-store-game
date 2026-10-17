@@ -1156,6 +1156,8 @@ starts the match (the host in a room, or a tablet playing by itself):
 2. **Level dial:** a phone-keypad grid of numbers, 1 to 9 to start. Only unlocked levels have a
    button; new ones appear as they unlock. Choosing a number brings up ▶️, which starts the match.
 
+- **Guests wait in the lobby** (decided 2026-10-17). While the host picks, everyone else stays on
+  the lobby screen with no button to press, and goes into the match when the host taps ▶️.
 - **What's unlocked is the room's minimum.** A stage or level shows only if *every* player in the
   room has reached it, so nobody is pulled past where they've played.
 - **A win unlocks the next level** (decided 2026-10-17). Winning a level saves the next one as

@@ -493,8 +493,9 @@ and smashers each get a round that is theirs.
     shelf and room for the start spots and piles.
   - The first build round (above), with each hero's pile next to them.
   - **The bad guys' fort comes with the level** (planned 2026-10-17), already built when the round
-    starts and as big as the level wants (Pieces are fixed by level: CPU bad guys aren't limited), with
-    room left for the raider to come out.
+    starts and as big as the level wants (Pieces are fixed by level: CPU bad guys aren't limited). The
+    raider starts inside it and kicks its way out through its own blocks (decided 2026-10-17), so
+    the kids see wall-breaking before it reaches their wall.
   - **One CPU bad guy**, whatever `badGuys(level, grownups)` says (Bad guys): level 2 is still
     teaching, so the kids meet a single raider.
   - **4 fort pieces per hero** (8 for two kids): `piecesEach(2)`, the base rule.

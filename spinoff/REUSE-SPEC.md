@@ -1253,8 +1253,9 @@ kids up. Being in a room (the *session*) is not a screen: it lives on the tap pa
 rooms (Multiplayer, Kept rooms), and moving between the lobby, the chooser, the pickers and a
 match never ends it. Only 👋 leaves.
 
-- **✏️ works in a room.** It opens the chooser without leaving; 👍 there brings you back to the
-  same room's lobby, still in it, with everyone where they were.
+- **✏️ works in a room, in the lobby and between rounds** (on the end card), never during a match:
+  changing outfits mid-fight would be silly. It opens the chooser without leaving; 👍 there brings
+  you back where you came from (the room's lobby, or the end card), still in the room.
 - **A new look reaches everyone.** Saving a changed fighter in a room sends it to every tablet
   there, and their lobby redraws you.
 - **The host can dress up too.** While the host is in the chooser, nobody can start (only the

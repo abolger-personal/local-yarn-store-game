@@ -1158,7 +1158,8 @@ starts the match (the host in a room, or a tablet playing by itself):
 
 - **What's unlocked is the room's minimum.** A stage or level shows only if *every* player in the
   room has reached it, so nobody is pulled past where they've played.
-- **Reaching the next level:** ▶️ on level 1's end card plays level 2, and finishing level 1 unlocks it.
+- **A win unlocks the next level** (decided 2026-10-17). Winning a level saves the next one as
+  reached, and ▶️ on that end card plays it; after a loss, ▶️ plays the same level again.
 - **One game save per browser:** the highest level and the stages each player has reached are
   saved in their browser as the whole game's progress, apart from the fighter, so re-rolling or
   re-dressing a fighter keeps it (decided 2026-10-17). It travels with the fighter when they join a
@@ -1314,7 +1315,7 @@ scary, for 4–6 year olds.
 
   Two grownups on level 3 face the kids with 2 CPU bad guys beside them; no grownups on level 3
   is 3 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
-  drops it (brainstorm 2026-10-13).
+  drops it (planned 2026-10-17; After the lobby: a win unlocks the next level).
 
   A grownup bad guy on level 1 (🥷 isn't built yet) can't attack the kids: they can only defend
   their base, by standing guard at their shelf (brainstorm 2026-10-17).

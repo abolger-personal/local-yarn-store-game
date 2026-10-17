@@ -489,7 +489,7 @@ and smashers each get a round that is theirs.
   - The first build round (above), with each hero's pile next to them.
   - **One CPU bad guy**, whatever `badGuys(level, grownups)` says (Bad guys): level 2 is still
     teaching, so the kids meet a single raider.
-  - **4 fort pieces per hero** (8 for two kids), in place of `piecesEach(2)`.
+  - **4 fort pieces per hero** (8 for two kids): `piecesEach(2)`, the base rule.
   - **The CPU's brain is Raid, Grab, Run home and Defend** (Bad guys), switched by one rule: it
     raids while the bad guys' shelf holds no hero donuts, and defends (goes home and guards its
     shelf, Mode: a guard blocks the grab) once it holds one or more. So the kids' first job is
@@ -611,14 +611,15 @@ and smashers each get a round that is theirs.
   look; who places and moves them is brainstorm 2026-10-13): dark
   chocolate pastry (pancakes, gingerbread) with dark purple cream or icing. Any bad guy can place or move any bad-guy piece,
   and their walls never get the mixed bonus, so only the heroes can build chunky walls.
-- **Pieces are fixed by level and number of players** (brainstorm 2026-10-13). Each player gets their
-  own small pile to place, so siblings never fight over pieces and every kid builds something:
+- **Pieces are fixed by level and number of players** (brainstorm 2026-10-13; the base of 4 each is
+  decided 2026-10-17). Each player gets their own small pile to place, so siblings never fight over
+  pieces and every kid builds something:
 
   ```
-  piecesEach(level) = min(6, 2 + floor((level - 1) / 2))      team pieces = piecesEach × team size
+  piecesEach(level) = min(6, 4 + floor((level - 1) / 2))      team pieces = piecesEach × team size
   ```
 
-  Level 1 is 2 each, level 3 is 3 each, up to 6 each from level 9. The pile mixes the unlocked
+  Levels 1 and 2 are 4 each, levels 3 and 4 are 5 each, and 6 each from level 5. The pile mixes the unlocked
   piece kinds, newest first, so a new level's piece is always in hand. CPU bad guys count
   toward their team's size and place theirs instantly. The team's grid floor caps the total, so
   a big team on a small stage can't fill every cell.

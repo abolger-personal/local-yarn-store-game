@@ -91,16 +91,16 @@ Difficulty is the level number a generated stage stands in for (decided 2026-10-
 problems and wall gaps, as `generate.js` does; the bad-guy and fort-piece columns are brainstorm
 2026-10-14). Everything else already scaled by
 level number (`REUSE-SPEC.md` §Bad guys, §Forts, §Power moves) uses the same number, so a generated
-stage at difficulty 3 plays with 3 CPU bad guys, 3 fort pieces each and Level 3's moves.
+stage at difficulty 3 plays with 3 CPU bad guys, 5 fort pieces each and Level 3's moves.
 
 | Difficulty | Kinds allowed | Problems per stage | Wall gaps | Bad guys (no grownups) | Fort pieces each |
 | --- | --- | --- | --- | --- | --- |
-| 1 | hill, tall middle, moat, field syrup (open run = no hill) | 2 | 0.8–1.4 | 1 | 2 |
-| 2 | same | 2 | 0.8–1.2 | 2 | 2 |
-| 3 | + choke point (always in at 3, its debut) | 3 | 0.8–1.0 | 3 | 3 |
-| 4 | same | 3 | 0.8 | 4 | 3 |
-| 5 | + step up (always in at 5) | 4 | 0.8 | 5 | 4 |
-| 6+ | all | 4 | 0.8 | up to 8 | up to 6 |
+| 1 | hill, tall middle, moat, field syrup (open run = no hill) | 2 | 0.8–1.4 | 1 | 4 |
+| 2 | same | 2 | 0.8–1.2 | 2 | 4 |
+| 3 | + choke point (always in at 3, its debut) | 3 | 0.8–1.0 | 3 | 5 |
+| 4 | same | 3 | 0.8 | 4 | 5 |
+| 5 | + step up (always in at 5) | 4 | 0.8 | 5 | 6 |
+| 6+ | all | 4 | 0.8 | up to 8 | 6 |
 
 Plus the wall, always. A newly unlocked kind is always in on its debut difficulty, like the fort pile
 "newest first". The real difficulty dial stays the bad-guy count and, later, auto-scaling by donut

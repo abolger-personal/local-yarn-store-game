@@ -917,14 +917,16 @@ home throws 30 sprinkle bits in the riot colours up from the shelf (`fx.burst` w
 sprinkles, so celebrations reuse it.
 
 **Colours show as picked** (decided 2026-10-16, playtest: the chooser's flat colour buttons now match the
-3D fighter). The renderer uses Khronos PBR Neutral tone mapping at exposure 0.7 (`spinoff/stage.js`):
-a colour under the highlight range shows as itself, and a bright one is compressed as a whole, so
-the riot palette never clips to pastel as it did under ACES (three's ACES also multiplies exposure
-by 1/0.6). The room's light is a light probe plus a faint camera fill instead of the PMREM room
-map, which some tablet GPUs drew differently from the Mac (the colour probe, `spinoff/colors.html`,
-showed only the map's light differing). `?tone=aces|neutral`, `?exposure=` and `?env=` (room light
-strength, or `map` for the old map) stay, on the tap page's address, for trying a different look
-per level later.
+3D fighter). The renderer uses Khronos PBR Neutral tone mapping at exposure 0.75 with the PMREM room
+map (`spinoff/stage.js`): a colour under the highlight range shows as itself, and a bright one is
+compressed as a whole, so the riot palette never clips to pastel as it did under ACES (three's ACES
+also multiplies exposure by 1/0.6, which did most of the washing out). The room map keeps glossy
+surfaces shiny, so `roughness` is the one glossiness setting for every material. Some tablet GPUs
+prepare the map slightly differently from the Mac (the colour probe, `spinoff/colors.html`, shows
+it in its c and d columns); side by side under neutral the difference was acceptable. If it ever
+isn't, bake the map once on the Mac and ship it (brainstorm 2026-10-16), or use the light-probe
+stand-in. `?tone=aces|neutral`, `?exposure=` and `?env=` (a number: the light-probe stand-in at that
+strength, no reflections) stay, on the tap page's address, for trying a different look per level later.
 
 Keep `felted` (the shop look, free; decided 2026-10-13), or try `toon` / `matcap` shading from
 `inventory/yarn-look.js` `SHADING` for a punchier arcade read (brainstorm 2026-10-13). `setViewMode(root, 'silhouette')`

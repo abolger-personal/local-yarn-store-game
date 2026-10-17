@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { roomEnvironment } from '../inventory/room-environment.js';
 import { studioLights } from '../characters/selfie-studio.js';
 
-/** `?tone=`, `?exposure=` and `?env=` (room light strength, 1 = as tuned; `map` = the old PMREM room map) on this page, or carried from the tap page (index.html) through sessionStorage. */
+/** `?tone=`, `?exposure=` and `?env=` (the PMREM room map, or a number: the light-probe stand-in at that strength) on this page, or carried from the tap page (index.html) through sessionStorage. */
 function lookParam(key) {
   const v = new URLSearchParams(location.search).get(key);
   try {
@@ -19,7 +19,7 @@ function makeRenderer(container) {
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   // neutral shows a colour as itself (the chooser's swatches match the fighter); ACES clipped the loud palette
   renderer.toneMapping = TONE[lookParam('tone')] ?? TONE.neutral;
-  renderer.toneMappingExposure = Number(lookParam('exposure')) || 0.7;
+  renderer.toneMappingExposure = Number(lookParam('exposure')) || 0.75;
   container.appendChild(renderer.domElement);
   return renderer;
 }
@@ -52,9 +52,9 @@ export function makeStage(container, { background = '#f6e7d4' } = {}) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(background);
   const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 100);
-  const env = lookParam('env');
-  const room = env === 'map' ? [] : roomLights(camera, env !== null && Number(env) >= 0 ? Number(env) : 1);
-  if (env === 'map') scene.environment = new THREE.PMREMGenerator(renderer).fromScene(roomEnvironment(), 0.04).texture;
+  const env = lookParam('env'), probe = env !== null && env !== '' && Number(env) >= 0;
+  const room = probe ? roomLights(camera, Number(env)) : [];
+  if (!probe) scene.environment = new THREE.PMREMGenerator(renderer).fromScene(roomEnvironment(), 0.04).texture;
   scene.add(camera, ...studioLights(camera));
   followSize(container, renderer, camera);
 

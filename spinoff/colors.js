@@ -1,4 +1,4 @@
-// ?exposure=, ?tone= and ?env= work here as in the game (c is the room's lights, or the old PMREM map with ?env=map); open it on the MacBook and a tablet and compare the numbers.
+// ?exposure=, ?tone= and ?env= work here as in the game (c is the PMREM room map, or the light-probe stand-in with ?env=<number>); open it on the MacBook and a tablet and compare the numbers.
 import * as THREE from 'three';
 import { makeStage } from './stage.js';
 import { RIOT } from './fx.js';

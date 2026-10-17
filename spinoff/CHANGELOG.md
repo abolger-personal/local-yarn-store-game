@@ -2,7 +2,7 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
-## 0.0.3 — in progress
+## 0.0.3 — 2026-10-16: Combos, and playing together that holds
 
 ### Play together
 - **Playing together is much more reliable.** Tablets stay connected from the lobby through every

@@ -12,8 +12,12 @@ Not everything in this doc is settled. Each idea is one of three kinds:
 
 - **Decided** (marked `decided DATE`): agreed with the players or the designer. Code follows it, and
   changing it is a new decision with a new date. Everything built and in `CHANGELOG.md` is decided.
+  A change to a decided idea updates its label rather than editing it silently: `decided DATE,
+  amended DATE` keeps the first date and adds each amendment's, with a short reason after a colon
+  when the text doesn't already say what changed (`decided 2026-10-15, amended 2026-10-15: no hook`).
 - **Planned** (marked `planned DATE`, or `decided DATE, not built yet`): the design is agreed, but it isn't built yet and the details may
-  still move when it is.
+  still move when it is. For now nothing is planned (2026-10-16): anything not built is brainstorm
+  until a true-up pass promotes it.
 - **Brainstorm** (marked `brainstorm DATE`, or in an Open questions list): unbaked ideas to choose
   from. Nothing is built from these until they're decided, and most will be dropped or changed.
 
@@ -22,7 +26,7 @@ doc when they're decided, not before.
 
 ## Layout
 
-Keep the spinoff **in this repo**, as pages under `spinoff/`, importing `../characters/npc.js`
+Keep the spinoff **in this repo** (decided 2026-10-13), as pages under `spinoff/`, importing `../characters/npc.js`
 directly. There is no build step and `serve.py` already serves the tree, so a sibling page costs
 nothing. Copying the rig into a new repo forks it, and every tuning pass on the yarn store (motion,
 tails, garments) would then have to be ported by hand.
@@ -34,12 +38,14 @@ chooser is its own code in `spinoff/fighter.js`, with its own save.
 
 ## Tier 1: reuse as-is (no yarn-store coupling)
 
+(decided 2026-10-13)
+
 | Module | What it gives | Imports |
 | --- | --- | --- |
 | `npc.js` | Species registry, `BASE_PARAMS` body proportions, `createCharacter` (procedural build → one rigid-skinned mesh per material family), `applyPose`, `groundCharacter`, `stepMotion`, `setViewMode` (`felted` / `grey` / `silhouette`), randomiser, `disposeCharacter` | `three`, `motion.js` |
 | `motion.js` | Spring-driven pose channels (19 joints + hold), interrupt-safe blending, idle layer (breath, weight shift, blinks, ear flicks), walk layer, `DANCES` step sequencer | nothing |
 | `llama.js`, `lion.js`, `owl.js` | Species kits: defaults, random ranges, presets (fleece / mane / feathers), per-species motion ranges, species `delighted` pose | `npc.js` |
-| `sparkle.js` | Timed particle burst on a character | `three` |
+| `sparkle.js` | Timed particle burst on a character. Not used in the spinoff (decided 2026-10-13, amended 2026-10-16: the yarn store's sparkle reads as damage in a fighting game, not victory; the spinoff has its own effects in `spinoff/fx.js`) | `three` |
 | `inventory/room-environment.js` | The lighting environment the felt look was tuned under | `three` |
 
 What matters more for a fighter than it did for a shop:
@@ -48,14 +54,22 @@ What matters more for a fighter than it did for a shop:
   springs specifically so a pose interrupted mid-move keeps its velocity. In a fighter every hit
   is an interrupt. A flinch is "retarget to a hurt pose", and a bigger hit can also add to
   `motion.vel` directly for a whip.
-- **`DANCES` is already a move-list format.** Each dance is a list of `{ pose, hold }` steps with
-  per-move `stiff` / `zeta` and root extras (`rise`, `turn`, `travel`, `shift`, `hop`). An attack
-  is the same shape: wind-up, strike, recovery. `hold` becomes frame data; `stiff` becomes how
-  snappy the move looks. New attacks are data entries, not new code.
+- **Anything that has to line up across tablets is a keyframed timeline; `DANCES` is for the rest**
+  (decided 2026-10-13, amended 2026-10-16). Attacks and anything else whose timing must match the
+  sim (a hit landing, the hit freeze) are keyframed timelines played from the move's `step`, layered
+  over the walk (`punches.js`, `kicks.js`): every tablet draws the same frame from a snapshot, and
+  the pose is fully out on the frame the hit lands. `DANCES` (a list of `{ pose, hold }` steps the
+  motion springs chase, with per-dance `stiff` / `zeta` and root extras `rise`, `turn`, `travel`,
+  `shift`, `hop`) can be used anywhere timing doesn't have to match: victory dances, emotes, the
+  chooser and the lobby. Its springs need ~0.3 s to reach a pose, too slow for a strike, and keep
+  their own state on each tablet. A dance can be played as a timeline (its steps as keys, its holds
+  as shares of the move) if it ever needs to sync.
 - **Tails react to world acceleration.** `tailAcceleration` reads the tail root's world position,
   so a lion's tail swings on its own when the body turns, jumps or is knocked back.
 
 ## Tier 2: reuse with its dependencies
+
+(decided 2026-10-13)
 
 | Module | What it gives | Drags in |
 | --- | --- | --- |
@@ -63,30 +77,31 @@ What matters more for a fighter than it did for a shop:
 | `selfie.js` | `shotFor` / `takeSelfie`: a camera that frames a character's face and outfit | `npc.js` |
 
 The drag-ins are small and in the same repo, so reuse means importing them. Knitwear is the
-charm: a fighter's alternate costumes are outfits. `selfie.js` is the victory screen camera.
+charm: a fighter's alternate costumes are outfits. `selfie.js` is the victory screen camera (brainstorm 2026-10-13).
 
 ## Tier 3: ideas to borrow, code to leave
 
 - **Personality is left out** (decided 2026-10-13). The yarn store's ten-trait model (`visit.js`
   `TRAITS`, `motionOf(traits)`, the trait-voiced `guestbook.js`) doesn't fit a fighter, so the
   spinoff uses none of it. Every fighter moves with the same idle style (`IDLE` in `fighter.js`).
-- **`dress-up.js`'s save and rebuild loop.** The chooser does the same job (species params plus
+- **`dress-up.js`'s save and rebuild loop** (decided 2026-10-13). The chooser does the same job (species params plus
   outfit, rebuilt on every change) in `spinoff/fighter.js`, saved under `lys.fighter.v1`; it
   imports nothing from `dress-up.js`.
 
-Not reusable: the store sim, displays, pathing, puzzle, stock and HUD. The inventory grid is
+Not reusable: the store sim, displays, pathing, puzzle, stock and HUD (decided 2026-10-13). The inventory grid is
 reused: `inventory/grid.js` for the lobby floor, team shelves and forts, and
-`inventory/pick-place.js` was the plan for fort placement; forts are now built by carrying blocks (see Forts).
+`inventory/pick-place.js` was the plan for fort placement; forts are now built by carrying blocks
+(see Forts; brainstorm 2026-10-15).
 
 ## What the fighter needs
 
 ### New
 
-- **Physics in a depth band** (decided 2026-10-13, replacing the earlier flat x/y plane): fighters
+- **Physics in a depth band** (decided 2026-10-13, amended 2026-10-13, replacing the earlier flat x/y plane): fighters
   walk in x (along the stage) and z (toward and away from the camera), and jump in y onto raised
   floors. Gravity, jumps, raised floors, ring-out off the front and the two ends; the back is a
   wall. Add/multiply only; no physics library (see Determinism below for why add/multiply).
-- **Percent and knockback:** hits raise a fighter's percent; knockback grows with it; leaving
+- **Percent and knockback** (decided 2026-10-13): hits raise a fighter's percent; knockback grows with it; leaving
   the stage bounds is a ring-out. **No health bar** (decided 2026-10-14): nobody is ever knocked
   out, so a bar running down would promise an ending that never comes. Percent shows as
   **wobble** instead: the whole fighter rocks on its feet like a Weeble, growing to ~22° each way
@@ -100,33 +115,36 @@ reused: `inventory/grid.js` for the lobby floor, team shelves and forts, and
   **Percent steadies** (decided 2026-10-14): a fighter nobody has hit for 1.5 s drains 30% a
   second (`CALM_TICKS`, `CALM_DRAIN` in `sim.js`), so a full wobble is gone about 4 s after the
   last hit. It drains in the sim, so the wobble and the real launch stay in step: wobbly always
-  means easy to launch. Keep hitting to build it. Damage pops sprinkles (`sparkle.js` recoloured). A ring-out
+  means easy to launch. Keep hitting to build it. Damage pops sprinkles (`spinoff/fx.js`). A ring-out
   costs donuts, never playing time (see Scoring).
-- **Kicking is required** (the kids' own ask, 2026-10-13). Punch and kick are the two core
+- **Kicking is required** (decided 2026-10-13, the kids' own ask). Punch and kick are the two core
   attacks, each with its own button, so a 4-year-old never needs a combo to kick.
   The rig already kicks: `motion.js` has `rd-kick-l` / `rd-kick-r` poses on the `legSwing`,
   `hipFlex` and `kneeBend` channels, used in a dance. A kick reaches further and launches flatter
-  than a punch, and is a little slower. In the air it becomes a diving stomp. The owl's legs are
-  short, so its kick is a talon swipe from a hop.
-- **Moves:** ~6–10 per species as `DANCES`-style entries. Each move also carries its hit
+  than a punch, and is a little slower. In the air it becomes a diving stomp. The owl kicks like
+  the others (decided 2026-10-13, amended 2026-10-16: no talon swipe; its short-legged kick looks fine).
+- **Moves** (brainstorm 2026-10-13; per-step hit spheres as data are decided): ~6–10 per species as keyframed timelines. Each move also carries its hit
   spheres per step (offset, radius, active steps), authored as data, not read off live joints
   (see Multiplayer: the spring rig is cosmetic and differs per tablet).
-- **Hurt spheres:** sized from params (`headRadius`, `torsoW/H/D`, `legHeight`), fixed to the
+- **Hurt spheres** (decided 2026-10-13): sized from params (`headRadius`, `torsoW/H/D`, `legHeight`), fixed to the
   fighter's body position, not to animated joints.
-- **Touch controls, and nothing else.** No keyboard path, not even for development. Development
+- **Touch controls, and nothing else** (decided 2026-10-13). No keyboard path, not even for development. Development
   is tested by scripted inputs in node and on a real tablet. See Navigation: tap to move.
-- **Per-tablet camera:** each tablet frames its own fighter and the nearest opponents, with
+- **Per-tablet camera** (decided 2026-10-13 for following your own fighter; framing the nearest
+  opponents and edge markers are brainstorm 2026-10-13): each tablet frames its own fighter and the nearest opponents, with
   edge markers for fighters off screen. Purely local; nothing about it crosses the network.
 
 ### Fixes in the shared rig
 
-- **Tail resets above 6 units/s: fixed** (`425df37` on `0.0.1`, 2026-10-13). The tail now resets
+- **Tail resets above 6 units/s: fixed** (decided 2026-10-13; `425df37` on `0.0.1`, 2026-10-13). The tail now resets
   only on a real teleport (faster than 50 units/s, or more than 3 units in one step), so a
   knockback launch swings it.
-- **No per-channel joint limits** (`MOTION-TODO.md` §Known ceilings). Exaggerated attack poses
+- **No per-channel joint limits** (brainstorm 2026-10-13; `MOTION-TODO.md` §Known ceilings). Exaggerated attack poses
   plus an idle twitch can push an ear through the skull.
 
 ### Arms read, thanks to the gloves
+
+(decided 2026-10-13)
 
 The species kits' `delighted` comments say arm poses don't read through fleece and mane
 (`coatBulge`), which is why the llama cheers with its ears and the lion with its tail. That was
@@ -139,7 +157,7 @@ follows, so punches are fine as signature moves (checked by eye on dozens of ran
 No joystick (decided 2026-10-13). Tap where you want to go and your fighter goes there. The only
 buttons are 🥊 punch and 🦶 kick, which attack where the fighter is, while it keeps moving.
 
-**It's a depth band, not a flat line** (decided 2026-10-13, after the first playtest felt like "2D
+**It's a depth band, not a flat line** (decided 2026-10-13, amended 2026-10-13, after the first playtest felt like "2D
 with 3D graphics"). The stage is a floor you walk around on, like a belt-scrolling brawler: a
 tap on the floor is a spot in x and z, and raised floors (decks, the middle hill) are reached
 by jumping. Facing is a direction on the floor (a yaw), not just left or right. Hits only land on
@@ -164,7 +182,7 @@ floor at an angle and follows your fighter.
   carries on to where it was going, so nobody has to re-tap after every hit.
 - **Attacking on the move.** A punch is layered on the upper body over the walk on the legs, so
   the fighter keeps going. A kick needs the legs: the fighter pauses for the kick and walks on.
-- **The punch string is look only** (decided 2026-10-15). The sim has one punch; each tablet draws
+- **The punch string is look only** (decided 2026-10-15, amended 2026-10-15: no hook). The sim has one punch; each tablet draws
   it as the next of jab, cross, uppercut, uppercut (then round again; the hook was dropped 2026-10-15, as from the side-on camera it read the same as a cross), counting the
   punches that landed: hit events on an enemy fighter, the dummy or a fort brick, credited to the
   nearest puncher not on the target's team. The move is picked when the punch starts, from the
@@ -185,7 +203,7 @@ floor at an angle and follows your fighter.
   (2026-10-16): keep the deep lean, the flung arms and the lunge when retuning. Both use the leg nearer the camera.
   Keyframed over the kick's `step` like the punches (`spinoff/kicks.js`): the motion spring
   needs ~0.3 s to reach a pose, longer than the kick.
-- **Fort walls: around if there's a way, stop if there isn't** (depth band, 2026-10-13). On a
+- **Fort walls: around if there's a way, stop if there isn't** (decided 2026-10-13, amended 2026-10-13: depth band). On a
   floor you can walk around things, so a tap behind a wall routes through a gap if one exists.
   If the fort is closed, the fighter goes as close as it can and stands `'blocked'`, facing the
   wall, and the kid smashes through. (In the flat version it always stopped; with a depth band
@@ -200,7 +218,7 @@ floor at an angle and follows your fighter.
 ## Power moves: gestures behind a power bar
 
 Many-finger gestures are extra moves inside the fighter, unlocked only when a power bar is full
-(decided 2026-10-13). Tap to move and the two buttons stay the whole game for a kid who never finds
+(brainstorm 2026-10-13). Tap to move and the two buttons stay the whole game for a kid who never finds
 a gesture.
 
 - **One finger always moves.** Two or more fingers on the stage at once is a gesture, and only
@@ -217,7 +235,7 @@ a gesture.
 - **Same gestures, species flavour.** Each gesture does the same job for every fighter but looks
   like its species: the lion's slap is a roar, the llama's a stomp, the owl's a wing gust.
 
-**Heroes unlock lots of moves by level** (decided 2026-10-13). Level 1 is 🥊, 🦶 and the
+**Heroes unlock lots of moves by level** (brainstorm 2026-10-13). Level 1 is 🥊, 🦶 and the
 whole-hand slap. The air stomp is on from Level 1 too (decided 2026-10-14), because kids press
 🦶 mid-jump anyway, but nothing teaches or highlights it, and early stages have nothing tall
 enough to make jumping down onto people the obvious play. Every level after adds one or two: a new power gesture, a situational move (dash
@@ -239,7 +257,7 @@ so the two ladders can't drift apart. A first ladder, for tuning:
 | 8 | Wall-kick jump; charged swing (hold 🥊) |
 | 9+ | The rest of the gesture table, one per level |
 
-**Idea: a falling attack off something tall** (playtest 2026-10-14, kept for later). The owl
+**Idea: a falling attack off something tall** (brainstorm 2026-10-14, from a playtest, kept for later). The owl
 falling off a tall waffle stack swung round toward the stack on the way down. That was a facing
 bug, now fixed (facing holds in the air), but the swing looked like a wind-up, so keep it as a
 move: press 🦶 while falling from a height and the fighter turns, tucks and drops onto whatever
@@ -247,7 +265,7 @@ is below, landing harder the further it fell (a bigger BAM, a longer hit-stop, k
 pieces loose). It's the big brother of the air stomp (Level 1 below), so it slots in as a later
 unlock or a power move.
 
-Candidate gestures (brainstorm, 2026-10-13; first ones to try are marked ★):
+Candidate gestures (brainstorm 2026-10-13; first ones to try are marked ★):
 
 | Gesture | Power | For |
 | --- | --- | --- |
@@ -263,11 +281,11 @@ Candidate gestures (brainstorm, 2026-10-13; first ones to try are marked ★):
 
 ### Team powers
 
-Teamwork makes the dream work (decided 2026-10-13). Teammates who fire powers close together get
+Teamwork makes the dream work (brainstorm 2026-10-13). Teammates who fire powers close together get
 a bigger, combined power, and every tablet shows what teammates are doing so they can find each
 other.
 
-- **Who can combine:** heroes, and bad guys played by people (decided 2026-10-13). Two grownup bad
+- **Who can combine:** heroes, and bad guys played by people (brainstorm 2026-10-13). Two grownup bad
   guys can join bolts. CPU bad guys never combine: perfectly timed CPU combos would be too much for
   4-year-olds.
 - **Nobody waits.** The first power fires at once, as usual. It opens a **2-second join window**:
@@ -297,7 +315,7 @@ Visual indicators, so each kid can tell what their teammates are doing:
 
 ## Scoring: everyone plays the whole time
 
-No lives, no elimination, no waiting to respawn. A match runs on a timer and every player is in
+No lives, no elimination, no waiting to respawn (decided 2026-10-13). A match runs on a timer and every player is in
 it from start to finish.
 
 - **The score is the team's shelf.** Donuts banked on your team's shelf count; donuts in a bag
@@ -329,7 +347,7 @@ over 3 minutes.
 - **Dropped donuts stay where they land** (decided 2026-10-13), as many as pile up, until someone
   taps one and picks it up (see Navigation: tap a thing). Scrambling for a loose donut is a real
   tactic, like a fumble in football; nothing rolls home on its own.
-- **So every top a donut can land on must be reachable** (playtest 2026-10-14: a generated
+- **So every top a donut can land on must be reachable** (decided 2026-10-14, playtest: a generated
   difficulty-5 stage dropped a donut on a pillar too tall to jump, and it was lost for the match).
   The playability check (`check-level.mjs`, every hand-made and generated level) taps a hero onto
   every raised top and fails the level if one can't be stood on. That means no top higher than
@@ -348,7 +366,7 @@ over 3 minutes.
 ## Mode: donut capture the flag
 
 Two teams, the kids and the bad guys (see Bad guys), and two bakery shelves, one at each end of
-a stage wider than one screen. The per-tablet camera follows each kid's own fighter, so the
+a stage wider than one screen (decided 2026-10-13). The per-tablet camera follows each kid's own fighter, so the
 wide stage costs nothing new.
 
 **The stage is in thirds** (decided 2026-10-13). One hand-made, mirrored stage for the MVP:
@@ -378,7 +396,7 @@ Later levels can bring new hand-made stages.
   `PROJECT-BAGS.md` §1–2 ("balls poking out, countable"), scaled up. Heroes' donuts
   and villains' donuts look different (below), so a bad guy carrying the kids' donut is visibly
   carrying *theirs*. Edge
-  markers show it for carriers off screen, and a hit sends it flying out in an arc. A full bag
+  markers show it for carriers off screen (brainstorm 2026-10-13), and a hit sends it flying out in an arc. A full bag
   can't grab more.
 - **Shelves are the shop's shelves.** A team shelf is a `grid.js` display like the wall shelves
   in `DISPLAY_SLOTS` (`characters/store/scene/displays.js`), standing against the back wall on its
@@ -406,21 +424,21 @@ so there is never a question which one goes forward.
 
 ## Forts: build it, then knock it down
 
-Every level is two rounds (decided 2026-10-13): a **build it** round, where each team fortifies
+Every level is two rounds (brainstorm 2026-10-13): a **build it** round, where each team fortifies
 its own shelf, then the **knock it down** round, the timed capture-the-flag match. Builders
 and smashers each get a round that is theirs.
 
 - **The build round has no timer.** It ends when both teams are ready: every hero has tapped 👍
   and every bad-guy player has tapped 👍. Tapping 👍 again takes it back, to keep building.
   Nobody is rushed, and a careful builder can take as long as their team lets them.
-- **Readers can force the start** (decided 2026-10-13). Beside 👍 is the written line "hold 👍 to
+- **Readers can force the start** (brainstorm 2026-10-13). Beside 👍 is the written line "hold 👍 to
   start now". Holding 👍 for 2 seconds, with a ring filling around it, starts the round for
   everyone. Reading is the gate, not a grown-up/kid label: nobody is marked as anything, and a
   kid who can read the line has earned the button. The 2-second hold keeps a 4-year-old's
   ordinary tap from setting it off.
 - **CPU bad guys build their fort and are ready at once.** With no grownup bad guys, the bad
   guys' side is ready from the start, so only the heroes decide when to go.
-- **Building is carrying blocks** (decided 2026-10-15, not built yet; replaces the shop's touch
+- **Building is carrying blocks** (brainstorm 2026-10-15; replaces the shop's touch
   picker). One rule runs both rounds: **a tap moves you, a button acts where you stand.**
   - **The pile is the inventory.** Each team's fort pieces start as a small heap beside its shelf
     (6–10 to begin with; the level's *fort pile*, in the `Stage` data). How many are left is how
@@ -441,13 +459,13 @@ and smashers each get a round that is theirs.
     camera follows your fighter as in a match, so big levels need nothing extra.
   - **Two players at one cell:** the host applies inputs a tick at a time, so one lands first and
     every tablet draws the result.
-- **Level 1 has no build round** (decided 2026-10-15). Its only opponent is the training dummy,
+- **Level 1 has no build round** (brainstorm 2026-10-15). Its only opponent is the training dummy,
   which never comes for your shelf, so there is nothing to defend; the tutorial teaches the other
   half, breaking in. The build round starts on the first level where something raids your shelf
   (CPU raiders or grownup bad guys). That level teaches building the way level 1 teaches punching
   through: a small pile, an obvious gap in front of your shelf, and the first raider walking into
   your wall.
-- **Later: patching mid-match** (decided 2026-10-15: wanted, not at first). A kid grabs a block
+- **Later: patching mid-match** (brainstorm 2026-10-15: wanted, not at first). A kid grabs a block
   during the match and plugs a hole the bad guys just opened; a hit knocks it loose like a donut.
   Not in the first version of building, because it puts ⬇️ beside 🥊 and 🦶 in the match: more
   buttons. The build round stays the calm opening either way.
@@ -458,7 +476,7 @@ and smashers each get a round that is theirs.
   plus the tutorial (on breakfast). Each stage's terrain rule makes it play differently, not
   just look different. Terrain lives in the `Stage` data (`butter`, `springs`, `bounce`), so it is
   deterministic and crosses the network with the stage.
-  - **Breakfast:** syrup slows you, **butter makes you slippery** (built): on a butter patch
+  - **Breakfast:** syrup slows you, **butter makes you slippery** (decided 2026-10-14): on a butter patch
     (`Stage.butter`, round patches on any top, like syrup) a fighter's velocity only eases
     toward the one it wants (`BUTTER_GRIP` of the gap a tick), so it keeps sliding the way it was
     going, takes longer to stop and turn round (about 13 ticks to reverse, against 1), and slides
@@ -481,7 +499,7 @@ and smashers each get a round that is theirs.
     hand-made cake stage's decks are 1.8 high (a sponge jump, out of reach on breakfast) and
     its middle tower is 3.6 high, reached only off the icing pad at its foot. The playability
     check still proves every top can be stood on.
-- **Each stage has its own treat theme** (decided 2026-10-14, replacing "World 1 is Gingerbread
+- **Each stage has its own treat theme** (decided 2026-10-13, amended 2026-10-14, replacing "World 1 is Gingerbread
   World"). The theme dresses the stage and the fort pieces. `spinoff/scenery.js` `THEMES` holds
   one entry per stage. While there's no stage button, the address picks: `play.html` is the
   tutorial, `play.html?stage=cake` (or `breakfast`) a hand-made stage, and adding `&seed=8` (and
@@ -493,7 +511,7 @@ and smashers each get a round that is theirs.
   good kick opens a way. `breakIn: true` on the level makes the playability check prove both
   halves in the real sim: no route to the shelf without breaking, and a hero who kicks when it
   stands blocked gets in (about 7 s, 3 bricks). The hand-made stages go back to the wall with gaps.
-- **Levels are data** (2026-10-14): `spinoff/levels.js` holds `TUTORIAL` and `STAGES` (one
+- **Levels are data** (decided 2026-10-14): `spinoff/levels.js` holds `TUTORIAL` and `STAGES` (one
   hand-made layout per stage), each a layout (a `Stage`: floors, each a `ground`, `deck` or
   `hill` that the theme dresses by kind, the back wall, shelves, zones, ring-out, bricks, syrup,
   butter, trampolines and bounce) and the name of its stage; `levelFor` reads the address. The
@@ -521,8 +539,9 @@ and smashers each get a round that is theirs.
     3.6-high tower), icing trampolines, and gingerbread-panel fort pieces (cookie panel, piped
     border, flooded icing, cracks). The playtest said the hill and panels don't read as baked
     yet; fix them when the cake stage gets its own pieces.
-  - Gingerbread as its own theme, and worlds beyond, wait until there are more levels.
-- **Fort pieces are coloured by their topping, in the builder's colour** (decided 2026-10-13;
+  - Gingerbread as its own theme, and worlds beyond, wait until there are more levels (brainstorm 2026-10-14).
+- **Fort pieces are coloured by their topping, in the builder's colour** (decided 2026-10-13 for the
+  topping colour; one new kind per level is brainstorm 2026-10-13;
   whipped cream on breakfast, icing on cake), flooded big enough to read at tablet size (thin
   piped lines would just look brown). One material per kind, colour per piece, so a many-coloured
   fort draws in a few batches. Kinds differ by shape, one new kind per level, unlocked for the
@@ -538,21 +557,22 @@ and smashers each get a round that is theirs.
   | 5 | Gingerbread-man shield | A gingerbread man standing guard; takes extra hits |
   | 6+ | More house parts | Windows, doors, chimneys |
 
-- **Heroes place only their own pieces** (decided 2026-10-13). Every hero's pieces carry their
+- **Heroes place only their own pieces** (brainstorm 2026-10-13). Every hero's pieces carry their
   fur colour (plus a small pattern when two kids share a colour). A hero can place and move only
   their own pieces, never a teammate's, and can stack on anything: their own or a teammate's.
   Nothing forces teamwork; the kids find it.
-- **Mixed walls are tougher, and look it** (decided 2026-10-13). Where a hero's piece rests on a
+- **Mixed walls are tougher, and look it** (brainstorm 2026-10-13). Where a hero's piece rests on a
   teammate's piece of another colour, both pieces in that joint take one extra hit. A piece
   bonded twice (the middle of a three-colour stack) takes two extra. Bonded pieces are drawn
   thicker, bulging toward the camera and overhanging their cell a little, with a fat bead of
   cream or icing "glue" in the seam. Same-colour stacks get nothing. Toughness is computed from the
   grid when the build round ends (count different-colour teammate pieces directly above and
   below), a pure function with a node test, and drawing follows that count.
-- **Bad guys' pieces are all one colour and skip the teamwork rules** (decided 2026-10-13): dark
+- **Bad guys' pieces are all one colour and skip the teamwork rules** (decided 2026-10-13 for the
+  look; who places and moves them is brainstorm 2026-10-13): dark
   chocolate pastry (pancakes, gingerbread) with dark purple cream or icing. Any bad guy can place or move any bad-guy piece,
   and their walls never get the mixed bonus, so only the heroes can build chunky walls.
-- **Pieces are fixed by level and number of players** (decided 2026-10-13). Each player gets their
+- **Pieces are fixed by level and number of players** (brainstorm 2026-10-13). Each player gets their
   own small pile to place, so siblings never fight over pieces and every kid builds something:
 
   ```
@@ -563,7 +583,7 @@ and smashers each get a round that is theirs.
   piece kinds, newest first, so a new level's piece is always in hand. CPU bad guys count
   toward their team's size and place theirs instantly. The team's grid floor caps the total, so
   a big team on a small stage can't fill every cell.
-- **Every fort piece can be smashed** in the knock-it-down round, by anyone, so a fort slows the
+- **Every fort piece can be smashed** (decided 2026-10-13) in the knock-it-down round, by anyone, so a fort slows the
   other team down without ever walling a 4-year-old out. Kicks hit fort pieces hardest. A piece
   must rest on something when placed (the grid's support rule).
 - **Pieces on top fall with a broken piece** (decided 2026-10-13). When a piece breaks, everything
@@ -573,7 +593,7 @@ and smashers each get a round that is theirs.
 
 ## Handicap: one `help` number per player
 
-Players are 4–6 year olds and grownups in the same match. Each player has one number, `help`,
+Players are 4–6 year olds and grownups in the same match (brainstorm 2026-10-13: no `help` in the code yet). Each player has one number, `help`,
 that nobody chooses: the game sets it from how they play (below). Every handicap knob is a straight
 line between a **pro** value and a **full help** value:
 
@@ -603,7 +623,7 @@ Starting points to tune in play, not measured values. Whole-number knobs round; 
 switch at the threshold shown. UI knobs never go below pro: a grownup is handicapped in the fight,
 never with smaller buttons.
 
-**Nobody sets `help`; scoring does** (decided 2026-10-13, the Mario Kart way). Every hero starts at
+**Nobody sets `help`; scoring does** (brainstorm 2026-10-13, the Mario Kart way). Every hero starts at
 full help, `1`. After each level the host compares each hero's banked donuts with their fair share
 (the team's banked donuts ÷ the number of heroes):
 
@@ -653,7 +673,7 @@ The game ships as static files on GitHub Pages. The lobby's networking is built
 matches are built too (0.0.2): `spinoff/multiplayer.js` is the host and guest logic over any
 link (`send(type, data, to)` / `on(type, fn)`), `spinoff/together.js` is the play page's glue,
 and `spinoff/multiplayer.test.mjs` runs a host and guests over an in-memory link that loses and
-reorders snapshots. What was built, and what the build decided (2026-10-14, to confirm):
+reorders snapshots. What was built, and what the build decided (decided 2026-10-14, to confirm):
 
 - **Starting together.** In a room, the tablet that opened it (🏠) gets ▶️; the others don't.
   ▶️ sends `go` to everyone in the room, and every tablet loads `play.html?room=CODE` (the host's
@@ -690,7 +710,7 @@ reorders snapshots. What was built, and what the build decided (2026-10-14, to c
 - **Guests draw:** no sim; every fighter, the guest's own too, is drawn one to two snapshots back
   (2–4 ticks), between the two snapshots either side, position and facing; everything else comes
   from the newest snapshot. (Drawn from the newest snapshot, a guest's own fighter moved only every
-  other frame, and jumped when snapshots arrived in clumps: decided 2026-10-15.) Each tablet's camera follows its own fighter.
+  other frame, and jumped when snapshots arrived in clumps: decided 2026-10-14, amended 2026-10-15.) Each tablet's camera follows its own fighter.
 - **Channel, as built:** Trystero 0.26 has no per-action channel options: every action rides one
   reliable, ordered data channel, snapshots too. `ponytail:` a negotiated
   `{ ordered: false, maxRetransmits: 0 }` channel on the peer connection if snapshots stutter.
@@ -698,14 +718,14 @@ reorders snapshots. What was built, and what the build decided (2026-10-14, to c
 - **Pause, away, gone:** see Network gotchas. A guest who drops out mid-match sits where it stopped
   for the rest of the round (the sim can't take a fighter out, and a sitting fighter can still
   be hit and still drops its donut). Its tablet can't rejoin that match.
-- **Again:** ▶️ on the host's end card sends `again` with the next round's number; every tablet
+- **Again** (decided 2026-10-14, amended 2026-10-16: a room per round): ▶️ on the host's end card sends `again` with the next round's number; every tablet
   reloads into a fresh match the same way it started (rejoin, ⏳, `start`), with `&round=N` in its
   address. Each round has its own room (`donut-CODE-playN`): a reload gives a tablet a new Trystero id,
   and in the last round's room the new pages heard the closed ones too and never connected
   (`heard 2 peers 0`, 2026-10-16), while the lobby, which nobody reloads into, always did. Late
   joiners' `go` carries the same number. Guests' ▶️ on the end card and the ⏸ card is hidden,
   and so is their ⏸. 👋 goes back to the lobby's first screen, out of the room.
-- **Late joiners play the next round** (0.0.3). The roster stays fixed for a round. Once `start` is
+- **Late joiners play the next round** (decided 2026-10-15; 0.0.3). The roster stays fixed for a round. Once `start` is
   out, the host's match page also joins the lobby room (`donut-CODE`, same `openRoom`, same home
   check; opened after `start` so its relay hellos don't land with the guests', and once per round,
   as the page reloads). A tablet that arrives there gets `playing` from the host, once, and its
@@ -722,6 +742,8 @@ The yarn store's seeded rng (ROADMAP A1) draws from
 `world.rngState` (`draw` in `characters/store/core/util.js`); the spinoff doesn't depend on it.
 
 ### Design: one host tablet, star topology
+
+(decided 2026-10-13)
 
 - **One kid's tablet hosts**, and that kid also plays. The host runs the only copy of the game
   state at a fixed 60 Hz tick. Each guest sends inputs to the host; the host sends each guest
@@ -753,7 +775,8 @@ The yarn store's seeded rng (ROADMAP A1) draws from
 - **Inputs** are a move target (a point or a tapped thing), 🥊 / 🦶 presses and a fired power
   ("power X at point P", see Power moves), sent only when they change, a few bytes each, on a
   reliable channel. A lost packet costs little: the target stays where it was. The host does the route-finding.
-- **Snapshots** (per fighter: position, velocity, facing, percent, donuts in bag, move id, move
+- **Snapshots** (decided 2026-10-13; the unreliable channel is brainstorm, see Channel, as built)
+  (per fighter: position, velocity, facing, percent, donuts in bag, move id, move
   step, ~30 bytes; under 450 bytes for 14 fighters; plus a few bytes each for bar level, tap
   target and power state, see Team powers; plus each shelf's donut count and loose donut pickups
   as positions) go 30 times a second on an unreliable channel
@@ -768,7 +791,8 @@ The yarn store's seeded rng (ROADMAP A1) draws from
 
 ### What crosses the network and what doesn't
 
-The split follows the A1 plan: gameplay is one authority, cosmetics are local.
+The split follows the A1 plan: gameplay is one authority, cosmetics are local (decided 2026-10-13;
+the sticker card and bad-guy players are brainstorm, see Bad guys).
 
 | Crosses | Stays local on each tablet |
 | --- | --- |
@@ -781,13 +805,13 @@ calls `Math.random`.
 
 ### Determinism
 
-Only the host simulates, so cross-device determinism is not required. Keep the physics on
+Only the host simulates, so cross-device determinism is not required (decided 2026-10-13). Keep the physics on
 add/multiply anyway and the gameplay out of the spring rig: it costs nothing now and leaves
 rollback or replays possible later.
 
 ### Network gotchas
 
-- **Clocks that disagree** (found 2026-10-15). A Nostr relay only passes a subscriber the messages
+- **Clocks that disagree** (decided 2026-10-15, found in play). A Nostr relay only passes a subscriber the messages
   stamped after the subscriber's own "now", so a tablet whose clock runs behind another's goes
   unheard by it until its clock catches up. After its first 7 s Trystero announces only once a
   minute, so tablets that join together (every match start) and are more than a few seconds apart
@@ -795,23 +819,23 @@ rollback or replays possible later.
   `net.js` asks the relays from 10 minutes earlier (`clockSlack`; the messages are never stored, so
   nothing old comes back). `?debug=1` shows each tablet's clock (UTC) to compare side by side, and
   `heard` (tablets whose relay messages arrived) apart from `peers` (tablets connected).
-- **Only on https** (found 2026-10-15). Trystero hashes room names and scrambles the hellos with
+- **Only on https** (decided 2026-10-15, found in play). Trystero hashes room names and scrambles the hellos with
   `crypto.subtle`, which browsers only give a secure page: https, or `localhost`. On plain
   `http://192.168.…` joining fails without an error and the lobby just never sees anyone. GitHub
   Pages is https; at home `serve.py` serves https when a home-made `cert.pem`/`key.pem` sits beside
   it (each tablet taps past the warning once), and redirects a plain http request to https.
-- **Relay rate limits** (found 2026-10-15). Every tablet in a home reaches the public relays from
+- **Relay rate limits** (decided 2026-10-15, found in play). Every tablet in a home reaches the public relays from
   one internet address, and each announces 5 times in its first ~9 s in a room. Three tablets
   starting a match together, after an evening of reloads, got `rate-limited`, and Trystero skips a
   relay that limits it for a minute or more. Rooms use 10 relays (`relayConfig.redundancy`; a
   hello needs only one), and guests join a match's room up to 2 s apart. `ponytail:` signalling
   through `serve.py` would keep even the hellos at home, but GitHub Pages players would still need
   the relays.
-- **Hidden addresses** (found 2026-10-15). Browsers hide a tablet's own addresses behind `.local`
+- **Hidden addresses** (decided 2026-10-15, found in play). Browsers hide a tablet's own addresses behind `.local`
   names. A tablet that connects by resolving the other's `.local` name shows up as a peer-reflexive
   route with no address; that only works on the same network, so the home check accepts it (and
   still hangs up on a hidden server-reflexive or relayed route, or a visible non-home address).
-- **Client isolation.** Guest networks and some mesh Wi-Fi systems block devices from reaching
+- **Client isolation** (decided 2026-10-13). Guest networks and some mesh Wi-Fi systems block devices from reaching
   each other. Symptom: everyone joins the room but no data channel opens. Use the main network.
 - **Leaving the screen** (decided 2026-10-14). A browser stops running a page that isn't on screen
   (background tabs are throttled, then frozen; a dark screen stops everything), and the game only
@@ -826,15 +850,17 @@ rollback or replays possible later.
     every screen shows the ⏸ card, and ▶️ on the host plays on. The host leaving the screen pauses
     the same way: the page gets a moment's notice when it's hidden, enough to send "paused"
     first. The snapshot carries `paused`, and guests show the card without a ▶️ (built, 0.0.2).
-- **Host gone for good, match ends.** `ponytail:` no host migration; if the host stays away (a
+- **Host gone for good, match ends** (decided 2026-10-13). `ponytail:` no host migration; if the host stays away (a
   minute, to tune) or its connection drops, the room shows "host left" and everyone rejoins. Add
   migration only if it happens often. Built (0.0.2): a guest that has had no snapshot for 60 s
   (`HOST_GONE_SECONDS`), whose host peer leaves, or whose `start` never comes, shows 🏠💨 with 👋
   back to the lobby.
-- **The room code is a label, not a lock.** Random, shown on the host, not a word. The home-network
+- **The room code is a label, not a lock** (decided 2026-10-13). Random, shown on the host, not a word. The home-network
   rules above keep strangers out; 1,296 picture codes only need to keep one house's games apart.
 
 ## Performance budget
+
+(decided 2026-10-13)
 
 Measured on the shop: ~15 draw calls per character, 40 characters at 35 fps under 20× CPU
 throttle (`WEARABLE-LOOK-VS-PERFORMANCE.md`). Every tablet renders at most 14 fighters (6 kids,
@@ -859,30 +885,31 @@ species `randomise` only uses `Math.random`).
 have to be a natural colour: a hot-pink lion and a cyan owl are the point. Quiet, natural and
 grey colours belong to the bad guys.
 
-**Hit-stop is our rumble** (playtest 2026-10-14: "that little freeze feels AWESOME"). Tablets
+**Hit-stop is our rumble** (decided 2026-10-14 for landing a hit; the other moments below are
+brainstorm 2026-10-14; playtest: "that little freeze feels AWESOME"). Tablets
 have no controller rumble, so a short freeze of everyone involved (`HITSTOP_TICKS`, 5 ticks at
 60 Hz, about 80 ms) is how an impact is felt. Use it more, scaled by how big the moment is:
 landing a hit, a brick breaking, knocking a donut loose, a steal, a power move going off, a
 ring-out. Keep it short, and in the sim so every tablet freezes on the same tick.
 
-**Grabs fly into the bag, keep it** (playtest 2026-10-14: "Love the flying donut"). A grabbed
+**Grabs fly into the bag, keep it** (decided 2026-10-14, playtest: "Love the flying donut"). A grabbed
 donut arcs from where it lay (or off the shelf) into the bag, growing to carried size, in about a
 third of a second (`placeCarried` in `play.js`). Good things show the thing travelling to you;
 never stars round a head, which reads as dazed (a hit).
 
-**Banking bursts sprinkles off the shelf, keep it** (playtest 2026-10-14). Banking a donut at
+**Banking bursts sprinkles off the shelf, keep it** (decided 2026-10-14, playtest). Banking a donut at
 home throws 30 sprinkle bits in the riot colours up from the shelf (`fx.burst` with
 `confettiMats` in `play.js` `onDonut`) and bounces the team's HUD count. It matches the house
 sprinkles, so celebrations reuse it.
 
-Keep `felted` (the shop look, free), or try `toon` / `matcap` shading from
-`inventory/yarn-look.js` `SHADING` for a punchier arcade read. `setViewMode(root, 'silhouette')`
+Keep `felted` (the shop look, free; decided 2026-10-13), or try `toon` / `matcap` shading from
+`inventory/yarn-look.js` `SHADING` for a punchier arcade read (brainstorm 2026-10-13). `setViewMode(root, 'silhouette')`
 gives a "who's that?" character-select reveal. Stages from the bakery: a giant cake, a stack of
-pancakes, a donut-shop counter, a cookie jar.
+pancakes, a donut-shop counter, a cookie jar (brainstorm 2026-10-13).
 
 ## Theme: treats
 
-The spinoff is about donuts, not yarn. The yarn store keeps its `inventory/` untouched; the
+The spinoff is about donuts, not yarn (decided 2026-10-13). The yarn store keeps its `inventory/` untouched; the
 spinoff gets its own small `spinoff/treats.js` and reuses the generic parts.
 
 | Existing | Treats use | Change |
@@ -890,9 +917,9 @@ spinoff gets its own small `spinoff/treats.js` and reuses the generic parts.
 | `inventory/grid.js` | Team shelves (grab and bank), obstacle and platform placement | None. Its `round` rule (a round item must rest on centres) stacks donuts and donut holes as it stacks yarn balls |
 | `inventory/pick-place.js` | Not for forts any more: blocks are carried and put down in front of you (see Forts) | None |
 | `inventory/yarn-look.js` | `matcap` / `toon` shading, `oklch` frosting palette, `bakeVertexAO`, `makeHull` outlines, `CHARACTER_RANGE` (keeps treats from matching fur colours) | None; skip `applyHatching`, which is the yarn texture |
-| `inventory/notions.js` + `notion_processing.py --theme` | Flat treat pickups and icons (sprinkles, cookies, cherries) from black line art; colour is applied at runtime | A new `treats` theme of line-art PNGs next to `themes/cottage/` |
+| `inventory/notions.js` + `notion_processing.py --theme` | Flat treat pickups and icons (sprinkles, cookies, cherries) from black line art; colour is applied at runtime | A new `treats` theme of line-art PNGs next to `themes/cottage/` (brainstorm 2026-10-13) |
 | `inventory/yarn-geometry.js` | The pattern: a profile per family, lathed or tubed, seated on the floor | Copy the pattern into `treats.js`; the yarn file stays yarn |
-| `sparkle.js` | Sprinkle burst | Recolour |
+| `sparkle.js` | Not used: hits, steals and banking use the spinoff's own effects in `spinoff/fx.js` | None (decided 2026-10-13, amended 2026-10-16: the yarn store's sparkle reads as damage in a fighting game, not victory) |
 | `garments.js` bag (`GARMENTS.bag`, `buildBag`) | The fighter carries donuts in a worn bag, poking out | Donut meshes placed at the bag's opening in the spinoff; `garments.js` unchanged |
 | `inventory/catalog.js` | — | Not used; the treat list is a few lines in `treats.js` |
 
@@ -900,7 +927,7 @@ Treat shapes are mostly three.js built-ins: a donut is `TorusGeometry` with a se
 torus on top for icing; a donut hole is a sphere; a cake is a lathe (the yarn `CAKE_PROFILE` is
 already a cake). Frosting colour, sprinkles and glaze are material and colour, not new geometry.
 
-**House style, keep it** (playtest 2026-10-14: "sprinkles and donut frosting look spectacular").
+**House style, keep it** (decided 2026-10-14, playtest: "sprinkles and donut frosting look spectacular").
 Sprinkles are one instanced capsule (radius 0.03, 0.1 long, roughness 0.5), each instance tinted
 from `RIOT`, laid flat at a 2.4 rad turn per index and spread by the R2 sequence (`scatter` in
 `play.js`), so no random seed. Frosting is a squashed second torus at roughness 0.45 over matte
@@ -911,7 +938,7 @@ The characters stay the yarn store's characters, so hats and capes stay knitwear
 
 ## Costumes: hats, capes, bags, boxing gloves
 
-Every fighter wears a bag and boxing gloves; a hat and a cape are the kid's choice. Each piece is
+Every fighter wears a bag and boxing gloves; a hat and a cape are the kid's choice (decided 2026-10-13). Each piece is
 in colours the kid picks.
 
 - **Hats:** `garments.js` hat, as-is. Ten silhouettes already (beanie, beret, bucket, earflap,
@@ -929,7 +956,7 @@ in colours the kid picks.
   Gloves are leather, not knit: a plain shiny `MeshStandardMaterial`, not `garmentMaterial`.
   They live in the spinoff, not in `garments.js`; the yarn store's mittens rule stays as it is
   unless decided separately.
-- **The owl wears its gloves on its wing tips** (kept, 2026-10-13). Its wing hangs from the upper
+- **The owl wears its gloves on its wing tips** (decided 2026-10-13). Its wing hangs from the upper
   arm and buries the hand at its middle, so a glove on the hand showed only as a lump halfway
   down the wing. The glove sits at 80% of the way down the wing instead, sized to swallow the
   tip whatever the owl's wing size (up to about 1.8 times a hand glove), so the wing is the arm
@@ -944,7 +971,7 @@ in colours the kid picks.
 - **Stitch texture on hats and capes** (`TEXTURES` in `fighter.js`): stockinette, rib, garter,
   cable, single crochet, waffle, lace. Seed, puff and linen stitch are left out (6–18× the
   triangles in worsted). Colourwork (stripes, fair isle, …) is free (vertex colours) and is the
-  next texture to offer.
+  next texture to offer (brainstorm 2026-10-13).
 - **Fighters knit in super-bulky yarn** (`YARN` in `fighter.js`, decided 2026-10-13). In worsted, a
   llama's rib, garter and cable were drawn smooth at lobby and match size by the shop's
   `LOOK.viewPx` rule (stitches under 1.5 px become plain), so the chooser showed a stitch the
@@ -953,11 +980,11 @@ in colours the kid picks.
   up to 24k in worsted. Chunky knits also suit the toy look. `fighter.test.mjs` checks every stitch
   shows on every species at `med` detail with the shop's `viewPx`.
 - **Kids wear whatever they like** (decided 2026-10-13): any hat or none, any cape or none. Only
-  the bag is required, since it carries donuts. Bad guys always wear the `ninja` hat.
+  the bag is required, since it carries donuts. Bad guys always wear the `ninja` hat (brainstorm 2026-10-13).
 
 ## Fighter chooser
 
-Built: `spinoff/choose.html` (page) on `spinoff/fighter.js` (everything a fighter is). Touch
+Built: `spinoff/choose.html` (page) on `spinoff/fighter.js` (everything a fighter is; decided 2026-10-13). Touch
 only, pictures and colour, no words needed; every button has an `aria-label` for screen readers.
 
 1. **Pick an animal.** Three big tiles (🦁 🦙 🦉). The new animal does its species `delighted`
@@ -990,12 +1017,12 @@ Trust boundary: `readFighter` is the only way in, from storage or from another t
 only known param keys with the right type (finite numbers, booleans, `#rrggbb` colours, a name
 from the rig's `NAMES`), and only known hats, capes, bags and kid colours.
 
-Not built yet: the silhouette reveal on the animal tiles. There is no `help` control anywhere:
+Not built yet: the silhouette reveal on the animal tiles (brainstorm 2026-10-13). There is no `help` control anywhere:
 scoring sets it (see Handicap).
 
 ## Lobby
 
-Built: `spinoff/lobby.html` (page) on `spinoff/net.js` and `spinoff/roster.js`.
+Built: `spinoff/lobby.html` (page) on `spinoff/net.js` and `spinoff/roster.js` (decided 2026-10-13).
 
 - 🏠 starts a game and shows a **picture code**: four treats out of six (🍩 🧁 🍪 🍒 🍓 🍰),
   1296 codes, readable by kids who can't read. 🔑 opens a six-treat keypad to type one.
@@ -1013,16 +1040,17 @@ Built: `spinoff/lobby.html` (page) on `spinoff/net.js` and `spinoff/roster.js`.
 
 ## Bad guys
 
-The other team: up to 8 bad guys, drawn from **8 fixed presets**. A grownup can play one (below);
+The other team: up to 8 bad guys, drawn from **8 fixed presets** (brainstorm 2026-10-13: only the
+training dummy is built). A grownup can play one (below);
 the host fills the rest of the team with CPU bad guys from the presets nobody took. Silly, not
 scary, for 4–6 year olds.
 
-- **Eight tablets at most: 6 heroes and 2 played bad guys** (decided 2026-10-13). Up to six
+- **Eight tablets at most: 6 heroes and 2 played bad guys** (brainstorm 2026-10-13). Up to six
   people play heroes. A seventh or eighth person plays a bad guy whether they tapped 🥷 or not:
   the latest arrivals, in the order the host saw them join, so nobody who was already a hero is
   moved. At most two people play bad guys; once two have, 🥷 greys out. A ninth tablet is
   turned away with a "room full" picture. CPU bad guys fill the rest of the bad-guy team, up to 8.
-- **Grownups join as bad guys with one button** (decided 2026-10-13). 🥷 in the lobby swaps your
+- **Grownups join as bad guys with one button** (brainstorm 2026-10-13). 🥷 in the lobby swaps your
   fighter for a bad guy; tap it again to go back. Nothing to pick: you get the first preset no
   other grownup in the room has. Which one is worked out the way `standingSpots` places people:
   every tablet sorts the bad-guy players' ids and hands out presets in order, so all tablets agree
@@ -1031,7 +1059,7 @@ scary, for 4–6 year olds.
 - **A bad-guy player sends only "bad guy", never a look.** Every tablet builds the preset from the
   table in code, so `readFighter` still never lets a bad-guy colour in from the network, and a kid
   still can't dress as one.
-- **Bad-guy players get the penalty** (decided 2026-10-13). A bad guy a person plays is fixed at
+- **Bad-guy players get the penalty** (brainstorm 2026-10-13). A bad guy a person plays is fixed at
   `help -0.5`, the grownup end of the table, because the grownups are the ones playing them: more knockback taken, less damage dealt,
   smaller hit spheres, no input buffer, shorter respawn invincibility. Nobody picks that level: it
   comes with the 🥷 button. CPU bad guys are adjusted by level instead (below).
@@ -1048,10 +1076,10 @@ scary, for 4–6 year olds.
 - **The `ninja` hat** is one more row in `garments.js`'s `HAT` table. It starts from `hood`,
   which already frames the face with the eyes uncovered (`face: true, eyesOut: true`), and sits
   lower (`seat`) so the edge reaches the brow. The eyes stay visible on purpose: light eyes on
-  a dark hood read as a goofy villain, a hidden face as a scary one. **Spinoff only** (decided
+  a dark hood read as a goofy villain, a hidden face as a scary one. **Spinoff only** (brainstorm
   2026-10-13): like the cape, it stays out of the shop's silhouette list, since a new shop
   silhouette re-rolls every pattern design after it in `PATTERN_TITLES`.
-- **Reserved colours.** Black and dark purple belong to the bad guys alone; the fighter chooser
+- **Reserved colours** (decided 2026-10-13). Black and dark purple belong to the bad guys alone; the fighter chooser
   leaves them out of the kids' swatches. This follows the anti-camouflage rule
   (`DESIGN-DECISIONS.md` §5, `CHARACTER_RANGE` in `yarn-look.js`), which reserves a colour range
   so characters never blend into the stock. Here it stops a bad guy blending into the kids' team.
@@ -1063,22 +1091,22 @@ scary, for 4–6 year olds.
   violet or magenta.
 - **Names:** a short list of silly villain names, shown only as pictures and voice, never as
   text the kids have to read.
-- **Bad-guy moves are a shared pool, not per preset** (decided 2026-10-13). Any bad guy can use
+- **Bad-guy moves are a shared pool, not per preset** (brainstorm 2026-10-13). Any bad guy can use
   any move it has. CPU bad guys gain moves as the levels get harder; grownup bad guys earn them
   through success in play (donuts, hit streaks and the like). The details of earning are being
   worked out on the Final Fantasy VII Limit Break model. The grape fizz bolt below is the first
   move in the pool.
-- **Everybody starts over each new game** (decided 2026-10-13). Moves earned in a game (a room,
+- **Everybody starts over each new game** (brainstorm 2026-10-13). Moves earned in a game (a room,
   from 🏠 to leaving) last only for that game. Next game night, grownup bad guys start again from
   the first moves. The one thing kept is each player's sticker card (see Saving progress).
-- **Starting high gives grownup bad guys that level's moves** (decided 2026-10-13). A game that
+- **Starting high gives grownup bad guys that level's moves** (brainstorm 2026-10-13). A game that
   starts on a high level hands every grownup bad guy the moves of that level's tier up front, the
   same moves CPU bad guys have there. Either the grownup knows how to use them or they figure it
   out in play; earning carries on from there.
-- **A bad guy's power bar fills from taking hits** (decided 2026-10-13), the FF7 Limit gauge: the
+- **A bad guy's power bar fills from taking hits** (brainstorm 2026-10-13), the FF7 Limit gauge: the
   more the kids clobber a bad guy, the sooner it can strike back. Heroes' bars never fill from
   being hit.
-- **Heroes fill from giving, and teamwork fills fastest** (decided 2026-10-13). Starting weights,
+- **Heroes fill from giving, and teamwork fills fastest** (brainstorm 2026-10-13). Starting weights,
   for tuning in play:
 
   | Event | Hero's bar | Bad guy's bar |
@@ -1093,7 +1121,7 @@ scary, for 4–6 year olds.
 
   Hurting a kid never charges anyone. Ganging up with plain hits charges the bad guy, but a team
   combo doesn't, so the kids' best answer to a glowing bad guy is to combine.
-- **First bad-guy power: the grape fizz bolt** (decided 2026-10-13). A cartoon lightning bolt,
+- **First bad-guy power: the grape fizz bolt** (brainstorm 2026-10-13). A cartoon lightning bolt,
   made cute: a chunky, rounded zig-zag like a gummy candy, grape purple with white fizz sparkles
   trailing, with a kazoo "bzzzt" rather than thunder.
 
@@ -1126,14 +1154,14 @@ scary, for 4–6 year olds.
 
   With two or more CPU bad guys, one stays home as a defender and the rest raid. In the build
   round, CPU bad guys stack their pile as a wall in front of their shelf, instantly.
-- **CPU bad guys break walls** (required, 2026-10-13). The basic hero fort is a ring of walls with
+- **CPU bad guys break walls** (brainstorm 2026-10-13, required). The basic hero fort is a ring of walls with
   the donut shelf in the middle, so a bad guy that can't get through is no opponent. A raider
   heads straight for the shelf, never routing around the fort. At a wall one piece high it jumps
   over; at anything taller it kicks the lowest piece in its way until it breaks, then carries on.
   It goes for the weakest piece within reach of its path (fewest hits left), so a mixed wall
   steers it toward a single-colour gap: the kids' best walls really do protect them. Breaking a
   piece charges nobody's bar.
-- **Targets: the nearest hero** (decided 2026-10-13), kid or grownup alike; no one is singled out.
+- **Targets: the nearest hero** (brainstorm 2026-10-13), kid or grownup alike; no one is singled out.
   The fairness rules below still apply on top (no two bad guys on one hero, grace after a hit).
 - **Fair to 4-year-olds.** About half a second of reaction delay before acting on anything new;
   at most one attack about every 0.8 s; two CPU bad guys never chase the same kid; after hitting a
@@ -1142,7 +1170,7 @@ scary, for 4–6 year olds.
   reaction delay, attack pace and grace time are plain numbers that auto-scaling can tune later.
 - **MVP subset:** Raid (with wall breaking), Grab, Run home and Chase first; Defend, Scoop and
   Power once matches work.
-- **The bad-guy team grows level by level** (decided 2026-10-13). Level 1 is the grownups who
+- **The bad-guy team grows level by level** (brainstorm 2026-10-13). Level 1 is the grownups who
   tapped 🥷, or one CPU bad guy if nobody did. Each level after adds one CPU bad guy:
 
   ```
@@ -1152,17 +1180,17 @@ scary, for 4–6 year olds.
   Two grownups on level 3 face the kids with 2 CPU bad guys beside them; no grownups on level 3
   is 3 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
   drops it.
-- **Saving progress: a sticker card per player** (decided 2026-10-14, replacing "only the highest
+- **Saving progress: a sticker card per player** (brainstorm 2026-10-14, replacing "only the highest
   level"). Every player has a stamp card, saved on their own tablet under its own key
   (`lys.stamps.v1`), apart from the fighter, so re-rolling or re-dressing a fighter never touches
   it: kids get bored of a look but keep their card. Everything else still starts over each game
   (`help`, earned moves, power bars).
-  - **A stamp for finishing a level** (decided 2026-10-14, for now). Playing a level all the way
+  - **A stamp for finishing a level** (brainstorm 2026-10-14, for now). Playing a level all the way
     to the end card stamps every hero still in the room, win, tie or loss, kept for good. Quitting
     early (👋, or a match that ends because the host left) gives nothing. **Finishing it again
     counts on the stamp:** the stamp gains a number, ×2, ×3 and up, like a sticker with a tally,
     so replaying a favourite level still fills the card.
-  - **A stamp looks like a kid's craft rubber stamp** (decided 2026-10-14; not a postage stamp):
+  - **A stamp looks like a kid's craft rubber stamp** (brainstorm 2026-10-14; not a postage stamp):
     the same picture that shows the level in the level picker, pressed in one sepia ink. Simple
     bold shapes, ink patchy where the stamp didn't press evenly, soft edges, a little crooked, never
     two exactly alike. The ×2, ×3 tally is stamped beside it the same way. The card is a grid of the levels' places; an unwon level's place is empty.
@@ -1170,14 +1198,14 @@ scary, for 4–6 year olds.
     like the fighter: keys are whole levels from 1 to the last level, counts whole numbers from 1
     (capped at 999, so the 100th finish still counts); anything else is dropped. A guest sends its
     card with its fighter when it joins.
-  - **Tally milestones unlock themed special items** (idea, 2026-10-14). Each stamp's count is a
+  - **Tally milestones unlock themed special items** (brainstorm 2026-10-14). Each stamp's count is a
     ladder: finishing a level enough times unlocks an item themed on that level, e.g. the pancake
     level's 100th finish gives a **magic spatula**. Items belong to the player like the card (they
-    survive re-rolling the fighter) and **go with them to every level** (decided 2026-10-14): the
+    survive re-rolling the fighter) and **go with them to every level** (brainstorm 2026-10-14): the
     spatula earned on pancakes works on the cake stage too. The theme only says where an item is
     earned, not where it can be used. The card is the one record, so items need no save of their
     own: what you have is worked out from the counts. **Three kinds, all used together, each with
-    its own name** (decided 2026-10-14), and **no equipment**: nothing is equipped, loaded out or
+    its own name** (brainstorm 2026-10-14), and **no equipment**: nothing is equipped, loaded out or
     slotted. A milestone can give any kind.
     - **Dress-ups** (looks): extra pictures in the fighter chooser that the kid toggles on and off,
       like hats and capes.
@@ -1187,9 +1215,9 @@ scary, for 4–6 year olds.
       or a gesture behind the power bar), only for the player who earned it.
     - **Goodies** (things on the level): a goodie appears on the stage during a match, to grab
       and use there, like a loose donut. Owning one is what makes it turn up, on any level.
-      **Anyone can grab a goodie** (decided 2026-10-14), teammate or bad guy, not only its owner:
+      **Anyone can grab a goodie** (brainstorm 2026-10-14), teammate or bad guy, not only its owner:
       sharing and passing need that, and teamwork rewards for them may come later.
-    **Starting ladder, per level** (2026-10-14, to tune). The very first finish already gives
+    **Starting ladder, per level** (brainstorm 2026-10-14, to tune). The very first finish already gives
     something besides the stamp, so a kid learns at once that the card hands out stuff:
 
     | Finishes | Reward |
@@ -1200,7 +1228,7 @@ scary, for 4–6 year olds.
     | 50 | A trick |
     | 100 | The big trick (pancakes: the magic spatula) |
 
-    **Every 10 finishes, evenly** (decided 2026-10-14): kids don't respond well to rewards that
+    **Every 10 finishes, evenly** (brainstorm 2026-10-14): kids don't respond well to rewards that
     get further and further apart, so the gap never grows. Tricks sit at 50 and 100, so a kid who
     plays more gets prettier before they get stronger. Past 100 is open. The end card presses the stamp, pops the reward out of it, and shows the next
     milestone's reward as a shadow with its number, so more is visibly coming.
@@ -1209,10 +1237,10 @@ scary, for 4–6 year olds.
     picked from the start; whether unlocked moves and fort pieces follow the chosen level or the
     card; whether winning should show on the stamp too; whether grownup bad-guy players have
     cards.
-- **No difficulty setting** (decided 2026-10-13). CPU bad guys play at `help 0`; the level (how
+- **No difficulty setting** (brainstorm 2026-10-13). CPU bad guys play at `help 0`; the level (how
   many of them) is the only dial for now. `ponytail:` auto-scaling comes later: nudge the CPU bad
   guys' `help` (between `-0.5` and `0.5`, below the kids' safety bounce at `0.75`) from the
-  previous level's **donut margin** (decided 2026-10-13). Matches run on a fixed timer
+  previous level's **donut margin** (brainstorm 2026-10-13). Matches run on a fixed timer
   (90 seconds to start, never over 3 minutes), so time can't be the signal: a big win nudges the next level harder, a narrow win or
   a loss nudges it easier.
 
@@ -1221,7 +1249,7 @@ bad guy grabs a donut and banks it.
 
 ## Milestones
 
-1. **Fun to hit, one tablet** (planned 2026-10-13; released as 0.0.1, 2026-10-14). On one tablet, your fighter on the stage in
+1. **Fun to hit, one tablet** (decided 2026-10-13; released as 0.0.1, 2026-10-14). On one tablet, your fighter on the stage in
    thirds against a training dummy: tap to move, 🥊 and 🦶, knock the dummy's donut loose and
    scramble for it, grab from the enemy shelf and bank on yours, and kick through a few
    **pre-placed gingerbread bricks** (no build round yet) that fall when the one under them
@@ -1260,7 +1288,7 @@ bad guy grabs a donut and banks it.
      is a block from the ground up: you jump onto it or walk around it, never through it.
    - **Stealing a donut is a victory moment** (playtest, 2026-10-14). The snapshot's `donutEvents`
      says when a donut is stolen from the enemy shelf, banked, or picked up. A steal gets a
-     sparkle burst (`sparkle.js`, recoloured), the species' `delighted` pose for a beat while it
+     sparkle burst (the spinoff's own, in `spinoff/fx.js`), the species' `delighted` pose for a beat while it
      keeps moving, and the donut popping up into the bag. Banking gets a bigger one: a sprinkle
      confetti burst over your shelf and the shelf count bouncing. A pickup off the floor gets a
      small sparkle.
@@ -1282,22 +1310,22 @@ bad guy grabs a donut and banks it.
      into this branch).
    - Out of scope: networking, the build round, bad-guy behaviour, powers, levels, `help`
      changes, team combos.
-2. **Two tablets.** Done: the fighter chooser, the room code and the join handshake, with
+2. **Two tablets** (decided 2026-10-13). Done: the fighter chooser, the room code and the join handshake, with
    everyone standing on the lobby floor. Done in 0.0.2 (see Multiplayer, Where things stand):
    the host's ▶️ starts one match for the whole room, the level and roster travel as data, inputs
    up, snapshots down at 30 Hz with events that survive a lost one, interpolation, a per-tablet
    camera, pause / away / host-left, and ▶️ again for everyone. Tested in node only; still to
    try on real tablets on home Wi-Fi.
-3. **Kids vs bad guys.** Up to eight tablets (six heroes, two played bad guys), the bad-guy team from its 8 presets,
+3. **Kids vs bad guys** (brainstorm 2026-10-13). Up to eight tablets (six heroes, two played bad guys), the bad-guy team from its 8 presets,
    `ninja` hat and AI, two shelves on a stage wider than a screen, edge markers, the match timer
    and team shelf score, donut pickups, a results screen with `selfie.js` portraits.
-4. **Content.** Full move lists per species, stages, alternate costumes, item drops with
+4. **Content** (brainstorm 2026-10-13). Full move lists per species, stages, alternate costumes, item drops with
    catch-up weighting.
 
 ## Open questions
 
 - **The owl's move set.** Its punches are wing swings with the gloves on its wing tips (see
-  Costumes) and its kick a talon swipe from a hop; the rest of its moves are still to design.
+  Costumes) and it kicks like the others; the rest of its moves are still to design.
 - **The bigger bag.** Carrying more than one donut is a later unlock. Is it a level unlock (from
   some level on, everyone's bag holds 2, then 3), or a power (a full bar or a gesture gives a big
   bag for a while)? Either way, the hit table (punch knocks 1 loose, kick 2, powers the whole bag)

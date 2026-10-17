@@ -1,12 +1,12 @@
 # Generated levels: an exploration
 
 Can Donut Fighters make its own stages, for replayability, so that a stage at difficulty N only
-holds the kinds of problem a kid has already met by then? (2026-10-14; exploration, not a
-shipped feature. The rules it builds on are in `REUSE-SPEC.md`.)
+holds the kinds of problem a kid has already met by then? (2026-10-14; an exploration:
+brainstorm 2026-10-14 unless marked decided. The rules it builds on are in `REUSE-SPEC.md`.)
 
 ## Verdict
 
-**Feasible, and cheap.** Since "Levels are data", a stage is a plain `Stage` object and every level
+**Feasible, and cheap** (decided 2026-10-14). Since "Levels are data", a stage is a plain `Stage` object and every level
 already runs through a playability test in the real sim. A generator only has to output that same
 object; the proof of concept (`spinoff/generate.js`, ~90 lines) does, and 5,000 generated stages
 pass the same checks as the hand-made levels. The hard part is not the generator but making
@@ -16,11 +16,11 @@ fun still needs a tablet and a kid.
 
 ## What a generator outputs, and what it must guarantee
 
-Output: a `Stage` (`match.js`), exactly the shape of a hand-made `STAGES[name].stage` in `levels.js`,
+Output (decided 2026-10-14): a `Stage` (`match.js`), exactly the shape of a hand-made `STAGES[name].stage` in `levels.js`,
 on the stage it was asked for. Nothing else in the sim, the page or the scenery changes; `scenery.js`
 dresses any floor by its kind.
 
-**Generation takes a stage** (2026-10-14, `REUSE-SPEC.md` §Stages and difficulty are separate):
+**Generation takes a stage** (decided 2026-10-14, `REUSE-SPEC.md` §Stages and difficulty are separate):
 `generateStage(seed, difficulty, stage)`, with `stage` `breakfast` (the default) or `cake`. The layout
 is drawn the same for both, then dressed with the stage's terrain rules, drawing last so a seed's
 breakfast layout is unchanged:
@@ -46,7 +46,8 @@ breakfast layout is unchanged:
 Two things the floor model can't express yet: pits (the stage has exactly one ground, so a gap in the
 floor is impossible) and anything that moves. Neither is needed for a first version.
 
-A note on determinism: the sim is host-authoritative, so in a room only the host runs it and guests
+A note on determinism (decided 2026-10-15 for sending the `Stage`, as `start` does; seeds and a
+generator version in the handshake are brainstorm 2026-10-14): the sim is host-authoritative, so in a room only the host runs it and guests
 draw from snapshots. A guest still needs the stage to draw the scenery, but the host could just
 send the `Stage` itself (about 1–2 KB of JSON) once at the start. The seed matters more for sharing a
 level *between* rooms (a daily level) and for reproducing a bug. If seeds are what crosses the
@@ -54,6 +55,9 @@ network, the handshake must also carry a generator version, because changing `ge
 every seed's stage.
 
 ## Problem kinds
+
+(decided 2026-10-14 for the kinds in the proof of concept; Split route and the hand-made Levels 3
+and 5 are brainstorm 2026-10-14)
 
 Each kind is one thing a 4–7 year old has to read and answer. The stage always has the deck-and-shelf
 at each end and the bad guys' wall with gaps (the hand-made stages' fort); the kinds are layered on top.
@@ -70,7 +74,7 @@ at each end and the bad guys' wall with gaps (the hand-made stages' fort); the k
 | Step up | The shelf deck is too high to jump to from the ground; a step beside it | deck 1.8 high, step 0.9 | Level 5 (proposed) | yes |
 | Split route | A long low deck in a third: over it or round the front | `deck` 0.6 high along the band | later | no |
 
-**A kind is first met in a hand-made level.** The rule that keeps generated stages fair to a kid:
+**A kind is first met in a hand-made level** (decided 2026-10-14). The rule that keeps generated stages fair to a kid:
 a hand-made level introduces each kind on a stage a grown-up designed to teach it, and the generator
 may use a kind only at or after that level. `UNLOCK` in `generate.js` is that table. The tutorial and
 the hand-made stages already use every Level 1 kind, so choke points and step ups wait for hand-made
@@ -78,7 +82,9 @@ Levels 3 and 5.
 
 ### Difficulty table
 
-Difficulty is the level number a generated stage stands in for. Everything else already scaled by
+Difficulty is the level number a generated stage stands in for (decided 2026-10-14 for kinds,
+problems and wall gaps, as `generate.js` does; the bad-guy and fort-piece columns are brainstorm
+2026-10-14). Everything else already scaled by
 level number (`REUSE-SPEC.md` §Bad guys, §Forts, §Power moves) uses the same number, so a generated
 stage at difficulty 3 plays with 3 CPU bad guys, 3 fort pieces each and Level 3's moves.
 
@@ -96,7 +102,7 @@ Plus the wall, always. A newly unlocked kind is always in on its debut difficult
 margin: terrain is for variety, not for being harder. The proof of concept bears this out (raid
 times below).
 
-**But that is only true for an empty stage run by today's AI** (user, 2026-10-14). Once both
+**But that is only true for an empty stage run by today's AI** (brainstorm 2026-10-14, user). Once both
 teams build forts, and grownups play the bad guys against the kids, the terrain is what each side
 builds *with*: a choke point is worth walling, a high deck is worth defending, a syrup gap is
 worth leaving open for the raiders to wade. Then terrain does change difficulty, through how
@@ -109,6 +115,8 @@ difficulty: a big win steps it up by one, never past the highest hand-made level
 finished; a loss keeps it (the spec never drops a level).
 
 ## Fitting the sticker card
+
+(brainstorm 2026-10-14)
 
 The card is a grid of the hand-made levels' places; a stamp is the level's picker picture with a
 tally, and the reward ladder hangs off each level's tally. Endless seeds don't fit a grid, and a
@@ -128,6 +136,8 @@ stamp nobody recognises is not a sticker anyone wants. Three ways in, in order o
 
 ## Risks, and numbers that catch some of them
 
+(brainstorm 2026-10-14; the measured column is the built proof of concept)
+
 | Risk | Numeric guard | What the PoC measured |
 | --- | --- | --- |
 | Samey stages | distribution of kind combinations per difficulty; spread of raid times | 6 combinations at difficulty 1–3, 10 at 4–5, 15 at 6; raid median 4.6 s → 5.4 s from difficulty 1 to 5, so stages *play* alike |
@@ -146,6 +156,8 @@ behave on it (they don't exist yet, though they will route through the same nav 
 known wart: the training dummy spawns at x −3, right against a choke pillar's edge.
 
 ## What the proof of concept showed
+
+(decided 2026-10-14)
 
 - `spinoff/generate.js`: `generateStage(seed, difficulty)` returns a `Stage`; `UNLOCK` is the
   kind-to-difficulty table. ESLint and typecheck clean.
@@ -175,6 +187,8 @@ layout on cake. `levelFor` in `levels.js` builds the stage from the query string
 `stage` says otherwise; without `seed` it's the stage's hand-made layout, or the tutorial.
 
 ## Recommendation
+
+(brainstorm 2026-10-14)
 
 Don't ship random levels yet. Next, smallest step: play five or six seeds on the tablet with a kid
 (the two above plus a few more at difficulties 3 and 5) and see whether the choke point and step up

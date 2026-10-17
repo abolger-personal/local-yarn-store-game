@@ -1,5 +1,7 @@
 # Stage ideas
 
+Everything here is `brainstorm 2026-10-16` unless marked otherwise.
+
 A brainstorm of new stages for Donut Fighters (2026-10-16; ideas, nothing decided or built). The
 rules these build on are in `REUSE-SPEC.md` (§Stages and difficulty are separate, §Mode, §Bad
 guys, §Handicap); layouts are in `GENERATED-LEVELS.md`.
@@ -7,7 +9,7 @@ guys, §Handicap); layouts are in `GENERATED-LEVELS.md`.
 ## What a stage is
 
 A stage is a place with its own treat theme **and its own play rule** (§Stages and difficulty are
-separate). Today there are two:
+separate). Today there are two (decided 2026-10-14):
 
 - **Breakfast:** a waffle floor, waffle-stack decks, a pancake hill. Syrup slows you down, and
   butter makes you slide past where you tapped.
@@ -48,7 +50,7 @@ is one number for the whole game.
 Every stage rule is built from what the sim already does, or from one of a few small additions
 that several stages share.
 
-**Already there:** *slow* (syrup), *slippery* (butter), *launch* (trampolines), *bouncy* (the
+**Already there** (decided 2026-10-14): *slow* (syrup), *slippery* (butter), *launch* (trampolines), *bouncy* (the
 bounce factor), *breakable* (bricks), *up* (decks and hills), *out* (the ring-out box).
 
 **Small additions,** each plain host-side arithmetic that crosses the network with the stage:
@@ -256,7 +258,7 @@ treats so the world stays whole (see the open question on that).
 - **Signature rule:** bad guys see in a cone, drawn as a flashlight beam (no reading). Get past
   without being caught in a beam and you reach their shelf; caught, they chase you.
 - **Reuses:** shelves, bricks as cover. Pairs well with Glow Party's darkness.
-- **Needs:** the computer bad guys first (planned, not built), a vision cone, and sneaking without a
+- **Needs:** the computer bad guys first (brainstorm 2026-10-13, not built), a vision cone, and sneaking without a
   third button: walking slowly, or tapping only a short way ahead, counts as sneaking.
 - **Art:** flashlight beams, hiding spots.
 - **Cost:** big (needs the bad-guy AI).

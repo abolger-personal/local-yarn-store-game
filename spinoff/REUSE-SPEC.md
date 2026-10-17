@@ -568,6 +568,19 @@ and smashers each get a round that is theirs.
   theirs as data; the generator draws them first (`startSpots` in `generate.js`), and the playability
   check fails a level whose spot is off the ground of the heroes' third, under a raised floor, or
   touches a brick, a patch or another spot. Bad guys still start beside their shelf.
+- **Blocks make stairs** (planned 2026-10-17). Two pieces:
+  1. **Block tops are floors.** Route-finding knows the top of every block as somewhere to stand,
+     so tapping the top of a wall walks you up any steps beside it, and a fighter can always walk
+     on and off blocks (the "stuck on your own pancakes" fix, done for good). A step of one block
+     is a hop; a full-height wall with no step beside it still can't be jumped.
+  2. **⬇️ reaches one level up or down.** From a deck you can drop a block over the edge onto the
+     ground below, and from the ground you can put one up onto a deck or a stack beside you, as
+     long as it is within one block's height of where you stand. Every step of a staircase is
+     something a kid can place.
+
+  So a wall is beaten by kicking it or by building a step to climb it: walls cost a block or a
+  kick, they don't stop anyone, and leaving loose blocks by your own wall helps the other team.
+  The raider still kicks rather than climbs.
 - **Later: patching mid-match** (brainstorm 2026-10-15: wanted, not at first). A kid grabs a block
   during the match and plugs a hole the bad guys just opened; a hit knocks it loose like a donut.
   Not in the first version of building, because it puts ⬇️ beside 🥊 and 🦶 in the match: more

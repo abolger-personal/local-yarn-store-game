@@ -1074,6 +1074,9 @@ couldn't slip through block gaps that others could). That's fine, the Mario Kart
 pick has a feel. A fighter's body is the box around everything they wear (`entrantOf` in
 `fighter.js`), so a big cape or hat makes a wider body, and that stays. The effect is always
 visible, since the body is the outfit you see.
+**A balance for the big cape, later** (brainstorm 2026-10-17). A big cape costs you the narrow
+gaps, so give it something back, e.g. it catches air and lets you jump a little higher. A trade
+like that keeps the big cape a choice rather than a handicap.
 
 - **A sword instead of the gloves** (decided 2026-10-17). The chooser's hands row offers 🥊 gloves or a sword,
   never both (`look.hands`, `HANDS` in `fighter.js`; anything else reads back as gloves, so old saves and old

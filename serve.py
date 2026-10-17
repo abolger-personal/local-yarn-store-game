@@ -44,6 +44,9 @@ def redirect_to_https(conn):
     conn.sendall(f"HTTP/1.1 301 Moved Permanently\r\nLocation: https://{host}{path}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".encode())
 
 
+UNTRUSTED = {"SSLV3_ALERT_CERTIFICATE_UNKNOWN", "TLSV1_ALERT_UNKNOWN_CA"}
+
+
 class Server(ThreadingHTTPServer):
     """https when given a TLS context; a plain http request on the same port (an old bookmark) is sent to https."""
     tls = None
@@ -52,7 +55,14 @@ class Server(ThreadingHTTPServer):
         if self.tls:
             if request.recv(1, socket.MSG_PEEK) != b"\x16":
                 return redirect_to_https(request)
-            request = self.tls.wrap_socket(request, server_side=True)
+            try:
+                request = self.tls.wrap_socket(request, server_side=True)
+            except ssl.SSLError as e:
+                # a tablet that tapped past the self-signed warning still drops some speculative connections
+                # this way; the page loads over its next one, so it isn't worth a traceback
+                if e.reason in UNTRUSTED:
+                    return None
+                raise
         return super().finish_request(request, client_address)
 
 

@@ -1159,9 +1159,10 @@ starts the match (the host in a room, or a tablet playing by itself):
 - **What's unlocked is the room's minimum.** A stage or level shows only if *every* player in the
   room has reached it, so nobody is pulled past where they've played.
 - **Reaching the next level:** ▶️ on level 1's end card plays level 2, and finishing level 1 unlocks it.
-- **Saved per browser with the character:** the highest level and the stages each player has
-  reached are saved in their browser with their fighter's save, and travel with the fighter when
-  they join a room, so the host can work out the room's minimum.
+- **One game save per browser:** the highest level and the stages each player has reached are
+  saved in their browser as the whole game's progress, apart from the fighter, so re-rolling or
+  re-dressing a fighter keeps it (decided 2026-10-17). It travels with the fighter when they join a
+  room, so the host can work out the room's minimum.
 - **The match needs the level number:** the host's `start` message carries the stage and the
   level number, not only the stage data (STAGE-IDEAS.md: Progression).
 

@@ -113,8 +113,7 @@ const shelfBox = (z0) => (sh) => ({ x0: sh.x - sh.half, x1: sh.x + sh.half, z0, 
 const patchAt = (s, list, p, grow = 0) => (list ?? []).findIndex((q) => Math.abs(p.y - (q.y ?? s.band.y)) <= STEP
   && Math.hypot(p.x - q.x, p.z - q.z) < q.r + grow);
 const shelfOf = (s, team) => s.shelves.find((sh) => sh.team === team);
-/** In front of the shelf, touching it anywhere along its front (`side` f.r: an end left open beside a block banks too, playtest)
- * or, with `side` 0, with your middle in front of it. */
+/** In front of the shelf: touching it anywhere along its front, or with `side` 0, your middle in front of it (REUSE-SPEC.md §Mode). */
 const standingAt = (f, sh, reach = SHELF_REACH, side = f.r) => f.onGround && Math.abs(f.y - sh.y) <= STEP
   && Math.abs(f.x - sh.x) < sh.half + side && f.z >= sh.z && f.z - sh.z < f.r + reach;
 /** REUSE-SPEC.md §Mode: a guard standing in front of its shelf blocks the grab; one knocked to its end doesn't. */
@@ -387,9 +386,8 @@ function facingGoal(s, f, it) {
   return { ...pointGoal(s, f, it.x + ux * away, it.z + uz * away, it.y), face: it };
 }
 
-/** The nearest spot where you touch the shelf's front, so blocks in front of its middle leave you an open end (playtest);
- * empty-handed at your own shelf you're going to guard it, so right in front of it if there's room. Picked once a tap,
- * and again when the blocks change or your hands do. */
+/** The nearest spot touching the shelf's front; empty-handed at your own, right in front of it (to guard) where there's room.
+ * Picked once a tap, again when the blocks or your hands change. */
 function shelfGoal(s, f, sh) {
   const why = `${sh.team}/${s.brickKey}/${Boolean(f.carrying)}`;
   if (f.shelfSpot?.why === why) return f.shelfSpot.goal;

@@ -66,7 +66,7 @@ body.lobby { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; heig
 .stages.hidden { display: none; }
 .stages button { width: 120px; height: 120px; }
 .stages .emoji { font-size: 70px; }
-/* side by side, the stages or the dial beside 👋 over ▶️, so the picker is no taller than the dial out of fullscreen */
+/* side by side, so the picker fits out of fullscreen */
 .picker { gap: 28px; }
 .picker .menu { display: flex; flex-direction: column; gap: 16px; }
 .dial span, .dial button { width: 84px; height: 84px; box-sizing: border-box; border-radius: 50%; }

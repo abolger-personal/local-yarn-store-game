@@ -468,8 +468,8 @@ export const HERO_DOUGH = '#e8c48e';
 export const BAD_DONUT = Object.freeze({ dough: '#241a1d', frosting: '#7b2fbf', stripe: true });
 
 /**
- * A built, unturned fighter as a match Entrant: as tall as its rest-pose bounding box, as wide as its body is across before
- * the outfit (the tail, cape and sword overlap things, as they look to), and reaching to its glove anchors.
+ * A built, unturned fighter as a match Entrant: as tall as its rest-pose bounding box, as wide as its body before it's
+ * dressed (REUSE-SPEC.md §Costumes), and reaching to its glove anchors.
  * @param {Fighter} f @param {{ id: string, team: import('./match.js').Team, dummy?: boolean }} who
  * @returns {import('./match.js').Entrant}
  */

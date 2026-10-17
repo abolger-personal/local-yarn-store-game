@@ -469,7 +469,7 @@ and smashers each get a round that is theirs.
   - **⬇️ puts it down in front of you.** A faint outline of the block shows in the grid cell you
     face (`inventory/grid.js`), moving as you walk and turn: on the floor, or on top of the stack
     already there. At the level's height limit the outline greys and ⬇️ only gets a head-shake.
-    **The height limit is high enough that nobody can jump over the wall** (decided 2026-10-17):
+    **The height limit is high enough that nobody can jump over the wall** (planned 2026-10-17):
     at least two blocks, as tall as level 1's wall, which the sim already treats as too tall to
     hop. Cake jumps higher, so the playability check proves the limit can't be jumped on every
     stage, not just breakfast.
@@ -478,7 +478,7 @@ and smashers each get a round that is theirs.
     a stack and you pick it back up. That is the take-back: only a top block (nothing floats), only
     your colour (nobody undoes a teammate's work), and no history, so nothing goes stale when
     teammates build on your blocks. A block of yours with a teammate's on top is stuck there for
-    the round (decided 2026-10-17).
+    the round (planned 2026-10-17).
   - **The buttons swap with the round.** In the build round the corner shows ⬇️ and 👍 where 🥊 and
     🦶 sit; when the match starts they drop away and 🥊 🦶 pop in with the hit-stop freeze. The
     camera follows your fighter as in a match, so big levels need nothing extra.
@@ -498,7 +498,7 @@ and smashers each get a round that is theirs.
   - The first build round (above), with each hero's pile next to them.
   - **The bad guys' fort comes with the level** (planned 2026-10-17), already built when the round
     starts and as big as the level wants (Pieces are fixed by level: CPU bad guys aren't limited). The
-    fort leaves the raider a way out, so it never has to kick through its own blocks (decided
+    fort leaves the raider a way out, so it never has to kick through its own blocks (planned
     2026-10-17).
   - **One CPU bad guy**, whatever `badGuys(level, grownups)` says (Bad guys): level 2 is still
     teaching, so the kids meet a single raider.
@@ -516,7 +516,7 @@ and smashers each get a round that is theirs.
     a hero, so the fairness rules (Bad guys) only start to matter on the level that brings Chase.
     A grownup playing a bad guy follows the same rule: their 🥊 and 🦶 break walls but never land
     on a hero (brainstorm 2026-10-17, since 🥷 isn't built yet).
-- **Start spots come first** (decided 2026-10-17). Step 1 of making any level, hand-made or
+- **Start spots come first** (planned 2026-10-17). Step 1 of making any level, hand-made or
   generated, on every stage: pick pseudo-random start spots for up to 6 heroes,
   each with room for the hero and their block pile beside them, and reserve them, so nothing
   placed or generated afterwards (bricks, syrup, butter, trampolines, raised floors) ever lands in
@@ -529,7 +529,7 @@ and smashers each get a round that is theirs.
   (Level 2, above), and a broken block is gone for the rest of the match. A
   match is short (90 s to start), so that's fine: this is short-term strategy, not a long siege.
   Revisit only if a playtest shows kids upset at their wall being gone.
-- **The breakfast stage is the tutorial stage** (decided 2026-10-17). The tutorial levels all play
+- **The breakfast stage is the tutorial stage** (planned 2026-10-17). The tutorial levels all play
   on breakfast, and between them they teach every basic mechanic once: breaking in, building,
   defending, and earning a goody and using a tool. They don't need every goody or tool, only one
   of each to teach how earning and using works.
@@ -639,7 +639,7 @@ and smashers each get a round that is theirs.
   chocolate pastry (pancakes, gingerbread) with dark purple cream or icing. Any bad guy can place or move any bad-guy piece,
   and their walls never get the mixed bonus, so only the heroes can build chunky walls.
 - **Pieces are fixed by level and number of players** (brainstorm 2026-10-13; the base of 4 each is
-  decided 2026-10-17). Each player gets their own small pile to place, so siblings never fight over
+  planned 2026-10-17). Each player gets their own small pile to place, so siblings never fight over
   pieces and every kid builds something:
 
   ```
@@ -649,7 +649,7 @@ and smashers each get a round that is theirs.
   Levels 1 and 2 are 4 each, levels 3 and 4 are 5 each, and 6 each from level 5. The pile mixes the unlocked
   piece kinds, newest first, so a new level's piece is always in hand. The team's grid floor caps
   the total, so a big team on a small stage can't fill every cell. **This is the players' rule
-  only** (decided 2026-10-17): every hero, and any grownup playing a bad guy, gets their own
+  only** (planned 2026-10-17): every hero, and any grownup playing a bad guy, gets their own
   `piecesEach` pile. CPU bad guys are never limited this way: their fort comes with the level, as
   many blocks as the level wants, because kids love knocking blocks down. Level 1 has 20 against
   one dummy.
@@ -1175,15 +1175,15 @@ starts the match (the host in a room, or a tablet playing by itself):
 2. **Level dial:** a phone-keypad grid of numbers, 1 to 9 to start. Only unlocked levels have a
    button; new ones appear as they unlock. Choosing a number brings up ▶️, which starts the match.
 
-- **Guests wait in the lobby** (decided 2026-10-17). While the host picks, everyone else stays on
+- **Guests wait in the lobby** (planned 2026-10-17). While the host picks, everyone else stays on
   the lobby screen with no button to press, and goes into the match when the host taps ▶️.
 - **What's unlocked is the room's minimum.** A stage or level shows only if *every* player in the
   room has reached it, so nobody is pulled past where they've played.
-- **A win unlocks the next level** (decided 2026-10-17). Winning a level saves the next one as
+- **A win unlocks the next level** (planned 2026-10-17). Winning a level saves the next one as
   reached, and ▶️ on that end card plays it; after a loss, ▶️ plays the same level again.
 - **One game save per browser:** the highest level and the stages each player has reached are
   saved in their browser as the whole game's progress, apart from the fighter, so re-rolling or
-  re-dressing a fighter keeps it (decided 2026-10-17). It travels with the fighter when they join a
+  re-dressing a fighter keeps it (planned 2026-10-17). It travels with the fighter when they join a
   room, so the host can work out the room's minimum.
 - **The match needs the level number:** the host's `start` message carries the stage and the
   level number, not only the stage data (STAGE-IDEAS.md: Progression).

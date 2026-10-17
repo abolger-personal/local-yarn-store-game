@@ -291,6 +291,8 @@ export function seatDrop(built) {
   return drop;
 }
 
+export const BAD_GUY_FUR = '#8f8f96';
+
 // REUSE-SPEC.md §Mode: how donuts look
 export const HERO_DOUGH = '#e8c48e';
 export const BAD_DONUT = Object.freeze({ dough: '#241a1d', frosting: '#7b2fbf', stripe: true });

@@ -9,6 +9,11 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   up to the bad guy instead, and it shakes "no". Knock it out of the way and you grab a donut. Kick
   the dummy off the stage and it pops back in right in front of its donuts.
 
+### Fixes
+- **Syrup is easy to spot.** It's a darker, thicker syrup now, so you can see the sticky puddles on the
+  waffle even on a small tablet. The waffle's holes, the top of the pancake hill and the cake stage's gumdrop
+  hill are a little darker too, so an orange or green fighter stands out on them.
+
 ## 0.0.3 — 2026-10-16: Combos, and playing together that holds
 
 ### Play together

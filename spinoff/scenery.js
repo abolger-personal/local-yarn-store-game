@@ -3,9 +3,9 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RIOT } from './fx.js';
 import { groundOf } from './match.js';
-import { BATTER, GINGER, box, brickMesh, damageBrick, damagePancake, mat, pancakeMesh, slabGeometry } from './treats.js';
+import { BATTER, GINGER, PIPING, box, brickMesh, damageBrick, damagePancake, mat, pancakeMesh, slabGeometry } from './treats.js';
 
-const ICING = '#fff3f8';
+const ICING = '#fff3f8', GUMDROP = '#00aa56', CAKE_WALL = '#f7bcd6', BREAKFAST_WALL = '#fff1c9';
 const _v = new THREE.Vector3(), _goal = new THREE.Vector3();
 
 // Cake and sprinkles (the first playtest stage, kept as it was)
@@ -14,7 +14,7 @@ function floorMesh(f) {
   const w = f.x1 - f.x0, d = f.z1 - f.z0, g = new THREE.Group();
   g.position.set((f.x0 + f.x1) / 2, 0, (f.z0 + f.z1) / 2);
   if (f.kind === 'hill') {
-    g.add(new THREE.Mesh(slabGeometry(w, d, f.y, 0.7, 0.22), mat('#2fd17a', 0.3)));
+    g.add(new THREE.Mesh(slabGeometry(w, d, f.y, 0.7, 0.22), mat(GUMDROP, 0.3)));
     return g;
   }
   const base = f.kind === 'ground' ? 0.7 : f.y;
@@ -70,7 +70,7 @@ function icingPads(springs) {
 }
 
 function cakeBackdrop(backWall) {
-  const wall = box(26, 7, 0.4, '#f7bcd6');
+  const wall = box(26, 7, 0.4, CAKE_WALL);
   wall.position.set(0, 2.8, backWall - 0.2);
   const skirting = box(26, 0.5, 0.2, GINGER.heroes);
   skirting.position.set(0, 0.25, backWall - 0.05);
@@ -78,9 +78,9 @@ function cakeBackdrop(backWall) {
 }
 
 // Breakfast
-const WAFFLE = { cell: 0.5, ridge: 0.09, deep: 0.07, dough: '#e2a24e', pocket: '#a8651f' };
-const SYRUP = new THREE.MeshStandardMaterial({ color: '#c0560c', roughness: 0.08, transparent: true, opacity: 0.6, depthWrite: false });
-const HILL = { cakes: 4, nudge: [[0.05, -0.03], [-0.04, 0.03], [0.02, 0.02], [0, 0]], browned: '#c47a2c' };
+const WAFFLE = { cell: 0.5, ridge: 0.09, deep: 0.07, dough: '#e2a24e', pocket: '#955300' };
+const SYRUP = new THREE.MeshStandardMaterial({ color: '#5b2700', roughness: 0.08, transparent: true, opacity: 0.8, depthWrite: false });
+const HILL = { cakes: 4, nudge: [[0.05, -0.03], [-0.04, 0.03], [0.02, 0.02], [0, 0]], browned: '#ab6306' };
 // Butter: a pale, glossy, opaque slick with a pat in the middle, so it never reads as the dark see-through syrup
 const BUTTER = { slick: new THREE.MeshStandardMaterial({ color: '#fff4b0', roughness: 0.08, metalness: 0.05 }), pat: '#ffe680' };
 
@@ -181,24 +181,48 @@ function breakfastFloor(f) {
 }
 
 function breakfastBackdrop(backWall) {
-  const wall = box(26, 7, 0.4, '#fff1c9');
+  const wall = box(26, 7, 0.4, BREAKFAST_WALL);
   wall.position.set(0, 2.8, backWall - 0.2);
   const skirting = box(26, 0.5, 0.2, WAFFLE.dough);
   skirting.position.set(0, 0.25, backWall - 0.05);
   return [wall, skirting];
 }
 
+export const SHELF_WOOD = Object.freeze({ back: '#9a5b2c', plank: '#7a4520' });
+
+// What each surface shows from a distance, for the visibility rules (visibility.test.mjs, REUSE-SPEC.md §Stage visibility rules)
+const hex = (m) => `#${m.color.getHexString()}`;
+const RIDGES = 1 - ((WAFFLE.cell - WAFFLE.ridge) / WAFFLE.cell) ** 2;
+const WAFFLE_TOP = [{ color: WAFFLE.dough, share: RIDGES }, { color: WAFFLE.pocket, share: 1 - RIDGES }];
+const PAD_RIM = 1 - (1 - (2 * PAD.pipe) / 0.45) ** 2; // on a 0.45 pad
+
 /** @typedef {import('./match.js').Stage} Stage */
+/**
+ * @typedef {{ color: string, share?: number, opacity?: number, over?: string }} Paint  share of the area; a see-through paint shows `over` through it
+ * @typedef {{ ground: Paint[], deck: Paint[], hill: Paint[], side: Paint[], wall: string, syrup?: Paint[], butter?: Paint[], spring?: Paint[],
+ *   brick: (team: import('./match.js').Team, icing: string) => Paint[] }} Surfaces
+ */
 const breakfast = (stage) => [...stage.floors.map(breakfastFloor), ...syrupPools(stage.puddles), ...butterSlicks(stage.butter ?? []),
   syrupDrips(groundOf(stage)), ...breakfastBackdrop(stage.backWall)];
 const cake = (stage) => [...stage.floors.map(floorMesh), ...icingPads(stage.springs ?? []), ...groundTreats(groundOf(stage)), ...cakeBackdrop(stage.backWall)];
 
 /**
  * @typedef {{ background: string, scenery: (stage: Stage) => THREE.Object3D[], brick: (b: import('./match.js').BrickState) => any,
- *   damage: (m: any, b: import('./match.js').BrickState) => void }} Theme
+ *   damage: (m: any, b: import('./match.js').BrickState) => void, surfaces: Surfaces }} Theme
  * @type {Record<import('./levels.js').Level['theme'], Theme>}
  */
 export const THEMES = {
-  breakfast: { background: '#fff6e0', scenery: breakfast, brick: pancakeMesh, damage: damagePancake },
-  cake: { background: '#ffe3f0', scenery: cake, brick: brickMesh, damage: damageBrick },
+  breakfast: { background: '#fff6e0', scenery: breakfast, brick: pancakeMesh, damage: damagePancake, surfaces: {
+    ground: WAFFLE_TOP, deck: WAFFLE_TOP, hill: [{ color: HILL.browned }],
+    side: [{ color: WAFFLE.dough }], wall: BREAKFAST_WALL,
+    syrup: [{ color: hex(SYRUP), opacity: SYRUP.opacity, over: WAFFLE.pocket }],
+    butter: [{ color: hex(BUTTER.slick) }],
+    brick: (team, icing) => [{ color: BATTER[team], share: 0.67 }, { color: icing, share: 0.33 }],
+  } },
+  cake: { background: '#ffe3f0', scenery: cake, brick: brickMesh, damage: damageBrick, surfaces: {
+    ground: [{ color: ICING }], deck: [{ color: ICING }], hill: [{ color: GUMDROP }], wall: CAKE_WALL,
+    side: [{ color: GINGER.heroes, share: 0.8 }, { color: ICING, share: 0.2 }],
+    spring: [{ color: PAD.flood, share: 1 - PAD_RIM }, { color: PAD.rim, share: PAD_RIM }],
+    brick: (team, icing) => [{ color: GINGER[team], share: 0.35 }, { color: icing, share: 0.55 }, { color: PIPING, share: 0.1 }],
+  } },
 };

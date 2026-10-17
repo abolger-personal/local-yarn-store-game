@@ -587,8 +587,9 @@ and smashers each get a round that is theirs.
   check fails a level whose spot is off the ground of the heroes' third, under a raised floor, or
   touches a brick, a patch or another spot. Bad guys still start beside their shelf.
 - **Every level fits the widest fighter** (decided 2026-10-17, playtest: level 2's fence gap was two
-  blocks wide, and a lion in a capelet is about 1.17). `WIDEST_FIGHTER` in `match.js` (1.25) is the widest
-  any outfit may be, which `fighter.test.mjs` holds every species in a capelet with a sword to. The
+  blocks wide; amended 2026-10-17: bodies are measured without the outfit, see §Costumes). `WIDEST_FIGHTER`
+  in `match.js` (1) is the widest any body may be (a big lion or llama is about 0.94), which `fighter.test.mjs`
+  holds every species to. The
   playability check (`check-level.mjs`) runs on every hand-made and generated level with a fighter that
   wide: from its start spot it must get to its own shelf to bank, and to the bad guys' shelf through a
   gap or by kicking a way in (a hole as wide as it needs). Walls built of floors, which can't be broken,
@@ -1161,11 +1162,13 @@ The characters stay the yarn store's characters, so hats and capes stay knitwear
 Every fighter wears a bag and boxing gloves or a sword; a hat and a cape are the kid's choice (decided 2026-10-13,
 amended 2026-10-17: a sword instead of gloves). Each piece is in colours the kid picks.
 
-**Dress-up can change how you play** (decided 2026-10-17, from a playtest: fighters in a big cape
-couldn't slip through block gaps that others could). That's fine, the Mario Kart way: what you
-pick has a feel. A fighter's body is the box around everything they wear (`entrantOf` in
-`fighter.js`), so a big cape or hat makes a wider body, and that stays. The effect is always
-visible, since the body is the outfit you see.
+**A fighter bumps into things where it looks like it would** (decided 2026-10-17, playtest: a lion
+on its deck put a block in front of its shelf and was shoved off the deck, though it looked like it
+fit). A fighter's body for bumping and fitting is as wide as it is across before it's dressed
+(`entrantOf` in `fighter.js`); its tail, cape and sword are thin and overlap things. This replaces
+"dress-up can change how you play" (decided 2026-10-17), where the box around everything worn was
+the body, so a capelet, sword or tail made it wider in every direction than it looked. Height still
+counts what you wear.
 **A balance for the big cape, later** (brainstorm 2026-10-17). A big cape costs you the narrow
 gaps, so give it something back, e.g. it catches air and lets you jump a little higher. A trade
 like that keeps the big cape a choice rather than a handicap.

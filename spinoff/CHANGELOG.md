@@ -64,10 +64,12 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **Tapping a bad guy takes you the short way.** You walk straight up to it from the side you came
   from, facing it, so your kick sends it off the way you were heading. Before, you were sometimes walked
   all the way round it.
-- **Big outfits fit everywhere.** A lion in a capelet, the widest fighter there is, could get stuck at level
-  2's fence gap, beside a step up or between a pillar and a trampoline. The gaps are wider now, and a wide
-  fighter finds a way round, or tries again, instead of pushing on the spot. Every level is now checked with
-  the widest outfit before it ships.
+- **Big fighters fit everywhere.** A big fighter could get stuck at level 2's fence gap, beside a step up
+  or between a pillar and a trampoline. The gaps are wider now, and a big fighter finds a way round, or
+  tries again, instead of pushing on the spot. Every level is now checked with the biggest fighter before it ships.
+- **Fighters fit where they look like they fit.** A tail, a capelet or a sword no longer makes a fighter
+  bump into things from further away. You can stand on your deck behind a block in front of your shelf
+  without being pushed off.
 - **The level 2 bad guy doesn't get stuck at walls.** It could stand pushing into a deck or a wall forever;
   now it hops up and kicks through like it should.
 - **Knocking a bad guy off doesn't send you to its donuts.** If you were chasing it, you stop where

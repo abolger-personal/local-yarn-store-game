@@ -145,9 +145,9 @@ for (const species of SPECIES) for (const cape of CAPES) {
     built.root.updateMatrixWorld(true);
     const size = new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3());
     assert.ok(size.x < cell && size.z < cell, `a ${built.species.id} (${size.x.toFixed(2)} × ${size.z.toFixed(2)}) spills out of its ${cell} lobby square`);
-    // the capelet sticks out furthest (a lion's about 1.17): every stage is checked with one WIDEST_FIGHTER wide (check-level.mjs)
+    // every stage is checked with one WIDEST_FIGHTER wide (check-level.mjs)
     const { width } = entrantOf(f, built, { id: 'a', team: 'heroes' });
-    assert.ok(width <= WIDEST_FIGHTER, `a ${built.species.id} in a capelet with a sword is ${width.toFixed(2)} wide, wider than every stage allows for (${WIDEST_FIGHTER})`);
+    assert.ok(width <= WIDEST_FIGHTER, `a ${built.species.id} is ${width.toFixed(2)} wide, wider than every stage allows for (${WIDEST_FIGHTER})`);
     disposeFighter(built);
   }
 }
@@ -305,16 +305,19 @@ for (const [hands, trick] of [['sword', 'sparkle'], ['sword', 'flame'], ['gloves
   disposeFighter(built);
 }
 
-// REUSE-SPEC.md §Costumes: the body is the outfit you see; a hidden swoosh or trick never makes it bigger
+// REUSE-SPEC.md §Costumes: a fighter is as wide as its body, whatever it wears; as tall as what shows, but a hidden swoosh or trick
 {
   const f = newFighter('lion'), built = buildFighter(f), who = { id: 'a', team: /** @type {const} */ ('heroes') };
   const { width, height } = entrantOf(f, built, who);
+  const dressed = { ...f, look: { ...f.look, cape: 'capelet', hands: 'sword' } }, big = buildFighter(dressed);
+  assert.equal(entrantOf(dressed, big, who).width, width, 'a capelet and a sword don\'t make a body wider');
+  disposeFighter(big);
   const far = new THREE.Mesh(new THREE.BoxGeometry(5, 5, 5));
   far.visible = false;
   built.root.add(far);
   assert.deepEqual([entrantOf(f, built, who).width, entrantOf(f, built, who).height], [width, height], 'a hidden part is not measured');
   far.visible = true;
-  assert.ok(entrantOf(f, built, who).width > width + 1, 'a shown part is');
+  assert.ok(entrantOf(f, built, who).height > height + 1, 'a shown part is');
   disposeFighter(built);
 }
 

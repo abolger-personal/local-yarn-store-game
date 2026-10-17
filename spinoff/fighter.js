@@ -368,6 +368,8 @@ export const showOffTrick = (built, side, t) =>
 /** Same order as the shop's `dressedCharacter` (store/sim/cast.js): dress unmerged, then merge. @param {Fighter} f */
 export function buildFighter(f) {
   const built = createCharacter({ ...BASE_PARAMS, ...f.params, mergeMeshes: false }, f.species);
+  built.root.updateMatrixWorld(true);
+  built.root.userData.across = new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3()).x;
   dress(built, outfitOf(f.look));
   mergeCharacter(built);
   if (f.look.hands === 'sword') addSword(built, f.look.gloves);
@@ -466,7 +468,8 @@ export const HERO_DOUGH = '#e8c48e';
 export const BAD_DONUT = Object.freeze({ dough: '#241a1d', frosting: '#7b2fbf', stripe: true });
 
 /**
- * A built, unturned fighter as a match Entrant, measured from its rest-pose bounding box and glove anchors.
+ * A built, unturned fighter as a match Entrant: as tall as its rest-pose bounding box, as wide as its body is across before
+ * the outfit (the tail, cape and sword overlap things, as they look to), and reaching to its glove anchors.
  * @param {Fighter} f @param {{ id: string, team: import('./match.js').Team, dummy?: boolean }} who
  * @returns {import('./match.js').Entrant}
  */
@@ -491,5 +494,5 @@ export function entrantOf(f, built, who) {
   const chest = built.chest.getWorldPosition(new THREE.Vector3());
   const tip = ({ parent, at, r }) => parent.localToWorld(new THREE.Vector3(...at)).distanceTo(chest) + r;
   const look = team === 'heroes' ? { dough: HERO_DOUGH, frosting: f.params.bodyColor, stripe: false } : BAD_DONUT;
-  return { id, team, height: size.y, width: size.z, reach: Math.max(...gloveAnchors(built).map(tip)), look, ...(dummy && { dummy }) };
+  return { id, team, height: size.y, width: built.root.userData.across, reach: Math.max(...gloveAnchors(built).map(tip)), look, ...(dummy && { dummy }) };
 }

@@ -130,7 +130,7 @@ assert.equal(snapshot(createMatch([A], TUTORIAL.stage)).phase, 'play', 'level 1 
 }
 
 // Plugging the gap in the yard's fence (playtest): however wide you are, carrying, a tap on your block faces it and ⬇️
-// stacks on it, and the block you tapped stays down (it isn't fetched back), with no head-shake. A lion with a sword is this wide.
+// stacks on it, and the block you tapped stays down (it isn't fetched back), with no head-shake. A big lion is about this wide.
 {
   const wide = { ...A, width: 0.86 }, m3 = createMatch([wide], stage, { pieces: 4 });
   const idle = (s) => who(s, 'A').move === 'idle', mine = () => snapshot(m3).bricks.filter((b) => b.team === 'heroes');
@@ -142,6 +142,19 @@ assert.equal(snapshot(createMatch([A], TUTORIAL.stage)).phase, 'play', 'level 1 
   const [under, top] = mine();
   assert.deepEqual([under.id, top.x, top.y, top.z], [first.id, first.x, BRICK, first.z], 'on top of the tapped one, which stays down');
   assert.equal(who(snapshot(m3), 'A').block, null, 'hands empty');
+}
+
+// Up on your own deck (playtest): a big lion, tapping its shelf, puts a block right in front of it and stays up there
+{
+  const m4 = createMatch([{ ...A, width: 0.8 }], stage, { pieces: 4 });
+  const [shelf] = snapshot(m4).shelves;
+  fetch(m4, 'A');
+  act(m4, 'A', { target: { thing: 'shelf', team: 'heroes' } }, (s) => who(s, 'A').move === 'idle' && Math.abs(who(s, 'A').x - shelf.x) < 0.01);
+  act(m4, 'A', { drop: true });
+  for (let i = 0; i < 60; i++) tick(m4, {});
+  const [b] = snapshot(m4).bricks.filter((o) => o.team === 'heroes');
+  assert.ok(b && b.y === shelf.y && Math.abs(b.x + BRICK / 2 - shelf.x) <= BRICK && b.z > shelf.z && b.z < shelf.z + BRICK, `the block goes in front of the shelf (${JSON.stringify(b)})`);
+  assert.equal(who(snapshot(m4), 'A').y, shelf.y, 'and the fighter is still on the deck');
 }
 
 console.log('build ok');

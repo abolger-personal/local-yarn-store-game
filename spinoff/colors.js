@@ -1,4 +1,4 @@
-// ?exposure=, ?tone= and ?env= work here as in the game; open it on the MacBook and a tablet and compare the numbers.
+// ?exposure=, ?tone= and ?env= work here as in the game (c is the room's lights, or the old PMREM map with ?env=map); open it on the MacBook and a tablet and compare the numbers.
 import * as THREE from 'three';
 import { makeStage } from './stage.js';
 import { RIOT } from './fx.js';
@@ -17,10 +17,10 @@ scene.add(...balls);
 stage.frame(balls, { margin: 1.05 });
 camera.updateMatrixWorld();
 
-const lit = balls.map((b) => b.material), room = scene.environment, lights = [];
+const lit = balls.map((b) => b.material), map = scene.environment, lights = [];
 scene.traverse((o) => { if (o.isLight) lights.push(o); });
 const flat = (toneMapped) => COLOURS.map((color) => new THREE.MeshBasicMaterial({ color, toneMapped }));
-/** name, materials, direct lights on, room environment on */
+/** name, materials, studio lights on, room on */
 const MODES = [['raw', flat(false), false, false], ['a basic', flat(true), false, false],
   ['b direct', lit, true, false], ['c env', lit, false, true], ['d both', lit, true, true]];
 
@@ -30,8 +30,8 @@ const hex = (r, g, b) => [r, g, b].map((v) => v.toString(16).padStart(2, '0')).j
 /** The median and brightest pixels, and the share with a channel at 255, inside each sphere's screen circle. */
 function shoot([, materials, direct, env]) {
   balls.forEach((b, i) => { b.material = materials[i]; });
-  for (const l of lights) l.visible = direct;
-  scene.environment = env ? room : null;
+  for (const l of lights) l.visible = stage.room.includes(l) ? env : direct;
+  scene.environment = env ? map : null;
   renderer.render(scene, camera);
   const px = new Uint8Array(w * h * 4);
   gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
@@ -74,7 +74,7 @@ const info = {
     vertexMedium: format(gl.VERTEX_SHADER, gl.MEDIUM_FLOAT), fragmentMedium: format(gl.FRAGMENT_SHADER, gl.MEDIUM_FLOAT),
   },
   threePrecision: renderer.capabilities.precision, samples: gl.getParameter(gl.SAMPLES), buffer: `${w}x${h}`,
-  toneMapping: renderer.toneMapping, exposure: renderer.toneMappingExposure, envIntensity: scene.environmentIntensity,
+  toneMapping: renderer.toneMapping, exposure: renderer.toneMappingExposure, room: map ? 'PMREM map' : `light probe + fill, ${stage.room[0].intensity}`,
   outputColorSpace: renderer.outputColorSpace, drawingBufferColorSpace: gl.drawingBufferColorSpace, contextAttributes: gl.getContextAttributes(),
   p3Screen: matchMedia('(color-gamut: p3)').matches, hdrScreen: matchMedia('(dynamic-range: high)').matches,
   devicePixelRatio, colorDepth: screen.colorDepth,

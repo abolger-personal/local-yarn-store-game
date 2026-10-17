@@ -29,6 +29,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 ### Fixes
 - A fighter whose bag is full shakes its head again when it tries for another donut.
 - Fighters' legs keep up when they run: no more feet skating along under a gliding body.
+- Colours look the same on a tablet as on a MacBook: the room's light is now plain lights instead of
+  a reflection map some tablets drew differently (`?env=map` brings the old map back to compare).
 
 ### Buttons
 - 👍 means "done, next" everywhere: the fighter chooser's ✅ is now 👍.

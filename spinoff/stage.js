@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { roomEnvironment } from '../inventory/room-environment.js';
 import { studioLights } from '../characters/selfie-studio.js';
 
-/** `?tone=`, `?exposure=` and `?env=` (room light strength, 1 = as tuned) on this page, or carried from the tap page (index.html) through sessionStorage. */
+/** `?tone=`, `?exposure=` and `?env=` (room light strength, 1 = as tuned; `map` = the old PMREM room map) on this page, or carried from the tap page (index.html) through sessionStorage. */
 function lookParam(key) {
   const v = new URLSearchParams(location.search).get(key);
   try {
@@ -34,13 +34,26 @@ function followSize(container, renderer, camera) {
   fit();
 }
 
+/** roomEnvironment()'s irradiance as L2 spherical harmonics (grey), from LightProbeGenerator on an M3. */
+const ROOM_SH = [1.496, 1.488, 1.152, 0.093, 0.122, 1.25, 0.657, -0.232, -0.479];
+
+// ponytail: tablet GPUs prefilter the PMREM room map differently (mediump), so the room is a light probe plus a camera fill that the material shader evaluates like the other lights; loses the map's soft reflections; tuned to the map's look with colors.html.
+function roomLights(camera, strength) {
+  const probe = new THREE.LightProbe(new THREE.SphericalHarmonics3().fromArray(ROOM_SH.flatMap((v) => [v, v, v])), strength);
+  const fill = new THREE.DirectionalLight('#ffffff', 0.3 * strength);
+  fill.position.set(0, 0, 1);
+  camera.add(probe, fill, fill.target);
+  return [probe, fill];
+}
+
 export function makeStage(container, { background = '#f6e7d4' } = {}) {
   const renderer = makeRenderer(container);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(background);
-  scene.environment = new THREE.PMREMGenerator(renderer).fromScene(roomEnvironment(), 0.04).texture;
-  scene.environmentIntensity = Number(lookParam('env') ?? 1);
   const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 100);
+  const env = lookParam('env');
+  const room = env === 'map' ? [] : roomLights(camera, Number(env ?? 1));
+  if (env === 'map') scene.environment = new THREE.PMREMGenerator(renderer).fromScene(roomEnvironment(), 0.04).texture;
   scene.add(camera, ...studioLights(camera));
   followSize(container, renderer, camera);
 
@@ -49,7 +62,7 @@ export function makeStage(container, { background = '#f6e7d4' } = {}) {
     step(Math.min(clock.update().getDelta(), 0.1));
     renderer.render(scene, camera);
   });
-  return { renderer, scene, camera, run, frame: (objects, opts) => frame(camera, objects, opts) };
+  return { renderer, scene, camera, room, run, frame: (objects, opts) => frame(camera, objects, opts) };
 }
 
 const VIEW = new THREE.Vector3(0, 0.28, 1).normalize();

@@ -1273,6 +1273,10 @@ scary, for 4–6 year olds.
   keep it small: level 1 has the training dummy (decided 2026-10-17), which never raids, and level 2
   has one CPU bad guy (Forts: Level 2). From level 3 the count grows by one CPU bad guy a level:
 
+  A grownup bad guy on level 1 (🥷 isn't built yet) can't attack the kids: they can only defend
+  their base, standing guard and getting knocked aside like the dummy (brainstorm 2026-10-17).
+
+
   ```
   badGuys(level, grownups) = min(8, max(grownups, 1) + level - 1)
   ```

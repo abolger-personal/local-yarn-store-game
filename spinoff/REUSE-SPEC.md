@@ -777,6 +777,12 @@ and smashers each get a round that is theirs.
 
 ## Handicap: one `help` number per player
 
+**A difficulty modifier is needed by level 3** (planned 2026-10-17, from the 0.0.4 playtest: the designer's
+four-year-old took about five tries to beat level 2 as launched in 0.0.4). Five tries is fine there,
+since level 2 has things to learn. But if each level asks that much more, the youngest kids stop
+progressing, so by level 3 the game needs something that eases it for a kid who keeps losing. The
+`help` number below is the likely way in; which knobs, and how it's set, isn't decided yet.
+
 Players are 4–6 year olds and grownups in the same match (brainstorm 2026-10-13: no `help` in the code yet). Each player has one number, `help`,
 that nobody chooses: the game sets it from how they play (below). Every handicap knob is a straight
 line between a **pro** value and a **full help** value:

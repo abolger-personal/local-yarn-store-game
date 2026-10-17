@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { roomEnvironment } from '../inventory/room-environment.js';
 import { studioLights } from '../characters/selfie-studio.js';
 
-/** `?tone=` and `?exposure=` on this page, or carried from the tap page (index.html) through sessionStorage. */
+/** `?tone=`, `?exposure=` and `?env=` (room light strength, 1 = as tuned) on this page, or carried from the tap page (index.html) through sessionStorage. */
 function lookParam(key) {
   const v = new URLSearchParams(location.search).get(key);
   try {
@@ -39,6 +39,7 @@ export function makeStage(container, { background = '#f6e7d4' } = {}) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(background);
   scene.environment = new THREE.PMREMGenerator(renderer).fromScene(roomEnvironment(), 0.04).texture;
+  scene.environmentIntensity = Number(lookParam('env') ?? 1);
   const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 100);
   scene.add(camera, ...studioLights(camera));
   followSize(container, renderer, camera);

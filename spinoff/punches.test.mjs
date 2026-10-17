@@ -129,6 +129,7 @@ for (const [move, S] of STRINGS) {
   const kid = { id: 'kid', team: 'heroes', ...body, look: { dough: '#e8c48a', frosting: '#14c4e0', stripe: false } };
   const dummy = { id: 'dummy', team: 'badGuys', ...body, look: { dough: '#2a1a14', frosting: '#7a2bbf', stripe: true }, dummy: true };
   const m = createMatch([kid, dummy], TUTORIAL.stage), c = newCombo(move, S.length), seen = [], string = [];
+  m.fighters[1].z = m.fighters[0].z; // straight ahead, so the knock-backs run along the stage, not off its front
   let was = '', landed = 0;
   for (let t = 0; t < 60 * 20; t++) {
     const before = snapshot(m).fighters, me = before[0], d = before[1];

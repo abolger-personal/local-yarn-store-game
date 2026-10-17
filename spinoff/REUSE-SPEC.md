@@ -176,6 +176,9 @@ floor at an angle and follows your fighter.
   tap higher, in the air, is the next mid-air jump. There is no jump button.
 - **Tap a thing:** the fighter goes to it and acts. A bad guy: chase them. A loose donut: pick it
   up. The enemy shelf: grab. Your own shelf: bank. The fighter **ends facing what was tapped**.
+  A fighter you tap is walked up to the short way, stopping on the side you came from (decided
+  2026-10-17, playtest: you were taken round to its left or right, so a kick couldn't send it off
+  the edge you came at it from). A guarded shelf still walks you beside the guard (Mode).
 - **Facing follows the direction of travel, for everyone** (decided 2026-10-13). A punch or kick
   goes the way the fighter is walking, or last walked. Turning is a small tap just in front of or
   behind the fighter. Facing is never a handicap knob: a rule that switched on and off with `help`

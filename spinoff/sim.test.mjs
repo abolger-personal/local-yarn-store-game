@@ -409,6 +409,7 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
 
 {
   const m = createMatch([hero, dummy], STAGE);
+  m.fighters[1].z = m.fighters[0].z; // straight ahead, so the knock-backs run along the stage, not off its front
   run(m, 300, once({ target: { thing: 'fighter', id: 'dummy' } }));
   let snap = run(m, 200, (_, i) => say({ punch: i % 30 === 0 }));
   const hit = me(snap, 'dummy').percent;
@@ -541,6 +542,20 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
 {
   const { starts } = TUTORIAL.stage, two = snapshot(createMatch([hero, { ...hero, id: 'kid2' }, dummy], TUTORIAL.stage));
   assert.deepEqual(two.fighters.slice(0, 2).map((f) => ({ x: f.x, z: f.z })), starts.slice(0, 2), 'heroes start on their start spots, in order');
+}
+
+// Tapping a foe walks the short way up to it, stopping on the side you came from, facing it, so 🦶 sends it on that way
+// (playtest: you were walked round to its left or right, and couldn't kick it off the edge you came at it from)
+for (const [from, at] of [['the front', { x: -3, z: 1.6 }], ['the right', { x: -1.8, z: 0.3 }], ['the front left', { x: -4.2, z: 1.4 }]]) {
+  const m = createMatch([hero, dummy], STAGE);
+  Object.assign(m.fighters[0], at);
+  Object.assign(m.fighters[1], { x: -3, z: 0.3 });
+  let walked = 0, was = { ...at };
+  const snap = run(m, 300, once({ target: { thing: 'fighter', id: 'dummy' } }), (s) => { walked += Math.hypot(me(s).x - was.x, me(s).z - was.z); was = { ...me(s) }; });
+  const k = me(snap), d = me(snap, 'dummy'), gap = Math.hypot(k.x - d.x, k.z - d.z), straight = Math.hypot(at.x - d.x, at.z - d.z) - gap;
+  const toward = Math.atan2(d.z - k.z, d.x - k.x), cameFrom = Math.atan2(at.z - d.z, at.x - d.x), sideNow = Math.atan2(k.z - d.z, k.x - d.x);
+  assert.ok(walked < straight + 0.1, `from ${from}, the short way (${walked.toFixed(2)} walked, ${straight.toFixed(2)} straight)`);
+  assert.ok(Math.abs(Math.sin((sideNow - cameFrom) / 2)) < 0.1 && Math.abs(Math.sin((k.facing - toward) / 2)) < 0.05, `on the side you came from, facing it (from ${from})`);
 }
 
 console.log('sim ok');

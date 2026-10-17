@@ -368,6 +368,12 @@ function besideGoal(s, f, it) {
   return { ...pointGoal(s, f, it.x + side * (it.r + f.r + FOLLOW_GAP), it.z, it.y), face: it };
 }
 
+/** Up to a fighter from the side you're coming from, facing it, so a hit sends it on the way you came (playtest: going round to one side). */
+function facingGoal(s, f, it) {
+  const d = flat(f, it), [ux, uz] = d > EPS ? [(f.x - it.x) / d, (f.z - it.z) / d] : [-1, 0], away = it.r + f.r + FOLLOW_GAP;
+  return { ...pointGoal(s, f, it.x + ux * away, it.z + uz * away, it.y), face: it };
+}
+
 function thingGoal(s, f, t) {
   if (t.thing === 'shelf') {
     // REUSE-SPEC.md §Mode: a guarded shelf walks you up to the guard instead, facing it
@@ -385,7 +391,7 @@ function thingGoal(s, f, t) {
   if (!it) return null;
   if (t.thing === 'brick') return brickGoal(s, f, it);
   if (t.thing === 'donut') return { ...pointGoal(s, f, it.x, it.z, it.y), face: it };
-  return besideGoal(s, f, it);
+  return facingGoal(s, f, it);
 }
 
 function resolve(s, f) {

@@ -10,7 +10,7 @@
 html, body {
   margin: 0; height: 100%; overflow: hidden; background: var(--cream); color: var(--ink);
   font-family: ui-rounded, ui-sans-serif, system-ui, sans-serif;
-  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
 }
 body { display: grid; grid-template-columns: 1fr minmax(320px, 44vw); }
 #stage { position: relative; min-height: 0; overflow: hidden; }

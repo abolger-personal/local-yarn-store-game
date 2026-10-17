@@ -685,7 +685,10 @@ connect every time):
   a minute), and after a few rounds with 3 tablets one always failed, while the lobby, connected
   once, always worked. A message to a tablet whose page is between screens is dropped, so what has
   to arrive is repeated until it does (`ready`, below). The lobby's first screen leaves every room.
-  With no tap page (a test, or a page opened by itself) a page keeps its own rooms, as before.
+  A game page opened by itself (a bookmark, an old link) goes to the tap page with `?open=` and
+  opens inside it once tapped, so the rooms always live there; only the game's own pages open that
+  way. The tap page blocks pull-to-refresh, which would drop every room. With no tap page at all
+  (the tests) a page keeps its own rooms.
 - **Starting together.** In a room, the tablet that opened it (🏠) gets ▶️; the others don't.
   ▶️ sends `go` to everyone in the room, and every tablet loads `play.html?room=CODE` (the host's
   with `&host=N`, N the guests it expects, counted before `go` goes out: the guests leave the lobby

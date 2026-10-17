@@ -7,7 +7,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>Donut fighters</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #f6e7d4; touch-action: none; }
+  /* no pull-to-refresh: reloading this page drops every room */
+  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: #f6e7d4; touch-action: none; }
   #tap { width: 100%; height: 100%; border: 0; background: none; font-size: 30vmin; cursor: pointer; }
   iframe { display: block; width: 100%; height: 100%; border: 0; }
 </style>
@@ -31,7 +32,9 @@
   document.getElementById('tap').addEventListener('click', (e) => {
     document.documentElement.requestFullscreen?.().catch(() => {});
     window.donutRooms = import('./rooms.js');
-    e.currentTarget.outerHTML = '<iframe src="choose.html" allow="fullscreen; screen-wake-lock"></iframe>';
+    // a game page opened by itself comes back here as ?open=, and opens once tapped; only the game's own pages
+    const open = /^(choose|lobby|play)\.html(\?[^"<>]*)?$/.test(q.get('open') ?? '') ? q.get('open') : 'choose.html';
+    e.currentTarget.outerHTML = `<iframe src="${open}" allow="fullscreen; screen-wake-lock"></iframe>`;
   });
 </script>
 </body>

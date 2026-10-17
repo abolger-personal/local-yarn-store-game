@@ -486,6 +486,10 @@ and smashers each get a round that is theirs.
   obvious gap in front of your shelf, and the first raider walking into your wall.
 - **Level 2: the building tutorial** (planned 2026-10-17). Still a tutorial level, on the breakfast
   stage:
+  - **Layout** (planned 2026-10-17): like the tutorial's, the two shelves at opposite ends of the
+    stage, with the pancake hill kept in the middle to jump on. The rest can change from level 1's
+    layout (the bad guys' shut-in wall, for one), to leave an obvious gap in front of the kids'
+    shelf and room for the start spots and piles.
   - The first build round (above), with each hero's pile next to them.
   - **One CPU bad guy**, whatever `badGuys(level, grownups)` says (Bad guys): level 2 is still
     teaching, so the kids meet a single raider.

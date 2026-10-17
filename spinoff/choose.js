@@ -50,7 +50,8 @@ const allowed = (f) => {
 const TRICK_ICON = { plain: '', sparkle: '✨', bubble: '🫧', flame: '🔥' };
 
 let fighter = allowed(loadFighter() ?? newFighter('lion'));
-let built = null, cheer = 0, spin = 0, swing = 1, landed = Infinity;
+let built = null, cheer = 0, spin = 0, swing = 1, landed = Infinity, shows = -1;
+const SHOW_MOVES = ['jab', 'cross', 'uppercut'];
 const panel = document.getElementById('panel');
 
 const button = (action, value, label, inner, on) =>
@@ -113,6 +114,7 @@ const ACTIONS = {
     else look.hands = v;
     allowed(fighter);
     swing = 0;
+    shows++;
   },
 };
 
@@ -163,7 +165,7 @@ stage.run((dt) => {
   const was = swing;
   swing = Math.min(1, swing + dt / 0.7);
   landed = was < STRIKE && swing >= STRIKE ? 0 : landed + dt;
-  if (swing < 1) stepFighter(built, dt, POSES.rest, 0, { name: 'jab', arm: -1, step: swing });
+  if (swing < 1) stepFighter(built, dt, POSES.rest, 0, { name: SHOW_MOVES[shows % SHOW_MOVES.length], arm: -1, step: swing });
   else animateFighter(built, dt, cheer > 0 ? 'delighted' : 'rest');
   if (swing >= STRIKE) showOffTrick(built, -1, landed);
 });

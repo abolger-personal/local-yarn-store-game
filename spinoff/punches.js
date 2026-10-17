@@ -43,14 +43,30 @@ export const GLOVE = Object.freeze([
   key(0.27, { stretch: -0.45, size: 1.45 }), key(HOLD, { stretch: 0.15, size: 1.3 }), key(1, { stretch: 0, size: 1 }),
 ]);
 
-// The sword's world angle above forward (radians) through each punch, and how strongly its swoosh shows:
-// jab and cross chop down from over the shoulder, the uppercut slashes up from low in front
+// REUSE-SPEC.md §Costumes: the sword's own string in the punches' places and timing, arm poses as PUNCHES plus
+// up: the blade's world angle above forward, swoosh: how strongly its trail shows, stab: 1 for a streak, 0 for a fan
 export const SWORD_UP = 0.6;
-const swing = (wind, strike, hold) => Object.freeze([
-  key(0, { up: SWORD_UP, swoosh: 0 }), key(WIND, { up: wind, swoosh: 0 }), key(STRIKE, { up: strike, swoosh: 0.75 }),
-  key(HOLD, { up: hold, swoosh: 0 }), key(1, { up: SWORD_UP, swoosh: 0 }),
+const blade = (stab, wind, strike, hold) => Object.freeze([
+  key(0, { up: SWORD_UP, swoosh: 0, stab }), key(WIND, { swoosh: 0, stab, ...wind }), key(STRIKE, { swoosh: 0.75, stab, ...strike }),
+  key(HOLD, { swoosh: 0, stab, ...hold }), key(1, { up: SWORD_UP, swoosh: 0, stab }),
 ]);
-export const SWING = Object.freeze({ jab: swing(1.9, -0.35, -0.25), cross: swing(2.2, -0.45, -0.35), uppercut: swing(0, 1.5, 1.4) });
+export const SWORD_MOVES = Object.freeze({
+  // stab: drawn back at the chest, then the arm shoots straight out along the blade
+  jab: blade(1,
+    { hit: 0.3, guard: -0.2, hitOut: 0.3, guardOut: 0.4, elbow: 1.7, twist: -0.4, lean: -0.05, up: 0.05 },
+    { hit: -1.55, guard: 0.6, hitOut: 0.05, guardOut: 0.5, elbow: 0, twist: 0.7, lean: 0.25, pitch: -0.1, up: -0.05 },
+    { hit: -1.5, guard: 0.5, hitOut: 0.05, guardOut: 0.45, elbow: 0.05, twist: 0.6, lean: 0.22, pitch: -0.08, up: -0.05 }),
+  // slash: arm out to the side at chest height, swept flat across the front
+  cross: blade(0,
+    { hit: -1.2, guard: -0.2, hitOut: 1.4, guardOut: 0.3, elbow: 0.3, twist: -0.9, up: 0.1 },
+    { hit: -1.45, guard: 0.5, hitOut: -0.3, guardOut: 0.5, elbow: 0.1, twist: 1, lean: 0.25, hip: 0.1, up: 0 },
+    { hit: -1.4, guard: 0.45, hitOut: -0.4, guardOut: 0.45, elbow: 0.15, twist: 0.9, lean: 0.2, up: 0 }),
+  // upward stab: crouched with the blade low, then thrust up and forward to point at the sky
+  uppercut: blade(1,
+    { hit: 0.5, guard: -0.6, hitOut: 0.3, guardOut: 0.3, elbow: 1.3, twist: -0.4, lean: 0.4, knee: 1, hip: 0.5, pitch: 0.15, up: 0.4 },
+    { hit: -2.5, guard: 0.6, hitOut: 0.15, guardOut: 0.5, elbow: 0.1, twist: 0.3, roll: 0.35, lean: -0.15, hip: -0.15, pitch: -0.35, up: 1.2 },
+    { hit: -2.4, guard: 0.5, hitOut: 0.15, guardOut: 0.45, elbow: 0.15, twist: 0.25, roll: 0.3, lean: -0.12, hip: -0.1, pitch: -0.3, up: 1.15 }),
+});
 
 const ease = (k) => k * k * (3 - 2 * k);
 
@@ -67,9 +83,9 @@ export function sample(keys, t) {
 /** The facing-keyed hitting arm: the one nearer the camera, or the far one on the combo's odd punches. */
 export const punchArm = (facing, n = 0) => (Math.cos(facing) >= 0 ? 1 : -1) * (n % 2 ? 1 : -1);
 
-/** Writes punch `p` over a pose that already has the walk in it: arms take over, torso and legs add on. */
-export function punchLayer(out, { name, arm, step }) {
-  const s = sample(PUNCHES[name], step), w = Math.min(1, step / WIND, (1 - step) / (1 - HOLD));
+/** Writes punch `p` (from `moves`, PUNCHES or SWORD_MOVES) over a pose that already has the walk in it: arms take over, torso and legs add on. */
+export function punchLayer(out, { name, arm, step }, moves = PUNCHES) {
+  const s = sample(moves[name], step), w = Math.min(1, step / WIND, (1 - step) / (1 - HOLD));
   const mix = (k, v) => { out[k] = v + (out[k] - POSES.rest[k]) * (1 - w); };
   mix('armSwing', (s.hit + s.guard) / 2);
   mix('armSwingAlt', (-arm * (s.hit - s.guard)) / 2);

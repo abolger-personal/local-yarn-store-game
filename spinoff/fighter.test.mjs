@@ -231,12 +231,27 @@ for (const species of SPECIES) {
     assert.ok(built.sword?.parent === hand && built.gloves.length === 0, `${species}: a sword in the right hand and no gloves`);
     const reach = (b) => entrantOf(f, b, { id: 'a', team: 'heroes' }).reach;
     assert.equal(reach(built), reach(gloved), `${species}: the sword hits exactly as far as gloves`);
-    const blade = (step) => {
-      for (let i = 0; i < 3; i++) stepFighter(built, 1e-4, POSES.rest, 0, { name: 'jab', arm: 1, step });
+    /** The blade's angle above level and its turn from straight ahead, in degrees, and which swoosh shows. */
+    const blade = (name, step) => {
+      for (let i = 0; i < 3; i++) stepFighter(built, 1e-4, POSES.rest, 0, { name, arm: 1, step });
       built.root.updateMatrixWorld(true);
-      return built.sword.localToWorld(new THREE.Vector3(0, 0, 0.4)).y - at(built.sword).y;
+      const d = built.sword.localToWorld(new THREE.Vector3(0, 0, 0.4)).sub(at(built.sword)).normalize();
+      const { fan, streak } = built.sword.userData;
+      return { up: Math.asin(d.y) * 57.3, turn: Math.atan2(d.x, d.z) * 57.3, fan: fan.visible, streak: streak.visible };
     };
-    assert.ok(blade(0.14) > 0.25 && blade(0.25) < -0.1, `${species}: a jab chops the sword down from up high`);
+    const stab = [blade('jab', 0.14), blade('jab', 0.25)], slash = [blade('cross', 0.14), blade('cross', 0.25)];
+    const lift = [blade('uppercut', 0.14), blade('uppercut', 0.25)];
+    assert.ok(stab.every((b) => Math.abs(b.up) < 25 && Math.abs(b.turn) < 45) && stab[1].streak && !stab[1].fan,
+      `${species}: a stab thrusts the blade level and straight ahead, with a streak (${JSON.stringify(stab)})`);
+    assert.ok(slash.every((b) => Math.abs(b.up) < 30) && Math.abs(slash[1].turn - slash[0].turn) > 120 && slash[1].fan && !slash[1].streak,
+      `${species}: a slash sweeps the blade level across the front, with a fan (${JSON.stringify(slash)})`);
+    assert.ok(lift[0].up < 20 && lift[1].up > 60 && lift[1].streak, `${species}: an upward stab ends pointing at the sky (${JSON.stringify(lift)})`);
+    blade('jab', 0.25);
+    if (species !== 'owl') {
+      const fore = built.holds[0].parent.parent, along = at(built.sword).sub(at(fore)).normalize();
+      const d = built.sword.localToWorld(new THREE.Vector3(0, 0, 0.4)).sub(at(built.sword)).normalize();
+      assert.ok(d.angleTo(along) < 0.35, `${species}: the stabbing arm reaches along the blade (${d.angleTo(along).toFixed(2)} rad off)`);
+    }
     assert.ok(built.tricks.length === 1 && built.tricks[0].parent === built.sword && built.tricks[0].visible, `${species}: a sword's sparkle at its tip as it lands`);
     assert.equal(gloved.tricks.length, 0, `${species}: plain gloves have no trick`);
     disposeFighter(built);

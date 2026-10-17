@@ -10,7 +10,7 @@ import { oklchOf } from '../inventory/yarn-look.js';
 import '../characters/llama.js';
 import { wingShape } from '../characters/owl.js';
 import { makeSparkle } from '../characters/sparkle.js';
-import { GLOVE, SWING, SWORD_UP, punchLayer, sample } from './punches.js';
+import { GLOVE, SWORD_MOVES, SWORD_UP, punchLayer, sample } from './punches.js';
 import { kickLayer, kickLunge } from './kicks.js';
 
 export const FIGHTER_KEY = 'lys.fighter.v1';
@@ -233,8 +233,10 @@ function swordGeometry() {
     new THREE.CapsuleGeometry(0.034, guard, 4, 12).translate(0, 0, at),
     new THREE.SphereGeometry(0.034, 14, 10).translate(0, 0, -grip / 2 - 0.018),
   ]);
-  const trail = new THREE.RingGeometry(at + 0.04, at + blade + wide / 2, 12, 1, 0, SWORD.trail).rotateY(-Math.PI / 2);
-  swordGeo = { handle, trim, trail };
+  const fan = new THREE.RingGeometry(at + 0.04, at + blade + wide / 2, 12, 1, Math.PI / 2, SWORD.trail).rotateX(Math.PI / 2);
+  const line = (y, z0, z1, w) => new THREE.PlaneGeometry(z1 - z0, w).rotateY(-Math.PI / 2).translate(0, y, (z0 + z1) / 2);
+  const streak = mergeGeometries([line(wide * 0.8, -0.3, at + blade * 0.5, 0.016), line(-wide * 0.8, -0.24, at + blade * 0.3, 0.016), line(0, -0.36, -0.08, 0.02)]);
+  swordGeo = { handle, trim, fan, streak };
   return swordGeo;
 }
 
@@ -248,11 +250,11 @@ export function addSword(built, color) {
   const sword = new THREE.Group();
   sword.add(new THREE.Mesh(geo.handle, candy(color)), new THREE.Mesh(geo.trim, candy(color === WHITE ? '#ff3b7f' : WHITE)));
   for (const m of sword.children) m.castShadow = true;
-  const trail = new THREE.Mesh(geo.trail, new THREE.MeshBasicMaterial({ color: WHITE, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
-  trail.visible = false;
-  sword.add(trail);
+  const swoosh = new THREE.MeshBasicMaterial({ color: WHITE, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+  const fan = new THREE.Mesh(geo.fan, swoosh), streak = new THREE.Mesh(geo.streak, swoosh);
+  sword.add(fan, streak);
   sword.position.set(...at);
-  sword.userData = { side: -1, trail, tip: SWORD.grip / 2 + 0.012 + SWORD.blade + SWORD.wide / 2 };
+  sword.userData = { side: -1, fan, streak, tip: SWORD.grip / 2 + 0.012 + SWORD.blade + SWORD.wide / 2 };
   parent.add(sword);
   built.sword = sword;
   swingSword(built, null);
@@ -265,18 +267,18 @@ export function removeSword(built) {
   built.sword = null;
 }
 
-/** Holds the blade at SWING's world angle above forward, whatever the arm is doing, with a swoosh behind it. */
+/** Holds the blade at SWORD_MOVES' world angle above forward, whatever the arm is doing: a fan behind a slash, a streak behind a stab. */
 export function swingSword(built, punch) {
   const { sword } = built;
   if (!sword) return;
   let arm = 0;
   for (let n = sword.parent; n && n !== built.chest; n = n.parent) arm += n.rotation.x;
-  const { up, swoosh } = punch ? sample(SWING[punch.name], punch.step) : { up: SWORD_UP, swoosh: 0 };
+  const { up, swoosh, stab } = punch ? sample(SWORD_MOVES[punch.name], punch.step) : { up: SWORD_UP, swoosh: 0, stab: 0 };
   sword.rotation.x = -(up + arm);
-  const { trail } = sword.userData;
-  trail.visible = swoosh > 0.02;
-  trail.material.opacity = swoosh;
-  if (punch) trail.scale.y = Math.sign(SWING[punch.name][1][1].up - SWING[punch.name][2][1].up);
+  const { fan, streak } = sword.userData;
+  fan.visible = swoosh > 0.02 && stab < 0.5;
+  streak.visible = swoosh > 0.02 && stab >= 0.5;
+  fan.material.opacity = swoosh;
 }
 
 const BUBBLES = [[0, 0, 0, 0.05], [0.07, 0.06, 0.02, 0.035], [-0.05, 0.09, -0.02, 0.03], [0.02, 0.15, 0.01, 0.025], [-0.08, 0.01, 0.03, 0.04]];
@@ -353,7 +355,7 @@ function poseTricks(built, side, size, turn, rise) {
 
 /** The hitting hand's trick pops up, upright and turning, through the swoosh of the punch. */
 export function stepTricks(built, punch) {
-  const k = punch ? sample(SWING[punch.name], punch.step).swoosh / 0.75 : 0;
+  const k = punch ? sample(SWORD_MOVES[punch.name], punch.step).swoosh / 0.75 : 0;
   poseTricks(built, k > 0.02 ? punch.arm : null, 0.3 + k, (punch?.step ?? 0) * 9, 0.12 * (punch?.step ?? 0));
 }
 
@@ -431,7 +433,7 @@ export function stepFighter(built, dt, pose, speed, strike = null) {
   built.root.position.z = kick ? kickLunge(built.params, kick) : 0;
   const out = stepMotion(built, pose, dt, IDLE, (o) => {
     if (gain > 0) walkLayer(o, w, gain, IDLE);
-    if (punch) punchLayer(o, punch);
+    if (punch) punchLayer(o, punch, built.sword ? SWORD_MOVES : undefined);
     if (kick) kickLayer(o, kick);
   });
   swingSword(built, punch);

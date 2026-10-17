@@ -135,7 +135,8 @@ export function createHost(link, start, me) {
     },
     /** A guest dropped: its fighter sits where it stopped (the sim has no way to take one out). */
     left(id) { if (guests.delete(id)) pending.set(id, { ...IDLE, away: true }); },
-    again() { link.send('again', true, [...guests]); },
+    /** @param {number} next the next round's, for its own room */
+    again(next) { link.send('again', next, [...guests]); },
   };
 }
 
@@ -151,7 +152,7 @@ export function lateJoiners(link) {
     arrive(id) { late.add(id); link.send('playing', true, [id]); },
     left(id) { late.delete(id); },
     /** @returns {number} how many more tablets the next round waits for */
-    go() { link.send('go', true, [...late]); return late.size; },
+    go(next) { link.send('go', next, [...late]); return late.size; },
   };
 }
 
@@ -185,13 +186,13 @@ function whenStarted(link, g, me, themes) {
 
 /**
  * A guest's side: waits for `start`, then keeps the host's snapshots and sends inputs.
- * @param {Link} link @param {string} me @param {string[]} themes @param {{ gone: () => void, again: () => void }} on
+ * @param {Link} link @param {string} me @param {string[]} themes @param {{ gone: () => void, again: (round: unknown) => void }} on
  */
 export function createGuest(link, me, themes, on) {
   const g = { host: null, ids: new Set(), buf: [], seq: 0, seen: -1, t: 0, quiet: 0, gone: false, fresh: noEvents() };
   const started = whenStarted(link, g, me, themes);
   link.on('snap', (raw, from) => { if (from === g.host) keep(g, readSnap(raw, g.ids)); });
-  link.on('again', (_, from) => { if (from === g.host) on.again(); });
+  link.on('again', (next, from) => { if (from === g.host) on.again(next); });
   const goneNow = () => { if (!g.gone) on.gone(); g.gone = true; };
   return {
     started,

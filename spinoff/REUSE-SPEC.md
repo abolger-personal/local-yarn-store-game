@@ -684,8 +684,12 @@ reorders snapshots. What was built, and what the build decided (2026-10-14, to c
 - **Pause, away, gone:** see Network gotchas. A guest who drops out mid-match sits where it stopped
   for the rest of the round (the sim can't take a fighter out, and a sitting fighter can still
   be hit and still drops its donut). Its tablet can't rejoin that match.
-- **Again:** ▶️ on the host's end card sends `again`; every tablet reloads into a fresh match the
-  same way it started (rejoin, ⏳, `start`). Guests' ▶️ on the end card and the ⏸ card is hidden,
+- **Again:** ▶️ on the host's end card sends `again` with the next round's number; every tablet
+  reloads into a fresh match the same way it started (rejoin, ⏳, `start`), with `&round=N` in its
+  address. Each round has its own room (`donut-CODE-playN`): a reload gives a tablet a new Trystero id,
+  and in the last round's room the new pages heard the closed ones too and never connected
+  (`heard 2 peers 0`, 2026-10-16), while the lobby, which nobody reloads into, always did. Late
+  joiners' `go` carries the same number. Guests' ▶️ on the end card and the ⏸ card is hidden,
   and so is their ⏸. 👋 goes back to the lobby's first screen, out of the room.
 - **Late joiners play the next round** (0.0.3). The roster stays fixed for a round. Once `start` is
   out, the host's match page also joins the lobby room (`donut-CODE`, same `openRoom`, same home

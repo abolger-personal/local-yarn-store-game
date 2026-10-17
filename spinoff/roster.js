@@ -54,6 +54,9 @@ export const CLOCK_SLACK_S = 600;
 export const clockSlack = (frame) => (typeof frame === 'string' && frame.startsWith('["REQ"')
   ? frame.replace(/"since":(\d+)/, (_, s) => `"since":${Number(s) - CLOCK_SLACK_S}`) : frame);
 
+/** A next round's number, from a message or the address: a whole number from 1, or 0 for the first round. */
+export const roundOf = (n) => (Number.isSafeInteger(n) && n > 0 ? n : 0);
+
 /** One `?debug=1` line per tablet met: the route and what the home check made of it. */
 export const routeNote = (remote) =>
   `${remote?.candidateType ?? 'no route'} ${remote?.address || remote?.ip || 'hidden'} ${isHomeRoute(remote) ? 'home' : 'hung up'}`;

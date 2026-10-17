@@ -20,6 +20,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **Kicks come in twos**: a quick front kick, and once it lands, a big movie-style thrust kick: the fighter throws its whole body way back, arms and head flung behind, and lunges in foot-first. Then round again; a miss waits, a pause starts again.
 
 ### Fixes
+- ▶️ for the next round brings every tablet along again, instead of leaving them all waiting on ⏳.
 - A fighter whose bag is full shakes its head again when it tries for another donut.
 - Fighters' legs keep up when they run: no more feet skating along under a gliding body.
 

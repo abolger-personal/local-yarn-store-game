@@ -3,7 +3,7 @@
 import { ROUND_SECONDS } from './match.js';
 import { HOST_GONE_SECONDS, createGuest, createHost, lateJoiners, rosterOf } from './multiplayer.js';
 import { debugging, note, openRoom, selfId, showDebug } from './net.js';
-import { codeHtml, isCode } from './roster.js';
+import { codeHtml, isCode, roundOf } from './roster.js';
 import { THEMES } from './scenery.js';
 
 // ponytail: the host waits this long for a tablet that doesn't arrive, then starts without it; a tablet that
@@ -18,6 +18,7 @@ const SEND_MS = 300;
 const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
 const el = (id) => document.getElementById(id);
 const toLobby = () => { location.href = 'lobby.html'; };
+const playRoom = (round) => `-play${round || ''}`;
 
 function hostGone() {
   el('gone').hidden = false;
@@ -34,46 +35,47 @@ function listenForLate(code, mine) {
   return late;
 }
 
-/** The host's page again, waiting for `expected` guests. */
-function nextRound(expected) {
+/** This page as round `round` (each round its own room, so no page from the last is still in it); the host's waits for `expected` guests. */
+function nextRound(round, expected) {
   const q = new URLSearchParams(location.search);
-  q.set('host', String(expected));
+  q.set('round', String(roundOf(round)));
+  if (expected !== undefined) q.set('host', String(expected));
   setTimeout(() => { location.search = q.toString(); }, SEND_MS);
 }
 
 const noteGuest = (id, n, expected, late) => note(`host: fighter ${id.slice(0, 4)}, ${n} of ${expected}${late ? ' (late)' : ''}`);
 
 /** @param {number[]} code @param {import('./fighter.js').Fighter} mine @param {import('./levels.js').Level} level */
-async function host(code, mine, level, expected) {
+async function host(code, mine, level, expected, round) {
   const guests = new Map();
   let h = null, ready;
   const full = new Promise((r) => { ready = r; });
   const room = openRoom(code, mine, {
     onFighter: (id, f) => { if (!h) guests.set(id, f); noteGuest(id, guests.size, expected, h); if (guests.size >= expected) ready(); },
     onLeave: (id) => { guests.delete(id); h?.left(id); },
-  }, '-play');
+  }, playRoom(round));
   await Promise.race([expected > 0 ? full : null, sleep(WAIT_FOR_GUESTS_MS)]);
   const start = { theme: level.theme, stage: level.stage, roster: rosterOf(selfId, mine, guests), settings: { seconds: ROUND_SECONDS } };
   h = createHost(room, start, selfId);
   note(`host: start sent to ${guests.size}`);
   const late = listenForLate(code, mine);
   const again = () => {
-    h.again();
-    nextRound(guests.size + late.go());
+    h.again(round + 1);
+    nextRound(round + 1, guests.size + late.go(round + 1));
   };
   return { me: selfId, start, host: h, again };
 }
 
 /** @param {number[]} code @param {import('./fighter.js').Fighter} mine */
-async function guest(code, mine) {
+async function guest(code, mine, round) {
   let g = null;
-  const room = openRoom(code, mine, { onFighter: () => {}, onLeave: (id) => g?.left(id) }, '-play');
+  const room = openRoom(code, mine, { onFighter: () => {}, onLeave: (id) => g?.left(id) }, playRoom(round));
   const heard = new Set(), link = { ...room, on: (type, fn) => room.on(type, (data, from) => {
     if (!heard.has(type)) note(`guest: first ${type} from ${from.slice(0, 4)}`);
     heard.add(type);
     fn(data, from);
   }) };
-  g = createGuest(link, selfId, Object.keys(THEMES), { gone: hostGone, again: () => location.reload() });
+  g = createGuest(link, selfId, Object.keys(THEMES), { gone: hostGone, again: (next) => nextRound(next) });
   g.started.then(() => note('guest: start accepted'));
   const start = await Promise.race([g.started, sleep(HOST_GONE_SECONDS * 1000)]);
   if (!start) {
@@ -96,7 +98,9 @@ export async function joinMatch(search, mine, level) {
   for (const c of document.querySelectorAll('.end .code')) c.innerHTML = codeHtml(code);
   el('wait').hidden = false;
   el('wait-bye').addEventListener('click', toLobby);
-  const match = q.has('host') ? await host(code, mine, level, Number(q.get('host')) || 0) : await sleep(STAGGER_MS * Math.random()).then(() => guest(code, mine));
+  const round = roundOf(Number(q.get('round')));
+  const match = q.has('host') ? await host(code, mine, level, Number(q.get('host')) || 0, round)
+    : await sleep(STAGGER_MS * Math.random()).then(() => guest(code, mine, round));
   el('wait').hidden = true;
   return match;
 }

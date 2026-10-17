@@ -34,6 +34,7 @@ export function joinRoom(config, roomId) {
     leave() { post({ t: 'leave', room: roomId }); rooms.delete(roomId); },
   };
   rooms.set(roomId, room);
+  (globalThis.joined ??= []).push(roomId);
   setTimeout(() => post({ t: 'join', room: roomId }));
   return room;
 }`;
@@ -58,10 +59,11 @@ function pageStubs(search) {
 // as lobby.js's room: a late friend waits for the host's `go`
 async function lobby(code) {
   const { openRoom } = await import('./net.js');
+  const { roundOf } = await import('./roster.js');
   const { randomFighter } = await import('./fighter.js');
   const room = openRoom(code, randomFighter(), { onFighter() {}, onLeave() {} });
   room.on('playing', () => parentPort.postMessage({ playing: true }));
-  room.on('go', () => parentPort.postMessage({ next: `?room=${code.join('')}` }));
+  room.on('go', (round) => parentPort.postMessage({ next: `?room=${code.join('')}&round=${roundOf(round)}` }));
 }
 
 async function tablet({ search, late }) {
@@ -72,7 +74,7 @@ async function tablet({ search, late }) {
   const { randomFighter } = await import('./fighter.js');
   const { TUTORIAL } = await import('./levels.js');
   const match = await joinMatch(search, randomFighter(), TUTORIAL);
-  parentPort.postMessage({ me: match.me, roster: match.start.roster.map((s) => s.id) });
+  parentPort.postMessage({ me: match.me, roster: match.start.roster.map((s) => s.id), joined: globalThis.joined });
   parentPort.on('message', () => match.again());
 }
 
@@ -95,10 +97,11 @@ async function round(searches, what) {
   const [host, ...guests] = await within(15000, Promise.all(pages.map((p) => p.said('roster'))), what);
   assert.equal(host.roster.length, searches.length + 1, `the host's match has itself, every guest and the dummy (${host.roster})`);
   for (const g of guests) {
+    assert.deepEqual(g.joined, host.joined.slice(0, 1), 'every guest joins the host\'s match room');
     assert.ok(host.roster.includes(g.me), 'every guest is in the host\'s roster');
     assert.deepEqual(g.roster, host.roster, 'every guest plays the host\'s roster');
   }
-  return pages;
+  return Object.assign(pages, { room: host.joined[0] });
 }
 
 const within = (ms, p, what) => Promise.race([p, new Promise((_, no) => { setTimeout(() => no(new Error(`${what} not within ${ms} ms`)), ms); })]);
@@ -107,15 +110,17 @@ async function main() {
   for (const p of await round(['?room=1234&host=2', '?room=1234', '?room=1234'], 'three tablets starting a match')) p.worker.terminate();
   console.log('together ok (a host and two guests start one match through net.js)');
 
-  const [host, guest] = await round(['?room=2341&host=1', '?room=2341'], 'two tablets starting a match');
+  const first = await round(['?room=2341&host=1', '?room=2341'], 'two tablets starting a match'), [host, guest] = first;
 
   const late = open('', [2, 3, 4, 1]);
   await within(15000, late.said('playing'), 'the host telling a late friend in the lobby a match is on');
   host.worker.postMessage('again');
   const next = await within(15000, Promise.all([host, guest, late].map((p) => p.said('next'))), 'everyone going to the next round');
   for (const p of [host, guest, late]) p.worker.terminate();
-  assert.deepEqual(next.map((n) => n.next), ['?room=2341&host=2', '?room=2341', '?room=2341'], 'the host waits for the guest and the late friend');
-  for (const p of await round(next.map((n) => n.next), 'the next round with the late friend')) p.worker.terminate();
+  assert.deepEqual(next.map((n) => n.next), ['?room=2341&host=2&round=1', '?room=2341&round=1', '?room=2341&round=1'], 'the host waits for the guest and the late friend');
+  const second = await round(next.map((n) => n.next), 'the next round with the late friend');
+  for (const p of second) p.worker.terminate();
+  assert.notEqual(second.room, first.room, 'the next round has a room of its own, with no page from the last in it');
   console.log('together ok (a late friend plays the next round)');
   process.exit(0);
 }

@@ -3,7 +3,7 @@ import { setGeometryDetail } from '../characters/npc.js';
 import { makeGridLines } from '../inventory/notions.js';
 import { animateFighter, buildFighter, disposeFighter, loadFighter } from './fighter.js';
 import { debugging, openRoom, selfId, showDebug } from './net.js';
-import { CODE_LENGTH, ROOM_TREATS, codeHtml, floorGrid, isCode, randomCode, standingSpots } from './roster.js';
+import { CODE_LENGTH, ROOM_TREATS, codeHtml, floorGrid, isCode, randomCode, roundOf, standingSpots } from './roster.js';
 import { makeStage } from './stage.js';
 
 // REUSE-SPEC.md §Performance: up to 14 small fighters on screen; 'high' is for the chooser's close-up
@@ -67,7 +67,7 @@ function enter(next, hosting = false) {
   for (const id of cast.keys()) if (id !== selfId) leave(id);
   roomCode = next;
   room = openRoom(next, mine, { onFighter: arrive, onLeave: leave });
-  room.on('go', () => { location.href = `play.html?room=${next.join('')}`; });
+  room.on('go', (round) => { location.href = `play.html?room=${next.join('')}${roundOf(round) ? `&round=${roundOf(round)}` : ''}`; });
   room.on('playing', (_, from) => waitForRound(from));
   waitForRound(null);
   showCode(next);

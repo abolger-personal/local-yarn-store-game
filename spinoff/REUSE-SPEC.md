@@ -617,9 +617,10 @@ and smashers each get a round that is theirs.
   | 5 | Gingerbread-man shield | A gingerbread man standing guard; takes extra hits |
   | 6+ | More house parts | Windows, doors, chimneys |
 
-- **Heroes place only their own pieces** (planned 2026-10-17 for owning and moving them; the colours
-  are brainstorm 2026-10-13). Every hero's pieces carry their fur colour (plus a small pattern when
-  two kids share a colour). A hero can place and move only their own pieces, never a teammate's,
+- **Heroes place only their own pieces** (planned 2026-10-17; the pattern for two kids sharing a
+  colour is brainstorm 2026-10-13). Every hero's pieces are topped in the same colour as their
+  donuts' frosting, which is their fur colour, so a kid finds their own blocks the way they find
+  their own donuts (plus a small pattern when two kids share a colour). A hero can place and move only their own pieces, never a teammate's,
   and can stack on anything: their own or a teammate's.
   Nothing forces teamwork; the kids find it.
 - **Mixed walls are tougher, and look it** (brainstorm 2026-10-13). Where a hero's piece rests on a

@@ -387,6 +387,16 @@ Later levels can bring new hand-made stages.
   kid can score something in a match, not only whoever reaches a single flag first.
 - **Grab:** tap the enemy shelf (see Navigation); on arrival the fighter grabs. The top donut there is taken off the shelf
   (`lift` in `inventory/grid.js`) into your bag.
+- **A guard blocks the grab** (planned 2026-10-16). A foe standing on the ground in front of their
+  own shelf, in the strip where a grab would happen, guards the whole shelf: nobody can grab from
+  it until the guard is fought or shoved out of that strip. Only where the guard stands counts, so
+  a knockback, a ring-out or shouldering them aside (foes are solid) all clear the way. A grab that
+  is blocked isn't used up: a fighter still standing there with the shelf tapped grabs the moment
+  the guard is gone. The blocked grab shows on the guard, so a kid sees *who* is in the way
+  (brainstorm 2026-10-16: the full-bag "can't" signal, or the guard's arms spreading). It works the
+  same for both teams. Level 1 teaches it with no new behaviour: a ring-out drops the dummy back in
+  above its own shelf (Scoring), so a kid who kicks it off finds it guarding the donuts and has to
+  knock it out of the way to grab. Guarding is also what the CPU's Defend state (Bad guys) is for.
 - **Bank:** touch your own shelf. Everything in your bag goes onto it on its own: `anySlot` finds
   the spot and `place` puts it there, both in `inventory/grid.js`. No dragging, so a 4-year-old
   banks by running home.

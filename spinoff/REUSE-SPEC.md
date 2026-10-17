@@ -504,6 +504,10 @@ and smashers each get a round that is theirs.
   during the match and plugs a hole the bad guys just opened; a hit knocks it loose like a donut.
   Not in the first version of building, because it puts ⬇️ beside 🥊 and 🦶 in the match: more
   buttons. The build round stays the calm opening either way.
+- **Lost blocks probably don't matter** (brainstorm 2026-10-17). Once raiders break walls (Bad guys:
+  CPU bad guys break walls, not built yet), a broken block is gone for the rest of the match. A
+  match is short (90 s to start), so that's fine: this is short-term strategy, not a long siege.
+  Revisit only if a playtest shows kids upset at their wall being gone.
 - **The breakfast stage is the tutorial stage** (decided 2026-10-17). The tutorial levels all play
   on breakfast, and between them they teach every basic mechanic once: breaking in, building,
   defending, and earning a goody and using a tool. They don't need every goody or tool, only one

@@ -320,16 +320,18 @@ Visual indicators, so each kid can tell what their teammates are doing:
 
 ## Scoring: everyone plays the whole time
 
-No lives, no elimination, no waiting to respawn (decided 2026-10-13). A match runs on a timer and every player is in
-it from start to finish.
+No lives, no elimination, and only a short wait after a ring-out (decided 2026-10-13, amended
+2026-10-17: the short wait). A match runs on a timer and every player is in it from start to finish.
 
 - **The score is the team's shelf.** Donuts banked on your team's shelf count; donuts in a bag
   are in transit and count for nobody yet. When the timer ends, the team with more donuts on its
   shelf wins (see Mode: donut capture the flag).
 - **A ring-out drops donuts, not the player.** The faller's bag spills across the stage as
-  pickups, and they are back at once: dropped in above their own shelf, fully controllable on
-  the way down, with respawn invincibility so nobody is waiting at the spawn point. Their
-  percent resets to 0.
+  pickups, and they come back after a **short wait, about 3 s** (amended 2026-10-17, playtest: a
+  guard kicked off its base was back before anyone could grab a donut; 2–5 s to tune): dropped in
+  above their own shelf, fully controllable on the way down, with respawn invincibility so nobody
+  is waiting at the spawn point. Their percent resets to 0. The wait is what makes knocking a
+  guard off worth it.
 - **Anyone can grab the spilled donuts**, the faller included, on the way back in. A ring-out
   turns into a scramble instead of a pause.
 - **Any hit pops the carried donut** out of the bag as a pickup, so carrying is risky even

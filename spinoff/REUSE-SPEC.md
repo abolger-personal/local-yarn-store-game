@@ -1273,10 +1273,6 @@ scary, for 4–6 year olds.
   keep it small: level 1 has the training dummy (decided 2026-10-17), which never raids, and level 2
   has one CPU bad guy (Forts: Level 2). From level 3 the count grows by one CPU bad guy a level:
 
-  A grownup bad guy on level 1 (🥷 isn't built yet) can't attack the kids: they can only defend
-  their base, standing guard and getting knocked aside like the dummy (brainstorm 2026-10-17).
-
-
   ```
   badGuys(level, grownups) = min(8, max(grownups, 1) + level - 1)
   ```
@@ -1284,6 +1280,9 @@ scary, for 4–6 year olds.
   Two grownups on level 3 face the kids with 2 CPU bad guys beside them; no grownups on level 3
   is 3 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
   drops it (brainstorm 2026-10-13).
+
+  A grownup bad guy on level 1 (🥷 isn't built yet) can't attack the kids: they can only defend
+  their base, by standing guard at their shelf (brainstorm 2026-10-17).
 - **Saving progress: a sticker card per player** (brainstorm 2026-10-14, replacing "only the highest
   level"). Every player has a stamp card, saved on their own tablet under its own key
   (`lys.stamps.v1`), apart from the fighter, so re-rolling or re-dressing a fighter never touches

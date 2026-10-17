@@ -387,7 +387,8 @@ function thingGoal(s, f, t) {
     return pile ? { ...pointGoal(s, f, pile.x, pile.z, pile.y), face: pile } : null;
   }
   const list = { donut: s.donuts, brick: s.bricks, fighter: s.fighters }[t.thing];
-  const it = list?.find((o) => o.id === t.id && o !== f);
+  // a fighter rung out is gone until it drops in: chasing it would walk you to its shelf (playtest)
+  const it = list?.find((o) => o.id === t.id && o !== f && !(o.out > 0));
   if (!it) return null;
   if (t.thing === 'brick') return brickGoal(s, f, it);
   if (t.thing === 'donut') return { ...pointGoal(s, f, it.x, it.z, it.y), face: it };

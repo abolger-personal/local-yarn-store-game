@@ -558,4 +558,15 @@ for (const [from, at] of [['the front', { x: -3, z: 1.6 }], ['the right', { x: -
   assert.ok(Math.abs(Math.sin((sideNow - cameFrom) / 2)) < 0.1 && Math.abs(Math.sin((k.facing - toward) / 2)) < 0.05, `on the side you came from, facing it (from ${from})`);
 }
 
+// Chasing a foe that gets rung out: the tap is used up where you are, it doesn't walk you on to its shelf (playtest)
+{
+  const m = createMatch([hero, dummy], STAGE);
+  Object.assign(m.fighters[1], { x: -3, z: 0.3 });
+  run(m, 10, once({ target: { thing: 'fighter', id: 'dummy' } }));
+  m.fighters[1].y = -10;
+  const at = { ...me(snapshot(m)) }, snap = run(m, 240);
+  assert.ok(me(snap, 'dummy').respawn > 0 || me(snap, 'dummy').x > 0, 'the dummy was rung out');
+  assert.ok(Math.hypot(me(snap).x - at.x, me(snap).z - at.z) < 0.5 && me(snap).target === null, `the kid stops, not off to the bad guys' shelf (at ${me(snap).x.toFixed(2)})`);
+}
+
 console.log('sim ok');

@@ -179,6 +179,10 @@ floor at an angle and follows your fighter.
   A fighter you tap is walked up to the short way, stopping on the side you came from (decided
   2026-10-17, playtest: you were taken round to its left or right, so a kick couldn't send it off
   the edge you came at it from). A guarded shelf still walks you beside the guard (Mode).
+  A fighter rung out is gone until it drops in, so chasing it stops where you are (decided
+  2026-10-17, playtest: the chase followed it back to its shelf and walked you up to the donuts).
+  Walking on to the enemy shelf after a ring-out on purpose, as an aid on low levels or a `help`
+  row, is brainstorm (2026-10-17).
 - **Facing follows the direction of travel, for everyone** (decided 2026-10-13). A punch or kick
   goes the way the fighter is walking, or last walked. Turning is a small tap just in front of or
   behind the fighter. Facing is never a handicap knob: a rule that switched on and off with `help`

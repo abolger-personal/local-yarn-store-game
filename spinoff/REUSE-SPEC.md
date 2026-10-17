@@ -676,14 +676,24 @@ reorders snapshots. What was built, and what the build decided (decided 2026-10-
 tablets; the flow is right and 4-year-olds follow it straight away; what's left is making it
 connect every time):
 
+- **Kept rooms** (decided 2026-10-16). A tablet joins a room once, from the lobby, and keeps it until
+  it goes back to the lobby's first screen. The tap page (`index.html`) stays loaded the whole visit
+  while the lobby and the play page come and go in its frame, so the room lives there
+  (`spinoff/rooms.js`), and each page attaches to it through `net.js` (`openRoom`) and detaches when
+  it goes. Going from the lobby to a match, or from one round to the next, never reconnects: each
+  reconnect went through the public relays again (rate limits, clocks, a lost offer stalling about
+  a minute), and after a few rounds with 3 tablets one always failed, while the lobby, connected
+  once, always worked. A message to a tablet whose page is between screens is dropped, so what has
+  to arrive is repeated until it does (`ready`, below). The lobby's first screen leaves every room.
+  With no tap page (a test, or a page opened by itself) a page keeps its own rooms, as before.
 - **Starting together.** In a room, the tablet that opened it (🏠) gets ▶️; the others don't.
   ▶️ sends `go` to everyone in the room, and every tablet loads `play.html?room=CODE` (the host's
   with `&host=N`, N the guests it expects, counted before `go` goes out: the guests leave the lobby
-  the moment it arrives, and a count taken after it found none, so the host waited for nobody). A page load drops the lobby's connections, so the
-  match has its own Trystero room (`donut-CODE-play`), apart from the lobby's; everyone rejoins it
-  with the same home-network check, guests a random 0–2 s apart (see Relay rate limits). The host waits for its N guests' fighters (60 s at most,
-  `ponytail:`, then it starts with whoever came), then sends `start` once. ⏳ shows meanwhile,
-  with 👋 back to the lobby.
+  the moment it arrives, and a count taken after it found none, so the host waited for nobody). The
+  match is in the lobby's room (Kept rooms). Each guest's play page says `ready` (its fighter) every
+  second until `start` comes; the host waits for N of them (60 s at most, `ponytail:`, then it starts
+  with whoever came), then sends `start`, and again to a playing guest that still says `ready` (it
+  missed it). ⏳ shows meanwhile, with 👋 back to the lobby.
 - **`start`** (host → each guest, once): the level as data (`theme` and the whole `Stage`,
   opaque: the guest never rebuilds it), the roster (`id`, `team`, and each player's fighter save,
   or `dummy: true` for the training dummy, which every tablet dresses the same), and the round
@@ -719,24 +729,19 @@ connect every time):
 - **Pause, away, gone:** see Network gotchas. A guest who drops out mid-match sits where it stopped
   for the rest of the round (the sim can't take a fighter out, and a sitting fighter can still
   be hit and still drops its donut). Its tablet can't rejoin that match.
-- **Again** (decided 2026-10-14, amended 2026-10-16: a room per round): ▶️ on the host's end card sends `again` with the next round's number; every tablet
-  reloads into a fresh match the same way it started (rejoin, ⏳, `start`), with `&round=N` in its
-  address. Each round has its own room (`donut-CODE-playN`): a reload gives a tablet a new Trystero id,
-  and in the last round's room the new pages heard the closed ones too and never connected
-  (`heard 2 peers 0`, 2026-10-16), while the lobby, which nobody reloads into, always did. Late
-  joiners' `go` carries the same number. Guests' ▶️ on the end card and the ⏸ card is hidden,
+- **Again** (decided 2026-10-14, amended 2026-10-16: kept rooms): ▶️ on the host's end card sends `again`;
+  every tablet's page reloads into a fresh match the same way it started (`ready`, ⏳, `start`), in
+  the same room. The host's old page detaches as it sends `again`, so a guest that reloads first
+  never gets the finished round's `start`. Guests' ▶️ on the end card and the ⏸ card is hidden,
   and so is their ⏸. 👋 goes back to the lobby's first screen, out of the room.
-- **Late joiners play the next round** (decided 2026-10-15; 0.0.3). The roster stays fixed for a round. Once `start` is
-  out, the host's match page also joins the lobby room (`donut-CODE`, same `openRoom`, same home
-  check; opened after `start` so its relay hellos don't land with the guests', and once per round,
-  as the page reloads). A tablet that arrives there gets `playing` from the host, once, and its
+- **Late joiners play the next round** (decided 2026-10-15; 0.0.3). The roster stays fixed for a round. The match is in the
+  lobby's room, so a tablet that taps 🔑 mid-match meets the players there. One that isn't playing
+  (it arrives after `start`, or was still on the lobby screen at `start`) gets `playing` from the host, once, and its
   lobby shows ⏳ beside 👋 (its own fighter and the host's stand on the floor) until `go`, or until
   the host leaves the lobby room. ▶️ on the host's end card sends `go` to every late joiner still
   there (`lateJoiners` in `multiplayer.js`) and counts them into the next round's `host=N`, so they
   load the match like any guest. `playing` is the only extra message: a joiner learns the room is
-  mid-match from the host answering it, not from anything announced. One that taps 🔑 while the
-  host is still on ⏳ (before `start`) sees nobody until `start` goes out. `?debug=1` on the host
-  notes each `lobby: XXXX waits for next round`. The room code (the lobby's treats) shows on the end,
+  mid-match from the host answering it, not from anything announced. The room code (the lobby's treats) shows on the end,
   ⏸ and ⏳ cards, never on the in-play HUD.
 
 The yarn store's seeded rng (ROADMAP A1) draws from
@@ -828,7 +833,8 @@ rollback or replays possible later.
   one internet address, and each announces 5 times in its first ~9 s in a room. Three tablets
   starting a match together, after an evening of reloads, got `rate-limited`, and Trystero skips a
   relay that limits it for a minute or more. Rooms use 10 relays (`relayConfig.redundancy`; a
-  hello needs only one), and guests join a match's room up to 2 s apart. `ponytail:` signalling
+  hello needs only one), and a match uses the room the lobby already joined (Kept rooms), so
+  starting a match or a round sends no hellos at all. `ponytail:` signalling
   through `serve.py` would keep even the hellos at home, but GitHub Pages players would still need
   the relays.
 - **Hidden addresses** (decided 2026-10-15, found in play). Browsers hide a tablet's own addresses behind `.local`

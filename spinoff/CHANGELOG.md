@@ -5,6 +5,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 ## 0.0.3 — in progress
 
 ### Play together
+- **Tablets stay connected from the lobby through every round.** Starting a match and ▶️ for
+  the next round no longer reconnect the tablets, so nobody is left waiting on ⏳.
 - Your own fighter walks smoothly on every tablet, not just the host's: it no longer stutters and
   jumps when the Wi-Fi is busy.
 - **Late friends play the next round.** Tap 🔑 and the room's code while a match is on: your
@@ -20,7 +22,6 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **Kicks come in twos**: a quick front kick, and once it lands, a big movie-style thrust kick: the fighter throws its whole body way back, arms and head flung behind, and lunges in foot-first. Then round again; a miss waits, a pause starts again.
 
 ### Fixes
-- ▶️ for the next round brings every tablet along again, instead of leaving them all waiting on ⏳.
 - A fighter whose bag is full shakes its head again when it tries for another donut.
 - Fighters' legs keep up when they run: no more feet skating along under a gliding body.
 

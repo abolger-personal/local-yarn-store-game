@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { newFighter } from './fighter.js';
-import { homeOnly } from './net.js';
+import { homeOnly } from './rooms.js';
 import {
   CLOCK_SLACK_S, MATCH, MAX_FIGHTERS, ROOM_TREATS, canHit, clockSlack, floorGrid, isCode, isHomeAddress, isHomeRoute, netProblem, randomCode,
   remoteOf, roomName, routeNote, standingSpots,

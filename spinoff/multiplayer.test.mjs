@@ -191,7 +191,7 @@ function play(n, hostInput = IDLE) {
   net.flush();
   assert.equal(g1.frame(0).over, true, 'the end of the match reaches every guest');
   assert.equal(g2.frame(0).over, true);
-  host.again(1);
+  host.again();
   net.flush();
   assert.equal(g1.seen.again, 1, '▶️ again on the host restarts every guest');
 }
@@ -219,7 +219,7 @@ function play(n, hostInput = IDLE) {
   late.left('L2');
   lobby.flush();
   assert.deepEqual(heard.L2, ['playing'], 'a tablet arriving mid-match hears the room is playing');
-  assert.equal(late.go(1), 1, 'the next round waits for each late joiner still there, once');
+  assert.equal(late.go(), 1, 'the next round waits for each late joiner still there, once');
   lobby.flush();
   assert.equal(heard.L1.at(-1), 'go', '▶️ again takes a late joiner along');
   assert.deepEqual(heard.L2, ['playing'], 'and not one that left');

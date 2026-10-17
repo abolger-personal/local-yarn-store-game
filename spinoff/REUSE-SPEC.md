@@ -397,6 +397,8 @@ Later levels can bring new hand-made stages.
   same for both teams. Level 1 teaches it with no new behaviour: a ring-out drops the dummy back in
   above its own shelf (Scoring), so a kid who kicks it off finds it guarding the donuts and has to
   knock it out of the way to grab. Guarding is also what the CPU's Defend state (Bad guys) is for.
+  Later levels can give a team more than one shelf, so one guard can't cover all its donuts
+  (brainstorm 2026-10-16).
 - **Bank:** touch your own shelf. Everything in your bag goes onto it on its own: `anySlot` finds
   the spot and `place` puts it there, both in `inventory/grid.js`. No dragging, so a 4-year-old
   banks by running home.

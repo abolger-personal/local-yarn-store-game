@@ -670,6 +670,20 @@ const overlapY = (a, b) => a.y < b.y + b.h - STEP && b.y < a.y + a.h - STEP;
  * Foes are solid to each other (teammates pass through): each overlapping pair is pushed apart, half each, then off
  * any wall. A guard holds its ground, so only a hit moves it.
  */
+/** A kid standing still beside its team's block: there's a wall for a bad guy to kick, so the kid in its gap holds (playtest). */
+const walled = (s, f) => s.bricks.some((b) => b.team === f.team && b.y < f.y + f.h && b.y + BRICK > f.y && toBox(brickBox(b), f.x, f.z) < f.r + BRICK);
+/** A guard at its shelf, or a kid standing still in a wall, isn't shoved by a fighter walking into it. */
+const holds = (s, f) => guarding(s, f) || (f.team === 'heroes' && f.onGround && !f.walkTo && walled(s, f));
+
+/** Pushed back off its way counts against a walker's progress, so walking into a fighter that holds is getting stuck. */
+function shove(s, f, px, pz) {
+  const w = f.walkTo, d = w ? flat(f, w) : 0;
+  if (d > EPS) f.gain += (px * (w.x - f.x) + pz * (w.z - f.z)) / d;
+  f.x += px;
+  f.z += pz;
+  pushOut(s, f, f.r, f.h);
+}
+
 function separate(s) {
   const fs = s.fighters;
   for (let i = 0; i < fs.length; i++) {
@@ -677,12 +691,10 @@ function separate(s) {
       const a = fs[i], b = fs[j], dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), gap = a.r + b.r - d;
       if (a.team === b.team || a.out || b.out || gap <= 0 || !overlapY(a, b)) continue;
       const [ux, uz] = d > EPS ? [dx / d, dz / d] : [a.team === 'heroes' ? 1 : -1, 0];
-      const held = [guarding(s, a), guarding(s, b)];
+      const held = [holds(s, a), holds(s, b)];
       for (const [f, sign, k] of [[a, -1, 0], [b, 1, 1]]) {
-        const share = held[k] ? 0 : (1 + Number(held[1 - k])) / 2;
-        f.x += sign * ux * gap * share;
-        f.z += sign * uz * gap * share;
-        pushOut(s, f, f.r, f.h);
+        const share = held[0] === held[1] ? 0.5 : Number(!held[k]);
+        shove(s, f, sign * ux * gap * share, sign * uz * gap * share);
       }
     }
   }

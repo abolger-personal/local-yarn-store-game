@@ -552,8 +552,9 @@ and smashers each get a round that is theirs.
     layout (the bad guys' shut-in wall, for one), to leave an obvious gap in front of the kids'
     shelf and room for the start spots and piles. Built: a tall waffle fence (1.8 high, so not a
     jump from the ground, but a step up from the deck) runs from the back wall along the inner end of
-    each deck and out in front of it, closing off the yard in front of each shelf except a gap two
-    blocks wide at the front edge. Two blocks two high (one kid's pile) plug it. The kids start
+    each deck and out in front of it, closing off the yard in front of each shelf except a gap three
+    blocks wide at the front edge (Every level fits the widest fighter). Six blocks, three across two high,
+    plug it; one kid's pile, a stack two high, narrows it to a choke a kid can stand in. The kids start
     outside their fence, between it and the middle; from inside, they can still hop out over the
     fence from the deck. No syrup or butter, like the tutorial. Mirrored, so the bad guys' end is the same.
   - The first build round (above), with each hero's pile next to them.
@@ -566,6 +567,12 @@ and smashers each get a round that is theirs.
   - **The bad guys' deck is twice as deep** (decided 2026-10-17, playtest: the front was the only edge to
     kick a bad guy off). It runs from the back wall to z 0.4 instead of -0.8, its wall moved to the new
     front, so a kid fighting up there can kick the bad guy off the stage's end anywhere along it.
+  - **A kid in a gap beside its blocks holds it** (decided 2026-10-17, playtest: a kid standing in a
+    choke point was shoved straight through it, so pancakes couldn't make a place to wait for the bad
+    guy). A kid standing still with one of its team's blocks right beside it isn't shoved by a bad guy
+    walking into it, like a guard at its shelf. The bad guy, stuck, kicks the blocks, which gives the kid
+    time to stop it; once they're gone it shoves past again. A kid standing anywhere with no blocks beside
+    it still gets shoved, so standing alone in the gap doesn't wall off a level.
   - **One CPU bad guy** (`badGuys` gives the tutorials one, Bad guys): level 2 is still
     teaching, so the kids meet a single raider. The training dummy stays on level 1.
   - **4 fort pieces per hero** (8 for two kids): `piecesEach(2)`, the base rule.

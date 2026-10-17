@@ -83,6 +83,25 @@ const me = (s) => s.fighters.find((f) => f.id === 'cpu1');
   assert.deepEqual(sent.map(([, r]) => r), [0], `it aims once, after the wait (${JSON.stringify(sent)})`);
 }
 
+// A kid standing in the fence gap beside its 2-high stack (playtest: a choke point to wait in): the raider stops at the kid and
+// kicks the stack, and only once it's down does it shove past; a kid standing there with no pancakes is shoved straight past
+{
+  const at = { ...level.stage, starts: [{ x: -5.8, z: 1.2 }] };
+  const choke = { ...at, bricks: [...at.bricks, { team: 'heroes', x: -6, z: 1.6, y: 0, hits: 2 }, { team: 'heroes', x: -6, z: 1.6, y: BRICK, hits: 2 }] };
+  const raid = (stage) => {
+    let gone = -1, stole = -1;
+    play(stage, 30, (s) => {
+      if (gone < 0 && !s.bricks.some((b) => b.team === 'heroes')) gone = s.tick;
+      if (steals(s)) { stole = s.tick; return true; }
+      return false;
+    });
+    return { gone, stole };
+  };
+  const walled = raid(choke), open = raid(at);
+  assert.ok(walled.gone > 0 && walled.stole > walled.gone, `in its gap beside its blocks a kid holds the raider until it has kicked them down (${JSON.stringify(walled)})`);
+  assert.ok(open.stole > 0 && walled.stole - open.stole > 3 * TICK_HZ, `with no blocks the raider shoves past (stole at ${open.stole}, ${walled.stole} with them)`);
+}
+
 {
   // level 2 is a tutorial: the raider walks at a fifth of a kid's speed, slow enough to catch, and still gets home in a round
   let fastest = 0, flew = 0, stole = -1, banked = -1;

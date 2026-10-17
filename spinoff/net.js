@@ -14,7 +14,7 @@ async function roomsOf() {
 }
 const rooms = await roomsOf();
 
-export const { selfId, note, homeOnly } = rooms;
+export const { selfId, note, homeOnly, inRoom, setRoom } = rooms;
 
 /** `?debug=1` (or `=0`) sticks through every page after it, until the tap page opens again without it. */
 export function debugging() {
@@ -55,5 +55,7 @@ export function openRoom(code, mine, { onFighter, onLeave }) {
   return link;
 }
 
-/** Out of every room: the lobby's first screen. */
+/** Out of every room, as 👋 is: the lobby's first screen. */
 export const leaveRooms = () => rooms.leaveAll();
+/** 👋 back to the lobby's first screen. */
+export const bye = () => { leaveRooms(); location.href = 'lobby.html'; };

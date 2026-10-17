@@ -15,6 +15,7 @@ import { SHELF_WOOD, THEMES } from './scenery.js';
 import { PIPING, box, donutMesh, sameLook } from './treats.js';
 import { rosterOf } from './multiplayer.js';
 import { joinMatch } from './together.js';
+import { bye } from './net.js';
 import { createCpu } from './cpu.js';
 
 /** @typedef {import('./match.js').Snapshot} Snapshot @typedef {import('./match.js').FighterState} FighterState */
@@ -569,13 +570,14 @@ async function play() {
 }
 
 const goTo = (href) => () => { location.href = href; };
-document.getElementById('leave').addEventListener('click', goTo('lobby.html'));
+document.getElementById('leave').addEventListener('click', bye);
 // The score first; a tap on it brings up what's next: play again or leave, and the room code for a late friend.
 document.getElementById('score').addEventListener('click', () => {
   document.getElementById('score').hidden = true;
   document.getElementById('next').hidden = false;
 });
-document.getElementById('bye').addEventListener('click', goTo('lobby.html'));
-document.getElementById('quit').addEventListener('click', goTo('lobby.html'));
+document.getElementById('bye').addEventListener('click', bye);
+document.getElementById('quit').addEventListener('click', bye);
+document.getElementById('edit').addEventListener('click', goTo('choose.html'));
 document.getElementById('again').addEventListener('click', () => (net?.again ? net.again(nextSearch) : goTo(`play.html?${nextSearch}`)()));
 if (mine) play();

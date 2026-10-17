@@ -9,6 +9,9 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   one or the other, in any colour. It's a chunky toy sword with its own moves: 🥊 stabs straight
   ahead, then slashes across, then stabs up at the sky, with a whoosh. A sword makes you a bit wider, so
   your hits land a little further out, and you're a little easier to hit.
+- **Change your outfit without leaving your friends.** In a room, ✏️ is there in the lobby and on the
+  score card between rounds. Dress up and tap 👍: you're still in the room, and everyone sees your new
+  look. If the next round starts while you're dressing up, you wait with ⏳ and play the one after.
 - **Tricks.** Tap your gloves or your sword again for a ✨ sparkle, 🫧 bubbles or a 🔥 flame that pops out
   when your punch lands. Tap again for the next one.
 

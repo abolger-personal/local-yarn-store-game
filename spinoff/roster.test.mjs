@@ -90,7 +90,7 @@ import {
 {
   const sent = [], got = [], mine = newFighter('owl'), theirs = newFighter('lion');
   const action = { onMessage: null, send: (data, opts) => { sent.push([data, opts.target]); } };
-  const peers = homeOnly(action, mine, (id, f) => got.push([id, f.species]));
+  const peers = homeOnly(action, () => mine, (id, f) => got.push([id, f.species]));
   action.onMessage(theirs, { peerId: 'A' });
   assert.deepEqual(got, [], 'a fighter from a tablet not yet checked is held');
   peers.welcome('A');

@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
 import { mock } from 'node:test';
-import { randomFighter } from './fighter.js';
+import { randomFighter, readFighter } from './fighter.js';
 import { levelFor, levelOf } from './levels.js';
 
 const HERE = new URL('.', import.meta.url).href;
@@ -103,28 +103,52 @@ function newTablet(n, reached) {
   return t;
 }
 
-// as lobby.js's room: the host's waits to meet `hosting` others and sends `go`; everyone else waits for `go`
-async function lobby(t, net, code, mine, hosting, quit) {
+// as lobby.js's room: the host's waits to meet `hosting` others (and with `hold`, for `start`) and sends `go`;
+// everyone else waits for `go`. ✏️ (`edit`) leaves for the chooser, still in the room.
+async function lobby(t, net, code, mine, hosting, { quit = false, hold = false } = {}) {
   const met = new Set();
-  let meet = () => {};
-  const room = net.openRoom(code, mine, { onFighter: (id, _, progress) => {
+  let meet = () => {}, edit = () => {}, start = () => {}, gone = false;
+  const room = net.openRoom(code, mine, { onFighter: (id, f, progress) => {
     met.add(id);
-    t.say({ heard: progress });
+    t.say({ heard: progress, look: f, from: id });
     meet();
   }, onLeave: (id) => met.delete(id) });
   room.on('playing', () => t.say({ playing: true }));
+  room.hello();
+  const editing = new Promise((r) => { edit = () => { gone = true; r('edit'); }; });
+  const told = new Promise((r) => { start = r; });
+  t.tell = (m) => ({ edit, start })[m]();
   if (quit) return new Promise(() => { room.on('go', () => setTimeout(() => room.leave(), 1500)); });
-  if (!hosting) return new Promise((go) => { room.on('go', () => go(`?room=${code.join('')}`)); });
-  await new Promise((r) => { meet = () => { if (met.size >= hosting) r(); }; meet(); });
-  room.send('go', true);
-  return `?room=${code.join('')}&host`;
+  if (!hosting) return Promise.race([editing, new Promise((go) => { room.on('go', () => go(`?room=${code.join('')}`)); })]);
+  return Promise.race([editing, (async () => {
+    await new Promise((r) => { meet = () => { if (met.size >= hosting) r(); }; meet(); });
+    if (hold) await told;
+    if (gone) return new Promise(() => {});
+    room.send('go', true);
+    return `?room=${code.join('')}&host`;
+  })()]);
+}
+
+// as choose.js in a room: a match starting meanwhile hears `dressing`; 👍 (`done`) saves a new look
+function chooser(t, net, code, mine) {
+  const room = net.openRoom(code, mine, { onFighter() {}, onLeave() {} });
+  room.on('go', (_, from) => room.send('dressing', true, [from]));
+  t.say({ dressing: true });
+  return new Promise((r) => { t.tell = (m) => { if (m === 'done') { const next = randomFighter(); t.say({ dressed: next }); r(next); } }; });
 }
 
 // One tablet's whole visit, as the tap page is: its pages come and go, its rooms stay.
-async function visit(t, { together, net }, { code, hosting, slow, quit, number }) {
-  const mine = randomFighter();
+async function visit(t, { together, net }, { code, hosting, slow, quit, number, hold }) {
+  let mine = randomFighter();
   t.page('', () => {});
-  let page = await lobby(t, net, code, mine, hosting, quit);
+  const inLobby = async (h, opts) => {
+    for (;;) {
+      const next = await lobby(t, net, code, mine, h, opts);
+      if (next !== 'edit') return next;
+      mine = await chooser(t, net, code, mine);
+    }
+  };
+  let page = await inLobby(hosting, { quit, hold });
   t.say({ left: page });
   await new Promise((r) => { setTimeout(r, slow); });
   for (;;) {
@@ -133,26 +157,31 @@ async function visit(t, { together, net }, { code, hosting, slow, quit, number }
     t.page(page, leave);
     await new Promise((r) => { setTimeout(r, pageMs(hosting)); });
     const match = await together.joinMatch(page, mine, page.includes('level=') ? levelFor(page) : levelOf('breakfast', number));
-    t.say({ me: match.me, roster: match.start.roster.map((s) => s.id), joined: [...t.joined], level: [match.start.theme, match.start.number] });
+    t.say({ me: match.me, roster: match.start.roster.map((s) => s.id), joined: [...t.joined], level: [match.start.theme, match.start.number],
+      looks: Object.fromEntries(match.start.roster.map((s) => [s.id, s.fighter])) });
     // 'again': the host's ▶️; 'bye': 👋 back to the lobby, which leaves the room, and the code typed again
-    // 'won': ▶️ on the end card after a win, which plays the next level
+    // 'won': ▶️ on the end card after a win, which plays the next level; 'edit': ✏️ on the end card
     t.tell = (m) => ({ bye: () => leave(null), reload: () => leave(page), again: () => match.again(),
-      won: () => match.again(`${page.slice(1)}&stage=breakfast&level=2`) })[m]();
+      won: () => match.again(`${page.slice(1)}&stage=breakfast&level=2`), edit: () => leave('edit') })[m]();
     page = await left;
     if (page === null) {
       net.leaveRooms();
-      page = await lobby(t, net, code, mine, 0);
+      page = await inLobby(0);
+    }
+    if (page === 'edit') {
+      mine = await chooser(t, net, code, mine);
+      page = await inLobby(hosting, { hold });
     }
     t.say({ next: page });
   }
 }
 
 /** A tablet, its visit started. */
-async function open(code, hosting = 0, slow = 0, quit = false, { number = 1, reached = 1 } = {}) {
+async function open(code, hosting = 0, slow = 0, quit = false, { number = 1, reached = 1, hold = false } = {}) {
   const t = newTablet(tablets.length, reached);
   tablets.push(t);
   const modules = { together: await import(`./together.js?tablet=${t.n}`), net: await import(`./net.js?tablet=${t.n}`) };
-  visit(t, modules, { code, hosting, slow, quit, number });
+  visit(t, modules, { code, hosting, slow, quit, number, hold });
   return t;
 }
 
@@ -236,4 +265,49 @@ const alone = await open([4, 1, 2, 3], 1), gone = await open([4, 1, 2, 3], 0, 0,
 await played([alone], [1], 'a match starting without the tablet that left');
 close([alone, gone]);
 console.log('together ok (the host doesn\'t wait for a tablet that left)');
+
+// REUSE-SPEC.md §Lobby, A room session outlasts every screen
+const keeps = await open([5, 0, 4, 1], 1, 0, false, { hold: true }), dresser = await open([5, 0, 4, 1]);
+const was1 = await within(1000, keeps.said('look'), 'the host meeting the guest');
+dresser.tell('edit');
+await within(1000, dresser.said('dressing'), 'the guest going to the chooser');
+dresser.tell('done');
+const { dressed } = await within(1000, dresser.said('dressed'), 'the guest saving a new look');
+const now1 = await within(1000, keeps.said('look', 2), 'the host hearing the new look');
+assert.deepEqual(now1.look, readFighter(dressed), 'the host\'s lobby redraws the guest in its new look');
+assert.notDeepEqual(now1.look, was1.look);
+await within(1000, dresser.said('look', 2), 'the guest\'s lobby seeing the host again');
+keeps.tell('start');
+const [, still] = await played([keeps, dresser], [1, 1], 'the guest that dressed up playing with the host');
+assert.equal(still.joined.length, 1, 'the guest never left the room to dress up');
+assert.deepEqual(still.looks[still.me], readFighter(dressed), 'and plays in its new look');
+close([keeps, dresser]);
+console.log('together ok (a guest dresses up in the lobby without leaving, and the host sees the new look)');
+
+const boss = await open([0, 5, 1, 4], 1), friend = await open([0, 5, 1, 4]);
+await played([boss, friend], [1, 1], 'two tablets starting a match');
+boss.tell('edit');
+await within(1000, boss.said('dressing'), 'the host going to the chooser from the end card');
+boss.tell('done');
+const { dressed: bossLook } = await within(1000, boss.said('dressed'), 'the host saving a new look');
+const after = await played([boss, friend], [2, 2], 'the host back from dressing up starting the next round with its guest');
+for (const m of after) assert.equal(m.joined.length, 1, 'nobody left the room or joined it again');
+assert.deepEqual(after[1].looks[boss.selfId], readFighter(bossLook), 'the guest sees the host\'s new look');
+close([boss, friend]);
+console.log('together ok (the host dresses up between rounds, and its guests are still there)');
+
+const lead = await open([4, 1, 5, 0], 1), dozy = await open([4, 1, 5, 0]);
+await played([lead, dozy], [1, 1], 'two tablets starting a match');
+dozy.tell('edit');
+await within(1000, dozy.said('dressing'), 'the guest going to the chooser from the end card');
+lead.tell('again');
+await played([lead], [2], 'the next round starting without waiting for the guest dressing up');
+await within(1000, new Promise((r) => { setTimeout(r, 100); }), 'a while longer dressing up');
+dozy.tell('done');
+await within(1000, dozy.said('playing'), 'the guest back in the lobby told a match is on (⏳)');
+lead.tell('again');
+const third = await played([lead, dozy], [3, 2], 'the guest that dressed up playing the round after');
+assert.equal(third[1].joined.length, 1, 'still in the room it joined once');
+close([lead, dozy]);
+console.log('together ok (a guest dressing up while a round starts is a late friend and plays the next)');
 mock.timers.reset();

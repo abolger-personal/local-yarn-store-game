@@ -3,7 +3,7 @@
 import { readFighter } from './fighter.js';
 import { ROUND_SECONDS } from './match.js';
 import { HOST_GONE_SECONDS, createGuest, createHost, lateJoiners, rosterOf } from './multiplayer.js';
-import { debugging, note, openRoom, selfId, showDebug } from './net.js';
+import { bye, debugging, note, openRoom, selfId, showDebug } from './net.js';
 import { codeHtml, isCode } from './roster.js';
 import { THEMES } from './scenery.js';
 
@@ -16,11 +16,10 @@ const READY_MS = 1000;
 
 const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
 const el = (id) => document.getElementById(id);
-const toLobby = () => { location.href = 'lobby.html'; };
 
 function hostGone() {
   el('gone').hidden = false;
-  el('gone-bye').addEventListener('click', toLobby);
+  el('gone-bye').addEventListener('click', bye);
 }
 
 /** The host's page again, waiting for `expected` guests. */
@@ -39,13 +38,14 @@ const noteGuest = (id, n, of) => note(`host: ${id.slice(0, 4)} ready, ${n} of ${
 
 /**
  * Fills `guests` with the tablets that say `ready` (with their fighter); `everyone` resolves once every tablet
- * in the room has, or time is up. `check` again when one leaves. After `start()` has one, a playing guest
- * that says it again missed `start` and gets it again.
+ * in the room has, or is `dressing` up in the chooser, or time is up. `check` again when one leaves. After
+ * `start()` has one, a playing guest that says it again missed `start` and gets it again.
  */
-function readyGuests(room, guests, start) {
+function readyGuests(room, guests, dressing, start) {
   let all;
   const done = new Promise((r) => { all = r; });
-  const check = () => { if (room.peers().every((id) => guests.has(id))) all(); };
+  const check = () => { if (room.peers().every((id) => guests.has(id) || dressing.has(id))) all(); };
+  room.on('dressing', (_, id) => { dressing.add(id); check(); });
   room.on('ready', (raw, id) => {
     const f = readFighter(raw), now = start();
     if (now) { if (f && now.roster.some((s) => s.id === id)) room.send('start', now, [id]); return; }
@@ -65,15 +65,16 @@ function readyGuests(room, guests, start) {
  * @param {number[]} code @param {import('./fighter.js').Fighter} mine @param {import('./levels.js').Level} level
  */
 async function host(code, mine, level) {
-  const guests = new Map();
+  const guests = new Map(), dressing = new Set();
   let h = null, late = null, start = null, recheck = () => {};
   const playing = (id) => start?.roster.some((s) => s.id === id);
   const room = openRoom(code, mine, {
-    // before `start` everyone comes along; a player that left and came back goes back into the match
-    onFighter: (id) => { if (start && !playing(id)) late?.arrive(id); else { h?.back(id); room.send('go', true, [id]); } },
+    // before `start` everyone comes along; a player that left and came back goes back into the match; a lobby
+    // back from the chooser hears `playing` again
+    onFighter: (id) => (start && !playing(id) ? (late?.left(id), late?.arrive(id)) : (dressing.delete(id), h?.back(id), room.send('go', true, [id]))),
     onLeave: (id) => { guests.delete(id); recheck(); late?.left(id); h?.left(id); },
   });
-  const ready = readyGuests(room, guests, () => start);
+  const ready = readyGuests(room, guests, dressing, () => start);
   recheck = ready.check;
   // everyone in the room comes along: the lobby's tablets, and guests still playing a match this page took over from
   room.send('go', true);
@@ -131,6 +132,6 @@ export async function joinMatch(search, mine, level) {
   if (!isCode(code)) return null;
   if (debugging()) showDebug();
   for (const c of document.querySelectorAll('.end .code')) c.innerHTML = codeHtml(code);
-  el('wait-bye').addEventListener('click', toLobby);
+  el('wait-bye').addEventListener('click', bye);
   return q.has('host') ? host(code, mine, level) : guest(code, mine);
 }

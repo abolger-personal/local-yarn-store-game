@@ -196,6 +196,14 @@ function play(n, hostInput = IDLE) {
 }
 
 {
+  g1.frame(HOST_GONE_SECONDS / 2);
+  assert.equal(g1.seen.gone, 0, 'a quiet host is not gone yet');
+  g1.frame(HOST_GONE_SECONDS / 2 + 1);
+  g1.frame(1);
+  assert.equal(g1.seen.gone, 1, 'a host silent for a minute has left, said once');
+}
+
+{
   while (!snapshot(state).over) tick(state, {});
   host.seen(snapshot(state));
   host.post(false);
@@ -205,14 +213,11 @@ function play(n, hostInput = IDLE) {
   host.again();
   net.flush();
   assert.equal(g1.seen.again, 1, '▶️ again on the host restarts every guest');
+  g2.frame(HOST_GONE_SECONDS + 1);
+  assert.equal(g2.seen.gone, 0, 'on the end card a quiet host may be dressing up: only leaving the room is gone');
 }
 
 {
-  g1.frame(HOST_GONE_SECONDS / 2);
-  assert.equal(g1.seen.gone, 0, 'a quiet host is not gone yet');
-  g1.frame(HOST_GONE_SECONDS / 2 + 1);
-  g1.frame(1);
-  assert.equal(g1.seen.gone, 1, 'a host silent for a minute has left, said once');
   g2.left('G1');
   assert.equal(g2.seen.gone, 0, 'another guest leaving is not the host leaving');
   g2.left('H');

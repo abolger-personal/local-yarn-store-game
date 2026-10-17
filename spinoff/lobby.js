@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { setGeometryDetail } from '../characters/npc.js';
 import { makeGridLines } from '../inventory/notions.js';
 import { animateFighter, buildFighter, disposeFighter, loadFighter } from './fighter.js';
-import { debugging, leaveRooms, openRoom, selfId, showDebug } from './net.js';
+import { debugging, inRoom, leaveRooms, openRoom, selfId, setRoom, showDebug } from './net.js';
 import { CODE_LENGTH, ROOM_TREATS, codeHtml, floorGrid, isCode, randomCode, standingSpots } from './roster.js';
 import { makeStage } from './stage.js';
 import { loadProgress, roomLevels, roomStages } from './progress.js';
@@ -10,8 +10,6 @@ import { loadProgress, roomLevels, roomStages } from './progress.js';
 // REUSE-SPEC.md §Performance: up to 14 small fighters on screen; 'high' is for the chooser's close-up
 setGeometryDetail('med');
 
-// the lobby's first screen is out of every room; a match's pages keep the lobby's room (REUSE-SPEC.md §Kept rooms)
-leaveRooms();
 const mine = loadFighter();
 if (!mine) location.replace('choose.html');
 
@@ -69,6 +67,7 @@ function enter(next, hosting = false) {
   room?.leave();
   for (const id of cast.keys()) if (id !== selfId) leave(id);
   roomCode = next;
+  setRoom({ code: next, hosting });
   room = openRoom(next, mine, { onFighter: arrive, onLeave: leave });
   room.on('go', () => { location.href = `play.html?room=${next.join('')}`; });
   room.on('playing', (_, from) => waitForRound(from));
@@ -79,6 +78,7 @@ function enter(next, hosting = false) {
   show('inroom', true);
   show('picker', false);
   show('go', hosting);
+  room.hello();
 }
 
 // REUSE-SPEC.md §After the lobby: 👍 (the host's in a room, or playing alone) picks a stage, then a level; ▶️ plays it.
@@ -128,7 +128,7 @@ function go() {
 }
 
 function exit() {
-  room?.leave();
+  leaveRooms();
   room = null;
   waitForRound(null);
   for (const id of cast.keys()) if (id !== selfId) leave(id);
@@ -161,6 +161,7 @@ const on = (id, fn) => document.getElementById(id).addEventListener('click', fn)
 on('host', () => enter(randomCode(), true));
 on('join', () => { typed = []; showCode([]); show('start', false); show('keypad', true); });
 on('edit', () => { location.href = 'choose.html'; });
+on('edit-room', () => { location.href = 'choose.html'; });
 on('play', pick);
 on('exit', exit);
 on('go', pick);
@@ -175,6 +176,8 @@ if (debugging()) showDebug();
 if (mine) {
   arrive(selfId, mine, loadProgress());
   stage.frame([floor], { margin: 1.05, view: new THREE.Vector3(0, 0.55, 1).normalize() });
+  const session = inRoom();
+  if (session) enter(session.code, session.hosting);
   stage.run((dt) => {
     for (const f of cast.values()) {
       f.cheer = Math.max(0, f.cheer - dt);

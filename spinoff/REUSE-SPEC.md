@@ -485,7 +485,8 @@ and smashers each get a round that is theirs.
     arrived once it has stopped, and stepping off butter gives your grip back at once. Butter is
     drawn as a pale, glossy, opaque slick with a pat in the middle, never like the dark,
     see-through syrup. The hand-made breakfast stage has a slick in front of each deck (you jump
-    up off a slide) and one on the pancake hill; generated breakfast stages get the same.
+    up off a slide) and one on the pancake hill; generated breakfast stages get the same. Level 1
+    (the tutorial) has no butter, and no decorative pat either (decided 2026-10-16).
   - **Cake: spongy** (decided and built 2026-10-14). **Bouncy sponge:** every jump on cake goes
     `BOUNCE.cake` (1.5×) as high (`Stage.bounce`), and landings squish and spring back on the
     page (drawing only: the sim never bounces you on its own). **Icing trampolines**

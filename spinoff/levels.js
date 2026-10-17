@@ -75,3 +75,9 @@ export function levelFor(search) {
   if (q.has('seed')) return { theme: name ?? 'breakfast', stage: generateStage(Number(q.get('seed')), Number(q.get('difficulty')) || 1, name ?? 'breakfast') };
   return name ? STAGES[name] : TUTORIAL;
 }
+
+/** The level a play page knows before the network: null for a guest (`?room` without `&host`), whose comes in the host's `start`. */
+export function levelBefore(search) {
+  const q = new URLSearchParams(search);
+  return q.has('room') && !q.has('host') ? null : levelFor(search);
+}

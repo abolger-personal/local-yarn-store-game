@@ -4,13 +4,13 @@ import { attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
 import { countStrike, landHit, newCombo, strikerOf } from './punches.js';
 import { KICK_COMBO, strikeOf } from './kicks.js';
-import { BAD_GUY_FUR, MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
+import { BAD_DONUT, BAD_GUY_FUR, MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
 import { BRICK, TICK_HZ, groundOf } from './match.js';
-import { levelFor } from './levels.js';
+import { levelBefore, levelFor } from './levels.js';
 import { makeStage } from './stage.js';
 import { SHELF_WOOD, THEMES } from './scenery.js';
-import { box, donutMesh, sameLook } from './treats.js';
+import { PIPING, box, donutMesh, sameLook } from './treats.js';
 import { rosterOf } from './multiplayer.js';
 import { joinMatch } from './together.js';
 
@@ -27,8 +27,19 @@ const LOOSE_R = 0.2, FACE_CAMERA = -0.5, FLY_ARC = 0.6, GRAB_FROM_Y = 0.4;
 const mine = loadFighter();
 if (!mine) location.replace('choose.html');
 // REUSE-SPEC.md §Multiplayer: in a room the host's level arrives as data, and each tablet is its own player
-const net = mine ? await joinMatch(location.search, mine, levelFor(location.search)) : null;
-const level = net?.start ?? levelFor(location.search), ground = groundOf(level.stage);
+const known = levelBefore(location.search), asked = known ?? levelFor(location.search);
+const joining = mine ? joinMatch(location.search, mine, asked) : null;
+
+// While ⏳ waits for the other tablets, everything the network doesn't decide is built and its shaders compiled:
+// everyone has their own fighter and the bad guy, and all but a guest know the level.
+const stage = makeStage(document.getElementById('stage'));
+const { scene, camera } = stage;
+const BAD_GUY = badGuyFighter(), prebuilt = { me: mine && buildFighter(mine), dummy: buildFighter(BAD_GUY) };
+const early = known && dress(known);
+const SAMPLE_BRICK = /** @type {any} */ ({ id: 'warm', team: 'heroes', icing: PIPING });
+const [net] = await Promise.all([joining, warmUp(...(prebuilt.me ? [prebuilt.me.root] : []), prebuilt.dummy.root, donutMesh(BAD_DONUT),
+  ...Object.values(THEMES).map((t) => t.brick(SAMPLE_BRICK).g), ...confettiMats.map((m) => new THREE.Mesh(undefined, m)))]);
+const level = net?.start ?? asked, ground = groundOf(level.stage);
 const ME = net?.me ?? 'me';
 const CAMERA = { pitch: THREE.MathUtils.degToRad(35), viewW: 7, viewH: 4.8, xMin: ground.x0 + 3, xMax: ground.x1 - 3 };
 const BACK = new THREE.Vector3(0, Math.sin(CAMERA.pitch), Math.cos(CAMERA.pitch));
@@ -40,8 +51,7 @@ const NONE = Object.freeze([]);
 const _v = new THREE.Vector3(), _goal = new THREE.Vector3();
 
 const theme = THEMES[level.theme];
-const stage = makeStage(document.getElementById('stage'), { background: theme.background });
-const { scene, camera } = stage;
+scene.background = new THREE.Color(theme.background);
 const fx = createFx(scene, camera, level.stage);
 
 function badGuyFighter() {
@@ -76,8 +86,14 @@ function fillShelf(s) {
   return g;
 }
 
-const scenery = theme.scenery(level.stage), pads = scenery.filter((o) => o.userData.spring != null);
-scene.add(...scenery, ...level.stage.shelves.map(shelfFrame));
+/** @param {import('./levels.js').Level} l */
+function dress(l) {
+  const objects = [...THEMES[l.theme].scenery(l.stage), ...l.stage.shelves.map(shelfFrame)];
+  scene.add(...objects);
+  return objects;
+}
+
+const scenery = early ?? dress(level), pads = scenery.filter((o) => o.userData.spring != null);
 
 let frame = 0, now = 0;
 
@@ -339,7 +355,7 @@ function showEnd(snap) {
 /** @param {import('./multiplayer.js').Seat[]} roster */
 function cast(roster) {
   return roster.map(({ id, team, fighter, dummy = false }) => {
-    const f = dummy ? badGuyFighter() : fighter, built = buildFighter(f), g = new THREE.Group();
+    const f = dummy ? BAD_GUY : fighter, built = (dummy ? prebuilt.dummy : id === ME && prebuilt.me) || buildFighter(f), g = new THREE.Group();
     const entrant = entrantOf(f, built, { id, team, dummy });
     g.add(built.root);
     scene.add(g);
@@ -398,14 +414,27 @@ function guest(controls) {
   });
 }
 
-function play() {
+/** Compiles the shaders of everything in the scene, and of `later` (things that turn up later), so the first frames don't stall. @param {THREE.Object3D[]} later */
+async function warmUp(...later) {
+  const g = new THREE.Group();
+  makeShadow(g);
+  for (const o of later) g.add(o);
+  scene.add(g);
+  await stage.renderer.compileAsync(scene, camera);
+  scene.remove(g);
+}
+
+async function play() {
   const entrants = cast(net?.start.roster ?? rosterOf(ME, mine));
   const controls = createControls(ME, level.stage);
   const button = (id) => document.getElementById(id);
   attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: button('punch'), kick: button('kick') } });
+  await warmUp();
   keepAwake();
   if (net?.guest) guest(controls);
   else host(api.createMatch(entrants, level.stage), controls);
+  // play.html shows ⏳ from the start; the first frame is drawn in the same paint that takes it away
+  document.getElementById('wait').hidden = true;
 }
 
 const goTo = (href) => () => { location.href = href; };

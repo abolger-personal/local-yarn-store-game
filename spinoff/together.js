@@ -130,9 +130,6 @@ export async function joinMatch(search, mine, level) {
   if (!isCode(code)) return null;
   if (debugging()) showDebug();
   for (const c of document.querySelectorAll('.end .code')) c.innerHTML = codeHtml(code);
-  el('wait').hidden = false;
   el('wait-bye').addEventListener('click', toLobby);
-  const match = q.has('host') ? await host(code, mine, level) : await guest(code, mine);
-  el('wait').hidden = true;
-  return match;
+  return q.has('host') ? host(code, mine, level) : guest(code, mine);
 }

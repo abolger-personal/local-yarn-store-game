@@ -17,6 +17,9 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   stage with only the score showing. When the game is played from a computer at home (`serve.py`), it now
   loads over far fewer connections, so a match comes up every time. Playing from the website was already
   fine.
+- **Matches come up faster, and you see ⏳ straight away.** After ▶️ the ⏳ shows at once instead of a
+  blank screen. While it waits for the other tablets, your tablet already sets up the stage and your
+  fighter, so the match starts sooner once everyone's there, and the first moment of play doesn't stutter.
 
 ## 0.0.3 — 2026-10-16: Combos, and playing together that holds
 

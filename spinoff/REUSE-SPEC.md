@@ -398,7 +398,10 @@ Later levels can bring new hand-made stages.
   above its own shelf (Scoring), so a kid who kicks it off finds it guarding the donuts and has to
   knock it out of the way to grab. Guarding is also what the CPU's Defend state (Bad guys) is for.
   Later levels can give a team more than one shelf, so one guard can't cover all its donuts
-  (brainstorm 2026-10-16).
+  (brainstorm 2026-10-16). A guard who was just hit but is still in the strip keeps blocking, since
+  there is no knockout short of a ring-out; a knocked-down state that lets the grab through could
+  come later and reach level 1 then (brainstorm 2026-10-16; it would need to square with "nobody
+  is ever knocked out" under Percent and knockback).
 - **Bank:** touch your own shelf. Everything in your bag goes onto it on its own: `anySlot` finds
   the spot and `place` puts it there, both in `inventory/grid.js`. No dragging, so a 4-year-old
   banks by running home.

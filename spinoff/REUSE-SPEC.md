@@ -1069,6 +1069,12 @@ The characters stay the yarn store's characters, so hats and capes stay knitwear
 Every fighter wears a bag and boxing gloves or a sword; a hat and a cape are the kid's choice (decided 2026-10-13,
 amended 2026-10-17: a sword instead of gloves). Each piece is in colours the kid picks.
 
+**Dress-up can change how you play** (decided 2026-10-17, from a playtest: fighters in a big cape
+couldn't slip through block gaps that others could). That's fine, the Mario Kart way: what you
+pick has a feel. A fighter's body is the box around everything they wear (`entrantOf` in
+`fighter.js`), so a big cape or hat makes a wider body, and that stays. The effect is always
+visible, since the body is the outfit you see.
+
 - **A sword instead of the gloves** (decided 2026-10-17). The chooser's hands row offers 🥊 gloves or a sword,
   never both (`look.hands`, `HANDS` in `fighter.js`; anything else reads back as gloves, so old saves and old
   tablets still work). It shows only once this tablet's player has beaten level 1 (see Fighter chooser).

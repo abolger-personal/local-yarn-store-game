@@ -382,13 +382,21 @@ Two teams, the kids and the bad guys (see Bad guys), and two bakery shelves, one
 a stage wider than one screen (decided 2026-10-13). The per-tablet camera follows each kid's own fighter, so the
 wide stage costs nothing new.
 
-**The stage is in thirds** (decided 2026-10-13). One hand-made, mirrored stage for the MVP:
+**The stage is in thirds** (decided 2026-10-13; amended 2026-10-17: building is no longer by third). One hand-made, mirrored stage for the MVP:
 
 | Zone | Terrain | Forts |
 | --- | --- | --- |
-| Heroes' third | A raised deck against the back wall with their shelf on it | Heroes build here only |
-| Middle third | A hill in the middle of the band, to jump on or walk around (breakfast: a stack of big pancakes) | Nobody builds: always open ground to fight over |
-| Bad guys' third | The mirror of the heroes' third | Bad guys build here only |
+| Heroes' third | A raised deck against the back wall with their shelf on it | |
+| Middle third | A hill in the middle of the band, to jump on or walk around (breakfast: a stack of big pancakes) | |
+| Bad guys' third | The mirror of the heroes' third | |
+
+**Build anywhere** (planned 2026-10-17, replacing "build only in your own third, nobody in the
+middle", playtest: the territory rule didn't feel right). A block can go on any cell of the stage,
+in front of the enemy base too, and right up against a shelf: there is no clearance around
+shelves. Every block can be punched or kicked through, so a wall is a cost, never a lock. Walling
+a shelf's grab or bank spot is a tactic: it guards the shelf, and its own team has to break
+through it to bank, a choice they made. Only the start spots in use stay reserved. The raider
+kicks through blocks on the way home to bank, as on the way out.
 
 The band is wide enough to walk around things, so one wall never closes a side: a fort is a ring
 on the floor grid around the deck, and a raider looks for the gap or the weakest piece. Terrain

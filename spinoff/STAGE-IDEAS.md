@@ -296,9 +296,10 @@ next: the push strip it needs also makes the Donut Shop and Pizza Party.
 ## Progression is a separate question
 
 Which stage a room plays next, and in what order, is not part of this doc. Two facts for whoever
-picks it up: today there is no level 2 (▶️ on the end card replays whatever the page was opened
-on), and the host's `start` message sends the level as data but carries no level number, which
-the sticker card will need.
+picks it up: level 2 is planned as the building tutorial on breakfast (planned 2026-10-17,
+`REUSE-SPEC.md` §Forts: Level 2), and breakfast is the tutorial stage (decided 2026-10-17); today ▶️
+on the end card still replays whatever the page was opened on, and the host's `start` message
+sends the level as data but carries no level number, which the sticker card will need.
 
 ## Open questions
 

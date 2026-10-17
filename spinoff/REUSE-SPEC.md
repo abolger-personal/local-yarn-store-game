@@ -448,21 +448,21 @@ Every level is two rounds (brainstorm 2026-10-13): a **build it** round, where e
 its own shelf, then the **knock it down** round, the timed capture-the-flag match. Builders
 and smashers each get a round that is theirs.
 
-- **The build round has no timer.** It ends when both teams are ready: every hero has tapped 👍
+- **The build round has no timer** (planned 2026-10-17). It ends when both teams are ready: every hero has tapped 👍
   and every bad-guy player has tapped 👍. Tapping 👍 again takes it back, to keep building.
   Nobody is rushed, and a careful builder can take as long as their team lets them.
-- **Readers can force the start** (brainstorm 2026-10-13). Beside 👍 is the written line "hold 👍 to
+- **Readers can force the start** (planned 2026-10-17). Beside 👍 is the written line "hold 👍 to
   start now". Holding 👍 for 2 seconds, with a ring filling around it, starts the round for
   everyone. Reading is the gate, not a grown-up/kid label: nobody is marked as anything, and a
   kid who can read the line has earned the button. The 2-second hold keeps a 4-year-old's
   ordinary tap from setting it off.
-- **CPU bad guys build their fort and are ready at once.** With no grownup bad guys, the bad
+- **CPU bad guys build their fort and are ready at once** (planned 2026-10-17). With no grownup bad guys, the bad
   guys' side is ready from the start, so only the heroes decide when to go.
-- **Building is carrying blocks** (brainstorm 2026-10-15; replaces the shop's touch
+- **Building is carrying blocks** (planned 2026-10-17; replaces the shop's touch
   picker). One rule runs both rounds: **a tap moves you, a button acts where you stand.**
-  - **The pile is the inventory.** Each team's fort pieces start as a small heap beside its shelf
-    (6–10 to begin with; the level's *fort pile*, in the `Stage` data). How many are left is how
-    big the heap is; nothing to read.
+  - **The pile is the inventory.** Each hero's fort pieces start as their own small heap right
+    next to where that hero starts (Start spots, below). How many are left is how big the heap
+    is; nothing to read.
   - **Tap a block in the pile** and your fighter runs over and grabs it; it flies into their arms
     with the donut grab's arc. One block per trip to start; if a playtest drags, a fighter carries
     a stack of 2–3 (the `help` table can give little kids the bigger stack).
@@ -479,16 +479,35 @@ and smashers each get a round that is theirs.
     camera follows your fighter as in a match, so big levels need nothing extra.
   - **Two players at one cell:** the host applies inputs a tick at a time, so one lands first and
     every tablet draws the result.
-- **Level 1 has no build round** (brainstorm 2026-10-15). Its only opponent is the training dummy,
+- **Level 1 has no build round** (planned 2026-10-17). Its only opponent is the training dummy,
   which never comes for your shelf, so there is nothing to defend; the tutorial teaches the other
-  half, breaking in. The build round starts on the first level where something raids your shelf
-  (CPU raiders or grownup bad guys). That level teaches building the way level 1 teaches punching
-  through: a small pile, an obvious gap in front of your shelf, and the first raider walking into
-  your wall.
+  half, breaking in. The build round starts on the first level where something raids your shelf:
+  level 2, which teaches building the way level 1 teaches punching through: a small pile, an
+  obvious gap in front of your shelf, and the first raider walking into your wall.
+- **Level 2: the building tutorial** (planned 2026-10-17). Still a tutorial level, on the breakfast
+  stage:
+  - The first build round (above), with each hero's pile next to them.
+  - **One CPU bad guy**, whatever `badGuys(level, grownups)` says (Bad guys): level 2 is still
+    teaching, so the kids meet a single raider.
+  - **4 fort pieces per hero** (8 for two kids), in place of `piecesEach(2)`.
+  - **The CPU's brain is Raid, Grab, Run home and Defend** (Bad guys), switched by one rule: it
+    raids while the bad guys' shelf holds no hero donuts, and defends (goes home and guards its
+    shelf, Mode: a guard blocks the grab) once it holds one or more. So the kids' first job is
+    to wall their shelf, and the moment the raider scores, the game flips to breaking in, which
+    level 1 taught.
+- **Start spots come first** (decided 2026-10-17). Step 1 of making any level, hand-made or
+  generated, on every stage: pick pseudo-random start spots for up to 6 heroes,
+  each with room for the hero and their block pile beside them, and reserve them, so nothing
+  placed or generated afterwards (bricks, syrup, butter, trampolines, raised floors) ever lands in
+  one. Pseudo-random from the level's seed, so every tablet gets the same spots.
 - **Later: patching mid-match** (brainstorm 2026-10-15: wanted, not at first). A kid grabs a block
   during the match and plugs a hole the bad guys just opened; a hit knocks it loose like a donut.
   Not in the first version of building, because it puts ⬇️ beside 🥊 and 🦶 in the match: more
   buttons. The build round stays the calm opening either way.
+- **The breakfast stage is the tutorial stage** (decided 2026-10-17). The tutorial levels all play
+  on breakfast, and between them they teach every basic mechanic once: breaking in, building,
+  defending, and earning a goody and using a tool. They don't need every goody or tool, only one
+  of each to teach how earning and using works.
 - **Stages and difficulty are separate** (decided 2026-10-14). Past the tutorial, a *stage* is a
   place with its own look and terrain rules, and *difficulty* is how hard the match is (bad-guy
   count, fort pile, moves, generated terrain problems). Anything tried at several difficulties
@@ -1215,7 +1234,7 @@ scary, for 4–6 year olds.
   The frizz is meant to be funny, so being zapped is something kids laugh at. To check before
   building: whether the coat can be scaled on its own after `mergeCharacter`, or the puff needs
   its own mesh.
-- **AI is a fake player on the host.** A CPU bad guy produces the same inputs a tablet does (a
+- **AI is a fake player on the host** (planned 2026-10-17). A CPU bad guy produces the same inputs a tablet does (a
   tap target, 🥊 / 🦶, a power gesture), played through the same sim, so it can do nothing a
   player can't, and the scripted-input sim tests cover it. The training dummy of milestone 1 is a
   bad guy whose input is "nothing". `ponytail:` one state machine for every bad guy.
@@ -1232,7 +1251,7 @@ scary, for 4–6 year olds.
 
   With two or more CPU bad guys, one stays home as a defender and the rest raid. In the build
   round, CPU bad guys stack their pile as a wall in front of their shelf, instantly.
-- **CPU bad guys break walls** (brainstorm 2026-10-13, required). The basic hero fort is a ring of walls with
+- **CPU bad guys break walls** (planned 2026-10-17, required). The basic hero fort is a ring of walls with
   the donut shelf in the middle, so a bad guy that can't get through is no opponent. A raider
   heads straight for the shelf, never routing around the fort. At a wall one piece high it jumps
   over; at anything taller it kicks the lowest piece in its way until it breaks, then carries on.
@@ -1241,15 +1260,17 @@ scary, for 4–6 year olds.
   piece charges nobody's bar.
 - **Targets: the nearest hero** (brainstorm 2026-10-13), kid or grownup alike; no one is singled out.
   The fairness rules below still apply on top (no two bad guys on one hero, grace after a hit).
-- **Fair to 4-year-olds.** About half a second of reaction delay before acting on anything new;
+- **Fair to 4-year-olds** (planned 2026-10-17). About half a second of reaction delay before acting on anything new;
   at most one attack about every 0.8 s; two CPU bad guys never chase the same kid; after hitting a
   kid, a bad guy leaves that kid alone for a few seconds; no waiting at the stage edge to knock a
   falling kid off again; powers aim where the kid was about half a second ago. Chase chance,
   reaction delay, attack pace and grace time are plain numbers that auto-scaling can tune later.
-- **MVP subset:** Raid (with wall breaking), Grab, Run home and Chase first; Defend, Scoop and
-  Power once matches work.
-- **The bad-guy team grows level by level** (brainstorm 2026-10-13). Level 1 is the grownups who
-  tapped 🥷, or one CPU bad guy if nobody did. Each level after adds one CPU bad guy:
+- **First states: Raid (with wall breaking), Grab, Run home and Defend** (planned 2026-10-17), for
+  level 2, switched by its raid-or-defend rule (Forts: Level 2). Chase, Scoop and Power come later
+  (brainstorm 2026-10-13).
+- **The bad-guy team grows level by level** (planned 2026-10-17). Level 1 is the grownups who
+  tapped 🥷, or one CPU bad guy if nobody did. Each level after adds one CPU bad guy, except that
+  the tutorial levels keep it small (level 2 has one; Forts: Level 2):
 
   ```
   badGuys(level, grownups) = min(8, max(grownups, 1) + level - 1)
@@ -1257,7 +1278,7 @@ scary, for 4–6 year olds.
 
   Two grownups on level 3 face the kids with 2 CPU bad guys beside them; no grownups on level 3
   is 3 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
-  drops it.
+  drops it (brainstorm 2026-10-13).
 - **Saving progress: a sticker card per player** (brainstorm 2026-10-14, replacing "only the highest
   level"). Every player has a stamp card, saved on their own tablet under its own key
   (`lys.stamps.v1`), apart from the fighter, so re-rolling or re-dressing a fighter never touches

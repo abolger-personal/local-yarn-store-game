@@ -25,6 +25,11 @@ dresses any floor by its kind.
 is drawn the same for both, then dressed with the stage's terrain rules, drawing last so a seed's
 breakfast layout is unchanged:
 
+- **First, start spots** (decided 2026-10-17, `REUSE-SPEC.md` §Start spots come first): before any
+  terrain, pick seeded pseudo-random start spots for up to 6 heroes, each with room
+  for the fighter and their block pile beside them, and reserve them; every later pick (pillars,
+  decks, syrup, butter, trampolines, bricks) must keep clear of them.
+
 - **Breakfast** keeps the syrup and adds butter: a mirrored slick in front of each deck and one on
   the hill top when there is a hill.
 - **Cake** has no syrup: the field syrup becomes a pair of icing trampolines and the moat is left
@@ -148,6 +153,7 @@ stamp nobody recognises is not a sticker anyone wants. Three ways in, in order o
 | Unfair spawns | spawn is the sim's (next to the own shelf), so mirrored terrain mirrors spawns | covered by the fairness ratio |
 | Too tight to squeeze through | narrowest gap ≥ 0.8 | by construction; not measured from the grid yet |
 | No room to build | free cells in the heroes' build zone ≥ the team's fort pile (`piecesEach × team size`) | not checked; matters once the build round exists |
+| A start spot covered | every reserved start spot and its pile room is clear floor (decided 2026-10-17) | not checked yet; the generator doesn't reserve spots yet |
 | Feels worse than hand-made | none; playtest | — |
 
 What the playability test can't catch: whether a stage is fun, whether a choke point reads as a

@@ -1152,7 +1152,8 @@ Planned 2026-10-17. Two plain screens between the lobby and the match, shown on 
 starts the match (the host in a room, or a tablet playing by itself):
 
 1. **Stage picker:** one big picture button per stage. A button is added as each new stage is
-   unlocked; today that is breakfast, the tutorial stage.
+   unlocked; today that is breakfast, the tutorial stage. How a new stage unlocks is still open
+   (brainstorm 2026-10-17: decide when there is a second stage to unlock).
 2. **Level dial:** a phone-keypad grid of numbers, 1 to 9 to start. Only unlocked levels have a
    button; new ones appear as they unlock. Choosing a number brings up ▶️, which starts the match.
 

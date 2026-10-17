@@ -540,6 +540,9 @@ and smashers each get a round that is theirs.
     2026-10-17). Built: 10 blocks, a wall two high on the ground in front of their deck, leaving the
     deck's corner by the fence open; the way out is that corner and their fence's gap, which is also
     the kids' way in (or they kick through the wall).
+  - **The bad guys' deck is twice as deep** (decided 2026-10-17, playtest: the front was the only edge to
+    kick a bad guy off). It runs from the back wall to z 0.4 instead of -0.8, its wall moved to the new
+    front, so a kid fighting up there can kick the bad guy off the stage's end anywhere along it.
   - **One CPU bad guy** (`badGuys` gives the tutorials one, Bad guys): level 2 is still
     teaching, so the kids meet a single raider. The training dummy stays on level 1.
   - **4 fort pieces per hero** (8 for two kids): `piecesEach(2)`, the base rule.

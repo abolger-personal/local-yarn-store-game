@@ -52,15 +52,17 @@ export const TUTORIAL = Object.freeze({ theme: 'breakfast', stage: Object.freeze
 // up from the deck) closes off the yard in front of each shelf but for one obvious gap at the front, two blocks wide;
 // the kids start outside theirs with their piles. The bad guys' fort comes with the level: a two-high wall in front of
 // their deck, leaving its corner by the fence open, so the raider's way out is that corner and their gap.
+// The bad guys' deck twice as deep as breakfast's, so there is room to fight a bad guy up there and kick it off the end
+const BAD_DECK_FRONT = 0.4;
 const FENCE = /** @type {const} */ ({ kind: 'deck', x0: -6, x1: -5.6, z0: -2, z1: 1.2, y: 1.8 });
 /** @type {Level} */
 const BUILDING = Object.freeze({ theme: 'breakfast', number: 2, match: Object.freeze({ ...MATCH, badGuysHit: false, badGuyPace: 0.2 }), stage: Object.freeze({
   ...TABLE,
-  floors: Object.freeze([...TABLE.floors, FENCE, { ...FENCE, x0: -FENCE.x1, x1: -FENCE.x0 }]),
+  floors: Object.freeze([...TABLE.floors.map((f) => (f.kind === 'deck' && f.x0 > 0 ? { ...f, z1: BAD_DECK_FRONT } : f)), FENCE, { ...FENCE, x0: -FENCE.x1, x1: -FENCE.x0 }]),
   puddles: Object.freeze([]),
   starts: Object.freeze([{ x: -5.2, z: 1.6 }, { x: -5.2, z: 0.8 }, { x: -4, z: 1.6 }, { x: -4, z: 0.8 }, { x: -5.2, z: 0 }, { x: -4, z: 0 }]),
   bricks: Object.freeze([
-    ...[6.8, 7.2, 7.6, 8, 8.4].flatMap((x) => [wall('badGuys', x, -0.8), wall('badGuys', x, -0.8, BRICK)]),
+    ...[6.8, 7.2, 7.6, 8, 8.4].flatMap((x) => [wall('badGuys', x, BAD_DECK_FRONT), wall('badGuys', x, BAD_DECK_FRONT, BRICK)]),
   ]),
 }) });
 

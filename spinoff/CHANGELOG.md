@@ -2,7 +2,14 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
-## 0.0.4 (in progress)
+## 0.0.5 (in progress)
+
+### Building
+- **Stand in your gap to stop the bad guy.** Stand in a gap next to your blocks and the bad guy can't
+  shove you out of the way any more: it stops and kicks your blocks, which gives you time to knock it
+  back. Without blocks beside you, it still pushes past.
+
+## 0.0.4 — 2026-10-17
 
 ### Dress up
 - **Swords!** Beat level 1 and a sword shows up next to the 🥊 boxing gloves on the dress-up page. Pick
@@ -70,9 +77,6 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **The lobby fits on a tablet that isn't fullscreen.** Picking a level, the bottom buttons were hidden
   under the browser's bars. Now 👋 and ▶️ sit beside the level numbers, so it all fits, and the lobby
   stops above the bars and scrolls if a screen is shorter still.
-- **Stand in your gap to stop the bad guy.** Stand in a gap next to your blocks and the bad guy can't
-  shove you out of the way any more: it stops and kicks your blocks, which gives you time to knock it
-  back. Without blocks beside you, it still pushes past.
 - **You can bank anywhere along your shelf.** With blocks in front of the middle of it, the open ends
   bank too, and tapping the shelf walks you to the nearest open spot. The shelf is also solid all the
   way to its ends now.

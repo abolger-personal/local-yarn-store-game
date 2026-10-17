@@ -22,6 +22,16 @@ export function outside(b, x, z) {
   return Math.max(0, Math.hypot(x - c.x, z - c.z) - c.r);
 }
 
+/** Rectangles seen from above overlap. @param {{x0: number, x1: number, z0: number, z1: number}} a @param {{x0: number, x1: number, z0: number, z1: number}} b */
+export const overlaps = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.z0 < b.z1 && b.z0 < a.z1;
+
+// REUSE-SPEC.md §Forts, Start spots come first
+export const MAX_HEROES = 6;
+/** A hero's block pile sits this far toward the middle from where the hero starts. */
+export const PILE_DX = 0.6;
+/** The floor a start spot keeps clear: the hero, and its pile beside them. @param {{x: number, z: number}} p */
+export const spotRect = (p) => ({ x0: p.x - 0.4, x1: p.x + 0.8, z0: p.z - 0.4, z1: p.z + 0.4 });
+
 /** The stage's one 'ground' floor. @param {Stage} stage */
 export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground');
 
@@ -38,12 +48,13 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  * @typedef {{ team: Team, x: number, z: number, y: number, hits: number }} BrickSpot
  *   a BRICK cube with its bottom-left-back corner at (x, y, z)
  * @typedef {{ x0: number, x1: number, z1: number, y: number }} RingOut  leave this box and you are out
+ * @typedef {{ x: number, z: number }} StartSpot  where a hero starts, on the ground, its pile PILE_DX toward the middle
  * @typedef {{ floors: readonly Floor[], backWall: number, shelves: readonly ShelfSpot[], zones: readonly BuildZone[],
  *             puddles: readonly Puddle[], ringOut: RingOut, bricks: readonly BrickSpot[],
- *             butter?: readonly Patch[], springs?: readonly Patch[], bounce?: number }} Stage
+ *             butter?: readonly Patch[], springs?: readonly Patch[], bounce?: number, starts?: readonly StartSpot[] }} Stage
  *   one layout (spinoff/levels.js): exactly one 'ground' floor, the lowest; the back edge is a wall at z = backWall.
  *   Terrain rules (REUSE-SPEC.md §Stages and difficulty are separate): `butter` is slippery, `springs` are trampolines,
- *   and `bounce` multiplies how high every jump goes (cake's sponge; 1 if left out)
+ *   and `bounce` multiplies how high every jump goes (cake's sponge; 1 if left out). `starts`: the heroes' start spots, in order
  */
 
 /**

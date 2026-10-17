@@ -15,9 +15,10 @@ for (const name of NAMES) for (const d of DIFFICULTIES)
     assert.deepEqual(generateStage(seed, d, name), stage, `${at}: same seed, same stage`);
     const floors = new Set(stage.floors.map((f) => JSON.stringify(f)));
     assert.ok(stage.floors.every((f) => floors.has(mirrored(f))), `${at}: terrain is mirrored`);
+    assert.deepEqual(stage.starts, generateStage(seed, d + 1, name).starts, `${at}: start spots come first, from the seed alone`);
     checkLevel(stage, at);
-    // Fairness: with the bad guys' pre-placed fort taken away, both teams' raids take the same time.
-    const open = { ...stage, bricks: [] }, h = ticksToShelf(open, 'heroes'), b = ticksToShelf(open, 'badGuys');
+    // Fairness of the terrain: with the bad guys' pre-placed fort taken away and both teams starting beside their shelf, both raids take the same time.
+    const open = { ...stage, bricks: [], starts: undefined }, h = ticksToShelf(open, 'heroes'), b = ticksToShelf(open, 'badGuys');
     raid.heroes.push(ticksToShelf(stage) / TICK_HZ);
     raid.badGuys.push(b / TICK_HZ);
     raid.ratio.push(h / b);

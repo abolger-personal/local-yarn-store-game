@@ -29,6 +29,8 @@ const TABLE = Object.freeze({
   /** @type {readonly import('./match.js').Puddle[]} breakfast's syrup: in both gaps round the bad guys' wall (smash through or wade), and one in each half of the field */
   puddles: Object.freeze([{ x: 4.8, z: 1.6, r: 0.45 }, { x: 4.8, z: -1.6, r: 0.45 }, { x: -2.6, z: 1.3, r: 0.6 }, { x: 2.4, z: -1.2, r: 0.55 }]),
   ringOut: Object.freeze({ x0: -11, x1: 11, z1: 3.5, y: -3 }),
+  /** @type {readonly import('./match.js').StartSpot[]} REUSE-SPEC.md §Forts, Start spots come first: clear of the deck, the butter and the syrup */
+  starts: Object.freeze([{ x: -4.8, z: 0 }, { x: -4.8, z: 0.8 }, { x: -4.8, z: -0.8 }, { x: -4.8, z: 1.6 }, { x: -4.8, z: -1.6 }, { x: -8.4, z: 0 }]),
   /** @type {readonly import('./match.js').BrickSpot[]} milestone 1's pre-placed bad-guy fort: a wall across the band, two high in the middle, with gaps at the back and front */
   bricks: Object.freeze([
     ...[-1.2, -0.8, -0.4, 0, 0.4, 0.8].map((z) => wall('badGuys', 4.6, z)),

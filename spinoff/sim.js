@@ -839,6 +839,9 @@ function makeShelf(spot, looks) {
 
 function spawnSpot(s, e, cursor) {
   if (e.dummy) return { x: DUMMY.x + DUMMY.gap * cursor.dummies++, z: DUMMY.z };
+  // REUSE-SPEC.md §Forts, Start spots come first
+  const spot = e.team === 'heroes' && s.stage.starts?.[cursor.starts++];
+  if (spot) return spot;
   const sh = shelfOf(s, e.team), dir = sh.x < 0 ? 1 : -1, k = (cursor[e.team] = (cursor[e.team] ?? -1) + 1);
   return { x: sh.x + dir * SPAWN_GAP * (1 + (k % SPAWN_ROW)), z: SPAWN_Z + SPAWN_GAP * Math.floor(k / SPAWN_ROW) };
 }
@@ -871,7 +874,7 @@ export function createMatch(entrants, stage) {
       maxHits: b.hits, icing: icingOf(entrants, b.team) })) };
   s.shelves = stage.shelves.map((spot) => makeShelf(spot, teamLooks(entrants, spot.team)));
   refresh(s);
-  const cursor = { dummies: 0 };
+  const cursor = { dummies: 0, starts: 0 };
   s.fighters = entrants.map((e) => newFighter(e, spawnSpot(s, e, cursor), s.band.y));
   for (const f of s.fighters) if (f.dummy) f.carrying = grab(shelfOf(s, f.team));
   return s;

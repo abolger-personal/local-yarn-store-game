@@ -1,7 +1,7 @@
 // The playability checks every stage passes, hand-made (levels.test.mjs) or generated (generate.test.mjs).
 // Syrup, butter and trampolines are all round patches lying on a floor top.
 import assert from 'node:assert/strict';
-import { BRICK, TICK_HZ, groundOf, outside } from './match.js';
+import { BRICK, MAX_HEROES, TICK_HZ, groundOf, outside, overlaps, spotRect } from './match.js';
 import { createMatch, snapshot, tick } from './sim.js';
 
 const KINDS = ['ground', 'deck', 'hill'];
@@ -35,7 +35,23 @@ function reachesTop(stage, floor) {
   return false;
 }
 
-const overlaps = (b, f) => b.x < f.x1 && b.x + BRICK > f.x0 && b.z < f.z1 && b.z + BRICK > f.z0;
+const brickRect = (b) => ({ x0: b.x, x1: b.x + BRICK, z0: b.z, z1: b.z + BRICK });
+
+/** REUSE-SPEC.md §Forts, Start spots come first: six spots, each with its pile room clear ground in the heroes' third. */
+function checkStarts(stage, at) {
+  const ground = groundOf(stage), third = stage.zones.find((z) => z.team === 'heroes'), starts = stage.starts ?? [];
+  assert.equal(starts.length, MAX_HEROES, `${at}: a start spot for each of ${MAX_HEROES} heroes`);
+  const rects = starts.map(spotRect);
+  rects.forEach((q, i) => {
+    const where = `${at}: start spot ${i} at ${starts[i].x},${starts[i].z}`;
+    assert.ok(q.x0 >= ground.x0 && q.x1 <= third.x1 && q.z0 >= stage.backWall && q.z1 <= ground.z1, `${where} is on the ground in the heroes' third`);
+    assert.ok(stage.floors.every((f) => f === ground || !overlaps(q, f)), `${where} is not under a raised floor`);
+    assert.ok(stage.bricks.every((b) => !overlaps(q, brickRect(b))), `${where} has no brick in it`);
+    for (const p of [...stage.puddles, ...stage.butter ?? [], ...stage.springs ?? []])
+      assert.ok(outside(q, p.x, p.z) >= p.r, `${where} is clear of the patch at ${p.x},${p.z}`);
+    assert.ok(rects.every((o, j) => j === i || !overlaps(q, o)), `${where} doesn't overlap another`);
+  });
+}
 
 /** Asserts a stage is playable; `at` names it in failures. `breakIn`: the bad guys' shelf must be walled in, reached only by kicking through. */
 export function checkLevel(stage, at, breakIn = false) {
@@ -51,7 +67,8 @@ export function checkLevel(stage, at, breakIn = false) {
     assert.ok(stage.floors.every((f) => f.y <= y || outside(f, p.x, p.z) >= p.r), `${at}: patch at ${p.x},${p.z} is clear of higher floors`);
   }
   for (const b of stage.bricks)
-    assert.ok(raised.every((f) => b.y >= f.y || !overlaps(b, f)), `${at}: brick at ${b.x},${b.y},${b.z} is not inside a raised floor`);
+    assert.ok(raised.every((f) => b.y >= f.y || !overlaps(brickRect(b), f)), `${at}: brick at ${b.x},${b.y},${b.z} is not inside a raised floor`);
+  checkStarts(stage, at);
   // REUSE-SPEC.md §Mode: dropped donuts stay where they land, so any top one can land on must be reachable
   for (const f of raised) assert.ok(reachesTop(stage, f), `${at}: the ${f.kind} top at x ${f.x0}..${f.x1}, y ${f.y} can be reached, or a donut landing there is lost`);
   if (!breakIn) {

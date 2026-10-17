@@ -12,6 +12,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   when your punch lands. Tap again for the next one.
 
 ### Fighting
+- **Everyone has their own start spot.** Each hero starts the match in a spot of their own, out in
+  front of the shelf, with room beside them for their blocks. Every tablet puts everyone in the same spots.
 - **Bad guys guard their donuts.** Tap a shelf with a bad guy standing in front of it and you walk
   up to the bad guy instead, and it shakes "no". Knock it out of the way and you grab a donut. Kick
   the dummy off the stage and it pops back in right in front of its donuts.

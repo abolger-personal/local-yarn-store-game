@@ -91,7 +91,7 @@ function play(n, hostInput = IDLE) {
 
 {
   const before = snapshot(state);
-  g1.input({ target: { x: at(before, 'G1').x + 2, z: 1 }, punch: false, kick: false });
+  g1.input({ target: { x: at(before, 'G1').x + 2, z: 0 }, punch: false, kick: false });
   net.flush();
   const walking = play(20), seen = at(drawn.G2, 'G1').x;
   assert.ok(seen < at(walking, 'G1').x - 0.07 && seen > at(walking, 'G1').x - 0.3, 'other guests draw a walking fighter a snapshot or two behind');

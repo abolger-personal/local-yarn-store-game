@@ -516,11 +516,16 @@ and smashers each get a round that is theirs.
     a hero, so the fairness rules (Bad guys) only start to matter on the level that brings Chase.
     A grownup playing a bad guy follows the same rule: their 🥊 and 🦶 break walls but never land
     on a hero (brainstorm 2026-10-17, since 🥷 isn't built yet).
-- **Start spots come first** (planned 2026-10-17). Step 1 of making any level, hand-made or
+- **Start spots come first** (decided 2026-10-17). Step 1 of making any level, hand-made or
   generated, on every stage: pick pseudo-random start spots for up to 6 heroes,
   each with room for the hero and their block pile beside them, and reserve them, so nothing
   placed or generated afterwards (bricks, syrup, butter, trampolines, raised floors) ever lands in
-  one. Pseudo-random from the level's seed, so every tablet gets the same spots.
+  one. Pseudo-random from the level's seed, so every tablet gets the same spots. A spot is `Stage.starts`
+  data (`{ x, z }` on the ground), and heroes spawn on them in roster order; it keeps clear the hero and
+  their pile `PILE_DX` toward the middle (`spotRect` in `match.js`, 1.2 by 0.8). Hand-made levels write
+  theirs as data; the generator draws them first (`startSpots` in `generate.js`), and the playability
+  check fails a level whose spot is off the ground of the heroes' third, under a raised floor, or
+  touches a brick, a patch or another spot. Bad guys still start beside their shelf.
 - **Later: patching mid-match** (brainstorm 2026-10-15: wanted, not at first). A kid grabs a block
   during the match and plugs a hole the bad guys just opened; a hit knocks it loose like a donut.
   Not in the first version of building, because it puts ⬇️ beside 🥊 and 🦶 in the match: more

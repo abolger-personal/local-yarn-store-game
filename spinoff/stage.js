@@ -17,8 +17,9 @@ const TONE = { aces: THREE.ACESFilmicToneMapping, neutral: THREE.NeutralToneMapp
 function makeRenderer(container) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.toneMapping = TONE[lookParam('tone')] ?? TONE.aces;
-  renderer.toneMappingExposure = Number(lookParam('exposure')) || 0.9;
+  // neutral shows a colour as itself (the chooser's swatches match the fighter); ACES clipped the loud palette
+  renderer.toneMapping = TONE[lookParam('tone')] ?? TONE.neutral;
+  renderer.toneMappingExposure = Number(lookParam('exposure')) || 0.7;
   container.appendChild(renderer.domElement);
   return renderer;
 }
@@ -52,7 +53,7 @@ export function makeStage(container, { background = '#f6e7d4' } = {}) {
   scene.background = new THREE.Color(background);
   const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 100);
   const env = lookParam('env');
-  const room = env === 'map' ? [] : roomLights(camera, Number(env ?? 1));
+  const room = env === 'map' ? [] : roomLights(camera, env !== null && Number(env) >= 0 ? Number(env) : 1);
   if (env === 'map') scene.environment = new THREE.PMREMGenerator(renderer).fromScene(roomEnvironment(), 0.04).texture;
   scene.add(camera, ...studioLights(camera));
   followSize(container, renderer, camera);

@@ -30,6 +30,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - A fighter whose bag is full shakes its head again when it tries for another donut.
 - Fighters' legs keep up when they run: no more feet skating along under a gliding body.
 - Colours look the same on a tablet as on a MacBook, instead of washed out on some tablets.
+- **Fighters are the colour you picked.** The colour buttons on the fighter screen now match the 3D
+  fighter, and loud colours like hot pink stay hot pink instead of fading to pastel.
 
 ### Buttons
 - 👍 means "done, next" everywhere: the fighter chooser's ✅ is now 👍.

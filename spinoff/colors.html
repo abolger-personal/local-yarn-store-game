@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Donut fighters — colour probe</title>
+<style>
+  body { margin: 0; font: 13px/1.4 system-ui, sans-serif; background: #f6e7d4; color: #222; }
+  #stage { height: 38vh; }
+  table { border-collapse: collapse; margin: 8px; }
+  td, th { padding: 2px 6px; text-align: left; }
+  .chip { width: 44px; height: 22px; border: 1px solid #0003; }
+  pre { margin: 8px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<main id="stage"></main>
+<table id="swatches"><tr><th>colour</th><th>HTML</th><th>3D median, as HTML</th><th>3D median</th><th>3D brightest</th><th>clipped</th></tr></table>
+<pre id="info"></pre>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.186.1/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.186.1/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="colors.js"></script>
+</body>
+</html>

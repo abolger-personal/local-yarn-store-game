@@ -6,6 +6,20 @@ a team of bad guys (CPU, or grownups who join as one) in donut capture the flag.
 the fighter still needs, and sets out the network design. A bare file name is in `characters/`;
 other paths are from the repo root.
 
+## Decided, planned, brainstorm
+
+Not everything in this doc is settled. Each idea is one of three kinds:
+
+- **Decided** (marked `decided DATE`): agreed with the players or the designer. Code follows it, and
+  changing it is a new decision with a new date. Everything built and in `CHANGELOG.md` is decided.
+- **Planned** (marked `planned DATE`, or `decided DATE, not built yet`): the design is agreed, but it isn't built yet and the details may
+  still move when it is.
+- **Brainstorm** (marked `brainstorm DATE`, or in an Open questions list): unbaked ideas to choose
+  from. Nothing is built from these until they're decided, and most will be dropped or changed.
+
+Whole brainstorm docs sit beside this one, such as `STAGE-IDEAS.md`. Ideas move from there into this
+doc when they're decided, not before.
+
 ## Layout
 
 Keep the spinoff **in this repo**, as pages under `spinoff/`, importing `../characters/npc.js`

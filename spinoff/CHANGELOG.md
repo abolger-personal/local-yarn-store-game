@@ -68,8 +68,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   or between a pillar and a trampoline. The gaps are wider now, and a big fighter finds a way round, or
   tries again, instead of pushing on the spot. Every level is now checked with the biggest fighter before it ships.
 - **The lobby fits on a tablet that isn't fullscreen.** Picking a level, the bottom buttons were hidden
-  under the browser's bars. The buttons now shrink to fit the screen, and the lobby scrolls if they
-  still can't.
+  under the browser's bars. Now the lobby stops above the bars and scrolls down to them.
 - **You can bank anywhere along your shelf.** With blocks in front of the middle of it, the open ends
   bank too, and tapping the shelf walks you to the nearest open spot. The shelf is also solid all the
   way to its ends now.

@@ -1,8 +1,8 @@
 // The level 2 raider in the real sim, played through the same inputs a tablet sends (REUSE-SPEC.md §Bad guys).
 import assert from 'node:assert/strict';
-import { BRICK, TICK_HZ } from './match.js';
+import { BRICK, ROUND_SECONDS, TICK_HZ } from './match.js';
 import { levelOf, matchOptions } from './levels.js';
-import { GUARD_REACH, createMatch, snapshot, tick } from './sim.js';
+import { GUARD_REACH, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
 import { ATTACK_TICKS, REACT_TICKS, createCpu, modeOf } from './cpu.js';
 
 const level = /** @type {import('./levels.js').Level} */ (levelOf('breakfast', 2));
@@ -10,9 +10,12 @@ const body = { height: 0.9, width: 0.45, reach: 0.38 };
 const kid = { id: 'kid', team: 'heroes', ...body, look: { dough: '#e8c48a', frosting: '#ff3b7f', stripe: false } };
 const raider = { id: 'cpu1', team: 'badGuys', ...body, look: { dough: '#241a1d', frosting: '#7b2fbf', stripe: true } };
 
+// the raider's choices, at full speed so they come quickly; level 2's slow pace has its own check below
+const fullPace = { ...matchOptions(level), match: { ...level.match, badGuyPace: 1 } };
+
 /** Plays `seconds` of level 2 (build round skipped) with the CPU's inputs; `kidInput(snap)` drives the kid; `watch` sees each snapshot. */
-function play(stage, seconds, watch, kidInput = () => null) {
-  const m = createMatch([kid, raider], stage, matchOptions(level)), cpu = createCpu('cpu1');
+function play(stage, seconds, watch, kidInput = () => null, opts = fullPace) {
+  const m = createMatch([kid, raider], stage, opts), cpu = createCpu('cpu1');
   tick(m, { kid: { target: null, punch: false, kick: false, go: true } });
   let snap = snapshot(m);
   for (let i = 0; i < seconds * TICK_HZ; i++) {
@@ -77,6 +80,19 @@ const me = (s) => s.fighters.find((f) => f.id === 'cpu1');
     if (input.target) sent.push([t, respawn]);
   }
   assert.deepEqual(sent.map(([, r]) => r), [0], `it aims once, after the wait (${JSON.stringify(sent)})`);
+}
+
+{
+  // level 2 is a tutorial: the raider walks at a fifth of a kid's speed, slow enough to catch, and still gets home in a round
+  let fastest = 0, stole = -1, banked = -1;
+  play(level.stage, ROUND_SECONDS, (s) => {
+    const f = me(s);
+    if (f.onGround) fastest = Math.max(fastest, Math.hypot(f.vx, f.vz));
+    if (stole < 0 && steals(s)) stole = s.tick;
+    if (banked < 0 && banks(s)) banked = s.tick;
+  }, () => null, matchOptions(level));
+  assert.ok(fastest <= 0.2 * WALK_SPEED + 1e-9, `the raider never walks faster than a fifth of a kid (${fastest.toFixed(2)})`);
+  assert.ok(stole > 0 && banked > stole, `and still steals and banks within the round (stole ${stole}, banked ${banked})`);
 }
 
 console.log('cpu ok');

@@ -492,9 +492,12 @@ function slide(s, f, dx, dz) {
   if (f.onGround) inStage(s, f);
 }
 
+/** The share of WALK_SPEED a fighter walks at: the level's `badGuyPace` for bad guys (REUSE-SPEC.md §Forts, Level 2). */
+const paceOf = (s, f) => (f.team === 'badGuys' ? s.rules.badGuyPace ?? 1 : 1);
+
 /** Stuck: barely moving for STUCK_TICKS. On butter, barely moving for the speed it's sliding at, since it slows right down to settle. */
-function stuckCheck(f, moved) {
-  if (moved == null || moved >= DT * 0.2 * (f.slick ? Math.hypot(f.vx, f.vz) : WALK_SPEED)) f.stuck = 0;
+function stuckCheck(s, f, moved) {
+  if (moved == null || moved >= DT * 0.2 * (f.slick ? Math.hypot(f.vx, f.vz) : WALK_SPEED * paceOf(s, f))) f.stuck = 0;
   else if (++f.stuck >= STUCK_TICKS) fail(f);
 }
 
@@ -506,7 +509,7 @@ function stuckCheck(f, moved) {
  */
 function walkVelocity(s, f, to) {
   const dx = to ? to.x - f.x : 0, dz = to ? to.z - f.z : 0, d = Math.hypot(dx, dz);
-  const top = WALK_SPEED * (patchAt(s, s.stage.puddles, f) < 0 ? 1 : SYRUP_SLOW);
+  const top = WALK_SPEED * paceOf(s, f) * (patchAt(s, s.stage.puddles, f) < 0 ? 1 : SYRUP_SLOW);
   const v = d > EPS ? Math.min(top, f.slick ? d * BUTTER_BRAKE : d / DT) / d : 0;
   if (!f.slick) { Object.assign(f, { vx: dx * v, vy: 0, vz: dz * v }); return d; }
   if (dx * f.vx + dz * f.vz < 0) f.passed = true;
@@ -521,7 +524,7 @@ function walkStep(s, f) {
   const to = paused ? null : f.walkTo, x0 = f.x, z0 = f.z, was = patchAt(s, s.stage.springs, f);
   const d = walkVelocity(s, f, to);
   slide(s, f, f.vx * DT, f.vz * DT);
-  stuckCheck(f, to && !f.attack && d > ARRIVE ? Math.hypot(f.x - x0, f.z - z0) : null);
+  stuckCheck(s, f, to && !f.attack && d > ARRIVE ? Math.hypot(f.x - x0, f.z - z0) : null);
   const top = supportAt(s.solids, f.x, f.z, f.y);
   if (top < f.y - STEP) { f.onGround = false; f.airTo = f.walkTo; return; }
   f.y = top;

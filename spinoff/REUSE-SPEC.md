@@ -558,6 +558,11 @@ and smashers each get a round that is theirs.
     a hero, so the fairness rules (Bad guys) only start to matter on the level that brings Chase.
     A grownup playing a bad guy follows the same rule: their 🥊 and 🦶 break walls but never land
     on a hero (brainstorm 2026-10-17, since 🥷 isn't built yet).
+  - **The bad guys walk at a fifth of a kid's speed on level 2** (decided 2026-10-17, playtest: the
+    raider was far too fast. It moves without waiting on a tap or a screen scroll, on a perfect
+    path, so a kid could never catch it). The level's `match` rule `badGuyPace: 0.2`, read by
+    `sim.js` for walking only: jumps keep their speed, so route-finding's jumps still land. The
+    raider steals around 25 s and banks around 50 s of a 90 s round; `spinoff/cpu.test.mjs` checks both.
 - **Start spots come first** (decided 2026-10-17). Step 1 of making any level, hand-made or
   generated, on every stage: pick pseudo-random start spots for up to 6 heroes,
   each with room for the hero and their block pile beside them, and reserve them, so nothing

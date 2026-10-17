@@ -1084,16 +1084,22 @@ like that keeps the big cape a choice rather than a handicap.
   Bad guys and the training dummy keep gloves.
   - **A toy, not a weapon:** a chunky flat blade with a rounded tip, a big rounded crossguard and a ball
     pommel, about a third of the fighter's height. Blade and grip are in the gloves colour (the same swatch
-    row), with three slanted white candy stripes and a white guard and pommel (hot pink trim on a white sword).
+    row), plain, with a white guard and pommel (hot pink trim on a white sword).
     The flat of the blade faces the match camera.
   - **Held in the right hand** (joint side -1), or the owl's right wing tip where its glove would be. The
     other hand is the bare paw or wing tip. Every punch of the string is swung with the sword arm, so it is
     the near arm facing one way and the far arm facing the other.
-  - **The punch is a swing, nothing else changes.** The same punch string, timing and arm poses; the
-    blade keeps its own angle to the ground (`SWING` in `punches.js`): the jab and cross chop down from over
-    the shoulder, the uppercut slashes up from low in front, with a white swoosh fan behind the blade while
-    it lands. Hit spheres, reach (`entrantOf` still measures from the glove spots) and damage are the
-    gloves' exactly; `fighter.test.mjs` checks the reach.
+  - **The sword has its own string: stab, slash, upward stab** (decided 2026-10-17). They take the jab's,
+    cross's and uppercut's places in `COMBO`, with their timing, and have their own sword-arm poses and
+    blade angles (`SWORD_MOVES` in `punches.js`). From the side: the **stab** draws the hand back to the
+    chest with the blade level, then shoots the arm straight out along the blade, with white speed lines
+    streaking behind it. The **slash** starts with the arm out to the side and the blade pointing back,
+    then sweeps it flat across the front at chest height, with a white fan behind the blade. The **upward
+    stab** crouches with the blade low and level, then thrusts up and forward until the blade points at
+    the sky, with the speed lines. The sim is untouched: hit timing, hit spheres and damage are the
+    punches', and the reach is measured from the glove spots (`fighter.test.mjs` checks it).
+  - **A full 360 spin with the sword: a later power move (brainstorm 2026-10-17).** It hits all around
+    you, which normal hits don't, so it belongs on the power-bar ladder.
 - **Tricks: tap the picked gloves or sword again** (decided 2026-10-17), the way a hat changes stitch.
   A trick pops out of the hitting glove or the sword's tip while a punch lands, upright and turning:
   ✨ sparkle (the yarn store's `characters/sparkle.js` stars), 🫧 bubbles, or 🔥 a cartoon flame.
@@ -1156,7 +1162,9 @@ only, pictures and colour, no words needed; every button has an `aria-label` for
    colours plus white), then
    the hands row: 🥊 gloves, or a sword once you've beaten level 1, then their colour (decided 2026-10-17).
    Tapping the gloves or sword you already have changes its trick, shown as a ✨ 🫧 🔥 badge on the icon,
-   and the preview throws a jab to show it off. Icons are drawn in the colour currently picked. Tapping the hat or cape you
+   and the preview throws a move to show it off (jab or stab, then cross or slash, then uppercut or upward
+   stab, in turn). The preview hits nothing, so once the move lands its
+   trick floats up off the glove or sword tip, big, for 1.2 s (`showOffTrick`), so a kid sees what it does. Icons are drawn in the colour currently picked. Tapping the hat or cape you
    already wear knits it in the next stitch; the icon shows the stitch as a pattern. Each tap rebuilds the fighter
    (about 17 ms) on a gently turning preview.
 4. **Surprise me.** 🎲 runs the species' `randomise` plus a random outfit.

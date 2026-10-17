@@ -10,7 +10,7 @@ import { oklchOf } from '../inventory/yarn-look.js';
 import '../characters/llama.js';
 import { wingShape } from '../characters/owl.js';
 import { makeSparkle } from '../characters/sparkle.js';
-import { GLOVE, SWING, SWORD_UP, punchLayer, sample } from './punches.js';
+import { GLOVE, SWORD_MOVES, SWORD_UP, punchLayer, sample } from './punches.js';
 import { kickLayer, kickLunge } from './kicks.js';
 
 export const FIGHTER_KEY = 'lys.fighter.v1';
@@ -229,14 +229,14 @@ function swordGeometry() {
     new THREE.CylinderGeometry(0.02, 0.02, grip, 12).rotateX(Math.PI / 2),
     new THREE.CapsuleGeometry(wide / 2, blade, 6, 14).rotateX(Math.PI / 2).scale(thick / wide, 1, 1).translate(0, 0, at + blade / 2 + wide / 2),
   ]);
-  const stripes = [0.3, 0.55, 0.8].map((k) => new THREE.BoxGeometry(thick * 1.15, wide * 0.9, 0.024).rotateX(0.5).translate(0, 0, at + k * blade));
   const trim = mergeGeometries([
     new THREE.CapsuleGeometry(0.034, guard, 4, 12).translate(0, 0, at),
     new THREE.SphereGeometry(0.034, 14, 10).translate(0, 0, -grip / 2 - 0.018),
-    ...stripes,
   ]);
-  const trail = new THREE.RingGeometry(at + 0.04, at + blade + wide / 2, 12, 1, 0, SWORD.trail).rotateY(-Math.PI / 2);
-  swordGeo = { handle, trim, trail };
+  const fan = new THREE.RingGeometry(at + 0.04, at + blade + wide / 2, 12, 1, Math.PI / 2, SWORD.trail).rotateX(Math.PI / 2);
+  const line = (y, z0, z1, w) => new THREE.PlaneGeometry(z1 - z0, w).rotateY(-Math.PI / 2).translate(0, y, (z0 + z1) / 2);
+  const streak = mergeGeometries([line(wide * 0.8, -0.3, at + blade * 0.5, 0.016), line(-wide * 0.8, -0.24, at + blade * 0.3, 0.016), line(0, -0.36, -0.08, 0.02)]);
+  swordGeo = { handle, trim, fan, streak };
   return swordGeo;
 }
 
@@ -250,11 +250,11 @@ export function addSword(built, color) {
   const sword = new THREE.Group();
   sword.add(new THREE.Mesh(geo.handle, candy(color)), new THREE.Mesh(geo.trim, candy(color === WHITE ? '#ff3b7f' : WHITE)));
   for (const m of sword.children) m.castShadow = true;
-  const trail = new THREE.Mesh(geo.trail, new THREE.MeshBasicMaterial({ color: WHITE, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
-  trail.visible = false;
-  sword.add(trail);
+  const swoosh = new THREE.MeshBasicMaterial({ color: WHITE, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+  const fan = new THREE.Mesh(geo.fan, swoosh), streak = new THREE.Mesh(geo.streak, swoosh);
+  sword.add(fan, streak);
   sword.position.set(...at);
-  sword.userData = { side: -1, trail, tip: SWORD.grip / 2 + 0.012 + SWORD.blade + SWORD.wide / 2 };
+  sword.userData = { side: -1, fan, streak, tip: SWORD.grip / 2 + 0.012 + SWORD.blade + SWORD.wide / 2 };
   parent.add(sword);
   built.sword = sword;
   swingSword(built, null);
@@ -267,18 +267,18 @@ export function removeSword(built) {
   built.sword = null;
 }
 
-/** Holds the blade at SWING's world angle above forward, whatever the arm is doing, with a swoosh behind it. */
+/** Holds the blade at SWORD_MOVES' world angle above forward, whatever the arm is doing: a fan behind a slash, a streak behind a stab. */
 export function swingSword(built, punch) {
   const { sword } = built;
   if (!sword) return;
   let arm = 0;
   for (let n = sword.parent; n && n !== built.chest; n = n.parent) arm += n.rotation.x;
-  const { up, swoosh } = punch ? sample(SWING[punch.name], punch.step) : { up: SWORD_UP, swoosh: 0 };
+  const { up, swoosh, stab } = punch ? sample(SWORD_MOVES[punch.name], punch.step) : { up: SWORD_UP, swoosh: 0, stab: 0 };
   sword.rotation.x = -(up + arm);
-  const { trail } = sword.userData;
-  trail.visible = swoosh > 0.02;
-  trail.material.opacity = swoosh;
-  if (punch) trail.scale.y = Math.sign(SWING[punch.name][1][1].up - SWING[punch.name][2][1].up);
+  const { fan, streak } = sword.userData;
+  fan.visible = swoosh > 0.02 && stab < 0.5;
+  streak.visible = swoosh > 0.02 && stab >= 0.5;
+  fan.material.opacity = swoosh;
 }
 
 const BUBBLES = [[0, 0, 0, 0.05], [0.07, 0.06, 0.02, 0.035], [-0.05, 0.09, -0.02, 0.03], [0.02, 0.15, 0.01, 0.025], [-0.08, 0.01, 0.03, 0.04]];
@@ -307,7 +307,7 @@ const bit = (geo, mat, [x, y, z], r) => {
 /** The trick's look, about a glove across, centred on its origin. */
 function trickMesh(kind, built) {
   const p = trickPartsOnce(), g = new THREE.Group();
-  if (kind === 'sparkle') g.add(makeSparkle(built).mesh);
+  if (kind === 'sparkle') g.add(Object.assign(makeSparkle(built).mesh, { visible: true }));
   if (kind === 'bubble') {
     for (const [x, y, z, r] of BUBBLES) g.add(bit(p.ball, p.bubble, [x, y, z], r));
   }
@@ -341,18 +341,29 @@ export function removeTricks(built) {
 
 const _q = new THREE.Quaternion(), _up = new THREE.Quaternion();
 
-/** The hitting hand's trick pops up, upright and turning, through the swoosh of the punch. */
-export function stepTricks(built, punch) {
-  const k = punch ? sample(SWING[punch.name], punch.step).swoosh / 0.75 : 0;
+/** Shows only `side`'s trick (none for null), upright, `size` times its own, turned and risen. */
+function poseTricks(built, side, size, turn, rise) {
   for (const g of built.tricks ?? []) {
-    g.visible = k > 0.02 && g.userData.side === punch.arm;
+    g.visible = g.userData.side === side;
     if (!g.visible) continue;
     g.quaternion.copy(g.parent.getWorldQuaternion(_q).invert().multiply(built.root.getWorldQuaternion(_up)));
-    g.scale.setScalar(0.3 + k);
-    g.userData.spin.rotation.y = punch.step * 9;
-    g.userData.spin.position.y = 0.12 * punch.step;
+    g.scale.setScalar(size);
+    g.userData.spin.rotation.y = turn;
+    g.userData.spin.position.y = rise;
   }
 }
+
+/** The hitting hand's trick pops up, upright and turning, through the swoosh of the punch. */
+export function stepTricks(built, punch) {
+  const k = punch ? sample(SWORD_MOVES[punch.name], punch.step).swoosh / 0.75 : 0;
+  poseTricks(built, k > 0.02 ? punch.arm : null, 0.3 + k, (punch?.step ?? 0) * 9, 0.12 * (punch?.step ?? 0));
+}
+
+// REUSE-SPEC.md §Fighter chooser: the preview never hits anything, so its trick stays out to be seen
+export const SHOW_OFF = 1.2;
+/** The chooser's trick, `t` seconds after its jab would land: big, floating up off the hand, gone after SHOW_OFF. */
+export const showOffTrick = (built, side, t) =>
+  poseTricks(built, t >= 0 && t < SHOW_OFF ? side : null, 1.4 * Math.min(1, 4 * (1 - t / SHOW_OFF)), t * 5, 0.35 * (t / SHOW_OFF));
 
 /** Same order as the shop's `dressedCharacter` (store/sim/cast.js): dress unmerged, then merge. @param {Fighter} f */
 export function buildFighter(f) {
@@ -422,7 +433,7 @@ export function stepFighter(built, dt, pose, speed, strike = null) {
   built.root.position.z = kick ? kickLunge(built.params, kick) : 0;
   const out = stepMotion(built, pose, dt, IDLE, (o) => {
     if (gain > 0) walkLayer(o, w, gain, IDLE);
-    if (punch) punchLayer(o, punch);
+    if (punch) punchLayer(o, punch, built.sword ? SWORD_MOVES : undefined);
     if (kick) kickLayer(o, kick);
   });
   swingSword(built, punch);

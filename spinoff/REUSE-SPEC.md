@@ -774,13 +774,12 @@ The yarn store's seeded rng (ROADMAP A1) draws from
 - **Inputs** are a move target (a point or a tapped thing), 🥊 / 🦶 presses and a fired power
   ("power X at point P", see Power moves), sent only when they change, a few bytes each, on a
   reliable channel. A lost packet costs little: the target stays where it was. The host does the route-finding.
-- **Snapshots** (decided 2026-10-13; the unreliable channel is brainstorm, see Channel, as built)
+- **Snapshots** (decided 2026-10-13; an unreliable channel is brainstorm 2026-10-16, until someone sees fighters stutter)
   (per fighter: position, velocity, facing, percent, donuts in bag, move id, move
   step, ~30 bytes; under 450 bytes for 14 fighters; plus a few bytes each for bar level, tap
   target and power state, see Team powers; plus each shelf's donut count and loose donut pickups
-  as positions) go 30 times a second on an unreliable channel
-  (`{ ordered: false, maxRetransmits: 0 }`). A newer snapshot replaces any lost one, so a drop
-  never stalls the stream.
+  as positions) go 30 times a second, on the one reliable channel Trystero gives (see Channel, as
+  built). A guest only ever draws the newest, so nothing depends on every snapshot arriving.
 - **Guests draw other fighters ~1–2 snapshots behind**, interpolating between the last two.
 - **No client prediction.** On home Wi-Fi a round trip is 5–20 ms, so a guest's own fighter
   answers about one frame late. `ponytail:` add prediction for the guest's own fighter only if

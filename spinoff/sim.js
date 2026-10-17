@@ -34,6 +34,7 @@ const HOP_COST = 8;
 const WP_ARRIVE = 0.25;
 const ARRIVE = 0.02;
 const GOAL_SEARCH = 3;
+const OFF_SEARCH = 8;
 const REPLAN_TICKS = 10;
 const STUCK_TICKS = 20;
 const MAX_FAILS = 2;
@@ -46,6 +47,8 @@ const LUNGE_KEEP = 0.1;
 export const RESPAWN_Y = 3;
 const RESPAWN_DZ = 0.6;
 export const INVINCIBLE_TICKS = 2 * TICK_HZ;
+/** After a ring-out the faller is out of play this long, then drops in (REUSE-SPEC.md §Scoring; 2-5 s to tune). */
+export const RESPAWN_WAIT = 3 * TICK_HZ;
 export const LAUNCH_SPEED = 5;
 /** Untouched this long, a fighter steadies: percent (and its wobble) drains at CALM_DRAIN a second. */
 export const CALM_TICKS = 1.5 * TICK_HZ;
@@ -286,16 +289,25 @@ function search(g, start, goal) {
   return { cells: trace(from, best), reached: false };
 }
 
-/** The walkable cell at the goal's height nearest the goal point. */
-function goalCell(g, p) {
+/** The walkable cell nearest p, within `reach` cells, that `ok` accepts; p's own cell if none. */
+function nearestCell(g, p, ok, reach) {
   const c = cellOf(g, p.x, p.z), ci = c % g.nx, cj = (c - ci) / g.nx;
   let best = c, bestD = Infinity;
-  for (let j = Math.max(0, cj - GOAL_SEARCH); j <= Math.min(g.nz - 1, cj + GOAL_SEARCH); j++)
-    for (let i = Math.max(0, ci - GOAL_SEARCH); i <= Math.min(g.nx - 1, ci + GOAL_SEARCH); i++) {
+  for (let j = Math.max(0, cj - reach); j <= Math.min(g.nz - 1, cj + reach); j++)
+    for (let i = Math.max(0, ci - reach); i <= Math.min(g.nx - 1, ci + reach); i++) {
       const n = j * g.nx + i, d = Math.hypot(cellX(g, n) - p.x, cellZ(g, n) - p.z);
-      if (g.kind[n] < HOP && Math.abs(g.top[n] - p.y) <= STEP && d < bestD) { best = n; bestD = d; }
+      if (g.kind[n] < HOP && ok(n) && d < bestD) { best = n; bestD = d; }
     }
   return best;
+}
+
+/** The walkable cell at the goal's height nearest the goal point. */
+const goalCell = (g, p) => nearestCell(g, p, (n) => Math.abs(g.top[n] - p.y) <= STEP, GOAL_SEARCH);
+
+/** Up on blocks too tall to hop (the grid only knows floors), the route starts with a step off them, to the nearest cell at or below. */
+function startCell(g, f) {
+  const at = cellOf(g, f.x, f.z);
+  return g.kind[at] === BLOCKED && f.y > g.top[at] + STEP ? nearestCell(g, f, (n) => g.top[n] <= f.y + STEP, OFF_SEARCH) : at;
 }
 
 /** Cells to waypoints: a waypoint reached across a hop or up onto a higher top is a jump; `spring` names the trampoline it bounces up from. */
@@ -387,9 +399,10 @@ function resolve(s, f) {
 // --- following a route ----------------------------------------------------------------------
 
 function plan(s, f) {
-  const g = navGrid(s, f), goal = f.dest, start = cellOf(g, f.x, f.z), end = goalCell(g, goal);
+  const g = navGrid(s, f), goal = f.dest, start = startCell(g, f), end = goalCell(g, goal);
   const found = f.fails >= MAX_FAILS ? { cells: [start], reached: false } : search(g, start, end);
   const wps = waypoints(g, found.cells);
+  if (start !== cellOf(g, f.x, f.z)) wps.unshift({ x: cellX(g, start), y: g.top[start], z: cellZ(g, start), jump: false, spring: -1 });
   const exact = found.reached && Math.hypot(goal.x - cellX(g, end), goal.z - cellZ(g, end)) <= CELL;
   if (exact) wps.push({ x: goal.x, y: goal.y, z: goal.z, jump: goal.y > (wps.at(-1)?.y ?? f.y) + STEP, spring: -1 });
   f.nav = { goal: { x: goal.x, y: goal.y, z: goal.z }, wps: pull(g, f, wps), k: 0, done: false, failed: false,
@@ -555,7 +568,7 @@ function ringOut(s, f) {
   drop(s, f, { x, y: supportAt(s.solids, x, z, Infinity), z, vx: 0, vy: 0, vz: 0 });
   const sh = shelfOf(s, f.team);
   Object.assign(f, { x: sh.x, y: sh.y + RESPAWN_Y, z: sh.z + RESPAWN_DZ, vx: 0, vy: 0, vz: 0, onGround: false,
-    jumps: 1, airTo: null, attack: null, stun: 0, pending: null, freeze: 0, percent: 0, calm: 0, inv: INVINCIBLE_TICKS,
+    jumps: 1, airTo: null, attack: null, stun: 0, pending: null, freeze: 0, percent: 0, calm: 0, inv: 0, out: RESPAWN_WAIT,
     nav: null, navJump: null, stuck: 0 });
 }
 
@@ -571,6 +584,10 @@ function release(f) {
 }
 
 function moveFighter(s, f) {
+  if (f.out > 0) {
+    if (--f.out === 0) f.inv = INVINCIBLE_TICKS;
+    return;
+  }
   f.still = f.freeze > 0;
   if (f.still) {
     if (--f.freeze === 0) release(f);
@@ -596,7 +613,7 @@ function separate(s) {
   for (let i = 0; i < fs.length; i++) {
     for (let j = i + 1; j < fs.length; j++) {
       const a = fs[i], b = fs[j], dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), gap = a.r + b.r - d;
-      if (a.team === b.team || gap <= 0 || !overlapY(a, b)) continue;
+      if (a.team === b.team || a.out || b.out || gap <= 0 || !overlapY(a, b)) continue;
       const [ux, uz] = d > EPS ? [dx / d, dz / d] : [a.team === 'heroes' ? 1 : -1, 0];
       const held = [guarding(s, a), guarding(s, b)];
       for (const [f, sign, k] of [[a, -1, 0], [b, 1, 1]]) {
@@ -631,7 +648,7 @@ function brickContact(sp, b) {
   return d <= sp.r ? { p, d } : null;
 }
 
-const canStrike = (s, f, o) => canHit(f, o, s.rules) && o.inv === 0 && Math.abs(o.z - f.z) <= HIT_DEPTH + f.r + o.r;
+const canStrike = (s, f, o) => canHit(f, o, s.rules) && o.inv === 0 && !o.out && Math.abs(o.z - f.z) <= HIT_DEPTH + f.r + o.r;
 
 /** The gap to the nearest thing in front that the attack could reach with a step, or Infinity. */
 function frontGap(s, f) {
@@ -871,7 +888,7 @@ function aim(s, f, t) {
   if ('x' in t) tapAbove(s, f, t);
 }
 
-const busy = (f) => Boolean(f.attack || f.stun > 0 || f.freeze > 0 || f.pending);
+const busy = (f) => Boolean(f.attack || f.stun > 0 || f.freeze > 0 || f.pending || f.out);
 
 function setAway(s, f, away) {
   if (away == null || away === f.away) return;
@@ -882,7 +899,7 @@ function setAway(s, f, away) {
 function applyInput(s, f, input) {
   setAway(s, f, input?.away);
   if (f.away || !input) return;
-  if (input.target) aim(s, f, input.target);
+  if (input.target && !f.out) aim(s, f, input.target);
   if (s.phase === 'build') readyInput(s, f, input);
   else attackInput(s, f, input);
 }
@@ -924,7 +941,7 @@ function newFighter(e, at, y) {
   return { id: e.id, team: e.team, icing: e.look.frosting, block: null, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
     x: at.x, y, z: at.z, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, onGround: true, jumps: 1,
     target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, fails: 0, stuck: 0, away: false, slick: false, passed: false, sprung: -1,
-    attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, percent: 0, calm: 0,
+    attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, out: 0, percent: 0, calm: 0,
     carrying: null, touching: [], shelfDone: false, blocked: false };
 }
 
@@ -1019,7 +1036,7 @@ function stepOf(f) {
 const fighterView = (f) => ({
   id: f.id, team: f.team, x: f.x, y: f.y, z: f.z, vx: f.vx, vy: f.vy, vz: f.vz, facing: f.facing, height: f.h,
   onGround: f.onGround, move: moveOf(f), step: stepOf(f), percent: f.percent, carrying: f.carrying ? { ...f.carrying } : null,
-  invincible: f.inv > 0, target: f.dest ? { x: f.dest.x, y: f.dest.y, z: f.dest.z } : null, block: f.block,
+  invincible: f.inv > 0, respawn: f.out / TICK_HZ, target: f.dest ? { x: f.dest.x, y: f.dest.y, z: f.dest.z } : null, block: f.block,
 });
 
 function winnerOf(s) {

@@ -9,7 +9,7 @@ const { stage: STAGE } = TUTORIAL;
 const look = (frosting) => ({ dough: '#e8c48e', frosting, stripe: false });
 const fighter = (id, team, x, z) => ({
   id, team, x, y: 0, z, vx: 0, vy: 0, vz: 0, facing: 0, height: 1, onGround: true, move: 'idle', step: 0, percent: 0,
-  carrying: null, invincible: false, target: null, block: null,
+  carrying: null, invincible: false, respawn: 0, target: null, block: null,
 });
 /** @type {import('./match.js').Snapshot} */
 const snap = {
@@ -41,6 +41,8 @@ assert.deepEqual(pickTarget(STAGE, snap, tap(-2, 0.2, 1), 'me'), { thing: 'donut
 assert.deepEqual(pickTarget(STAGE, snap, tap(-1.7, 0.4, 1.1), 'me'), { thing: 'donut', id: 'd0' }, 'a tap near a loose donut');
 assert.deepEqual(pickTarget(STAGE, snap, tap(2.5, 0.6, 0), 'me'), { thing: 'fighter', id: 'dummy' }, 'a tap on the dummy chases it');
 assert.deepEqual(pickTarget(STAGE, snap, tap(2.5, 1, 0), 'me'), { thing: 'fighter', id: 'dummy' }, "a tap on the dummy's head");
+const away = { ...snap, fighters: snap.fighters.map((f) => (f.id === 'dummy' ? { ...f, respawn: 2 } : f)) };
+assert.ok('x' in pickTarget(STAGE, away, tap(2.5, 0.6, 0), 'me'), 'a fighter waiting to drop back in is not there to tap');
 assert.deepEqual(pickTarget(STAGE, snap, tap(-4, 0.6, 0.5), 'me'), { stop: true }, 'a tap on myself stops');
 assert.ok('x' in pickTarget(STAGE, snap, tap(-3, 0.6, -1), 'me'), 'a teammate is not a foe');
 for (const s of snap.shelves) {

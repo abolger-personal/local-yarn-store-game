@@ -93,4 +93,40 @@ const held = createMatch([A, B], stage, { pieces: 4 });
 assert.equal(act(held, 'A', { go: true }).phase, 'play', 'holding 👍 starts the round for everyone');
 assert.equal(snapshot(createMatch([A], TUTORIAL.stage)).phase, 'play', 'level 1 has no build round');
 
+// Up against the fence, the deck or the middle third, ⬇️ puts the block at your feet instead of a head-shake
+{
+  const grid = fortGrid(stage, 'heroes', [], createMatch([A, B], stage, { pieces: 4 }).piles), R = body.width / 2 + 0.01;
+  for (const [what, f, at] of [
+    ['the fence', { x: -5.6 + R, y: 0, z: -0.6, facing: Math.PI }, [-5.6, 0, -0.8]],
+    ['the deck', { x: -7, y: 0, z: -0.8 + R, facing: -Math.PI / 2 }, [-7.2, 0, -0.8]],
+    ['the middle third', { x: -3.5, y: 0, z: -1.2, facing: 0 }, [-3.6, 0, -1.2]],
+  ]) {
+    const c = facedCell(grid, f);
+    assert.ok(c?.ok && [c.x, c.y, c.z].every((v, k) => Math.abs(v - at[k]) < 1e-9), `facing ${what} up close, the block goes at your feet (${JSON.stringify(c)})`);
+  }
+}
+
+// Up on a stack as tall as they go, yours or a teammate's, a tap on the floor beyond gets you down and there
+{
+  const m2 = createMatch([A, B], stage, { pieces: 4 });
+  const idle = (s, id) => who(s, id).move === 'idle';
+  /** `id` puts a stack HEIGHT_LIMIT high in front of where it walks to; its top block. */
+  const build = (id, at) => {
+    let top = null;
+    for (let k = 0; k < HEIGHT_LIMIT; k++) {
+      fetch(m2, id);
+      act(m2, id, { target: top ? { thing: 'brick', id: top.id } : at }, (s) => idle(s, id));
+      top = act(m2, id, { drop: true }).bricks.at(-1);
+    }
+    assert.equal(top.y, BRICK * (HEIGHT_LIMIT - 1), `${id} stacked ${HEIGHT_LIMIT} high`);
+    return top;
+  };
+  const mine = build('A', { x: -4, z: -0.8 }), theirs = build('B', { x: -4.4, z: 0.4 });
+  for (const [top, whose] of [[mine, 'your own'], [theirs, 'a teammate\'s']]) {
+    Object.assign(m2.fighters[0], { x: top.x + BRICK / 2, y: top.y + BRICK, z: top.z + BRICK / 2, onGround: true });
+    const there = (s) => idle(s, 'A') && Math.hypot(who(s, 'A').x + 3.5, who(s, 'A').z - 1.2) < 0.03;
+    assert.equal(who(act(m2, 'A', { target: { x: -3.5, z: 1.2 } }, there), 'A').y, 0, `standing on ${whose} stack, a floor tap walks off it and there`);
+  }
+}
+
 console.log('build ok');

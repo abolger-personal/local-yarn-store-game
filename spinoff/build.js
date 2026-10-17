@@ -5,8 +5,10 @@ import { dropLayer, fits, footprint, makeDisplay, place, topAt } from '../invent
 
 /** Blocks a stack may hold: two is as tall as level 1's wall, which nobody hops (the playability check proves it). */
 export const HEIGHT_LIMIT = 2;
-/** The cell you face is the one this far in front of you. */
+/** The cell you face is the one this far in front of you... */
 export const PLACE_AHEAD = 0.45;
+/** ...or, where that one can't take a block (a deck, the fence, the edge), the one this far in front, at your feet. */
+export const PLACE_NEAR = 0.2;
 // ponytail: wider than any shelf (sim.js makes them about 1.04 wide); measure the shelf if one gets bigger
 const SHELF_KEEP = 0.6;
 const EDGE = 0.01;
@@ -56,19 +58,24 @@ export function fortGrid(stage, team, bricks, piles) {
   return grid;
 }
 
-/**
- * The cell in front of a fighter standing on a floor, where ⬇️ puts a block: its corner and the height the block
- * would sit at, and `ok` while the stack there is under the height limit. Null when that cell can't be built on,
- * or lies on another floor than the one the fighter stands on.
- * @param {{ x: number, y: number, z: number, facing: number }} f
- * @returns {{ x: number, y: number, z: number, ok: boolean }|null}
- */
-export function facedCell(grid, f) {
-  const p = { x: f.x + Math.cos(f.facing) * PLACE_AHEAD, z: f.z + Math.sin(f.facing) * PLACE_AHEAD };
+/** @typedef {{ x: number, y: number, z: number, facing: number }} Facing */
+
+/** @param {Facing} f */
+function cellAhead(grid, f, ahead) {
+  const p = { x: f.x + Math.cos(f.facing) * ahead, z: f.z + Math.sin(f.facing) * ahead };
   const keys = cellKeys(grid, p), { c, r } = cellOf(grid, p);
   if (!keys || Math.abs(grid.tops[r * grid.cols + c] - f.y) > EDGE) return null;
   return { x: grid.ox + c * BRICK, y: grid.tops[r * grid.cols + c] + dropLayer(grid.g, keys) * BRICK, z: grid.oz + r * BRICK, ok: fits(grid.g, keys) };
 }
+
+/**
+ * The cell in front of a fighter standing on a floor, where ⬇️ puts a block: its corner and the height the block
+ * would sit at, and `ok` while the stack there is under the height limit. Null when neither the cell ahead nor the
+ * one at your feet can be built on from the floor the fighter stands on.
+ * @param {Facing} f
+ * @returns {{ x: number, y: number, z: number, ok: boolean }|null}
+ */
+export const facedCell = (grid, f) => cellAhead(grid, f, PLACE_AHEAD) ?? cellAhead(grid, f, PLACE_NEAR);
 
 /** Whether brick `i` (its index in the bricks the grid was built from) is on top of its stack. */
 export function onTop(grid, bricks, i) {

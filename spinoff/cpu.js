@@ -61,7 +61,7 @@ export function createCpu(id) {
     /** @param {Snapshot} snap @returns {Input} */
     input(snap) {
       const me = snap.fighters.find((f) => f.id === id);
-      if (!me || snap.phase === 'build' || snap.over) return IDLE;
+      if (!me || me.respawn || snap.phase === 'build' || snap.over) return IDLE;
       const target = aimFor(b, snap, me), key = JSON.stringify(target);
       if (key !== b.want) Object.assign(b, { want: key, since: snap.tick });
       if (snap.tick - b.since < REACT_TICKS) return IDLE;

@@ -208,8 +208,41 @@ function strikeNow(m, f, tick) {
   return n === undefined || m.t.joy ? null : strikeOf(f.move, n, f.facing, f.step);
 }
 
+const COUNT_UP = 1.3;
+/** A round badge with a big number on it, drawn over where a rung-out fighter will drop in. */
+function countBadge(n) {
+  const canvas = Object.assign(document.createElement('canvas'), { width: 128, height: 128 }), g = canvas.getContext('2d');
+  g.fillStyle = '#fffaf2';
+  g.beginPath();
+  g.arc(64, 64, 58, 0, Math.PI * 2);
+  g.fill();
+  g.font = 'bold 92px ui-rounded, system-ui, sans-serif';
+  Object.assign(g, { textAlign: 'center', textBaseline: 'middle', fillStyle: '#5a3a28' });
+  g.fillText(String(n), 64, 70);
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  return map;
+}
+const badges = new Map();
+
+/** REUSE-SPEC.md §Scoring: after a ring-out the fighter is gone for a moment, and a 3-2-1 counts down where they'll drop in. True while out. @param {FighterState} f */
+function waiting(m, f) {
+  const n = Math.ceil(f.respawn ?? 0);
+  for (const o of [m.g, m.shadow, m.held, m.carried]) if (o) o.visible = !n;
+  if (n && !m.count) scene.add((m.count = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false }))));
+  if (!m.count) return false;
+  m.count.visible = n > 0;
+  if (!n) return false;
+  if (!badges.has(n)) badges.set(n, countBadge(n));
+  if (m.count.material.map !== badges.get(n)) Object.assign(m.count.material, { map: badges.get(n), needsUpdate: true });
+  m.count.scale.setScalar(0.6);
+  m.count.position.set(f.x, f.y - match.RESPAWN_Y + COUNT_UP, f.z);
+  return true;
+}
+
 /** @param {FighterState} f */
 function drawFighter(m, f, dt, tick) {
+  if (waiting(m, f)) return;
   tickDown(m.t, FIGHTER_TIMERS, dt);
   bounces(m, f);
   placeFighter(m, f, dt);

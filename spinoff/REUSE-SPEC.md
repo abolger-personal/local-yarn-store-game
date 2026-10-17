@@ -185,6 +185,9 @@ floor at an angle and follows your fighter.
   Only a jump, or being hit, leaves the stage.
 - **Hits don't cancel the target.** After a launch, or a ring-out and drop-back-in, the fighter
   carries on to where it was going, so nobody has to re-tap after every hit.
+- **You can always get down** (decided 2026-10-17, playtest: a kid stuck on top of their own two-high
+  stack until the round changed). The route grid only knows floors, so a fighter standing on blocks
+  too tall to hop starts every route with a step off them, to the nearest floor cell at or below.
 - **Attacking on the move.** A punch is layered on the upper body over the walk on the legs, so
   the fighter keeps going. A kick needs the legs: the fighter pauses for the kick and walks on.
 - **The punch string is look only** (decided 2026-10-15). The sim has one punch; each tablet draws
@@ -331,7 +334,10 @@ No lives, no elimination, and only a short wait after a ring-out (decided 2026-1
   guard kicked off its base was back before anyone could grab a donut; 2–5 s to tune): dropped in
   above their own shelf, fully controllable on the way down, with respawn invincibility so nobody
   is waiting at the spawn point. Their percent resets to 0. The wait is what makes knocking a
-  guard off worth it.
+  guard off worth it. Built (decided 2026-10-17): `RESPAWN_WAIT` in `sim.js`, 3 s, for everyone,
+  the training dummy and CPU bad guys too. While they wait the faller is out of play: not drawn,
+  not solid, can't guard, grab, hit or be hit, and taps are ignored (the target is kept, so they
+  carry on where they were going). Every tablet shows a 3-2-1 badge over the spot they'll drop to.
 - **Anyone can grab the spilled donuts**, the faller included, on the way back in. A ring-out
   turns into a scramble instead of a pause.
 - **Any hit pops the carried donut** out of the bag as a pickup, so carrying is risky even
@@ -488,7 +494,10 @@ and smashers each get a round that is theirs.
     The cells are the world's 0.4 grid over your own third (`fortGrid`, on `inventory/grid.js`): a
     cell takes a block only where one floor top lies under all of it, clear of the shelves and of
     the start spots in use, and on the floor you stand on (the stack on it counts). Start spots no
-    hero took are free to build on.
+    hero took are free to build on. Where the cell you face can't take a block (you're up against
+    a deck, the fence, the stage's edge or the middle third), ⬇️ uses the cell at your feet instead
+    (`PLACE_NEAR`, decided 2026-10-17, playtest: "places I should be able to put pancakes"), so the
+    outline and ⬇️ give a head-shake far less often.
   - **What's in your hands decides what a tap on a block does.** Carrying: tap a block and you walk
     up to it and face it, so ⬇️ stacks on top. Empty-handed: tap one of *your own* blocks on top of
     a stack and you pick it back up. That is the take-back: only a top block (nothing floats), only

@@ -16,7 +16,7 @@ const floorY = (stage, x, z) => Math.max(0, ...stage.floors.filter((f) => x >= f
 /** @param {Entrant} e */
 const fighterOf = (e, carrying) => ({
   id: e.id, team: e.team, ...START[e.team], y: 0, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, height: e.height,
-  onGround: true, move: 'idle', step: 0, percent: 0, carrying, invincible: false, target: null, touching: null,
+  onGround: true, move: 'idle', step: 0, percent: 0, carrying, invincible: false, respawn: 0, target: null, touching: null,
 });
 
 /** @param {Entrant[]} entrants @param {import('./match.js').Stage} stage */

@@ -495,9 +495,11 @@ and smashers each get a round that is theirs.
     shelf, Mode: a guard blocks the grab) once it holds one or more. So the kids' first job is
     to wall their shelf, and the moment the raider scores, the game flips to breaking in, which
     level 1 taught.
-  - **The CPU never hits a kid on level 2** (planned 2026-10-17). It kicks walls on a raid and
-    stands guard when defending, but never attacks a hero, so the fairness rules (Bad guys) only
-    start to matter on the level that brings Chase.
+  - **No bad guy hits a kid on level 2** (planned 2026-10-17 for the CPU). Bad guys only forage
+    (raid, kicking walls on the way, grab and run home) or defend (stand guard); they never attack
+    a hero, so the fairness rules (Bad guys) only start to matter on the level that brings Chase.
+    A grownup playing a bad guy follows the same rule: their 🥊 and 🦶 break walls but never land
+    on a hero (brainstorm 2026-10-17, since 🥷 isn't built yet).
 - **Start spots come first** (decided 2026-10-17). Step 1 of making any level, hand-made or
   generated, on every stage: pick pseudo-random start spots for up to 6 heroes,
   each with room for the hero and their block pile beside them, and reserve them, so nothing

@@ -36,6 +36,11 @@ saved on their tablet, so each kid brings the fighter they made. The yarn store'
 `dress-up.html` is a grown-up tuning tool (lil-gui panels, text everywhere) and stays one; the
 chooser is its own code in `spinoff/fighter.js`, with its own save.
 
+**Tests never wait on real time** (decided 2026-10-17): timers and the clock are `node:test`'s
+`mock.timers`, ticked by the test, and tablets on the network share that one fake clock in one thread
+(`together.test.mjs`). Each test file in `npm run check` runs under 2 s; heavy CPU work goes in
+`npm run check:slow` (see `readme.md`).
+
 ## Tier 1: reuse as-is (no yarn-store coupling)
 
 (decided 2026-10-13)

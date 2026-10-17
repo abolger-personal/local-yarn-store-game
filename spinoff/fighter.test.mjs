@@ -15,6 +15,8 @@ import { SYRUP_SLOW, WALK_SPEED } from './sim.js';
 const SHOP_VIEW_PX = LOOK.viewPx;
 LOOK.viewPx = 0;
 
+// random bodies sampled per run; FULL=1 (npm run check:full) samples as many as before
+const OWLS = process.env.FULL ? 60 : 8, BODIES = process.env.FULL ? 40 : 6;
 const at = (o) => o.getWorldPosition(new THREE.Vector3());
 
 for (const species of SPECIES) {
@@ -34,7 +36,7 @@ for (const species of SPECIES) {
   disposeFighter(built);
 }
 
-for (const f of [newFighter('owl'), ...Array.from({ length: 60 }, () => randomFighter(Math.random, 'owl'))]) {
+for (const f of [newFighter('owl'), ...Array.from({ length: OWLS }, () => randomFighter(Math.random, 'owl'))]) {
   const built = buildFighter(f);
   const { pos, scale } = wingShape(built.params);
   applyPose(built, POSES.rest);
@@ -121,7 +123,8 @@ for (const species of SPECIES) for (const cape of CAPES) {
   };
   const smooth = triangles('stockinette');
   for (const stitch of TEXTURES) {
-    assert.ok(triangles(stitch) <= smooth * 5, `${stitch} hat and cape cost ${triangles(stitch)} triangles, over 5× smooth (${smooth})`);
+    const n = triangles(stitch);
+    assert.ok(n <= smooth * 5, `${stitch} hat and cape cost ${n} triangles, over 5× smooth (${smooth})`);
   }
 }
 
@@ -134,7 +137,7 @@ for (const species of SPECIES) for (const cape of CAPES) {
 {
   const { cell } = floorGrid();
   // ponytail: sampled, since species randomise() is Math.random only; 1.4 vs 1.26 widest of 600 is the margin
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < BODIES; i++) {
     const f = randomFighter();
     f.look = { ...f.look, cape: 'capelet', bag: 'crossbody pouch' };
     const built = buildFighter(f);

@@ -8,7 +8,14 @@ from a CDN, served statically.
 ```sh
 npm run serve      # http://localhost:8765  (no-cache dev server)
 npm run lint       # ESLint, flat config
+npm run check      # lint, typecheck and the fast tests
+npm run check:slow # the CPU-heavy tests
+npm run check:all  # both
 ```
+
+Tests never wait on real time: use `node:test`'s `mock.timers` (`setTimeout`, `setInterval`, `Date`) and
+`tick()` it. Every test file in `check` runs under 2 s or the check fails (`tools/run-tests.mjs`); a file
+that can't, because it is heavy CPU work rather than waiting, moves to `check:slow`.
 
 Use `serve.py`, **not** `python3 -m http.server`. Plain `http.server` sends `Last-Modified`, so
 browsers answer 304 and keep serving stale ES modules. That is merely confusing when a function

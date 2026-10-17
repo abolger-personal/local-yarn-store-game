@@ -39,6 +39,9 @@ What is left is project-specific, and no off-the-shelf rule knows about it:
   nothing and are referenced by nothing, so every other tool considers them dead code. Dropping
   them leaves no species registered and the shop fails to open.
 - **`modules.mjs`** — shared helper: every store module, wherever it lives in the folder tree.
+- **`run-tests.mjs`** — `node tools/run-tests.mjs [fast|slow|all] [file ...]`: each test file in its own
+  `node`, timed. A fast-section file over 2 s fails (`npm run check`); `slow` is `npm run check:slow`.
+  `FULL=1` lifts the limit, since it samples more.
 
 Every lint rule is an **error**, not a warning: a warning nobody has to fix is one nobody reads.
 

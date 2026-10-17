@@ -59,7 +59,11 @@ async function lobby(code, mine, hosting, quit) {
   const { openRoom } = await import('./net.js');
   const met = new Set();
   let meet = () => {};
-  const room = openRoom(code, mine, { onFighter: (id) => { met.add(id); meet(); }, onLeave: (id) => met.delete(id) });
+  const room = openRoom(code, mine, { onFighter: (id, _, progress) => {
+    met.add(id);
+    parentPort.postMessage({ heard: progress });
+    meet();
+  }, onLeave: (id) => met.delete(id) });
   room.on('playing', () => parentPort.postMessage({ playing: true }));
   if (quit) return new Promise(() => { room.on('go', () => setTimeout(() => room.leave(), 1500)); });
   if (!hosting) return new Promise((go) => { room.on('go', () => go(`?room=${code.join('')}`)); });
@@ -69,11 +73,14 @@ async function lobby(code, mine, hosting, quit) {
 }
 
 // One worker is one tablet's whole visit, as the tap page is: its pages come and go, its rooms stay.
-async function visit({ code, hosting, slow = 0, quit = false }) {
+async function visit({ code, hosting, slow = 0, quit = false, number = 1, reached = 1 }) {
   register('data:text/javascript,' + encodeURIComponent(HOOKS));
+  // this tablet's game save, which goes along with its fighter
+  const save = JSON.stringify({ beaten: reached - 1, reached: { breakfast: reached } });
+  globalThis.localStorage = /** @type {any} */ ({ getItem: (k) => (k === 'lys.progress.v1' ? save : null), setItem() {} });
   const { joinMatch } = await import('./together.js');
   const { randomFighter } = await import('./fighter.js');
-  const { TUTORIAL } = await import('./levels.js');
+  const { levelFor, levelOf } = await import('./levels.js');
   const { leaveRooms } = await import('./net.js');
   const mine = randomFighter();
   pageStubs('', () => {});
@@ -84,11 +91,14 @@ async function visit({ code, hosting, slow = 0, quit = false }) {
     let leave;
     const left = new Promise((r) => { leave = r; });
     pageStubs(page, leave);
-    const match = await joinMatch(page, mine, TUTORIAL);
-    parentPort.postMessage({ me: match.me, roster: match.start.roster.map((s) => s.id), joined: [...globalThis.joined] });
+    const match = await joinMatch(page, mine, page.includes('level=') ? levelFor(page) : levelOf('breakfast', number));
+    parentPort.postMessage({ me: match.me, roster: match.start.roster.map((s) => s.id), joined: [...globalThis.joined],
+      level: [match.start.theme, match.start.number] });
     parentPort.removeAllListeners('message');
     // 'again': the host's ▶️; 'bye': 👋 back to the lobby, which leaves the room, and the code typed again
-    parentPort.on('message', (m) => ({ bye: () => leave(null), reload: () => leave(page), again: () => match.again() })[m]());
+    // 'won': ▶️ on the end card after a win, which plays the next level
+    parentPort.on('message', (m) => ({ bye: () => leave(null), reload: () => leave(page), again: () => match.again(),
+      won: () => match.again(`${page.slice(1)}&stage=breakfast&level=2`) })[m]());
     page = await left;
     if (page === null) {
       leaveRooms();
@@ -99,8 +109,8 @@ async function visit({ code, hosting, slow = 0, quit = false }) {
 }
 
 /** A tablet; `said(key, n)` resolves with the `n`th message it posts that has `key`. */
-function open(code, hosting = 0, slow = 0, quit = false) {
-  const worker = new Worker(new URL(import.meta.url), { workerData: { code, hosting, slow, quit } }), heard = [], waiting = [];
+function open(code, hosting = 0, slow = 0, quit = false, more = {}) {
+  const worker = new Worker(new URL(import.meta.url), { workerData: { code, hosting, slow, quit, ...more } }), heard = [], waiting = [];
   const check = () => {
     for (const w of [...waiting]) {
       const m = heard.filter((h) => w.key in h)[w.n - 1];
@@ -127,24 +137,31 @@ async function played(tablets, n, what) {
   for (const g of guests) {
     assert.ok(host.roster.includes(g.me), 'every guest is in the host\'s roster');
     assert.deepEqual(g.roster, host.roster, 'every guest plays the host\'s roster');
+    assert.deepEqual(g.level, host.level, 'on the host\'s stage and level');
   }
   return [host, ...guests];
 }
 
 async function main() {
-  const three = [open([1, 2, 3, 4], 2), open([1, 2, 3, 4]), open([1, 2, 3, 4])];
-  await played(three, [1, 1, 1], 'three tablets starting a match');
+  const three = [open([1, 2, 3, 4], 2, 0, false, { number: 2 }), open([1, 2, 3, 4], 0, 0, false, { reached: 2 }), open([1, 2, 3, 4], 0, 0, false, { reached: 3 })];
+  const [host3] = await played(three, [1, 1, 1], 'three tablets starting a match');
+  assert.deepEqual(host3.level, ['breakfast', 2], 'the start carries the stage\'s name and the level\'s number');
+  assert.ok(host3.roster.includes('cpu1') && !host3.roster.includes('dummy'), 'level 2 brings its raider, not the dummy');
+  const heard = await Promise.all([1, 2].map((n) => three[0].said('heard', n)));
+  assert.deepEqual(heard.map((h) => h.heard.reached.breakfast).sort(), [2, 3], 'each tablet\'s progress comes to the host with its fighter');
   for (const t of three) t.worker.terminate();
-  console.log('together ok (a host and two guests start one match through net.js)');
+  console.log('together ok (a host and two guests start one match through net.js, on the host\'s level)');
 
   const [host, guest] = [open([2, 3, 4, 1], 1), open([2, 3, 4, 1])];
   await played([host, guest], [1, 1], 'two tablets starting a match');
   const late = open([2, 3, 4, 1]);
   await within(15000, late.said('playing'), 'the host telling a late friend in the lobby a match is on');
-  host.worker.postMessage('again');
+  host.worker.postMessage('won');
   const next = await within(15000, Promise.all([host, guest].map((t) => t.said('next'))), 'everyone going to the next round');
-  assert.deepEqual(next.map((m) => m.next), ['?room=2341&host', '?room=2341'], 'everyone reloads the same page for the next round');
+  assert.deepEqual(next.map((m) => m.next), ['?room=2341&host&stage=breakfast&level=2', '?room=2341'],
+    'after a win the host goes on to the next level, and the guests reload to hear which');
   const second = await played([host, guest, late], [2, 2, 1], 'the next round with the late friend');
+  assert.deepEqual(second[0].level, ['breakfast', 2], 'which everyone plays');
   for (const m of second) assert.deepEqual(m.joined, m.joined.filter((r, i) => m.joined.indexOf(r) === i), 'no tablet joins a room twice');
   assert.equal(second[0].joined.length, 1, 'the host plays every round, and hears the late friend, in the room it opened once');
   for (const t of [host, guest, late]) t.worker.terminate();

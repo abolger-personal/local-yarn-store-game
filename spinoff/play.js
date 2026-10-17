@@ -7,7 +7,8 @@ import { KICK_COMBO, strikeOf } from './kicks.js';
 import { BAD_DONUT, BAD_GUY_FUR, MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
 import { BRICK, TICK_HZ, groundOf } from './match.js';
-import { beatLevel, levelBefore, levelFor, levelNumber, matchOptions } from './levels.js';
+import { levelBefore, levelFor, matchOptions } from './levels.js';
+import { outcomeOf, recordOutcome } from './progress.js';
 import { facedCell, fortGrid } from './build.js';
 import { makeStage } from './stage.js';
 import { SHELF_WOOD, THEMES } from './scenery.js';
@@ -452,6 +453,20 @@ function endPicture(e) {
   document.getElementById(`end-pics-${e.team}`).append(dot);
 }
 
+// What ▶️ on the end card plays: this level again, or after a win the next one (REUSE-SPEC.md §After the lobby)
+let nextSearch = location.search.slice(1);
+
+/** @param {import('./match.js').Team|null} winner */
+function progress(winner) {
+  const o = outcomeOf(level.theme, level.number ?? 0, winner);
+  if (fighters.get(ME)?.team === 'heroes') recordOutcome(level.theme, o);
+  if (!o.next) return;
+  const q = new URLSearchParams(location.search);
+  q.set('stage', level.theme);
+  q.set('level', String(o.next));
+  nextSearch = q.toString();
+}
+
 /** @param {Snapshot} snap */
 function showEnd(snap) {
   const card = document.getElementById('end');
@@ -460,8 +475,7 @@ function showEnd(snap) {
     document.getElementById(`end-count-${s.team}`).textContent = String(s.donuts.length);
     card.querySelector(`.side.${s.team}`).classList.toggle('won', !snap.winner || snap.winner === s.team);
   }
-  // REUSE-SPEC.md §Fighter chooser: a hero whose end card shows their side won (a tie shows both) has beaten the level
-  if (fighters.get(ME)?.team === 'heroes' && snap.winner !== 'badGuys') beatLevel(levelNumber(level));
+  progress(snap.winner);
   card.hidden = false;
 }
 
@@ -563,5 +577,5 @@ document.getElementById('score').addEventListener('click', () => {
 });
 document.getElementById('bye').addEventListener('click', goTo('lobby.html'));
 document.getElementById('quit').addEventListener('click', goTo('lobby.html'));
-document.getElementById('again').addEventListener('click', net?.again ?? goTo(`play.html${location.search}`));
+document.getElementById('again').addEventListener('click', () => (net?.again ? net.again(nextSearch) : goTo(`play.html?${nextSearch}`)()));
 if (mine) play();

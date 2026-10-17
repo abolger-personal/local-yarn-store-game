@@ -60,6 +60,13 @@ body.lobby { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
 .keypad { display: grid; grid-template-columns: repeat(3, 84px); gap: 12px; justify-content: center; padding: 12px; }
 .keypad button { width: 84px; height: 84px; }
 .keypad .emoji { font-size: 44px; }
+/* after the lobby: a picture per stage, then a phone-keypad level dial where only unlocked levels are buttons */
+.stages { display: flex; gap: 20px; }
+.stages.hidden { display: none; }
+.stages button { width: 120px; height: 120px; }
+.stages .emoji { font-size: 70px; }
+.dial span, .dial button { width: 84px; height: 84px; }
+.dial button { font-size: 40px; font-weight: 800; color: var(--ink); }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .overlay > * { pointer-events: auto; }
 

@@ -122,23 +122,3 @@ export function levelBefore(search) {
   const q = new URLSearchParams(search);
   return q.has('room') && !q.has('host') ? null : levelFor(search);
 }
-
-// ponytail: a guest only gets the stage, so level 1 (the tutorial) is known by its stage; use the number once `start` carries it
-/** 1 for the tutorial, 0 for anything else. @param {Level} level */
-export const levelNumber = (level) => (JSON.stringify(level.stage) === JSON.stringify(TUTORIAL.stage) ? 1 : 0);
-
-// REUSE-SPEC.md §After the lobby, One game save per browser: apart from the fighter, so re-dressing never touches it
-export const PROGRESS_KEY = 'lys.progress.v1';
-
-/** The highest level this tablet's player has beaten, from untrusted storage. */
-export function levelsBeaten() {
-  try {
-    const n = JSON.parse(localStorage.getItem(PROGRESS_KEY) ?? '{}')?.beaten;
-    return Number.isInteger(n) && n > 0 ? n : 0;
-  } catch { return 0; }
-}
-
-export function beatLevel(n) {
-  if (n <= levelsBeaten()) return;
-  try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ beaten: n })); } catch {}
-}

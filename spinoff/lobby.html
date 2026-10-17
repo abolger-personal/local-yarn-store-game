@@ -19,13 +19,19 @@
     <button id="edit" aria-label="change my fighter"><span class="emoji">✏️</span></button>
     <button id="host" aria-label="start a game"><span class="emoji">🏠</span></button>
     <button id="join" aria-label="join a game"><span class="emoji">🔑</span></button>
-    <button id="play" aria-label="play by myself"><span class="emoji">▶️</span></button>
+    <button id="play" aria-label="play by myself: pick where"><span class="emoji">👍</span></button>
   </div>
   <div id="keypad" class="keypad hidden" aria-label="type the code"></div>
   <div id="inroom" class="bar hidden">
     <button id="exit" aria-label="wave bye, leave this room"><span class="emoji">👋</span></button>
     <div id="playing" class="wait hidden" aria-label="a game is on: you play the next round"><span class="emoji">⏳</span></div>
-    <button id="go" class="hidden" aria-label="start the game for everyone here"><span class="emoji">▶️</span></button>
+    <button id="go" class="hidden" aria-label="pick where everyone here plays"><span class="emoji">👍</span></button>
+  </div>
+  <div id="picker" class="bar picker hidden">
+    <button id="pick-bye" aria-label="wave bye, back to the room"><span class="emoji">👋</span></button>
+    <div id="stage-list" class="stages" aria-label="pick a stage"></div>
+    <div id="dial" class="keypad dial hidden" aria-label="pick a level"></div>
+    <button id="pick-go" class="hidden" aria-label="play this level"><span class="emoji">▶️</span></button>
   </div>
 </footer>
 <script type="importmap">

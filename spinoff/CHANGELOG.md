@@ -11,6 +11,15 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **Tricks.** Tap your gloves or your sword again for a ✨ sparkle, 🫧 bubbles or a 🔥 flame that pops out
   when your punch lands. Tap again for the next one.
 
+### Levels
+- **Pick where to play.** 👍 in the lobby (instead of ▶️) shows the stages to choose from (🥞 breakfast
+  for now), then a number pad of levels. Only the levels you have reached have a number; tap one
+  and ▶️ to play it. In a room, the host picks and everyone else waits in the lobby until the host
+  taps ▶️. A room only offers levels that everyone in it has reached.
+- **Win a level to unlock the next one.** After a win, ▶️ on the score card plays the next level;
+  after a loss or a tie it plays the same one again. Your tablet remembers how far you've got,
+  even if you make a new fighter.
+
 ### Building
 - **Build a wall before the match.** On level 2 a match starts with building time. Your blocks are
   the little heap next to you, topped in your own colour. Tap the heap to pick one up, walk to where

@@ -11,7 +11,8 @@ import { badGuys } from './levels.js';
  * @typedef {{ send: (type: string, data: any, to?: string[]) => void, on: (type: string, fn: (data: any, from: string) => void) => void }} Link
  * @typedef {{ id: string, team: import('./match.js').Team, fighter?: import('./fighter.js').Fighter, dummy?: boolean, cpu?: boolean }} Seat
  *   a player, the training dummy, or a CPU bad guy, whose inputs the host makes (cpu.js)
- * @typedef {{ theme: string, stage: import('./match.js').Stage, roster: Seat[], settings: { seconds: number } }} Start
+ * @typedef {{ theme: string, stage: import('./match.js').Stage, number: number, roster: Seat[], settings: { seconds: number } }} Start
+ *   `theme` is the stage's name and `number` the level's (0 for a layout picked by address, not off the level dial)
  * @typedef {{ tick: number, hits: Snapshot['hits'], fullBag: Snapshot['fullBag'], donutEvents: Snapshot['donutEvents'] }} Events
  * @typedef {Snapshot & { seq: number, paused: boolean }} Drawn
  */
@@ -72,12 +73,14 @@ function readSeat(s) {
 const isStage = (s) => isArrays(s ?? {}, ['floors', 'shelves', 'bricks']) && s.floors.filter((f) => f?.kind === 'ground').length === 1
   && s.floors.every((f) => ['x0', 'x1', 'z0', 'z1', 'y'].every((k) => isNum(f[k]))) && s.shelves.every((h) => TEAMS.has(h?.team));
 
+const levelNumber = (n) => (Number.isInteger(n) && n > 0 ? n : 0);
+
 /** The host's start message as a guest trusts it, or null. @param {string} me @param {string[]} themes @returns {Start|null} */
 export function readStart(raw, me, themes) {
   if (!sane(raw) || !themes.includes(raw?.theme) || !isStage(raw.stage) || !Array.isArray(raw.roster) || raw.roster.length > MAX_FIGHTERS) return null;
   const roster = raw.roster.map(readSeat);
   if (!roster.every(Boolean) || new Set(roster.map((s) => s.id)).size !== roster.length || !roster.some((s) => s.id === me)) return null;
-  return { theme: raw.theme, stage: raw.stage, roster, settings: { seconds: isNum(raw.settings?.seconds) ? raw.settings.seconds : ROUND_SECONDS } };
+  return { theme: raw.theme, stage: raw.stage, number: levelNumber(raw.number), roster, settings: { seconds: isNum(raw.settings?.seconds) ? raw.settings.seconds : ROUND_SECONDS } };
 }
 
 /** A snapshot from the host as a guest trusts it, or null. @param {Set<string>} ids the roster's */

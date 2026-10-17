@@ -3,7 +3,7 @@ import {
   randomFighter, saveFighter, setFur, stepFighter,
 } from './fighter.js';
 import { POSES } from '../characters/npc.js';
-import { levelsBeaten } from './levels.js';
+import { levelsBeaten } from './progress.js';
 import { makeStage } from './stage.js';
 
 const ANIMAL = { lion: '🦁', llama: '🦙', owl: '🦉' };

@@ -56,6 +56,8 @@ function guestOf(net, id) {
   const start = { theme: 'breakfast', stage: TUTORIAL.stage, roster: rosterOf('H', newFighter('owl'), new Map([['G1', newFighter('lion')]])), settings: { seconds: 90 } };
   const sent = JSON.parse(JSON.stringify(start));
   assert.ok(readStart(sent, 'G1', THEMES), 'a good start is taken');
+  assert.equal(readStart({ ...sent, number: 2 }, 'G1', THEMES)?.number, 2, 'the start names the level by number');
+  assert.equal(readStart({ ...sent, number: -1.5 }, 'G1', THEMES)?.number, 0, 'and a junk number is no number');
   assert.equal(readStart(sent, 'G9', THEMES), null, 'a start without me in it is not mine');
   assert.equal(readStart({ ...sent, theme: 'lava' }, 'G1', THEMES), null, 'an unknown theme is refused');
   const twoGrounds = { ...sent.stage, floors: [...sent.stage.floors, sent.stage.floors[0]] };

@@ -1198,9 +1198,8 @@ lock is the chooser's alone: a friend's sword from another tablet always shows.
 
 **The sword unlocks after level 1** (decided 2026-10-17). A hero whose end card shows the heroes won
 (a tie shows both sides won) has beaten that level; the tablet keeps the highest level beaten in
-`lys.progress.v1` (`{ "beaten": 1 }`, apart from the fighter; `levelsBeaten` / `beatLevel` in
-`levels.js`). Level 1 is the tutorial, recognised by its stage, since a guest's `start` doesn't carry
-the level number yet. Until then the chooser shows only gloves, and a saved or 🎲 sword becomes gloves.
+the game save (`lys.progress.v1`'s `beaten`, apart from the fighter; `levelsBeaten` / `beatLevel` in
+`progress.js`), by the level number `start` carries. Until then the chooser shows only gloves, and a saved or 🎲 sword becomes gloves.
 More unlocks behind later levels: brainstorm 2026-10-17.
 
 Not built yet: the silhouette reveal on the animal tiles (brainstorm 2026-10-13). There is no `help` control anywhere:
@@ -1217,34 +1216,44 @@ Built: `spinoff/lobby.html` (page) on `spinoff/net.js` and `spinoff/roster.js` (
   arrangement whatever order people joined in: front row first, from the middle out, 7 × 2
   cells, room for 14 (6 heroes, 8 bad guys).
 - A newcomer arrives with a cheer. 👋 waves bye and leaves the room (not a door: a door reads as going in as much as out); ✏️ goes back to the chooser.
-- In a room, the tablet that opened it also has ▶️, which takes everyone in the room into one
-  match (see Multiplayer, Where things stand); ▶️ outside a room still plays by yourself.
-  **Amended plan** (planned 2026-10-17): that button becomes 👍, which moves on to choosing where
-  to play (below), and ▶️ appears only once a stage and level are chosen, since ▶️ means play.
+- In a room, the tablet that opened it also has a button that takes everyone in the room into one
+  match (see Multiplayer, Where things stand); outside a room the same button plays by yourself.
+  It is 👍 (decided 2026-10-17), which moves on to choosing where to play (below), and ▶️ appears
+  only once a stage and level are chosen, since ▶️ means play.
 
 ### After the lobby: pick a stage, then a level
 
-Planned 2026-10-17. Two plain screens between the lobby and the match, shown on the tablet that
-starts the match (the host in a room, or a tablet playing by itself):
+Decided 2026-10-17. Two plain screens between the lobby and the match, shown on the tablet that
+starts the match (the host in a room, or a tablet playing by itself). Built in the lobby's footer
+(`#picker`, with 👋 back to the room), on `spinoff/progress.js`:
 
 1. **Stage picker:** one big picture button per stage. A button is added as each new stage is
-   unlocked; today that is breakfast, the tutorial stage. How a new stage unlocks is still open
-   (brainstorm 2026-10-17: decide when there is a second stage to unlock).
+   unlocked; today that is breakfast (🥞), the tutorial stage. How a new stage unlocks is still open
+   (brainstorm 2026-10-17: decide when there is a second stage to unlock); until then every stage
+   with numbered levels shows (`roomStages` in `progress.js`), which is only breakfast.
 2. **Level dial:** a phone-keypad grid of numbers, 1 to 9 to start. Only unlocked levels have a
-   button; new ones appear as they unlock. Choosing a number brings up ▶️, which starts the match.
+   button; new ones appear as they unlock. Choosing a number brings up ▶️, which starts the match:
+   `play.html?stage=breakfast&level=2`, with `room=CODE&host` in a room.
 
-- **Guests wait in the lobby** (planned 2026-10-17). While the host picks, everyone else stays on
+- **Guests wait in the lobby** (decided 2026-10-17). While the host picks, everyone else stays on
   the lobby screen with no button to press, and goes into the match when the host taps ▶️.
-- **What's unlocked is the room's minimum.** A stage or level shows only if *every* player in the
-  room has reached it, so nobody is pulled past where they've played.
-- **A win unlocks the next level** (planned 2026-10-17). Winning a level saves the next one as
-  reached, and ▶️ on that end card plays it; after a loss, ▶️ plays the same level again.
+- **What's unlocked is the room's minimum** (decided 2026-10-17). A stage or level shows only if *every* player in the
+  room has reached it, so nobody is pulled past where they've played (`roomLevels`, over the
+  progress each tablet's fighter brought to the lobby). A late friend who joins mid-match plays the
+  next round on whatever level it is.
+- **A win unlocks the next level** (decided 2026-10-17). Winning a level saves the next one as
+  reached, and ▶️ on that end card plays it (if there is one); after a loss or a tie, ▶️ plays the
+  same level again (`outcomeOf`). Each hero's tablet saves its own. A tie still counts as beating the
+  level for the sword (Fighter chooser), so the sword's rule and the level rule differ on a tie.
 - **One game save per browser:** the highest level and the stages each player has reached are
   saved in their browser as the whole game's progress, apart from the fighter, so re-rolling or
-  re-dressing a fighter keeps it (planned 2026-10-17). It travels with the fighter when they join a
-  room, so the host can work out the room's minimum.
-- **The match needs the level number:** the host's `start` message carries the stage and the
-  level number, not only the stage data (STAGE-IDEAS.md: Progression).
+  re-dressing a fighter keeps it (decided 2026-10-17). It travels with the fighter when they join a
+  room, so the host can work out the room's minimum. Built: `lys.progress.v1`, `{ "beaten": 1,
+  "reached": { "breakfast": 2 } }` (the sword's save, grown), owned by `spinoff/progress.js` and checked on
+  the way in by `readProgress` like `readFighter`: whole levels 1 to 99 on known stages only.
+  `net.js` adds it to the fighter every tablet sends when they meet.
+- **The match needs the level number** (decided 2026-10-17): the host's `start` message carries the stage and the
+  level number (`theme`, `number`; 0 for a layout picked by address), not only the stage data (STAGE-IDEAS.md: Progression).
 
 - Network: Trystero 0.26 over Nostr, loaded from esm.sh through the import map, a devDependency
   for its types only (the same arrangement as `three`). Each tablet sends its fighter to each

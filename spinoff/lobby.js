@@ -5,6 +5,7 @@ import { animateFighter, buildFighter, disposeFighter, loadFighter } from './fig
 import { debugging, leaveRooms, openRoom, selfId, showDebug } from './net.js';
 import { CODE_LENGTH, ROOM_TREATS, codeHtml, floorGrid, isCode, randomCode, standingSpots } from './roster.js';
 import { makeStage } from './stage.js';
+import { loadProgress, roomLevels, roomStages } from './progress.js';
 
 // REUSE-SPEC.md §Performance: up to 14 small fighters on screen; 'high' is for the chooser's close-up
 setGeometryDetail('med');
@@ -20,7 +21,7 @@ const floor = makeGridLines(grid, 0, '#c9ae8c');
 floor.position.y = 0.002;
 stage.scene.add(floor);
 
-/** @type {Map<string, {built: any, cheer: number}>} */
+/** @type {Map<string, {built: any, cheer: number, progress: import('./progress.js').Progress}>} */
 const cast = new Map();
 let room = null, typed = [], roomCode = [], playingHost = null;
 
@@ -33,11 +34,11 @@ function place() {
   }
 }
 
-function arrive(id, fighter) {
+function arrive(id, fighter, progress) {
   leave(id);
   const built = buildFighter(fighter);
   stage.scene.add(built.root);
-  cast.set(id, { built, cheer: 1.6 });
+  cast.set(id, { built, cheer: 1.6, progress });
   place();
 }
 
@@ -76,13 +77,54 @@ function enter(next, hosting = false) {
   show('start', false);
   show('keypad', false);
   show('inroom', true);
+  show('picker', false);
   show('go', hosting);
 }
 
+// REUSE-SPEC.md §After the lobby: 👍 (the host's in a room, or playing alone) picks a stage, then a level; ▶️ plays it.
+// Guests stay in the lobby meanwhile, with nothing to press, until the host's ▶️ sends `go`.
+const STAGE_PICTURE = { breakfast: '🥞', cake: '🎂' };
+const DIAL = 9;
+let picked = { stage: '', level: 0 };
+
+const everyone = () => (room ? [...cast.values()].map((f) => f.progress) : [loadProgress()]);
+
+function pick() {
+  show('start', false);
+  show('inroom', false);
+  show('picker', true);
+  show('dial', false);
+  show('pick-go', false);
+  show('stage-list', true);
+  document.getElementById('stage-list').innerHTML = roomStages()
+    .map((s) => `<button data-stage="${s}" aria-label="${s}"><span class="emoji">${STAGE_PICTURE[s] ?? '❓'}</span></button>`).join('');
+}
+
+function pickStage(name) {
+  const open = new Set(roomLevels(name, everyone()).map((l) => l.number));
+  picked = { stage: name, level: 0 };
+  show('stage-list', false);
+  show('dial', true);
+  document.getElementById('dial').innerHTML = Array.from({ length: DIAL }, (_, i) => i + 1)
+    .map((n) => (open.has(n) ? `<button data-level="${n}" aria-label="level ${n}">${n}</button>` : '<span></span>')).join('');
+}
+
+function pickLevel(n, b) {
+  picked.level = n;
+  for (const o of document.querySelectorAll('#dial button')) o.setAttribute('aria-pressed', String(o === b));
+  show('pick-go', true);
+}
+
+function unpick() {
+  show('picker', false);
+  show(room ? 'inroom' : 'start', true);
+}
+
 function go() {
-  const match = `play.html?room=${roomCode.join('')}&host`;
+  const level = `stage=${picked.stage}&level=${picked.level}`;
+  if (!room) { location.href = `play.html?${level}`; return; }
   room.send('go', true);
-  location.href = match;
+  location.href = `play.html?room=${roomCode.join('')}&host&${level}`;
 }
 
 function exit() {
@@ -94,6 +136,7 @@ function exit() {
   showCode([]);
   show('inroom', false);
   show('keypad', false);
+  show('picker', false);
   show('start', true);
 }
 
@@ -118,14 +161,19 @@ const on = (id, fn) => document.getElementById(id).addEventListener('click', fn)
 on('host', () => enter(randomCode(), true));
 on('join', () => { typed = []; showCode([]); show('start', false); show('keypad', true); });
 on('edit', () => { location.href = 'choose.html'; });
-on('play', () => { location.href = 'play.html'; });
+on('play', pick);
 on('exit', exit);
-on('go', go);
+on('go', pick);
+on('pick-bye', unpick);
+on('pick-go', go);
+const tapped = (e) => /** @type {HTMLElement} */ (e.target).closest('button');
+on('stage-list', (e) => { const b = tapped(e); if (b) pickStage(b.dataset.stage); });
+on('dial', (e) => { const b = tapped(e); if (b) pickLevel(Number(b.dataset.level), b); });
 buildKeypad();
 if (debugging()) showDebug();
 
 if (mine) {
-  arrive(selfId, mine);
+  arrive(selfId, mine, loadProgress());
   stage.frame([floor], { margin: 1.05, view: new THREE.Vector3(0, 0.55, 1).normalize() });
   stage.run((dt) => {
     for (const f of cast.values()) {

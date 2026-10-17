@@ -73,7 +73,7 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  * @typedef {{ target: Target|null, punch: boolean, kick: boolean, away?: boolean, drop?: boolean, ready?: boolean, go?: boolean }} Input
  *
  * @typedef {{ id: string, team: Team, x: number, y: number, z: number, vx: number, vy: number, vz: number,
- *             facing: number, height: number, onGround: boolean, move: MoveId, step: number,
+ *             facing: number, height: number, width: number, onGround: boolean, move: MoveId, step: number,
  *             percent: number, carrying: DonutLook|null, invincible: boolean, respawn: number,
  *             target: { x: number, y: number, z: number }|null, block: string|null }} FighterState
  *   `facing` is the yaw in radians (0 faces +x, PI/2 faces +z, toward the camera). `step` is the

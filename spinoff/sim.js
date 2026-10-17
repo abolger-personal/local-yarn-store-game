@@ -830,11 +830,13 @@ function shake(s, f) { s.fullBag.push(event(f, f)); }
 
 /** ⬇️: the carried block goes on the faced cell of your own third, unless the stack there is at the height limit. */
 function putDown(s, f) {
-  const cell = f.block && f.onGround ? facedCell(fortGrid(s.stage, f.team, s.bricks, s.piles), f) : null;
+  const cell = f.block && f.onGround ? facedCell(fortGrid(s.stage, f.team, s.bricks, s.piles), { ...f, width: f.w }) : null;
   if (!cell?.ok) { shake(s, f); return; }
   s.bricks.push({ id: `p${s.nextBrick++}`, team: f.team, owner: f.id, x: cell.x, y: cell.y, z: cell.z, vy: 0,
     hits: BLOCK_HITS, maxHits: BLOCK_HITS, icing: f.block });
   f.block = null;
+  // a block tapped while carrying was only to face it: it isn't taken back the moment your hands are empty
+  if (f.target?.thing === 'brick') f.target = null;
   s.donutEvents.push({ ...event(f, { x: cell.x + BRICK / 2, y: cell.y, z: cell.z + BRICK / 2 }), kind: 'place' });
 }
 
@@ -1043,7 +1045,7 @@ function stepOf(f) {
 
 /** @returns {import('./match.js').FighterState} */
 const fighterView = (f) => ({
-  id: f.id, team: f.team, x: f.x, y: f.y, z: f.z, vx: f.vx, vy: f.vy, vz: f.vz, facing: f.facing, height: f.h,
+  id: f.id, team: f.team, x: f.x, y: f.y, z: f.z, vx: f.vx, vy: f.vy, vz: f.vz, facing: f.facing, height: f.h, width: f.w,
   onGround: f.onGround, move: moveOf(f), step: stepOf(f), percent: f.percent, carrying: f.carrying ? { ...f.carrying } : null,
   invincible: f.inv > 0, respawn: f.out / TICK_HZ, target: f.dest ? { x: f.dest.x, y: f.dest.y, z: f.dest.z } : null, block: f.block,
 });

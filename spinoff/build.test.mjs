@@ -95,11 +95,11 @@ assert.equal(snapshot(createMatch([A], TUTORIAL.stage)).phase, 'play', 'level 1 
 
 // Up against the fence, the deck or the middle third, ⬇️ puts the block at your feet instead of a head-shake
 {
-  const grid = fortGrid(stage, 'heroes', [], createMatch([A, B], stage, { pieces: 4 }).piles), R = body.width / 2 + 0.01;
+  const grid = fortGrid(stage, 'heroes', [], createMatch([A, B], stage, { pieces: 4 }).piles), R = body.width / 2 + 0.01, { width } = body;
   for (const [what, f, at] of [
-    ['the fence', { x: -5.6 + R, y: 0, z: -0.6, facing: Math.PI }, [-5.6, 0, -0.8]],
-    ['the deck', { x: -7, y: 0, z: -0.8 + R, facing: -Math.PI / 2 }, [-7.2, 0, -0.8]],
-    ['the middle third', { x: -3.5, y: 0, z: -1.2, facing: 0 }, [-3.6, 0, -1.2]],
+    ['the fence', { x: -5.6 + R, y: 0, z: -0.6, facing: Math.PI, width }, [-5.6, 0, -0.8]],
+    ['the deck', { x: -7, y: 0, z: -0.8 + R, facing: -Math.PI / 2, width }, [-7.2, 0, -0.8]],
+    ['the middle third', { x: -3.5, y: 0, z: -1.2, facing: 0, width }, [-3.6, 0, -1.2]],
   ]) {
     const c = facedCell(grid, f);
     assert.ok(c?.ok && [c.x, c.y, c.z].every((v, k) => Math.abs(v - at[k]) < 1e-9), `facing ${what} up close, the block goes at your feet (${JSON.stringify(c)})`);
@@ -127,6 +127,21 @@ assert.equal(snapshot(createMatch([A], TUTORIAL.stage)).phase, 'play', 'level 1 
     const there = (s) => idle(s, 'A') && Math.hypot(who(s, 'A').x + 3.5, who(s, 'A').z - 1.2) < 0.03;
     assert.equal(who(act(m2, 'A', { target: { x: -3.5, z: 1.2 } }, there), 'A').y, 0, `standing on ${whose} stack, a floor tap walks off it and there`);
   }
+}
+
+// Plugging the gap in the yard's fence (playtest): however wide you are, carrying, a tap on your block faces it and ⬇️
+// stacks on it, and the block you tapped stays down (it isn't fetched back), with no head-shake. A lion with a sword is this wide.
+{
+  const wide = { ...A, width: 0.86 }, m3 = createMatch([wide], stage, { pieces: 4 });
+  const idle = (s) => who(s, 'A').move === 'idle', mine = () => snapshot(m3).bricks.filter((b) => b.team === 'heroes');
+  const settle = () => { const shakes = []; for (let i = 0; i < 30; i++) { tick(m3, {}); shakes.push(...snapshot(m3).fullBag); } return shakes; };
+  const place = (target) => { fetch(m3, 'A'); act(m3, 'A', { target }, idle); return [...act(m3, 'A', { drop: true }).fullBag, ...settle()]; };
+  assert.deepEqual(place({ x: -5.8, z: 1.6 }), [], 'a wide fighter puts one down in front');
+  const [first] = mine();
+  assert.deepEqual(place({ thing: 'brick', id: first.id }), [], 'and, tapping it, stacks one on it with no head-shake');
+  const [under, top] = mine();
+  assert.deepEqual([under.id, top.x, top.y, top.z], [first.id, first.x, BRICK, first.z], 'on top of the tapped one, which stays down');
+  assert.equal(who(snapshot(m3), 'A').block, null, 'hands empty');
 }
 
 console.log('build ok');

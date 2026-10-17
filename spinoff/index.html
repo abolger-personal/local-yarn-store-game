@@ -20,8 +20,14 @@
      (rooms.js) live here, so going from screen to screen never drops the other tablets. -->
 <button id="tap" aria-label="tap to play">🍩👆</button>
 <script>
-  const debug = new URLSearchParams(location.search).get('debug');
-  try { sessionStorage.setItem('donut.debug', debug ?? '0'); } catch { /* private mode */ }
+  const q = new URLSearchParams(location.search);
+  try {
+    sessionStorage.setItem('donut.debug', q.get('debug') ?? '0');
+    for (const k of ['tone', 'exposure']) {
+      if (q.has(k)) sessionStorage.setItem(`donut.${k}`, q.get(k));
+      else sessionStorage.removeItem(`donut.${k}`);
+    }
+  } catch { /* private mode */ }
   document.getElementById('tap').addEventListener('click', (e) => {
     document.documentElement.requestFullscreen?.().catch(() => {});
     window.donutRooms = import('./rooms.js');

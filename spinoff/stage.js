@@ -2,11 +2,23 @@ import * as THREE from 'three';
 import { roomEnvironment } from '../inventory/room-environment.js';
 import { studioLights } from '../characters/selfie-studio.js';
 
+/** `?tone=` and `?exposure=` on this page, or carried from the tap page (index.html) through sessionStorage. */
+function lookParam(key) {
+  const v = new URLSearchParams(location.search).get(key);
+  try {
+    return v ?? sessionStorage.getItem(`donut.${key}`);
+  } catch {
+    return v;
+  }
+}
+
+const TONE = { aces: THREE.ACESFilmicToneMapping, neutral: THREE.NeutralToneMapping };
+
 function makeRenderer(container) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.9;
+  renderer.toneMapping = TONE[lookParam('tone')] ?? TONE.aces;
+  renderer.toneMappingExposure = Number(lookParam('exposure')) || 0.9;
   container.appendChild(renderer.domElement);
   return renderer;
 }

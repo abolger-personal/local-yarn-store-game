@@ -66,8 +66,9 @@ body.lobby { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; heig
 .stages.hidden { display: none; }
 .stages button { width: 120px; height: 120px; }
 .stages .emoji { font-size: 70px; }
-.picker { flex-direction: column; gap: 16px; }
-.picker .menu { display: flex; justify-content: space-between; width: 276px; }
+/* side by side, the stages or the dial beside 👋 over ▶️, so the picker is no taller than the dial out of fullscreen */
+.picker { gap: 28px; }
+.picker .menu { display: flex; flex-direction: column; gap: 16px; }
 .dial span, .dial button { width: 84px; height: 84px; box-sizing: border-box; border-radius: 50%; }
 .dial span { border: 3px dashed #e7d6c1; }
 .dial button { font-size: 40px; font-weight: 800; color: var(--ink); }

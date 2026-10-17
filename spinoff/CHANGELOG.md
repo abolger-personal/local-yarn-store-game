@@ -14,8 +14,9 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   waffle even on a small tablet. The waffle's holes, the top of the pancake hill and the cake stage's gumdrop
   hill are a little darker too, so an orange or green fighter stands out on them.
 - **Matches start more reliably on tablets.** Pressing ▶️ sometimes left both tablets stuck on an empty
-  stage with only the score showing. The game now loads over far fewer connections, so a match comes up
-  every time.
+  stage with only the score showing. When the game is played from a computer at home (`serve.py`), it now
+  loads over far fewer connections, so a match comes up every time. Playing from the website was already
+  fine.
 
 ## 0.0.3 — 2026-10-16: Combos, and playing together that holds
 

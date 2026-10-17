@@ -9,7 +9,8 @@ import { CRAFTS, STITCHES_BY_CRAFT, defaultItem, dress, undress, usualTool } fro
 import { oklchOf } from '../inventory/yarn-look.js';
 import '../characters/llama.js';
 import { wingShape } from '../characters/owl.js';
-import { GLOVE, punchLayer, sample } from './punches.js';
+import { makeSparkle } from '../characters/sparkle.js';
+import { GLOVE, SWING, SWORD_UP, punchLayer, sample } from './punches.js';
 import { kickLayer, kickLunge } from './kicks.js';
 
 export const FIGHTER_KEY = 'lys.fighter.v1';
@@ -34,6 +35,10 @@ export const CAPES = Object.freeze(['cape', 'capelet']);
 export const BAGS = Object.freeze(['backpack', 'drawstring bag', 'crossbody pouch']);
 // REUSE-SPEC.md §Costumes: up to cable's weight; seed, puff and linen stitch cost 6–18× the triangles
 export const TEXTURES = Object.freeze(['stockinette', 'rib', 'garter', 'cable', 'single crochet', 'waffle', 'lace']);
+// REUSE-SPEC.md §Costumes: one or the other, in the `gloves` colour
+export const HANDS = Object.freeze(['gloves', 'sword']);
+// what flies off the hitting glove or the sword's tip as it lands; tapping the picked one goes to the next
+export const TRICKS = Object.freeze({ gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame']), sword: Object.freeze(['sparkle', 'bubble', 'flame']) });
 
 // spinoff/REUSE-SPEC.md §Bad guys: grey fur, black and dark purple, reserved from the kids' swatches
 export function isBadGuyCloth(hex) {
@@ -59,14 +64,14 @@ export function nearestSwatch(list, hex) {
 
 /**
  * @typedef {{ hat: string|null, hatColor: string, hatStitch: string, cape: string|null, capeColor: string, capeStitch: string,
- *             bag: string, bagColor: string, gloves: string }} Look
+ *             bag: string, bagColor: string, gloves: string, hands: string, trick: string }} Look
  * @typedef {{ species: string, params: Record<string, any>, look: Look }} Fighter
  */
 
 /** @returns {Look} */
 export const defaultLook = () => ({
   hat: 'beanie', hatColor: '#8be02a', hatStitch: 'rib', cape: 'cape', capeColor: '#8154ff', capeStitch: 'stockinette',
-  bag: 'backpack', bagColor: '#ffd21a', gloves: '#ff3b7f',
+  bag: 'backpack', bagColor: '#ffd21a', gloves: '#ff3b7f', hands: 'gloves', trick: 'plain',
 });
 
 const coatOf = (species, fur) => (species === 'lion' ? deriveManeColor(fur) : deriveCoatColor(fur));
@@ -90,11 +95,11 @@ const pickOf = (list, rng) => list[Math.floor(rng() * list.length)];
 export function randomFighter(rng = Math.random, species = pickOf(SPECIES, rng)) {
   const f = newFighter(species);
   getSpecies(species).randomise(f.params);
-  const colour = () => pickOf(CLOTH, rng).hex;
+  const colour = () => pickOf(CLOTH, rng).hex, hands = pickOf(HANDS, rng);
   f.look = {
     hat: pickOf([...HATS, null], rng), hatColor: colour(), hatStitch: pickOf(TEXTURES, rng),
     cape: pickOf([...CAPES, null], rng), capeColor: colour(), capeStitch: pickOf(TEXTURES, rng),
-    bag: pickOf(BAGS, rng), bagColor: colour(), gloves: colour(),
+    bag: pickOf(BAGS, rng), bagColor: colour(), gloves: colour(), hands, trick: pickOf(TRICKS[hands], rng),
   };
   return setFur(f, pickOf(FUR, rng).hex);
 }
@@ -116,10 +121,11 @@ function readLook(raw) {
   const base = defaultLook(), r = raw && typeof raw === 'object' ? raw : {};
   const colour = (k) => (HEX.test(r[k]) ? nearestSwatch(CLOTH, r[k]).hex : base[k]);
   const choice = (k, list, none) => (list.includes(r[k]) || (none && r[k] === null) ? r[k] : base[k]);
+  const hands = choice('hands', HANDS, false), tricks = TRICKS[hands];
   return {
     hat: choice('hat', HATS, true), hatColor: colour('hatColor'), hatStitch: choice('hatStitch', TEXTURES, false),
     cape: choice('cape', CAPES, true), capeColor: colour('capeColor'), capeStitch: choice('capeStitch', TEXTURES, false),
-    bag: choice('bag', BAGS, false), bagColor: colour('bagColor'), gloves: colour('gloves'),
+    bag: choice('bag', BAGS, false), bagColor: colour('bagColor'), gloves: colour('gloves'), hands, trick: tricks.includes(r.trick) ? r.trick : tricks[0],
   };
 }
 
@@ -189,6 +195,8 @@ export const gloveAnchors = (built) => (built.species.id === 'owl' ? onWingTips(
 
 /** Boxing gloves on both hands, or both wing tips (REUSE-SPEC.md §Costumes). */
 export function addGloves(built, color) {
+  removeTricks(built);
+  removeSword(built);
   removeGloves(built);
   const material = new THREE.MeshStandardMaterial({ color, roughness: 0.38, metalness: 0 });
   built.gloves = gloveAnchors(built).map(({ parent, at, r }) => {
@@ -209,17 +217,158 @@ export function removeGloves(built) {
   built.gloves = [];
 }
 
+// REUSE-SPEC.md §Costumes: a toy sword, chunky with a rounded tip; along +z, gripped at the origin, flat side to the camera
+const SWORD = { grip: 0.08, guard: 0.2, blade: 0.3, wide: 0.11, thick: 0.036, trail: 1.3 };
+const WHITE = '#ffffff';
+let swordGeo = null;
+
+function swordGeometry() {
+  if (swordGeo) return swordGeo;
+  const { grip, guard, blade, wide, thick } = SWORD, at = grip / 2 + 0.012;
+  const handle = mergeGeometries([
+    new THREE.CylinderGeometry(0.02, 0.02, grip, 12).rotateX(Math.PI / 2),
+    new THREE.CapsuleGeometry(wide / 2, blade, 6, 14).rotateX(Math.PI / 2).scale(thick / wide, 1, 1).translate(0, 0, at + blade / 2 + wide / 2),
+  ]);
+  const stripes = [0.3, 0.55, 0.8].map((k) => new THREE.BoxGeometry(thick * 1.15, wide * 0.9, 0.024).rotateX(0.5).translate(0, 0, at + k * blade));
+  const trim = mergeGeometries([
+    new THREE.CapsuleGeometry(0.034, guard, 4, 12).translate(0, 0, at),
+    new THREE.SphereGeometry(0.034, 14, 10).translate(0, 0, -grip / 2 - 0.018),
+    ...stripes,
+  ]);
+  const trail = new THREE.RingGeometry(at + 0.04, at + blade + wide / 2, 12, 1, 0, SWORD.trail).rotateY(-Math.PI / 2);
+  swordGeo = { handle, trim, trail };
+  return swordGeo;
+}
+
+/** A toy sword in the right hand (joint side -1), or the owl's right wing tip; no gloves (REUSE-SPEC.md §Costumes). */
+export function addSword(built, color) {
+  removeTricks(built);
+  removeGloves(built);
+  removeSword(built);
+  const geo = swordGeometry(), { parent, at } = gloveAnchors(built)[0];
+  const candy = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.38, metalness: 0 });
+  const sword = new THREE.Group();
+  sword.add(new THREE.Mesh(geo.handle, candy(color)), new THREE.Mesh(geo.trim, candy(color === WHITE ? '#ff3b7f' : WHITE)));
+  for (const m of sword.children) m.castShadow = true;
+  const trail = new THREE.Mesh(geo.trail, new THREE.MeshBasicMaterial({ color: WHITE, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+  trail.visible = false;
+  sword.add(trail);
+  sword.position.set(...at);
+  sword.userData = { side: -1, trail, tip: SWORD.grip / 2 + 0.012 + SWORD.blade + SWORD.wide / 2 };
+  parent.add(sword);
+  built.sword = sword;
+  swingSword(built, null);
+  return sword;
+}
+
+export function removeSword(built) {
+  built.sword?.removeFromParent();
+  for (const o of built.sword?.children ?? []) if (o instanceof THREE.Mesh) o.material.dispose();
+  built.sword = null;
+}
+
+/** Holds the blade at SWING's world angle above forward, whatever the arm is doing, with a swoosh behind it. */
+export function swingSword(built, punch) {
+  const { sword } = built;
+  if (!sword) return;
+  let arm = 0;
+  for (let n = sword.parent; n && n !== built.chest; n = n.parent) arm += n.rotation.x;
+  const { up, swoosh } = punch ? sample(SWING[punch.name], punch.step) : { up: SWORD_UP, swoosh: 0 };
+  sword.rotation.x = -(up + arm);
+  const { trail } = sword.userData;
+  trail.visible = swoosh > 0.02;
+  trail.material.opacity = swoosh;
+  if (punch) trail.scale.y = Math.sign(SWING[punch.name][1][1].up - SWING[punch.name][2][1].up);
+}
+
+const BUBBLES = [[0, 0, 0, 0.05], [0.07, 0.06, 0.02, 0.035], [-0.05, 0.09, -0.02, 0.03], [0.02, 0.15, 0.01, 0.025], [-0.08, 0.01, 0.03, 0.04]];
+const FLAMES = [['#ff5a1f', 0.075], ['#ff9a1a', 0.055], ['#ffd21a', 0.035]];
+let trickParts = null;
+
+function trickPartsOnce() {
+  if (trickParts) return trickParts;
+  const drop = mergeGeometries([new THREE.SphereGeometry(1, 12, 8), new THREE.ConeGeometry(1, 2.2, 12).translate(0, 1.1, 0)]);
+  trickParts = {
+    ball: new THREE.SphereGeometry(1, 14, 10),
+    bubble: new THREE.MeshStandardMaterial({ color: '#c8f2ff', roughness: 0.05, transparent: true, opacity: 0.55, depthWrite: false }),
+    drop,
+    flames: FLAMES.map(([color]) => new THREE.MeshBasicMaterial({ color, toneMapped: false })),
+  };
+  return trickParts;
+}
+
+const bit = (geo, mat, [x, y, z], r) => {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  m.scale.setScalar(r);
+  return m;
+};
+
+/** The trick's look, about a glove across, centred on its origin. */
+function trickMesh(kind, built) {
+  const p = trickPartsOnce(), g = new THREE.Group();
+  if (kind === 'sparkle') g.add(makeSparkle(built).mesh);
+  if (kind === 'bubble') {
+    for (const [x, y, z, r] of BUBBLES) g.add(bit(p.ball, p.bubble, [x, y, z], r));
+  }
+  if (kind === 'flame') {
+    FLAMES.forEach(([, r], i) => g.add(bit(p.drop, p.flames[i], [0.035 * i, -0.04 - 0.01 * i, 0.035 * i], r)));
+  }
+  return g;
+}
+
+/** A trick at the sword's tip, or at each glove; shared materials, so nothing to dispose. */
+export function addTricks(built, kind) {
+  removeTricks(built);
+  if (kind === 'plain') return;
+  const spots = built.sword
+    ? [{ parent: built.sword, at: [0, 0, built.sword.userData.tip], side: built.sword.userData.side }]
+    : gloveAnchors(built).map(({ parent, at }, i) => ({ parent, at, side: i ? 1 : -1 }));
+  built.tricks = spots.map(({ parent, at, side }) => {
+    const spin = trickMesh(kind, built), g = new THREE.Group().add(spin);
+    g.position.set(...at);
+    g.userData = { side, spin };
+    g.visible = false;
+    parent.add(g);
+    return g;
+  });
+}
+
+export function removeTricks(built) {
+  for (const g of built.tricks ?? []) g.removeFromParent();
+  built.tricks = [];
+}
+
+const _q = new THREE.Quaternion(), _up = new THREE.Quaternion();
+
+/** The hitting hand's trick pops up, upright and turning, through the swoosh of the punch. */
+export function stepTricks(built, punch) {
+  const k = punch ? sample(SWING[punch.name], punch.step).swoosh / 0.75 : 0;
+  for (const g of built.tricks ?? []) {
+    g.visible = k > 0.02 && g.userData.side === punch.arm;
+    if (!g.visible) continue;
+    g.quaternion.copy(g.parent.getWorldQuaternion(_q).invert().multiply(built.root.getWorldQuaternion(_up)));
+    g.scale.setScalar(0.3 + k);
+    g.userData.spin.rotation.y = punch.step * 9;
+    g.userData.spin.position.y = 0.12 * punch.step;
+  }
+}
+
 /** Same order as the shop's `dressedCharacter` (store/sim/cast.js): dress unmerged, then merge. @param {Fighter} f */
 export function buildFighter(f) {
   const built = createCharacter({ ...BASE_PARAMS, ...f.params, mergeMeshes: false }, f.species);
   dress(built, outfitOf(f.look));
   mergeCharacter(built);
-  addGloves(built, f.look.gloves);
+  if (f.look.hands === 'sword') addSword(built, f.look.gloves);
+  else addGloves(built, f.look.gloves);
+  addTricks(built, f.look.trick);
   return built;
 }
 
 export function disposeFighter(built) {
+  removeTricks(built);
   removeGloves(built);
+  removeSword(built);
   undress(built);
   disposeCharacter(built);
 }
@@ -229,7 +378,11 @@ export function disposeFighter(built) {
 export const IDLE = Object.freeze({ ...MOTION_DEFAULTS, cadenceMax: 12 });
 
 /** @param {keyof typeof POSES} [pose] */
-export const animateFighter = (built, dt, pose = 'rest') => stepMotion(built, POSES[pose], dt, IDLE);
+export function animateFighter(built, dt, pose = 'rest') {
+  const out = stepMotion(built, POSES[pose], dt, IDLE);
+  swingSword(built, null);
+  return out;
+}
 
 /** Rest pose plus the walk layer at `speed`, the way characters/dress-up.js walks. */
 // REUSE-SPEC.md §What the fighter needs: hits taken show as a fast wobble on the feet, growing to full by
@@ -263,14 +416,18 @@ export function stepFighter(built, dt, pose, speed, strike = null) {
   const w = walkPhase(at, speed, L, IDLE);
   const gain = walkGain(built.motion, speed, dt, IDLE);
   built.walkAt = (at + phaseStep(speed * dt, speed, L, IDLE)) % 1;
-  const kick = strike && 'leg' in strike ? strike : null, punch = strike && 'arm' in strike ? strike : null;
+  const kick = strike && 'leg' in strike ? strike : null;
+  const punch = strike && 'arm' in strike ? { ...strike, arm: built.sword?.userData.side ?? strike.arm } : null;
   squashGloves(built, punch);
   built.root.position.z = kick ? kickLunge(built.params, kick) : 0;
-  return stepMotion(built, pose, dt, IDLE, (out) => {
-    if (gain > 0) walkLayer(out, w, gain, IDLE);
-    if (punch) punchLayer(out, punch);
-    if (kick) kickLayer(out, kick);
+  const out = stepMotion(built, pose, dt, IDLE, (o) => {
+    if (gain > 0) walkLayer(o, w, gain, IDLE);
+    if (punch) punchLayer(o, punch);
+    if (kick) kickLayer(o, kick);
   });
+  swingSword(built, punch);
+  stepTricks(built, punch);
+  return out;
 }
 
 const posed = (p) => Object.freeze({ ...POSES.rest, ...p });

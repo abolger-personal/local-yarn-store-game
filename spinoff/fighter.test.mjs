@@ -5,7 +5,7 @@ import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import {
   BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, buildFighter, disposeFighter, gloveAnchors, isBadGuyCloth, isBadGuyFur, nearestSwatch,
-  IDLE, newFighter, randomFighter, readFighter, seatDrop, setFur, wobbleAt, wobbleHz,
+  IDLE, entrantOf, newFighter, randomFighter, readFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz,
 } from './fighter.js';
 import { wingShape } from '../characters/owl.js';
 import { floorGrid } from './roster.js';
@@ -218,6 +218,48 @@ for (const species of SPECIES) {
   const saved = readFighter({ species: 'owl', params: {}, look: { hatColor: '#e83ad8', gloves: '#2a0a3a' } });
   assert.equal(saved.look.hatColor, '#cf4bfc', 'an old saved hat colour moves to its new swatch');
   assert.ok(CLOTH.some((s) => s.hex === saved.look.gloves) && !isBadGuyCloth(saved.look.gloves), 'any saved colour lands on a swatch, never a bad guy\'s');
+}
+
+// A sword instead of gloves: saved and sent like any look, one hand only, and the same reach as the gloves.
+{
+  const look = (hands) => readFighter({ species: 'lion', params: {}, look: { hands } })?.look.hands;
+  assert.equal(look('sword'), 'sword', 'a sword reads back');
+  for (const junk of [undefined, null, 'axe', 3]) assert.equal(look(junk), 'gloves', `an old save or a junk ${junk} gets gloves`);
+  for (const species of SPECIES) {
+    const f = newFighter(species), built = buildFighter({ ...f, look: { ...f.look, hands: 'sword', trick: 'sparkle' } }), gloved = buildFighter(f);
+    const hand = species === 'owl' ? built.joints.upperArm[0].node : built.holds[0].parent;
+    assert.ok(built.sword?.parent === hand && built.gloves.length === 0, `${species}: a sword in the right hand and no gloves`);
+    const reach = (b) => entrantOf(f, b, { id: 'a', team: 'heroes' }).reach;
+    assert.equal(reach(built), reach(gloved), `${species}: the sword hits exactly as far as gloves`);
+    const blade = (step) => {
+      for (let i = 0; i < 3; i++) stepFighter(built, 1e-4, POSES.rest, 0, { name: 'jab', arm: 1, step });
+      built.root.updateMatrixWorld(true);
+      return built.sword.localToWorld(new THREE.Vector3(0, 0, 0.4)).y - at(built.sword).y;
+    };
+    assert.ok(blade(0.14) > 0.25 && blade(0.25) < -0.1, `${species}: a jab chops the sword down from up high`);
+    assert.ok(built.tricks.length === 1 && built.tricks[0].parent === built.sword && built.tricks[0].visible, `${species}: a sword's sparkle at its tip as it lands`);
+    assert.equal(gloved.tricks.length, 0, `${species}: plain gloves have no trick`);
+    disposeFighter(built);
+    disposeFighter(gloved);
+  }
+}
+
+// Tapping the picked hands goes through its tricks; a trick the other hands don't have falls back to their first.
+{
+  const trick = (hands, t) => readFighter({ species: 'owl', params: {}, look: { hands, trick: t } })?.look.trick;
+  assert.equal(trick('sword', 'flame'), 'flame');
+  assert.equal(trick('sword', 'plain'), 'sparkle', 'a sword always has a trick');
+  assert.equal(trick('gloves', 'rocket'), 'plain', 'an unknown trick is plain gloves');
+  assert.equal(trick(undefined, undefined), 'plain', 'an old save is plain gloves');
+  const f = newFighter('llama'), built = buildFighter({ ...f, look: { ...f.look, trick: 'bubble' } });
+  const shown = (arm, step) => {
+    stepFighter(built, 1e-4, POSES.rest, 0, { name: 'cross', arm, step });
+    return built.tricks.map((g) => g.visible);
+  };
+  assert.deepEqual(shown(1, 0.25), [false, true], 'only the hitting glove blows bubbles');
+  assert.deepEqual(shown(-1, 0.25), [true, false]);
+  assert.deepEqual(shown(-1, 0.8), [false, false], 'and only while the punch lands');
+  disposeFighter(built);
 }
 
 console.log('fighter ok');

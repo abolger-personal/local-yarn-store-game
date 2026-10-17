@@ -4,7 +4,7 @@ import { POSES, applyPose, setGeometryDetail } from '../characters/npc.js';
 import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import {
-  BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, buildFighter, disposeFighter, gloveAnchors, isBadGuyCloth, isBadGuyFur,
+  BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, buildFighter, disposeFighter, gloveAnchors, isBadGuyCloth, isBadGuyFur, nearestSwatch,
   IDLE, newFighter, randomFighter, readFighter, seatDrop, setFur, wobbleAt, wobbleHz,
 } from './fighter.js';
 import { wingShape } from '../characters/owl.js';
@@ -204,6 +204,20 @@ for (const species of SPECIES) {
     assert.ok(skate < 0.2, `feet keep up with the body at ${speed} m/s (skating ${skate.toFixed(2)} of each stride)`);
   }
   disposeFighter(built);
+}
+
+// The swatches in rainbow order, far enough apart in hue to tell apart; a colour saved from the old palette keeps its look.
+{
+  const hues = FUR.map((s) => oklchOf(s.hex).h);
+  const gaps = hues.map((h, i) => (hues[(i + 1) % hues.length] - h + 360) % 360);
+  assert.ok(gaps.every((g) => g > 0 && g < 90), `the fur swatches go round the hue circle once, in order (${gaps.map(Math.round)})`);
+  assert.ok(Math.min(...gaps) >= 20, `no two fur swatches closer than 20° of hue (${gaps.map(Math.round)})`);
+  const old = { '#ff7a1a': 'tangerine', '#14c4e0': 'turquoise', '#6fc8ff': 'sky', '#8a4dff': 'violet', '#e83ad8': 'magenta', '#ff6f61': 'coral', '#ff9ad5': 'bubblegum' };
+  for (const [hex, name] of Object.entries(old)) assert.equal(nearestSwatch(CLOTH, hex).name, name, `a saved ${hex} becomes ${name}`);
+  assert.equal(nearestSwatch(CLOTH, '#ffffff').name, 'white', 'white stays white');
+  const saved = readFighter({ species: 'owl', params: {}, look: { hatColor: '#e83ad8', gloves: '#2a0a3a' } });
+  assert.equal(saved.look.hatColor, '#cf4bfc', 'an old saved hat colour moves to its new swatch');
+  assert.ok(CLOTH.some((s) => s.hex === saved.look.gloves) && !isBadGuyCloth(saved.look.gloves), 'any saved colour lands on a swatch, never a bad guy\'s');
 }
 
 console.log('fighter ok');

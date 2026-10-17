@@ -17,16 +17,17 @@ export const SPECIES = Object.freeze(['lion', 'llama', 'owl']);
 
 const swatches = (pairs) => Object.freeze(pairs.map(([hex, name]) => Object.freeze({ hex, name })));
 
-// REUSE-SPEC.md §Look: when in doubt, colour riot. Fur is not natural colours.
+// REUSE-SPEC.md §Look: when in doubt, colour riot. Fur is not natural colours. In rainbow order, 24–40° of
+// OKLCH hue apart, so no two look alike.
 const RIOT = [
-  ['#ff3b7f', 'hot pink'], ['#ff7a1a', 'tangerine'], ['#ffd21a', 'lemon'], ['#8be02a', 'lime'],
-  ['#1fd18b', 'jade'], ['#14c4e0', 'cyan'], ['#2f6bff', 'electric blue'], ['#8a4dff', 'violet'],
-  ['#e83ad8', 'magenta'], ['#ff6f61', 'coral'], ['#6fc8ff', 'sky'], ['#ff9ad5', 'bubblegum'],
+  ['#ff3b7f', 'hot pink'], ['#fe7155', 'coral'], ['#ef8907', 'tangerine'], ['#ffd21a', 'lemon'],
+  ['#8be02a', 'lime'], ['#1fd18b', 'jade'], ['#0fc8c5', 'turquoise'], ['#5eccf6', 'sky'],
+  ['#2f6bff', 'electric blue'], ['#8154ff', 'violet'], ['#cf4bfc', 'magenta'], ['#fd9bd9', 'bubblegum'],
 ];
 
 export const FUR = swatches(RIOT);
 export const CLOTH = swatches([...RIOT, ['#ffffff', 'white']]);
-const FIRST_FUR = Object.freeze({ lion: '#ff7a1a', llama: '#ff9ad5', owl: '#14c4e0' });
+const FIRST_FUR = Object.freeze({ lion: '#ef8907', llama: '#fd9bd9', owl: '#0fc8c5' });
 
 export const HATS = Object.freeze(['beanie', 'pixie', 'beret', 'bucket', 'earflap']);
 export const CAPES = Object.freeze(['cape', 'capelet']);
@@ -46,7 +47,15 @@ export function isBadGuyFur(hex) {
 }
 
 const HEX = /^#[0-9a-f]{6}$/i;
-const hexIn = (list, hex) => list.some((s) => s.hex === hex);
+const oklab = (hex) => {
+  const { l, c, h } = oklchOf(hex), a = (h * Math.PI) / 180;
+  return [l, c * Math.cos(a) || 0, c * Math.sin(a) || 0];
+};
+/** The swatch nearest `hex`, so a colour saved from an older palette keeps its look. */
+export function nearestSwatch(list, hex) {
+  const p = oklab(hex), far = (s) => oklab(s.hex).reduce((d, v, i) => d + (v - p[i]) ** 2, 0);
+  return list.reduce((best, s) => (far(s) < far(best) ? s : best));
+}
 
 /**
  * @typedef {{ hat: string|null, hatColor: string, hatStitch: string, cape: string|null, capeColor: string, capeStitch: string,
@@ -56,7 +65,7 @@ const hexIn = (list, hex) => list.some((s) => s.hex === hex);
 
 /** @returns {Look} */
 export const defaultLook = () => ({
-  hat: 'beanie', hatColor: '#8be02a', hatStitch: 'rib', cape: 'cape', capeColor: '#8a4dff', capeStitch: 'stockinette',
+  hat: 'beanie', hatColor: '#8be02a', hatStitch: 'rib', cape: 'cape', capeColor: '#8154ff', capeStitch: 'stockinette',
   bag: 'backpack', bagColor: '#ffd21a', gloves: '#ff3b7f',
 });
 
@@ -105,7 +114,7 @@ function readParams(species, raw) {
 
 function readLook(raw) {
   const base = defaultLook(), r = raw && typeof raw === 'object' ? raw : {};
-  const colour = (k) => (hexIn(CLOTH, r[k]) ? r[k] : base[k]);
+  const colour = (k) => (HEX.test(r[k]) ? nearestSwatch(CLOTH, r[k]).hex : base[k]);
   const choice = (k, list, none) => (list.includes(r[k]) || (none && r[k] === null) ? r[k] : base[k]);
   return {
     hat: choice('hat', HATS, true), hatColor: colour('hatColor'), hatStitch: choice('hatStitch', TEXTURES, false),

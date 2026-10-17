@@ -31,6 +31,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - Fighters' legs keep up when they run: no more feet skating along under a gliding body.
 - **Fighters are the colour you picked.** The colour buttons on the fighter screen now match the 3D
   fighter, and loud colours like hot pink stay hot pink instead of fading to pastel, sprinkles too.
+- The colour buttons go in rainbow order, and no two look alike any more (the two blues and the two
+  pinks moved apart). A colour you already picked moves to the nearest new one.
 
 ### Buttons
 - 👍 means "done, next" everywhere: the fighter chooser's ✅ is now 👍.

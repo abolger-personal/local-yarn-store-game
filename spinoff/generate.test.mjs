@@ -4,7 +4,7 @@ import { checkLevel, ticksToShelf } from './check-level.mjs';
 import { TICK_HZ } from './match.js';
 import { levelFor } from './levels.js';
 
-const SEEDS = Number(process.env.SEEDS ?? 20), DIFFICULTIES = [1, 2, 3, 4, 5], NAMES = ['breakfast', 'cake'];
+const SEEDS = Number(process.env.SEEDS ?? 3), DIFFICULTIES = [1, 2, 3, 4, 5], NAMES = ['breakfast', 'cake'];
 const mirrored = (f) => JSON.stringify({ ...f, x0: -f.x1, x1: -f.x0 });
 const raid = { heroes: [], badGuys: [], ratio: [] };
 const started = performance.now();

@@ -42,8 +42,11 @@ function guestOf(net, id) {
 {
   assert.deepEqual(readInput({ target: { x: 1, z: 2 }, punch: true, kick: false }), { target: { x: 1, z: 2 }, punch: true, kick: false });
   assert.deepEqual(readInput({ ...IDLE, away: true }), { ...IDLE, away: true });
+  const building = { ...IDLE, target: { thing: 'pile', id: 'G1' }, drop: true, ready: false, go: true };
+  assert.deepEqual(readInput({ ...building, extra: 1 }), building, 'the build round\'s ⬇️, 👍 and hold come through, and a tap on a pile');
   for (const bad of [null, 'go', { target: null }, { ...IDLE, target: { x: 1e9, z: 0 } }, { ...IDLE, target: { x: Number.NaN, z: 0 } },
-    { ...IDLE, target: { thing: 'shelf', team: 'everyone' } }, { ...IDLE, target: { thing: 'fighter', id: 'x'.repeat(500) } }, { ...IDLE, away: 'yes' }])
+    { ...IDLE, target: { thing: 'shelf', team: 'everyone' } }, { ...IDLE, target: { thing: 'fighter', id: 'x'.repeat(500) } }, { ...IDLE, away: 'yes' },
+    { ...IDLE, ready: 'yes' }, { ...IDLE, drop: 1 }])
     assert.equal(readInput(bad), null, `a malformed input is ignored: ${JSON.stringify(bad)}`);
 
   const start = { theme: 'breakfast', stage: TUTORIAL.stage, roster: rosterOf('H', newFighter('owl'), new Map([['G1', newFighter('lion')]])), settings: { seconds: 90 } };

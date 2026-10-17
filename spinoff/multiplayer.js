@@ -22,7 +22,8 @@ export const EVENT_TICKS = TICK_HZ / 2;
 const REFRESH = 15;
 // Guests draw other fighters one to two snapshots back (BEHIND ticks at most), between the two either side.
 const BEHIND = 2 * (TICK_HZ / SNAP_HZ), KEEP = 8;
-const TEAMS = new Set(['heroes', 'badGuys']), THINGS = new Set(['donut', 'brick', 'fighter']), FAR = 1e6;
+const TEAMS = new Set(['heroes', 'badGuys']), THINGS = new Set(['donut', 'brick', 'fighter', 'pile']), FAR = 1e6;
+const FLAGS = ['away', 'drop', 'ready', 'go'];
 /** @type {import('./match.js').Team} */
 const HEROES = 'heroes';
 const IDLE = Object.freeze({ target: null, punch: false, kick: false });
@@ -52,8 +53,8 @@ function readTarget(t) {
 export function readInput(raw) {
   if (!raw || typeof raw !== 'object' || typeof raw.punch !== 'boolean' || typeof raw.kick !== 'boolean') return null;
   const target = readTarget(raw.target);
-  if (target === undefined || (raw.away !== undefined && typeof raw.away !== 'boolean')) return null;
-  return { target, punch: raw.punch, kick: raw.kick, ...(raw.away !== undefined && { away: raw.away }) };
+  if (target === undefined || FLAGS.some((k) => raw[k] !== undefined && typeof raw[k] !== 'boolean')) return null;
+  return { target, punch: raw.punch, kick: raw.kick, ...Object.fromEntries(FLAGS.filter((k) => raw[k] !== undefined).map((k) => [k, raw[k]])) };
 }
 
 /** @returns {Seat|null} */
@@ -90,8 +91,9 @@ export const rosterOf = (me, mine, guests = new Map()) => [
   { id: DUMMY_ID, team: /** @type {const} */ ('badGuys'), dummy: true },
 ];
 
-/** @param {Input} input */
-const merge = (input, was = IDLE) => ({ ...was, ...input, target: input.target ?? was.target, punch: was.punch || input.punch, kick: was.kick || input.kick });
+/** @param {Input} input @param {Input} [was] */
+const merge = (input, was = IDLE) => ({ ...was, ...input, target: input.target ?? was.target, punch: was.punch || input.punch, kick: was.kick || input.kick,
+  ...((was.drop || input.drop) && { drop: true }), ...((was.go || input.go) && { go: true }) });
 const eventsOf = (s) => (s.hits.length + s.fullBag.length + s.donutEvents.length
   ? [{ tick: s.tick, hits: s.hits, fullBag: s.fullBag, donutEvents: s.donutEvents }] : []);
 const round = (_, v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v);
@@ -205,7 +207,7 @@ export function createGuest(link, me, themes, on) {
       return g.buf.length ? drawn(g, dt) : null;
     },
     /** @param {Input} input */
-    input(input) { if (g.host && (input.target || input.punch || input.kick || input.away !== undefined)) link.send('input', input, [g.host]); },
+    input(input) { if (g.host && (input.target || input.punch || input.kick || FLAGS.some((k) => input[k] !== undefined))) link.send('input', input, [g.host]); },
     left(id) { if (id === g.host) goneNow(); },
   };
 }

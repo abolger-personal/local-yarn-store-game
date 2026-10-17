@@ -7,7 +7,8 @@ import { KICK_COMBO, strikeOf } from './kicks.js';
 import { BAD_DONUT, BAD_GUY_FUR, MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
 import { BRICK, TICK_HZ, groundOf } from './match.js';
-import { beatLevel, levelBefore, levelFor, levelNumber } from './levels.js';
+import { beatLevel, levelBefore, levelFor, levelNumber, matchOptions } from './levels.js';
+import { facedCell, fortGrid } from './build.js';
 import { makeStage } from './stage.js';
 import { SHELF_WOOD, THEMES } from './scenery.js';
 import { PIPING, box, donutMesh, sameLook } from './treats.js';
@@ -112,7 +113,7 @@ function sync(drawn, list, make, update, dt) {
   }
 }
 
-const fighters = new Map(), donuts = new Map(), bricks = new Map(), shelves = new Map();
+const fighters = new Map(), donuts = new Map(), bricks = new Map(), shelves = new Map(), piles = new Map();
 
 function tickDown(t, keys, dt) {
   for (const k of keys) t[k] = Math.max(0, t[k] - dt / TIMERS[k]);
@@ -160,6 +161,25 @@ function drawPads(dt) {
   }
 }
 
+/** REUSE-SPEC.md §Forts: a block being carried is held out in front, in the builder's colour. */
+function hold(m, icing) {
+  if (m.heldIcing === icing) return;
+  if (m.held) scene.remove(m.held);
+  m.heldIcing = icing;
+  m.held = icing ? theme.brick(/** @type {any} */ ({ id: 'held', team: m.team, icing })).g : null;
+  if (m.held) scene.add(m.held);
+}
+
+/** Out in front of the chest; a fetched block flies there in the donut grab's arc. */
+function placeHeld(m) {
+  const P = m.built.params, k = 1 - m.t.pop * m.t.pop;
+  m.g.updateMatrixWorld(true);
+  m.built.chest.localToWorld(_v.set(0, 0, P.torsoD + BRICK * 0.6));
+  m.held.position.copy(m.t.pop > 0 ? _goal.copy(m.from).lerp(_v, k) : _v);
+  m.held.position.y += FLY_ARC * Math.sin(Math.PI * k);
+  m.held.rotation.set(0, m.g.rotation.y, 0);
+}
+
 function carry(m, look) {
   if (sameLook(m.carryLook, look)) return;
   if (m.carried) scene.remove(m.carried);
@@ -194,6 +214,8 @@ function drawFighter(m, f, dt, tick) {
   stepFighter(m.built, dt, poseOf(m, f), speed, strikeNow(m, f, tick));
   carry(m, f.carrying);
   if (m.carried) placeCarried(m);
+  hold(m, f.block ?? null);
+  if (m.held) placeHeld(m);
   placeShadow(level.stage, m.shadow, f, 0.42);
 }
 
@@ -225,6 +247,86 @@ function drawBrick(m, b, dt) {
   placeShadow(level.stage, m.shadow, { x: m.g.position.x, y: b.y, z: m.g.position.z }, BRICK * 0.6);
 }
 
+const PILE_SCALE = 0.5;
+/** A hero's blocks left to place, a small heap of half-size blocks, two by two and up. */
+function newPile() {
+  const m = { g: new THREE.Group(), shadow: makeShadow(scene), count: -1 };
+  scene.add(m.g);
+  return m;
+}
+
+/** @param {import('./match.js').PileState} p */
+function drawPile(m, p) {
+  if (m.count !== p.count) {
+    m.g.clear();
+    const s = BRICK * PILE_SCALE;
+    for (let i = 0; i < p.count; i++) {
+      const b = theme.brick(/** @type {any} */ ({ id: `${p.owner}${i}`, team: 'heroes', icing: p.icing })).g;
+      b.scale.setScalar(PILE_SCALE);
+      b.position.set(((i % 2) - 0.5) * s * 1.1, (Math.floor(i / 4) + 0.5) * s, ((Math.floor(i / 2) % 2) - 0.5) * s * 1.1);
+      m.g.add(b);
+    }
+    m.count = p.count;
+  }
+  m.g.position.set(p.x, p.y, p.z);
+  placeShadow(level.stage, m.shadow, p, p.count ? 0.3 : 0.01);
+}
+
+// REUSE-SPEC.md §Forts: carrying a block, a faint outline shows the cell ⬇️ puts it in, greyed at the height limit
+const outline = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(BRICK, BRICK, BRICK)),
+  new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85 }));
+outline.visible = false;
+scene.add(outline);
+
+/** @param {Snapshot} snap @param {FighterState|undefined} me */
+function drawOutline(snap, me) {
+  const cell = snap.phase === 'build' && me?.block ? facedCell(fortGrid(level.stage, me.team, snap.bricks, snap.piles), me) : null;
+  outline.visible = Boolean(cell);
+  if (!cell) return;
+  outline.position.set(cell.x + BRICK / 2, cell.y + BRICK / 2, cell.z + BRICK / 2);
+  outline.material.color.set(cell.ok ? '#ffffff' : '#7d7d7d');
+}
+
+const el = (id) => document.getElementById(id);
+let phaseShown = 'play';
+/** REUSE-SPEC.md §Forts, the buttons swap with the round: ⬇️ 👍 to build, then 🥊 🦶 pop in for the match. @param {Snapshot} snap */
+function showPhase(snap) {
+  const phase = snap.phase ?? 'play';
+  el('ready').classList.toggle('on', Boolean(snap.ready?.includes(ME)));
+  if (phase === phaseShown) return;
+  phaseShown = phase;
+  const build = phase === 'build';
+  for (const id of ['drop', 'ready', 'hold']) el(id).classList.toggle('hidden', !build);
+  for (const id of ['punch', 'kick']) {
+    el(id).classList.toggle('hidden', build);
+    if (!build) el(id).classList.add('pop');
+  }
+}
+for (const id of ['punch', 'kick']) el(id).addEventListener('animationend', () => el(id).classList.remove('pop'));
+
+/** 👍: a tap says ready (or takes it back); held for HOLD_MS, with its ring filling, it starts the round for everyone. */
+const HOLD_MS = 2000;
+function attachReady(controls) {
+  const b = el('ready');
+  let since = 0;
+  const fill = (k) => b.style.setProperty('--fill', String(k));
+  const step = () => {
+    if (!since) return;
+    const k = (performance.now() - since) / HOLD_MS;
+    if (k < 1) { fill(k); requestAnimationFrame(step); return; }
+    since = -1;
+    fill(0);
+    controls.go();
+  };
+  b.addEventListener('pointerdown', (e) => {
+    b.setPointerCapture(e.pointerId);
+    since = performance.now();
+    requestAnimationFrame(step);
+  });
+  b.addEventListener('pointerup', () => { if (since > 0) controls.ready(!b.classList.contains('on')); since = 0; fill(0); });
+  b.addEventListener('pointercancel', () => { since = 0; fill(0); });
+}
+
 function drawShelf(m, s) {
   if (m.donuts?.length === s.donuts.length && s.donuts.every((d, i) => sameLook(d, m.donuts[i]))) return;
   if (m.g) scene.remove(m.g);
@@ -247,6 +349,9 @@ function draw(snap, dt) {
   for (const f of snap.fighters) drawFighter(fighters.get(f.id), f, dt, snap.tick);
   sync(donuts, snap.donuts, newLoose, drawLoose, dt);
   sync(bricks, snap.bricks, newBrick, drawBrick, dt);
+  sync(piles, (snap.piles ?? NONE).map((p) => ({ ...p, id: p.owner })), newPile, drawPile, dt);
+  showPhase(snap);
+  drawOutline(snap, snap.fighters.find((f) => f.id === ME));
   for (const s of snap.shelves) {
     if (!shelves.has(s.team)) shelves.set(s.team, {});
     drawShelf(shelves.get(s.team), s);
@@ -318,6 +423,11 @@ function bounce(team) {
 /** @param {DonutEvent} e */
 function onDonut(e) {
   const m = fighters.get(e.fighter);
+  if (e.kind === 'place') { fx.burst(e, confettiMats, 8, 1.2); return; }
+  if (e.kind === 'fetch') {
+    if (m) Object.assign(m, { from: new THREE.Vector3(e.x, e.y + GRAB_FROM_Y, e.z) }).t.pop = 1;
+    return;
+  }
   if (e.kind === 'bank') fx.burst({ x: e.x, y: e.y + 1.6, z: e.z }, confettiMats, 30, 2.4);
   if (e.kind === 'bank') bounce(m?.team);
   if (!m) return;
@@ -430,11 +540,12 @@ async function play() {
   const entrants = cast(net?.start.roster ?? rosterOf(ME, mine));
   const controls = createControls(ME, level.stage);
   const button = (id) => document.getElementById(id);
-  attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: button('punch'), kick: button('kick') } });
+  attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: button('punch'), kick: button('kick'), drop: button('drop') } });
+  attachReady(controls);
   await warmUp();
   keepAwake();
   if (net?.guest) guest(controls);
-  else host(api.createMatch(entrants, level.stage), controls);
+  else host(api.createMatch(entrants, level.stage, matchOptions(asked)), controls);
   // play.html shows ⏳ from the start; the first frame is drawn in the same paint that takes it away
   document.getElementById('wait').hidden = true;
 }

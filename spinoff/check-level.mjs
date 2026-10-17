@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { BRICK, MAX_HEROES, TICK_HZ, groundOf, outside, overlaps, spotRect } from './match.js';
 import { createMatch, snapshot, tick } from './sim.js';
+import { HEIGHT_LIMIT } from './build.js';
 
 const KINDS = ['ground', 'deck', 'hill'];
 const LOOK = { dough: '#e8c48a', frosting: '#14c4e0', stripe: false };
@@ -69,6 +70,12 @@ export function checkLevel(stage, at, breakIn = false) {
   for (const b of stage.bricks)
     assert.ok(raised.every((f) => b.y >= f.y || !overlaps(brickRect(b), f)), `${at}: brick at ${b.x},${b.y},${b.z} is not inside a raised floor`);
   checkStarts(stage, at);
+  // REUSE-SPEC.md §Forts: the height limit is high enough that nobody can jump over the wall, on every stage's jump
+  const third = stage.zones.find((z) => z.team === 'heroes'), across = [];
+  for (let z = stage.backWall; z < ground.z1 - 1e-9; z += BRICK)
+    for (let k = 0; k < HEIGHT_LIMIT; k++) across.push({ team: 'heroes', x: third.x1 - 4 * BRICK, z, y: k * BRICK, hits: 2 });
+  assert.equal(ticksToShelf({ ...stage, bricks: across, starts: undefined }, 'badGuys'), Infinity,
+    `${at}: a wall across the heroes' third as high as the height limit (${HEIGHT_LIMIT}) can't be got over`);
   // REUSE-SPEC.md §Mode: dropped donuts stay where they land, so any top one can land on must be reachable
   for (const f of raised) assert.ok(reachesTop(stage, f), `${at}: the ${f.kind} top at x ${f.x0}..${f.x1}, y ${f.y} can be reached, or a donut landing there is lost`);
   if (!breakIn) {

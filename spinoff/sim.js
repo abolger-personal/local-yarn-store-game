@@ -1,8 +1,9 @@
 // The match host: one fixed tick of pure logic, no three.js, no Math.random. REUSE-SPEC.md §Milestones 1.
 // The stage is a depth band (§Navigation): fighters walk in x/z on floor tops and jump in y.
-import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, HIT_DEPTH, ROUND_SECONDS, TICK_HZ, coreOf, groundOf, outside } from './match.js';
+import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, HIT_DEPTH, PILE_DX, ROUND_SECONDS, TICK_HZ, coreOf, groundOf, outside } from './match.js';
 import { EMPTY, anySlot, footprint, gridSize, lift, makeDisplay, place, topAt } from '../inventory/grid.js';
-import { canHit } from './roster.js';
+import { MATCH, canHit } from './roster.js';
+import { facedCell, fortGrid, onTop } from './build.js';
 
 const DT = 1 / TICK_HZ;
 const EPS = 1e-6;
@@ -69,6 +70,9 @@ const DEFAULT_LOOKS = Object.freeze({
   badGuys: Object.freeze({ dough: '#2a1a14', frosting: '#7a2bbf', stripe: true }),
 });
 export const BAD_ICING = '#4a1d6b';
+/** How close to its pile, or past a block's edge, a fighter reaches to pick a block up. */
+const FETCH_REACH = 0.35;
+const BLOCK_HITS = 2;
 
 /**
  * A hit sphere sits along the attacker's facing, at its body edge + max(reach × scale, min)
@@ -360,6 +364,10 @@ function thingGoal(s, f, t) {
     const sh = shelfOf(s, t.team);
     return { ...pointGoal(s, f, sh.x, sh.z + f.r + SHELF_GAP, sh.y), face: sh };
   }
+  if (t.thing === 'pile') {
+    const pile = s.piles.find((p) => p.owner === t.id);
+    return pile ? { ...pointGoal(s, f, pile.x, pile.z, pile.y), face: pile } : null;
+  }
   const list = { donut: s.donuts, brick: s.bricks, fighter: s.fighters }[t.thing];
   const it = list?.find((o) => o.id === t.id && o !== f);
   if (!it) return null;
@@ -623,7 +631,7 @@ function brickContact(sp, b) {
   return d <= sp.r ? { p, d } : null;
 }
 
-const canStrike = (f, o) => canHit(f, o) && o.inv === 0 && Math.abs(o.z - f.z) <= HIT_DEPTH + f.r + o.r;
+const canStrike = (s, f, o) => canHit(f, o, s.rules) && o.inv === 0 && Math.abs(o.z - f.z) <= HIT_DEPTH + f.r + o.r;
 
 /** The gap to the nearest thing in front that the attack could reach with a step, or Infinity. */
 function frontGap(s, f) {
@@ -631,7 +639,7 @@ function frontGap(s, f) {
   let best = Infinity;
   for (const o of s.fighters) {
     const dx = o.x - f.x, dz = o.z - f.z, along = dx * u.x + dz * u.z;
-    if (!canStrike(f, o) || along <= 0 || Math.abs(dx * u.z - dz * u.x) > HIT_DEPTH + o.r || Math.abs(o.y - f.y) > f.h) continue;
+    if (!canStrike(s, f, o) || along <= 0 || Math.abs(dx * u.z - dz * u.x) > HIT_DEPTH + o.r || Math.abs(o.y - f.y) > f.h) continue;
     best = Math.min(best, along - f.r - o.r);
   }
   for (const b of s.bricks) {
@@ -686,7 +694,7 @@ function attackStep(s, f) {
   if (a.t < m.active[0] || a.t > m.active[1]) return;
   const sp = hitSphere(f, m);
   for (const o of s.fighters) {
-    const p = !a.hit.includes(o.id) && canStrike(f, o) ? bodyContact(sp, o) : null;
+    const p = !a.hit.includes(o.id) && canStrike(s, f, o) ? bodyContact(sp, o) : null;
     if (p) strike(s, f, o, p);
   }
   if (!a.brickDone) hitBrick(s, f, sp);
@@ -790,6 +798,66 @@ function shelfStep(s, f) {
   else if ((f.carrying = grab(sh))) s.donutEvents.push({ ...event(f, sh), kind: 'steal' });
 }
 
+// --- the build round (REUSE-SPEC.md §Forts) ------------------------------------------------
+
+function shake(s, f) { s.fullBag.push(event(f, f)); }
+
+/** ⬇️: the carried block goes on the faced cell of your own third, unless the stack there is at the height limit. */
+function putDown(s, f) {
+  const cell = f.block && f.onGround ? facedCell(fortGrid(s.stage, f.team, s.bricks, s.piles), f) : null;
+  if (!cell?.ok) { shake(s, f); return; }
+  s.bricks.push({ id: `p${s.nextBrick++}`, team: f.team, owner: f.id, x: cell.x, y: cell.y, z: cell.z, vy: 0,
+    hits: BLOCK_HITS, maxHits: BLOCK_HITS, icing: f.block });
+  f.block = null;
+  s.donutEvents.push({ ...event(f, { x: cell.x + BRICK / 2, y: cell.y, z: cell.z + BRICK / 2 }), kind: 'place' });
+}
+
+/** Arriving empty-handed at your pile takes a block from it; at your own block on top of a stack, takes that back. */
+function fetchStep(s, f) {
+  if (f.block || !f.target) return;
+  if (f.target.thing === 'pile') fromPile(s, f);
+  if (f.target?.thing === 'brick') fromStack(s, f, f.target.id);
+}
+
+function fromPile(s, f) {
+  const pile = s.piles.find((p) => p.owner === f.id);
+  if (!pile?.count || flat(f, pile) > f.r + FETCH_REACH) return;
+  pile.count--;
+  take(s, f, pile.icing, pile);
+}
+
+function fromStack(s, f, id) {
+  const i = s.bricks.findIndex((b) => b.id === id), b = s.bricks[i];
+  if (!b || !f.nav?.done || flat(f, { x: clamp(f.x, b.x, b.x + BRICK), z: clamp(f.z, b.z, b.z + BRICK) }) > f.r + FETCH_REACH) return;
+  f.target = null;
+  if (b.owner !== f.id || !onTop(fortGrid(s.stage, f.team, s.bricks, s.piles), s.bricks, i)) { shake(s, f); return; }
+  s.bricks = s.bricks.filter((o) => o !== b);
+  take(s, f, b.icing, { x: b.x + BRICK / 2, y: b.y, z: b.z + BRICK / 2 });
+}
+
+function take(s, f, icing, from) {
+  f.block = icing;
+  f.target = null;
+  s.donutEvents.push({ ...event(f, from), kind: 'fetch' });
+}
+
+/** 👍 and its take-back, and the 2-second hold that starts the round for everyone. */
+function readyInput(s, f, input) {
+  if (input.ready === true) s.ready.add(f.id);
+  if (input.ready === false) s.ready.delete(f.id);
+  if (input.go) s.go = true;
+  if (input.drop) putDown(s, f);
+}
+
+/** The round starts when every hero here has 👍 (CPU bad guys are ready at once), or someone held 👍: piles and carried blocks go. */
+function startWhenReady(s) {
+  const heroes = s.fighters.filter((f) => f.team === 'heroes' && !f.dummy && !f.away);
+  if (!s.go && !(heroes.length && heroes.every((f) => s.ready.has(f.id)))) return;
+  Object.assign(s, { phase: 'play', t0: s.tick, piles: [], go: false });
+  s.ready.clear();
+  for (const f of s.fighters) f.block = null;
+}
+
 // --- input ----------------------------------------------------------------------------------
 
 function tapAbove(s, f, t) {
@@ -813,9 +881,15 @@ function setAway(s, f, away) {
 
 function applyInput(s, f, input) {
   setAway(s, f, input?.away);
-  if (f.away) return;
-  if (input?.target) aim(s, f, input.target);
-  if (busy(f) || !(input?.kick || input?.punch)) return;
+  if (f.away || !input) return;
+  if (input.target) aim(s, f, input.target);
+  if (s.phase === 'build') readyInput(s, f, input);
+  else attackInput(s, f, input);
+}
+
+/** @param {import('./match.js').Input} input */
+function attackInput(s, f, input) {
+  if (busy(f) || !(input.kick || input.punch)) return;
   let id = 'punch';
   if (input.kick) id = f.onGround ? 'kick' : 'stomp';
   f.attack = { id, t: 0, hit: [], brickDone: false, lunge: lungeFor(s, f, MOVES[id]) };
@@ -847,7 +921,7 @@ function spawnSpot(s, e, cursor) {
 }
 
 function newFighter(e, at, y) {
-  return { id: e.id, team: e.team, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
+  return { id: e.id, team: e.team, icing: e.look.frosting, block: null, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
     x: at.x, y, z: at.z, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, onGround: true, jumps: 1,
     target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, fails: 0, stuck: 0, away: false, slick: false, passed: false, sprung: -1,
     attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, percent: 0, calm: 0,
@@ -866,10 +940,13 @@ function jumpsOn(stage) {
   return { speed, up: reachUp(speed), spring, springUp: reachUp(spring) };
 }
 
-/** @param {import('./match.js').Entrant[]} entrants @param {import('./match.js').Stage} stage a level's (levels.js) */
-export function createMatch(entrants, stage) {
+/**
+ * @param {import('./match.js').Entrant[]} entrants @param {import('./match.js').Stage} stage a level's (levels.js)
+ * @param {import('./match.js').MatchOptions} [opts] pieces: each hero's pile, and a build round first if any; match: who can hit whom
+ */
+export function createMatch(entrants, stage, { pieces = 0, match = MATCH } = {}) {
   const s = { stage, band: bandOf(stage), jump: jumpsOn(stage), floorBoxes: stage.floors.map(floorBox), tick: 0, nextDonut: 0, fighters: [], donuts: [], shelves: [], solids: [], grids: new Map(), brickKey: '',
-    hits: [], fullBag: [], donutEvents: [],
+    hits: [], fullBag: [], donutEvents: [], rules: match, phase: pieces > 0 ? 'build' : 'play', t0: 0, ready: new Set(), go: false, piles: [], nextBrick: 0,
     bricks: stage.bricks.map((b, i) => ({ id: `b${i}`, team: b.team, x: b.x, y: b.y, z: b.z, vy: 0, hits: b.hits,
       maxHits: b.hits, icing: icingOf(entrants, b.team) })) };
   s.shelves = stage.shelves.map((spot) => makeShelf(spot, teamLooks(entrants, spot.team)));
@@ -877,16 +954,24 @@ export function createMatch(entrants, stage) {
   const cursor = { dummies: 0, starts: 0 };
   s.fighters = entrants.map((e) => newFighter(e, spawnSpot(s, e, cursor), s.band.y));
   for (const f of s.fighters) if (f.dummy) f.carrying = grab(shelfOf(s, f.team));
+  if (s.phase === 'build') s.piles = s.fighters.filter((f) => f.team === 'heroes' && !f.dummy)
+    .map((f) => ({ owner: f.id, x: f.x + PILE_DX, y: f.y, z: f.z, count: pieces, icing: f.icing }));
   return s;
 }
 
-const isOver = (s) => s.tick >= ROUND_SECONDS * TICK_HZ;
+const played = (s) => (s.phase === 'play' ? s.tick - s.t0 : 0);
+const isOver = (s) => played(s) >= ROUND_SECONDS * TICK_HZ;
+
+function applyInputs(s, inputs) {
+  for (const f of s.fighters) if (!f.dummy) applyInput(s, f, inputs[f.id]);
+  if (s.phase === 'build') startWhenReady(s);
+}
 
 /** One fixed 1/TICK_HZ step. @param {Record<string, import('./match.js').Input>} inputs */
 export function tick(s, inputs) {
   if (isOver(s)) return;
   Object.assign(s, { hits: [], fullBag: [], donutEvents: [] });
-  for (const f of s.fighters) if (!f.dummy) applyInput(s, f, inputs[f.id]);
+  applyInputs(s, inputs);
   for (const f of s.fighters) moveFighter(s, f);
   separate(s);
   for (const f of s.fighters) attackStep(s, f);
@@ -895,7 +980,7 @@ export function tick(s, inputs) {
   for (const d of s.donuts) stepDonut(s, d);
   for (const f of s.fighters) {
     touchDonuts(s, f);
-    shelfStep(s, f);
+    (s.phase === 'build' ? fetchStep : shelfStep)(s, f);
     if (f.still) continue;
     f.stun = Math.max(0, f.stun - 1);
     f.inv = Math.max(0, f.inv - 1);
@@ -934,7 +1019,7 @@ function stepOf(f) {
 const fighterView = (f) => ({
   id: f.id, team: f.team, x: f.x, y: f.y, z: f.z, vx: f.vx, vy: f.vy, vz: f.vz, facing: f.facing, height: f.h,
   onGround: f.onGround, move: moveOf(f), step: stepOf(f), percent: f.percent, carrying: f.carrying ? { ...f.carrying } : null,
-  invincible: f.inv > 0, target: f.dest ? { x: f.dest.x, y: f.dest.y, z: f.dest.z } : null,
+  invincible: f.inv > 0, target: f.dest ? { x: f.dest.x, y: f.dest.y, z: f.dest.z } : null, block: f.block,
 });
 
 function winnerOf(s) {
@@ -947,7 +1032,8 @@ function winnerOf(s) {
 /** @returns {import('./match.js').Snapshot} */
 export function snapshot(s) {
   return {
-    tick: s.tick, secondsLeft: Math.max(0, ROUND_SECONDS - s.tick / TICK_HZ), over: isOver(s), winner: winnerOf(s),
+    tick: s.tick, secondsLeft: Math.max(0, ROUND_SECONDS - played(s) / TICK_HZ), over: isOver(s), winner: winnerOf(s),
+    phase: s.phase, ready: [...s.ready], piles: s.piles.map((p) => ({ ...p })),
     fighters: s.fighters.map(fighterView),
     donuts: s.donuts.map((d) => ({ id: d.id, x: d.x, y: d.y, z: d.z, look: { ...d.look } })),
     bricks: s.bricks.map((b) => ({ id: b.id, team: b.team, x: b.x, y: b.y, z: b.z, hits: b.hits, maxHits: b.maxHits, icing: b.icing })),

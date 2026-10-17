@@ -9,7 +9,7 @@ const { stage: STAGE } = TUTORIAL;
 const look = (frosting) => ({ dough: '#e8c48e', frosting, stripe: false });
 const fighter = (id, team, x, z) => ({
   id, team, x, y: 0, z, vx: 0, vy: 0, vz: 0, facing: 0, height: 1, onGround: true, move: 'idle', step: 0, percent: 0,
-  carrying: null, invincible: false, target: null,
+  carrying: null, invincible: false, target: null, block: null,
 });
 /** @type {import('./match.js').Snapshot} */
 const snap = {
@@ -18,6 +18,7 @@ const snap = {
   donuts: [{ id: 'd0', x: -2, y: 0, z: 1, look: look('#ff3b7f') }],
   bricks: STAGE.bricks.map((b, i) => ({ id: `b${i}`, ...b, maxHits: b.hits, icing: '#7b2fbf' })),
   shelves: STAGE.shelves.map((s) => ({ ...s, donuts: [] })),
+  phase: 'play', ready: [], piles: [],
 };
 
 // A camera up and in front, looking down about 35 degrees, as play.js frames it.
@@ -103,6 +104,19 @@ assert.deepEqual(pickTarget(STAGE, snap, tap(front.x + 0.2, 0.2, front.z + 0.2),
   assert.equal(floorTop(STAGE, (hill.x0 + hill.x1) / 2, (hill.z0 + hill.z1) / 2), hill.y, 'the middle of the rounded hill is its top');
   assert.equal(floorTop(STAGE, hill.x1 - 0.05, hill.z1 - 0.05), 0, 'its rounded-off corner is ground, not thin air');
   assert.equal(floorTop(STAGE, hill.x1 - 0.05, (hill.z0 + hill.z1) / 2), hill.y, 'its straight side still reaches the edge');
+}
+
+{
+  const piles = [{ owner: 'me', x: -5, y: 0, z: 1.4, count: 4, icing: '#ff3b7f' }, { owner: 'pal', x: -5, y: 0, z: -0.6, count: 4, icing: '#14c4e0' }];
+  const building = { ...snap, phase: /** @type {const} */ ('build'), piles };
+  assert.deepEqual(pickTarget(STAGE, building, tap(-5, 0.2, 1.4), 'me'), { thing: 'pile', id: 'me' }, 'a tap on your pile fetches from it');
+  assert.ok(!('thing' in pickTarget(STAGE, building, tap(-5, 0.2, -0.6), 'me')), "a teammate's pile is only floor to you");
+  const c = createControls('me', STAGE);
+  c.down(1, 'drop', null);
+  c.ready(true);
+  c.go();
+  assert.deepEqual(c.take(snap), { target: null, punch: false, kick: false, drop: true, ready: true, go: true }, '⬇️, 👍 and the hold go out once');
+  assert.deepEqual(c.take(snap), { target: null, punch: false, kick: false }, 'and only once');
 }
 
 console.log('controls ok');

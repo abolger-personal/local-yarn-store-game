@@ -145,5 +145,5 @@ export function tick(state, inputs) {
 export const snapshot = (state) => structuredClone({
   tick: state.tick, secondsLeft: Math.max(0, ROUND_SECONDS - state.tick / TICK_HZ), over: state.over, winner: state.winner,
   fighters: state.fighters, donuts: state.donuts, bricks: state.bricks, shelves: state.shelves,
-  hits: state.hits, fullBag: state.fullBag, donutEvents: state.donutEvents,
+  hits: state.hits, fullBag: state.fullBag, donutEvents: state.donutEvents, phase: /** @type {const} */ ('play'), ready: [], piles: [],
 });

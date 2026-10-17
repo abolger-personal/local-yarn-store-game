@@ -6,7 +6,7 @@ import { BRICK, outside } from './match.js';
 /** @typedef {import('./match.js').Input} Input @typedef {import('./match.js').FighterState} FighterState */
 /** @typedef {import('./match.js').Stage} Stage @typedef {{ x: number, y: number, z: number }} P3 @typedef {{ origin: P3, direction: P3 }} Ray */
 
-export const TAP_RADIUS = { donut: 0.55, foe: 0.55, me: 0.35, shelf: 0.75, brick: 0.4 };
+export const TAP_RADIUS = { donut: 0.55, foe: 0.55, me: 0.35, shelf: 0.75, brick: 0.4, pile: 0.5 };
 export const DONUT_UP = 0.2;
 export const SHELF_UP = 0.65;
 
@@ -76,6 +76,9 @@ export function pickTarget(stage, snap, ray, myId) {
   if (me && fighterDist(ray, me) <= TAP_RADIUS.me) return { stop: true };
   const shelf = closest(snap.shelves, (s) => shelfDist(ray, s), TAP_RADIUS.shelf);
   if (shelf) return { thing: 'shelf', team: shelf.team };
+  // REUSE-SPEC.md §Forts: only your own pile is yours to take from
+  const pile = closest((snap.piles ?? []).filter((p) => p.owner === myId && p.count), (p) => rayDist(ray, p.x, p.y + BRICK / 2, p.z), TAP_RADIUS.pile);
+  if (pile) return { thing: 'pile', id: myId };
   const brick = closest(snap.bricks, (b) => brickDist(ray, b), TAP_RADIUS.brick);
   if (brick) return { thing: 'brick', id: brick.id };
   return pointTarget(stage, ray);
@@ -83,9 +86,12 @@ export function pickTarget(stage, snap, ray, myId) {
 
 /** Pointer state per finger, turned into one Input per tick by `take`. @param {Stage} stage */
 export function createControls(myId, stage) {
-  const s = { finger: null, aim: null, fresh: false, punch: false, kick: false };
+  const s = { finger: null, aim: null, fresh: false, punch: false, kick: false, drop: false, ready: undefined, go: false };
   return {
-    /** @param {'stage'|'punch'|'kick'} on @param {Ray|null} ray */
+    /** 👍 tapped (on or back off), and 👍 held long enough to start the round. */
+    ready(on) { s.ready = on; },
+    go() { s.go = true; },
+    /** @param {'stage'|'punch'|'kick'|'drop'} on @param {Ray|null} ray */
     down(pointerId, on, ray) {
       if (on !== 'stage') { s[on] = true; return; }
       Object.assign(s, { finger: pointerId, aim: ray, fresh: true });
@@ -95,8 +101,9 @@ export function createControls(myId, stage) {
     up(pointerId) { if (pointerId === s.finger) s.finger = null; },
     /** @param {Snapshot} snap @returns {Input} */
     take(snap) {
-      const input = { target: s.fresh && s.aim ? pickTarget(stage, snap, s.aim, myId) : null, punch: s.punch, kick: s.kick };
-      Object.assign(s, { fresh: false, punch: false, kick: false });
+      const input = { target: s.fresh && s.aim ? pickTarget(stage, snap, s.aim, myId) : null, punch: s.punch, kick: s.kick,
+        ...(s.drop && { drop: true }), ...(s.ready !== undefined && { ready: s.ready }), ...(s.go && { go: true }) };
+      Object.assign(s, { fresh: false, punch: false, kick: false, drop: false, ready: undefined, go: false });
       return input;
     },
   };
@@ -128,7 +135,7 @@ export function attachControls(controls, { camera, canvas, buttons }) {
     b.addEventListener('pointerdown', (e) => {
       b.setPointerCapture(e.pointerId);
       b.classList.add('down');
-      controls.down(e.pointerId, /** @type {'punch'|'kick'} */ (name), null);
+      controls.down(e.pointerId, /** @type {'punch'|'kick'|'drop'} */ (name), null);
     });
     for (const type of ['pointerup', 'pointercancel']) b.addEventListener(type, () => b.classList.remove('down'));
   }

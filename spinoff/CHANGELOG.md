@@ -11,6 +11,16 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **Tricks.** Tap your gloves or your sword again for a ✨ sparkle, 🫧 bubbles or a 🔥 flame that pops out
   when your punch lands. Tap again for the next one.
 
+### Building
+- **Build a wall before the match.** On level 2 a match starts with building time. Your blocks are
+  the little heap next to you, topped in your own colour. Tap the heap to pick one up, walk to where
+  you want it, and press ⬇️ to put it down in front of you; the outline shows where it will go. Stack
+  blocks two high, too tall for anyone to jump. Tap one of your own blocks to pick it back up (not
+  one with a friend's block on top).
+- **👍 when you're ready.** The match starts when everyone has tapped 👍; tap it again if you want
+  to keep building. Grown-ups and kids who can read can hold 👍 for two seconds to start straight away.
+  Then 🥊 and 🦶 pop back in and the clock starts.
+
 ### Fighting
 - **Everyone has their own start spot.** Each hero starts the match in a spot of their own, out in
   front of the shelf, with room beside them for their blocks. Every tablet puts everyone in the same spots.

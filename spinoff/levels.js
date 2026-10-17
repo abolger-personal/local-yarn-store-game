@@ -72,6 +72,9 @@ export const levelOf = (name, n) => (Object.hasOwn(LEVELS, name) && LEVELS[name]
 /** REUSE-SPEC.md §Forts, Pieces are fixed by level: each player's pile; CPU bad guys aren't limited. */
 export const piecesEach = (level) => Math.min(6, 4 + Math.floor((level - 1) / 2));
 
+/** What a level sets for its match (sim.js `createMatch`): from level 2 a build round, with each hero's pile. @param {Level} level @returns {import('./match.js').MatchOptions} */
+export const matchOptions = (level) => ({ pieces: (level.number ?? 0) >= 2 ? piecesEach(level.number) : 0 });
+
 // Cake is spongy, so it goes crazy tall: decks a sponge jump high (too high on breakfast), and a tower in the
 // middle only a trampoline gets you up, from the icing pad at its foot. Each pad is a way up only where it touches the top's edge.
 const CAKE_TOWER = { kind: /** @type {const} */ ('hill'), x0: -1, x1: 1, z0: -1.4, z1: 0.2, y: 3.6, round: 0.5 };

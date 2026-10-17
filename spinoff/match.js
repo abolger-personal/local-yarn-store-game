@@ -59,23 +59,26 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
 
 /**
  * @typedef {{ dough: string, frosting: string, stripe: boolean }} DonutLook
- * @typedef {{ x: number, z: number, y?: number } | { thing: 'donut'|'brick'|'fighter', id: string }
+ * @typedef {{ x: number, z: number, y?: number } | { thing: 'donut'|'brick'|'fighter'|'pile', id: string }
  *           | { thing: 'shelf', team: Team } | { stop: true }} Target
- *   a point on the stage (y given when the tap landed on a raised top), a thing, or stop where you are
+ *   a point on the stage (y given when the tap landed on a raised top), a thing (a pile by its owner's id), or stop where you are
  * @typedef {'idle'|'walk'|'jump'|'fall'|'punch'|'kick'|'hurt'|'launched'|'blocked'|'sit'} MoveId
  *   'blocked': standing at a wall it can't hop, facing it; 'sit': away from the screen, sitting where it stopped
  *
  * One player's input for one tick. `target` is sent only when it changes (null keeps the last
  * one); `punch` / `kick` are true on the tick the button went down. `away` is sent when a guest's
  * screen is hidden (true) or back (false), and kept between: the fighter stops and sits.
- * @typedef {{ target: Target|null, punch: boolean, kick: boolean, away?: boolean }} Input
+ * In the build round, `drop` (⬇️) is true on the tick it went down, `ready` (👍) is sent when it changes and
+ * `go` once, when 👍 has been held long enough to start the round for everyone.
+ * @typedef {{ target: Target|null, punch: boolean, kick: boolean, away?: boolean, drop?: boolean, ready?: boolean, go?: boolean }} Input
  *
  * @typedef {{ id: string, team: Team, x: number, y: number, z: number, vx: number, vy: number, vz: number,
  *             facing: number, height: number, onGround: boolean, move: MoveId, step: number,
  *             percent: number, carrying: DonutLook|null, invincible: boolean,
- *             target: { x: number, y: number, z: number }|null }} FighterState
+ *             target: { x: number, y: number, z: number }|null, block: string|null }} FighterState
  *   `facing` is the yaw in radians (0 faces +x, PI/2 faces +z, toward the camera). `step` is the
- *   move's progress, 0 to 1. `target` is where it is heading, for teammates' footprints.
+ *   move's progress, 0 to 1. `target` is where it is heading, for teammates' footprints. `block`: the icing
+ *   of the block it carries in the build round.
  * @typedef {{ id: string, x: number, y: number, z: number, look: DonutLook }} LooseDonut
  * @typedef {{ id: string, team: Team, x: number, y: number, z: number, hits: number, maxHits: number,
  *             icing: string }} BrickState
@@ -85,9 +88,10 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  *   a hit that landed this tick, at its point of contact, on the fighter or brick `target` (its id),
  *   for the page's BAM burst and shake;
  *   both fighters freeze for HITSTOP_TICKS on contact. `broke`: the brick (or bag) gave way.
- * @typedef {{ fighter: string, kind: 'steal'|'bank'|'pickup', x: number, y: number, z: number }} DonutEvent
+ * @typedef {{ fighter: string, kind: 'steal'|'bank'|'pickup'|'fetch'|'place', x: number, y: number, z: number }} DonutEvent
  *   a donut changed hands this tick: taken from the enemy shelf (`steal`), put on your own shelf
- *   (`bank`), or picked up off the floor (`pickup`), at that spot, for the page's celebrations.
+ *   (`bank`), or picked up off the floor (`pickup`), at that spot, for the page's celebrations; or in the
+ *   build round a block was taken from a pile or a stack (`fetch`) or put down (`place`).
  * @typedef {{ fighter: string, x: number, y: number, z: number }} FullBagEvent
  *   a fighter already carrying a donut touched a loose donut or reached the enemy shelf this tick,
  *   at that donut or shelf, so the page can show "your bag holds one"; or a guard (the fighter, where
@@ -95,11 +99,14 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  *
  * Everything the page draws, every tick. No three.js objects, only numbers and strings, so it
  * can cross the network unchanged in milestone 2. `over` is true once the clock runs out;
- * `winner` is the team with more donuts on its shelf then, or null for a tie.
+ * `winner` is the team with more donuts on its shelf then, or null for a tie. `phase` is the build round
+ * (no clock: `ready` has who tapped 👍, `piles` the blocks left) until it gives way to `play`.
+ * @typedef {{ owner: string, x: number, y: number, z: number, count: number, icing: string }} PileState
+ *   a hero's blocks left to place, in a heap at (x, y, z)
  * @typedef {{ tick: number, secondsLeft: number, over: boolean, winner: Team|null,
  *             fighters: FighterState[], donuts: LooseDonut[], bricks: BrickState[],
  *             shelves: ShelfState[], hits: HitEvent[], fullBag: FullBagEvent[],
- *             donutEvents: DonutEvent[] }} Snapshot
+ *             donutEvents: DonutEvent[], phase: 'build'|'play', ready: string[], piles: PileState[] }} Snapshot
  *
  * Who is in the match. height / width / reach come from the fighter's params (fighter.js) as plain
  * numbers; look is the donut frosting this entrant brings to its team's shelf, and the icing
@@ -107,8 +114,12 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  * @typedef {{ id: string, team: Team, height: number, width: number, reach: number,
  *             look: DonutLook, dummy?: boolean }} Entrant
  *
+ * What the level sets for a match: each hero's pile (`pieces`, with a build round first when there are any) and who can
+ * hit whom (`match`, roster.js's MATCH).
+ * @typedef {{ pieces?: number, match?: { friendlyFire: boolean, badGuysHit?: boolean } }} MatchOptions
+ *
  * The sim's whole API, which sim.js implements:
- * @typedef {{ createMatch: (entrants: Entrant[], stage: Stage) => any,
+ * @typedef {{ createMatch: (entrants: Entrant[], stage: Stage, opts?: MatchOptions) => any,
  *             tick: (state: any, inputs: Record<string, Input>) => void,
  *             snapshot: (state: any) => Snapshot }} MatchApi
  */

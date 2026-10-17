@@ -448,43 +448,52 @@ Every level is two rounds (brainstorm 2026-10-13): a **build it** round, where e
 its own shelf, then the **knock it down** round, the timed capture-the-flag match. Builders
 and smashers each get a round that is theirs.
 
-- **The build round has no timer** (planned 2026-10-17). It ends when both teams are ready: every hero has tapped 👍
+- **The build round has no timer** (decided 2026-10-17). It ends when both teams are ready: every hero has tapped 👍
   and every bad-guy player has tapped 👍. Tapping 👍 again takes it back, to keep building.
-  Nobody is rushed, and a careful builder can take as long as their team lets them.
-- **Readers can force the start** (planned 2026-10-17). Beside 👍 is the written line "hold 👍 to
+  Nobody is rushed, and a careful builder can take as long as their team lets them. Built in the
+  sim (`phase` `'build'` then `'play'`; the clock starts with the match). A hero who is away
+  (screen off, sitting) isn't waited for. Each tablet sees who has 👍: their button gets a green rim.
+- **Readers can force the start** (decided 2026-10-17). Beside 👍 is the written line "hold 👍 to
   start now". Holding 👍 for 2 seconds, with a ring filling around it, starts the round for
   everyone. Reading is the gate, not a grown-up/kid label: nobody is marked as anything, and a
   kid who can read the line has earned the button. The 2-second hold keeps a 4-year-old's
   ordinary tap from setting it off.
-- **CPU bad guys build their fort and are ready at once** (planned 2026-10-17). With no grownup bad guys, the bad
+- **CPU bad guys build their fort and are ready at once** (decided 2026-10-17; their fort is the level's). With no grownup bad guys, the bad
   guys' side is ready from the start, so only the heroes decide when to go.
-- **Building is carrying blocks** (planned 2026-10-17; replaces the shop's touch
+- **Building is carrying blocks** (decided 2026-10-17; replaces the shop's touch
   picker). One rule runs both rounds: **a tap moves you, a button acts where you stand.**
   - **The pile is the inventory.** Each hero's fort pieces start as their own small heap right
     next to where that hero starts (Start spots, below). How many are left is how big the heap
-    is; nothing to read.
+    is; nothing to read. Drawn as half-size blocks, two by two and up. Only your own pile answers
+    a tap; a teammate's is just floor to you. Piles, and any block still in someone's hands, go
+    when the match starts (patching mid-match is brainstorm, below).
   - **Tap a block in the pile** and your fighter runs over and grabs it; it flies into their arms
     with the donut grab's arc. One block per trip to start; if a playtest drags, a fighter carries
     a stack of 2–3 (the `help` table can give little kids the bigger stack).
   - **⬇️ puts it down in front of you.** A faint outline of the block shows in the grid cell you
     face (`inventory/grid.js`), moving as you walk and turn: on the floor, or on top of the stack
     already there. At the level's height limit the outline greys and ⬇️ only gets a head-shake.
-    **The height limit is high enough that nobody can jump over the wall** (planned 2026-10-17):
+    **The height limit is high enough that nobody can jump over the wall** (decided 2026-10-17):
     at least two blocks, as tall as level 1's wall, which the sim already treats as too tall to
     hop. Cake jumps higher, so the playability check proves the limit can't be jumped on every
-    stage, not just breakfast.
+    stage, not just breakfast. Built: `HEIGHT_LIMIT` 2 in `spinoff/build.js`; `checkLevel` stands a
+    wall that high across the heroes' third and a bad guy tapped to their shelf never gets past it.
+    The cells are the world's 0.4 grid over your own third (`fortGrid`, on `inventory/grid.js`): a
+    cell takes a block only where one floor top lies under all of it, clear of the shelves and of
+    the start spots in use, and on the floor you stand on (the stack on it counts). Start spots no
+    hero took are free to build on.
   - **What's in your hands decides what a tap on a block does.** Carrying: tap a block and you walk
     up to it and face it, so ⬇️ stacks on top. Empty-handed: tap one of *your own* blocks on top of
     a stack and you pick it back up. That is the take-back: only a top block (nothing floats), only
     your colour (nobody undoes a teammate's work), and no history, so nothing goes stale when
     teammates build on your blocks. A block of yours with a teammate's on top is stuck there for
-    the round (planned 2026-10-17).
+    the round (decided 2026-10-17); tapping it gets a head-shake.
   - **The buttons swap with the round.** In the build round the corner shows ⬇️ and 👍 where 🥊 and
     🦶 sit; when the match starts they drop away and 🥊 🦶 pop in with the hit-stop freeze. The
     camera follows your fighter as in a match, so big levels need nothing extra.
   - **Two players at one cell:** the host applies inputs a tick at a time, so one lands first and
     every tablet draws the result.
-- **Level 1 has no build round** (planned 2026-10-17). Its only opponent is the training dummy,
+- **Level 1 has no build round** (decided 2026-10-17). Its only opponent is the training dummy,
   which never comes for your shelf, so there is nothing to defend; the tutorial teaches the other
   half, breaking in. The build round starts on the first level where something raids your shelf:
   level 2, which teaches building the way level 1 teaches punching through: a small pile, an
@@ -636,7 +645,7 @@ and smashers each get a round that is theirs.
   | 5 | Gingerbread-man shield | A gingerbread man standing guard; takes extra hits |
   | 6+ | More house parts | Windows, doors, chimneys |
 
-- **Heroes place only their own pieces** (planned 2026-10-17; the pattern for two kids sharing a
+- **Heroes place only their own pieces** (decided 2026-10-17; the pattern for two kids sharing a
   colour is brainstorm 2026-10-13). Every hero's pieces are topped in the same colour as their
   donuts' frosting, which is their fur colour, so a kid finds their own blocks the way they find
   their own donuts (plus a small pattern when two kids share a colour). A hero can place and move only their own pieces, never a teammate's,
@@ -654,7 +663,7 @@ and smashers each get a round that is theirs.
   chocolate pastry (pancakes, gingerbread) with dark purple cream or icing. Any bad guy can place or move any bad-guy piece,
   and their walls never get the mixed bonus, so only the heroes can build chunky walls.
 - **Pieces are fixed by level and number of players** (brainstorm 2026-10-13; the base of 4 each is
-  planned 2026-10-17). Each player gets their own small pile to place, so siblings never fight over
+  decided 2026-10-17: `piecesEach` in `levels.js`, one piece kind so far). Each player gets their own small pile to place, so siblings never fight over
   pieces and every kid builds something:
 
   ```
@@ -664,7 +673,7 @@ and smashers each get a round that is theirs.
   Levels 1 and 2 are 4 each, levels 3 and 4 are 5 each, and 6 each from level 5. The pile mixes the unlocked
   piece kinds, newest first, so a new level's piece is always in hand. The team's grid floor caps
   the total, so a big team on a small stage can't fill every cell. **This is the players' rule
-  only** (planned 2026-10-17): every hero, and any grownup playing a bad guy, gets their own
+  only** (decided 2026-10-17): every hero, and any grownup playing a bad guy, gets their own
   `piecesEach` pile. CPU bad guys are never limited this way: their fort comes with the level, as
   many blocks as the level wants, because kids love knocking blocks down. Level 1 has 20 against
   one dummy.

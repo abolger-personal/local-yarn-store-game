@@ -78,7 +78,7 @@ export function showDebug() {
     const s = { ...seen, subtle: Boolean(globalThis.crypto?.subtle), relays, heard: seen.heard.size };
     // the clock (UTC) is there to compare tablets side by side: see clockSlack
     line.textContent = [`me ${short(selfId)} ${new Date().toISOString().slice(11, 19)} secure ${isSecureContext} subtle ${s.subtle}`,
-      `relays ${relays} heard ${s.heard} peers ${s.peers} home ${s.homes}`, ...seen.notes.slice(-10), netProblem(s)].join('\n');
+      `relays ${relays} heard ${s.heard} (${[...seen.heard].map(short).join(' ')}) peers ${s.peers} home ${s.homes}`, ...seen.notes.slice(-10), netProblem(s)].join('\n');
   }, 1000);
 }
 

@@ -1246,6 +1246,23 @@ Built: `spinoff/lobby.html` (page) on `spinoff/net.js` and `spinoff/roster.js` (
   It is 👍 (decided 2026-10-17), which moves on to choosing where to play (below), and ▶️ appears
   only once a stage and level are chosen, since ▶️ means play.
 
+### A room session outlasts every screen
+
+Planned 2026-10-17, from a playtest: changing your dress-up meant leaving the room, which split the
+kids up. Being in a room (the *session*) is not a screen: it lives on the tap page with the kept
+rooms (Multiplayer, Kept rooms), and moving between the lobby, the chooser, the pickers and a
+match never ends it. Only 👋 leaves.
+
+- **✏️ works in a room.** It opens the chooser without leaving; 👍 there brings you back to the
+  same room's lobby, still in it, with everyone where they were.
+- **A new look reaches everyone.** Saving a changed fighter in a room sends it to every tablet
+  there, and their lobby redraws you.
+- **The host can dress up too.** While the host is in the chooser, nobody can start (only the
+  host has 👍 and ▶️), so guests just wait.
+- **If a match starts while you're dressing up,** you are a late friend (Late joiners): ⏳, and
+  you play from the next round.
+- The lobby's first screen (🏠 🔑) is still out of every room: you get there only by 👋.
+
 ### After the lobby: pick a stage, then a level
 
 Decided 2026-10-17. Two plain screens between the lobby and the match, shown on the tablet that

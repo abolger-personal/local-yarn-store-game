@@ -1268,9 +1268,9 @@ scary, for 4–6 year olds.
 - **First states: Raid (with wall breaking), Grab, Run home and Defend** (planned 2026-10-17), for
   level 2, switched by its raid-or-defend rule (Forts: Level 2). Chase, Scoop and Power come later
   (brainstorm 2026-10-13).
-- **The bad-guy team grows level by level** (planned 2026-10-17). Level 1 is the grownups who
-  tapped 🥷, or one CPU bad guy if nobody did. Each level after adds one CPU bad guy, except that
-  the tutorial levels keep it small (level 2 has one; Forts: Level 2):
+- **The bad-guy team grows level by level** (planned 2026-10-17). The tutorial levels
+  keep it small: level 1 has the training dummy (decided 2026-10-17), which never raids, and level 2
+  has one CPU bad guy (Forts: Level 2). From level 3 the count grows by one CPU bad guy a level:
 
   ```
   badGuys(level, grownups) = min(8, max(grownups, 1) + level - 1)

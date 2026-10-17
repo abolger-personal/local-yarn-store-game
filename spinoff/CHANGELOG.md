@@ -5,8 +5,13 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 ## 0.0.3 — in progress
 
 ### Play together
-- **Tablets stay connected from the lobby through every round.** Starting a match and ▶️ for
-  the next round no longer reconnect the tablets, so nobody is left waiting on ⏳.
+- **Playing together is much more reliable.** Tablets stay connected from the lobby through every
+  round, so starting a match and ▶️ for the next round no longer leave anyone stuck on ⏳.
+  - A friend who taps 🔑 and the code while the host is still on ⏳ comes along into this match.
+  - A friend who goes back to the lobby mid-match and types the code again is back in the match.
+  - If the host's game reloads mid-match, everyone starts the round again together.
+  - If a tablet's game reloads while its fighter was sitting (screen off), the fighter stands back up.
+  - Opening the lobby or a match from an old link goes through 🍩👆 first, so it stays connected too.
 - Your own fighter walks smoothly on every tablet, not just the host's: it no longer stutters and
   jumps when the Wi-Fi is busy.
 - **Late friends play the next round.** Tap 🔑 and the room's code while a match is on: your

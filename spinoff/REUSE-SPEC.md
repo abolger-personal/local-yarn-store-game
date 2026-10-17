@@ -498,7 +498,7 @@ and smashers each get a round that is theirs.
   half, breaking in. The build round starts on the first level where something raids your shelf:
   level 2, which teaches building the way level 1 teaches punching through: a small pile, an
   obvious gap in front of your shelf, and the first raider walking into your wall.
-- **Level 2: the building tutorial** (planned 2026-10-17). Still a tutorial level, on the breakfast
+- **Level 2: the building tutorial** (decided 2026-10-17). Still a tutorial level, on the breakfast
   stage:
   - **Layout** (decided 2026-10-17): like the tutorial's, the two shelves at opposite ends of the
     stage, with the pancake hill kept in the middle to jump on. The rest can change from level 1's
@@ -516,18 +516,20 @@ and smashers each get a round that is theirs.
     2026-10-17). Built: 10 blocks, a wall two high on the ground in front of their deck, leaving the
     deck's corner by the fence open; the way out is that corner and their fence's gap, which is also
     the kids' way in (or they kick through the wall).
-  - **One CPU bad guy**, whatever `badGuys(level, grownups)` says (Bad guys): level 2 is still
-    teaching, so the kids meet a single raider.
+  - **One CPU bad guy** (`badGuys` gives the tutorials one, Bad guys): level 2 is still
+    teaching, so the kids meet a single raider. The training dummy stays on level 1.
   - **4 fort pieces per hero** (8 for two kids): `piecesEach(2)`, the base rule.
   - **The CPU's brain is Raid, Grab, Run home and Defend** (Bad guys), switched by one rule: it
     raids while the bad guys' shelf holds no hero donuts, and defends (goes home and guards its
     shelf, Mode: a guard blocks the grab) once it holds one or more. So the kids' first job is
     to wall their shelf, and the moment the raider scores, the game flips to breaking in, which
-    level 1 taught.
-  - **Raiders break blocks on level 2** (planned 2026-10-17, required; Bad guys: CPU bad guys break
+    level 1 taught. Built in `spinoff/cpu.js`, `spinoff/cpu.test.mjs` plays it.
+  - **Raiders break blocks on level 2** (decided 2026-10-17, required; Bad guys: CPU bad guys break
     walls). Without it a complete wall stops the raider for good: it never scores, never turns to
     defend, and level 2 would only teach walling.
-  - **No bad guy hits a kid on level 2** (planned 2026-10-17 for the CPU). Bad guys only forage
+  - **No bad guy hits a kid on level 2** (decided 2026-10-17 for the CPU; a level's `match` rule,
+    `badGuysHit: false`, beside `friendlyFire` in `roster.js`'s `MATCH`, which `canHit` reads for every
+    bad guy, so a grownup's would follow it too; the CPU's kicks at walls never land on a kid standing there). Bad guys only forage
     (raid, kicking walls on the way, grab and run home) or defend (stand guard); they never attack
     a hero, so the fairness rules (Bad guys) only start to matter on the level that brings Chase.
     A grownup playing a bad guy follows the same rule: their 🥊 and 🦶 break walls but never land
@@ -1348,7 +1350,8 @@ scary, for 4–6 year olds.
   The frizz is meant to be funny, so being zapped is something kids laugh at. To check before
   building: whether the coat can be scaled on its own after `mergeCharacter`, or the puff needs
   its own mesh.
-- **AI is a fake player on the host** (planned 2026-10-17). A CPU bad guy produces the same inputs a tablet does (a
+- **AI is a fake player on the host** (decided 2026-10-17: `createCpu` in `spinoff/cpu.js` reads the snapshot a tablet
+  draws and returns an `Input`, which the host's page feeds into the tick beside the tablets'). A CPU bad guy produces the same inputs a tablet does (a
   tap target, 🥊 / 🦶, a power gesture), played through the same sim, so it can do nothing a
   player can't, and the scripted-input sim tests cover it. The training dummy of milestone 1 is a
   bad guy whose input is "nothing". `ponytail:` one state machine for every bad guy.
@@ -1365,29 +1368,35 @@ scary, for 4–6 year olds.
 
   With two or more CPU bad guys, one stays home as a defender and the rest raid. In the build
   round, CPU bad guys stack their pile as a wall in front of their shelf, instantly.
-- **CPU bad guys break walls** (planned 2026-10-17, required). The basic hero fort is a ring of walls with
+- **CPU bad guys break walls** (decided 2026-10-17, required). The basic hero fort is a ring of walls with
   the donut shelf in the middle, so a bad guy that can't get through is no opponent. A raider
   heads straight for the shelf, never routing around the fort. At a wall one piece high it jumps
   over; at anything taller it kicks the lowest piece in its way until it breaks, then carries on.
   It goes for the weakest piece within reach of its path (fewest hits left), so a mixed wall
   steers it toward a single-colour gap: the kids' best walls really do protect them. Breaking a
-  piece charges nobody's bar.
+  piece charges nobody's bar. Built: the raider taps the kids' shelf and lets the route-finding hop
+  one-high walls; when it stands blocked (no way through), it walks up to the weakest of the kids'
+  blocks near the one closest to it (fewest hits, then the lowest), kicks it until it breaks, and
+  taps the shelf again. The closest block, not one on a planned path: the route-finding has no path
+  through a wall to measure along.
 - **Targets: the nearest hero** (brainstorm 2026-10-13), kid or grownup alike; no one is singled out.
   The fairness rules below still apply on top (no two bad guys on one hero, grace after a hit).
-- **Fair to 4-year-olds** (planned 2026-10-17). About half a second of reaction delay before acting on anything new;
+- **Fair to 4-year-olds** (decided 2026-10-17 for the reaction delay and the attack pace, `REACT_TICKS` and
+  `ATTACK_TICKS` in `cpu.js`; the rest planned 2026-10-17, for the level that brings Chase). About half a second of reaction delay before acting on anything new;
   at most one attack about every 0.8 s; two CPU bad guys never chase the same kid; after hitting a
   kid, a bad guy leaves that kid alone for a few seconds; no waiting at the stage edge to knock a
   falling kid off again; powers aim where the kid was about half a second ago. Chase chance,
   reaction delay, attack pace and grace time are plain numbers that auto-scaling can tune later.
-- **First states: Raid (with wall breaking), Grab, Run home and Defend** (planned 2026-10-17), for
+- **First states: Raid (with wall breaking), Grab, Run home and Defend** (decided 2026-10-17), for
   level 2, switched by its raid-or-defend rule (Forts: Level 2). Chase, Scoop and Power come later
   (brainstorm 2026-10-13).
-- **The bad-guy team grows level by level** (planned 2026-10-17). The tutorial levels
+- **The bad-guy team grows level by level** (decided 2026-10-17; `badGuys` in `levels.js`, though there is no
+  level 3 yet). The tutorial levels
   keep it small: level 1 has the training dummy (decided 2026-10-17), which never raids, and level 2
   has one CPU bad guy (Forts: Level 2). From level 3 the count grows by one CPU bad guy a level:
 
   ```
-  badGuys(level, grownups) = min(8, max(grownups, 1) + level - 1)
+  badGuys(level, grownups) = 1 for levels 1 and 2, else min(8, max(grownups, 1) + level - 1)
   ```
 
   Two grownups on level 3 face the kids with 2 CPU bad guys beside them; no grownups on level 3
@@ -1460,8 +1469,9 @@ scary, for 4–6 year olds.
   (90 seconds to start, never over 3 minutes), so time can't be the signal: a big win nudges the next level harder, a narrow win or
   a loss nudges it easier.
 
-Check: a node test runs one bad guy against an idle kid on the two-shelf stage and asserts the
-bad guy grabs a donut and banks it.
+Check: `spinoff/cpu.test.mjs` runs the level 2 raider against an idle kid and asserts it grabs a donut,
+banks it and then stands guard; and, with the kids' gap walled two high, that it kicks through (no
+faster than the attack pace) and steals without ever hitting the kid at the wall.
 
 ## Milestones
 

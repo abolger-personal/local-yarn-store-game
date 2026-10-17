@@ -78,7 +78,7 @@ async function host(code, mine, level) {
   room.send('go', true);
   room.send('again', true);
   await ready.everyone;
-  start = { theme: level.theme, stage: level.stage, roster: rosterOf(selfId, mine, guests), settings: { seconds: ROUND_SECONDS } };
+  start = { theme: level.theme, stage: level.stage, roster: rosterOf(selfId, mine, guests, level.number), settings: { seconds: ROUND_SECONDS } };
   h = createHost(room, start, selfId);
   note(`host: start sent to ${guests.size}`);
   late = lateJoiners(room);

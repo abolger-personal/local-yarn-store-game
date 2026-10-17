@@ -2,12 +2,13 @@
 // (REUSE-SPEC.md §Stages and difficulty are separate). Pure data, checked by levels.test.mjs.
 // Bad guys, the fort pile and moves are formulas of the difficulty (§Bad guys, §Forts, §Power moves), not data here.
 import { BRICK } from './match.js';
+import { MATCH } from './roster.js';
 import { BOUNCE, generateStage } from './generate.js';
 
 /** @typedef {import('./match.js').Stage} Stage @typedef {import('./match.js').Floor} Floor @typedef {import('./generate.js').StageName} StageName
- * @typedef {{ theme: StageName, stage: Stage, breakIn?: boolean, number?: number }} Level
+ * @typedef {{ theme: StageName, stage: Stage, breakIn?: boolean, number?: number, match?: import('./match.js').MatchOptions['match'] }} Level
  *   breakIn: the bad guys' shelf is walled in, so the only way to it is to punch and kick through; number: its place in
- *   the stage's run of levels (LEVELS), for the ones the level dial picks */
+ *   the stage's run of levels (LEVELS), for the ones the level dial picks; match: who can hit whom, if not roster.js's MATCH */
 
 const wall = (team, x, z, y = 0) => ({ team, x, z, y, hits: 2 });
 
@@ -53,7 +54,7 @@ export const TUTORIAL = Object.freeze({ theme: 'breakfast', stage: Object.freeze
 // their deck, leaving its corner by the fence open, so the raider's way out is that corner and their gap.
 const FENCE = /** @type {const} */ ({ kind: 'deck', x0: -6, x1: -5.6, z0: -2, z1: 1.2, y: 1.8 });
 /** @type {Level} */
-const BUILDING = Object.freeze({ theme: 'breakfast', number: 2, stage: Object.freeze({
+const BUILDING = Object.freeze({ theme: 'breakfast', number: 2, match: Object.freeze({ ...MATCH, badGuysHit: false }), stage: Object.freeze({
   ...TABLE,
   floors: Object.freeze([...TABLE.floors, FENCE, { ...FENCE, x0: -FENCE.x1, x1: -FENCE.x0 }]),
   puddles: Object.freeze([]),
@@ -73,7 +74,13 @@ export const levelOf = (name, n) => (Object.hasOwn(LEVELS, name) && LEVELS[name]
 export const piecesEach = (level) => Math.min(6, 4 + Math.floor((level - 1) / 2));
 
 /** What a level sets for its match (sim.js `createMatch`): from level 2 a build round, with each hero's pile. @param {Level} level @returns {import('./match.js').MatchOptions} */
-export const matchOptions = (level) => ({ pieces: (level.number ?? 0) >= 2 ? piecesEach(level.number) : 0 });
+export const matchOptions = (level) => ({ pieces: (level.number ?? 0) >= 2 ? piecesEach(level.number) : 0, match: level.match ?? MATCH });
+
+/**
+ * REUSE-SPEC.md §Bad guys, the bad-guy team grows level by level: CPU bad guys beside the grownups playing them. Level 1's
+ * is the training dummy and level 2 has one raider, the tutorials' single opponent.
+ */
+export const badGuys = (level, grownups = 0) => (level <= 2 ? 1 : Math.min(8, Math.max(grownups, 1) + level - 1));
 
 // Cake is spongy, so it goes crazy tall: decks a sponge jump high (too high on breakfast), and a tower in the
 // middle only a trampoline gets you up, from the icing pad at its foot. Each pad is a way up only where it touches the top's edge.

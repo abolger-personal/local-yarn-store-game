@@ -40,6 +40,8 @@ import {
   assert.ok(canHit(kid('a'), bad) && canHit(bad, kid('a')), 'kids and bad guys can hit each other');
   assert.ok(canHit(kid('a'), kid('c'), { ...MATCH, friendlyFire: true }), 'a kid-vs-kid mode is one setting away');
   assert.ok(!canHit(kid('a'), kid('a'), { friendlyFire: true }), 'nobody hits themselves');
+  const gentle = { ...MATCH, badGuysHit: false }, hero = { id: 'h', team: 'heroes' }, villain = { id: 'v', team: 'badGuys' };
+  assert.ok(canHit(villain, hero) && !canHit(villain, hero, gentle) && canHit(hero, villain, gentle), 'on a level where bad guys never hit heroes, heroes still hit them');
 }
 
 {

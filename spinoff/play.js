@@ -14,6 +14,7 @@ import { SHELF_WOOD, THEMES } from './scenery.js';
 import { PIPING, box, donutMesh, sameLook } from './treats.js';
 import { rosterOf } from './multiplayer.js';
 import { joinMatch } from './together.js';
+import { createCpu } from './cpu.js';
 
 /** @typedef {import('./match.js').Snapshot} Snapshot @typedef {import('./match.js').FighterState} FighterState */
 /** @typedef {import('./match.js').HitEvent} HitEvent @typedef {import('./match.js').DonutEvent} DonutEvent */
@@ -466,8 +467,8 @@ function showEnd(snap) {
 
 /** @param {import('./multiplayer.js').Seat[]} roster */
 function cast(roster) {
-  return roster.map(({ id, team, fighter, dummy = false }) => {
-    const f = dummy ? BAD_GUY : fighter, built = (dummy ? prebuilt.dummy : id === ME && prebuilt.me) || buildFighter(f), g = new THREE.Group();
+  return roster.map(({ id, team, fighter, dummy = false, cpu = false }) => {
+    const f = dummy || cpu ? BAD_GUY : fighter, built = (dummy || id === 'cpu1' ? prebuilt.dummy : id === ME && prebuilt.me) || buildFighter(f), g = new THREE.Group();
     const entrant = entrantOf(f, built, { id, team, dummy });
     g.add(built.root);
     scene.add(g);
@@ -497,14 +498,17 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden) keepAwake();
 });
 
-function host(state, controls) {
+const cpuInputs = (cpus, snap) => Object.fromEntries(cpus.map((c) => [c.id, c.input(snap)]));
+
+/** @param {ReturnType<typeof createCpu>[]} cpus the CPU bad guys, whose inputs this host makes from what it draws */
+function host(state, controls, cpus) {
   let snap = api.snapshot(state), acc = 0;
   stage.run((dt) => {
     net?.host.post(paused, dt);
     if (snap.over) { showEnd(snap); return; }
     if (paused) { acc = 0; return; }
     for (acc += dt; acc >= 1 / TICK_HZ; acc -= 1 / TICK_HZ) {
-      api.tick(state, { ...net?.host.inputs(), [ME]: controls.take(snap) });
+      api.tick(state, { ...net?.host.inputs(), [ME]: controls.take(snap), ...cpuInputs(cpus, snap) });
       snap = api.snapshot(state);
       net?.host.seen(snap);
       react(snap);
@@ -537,7 +541,7 @@ async function warmUp(...later) {
 }
 
 async function play() {
-  const entrants = cast(net?.start.roster ?? rosterOf(ME, mine));
+  const roster = net?.start.roster ?? rosterOf(ME, mine, undefined, asked.number), entrants = cast(roster);
   const controls = createControls(ME, level.stage);
   const button = (id) => document.getElementById(id);
   attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: button('punch'), kick: button('kick'), drop: button('drop') } });
@@ -545,7 +549,7 @@ async function play() {
   await warmUp();
   keepAwake();
   if (net?.guest) guest(controls);
-  else host(api.createMatch(entrants, level.stage, matchOptions(asked)), controls);
+  else host(api.createMatch(entrants, level.stage, matchOptions(asked)), controls, roster.filter((r) => r.cpu).map((r) => createCpu(r.id)));
   // play.html shows ⏳ from the start; the first frame is drawn in the same paint that takes it away
   document.getElementById('wait').hidden = true;
 }

@@ -66,9 +66,13 @@ export function netProblem({ subtle, relays, heard, peers, homes }) {
   return homes ? 'ok' : 'every tablet hung up on by the home check';
 }
 
-// REUSE-SPEC.md §Mode: kids can't hit each other for now, but it is a match setting, not a rule baked in
-export const MATCH = Object.freeze({ friendlyFire: false });
-export const canHit = (a, b, match = MATCH) => a.id !== b.id && (a.team !== b.team || match.friendlyFire);
+// REUSE-SPEC.md §Mode: kids can't hit each other for now, but it is a match setting, not a rule baked in; so is whether
+// bad guys may hit heroes (§Forts, Level 2: they don't there), CPU or grownup alike
+/** @type {Readonly<{ friendlyFire: boolean, badGuysHit: boolean }>} */
+export const MATCH = Object.freeze({ friendlyFire: false, badGuysHit: true });
+/** @param {{ id: string, team: string }} a @param {{ id: string, team: string }} b @param {{ friendlyFire: boolean, badGuysHit?: boolean }} [match] */
+export const canHit = (a, b, match = MATCH) => a.id !== b.id && (a.team !== b.team || match.friendlyFire)
+  && (match.badGuysHit !== false || a.team !== 'badGuys' || b.team !== 'heroes');
 
 // a cell holds the widest fighter, gloves and cape included (fighter.test.mjs)
 export const floorGrid = () => makeDisplay(7, 2, { cell: 1.4 });

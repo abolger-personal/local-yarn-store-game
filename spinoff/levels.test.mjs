@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { LEVELS, PROGRESS_KEY, STAGES, TUTORIAL, beatLevel, levelBefore, levelFor, levelNumber, levelOf, levelsBeaten, piecesEach } from './levels.js';
+import { LEVELS, badGuys, PROGRESS_KEY, STAGES, TUTORIAL, beatLevel, levelBefore, levelFor, levelNumber, levelOf, levelsBeaten, piecesEach } from './levels.js';
 import { checkLevel } from './check-level.mjs';
 
 checkLevel(TUTORIAL.stage, 'tutorial', true);
@@ -11,6 +11,8 @@ assert.equal(levelFor('?stage=breakfast&level=2'), levelOf('breakfast', 2), '?le
 assert.equal(levelFor('?level=2').number, 2, 'on breakfast, the tutorial stage, if no stage is given');
 assert.equal(levelFor('?stage=breakfast&level=99'), STAGES.breakfast, 'a level that isn\'t there is the stage\'s hand-made layout');
 assert.ok(LEVELS.breakfast.every((l, i) => l.number === i + 1 && l.theme === 'breakfast'), 'the breakfast stage is the tutorial stage, numbered in order');
+assert.deepEqual([1, 2, 3, 4, 9, 20].map((n) => badGuys(n)), [1, 1, 3, 4, 8, 8], 'one bad guy on the tutorials, then one more a level, at most 8');
+assert.equal(badGuys(3, 2), 4, 'beside two grownups on level 3, two CPU bad guys');
 assert.deepEqual([1, 2, 3, 4, 5, 6, 9].map(piecesEach), [4, 4, 5, 5, 6, 6, 6], 'piecesEach: 4 each, one more every two levels, at most 6');
 
 assert.equal(levelFor(''), TUTORIAL, 'play.html with nothing after it is the tutorial');

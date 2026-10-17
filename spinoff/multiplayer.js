@@ -4,11 +4,13 @@
 import { readFighter } from './fighter.js';
 import { ROUND_SECONDS, TICK_HZ } from './match.js';
 import { MAX_FIGHTERS } from './roster.js';
+import { badGuys } from './levels.js';
 
 /** @typedef {import('./match.js').Input} Input @typedef {import('./match.js').Snapshot} Snapshot */
 /**
  * @typedef {{ send: (type: string, data: any, to?: string[]) => void, on: (type: string, fn: (data: any, from: string) => void) => void }} Link
- * @typedef {{ id: string, team: import('./match.js').Team, fighter?: import('./fighter.js').Fighter, dummy?: boolean }} Seat
+ * @typedef {{ id: string, team: import('./match.js').Team, fighter?: import('./fighter.js').Fighter, dummy?: boolean, cpu?: boolean }} Seat
+ *   a player, the training dummy, or a CPU bad guy, whose inputs the host makes (cpu.js)
  * @typedef {{ theme: string, stage: import('./match.js').Stage, roster: Seat[], settings: { seconds: number } }} Start
  * @typedef {{ tick: number, hits: Snapshot['hits'], fullBag: Snapshot['fullBag'], donutEvents: Snapshot['donutEvents'] }} Events
  * @typedef {Snapshot & { seq: number, paused: boolean }} Drawn
@@ -61,6 +63,7 @@ export function readInput(raw) {
 function readSeat(s) {
   if (!isId(s?.id) || !TEAMS.has(s.team)) return null;
   if (s.dummy === true) return { id: s.id, team: s.team, dummy: true };
+  if (s.cpu === true) return { id: s.id, team: s.team, cpu: true };
   const fighter = readFighter(s.fighter);
   return fighter && { id: s.id, team: s.team, fighter };
 }
@@ -85,10 +88,14 @@ export function readSnap(raw, ids) {
   return raw.events.every((e) => Number.isInteger(e?.tick) && isArrays(e, ['hits', 'fullBag', 'donutEvents'])) ? raw : null;
 }
 
-/** Everyone in a match: the players as heroes, then the training dummy. @param {Map<string, import('./fighter.js').Fighter>} guests @returns {Seat[]} */
-export const rosterOf = (me, mine, guests = new Map()) => [
+/**
+ * Everyone in a match: the players as heroes, then the training dummy, or from level 2 the CPU bad guys.
+ * @param {Map<string, import('./fighter.js').Fighter>} guests @param {number} [level] the level's number, if it has one @returns {Seat[]}
+ */
+export const rosterOf = (me, mine, guests = new Map(), level = 0) => [
   { id: me, team: HEROES, fighter: mine }, ...[...guests].map(([id, fighter]) => ({ id, team: HEROES, fighter })),
-  { id: DUMMY_ID, team: /** @type {const} */ ('badGuys'), dummy: true },
+  ...(level >= 2 ? Array.from({ length: badGuys(level) }, (_, i) => ({ id: `cpu${i + 1}`, team: /** @type {const} */ ('badGuys'), cpu: true }))
+    : [{ id: DUMMY_ID, team: /** @type {const} */ ('badGuys'), dummy: true }]),
 ];
 
 /** @param {Input} input @param {Input} [was] */

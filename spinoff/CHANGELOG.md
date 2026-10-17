@@ -21,6 +21,12 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   to keep building. Grown-ups and kids who can read can hold 👍 for two seconds to start straight away.
   Then 🥊 and 🦶 pop back in and the clock starts.
 
+### Bad guys
+- **A bad guy comes for your donuts on level 2.** It runs to your shelf, grabs a donut and runs home
+  with it. A wall one block high it just jumps; a taller wall it kicks down, one block at a time.
+  Once it has one of your donuts, it goes home and guards its shelf, so you have to knock it out of
+  the way to get your donut back. On level 2 it never hits you, only your blocks.
+
 ### Fighting
 - **Everyone has their own start spot.** Each hero starts the match in a spot of their own, out in
   front of the shelf, with room beside them for their blocks. Every tablet puts everyone in the same spots.

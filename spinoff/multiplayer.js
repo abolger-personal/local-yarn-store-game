@@ -140,18 +140,16 @@ export function createHost(link, start, me) {
 }
 
 /**
- * The host's ear in the lobby room during a match: a tablet that arrives there hears `playing`, waits, and gets
- * `go` with the guests' `again`, so it plays the next round.
+ * The host's ear for tablets in the room that aren't playing: each hears `playing`, once, and waits in the
+ * lobby; the next round's page sends it `go`, so it plays the next round.
  * ponytail: no cap, as in the lobby; past MAX_FIGHTERS every guest refuses `start`. Cap here if rooms get that full.
  * @param {Link} link the lobby room's
  */
 export function lateJoiners(link) {
   const late = new Set();
   return {
-    arrive(id) { late.add(id); link.send('playing', true, [id]); },
+    arrive(id) { if (!late.has(id)) link.send('playing', true, [id]); late.add(id); },
     left(id) { late.delete(id); },
-    /** @returns {number} how many more tablets the next round waits for */
-    go() { link.send('go', true, [...late]); return late.size; },
   };
 }
 

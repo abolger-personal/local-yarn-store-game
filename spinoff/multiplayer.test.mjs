@@ -208,21 +208,20 @@ function play(n, hostInput = IDLE) {
   assert.equal(g2.seen.gone, 1, 'the host\'s connection dropping is the host leaving');
 }
 
-// --- late joiners: the host's match page listening in the lobby room -------------------------------
+// --- late joiners: tablets in the room that aren't playing -------------------------------------
 {
   const lobby = network(), heard = { L1: [], L2: [] };
-  for (const id of ['L1', 'L2']) for (const type of ['playing', 'go']) lobby.link(id).on(type, () => heard[id].push(type));
+  for (const id of ['L1', 'L2']) lobby.link(id).on('playing', () => heard[id].push('playing'));
   const late = lateJoiners(lobby.link('H'));
   late.arrive('L1');
   late.arrive('L2');
   late.arrive('L1');
+  lobby.flush();
+  assert.deepEqual(heard, { L1: ['playing'], L2: ['playing'] }, 'a tablet arriving mid-match hears the room is playing, once');
   late.left('L2');
+  late.arrive('L2');
   lobby.flush();
-  assert.deepEqual(heard.L2, ['playing'], 'a tablet arriving mid-match hears the room is playing');
-  assert.equal(late.go(), 1, 'the next round waits for each late joiner still there, once');
-  lobby.flush();
-  assert.equal(heard.L1.at(-1), 'go', '▶️ again takes a late joiner along');
-  assert.deepEqual(heard.L2, ['playing'], 'and not one that left');
+  assert.deepEqual(heard.L2, ['playing', 'playing'], 'and again if it left and came back');
 }
 
 console.log('multiplayer: ok');

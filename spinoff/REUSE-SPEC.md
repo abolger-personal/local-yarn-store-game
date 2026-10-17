@@ -689,14 +689,15 @@ connect every time):
   opens inside it once tapped, so the rooms always live there; only the game's own pages open that
   way. The tap page blocks pull-to-refresh, which would drop every room. With no tap page at all
   (the tests) a page keeps its own rooms.
-- **Starting together.** In a room, the tablet that opened it (🏠) gets ▶️; the others don't.
-  ▶️ sends `go` to everyone in the room, and every tablet loads `play.html?room=CODE` (the host's
-  with `&host=N`, N the guests it expects, counted before `go` goes out: the guests leave the lobby
-  the moment it arrives, and a count taken after it found none, so the host waited for nobody). The
-  match is in the lobby's room (Kept rooms). Each guest's play page says `ready` (its fighter) every
-  second until `start` comes; the host waits for N of them (60 s at most, `ponytail:`, then it starts
-  with whoever came), then sends `start`, and again to a playing guest that still says `ready` (it
-  missed it). ⏳ shows meanwhile, with 👋 back to the lobby.
+- **Starting together** (decided 2026-10-14, amended 2026-10-16: everyone in the room). In a room,
+  the tablet that opened it (🏠) gets ▶️; the others don't. ▶️ sends `go` to everyone in the room,
+  and every tablet loads `play.html?room=CODE` (the host's with `&host`). The match is in the
+  lobby's room (Kept rooms), so the host knows who is in it: it waits until every tablet in the room
+  says `ready` (each guest's play page says it, with its fighter, every second until `start`), 60 s
+  at most (`ponytail:`, then it starts with whoever is ready), then sends `start`, and again to a
+  playing guest that still says `ready` (it missed it). A tablet in the room that isn't on its way
+  (still on the lobby screen, or it typed the code while the host was on ⏳) gets `go` too, and one
+  that leaves the room stops being waited for. ⏳ shows meanwhile, with 👋 back to the lobby.
 - **`start`** (host → each guest, once): the level as data (`theme` and the whole `Stage`,
   opaque: the guest never rebuilds it), the roster (`id`, `team`, and each player's fighter save,
   or `dummy: true` for the training dummy, which every tablet dresses the same), and the round
@@ -731,7 +732,8 @@ connect every time):
   The design above doesn't depend on reliability, so the switch is local to `net.js`.
 - **Pause, away, gone:** see Network gotchas. A guest who drops out mid-match sits where it stopped
   for the rest of the round (the sim can't take a fighter out, and a sitting fighter can still
-  be hit and still drops its donut). Its tablet can't rejoin that match.
+  be hit and still drops its donut). Its tablet can't rejoin that match. A guest whose page reloads but
+  whose tablet stays in the room says `ready` again and gets `start` again, so it picks the match back up.
 - **Again** (decided 2026-10-14, amended 2026-10-16: kept rooms): ▶️ on the host's end card sends `again`;
   every tablet's page reloads into a fresh match the same way it started (`ready`, ⏳, `start`), in
   the same room. The host's old page detaches as it sends `again`, so a guest that reloads first
@@ -741,9 +743,8 @@ connect every time):
   lobby's room, so a tablet that taps 🔑 mid-match meets the players there. One that isn't playing
   (it arrives after `start`, or was still on the lobby screen at `start`) gets `playing` from the host, once, and its
   lobby shows ⏳ beside 👋 (its own fighter and the host's stand on the floor) until `go`, or until
-  the host leaves the lobby room. ▶️ on the host's end card sends `go` to every late joiner still
-  there (`lateJoiners` in `multiplayer.js`) and counts them into the next round's `host=N`, so they
-  load the match like any guest. `playing` is the only extra message: a joiner learns the room is
+  the host leaves the lobby room. The host's next round page sends `go` to everyone in the room
+  not on their way, so they load the match like any guest. `playing` is the only extra message: a joiner learns the room is
   mid-match from the host answering it, not from anything announced. The room code (the lobby's treats) shows on the end,
   ⏸ and ⏳ cards, never on the in-play HUD.
 

@@ -54,23 +54,31 @@ function pageStubs(search, to) {
   globalThis.location = { href: '', reload: () => to(search), set search(next) { to(`?${next}`); }, get search() { return search; } };
 }
 
-// as lobby.js's room: a late friend waits for the host's `go`, then loads the match
-async function lobby(code, mine) {
+// as lobby.js's room: the host's waits to meet `hosting` others and sends `go`; everyone else waits for `go`
+async function lobby(code, mine, hosting, quit) {
   const { openRoom } = await import('./net.js');
-  const room = openRoom(code, mine, { onFighter: () => parentPort.postMessage({ met: true }), onLeave() {} });
+  const met = new Set();
+  let meet = () => {};
+  const room = openRoom(code, mine, { onFighter: (id) => { met.add(id); meet(); }, onLeave: (id) => met.delete(id) });
   room.on('playing', () => parentPort.postMessage({ playing: true }));
-  return new Promise((go) => { room.on('go', () => go(`?room=${code.join('')}`)); });
+  if (quit) return new Promise(() => { room.on('go', () => setTimeout(() => room.leave(), 1500)); });
+  if (!hosting) return new Promise((go) => { room.on('go', () => go(`?room=${code.join('')}`)); });
+  await new Promise((r) => { meet = () => { if (met.size >= hosting) r(); }; meet(); });
+  room.send('go', true);
+  return `?room=${code.join('')}&host`;
 }
 
 // One worker is one tablet's whole visit, as the tap page is: its pages come and go, its rooms stay.
-async function visit({ search, late }) {
+async function visit({ code, hosting, slow = 0, quit = false }) {
   register('data:text/javascript,' + encodeURIComponent(HOOKS));
   const { joinMatch } = await import('./together.js');
   const { randomFighter } = await import('./fighter.js');
   const { TUTORIAL } = await import('./levels.js');
   const mine = randomFighter();
   pageStubs('', () => {});
-  let page = late ? await lobby(late, mine) : search;
+  let page = await lobby(code, mine, hosting, quit);
+  parentPort.postMessage({ left: page });
+  await new Promise((r) => { setTimeout(r, slow); });
   for (;;) {
     let leave;
     const left = new Promise((r) => { leave = r; });
@@ -85,8 +93,8 @@ async function visit({ search, late }) {
 }
 
 /** A tablet; `said(key, n)` resolves with the `n`th message it posts that has `key`. */
-function open(search, late) {
-  const worker = new Worker(new URL(import.meta.url), { workerData: { search, late } }), heard = [], waiting = [];
+function open(code, hosting = 0, slow = 0, quit = false) {
+  const worker = new Worker(new URL(import.meta.url), { workerData: { code, hosting, slow, quit } }), heard = [], waiting = [];
   const check = () => {
     for (const w of [...waiting]) {
       const m = heard.filter((h) => w.key in h)[w.n - 1];
@@ -118,31 +126,37 @@ async function played(tablets, n, what) {
 }
 
 async function main() {
-  const three = ['?room=1234&host=2', '?room=1234', '?room=1234'].map((s) => open(s));
+  const three = [open([1, 2, 3, 4], 2), open([1, 2, 3, 4]), open([1, 2, 3, 4])];
   await played(three, [1, 1, 1], 'three tablets starting a match');
   for (const t of three) t.worker.terminate();
   console.log('together ok (a host and two guests start one match through net.js)');
 
-  const [host, guest] = ['?room=2341&host=1', '?room=2341'].map((s) => open(s));
+  const [host, guest] = [open([2, 3, 4, 1], 1), open([2, 3, 4, 1])];
   await played([host, guest], [1, 1], 'two tablets starting a match');
-  const late = open('', [2, 3, 4, 1]);
+  const late = open([2, 3, 4, 1]);
   await within(15000, late.said('playing'), 'the host telling a late friend in the lobby a match is on');
   host.worker.postMessage('again');
   const next = await within(15000, Promise.all([host, guest].map((t) => t.said('next'))), 'everyone going to the next round');
-  assert.deepEqual(next.map((m) => m.next), ['?room=2341&host=2', '?room=2341'], 'the host waits for the guest and the late friend');
+  assert.deepEqual(next.map((m) => m.next), ['?room=2341&host', '?room=2341'], 'everyone reloads the same page for the next round');
   const second = await played([host, guest, late], [2, 2, 1], 'the next round with the late friend');
   for (const m of second) assert.deepEqual(m.joined, m.joined.filter((r, i) => m.joined.indexOf(r) === i), 'no tablet joins a room twice');
   assert.equal(second[0].joined.length, 1, 'the host plays every round, and hears the late friend, in the room it opened once');
   for (const t of [host, guest, late]) t.worker.terminate();
   console.log('together ok (a late friend plays the next round, nobody reconnects)');
 
-  const first = open('?room=3412&host=1'), waiting = open('', [3, 4, 1, 2]);
-  await within(15000, waiting.said('met'), 'a tablet in the lobby meeting the host before the match');
-  const other = open('?room=3412');
-  await played([first, other], [1, 1], 'a match starting with a tablet still in the lobby');
-  await within(15000, waiting.said('playing'), 'the host telling a tablet still in the lobby at the start a match is on');
-  for (const t of [first, other, waiting]) t.worker.terminate();
-  console.log('together ok (a tablet still in the lobby at the start waits for the next round)');
+  // the host's page is waiting (⏳) for a slow guest when a tablet comes in through the lobby: it's sent along
+  const first = open([3, 4, 1, 2], 1), slow = open([3, 4, 1, 2], 0, 3000);
+  await within(15000, first.said('left'), 'the host starting the match');
+  const retyped = open([3, 4, 1, 2]);
+  await played([first, slow, retyped], [1, 1, 1], 'a tablet that typed the code while the host waited joining the match');
+  for (const t of [first, slow, retyped]) t.worker.terminate();
+  console.log('together ok (a tablet that comes in through the lobby while the host waits plays this round)');
+
+  // the only other tablet leaves the room (👋) instead of coming along: the host stops waiting for it
+  const alone = open([4, 1, 2, 3], 1), gone = open([4, 1, 2, 3], 0, 0, true);
+  await played([alone], [1], 'a match starting without the tablet that left');
+  for (const t of [alone, gone]) t.worker.terminate();
+  console.log('together ok (the host doesn\'t wait for a tablet that left)');
   process.exit(0);
 }
 

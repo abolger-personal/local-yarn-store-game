@@ -491,6 +491,9 @@ and smashers each get a round that is theirs.
     layout (the bad guys' shut-in wall, for one), to leave an obvious gap in front of the kids'
     shelf and room for the start spots and piles.
   - The first build round (above), with each hero's pile next to them.
+  - **The bad guys' fort comes with the level** (planned 2026-10-17), already built when the round
+    starts and as big as the level wants (Pieces are fixed by level: the heroes' rule only), with
+    room left for the raider to come out.
   - **One CPU bad guy**, whatever `badGuys(level, grownups)` says (Bad guys): level 2 is still
     teaching, so the kids meet a single raider.
   - **4 fort pieces per hero** (8 for two kids): `piecesEach(2)`, the base rule.
@@ -636,9 +639,11 @@ and smashers each get a round that is theirs.
   ```
 
   Levels 1 and 2 are 4 each, levels 3 and 4 are 5 each, and 6 each from level 5. The pile mixes the unlocked
-  piece kinds, newest first, so a new level's piece is always in hand. CPU bad guys count
-  toward their team's size and place theirs instantly. The team's grid floor caps the total, so
-  a big team on a small stage can't fill every cell.
+  piece kinds, newest first, so a new level's piece is always in hand. The team's grid floor caps
+  the total, so a big team on a small stage can't fill every cell. **This is the heroes' rule
+  only:** the bad guys' fort comes with the level, as many blocks as the level wants, never
+  `piecesEach` × bad guys (decided 2026-10-17): kids love knocking blocks down, so the bad guys
+  get plenty. Level 1 has 20 against one dummy.
 - **Every fort piece can be smashed** (decided 2026-10-13) in the knock-it-down round, by anyone, so a fort slows the
   other team down without ever walling a 4-year-old out. Kicks hit fort pieces hardest. A piece
   must rest on something when placed (the grid's support rule).

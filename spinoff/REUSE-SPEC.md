@@ -1143,6 +1143,28 @@ Built: `spinoff/lobby.html` (page) on `spinoff/net.js` and `spinoff/roster.js` (
 - A newcomer arrives with a cheer. 👋 waves bye and leaves the room (not a door: a door reads as going in as much as out); ✏️ goes back to the chooser.
 - In a room, the tablet that opened it also has ▶️, which takes everyone in the room into one
   match (see Multiplayer, Where things stand); ▶️ outside a room still plays by yourself.
+  **Amended plan** (planned 2026-10-17): that button becomes 👍, which moves on to choosing where
+  to play (below), and ▶️ appears only once a stage and level are chosen, since ▶️ means play.
+
+### After the lobby: pick a stage, then a level
+
+Planned 2026-10-17. Two plain screens between the lobby and the match, shown on the tablet that
+starts the match (the host in a room, or a tablet playing by itself):
+
+1. **Stage picker:** one big picture button per stage. A button is added as each new stage is
+   unlocked; today that is breakfast, the tutorial stage.
+2. **Level dial:** a phone-keypad grid of numbers, 1 to 9 to start. Only unlocked levels have a
+   button; new ones appear as they unlock. Choosing a number brings up ▶️, which starts the match.
+
+- **What's unlocked is the room's minimum.** A stage or level shows only if *every* player in the
+  room has reached it, so nobody is pulled past where they've played.
+- **Reaching the next level:** ▶️ on level 1's end card plays level 2, and finishing level 1 unlocks it.
+- **Saved per browser with the character:** the highest level and the stages each player has
+  reached are saved in their browser with their fighter's save, and travel with the fighter when
+  they join a room, so the host can work out the room's minimum.
+- **The match needs the level number:** the host's `start` message carries the stage and the
+  level number, not only the stage data (STAGE-IDEAS.md: Progression).
+
 - Network: Trystero 0.26 over Nostr, loaded from esm.sh through the import map, a devDependency
   for its types only (the same arrangement as `three`). Each tablet sends its fighter to each
   newcomer (`maxReceiveBytes` 64 KB). `ponytail:` every tablet talks to every other in the lobby,

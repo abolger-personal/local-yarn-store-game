@@ -42,13 +42,22 @@ function guestOf(net, id) {
 {
   assert.deepEqual(readInput({ target: { x: 1, z: 2 }, punch: true, kick: false }), { target: { x: 1, z: 2 }, punch: true, kick: false });
   assert.deepEqual(readInput({ ...IDLE, away: true }), { ...IDLE, away: true });
+  const cpu = rosterOf('H', newFighter('owl'), new Map(), 2);
+  assert.deepEqual(cpu.slice(1), [{ id: 'cpu1', team: 'badGuys', cpu: true }], 'level 2 brings one CPU bad guy instead of the dummy');
+  assert.deepEqual(readStart(JSON.parse(JSON.stringify({ theme: 'breakfast', stage: TUTORIAL.stage, roster: cpu, settings: { seconds: 90 } })), 'H', ['breakfast'])?.roster, cpu,
+    'and a guest takes it from the host\'s start');
+  const building = { ...IDLE, target: { thing: 'pile', id: 'G1' }, drop: true, ready: false, go: true };
+  assert.deepEqual(readInput({ ...building, extra: 1 }), building, 'the build round\'s ⬇️, 👍 and hold come through, and a tap on a pile');
   for (const bad of [null, 'go', { target: null }, { ...IDLE, target: { x: 1e9, z: 0 } }, { ...IDLE, target: { x: Number.NaN, z: 0 } },
-    { ...IDLE, target: { thing: 'shelf', team: 'everyone' } }, { ...IDLE, target: { thing: 'fighter', id: 'x'.repeat(500) } }, { ...IDLE, away: 'yes' }])
+    { ...IDLE, target: { thing: 'shelf', team: 'everyone' } }, { ...IDLE, target: { thing: 'fighter', id: 'x'.repeat(500) } }, { ...IDLE, away: 'yes' },
+    { ...IDLE, ready: 'yes' }, { ...IDLE, drop: 1 }])
     assert.equal(readInput(bad), null, `a malformed input is ignored: ${JSON.stringify(bad)}`);
 
   const start = { theme: 'breakfast', stage: TUTORIAL.stage, roster: rosterOf('H', newFighter('owl'), new Map([['G1', newFighter('lion')]])), settings: { seconds: 90 } };
   const sent = JSON.parse(JSON.stringify(start));
   assert.ok(readStart(sent, 'G1', THEMES), 'a good start is taken');
+  assert.equal(readStart({ ...sent, number: 2 }, 'G1', THEMES)?.number, 2, 'the start names the level by number');
+  assert.equal(readStart({ ...sent, number: -1.5 }, 'G1', THEMES)?.number, 0, 'and a junk number is no number');
   assert.equal(readStart(sent, 'G9', THEMES), null, 'a start without me in it is not mine');
   assert.equal(readStart({ ...sent, theme: 'lava' }, 'G1', THEMES), null, 'an unknown theme is refused');
   const twoGrounds = { ...sent.stage, floors: [...sent.stage.floors, sent.stage.floors[0]] };
@@ -91,7 +100,7 @@ function play(n, hostInput = IDLE) {
 
 {
   const before = snapshot(state);
-  g1.input({ target: { x: at(before, 'G1').x + 2, z: 1 }, punch: false, kick: false });
+  g1.input({ target: { x: at(before, 'G1').x + 2, z: 0 }, punch: false, kick: false });
   net.flush();
   const walking = play(20), seen = at(drawn.G2, 'G1').x;
   assert.ok(seen < at(walking, 'G1').x - 0.07 && seen > at(walking, 'G1').x - 0.3, 'other guests draw a walking fighter a snapshot or two behind');

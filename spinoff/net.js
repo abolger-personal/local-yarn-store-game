@@ -1,5 +1,6 @@
 // A page's side of the network: the rooms live on the tap page (rooms.js), so they outlast this page.
 import { readFighter } from './fighter.js';
+import { loadProgress, readProgress } from './progress.js';
 
 /** The tap page's rooms, or this page's own when there is no tap page (a test, or a page opened by itself). */
 async function roomsOf() {
@@ -39,14 +40,15 @@ export function showDebug() {
 /**
  * This page in `code`'s room (REUSE-SPEC.md §Multiplayer, Kept rooms): joined the first time, and every page
  * after uses the same connections. Fighters that arrive are checked here, in the page that uses them.
+ * Each tablet's fighter carries its game progress (progress.js) along, for the host to work out the room's minimum.
  * ponytail: every tablet tells every other its fighter when they meet, in a match too; only the host uses them.
  * @param {number[]} code
  * @param {import('./fighter.js').Fighter} mine
- * @param {{ onFighter: (id: string, f: import('./fighter.js').Fighter) => void, onLeave: (id: string) => void }} on
+ * @param {{ onFighter: (id: string, f: import('./fighter.js').Fighter, p: import('./progress.js').Progress) => void, onLeave: (id: string) => void }} on
  */
 export function openRoom(code, mine, { onFighter, onLeave }) {
-  const link = rooms.attach(code, mine, {
-    onFighter: (id, raw) => { const f = readFighter(raw); if (f) onFighter(id, f); },
+  const link = rooms.attach(code, { ...mine, progress: loadProgress() }, {
+    onFighter: (id, raw) => { const f = readFighter(raw); if (f) onFighter(id, f, readProgress(/** @type {any} */ (raw)?.progress)); },
     onLeave,
   });
   globalThis.addEventListener?.('pagehide', () => link.detach());

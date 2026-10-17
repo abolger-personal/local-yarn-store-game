@@ -4,12 +4,15 @@
 import { readFighter } from './fighter.js';
 import { ROUND_SECONDS, TICK_HZ } from './match.js';
 import { MAX_FIGHTERS } from './roster.js';
+import { badGuys } from './levels.js';
 
 /** @typedef {import('./match.js').Input} Input @typedef {import('./match.js').Snapshot} Snapshot */
 /**
  * @typedef {{ send: (type: string, data: any, to?: string[]) => void, on: (type: string, fn: (data: any, from: string) => void) => void }} Link
- * @typedef {{ id: string, team: import('./match.js').Team, fighter?: import('./fighter.js').Fighter, dummy?: boolean }} Seat
- * @typedef {{ theme: string, stage: import('./match.js').Stage, roster: Seat[], settings: { seconds: number } }} Start
+ * @typedef {{ id: string, team: import('./match.js').Team, fighter?: import('./fighter.js').Fighter, dummy?: boolean, cpu?: boolean }} Seat
+ *   a player, the training dummy, or a CPU bad guy, whose inputs the host makes (cpu.js)
+ * @typedef {{ theme: string, stage: import('./match.js').Stage, number: number, roster: Seat[], settings: { seconds: number } }} Start
+ *   `theme` is the stage's name and `number` the level's (0 for a layout picked by address, not off the level dial)
  * @typedef {{ tick: number, hits: Snapshot['hits'], fullBag: Snapshot['fullBag'], donutEvents: Snapshot['donutEvents'] }} Events
  * @typedef {Snapshot & { seq: number, paused: boolean }} Drawn
  */
@@ -22,7 +25,8 @@ export const EVENT_TICKS = TICK_HZ / 2;
 const REFRESH = 15;
 // Guests draw other fighters one to two snapshots back (BEHIND ticks at most), between the two either side.
 const BEHIND = 2 * (TICK_HZ / SNAP_HZ), KEEP = 8;
-const TEAMS = new Set(['heroes', 'badGuys']), THINGS = new Set(['donut', 'brick', 'fighter']), FAR = 1e6;
+const TEAMS = new Set(['heroes', 'badGuys']), THINGS = new Set(['donut', 'brick', 'fighter', 'pile']), FAR = 1e6;
+const FLAGS = ['away', 'drop', 'ready', 'go'];
 /** @type {import('./match.js').Team} */
 const HEROES = 'heroes';
 const IDLE = Object.freeze({ target: null, punch: false, kick: false });
@@ -52,14 +56,15 @@ function readTarget(t) {
 export function readInput(raw) {
   if (!raw || typeof raw !== 'object' || typeof raw.punch !== 'boolean' || typeof raw.kick !== 'boolean') return null;
   const target = readTarget(raw.target);
-  if (target === undefined || (raw.away !== undefined && typeof raw.away !== 'boolean')) return null;
-  return { target, punch: raw.punch, kick: raw.kick, ...(raw.away !== undefined && { away: raw.away }) };
+  if (target === undefined || FLAGS.some((k) => raw[k] !== undefined && typeof raw[k] !== 'boolean')) return null;
+  return { target, punch: raw.punch, kick: raw.kick, ...Object.fromEntries(FLAGS.filter((k) => raw[k] !== undefined).map((k) => [k, raw[k]])) };
 }
 
 /** @returns {Seat|null} */
 function readSeat(s) {
   if (!isId(s?.id) || !TEAMS.has(s.team)) return null;
   if (s.dummy === true) return { id: s.id, team: s.team, dummy: true };
+  if (s.cpu === true) return { id: s.id, team: s.team, cpu: true };
   const fighter = readFighter(s.fighter);
   return fighter && { id: s.id, team: s.team, fighter };
 }
@@ -68,12 +73,14 @@ function readSeat(s) {
 const isStage = (s) => isArrays(s ?? {}, ['floors', 'shelves', 'bricks']) && s.floors.filter((f) => f?.kind === 'ground').length === 1
   && s.floors.every((f) => ['x0', 'x1', 'z0', 'z1', 'y'].every((k) => isNum(f[k]))) && s.shelves.every((h) => TEAMS.has(h?.team));
 
+const levelNumber = (n) => (Number.isInteger(n) && n > 0 ? n : 0);
+
 /** The host's start message as a guest trusts it, or null. @param {string} me @param {string[]} themes @returns {Start|null} */
 export function readStart(raw, me, themes) {
   if (!sane(raw) || !themes.includes(raw?.theme) || !isStage(raw.stage) || !Array.isArray(raw.roster) || raw.roster.length > MAX_FIGHTERS) return null;
   const roster = raw.roster.map(readSeat);
   if (!roster.every(Boolean) || new Set(roster.map((s) => s.id)).size !== roster.length || !roster.some((s) => s.id === me)) return null;
-  return { theme: raw.theme, stage: raw.stage, roster, settings: { seconds: isNum(raw.settings?.seconds) ? raw.settings.seconds : ROUND_SECONDS } };
+  return { theme: raw.theme, stage: raw.stage, number: levelNumber(raw.number), roster, settings: { seconds: isNum(raw.settings?.seconds) ? raw.settings.seconds : ROUND_SECONDS } };
 }
 
 /** A snapshot from the host as a guest trusts it, or null. @param {Set<string>} ids the roster's */
@@ -84,14 +91,19 @@ export function readSnap(raw, ids) {
   return raw.events.every((e) => Number.isInteger(e?.tick) && isArrays(e, ['hits', 'fullBag', 'donutEvents'])) ? raw : null;
 }
 
-/** Everyone in a match: the players as heroes, then the training dummy. @param {Map<string, import('./fighter.js').Fighter>} guests @returns {Seat[]} */
-export const rosterOf = (me, mine, guests = new Map()) => [
+/**
+ * Everyone in a match: the players as heroes, then the training dummy, or from level 2 the CPU bad guys.
+ * @param {Map<string, import('./fighter.js').Fighter>} guests @param {number} [level] the level's number, if it has one @returns {Seat[]}
+ */
+export const rosterOf = (me, mine, guests = new Map(), level = 0) => [
   { id: me, team: HEROES, fighter: mine }, ...[...guests].map(([id, fighter]) => ({ id, team: HEROES, fighter })),
-  { id: DUMMY_ID, team: /** @type {const} */ ('badGuys'), dummy: true },
+  ...(level >= 2 ? Array.from({ length: badGuys(level) }, (_, i) => ({ id: `cpu${i + 1}`, team: /** @type {const} */ ('badGuys'), cpu: true }))
+    : [{ id: DUMMY_ID, team: /** @type {const} */ ('badGuys'), dummy: true }]),
 ];
 
-/** @param {Input} input */
-const merge = (input, was = IDLE) => ({ ...was, ...input, target: input.target ?? was.target, punch: was.punch || input.punch, kick: was.kick || input.kick });
+/** @param {Input} input @param {Input} [was] */
+const merge = (input, was = IDLE) => ({ ...was, ...input, target: input.target ?? was.target, punch: was.punch || input.punch, kick: was.kick || input.kick,
+  ...((was.drop || input.drop) && { drop: true }), ...((was.go || input.go) && { go: true }) });
 const eventsOf = (s) => (s.hits.length + s.fullBag.length + s.donutEvents.length
   ? [{ tick: s.tick, hits: s.hits, fullBag: s.fullBag, donutEvents: s.donutEvents }] : []);
 const round = (_, v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v);
@@ -205,7 +217,7 @@ export function createGuest(link, me, themes, on) {
       return g.buf.length ? drawn(g, dt) : null;
     },
     /** @param {Input} input */
-    input(input) { if (g.host && (input.target || input.punch || input.kick || input.away !== undefined)) link.send('input', input, [g.host]); },
+    input(input) { if (g.host && (input.target || input.punch || input.kick || FLAGS.some((k) => input[k] !== undefined))) link.send('input', input, [g.host]); },
     left(id) { if (id === g.host) goneNow(); },
   };
 }

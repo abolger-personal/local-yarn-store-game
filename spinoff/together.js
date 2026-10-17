@@ -26,12 +26,13 @@ function hostGone() {
 /** The host's page again, waiting for `expected` guests. */
 
 
-/** ▶️ on the host's end card: everyone to the next round. */
-function endRound(h, room) {
+/** ▶️ on the host's end card: everyone to the next round, on the level `search` names (after a win, the next one). */
+function endRound(h, room, search) {
   h.again();
   // this round is over: a guest already on the next page must not get this one's `start`
   room.detach();
-  location.reload();
+  if (search && `?${search}` !== location.search) location.search = search;
+  else location.reload();
 }
 
 const noteGuest = (id, n, of) => note(`host: ${id.slice(0, 4)} ready, ${n} of ${of}`);
@@ -78,12 +79,12 @@ async function host(code, mine, level) {
   room.send('go', true);
   room.send('again', true);
   await ready.everyone;
-  start = { theme: level.theme, stage: level.stage, roster: rosterOf(selfId, mine, guests), settings: { seconds: ROUND_SECONDS } };
+  start = { theme: level.theme, stage: level.stage, number: level.number ?? 0, roster: rosterOf(selfId, mine, guests, level.number), settings: { seconds: ROUND_SECONDS } };
   h = createHost(room, start, selfId);
   note(`host: start sent to ${guests.size}`);
   late = lateJoiners(room);
   room.peers().filter((id) => !playing(id)).forEach(late.arrive);
-  return { me: selfId, start, host: h, again: () => endRound(h, room) };
+  return { me: selfId, start, host: h, again: (search) => endRound(h, room, search) };
 }
 
 /** `room` noting the first message of each type, for `?debug=1`. */

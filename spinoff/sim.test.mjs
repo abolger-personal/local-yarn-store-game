@@ -4,8 +4,8 @@ import { STAGES, TUTORIAL } from './levels.js';
 import { CALM_DRAIN, CALM_TICKS, DUMMY, SPRING_LIFT, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
 import { BOUNCE } from './generate.js';
 
-// The tutorial's layout and syrup with the gapped wall (the hand-made stages' fort), so routing has gaps to find
-const STAGE = { ...TUTORIAL.stage, bricks: STAGES.breakfast.stage.bricks };
+// The tutorial's layout and syrup with the gapped wall (the hand-made stages' fort), so routing has gaps to find; heroes start beside their shelf
+const STAGE = { ...TUTORIAL.stage, bricks: STAGES.breakfast.stage.bricks, starts: undefined };
 const LOOK = { dough: '#e8c48a', frosting: '#14c4e0', stripe: false };
 const BAD = { dough: '#2a1a14', frosting: '#7a2bbf', stripe: true };
 const body = { height: 0.9, width: 0.45, reach: 0.38 };
@@ -496,6 +496,11 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
   const up = climb(CAKE), noPad = climb({ ...CAKE, springs: [] });
   assert.ok(up.y === tower.y && up.move === 'idle' && near(up.x, top.x) && near(up.z, top.z), `tapped onto the ${tower.y} high tower, a hero bounces up off the icing pad`);
   assert.ok(noPad.y < tower.y, 'which is the only way up');
+}
+
+{
+  const { starts } = TUTORIAL.stage, two = snapshot(createMatch([hero, { ...hero, id: 'kid2' }, dummy], TUTORIAL.stage));
+  assert.deepEqual(two.fighters.slice(0, 2).map((f) => ({ x: f.x, z: f.z })), starts.slice(0, 2), 'heroes start on their start spots, in order');
 }
 
 console.log('sim ok');

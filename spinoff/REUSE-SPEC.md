@@ -448,79 +448,102 @@ Every level is two rounds (brainstorm 2026-10-13): a **build it** round, where e
 its own shelf, then the **knock it down** round, the timed capture-the-flag match. Builders
 and smashers each get a round that is theirs.
 
-- **The build round has no timer** (planned 2026-10-17). It ends when both teams are ready: every hero has tapped 👍
+- **The build round has no timer** (decided 2026-10-17). It ends when both teams are ready: every hero has tapped 👍
   and every bad-guy player has tapped 👍. Tapping 👍 again takes it back, to keep building.
-  Nobody is rushed, and a careful builder can take as long as their team lets them.
-- **Readers can force the start** (planned 2026-10-17). Beside 👍 is the written line "hold 👍 to
+  Nobody is rushed, and a careful builder can take as long as their team lets them. Built in the
+  sim (`phase` `'build'` then `'play'`; the clock starts with the match). A hero who is away
+  (screen off, sitting) isn't waited for. Each tablet sees who has 👍: their button gets a green rim.
+- **Readers can force the start** (decided 2026-10-17). Beside 👍 is the written line "hold 👍 to
   start now". Holding 👍 for 2 seconds, with a ring filling around it, starts the round for
   everyone. Reading is the gate, not a grown-up/kid label: nobody is marked as anything, and a
   kid who can read the line has earned the button. The 2-second hold keeps a 4-year-old's
   ordinary tap from setting it off.
-- **CPU bad guys build their fort and are ready at once** (planned 2026-10-17). With no grownup bad guys, the bad
+- **CPU bad guys build their fort and are ready at once** (decided 2026-10-17; their fort is the level's). With no grownup bad guys, the bad
   guys' side is ready from the start, so only the heroes decide when to go.
-- **Building is carrying blocks** (planned 2026-10-17; replaces the shop's touch
+- **Building is carrying blocks** (decided 2026-10-17; replaces the shop's touch
   picker). One rule runs both rounds: **a tap moves you, a button acts where you stand.**
   - **The pile is the inventory.** Each hero's fort pieces start as their own small heap right
     next to where that hero starts (Start spots, below). How many are left is how big the heap
-    is; nothing to read.
+    is; nothing to read. Drawn as half-size blocks, two by two and up. Only your own pile answers
+    a tap; a teammate's is just floor to you. Piles, and any block still in someone's hands, go
+    when the match starts (patching mid-match is brainstorm, below).
   - **Tap a block in the pile** and your fighter runs over and grabs it; it flies into their arms
     with the donut grab's arc. One block per trip to start; if a playtest drags, a fighter carries
     a stack of 2–3 (the `help` table can give little kids the bigger stack).
   - **⬇️ puts it down in front of you.** A faint outline of the block shows in the grid cell you
     face (`inventory/grid.js`), moving as you walk and turn: on the floor, or on top of the stack
     already there. At the level's height limit the outline greys and ⬇️ only gets a head-shake.
-    **The height limit is high enough that nobody can jump over the wall** (planned 2026-10-17):
+    **The height limit is high enough that nobody can jump over the wall** (decided 2026-10-17):
     at least two blocks, as tall as level 1's wall, which the sim already treats as too tall to
     hop. Cake jumps higher, so the playability check proves the limit can't be jumped on every
-    stage, not just breakfast.
+    stage, not just breakfast. Built: `HEIGHT_LIMIT` 2 in `spinoff/build.js`; `checkLevel` stands a
+    wall that high across the heroes' third and a bad guy tapped to their shelf never gets past it.
+    The cells are the world's 0.4 grid over your own third (`fortGrid`, on `inventory/grid.js`): a
+    cell takes a block only where one floor top lies under all of it, clear of the shelves and of
+    the start spots in use, and on the floor you stand on (the stack on it counts). Start spots no
+    hero took are free to build on.
   - **What's in your hands decides what a tap on a block does.** Carrying: tap a block and you walk
     up to it and face it, so ⬇️ stacks on top. Empty-handed: tap one of *your own* blocks on top of
     a stack and you pick it back up. That is the take-back: only a top block (nothing floats), only
     your colour (nobody undoes a teammate's work), and no history, so nothing goes stale when
     teammates build on your blocks. A block of yours with a teammate's on top is stuck there for
-    the round (planned 2026-10-17).
+    the round (decided 2026-10-17); tapping it gets a head-shake.
   - **The buttons swap with the round.** In the build round the corner shows ⬇️ and 👍 where 🥊 and
     🦶 sit; when the match starts they drop away and 🥊 🦶 pop in with the hit-stop freeze. The
     camera follows your fighter as in a match, so big levels need nothing extra.
   - **Two players at one cell:** the host applies inputs a tick at a time, so one lands first and
     every tablet draws the result.
-- **Level 1 has no build round** (planned 2026-10-17). Its only opponent is the training dummy,
+- **Level 1 has no build round** (decided 2026-10-17). Its only opponent is the training dummy,
   which never comes for your shelf, so there is nothing to defend; the tutorial teaches the other
   half, breaking in. The build round starts on the first level where something raids your shelf:
   level 2, which teaches building the way level 1 teaches punching through: a small pile, an
   obvious gap in front of your shelf, and the first raider walking into your wall.
-- **Level 2: the building tutorial** (planned 2026-10-17). Still a tutorial level, on the breakfast
+- **Level 2: the building tutorial** (decided 2026-10-17). Still a tutorial level, on the breakfast
   stage:
-  - **Layout** (planned 2026-10-17): like the tutorial's, the two shelves at opposite ends of the
+  - **Layout** (decided 2026-10-17): like the tutorial's, the two shelves at opposite ends of the
     stage, with the pancake hill kept in the middle to jump on. The rest can change from level 1's
     layout (the bad guys' shut-in wall, for one), to leave an obvious gap in front of the kids'
-    shelf and room for the start spots and piles.
+    shelf and room for the start spots and piles. Built: a tall waffle fence (1.8 high, so not a
+    jump from the ground, but a step up from the deck) runs from the back wall along the inner end of
+    each deck and out in front of it, closing off the yard in front of each shelf except a gap two
+    blocks wide at the front edge. Two blocks two high (one kid's pile) plug it. The kids start
+    outside their fence, between it and the middle; from inside, they can still hop out over the
+    fence from the deck. No syrup or butter, like the tutorial. Mirrored, so the bad guys' end is the same.
   - The first build round (above), with each hero's pile next to them.
-  - **The bad guys' fort comes with the level** (planned 2026-10-17), already built when the round
+  - **The bad guys' fort comes with the level** (decided 2026-10-17), already built when the round
     starts and as big as the level wants (Pieces are fixed by level: CPU bad guys aren't limited). The
-    fort leaves the raider a way out, so it never has to kick through its own blocks (planned
-    2026-10-17).
-  - **One CPU bad guy**, whatever `badGuys(level, grownups)` says (Bad guys): level 2 is still
-    teaching, so the kids meet a single raider.
+    fort leaves the raider a way out, so it never has to kick through its own blocks (decided
+    2026-10-17). Built: 10 blocks, a wall two high on the ground in front of their deck, leaving the
+    deck's corner by the fence open; the way out is that corner and their fence's gap, which is also
+    the kids' way in (or they kick through the wall).
+  - **One CPU bad guy** (`badGuys` gives the tutorials one, Bad guys): level 2 is still
+    teaching, so the kids meet a single raider. The training dummy stays on level 1.
   - **4 fort pieces per hero** (8 for two kids): `piecesEach(2)`, the base rule.
   - **The CPU's brain is Raid, Grab, Run home and Defend** (Bad guys), switched by one rule: it
     raids while the bad guys' shelf holds no hero donuts, and defends (goes home and guards its
     shelf, Mode: a guard blocks the grab) once it holds one or more. So the kids' first job is
     to wall their shelf, and the moment the raider scores, the game flips to breaking in, which
-    level 1 taught.
-  - **Raiders break blocks on level 2** (planned 2026-10-17, required; Bad guys: CPU bad guys break
+    level 1 taught. Built in `spinoff/cpu.js`, `spinoff/cpu.test.mjs` plays it.
+  - **Raiders break blocks on level 2** (decided 2026-10-17, required; Bad guys: CPU bad guys break
     walls). Without it a complete wall stops the raider for good: it never scores, never turns to
     defend, and level 2 would only teach walling.
-  - **No bad guy hits a kid on level 2** (planned 2026-10-17 for the CPU). Bad guys only forage
+  - **No bad guy hits a kid on level 2** (decided 2026-10-17 for the CPU; a level's `match` rule,
+    `badGuysHit: false`, beside `friendlyFire` in `roster.js`'s `MATCH`, which `canHit` reads for every
+    bad guy, so a grownup's would follow it too; the CPU's kicks at walls never land on a kid standing there). Bad guys only forage
     (raid, kicking walls on the way, grab and run home) or defend (stand guard); they never attack
     a hero, so the fairness rules (Bad guys) only start to matter on the level that brings Chase.
     A grownup playing a bad guy follows the same rule: their 🥊 and 🦶 break walls but never land
     on a hero (brainstorm 2026-10-17, since 🥷 isn't built yet).
-- **Start spots come first** (planned 2026-10-17). Step 1 of making any level, hand-made or
+- **Start spots come first** (decided 2026-10-17). Step 1 of making any level, hand-made or
   generated, on every stage: pick pseudo-random start spots for up to 6 heroes,
   each with room for the hero and their block pile beside them, and reserve them, so nothing
   placed or generated afterwards (bricks, syrup, butter, trampolines, raised floors) ever lands in
-  one. Pseudo-random from the level's seed, so every tablet gets the same spots.
+  one. Pseudo-random from the level's seed, so every tablet gets the same spots. A spot is `Stage.starts`
+  data (`{ x, z }` on the ground), and heroes spawn on them in roster order; it keeps clear the hero and
+  their pile `PILE_DX` toward the middle (`spotRect` in `match.js`, 1.2 by 0.8). Hand-made levels write
+  theirs as data; the generator draws them first (`startSpots` in `generate.js`), and the playability
+  check fails a level whose spot is off the ground of the heroes' third, under a raised floor, or
+  touches a brick, a patch or another spot. Bad guys still start beside their shelf.
 - **Later: patching mid-match** (brainstorm 2026-10-15: wanted, not at first). A kid grabs a block
   during the match and plugs a hole the bad guys just opened; a hit knocks it loose like a donut.
   Not in the first version of building, because it puts ⬇️ beside 🥊 and 🦶 in the match: more
@@ -529,8 +552,9 @@ and smashers each get a round that is theirs.
   (Level 2, above), and a broken block is gone for the rest of the match. A
   match is short (90 s to start), so that's fine: this is short-term strategy, not a long siege.
   Revisit only if a playtest shows kids upset at their wall being gone.
-- **The breakfast stage is the tutorial stage** (planned 2026-10-17). The tutorial levels all play
-  on breakfast, and between them they teach every basic mechanic once: breaking in, building,
+- **The breakfast stage is the tutorial stage** (decided 2026-10-17). The tutorial levels all play
+  on breakfast (`LEVELS.breakfast`: level 1 breaking in, level 2 building and defending; the goody
+  and tool levels aren't made yet), and between them they teach every basic mechanic once: breaking in, building,
   defending, and earning a goody and using a tool. They don't need every goody or tool, only one
   of each to teach how earning and using works.
 - **Stages and difficulty are separate** (decided 2026-10-14). Past the tutorial, a *stage* is a
@@ -565,9 +589,10 @@ and smashers each get a round that is theirs.
     its middle tower is 3.6 high, reached only off the icing pad at its foot. The playability
     check still proves every top can be stood on.
 - **Each stage has its own treat theme** (decided 2026-10-13, amended 2026-10-14). The theme dresses the stage and the fort pieces. `spinoff/scenery.js` `THEMES` holds
-  one entry per stage. While there's no stage button, the address picks: `play.html` is the
+  one entry per stage. The level dial's ▶️ goes to `play.html?stage=breakfast&level=2`, a stage's
+  numbered level (After the lobby). The address still picks the rest by hand: `play.html` is the
   tutorial, `play.html?stage=cake` (or `breakfast`) a hand-made stage, and adding `&seed=8` (and
-  `&difficulty=1` to `5`) a generated one on that stage. `?level=` is gone.
+  `&difficulty=1` to `5`) a generated one on that stage.
 - **The tutorial makes you break in** (decided 2026-10-14). It's the tutorial, so the bad guys' fort
   shuts their end off completely: a wall right across the band, two high (too tall to hop), no
   gap at the front or back. Walking round it can't teach that forts break; this way the first
@@ -576,7 +601,8 @@ and smashers each get a round that is theirs.
   halves in the real sim: no route to the shelf without breaking, and a hero who kicks when it
   stands blocked gets in (about 7 s, 3 bricks). The hand-made stages go back to the wall with gaps.
 - **Levels are data** (decided 2026-10-14): `spinoff/levels.js` holds `TUTORIAL` and `STAGES` (one
-  hand-made layout per stage), each a layout (a `Stage`: floors, each a `ground`, `deck` or
+  hand-made layout per stage), and `LEVELS`, each stage's levels by number (decided 2026-10-17:
+  `levelOf('breakfast', 2)`; breakfast's are the tutorial and level 2), each a layout (a `Stage`: floors, each a `ground`, `deck` or
   `hill` that the theme dresses by kind, the back wall, shelves, zones, ring-out, bricks, syrup,
   butter, trampolines and bounce) and the name of its stage; `levelFor` reads the address. The
   stage is passed in, never imported: `createMatch(entrants, stage)`, and the page's taps,
@@ -621,7 +647,7 @@ and smashers each get a round that is theirs.
   | 5 | Gingerbread-man shield | A gingerbread man standing guard; takes extra hits |
   | 6+ | More house parts | Windows, doors, chimneys |
 
-- **Heroes place only their own pieces** (planned 2026-10-17; the pattern for two kids sharing a
+- **Heroes place only their own pieces** (decided 2026-10-17; the pattern for two kids sharing a
   colour is brainstorm 2026-10-13). Every hero's pieces are topped in the same colour as their
   donuts' frosting, which is their fur colour, so a kid finds their own blocks the way they find
   their own donuts (plus a small pattern when two kids share a colour). A hero can place and move only their own pieces, never a teammate's,
@@ -639,7 +665,7 @@ and smashers each get a round that is theirs.
   chocolate pastry (pancakes, gingerbread) with dark purple cream or icing. Any bad guy can place or move any bad-guy piece,
   and their walls never get the mixed bonus, so only the heroes can build chunky walls.
 - **Pieces are fixed by level and number of players** (brainstorm 2026-10-13; the base of 4 each is
-  planned 2026-10-17). Each player gets their own small pile to place, so siblings never fight over
+  decided 2026-10-17: `piecesEach` in `levels.js`, one piece kind so far). Each player gets their own small pile to place, so siblings never fight over
   pieces and every kid builds something:
 
   ```
@@ -649,7 +675,7 @@ and smashers each get a round that is theirs.
   Levels 1 and 2 are 4 each, levels 3 and 4 are 5 each, and 6 each from level 5. The pile mixes the unlocked
   piece kinds, newest first, so a new level's piece is always in hand. The team's grid floor caps
   the total, so a big team on a small stage can't fill every cell. **This is the players' rule
-  only** (planned 2026-10-17): every hero, and any grownup playing a bad guy, gets their own
+  only** (decided 2026-10-17): every hero, and any grownup playing a bad guy, gets their own
   `piecesEach` pile. CPU bad guys are never limited this way: their fort comes with the level, as
   many blocks as the level wants, because kids love knocking blocks down. Level 1 has 20 against
   one dummy.
@@ -1192,9 +1218,8 @@ lock is the chooser's alone: a friend's sword from another tablet always shows.
 
 **The sword unlocks after level 1** (decided 2026-10-17). A hero whose end card shows the heroes won
 (a tie shows both sides won) has beaten that level; the tablet keeps the highest level beaten in
-`lys.progress.v1` (`{ "beaten": 1 }`, apart from the fighter; `levelsBeaten` / `beatLevel` in
-`levels.js`). Level 1 is the tutorial, recognised by its stage, since a guest's `start` doesn't carry
-the level number yet. Until then the chooser shows only gloves, and a saved or 🎲 sword becomes gloves.
+the game save (`lys.progress.v1`'s `beaten`, apart from the fighter; `levelsBeaten` / `beatLevel` in
+`progress.js`), by the level number `start` carries. Until then the chooser shows only gloves, and a saved or 🎲 sword becomes gloves.
 More unlocks behind later levels: brainstorm 2026-10-17.
 
 Not built yet: the silhouette reveal on the animal tiles (brainstorm 2026-10-13). There is no `help` control anywhere:
@@ -1211,34 +1236,44 @@ Built: `spinoff/lobby.html` (page) on `spinoff/net.js` and `spinoff/roster.js` (
   arrangement whatever order people joined in: front row first, from the middle out, 7 × 2
   cells, room for 14 (6 heroes, 8 bad guys).
 - A newcomer arrives with a cheer. 👋 waves bye and leaves the room (not a door: a door reads as going in as much as out); ✏️ goes back to the chooser.
-- In a room, the tablet that opened it also has ▶️, which takes everyone in the room into one
-  match (see Multiplayer, Where things stand); ▶️ outside a room still plays by yourself.
-  **Amended plan** (planned 2026-10-17): that button becomes 👍, which moves on to choosing where
-  to play (below), and ▶️ appears only once a stage and level are chosen, since ▶️ means play.
+- In a room, the tablet that opened it also has a button that takes everyone in the room into one
+  match (see Multiplayer, Where things stand); outside a room the same button plays by yourself.
+  It is 👍 (decided 2026-10-17), which moves on to choosing where to play (below), and ▶️ appears
+  only once a stage and level are chosen, since ▶️ means play.
 
 ### After the lobby: pick a stage, then a level
 
-Planned 2026-10-17. Two plain screens between the lobby and the match, shown on the tablet that
-starts the match (the host in a room, or a tablet playing by itself):
+Decided 2026-10-17. Two plain screens between the lobby and the match, shown on the tablet that
+starts the match (the host in a room, or a tablet playing by itself). Built in the lobby's footer
+(`#picker`, with 👋 back to the room), on `spinoff/progress.js`:
 
 1. **Stage picker:** one big picture button per stage. A button is added as each new stage is
-   unlocked; today that is breakfast, the tutorial stage. How a new stage unlocks is still open
-   (brainstorm 2026-10-17: decide when there is a second stage to unlock).
+   unlocked; today that is breakfast (🥞), the tutorial stage. How a new stage unlocks is still open
+   (brainstorm 2026-10-17: decide when there is a second stage to unlock); until then every stage
+   with numbered levels shows (`roomStages` in `progress.js`), which is only breakfast.
 2. **Level dial:** a phone-keypad grid of numbers, 1 to 9 to start. Only unlocked levels have a
-   button; new ones appear as they unlock. Choosing a number brings up ▶️, which starts the match.
+   button; new ones appear as they unlock. Choosing a number brings up ▶️, which starts the match:
+   `play.html?stage=breakfast&level=2`, with `room=CODE&host` in a room.
 
-- **Guests wait in the lobby** (planned 2026-10-17). While the host picks, everyone else stays on
+- **Guests wait in the lobby** (decided 2026-10-17). While the host picks, everyone else stays on
   the lobby screen with no button to press, and goes into the match when the host taps ▶️.
-- **What's unlocked is the room's minimum.** A stage or level shows only if *every* player in the
-  room has reached it, so nobody is pulled past where they've played.
-- **A win unlocks the next level** (planned 2026-10-17). Winning a level saves the next one as
-  reached, and ▶️ on that end card plays it; after a loss, ▶️ plays the same level again.
+- **What's unlocked is the room's minimum** (decided 2026-10-17). A stage or level shows only if *every* player in the
+  room has reached it, so nobody is pulled past where they've played (`roomLevels`, over the
+  progress each tablet's fighter brought to the lobby). A late friend who joins mid-match plays the
+  next round on whatever level it is.
+- **A win unlocks the next level** (decided 2026-10-17). Winning a level saves the next one as
+  reached, and ▶️ on that end card plays it (if there is one); after a loss or a tie, ▶️ plays the
+  same level again (`outcomeOf`). Each hero's tablet saves its own. A tie still counts as beating the
+  level for the sword (Fighter chooser), so the sword's rule and the level rule differ on a tie.
 - **One game save per browser:** the highest level and the stages each player has reached are
   saved in their browser as the whole game's progress, apart from the fighter, so re-rolling or
-  re-dressing a fighter keeps it (planned 2026-10-17). It travels with the fighter when they join a
-  room, so the host can work out the room's minimum.
-- **The match needs the level number:** the host's `start` message carries the stage and the
-  level number, not only the stage data (STAGE-IDEAS.md: Progression).
+  re-dressing a fighter keeps it (decided 2026-10-17). It travels with the fighter when they join a
+  room, so the host can work out the room's minimum. Built: `lys.progress.v1`, `{ "beaten": 1,
+  "reached": { "breakfast": 2 } }` (the sword's save, grown), owned by `spinoff/progress.js` and checked on
+  the way in by `readProgress` like `readFighter`: whole levels 1 to 99 on known stages only.
+  `net.js` adds it to the fighter every tablet sends when they meet.
+- **The match needs the level number** (decided 2026-10-17): the host's `start` message carries the stage and the
+  level number (`theme`, `number`; 0 for a layout picked by address), not only the stage data (STAGE-IDEAS.md: Progression).
 
 - Network: Trystero 0.26 over Nostr, loaded from esm.sh through the import map, a devDependency
   for its types only (the same arrangement as `three`). Each tablet sends its fighter to each
@@ -1344,7 +1379,8 @@ scary, for 4–6 year olds.
   The frizz is meant to be funny, so being zapped is something kids laugh at. To check before
   building: whether the coat can be scaled on its own after `mergeCharacter`, or the puff needs
   its own mesh.
-- **AI is a fake player on the host** (planned 2026-10-17). A CPU bad guy produces the same inputs a tablet does (a
+- **AI is a fake player on the host** (decided 2026-10-17: `createCpu` in `spinoff/cpu.js` reads the snapshot a tablet
+  draws and returns an `Input`, which the host's page feeds into the tick beside the tablets'). A CPU bad guy produces the same inputs a tablet does (a
   tap target, 🥊 / 🦶, a power gesture), played through the same sim, so it can do nothing a
   player can't, and the scripted-input sim tests cover it. The training dummy of milestone 1 is a
   bad guy whose input is "nothing". `ponytail:` one state machine for every bad guy.
@@ -1361,34 +1397,40 @@ scary, for 4–6 year olds.
 
   With two or more CPU bad guys, one stays home as a defender and the rest raid. In the build
   round, CPU bad guys stack their pile as a wall in front of their shelf, instantly.
-- **CPU bad guys break walls** (planned 2026-10-17, required). The basic hero fort is a ring of walls with
+- **CPU bad guys break walls** (decided 2026-10-17, required). The basic hero fort is a ring of walls with
   the donut shelf in the middle, so a bad guy that can't get through is no opponent. A raider
   heads straight for the shelf, never routing around the fort. At a wall one piece high it jumps
   over; at anything taller it kicks the lowest piece in its way until it breaks, then carries on.
   It goes for the weakest piece within reach of its path (fewest hits left), so a mixed wall
   steers it toward a single-colour gap: the kids' best walls really do protect them. Breaking a
-  piece charges nobody's bar.
+  piece charges nobody's bar. Built: the raider taps the kids' shelf and lets the route-finding hop
+  one-high walls; when it stands blocked (no way through), it walks up to the weakest of the kids'
+  blocks near the one closest to it (fewest hits, then the lowest), kicks it until it breaks, and
+  taps the shelf again. The closest block, not one on a planned path: the route-finding has no path
+  through a wall to measure along.
 - **Targets: the nearest hero** (brainstorm 2026-10-13), kid or grownup alike; no one is singled out.
   The fairness rules below still apply on top (no two bad guys on one hero, grace after a hit).
-- **Fair to 4-year-olds** (planned 2026-10-17). About half a second of reaction delay before acting on anything new;
+- **Fair to 4-year-olds** (decided 2026-10-17 for the reaction delay and the attack pace, `REACT_TICKS` and
+  `ATTACK_TICKS` in `cpu.js`; the rest planned 2026-10-17, for the level that brings Chase). About half a second of reaction delay before acting on anything new;
   at most one attack about every 0.8 s; two CPU bad guys never chase the same kid; after hitting a
   kid, a bad guy leaves that kid alone for a few seconds; no waiting at the stage edge to knock a
   falling kid off again; powers aim where the kid was about half a second ago. Chase chance,
   reaction delay, attack pace and grace time are plain numbers that auto-scaling can tune later.
-- **First states: Raid (with wall breaking), Grab, Run home and Defend** (planned 2026-10-17), for
+- **First states: Raid (with wall breaking), Grab, Run home and Defend** (decided 2026-10-17), for
   level 2, switched by its raid-or-defend rule (Forts: Level 2). Chase, Scoop and Power come later
   (brainstorm 2026-10-13).
-- **The bad-guy team grows level by level** (planned 2026-10-17). The tutorial levels
+- **The bad-guy team grows level by level** (decided 2026-10-17; `badGuys` in `levels.js`, though there is no
+  level 3 yet). The tutorial levels
   keep it small: level 1 has the training dummy (decided 2026-10-17), which never raids, and level 2
   has one CPU bad guy (Forts: Level 2). From level 3 the count grows by one CPU bad guy a level:
 
   ```
-  badGuys(level, grownups) = min(8, max(grownups, 1) + level - 1)
+  badGuys(level, grownups) = 1 for levels 1 and 2, else min(8, max(grownups, 1) + level - 1)
   ```
 
   Two grownups on level 3 face the kids with 2 CPU bad guys beside them; no grownups on level 3
   is 3 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
-  drops it (planned 2026-10-17; After the lobby: a win unlocks the next level).
+  drops it (decided 2026-10-17; After the lobby: a win unlocks the next level).
 
   A grownup bad guy on level 1 (🥷 isn't built yet) can't attack the kids: they can only defend
   their base, by standing guard at their shelf (brainstorm 2026-10-17).
@@ -1456,8 +1498,9 @@ scary, for 4–6 year olds.
   (90 seconds to start, never over 3 minutes), so time can't be the signal: a big win nudges the next level harder, a narrow win or
   a loss nudges it easier.
 
-Check: a node test runs one bad guy against an idle kid on the two-shelf stage and asserts the
-bad guy grabs a donut and banks it.
+Check: `spinoff/cpu.test.mjs` runs the level 2 raider against an idle kid and asserts it grabs a donut,
+banks it and then stands guard; and, with the kids' gap walled two high, that it kicks through (no
+faster than the attack pace) and steals without ever hitting the kid at the wall.
 
 ## Milestones
 

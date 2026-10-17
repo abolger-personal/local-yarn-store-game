@@ -12,7 +12,34 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **Tricks.** Tap your gloves or your sword again for a ✨ sparkle, 🫧 bubbles or a 🔥 flame that pops out
   when your punch lands. Tap again for the next one.
 
+### Levels
+- **Pick where to play.** 👍 in the lobby (instead of ▶️) shows the stages to choose from (🥞 breakfast
+  for now), then a number pad of levels. Only the levels you have reached have a number; tap one
+  and ▶️ to play it. In a room, the host picks and everyone else waits in the lobby until the host
+  taps ▶️. A room only offers levels that everyone in it has reached.
+- **Win a level to unlock the next one.** After a win, ▶️ on the score card plays the next level;
+  after a loss or a tie it plays the same one again. Your tablet remembers how far you've got,
+  even if you make a new fighter.
+
+### Building
+- **Build a wall before the match.** On level 2 a match starts with building time. Your blocks are
+  the little heap next to you, topped in your own colour. Tap the heap to pick one up, walk to where
+  you want it, and press ⬇️ to put it down in front of you; the outline shows where it will go. Stack
+  blocks two high, too tall for anyone to jump. Tap one of your own blocks to pick it back up (not
+  one with a friend's block on top).
+- **👍 when you're ready.** The match starts when everyone has tapped 👍; tap it again if you want
+  to keep building. Grown-ups and kids who can read can hold 👍 for two seconds to start straight away.
+  Then 🥊 and 🦶 pop back in and the clock starts.
+
+### Bad guys
+- **A bad guy comes for your donuts on level 2.** It runs to your shelf, grabs a donut and runs home
+  with it. A wall one block high it just jumps; a taller wall it kicks down, one block at a time.
+  Once it has one of your donuts, it goes home and guards its shelf, so you have to knock it out of
+  the way to get your donut back. On level 2 it never hits you, only your blocks.
+
 ### Fighting
+- **Everyone has their own start spot.** Each hero starts the match in a spot of their own, out in
+  front of the shelf, with room beside them for their blocks. Every tablet puts everyone in the same spots.
 - **Bad guys guard their donuts.** Tap a shelf with a bad guy standing in front of it and you walk
   up to the bad guy instead, and it shakes "no". Knock it out of the way and you grab a donut. Kick
   the dummy off the stage and it pops back in right in front of its donuts.

@@ -60,6 +60,13 @@ body.lobby { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
 .keypad { display: grid; grid-template-columns: repeat(3, 84px); gap: 12px; justify-content: center; padding: 12px; }
 .keypad button { width: 84px; height: 84px; }
 .keypad .emoji { font-size: 44px; }
+/* after the lobby: a picture per stage, then a phone-keypad level dial where only unlocked levels are buttons */
+.stages { display: flex; gap: 20px; }
+.stages.hidden { display: none; }
+.stages button { width: 120px; height: 120px; }
+.stages .emoji { font-size: 70px; }
+.dial span, .dial button { width: 84px; height: 84px; }
+.dial button { font-size: 40px; font-weight: 800; color: var(--ink); }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .overlay > * { pointer-events: auto; }
 
@@ -81,6 +88,14 @@ body.play #stage canvas { touch-action: none; }
 .moves button { width: min(112px, 15vmin); height: min(112px, 15vmin); border-width: 5px; touch-action: none; -webkit-touch-callout: none; }
 .moves .emoji { font-size: min(58px, 8vmin); }
 .moves button.down { background: #ffd21a; border-color: var(--ring); transform: scale(1.1); }
+/* the build round: 👍 fills a ring while held, and stays green-rimmed once tapped */
+.moves #ready { background: conic-gradient(#ffd21a calc(var(--fill, 0) * 1turn), #fff 0); }
+.moves #ready.on { border-color: #2fae5b; border-width: 9px; }
+.moves button.pop { animation: pop 320ms ease-out; }
+@keyframes pop { from { transform: scale(0.2); } 60% { transform: scale(1.25); } to { transform: scale(1); } }
+.hold { position: absolute; right: min(56px, 5vmin); bottom: calc(2 * min(56px, 5vmin) + min(112px, 15vmin)); margin: 0;
+  padding: 4px 12px; border-radius: 14px; background: var(--panel); font-size: min(22px, 3.4vmin); }
+.hold.hidden { display: none; }
 .end { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(74, 58, 48, .45); }
 .end[hidden], .end .card[hidden] { display: none; }
 #score { cursor: pointer; }

@@ -1,6 +1,6 @@
 // Generated stages (GENERATED-LEVELS.md): a pure function of (seed, difficulty, stage), so the host sends that and
 // every tablet rebuilds the same Stage. Terrain is mirrored; the bad guys' pre-placed fort is on their side only.
-import { BRICK } from './match.js';
+import { BRICK, MAX_HEROES, outside, overlaps, spotRect } from './match.js';
 
 /** @typedef {import('./match.js').Stage} Stage @typedef {import('./match.js').Floor} Floor @typedef {import('./match.js').Puddle} Puddle */
 
@@ -26,6 +26,19 @@ const r1 = (v) => Math.round(v * 10) / 10;
 const pick = (r, lo, hi) => r1(lo + r() * (hi - lo));
 /** @param {Floor} f @returns {Floor[]} */
 const both = (f) => [f, { ...f, x0: -f.x1, x1: -f.x0 }];
+
+// REUSE-SPEC.md §Forts, Start spots come first: a lattice in the heroes' third between their deck (every layout's deck
+// stands there) and the middle, so neighbouring spots just touch; everything picked after keeps clear of the ones taken
+const SPOT_XS = [-6, -4.8], SPOT_ZS = [-1.6, -0.8, 0, 0.8, 1.6];
+const HERO_DECK = { x0: -9, x1: -6, z0: -2, z1: -0.8 };
+
+/** The heroes' start spots for this seed, in the order heroes take them. @param {number} seed @returns {import('./match.js').StartSpot[]} */
+export function startSpots(seed) {
+  const r = rng(~seed);
+  const all = SPOT_XS.flatMap((x) => SPOT_ZS.map((z) => ({ x, z }))).filter((p) => !overlaps(spotRect(p), HERO_DECK));
+  return all.map((p) => /** @type {const} */ ([r(), p])).sort((a, b) => a[0] - b[0]).slice(0, MAX_HEROES).map(([, p]) => p);
+}
+const clearOf = (starts, p) => starts.every((s) => outside(spotRect(s), p.x, p.z) >= p.r);
 
 /** Which kinds this stage has: the kind new at this difficulty first, then a seeded shuffle of the rest met so far. */
 function problems(r, d) {
@@ -74,16 +87,20 @@ function fort(r, d, has) {
   return { bricks: [...zs.map((z) => ({ team: 'badGuys', x: 4.6, z, y: 0, hits: 2 })), ...tall], moat };
 }
 
-/** @returns {Puddle[]} a butter slick in front of each deck, and one on the hill top if there is a hill */
-function butter(r, top) {
-  const p = { x: pick(r, 6.2, 7), z: pick(r, 0.7, 1.3), r: pick(r, 0.4, 0.5) };
+/** @returns {Puddle[]} a butter slick in front of each deck, drawn again while it covers a start spot (left out if it always does), and one on the hill top if there is a hill */
+function butter(r, top, starts) {
+  let p = null;
+  for (let i = 0; i < 20 && !p; i++) {
+    const q = { x: pick(r, 6.2, 8.4), z: pick(r, -0.3, 1.5), r: pick(r, 0.4, 0.5) };
+    if (clearOf(starts, { ...q, x: -q.x })) p = q;
+  }
   const onTop = top ? [{ x: 0, z: r1((top.z0 + top.z1) / 2), r: r1(Math.min(top.x1 - top.x0, top.z1 - top.z0) / 4), y: top.y }] : [];
-  return [p, { ...p, x: -p.x }, ...onTop];
+  return [...(p ? [p, { ...p, x: -p.x }] : []), ...onTop];
 }
 
 /** Breakfast's syrup and butter, or cake's trampolines and taller everything: heights scale with the jump, so every top stays reachable. */
 function dress(stage, r, name) {
-  if (name === 'breakfast') return { ...stage, butter: butter(r, stage.floors.find((f) => f.kind === 'hill')) };
+  if (name === 'breakfast') return { ...stage, butter: butter(r, stage.floors.find((f) => f.kind === 'hill'), stage.starts) };
   const lift = (o) => ({ ...o, y: r1(o.y * BOUNCE.cake) });
   return { ...stage, floors: stage.floors.map((f) => (f.kind === 'ground' ? f : lift(f))), shelves: stage.shelves.map(lift),
     puddles: [], springs: stage.puddles.filter((p) => Math.abs(p.x) < 3), bounce: BOUNCE.cake };
@@ -94,9 +111,10 @@ function dress(stage, r, name) {
  * @param {number} seed @param {number} difficulty @param {StageName} [name] @returns {Stage}
  */
 export function generateStage(seed, difficulty, name = 'breakfast') {
-  const r = rng(seed), d = Math.max(1, Math.floor(difficulty)), has = problems(r, d), end = ends(r, has.has('stepUp'));
+  const starts = startSpots(seed), r = rng(seed), d = Math.max(1, Math.floor(difficulty)), has = problems(r, d), end = ends(r, has.has('stepUp'));
   const wall = fort(r, d, has);
   return dress({
+    starts,
     floors: [{ kind: 'ground', x0: -9, x1: 9, z0: -2, z1: 2, y: 0 }, ...end.floors, ...(has.has('hill') ? [hill(r)] : []),
       ...(has.has('choke') ? choke(r) : [])],
     backWall: -2,

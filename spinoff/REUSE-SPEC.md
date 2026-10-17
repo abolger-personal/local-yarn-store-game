@@ -1410,7 +1410,7 @@ scary, for 4–6 year olds.
 
   Two grownups on level 3 face the kids with 2 CPU bad guys beside them; no grownups on level 3
   is 3 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
-  drops it (planned 2026-10-17; After the lobby: a win unlocks the next level).
+  drops it (decided 2026-10-17; After the lobby: a win unlocks the next level).
 
   A grownup bad guy on level 1 (🥷 isn't built yet) can't attack the kids: they can only defend
   their base, by standing guard at their shelf (brainstorm 2026-10-17).

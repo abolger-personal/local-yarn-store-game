@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Static server for the concept viewers, with caching turned off.
+"""Static server for the concept viewers: every file is checked with the server on every use, never stale.
 
-Plain http.server sends Last-Modified, so browsers answer 304 and keep serving stale ES
-modules. That is merely confusing for a changed function body, but fatal when a module gains
-an export: the importing module fails to link and the whole page renders blank white.
+Plain http.server sends Last-Modified with no Cache-Control, so browsers guess a lifetime and keep serving
+stale ES modules without asking. That is merely confusing for a changed function body, but fatal when a module
+gains an export: the importing module fails to link and the whole page renders blank white. `no-cache` makes the
+browser ask every time; an unchanged file answers 304 with no body, and HTTP/1.1 keeps one connection open for
+all of a page's modules, so a tablet doesn't redo the https handshake per file.
 """
 
 import socket
@@ -14,19 +16,18 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 
 class NoCacheHandler(SimpleHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+    # an idle kept-open connection (a tablet asleep) frees its thread after this many seconds
+    timeout = 30
+
     def end_headers(self):
-        self.send_header("Cache-Control", "no-store, must-revalidate")
-        self.send_header("Pragma", "no-cache")
-        self.send_header("Expires", "0")
+        # ponytail: Last-Modified has 1 s resolution, so a file saved twice within one second of a fetch can be
+        # served stale once; send an ETag of mtime_ns + size if that ever bites
+        self.send_header("Cache-Control", "no-cache")
         # No Clear-Site-Data: '"cache"' on documents any more. It purged modules cached before
         # this server existed, but the browser holds the page until the wipe finishes, on every
         # load, and that stalled index.html. Stale modules from an older server: one Cmd-Shift-R.
         super().end_headers()
-
-    def send_header(self, keyword, value):
-        if keyword.lower() == "last-modified":
-            return
-        super().send_header(keyword, value)
 
 
 # Tablets need https for Donut Fighters rooms (crypto.subtle); with cert.pem + key.pem beside this file it

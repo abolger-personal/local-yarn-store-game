@@ -74,11 +74,12 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  *
  * @typedef {{ id: string, team: Team, x: number, y: number, z: number, vx: number, vy: number, vz: number,
  *             facing: number, height: number, onGround: boolean, move: MoveId, step: number,
- *             percent: number, carrying: DonutLook|null, invincible: boolean,
+ *             percent: number, carrying: DonutLook|null, invincible: boolean, respawn: number,
  *             target: { x: number, y: number, z: number }|null, block: string|null }} FighterState
  *   `facing` is the yaw in radians (0 faces +x, PI/2 faces +z, toward the camera). `step` is the
  *   move's progress, 0 to 1. `target` is where it is heading, for teammates' footprints. `block`: the icing
- *   of the block it carries in the build round.
+ *   of the block it carries in the build round. `respawn`: seconds left out of play after a ring-out (0 in play): not
+ *   drawn then, and x/y/z is where it will drop in.
  * @typedef {{ id: string, x: number, y: number, z: number, look: DonutLook }} LooseDonut
  * @typedef {{ id: string, team: Team, x: number, y: number, z: number, hits: number, maxHits: number,
  *             icing: string }} BrickState

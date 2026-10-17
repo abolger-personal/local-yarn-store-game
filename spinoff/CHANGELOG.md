@@ -42,9 +42,15 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   front of the shelf, with room beside them for their blocks. Every tablet puts everyone in the same spots.
 - **Bad guys guard their donuts.** Tap a shelf with a bad guy standing in front of it and you walk
   up to the bad guy instead, and it shakes "no". Knock it out of the way and you grab a donut. Kick
-  the dummy off the stage and it pops back in right in front of its donuts.
+  the dummy off the stage and it pops back in right in front of its donuts, after a few seconds.
 
 ### Fixes
+- **After you knock someone off, they take a few seconds to come back**, so you can grab a donut. A
+  big 3, 2, 1 counts down over the spot where they'll drop back in. It's the same for you.
+- **You can put blocks in more places.** Right up against the deck, the fence or the end of your side,
+  ⬇️ puts the block at your feet instead of shaking its head.
+- **You can't get stuck on top of your own blocks** any more, or a friend's: tap where you want to go
+  and your fighter steps off.
 - **Syrup is easy to spot.** It's a darker, thicker syrup now, so you can see the sticky puddles on the
   waffle even on a small tablet. The waffle's holes, the top of the pancake hill and the cake stage's gumdrop
   hill are a little darker too, so an orange or green fighter stands out on them.

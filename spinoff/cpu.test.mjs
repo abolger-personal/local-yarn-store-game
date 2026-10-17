@@ -68,6 +68,15 @@ const me = (s) => s.fighters.find((f) => f.id === 'cpu1');
   assert.equal(modeOf(snapWith([bad, bad]), f), 'raid', 'it raids while its shelf holds no hero donuts');
   assert.equal(modeOf(snapWith([bad, hero]), f), 'defend', 'and defends once it holds one');
   assert.equal(modeOf(snapWith([bad]), { ...f, carrying: hero }), 'home', 'carrying, it runs home');
+
+  // REUSE-SPEC.md §Scoring: rung out, it waits with everyone else, then sets off again (the sim ignores taps while out)
+  const cpu = createCpu('cpu1'), sent = [];
+  for (let t = 0; t < 4 * REACT_TICKS; t++) {
+    const respawn = t < 2 * REACT_TICKS ? 1 : 0;
+    const input = cpu.input(/** @type {any} */ ({ tick: t, phase: 'play', over: false, bricks: [], shelves: [shelf([bad])], fighters: [{ ...f, move: 'idle', respawn }] }));
+    if (input.target) sent.push([t, respawn]);
+  }
+  assert.deepEqual(sent.map(([, r]) => r), [0], `it aims once, after the wait (${JSON.stringify(sent)})`);
 }
 
 console.log('cpu ok');

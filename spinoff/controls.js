@@ -71,7 +71,7 @@ export function pickTarget(stage, snap, ray, myId) {
   const me = snap.fighters.find((f) => f.id === myId);
   const donut = closest(snap.donuts, (d) => rayDist(ray, d.x, d.y + DONUT_UP, d.z), TAP_RADIUS.donut);
   if (donut) return { thing: 'donut', id: donut.id };
-  const foe = closest(snap.fighters.filter((f) => f.team !== me?.team), (f) => fighterDist(ray, f), TAP_RADIUS.foe);
+  const foe = closest(snap.fighters.filter((f) => f.team !== me?.team && !f.respawn), (f) => fighterDist(ray, f), TAP_RADIUS.foe);
   if (foe) return { thing: 'fighter', id: foe.id };
   if (me && fighterDist(ray, me) <= TAP_RADIUS.me) return { stop: true };
   const shelf = closest(snap.shelves, (s) => shelfDist(ray, s), TAP_RADIUS.shelf);

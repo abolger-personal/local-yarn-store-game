@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, ROUND_SECONDS, TICK_HZ, outside } from './match.js';
 import { STAGES, TUTORIAL } from './levels.js';
-import { CALM_DRAIN, CALM_TICKS, DUMMY, SPRING_LIFT, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
+import { CALM_DRAIN, CALM_TICKS, DUMMY, RESPAWN_WAIT, SPRING_LIFT, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
 import { BOUNCE } from './generate.js';
 
 // The tutorial's layout and syrup with the gapped wall (the hand-made stages' fort), so routing has gaps to find; heroes start beside their shelf
@@ -287,11 +287,21 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
   run(m, 400, once({ target: { x: -4, z: -1, y: 0 } }, 'brute'));
   run(m, 400, once({ target: { x: -4, z: 1.2, y: 0 } }, 'brute'));
   const goal = me(snapshot(m)).target;
-  let out = null;
-  run(m, 300, (s, i) => say({ punch: i % 30 === 0 }, 'brute'), (s) => { if (!out && me(s).invincible) out = me(s); });
-  const r = STAGE.ringOut;
+  let out = null, waited = 0, at = null;
+  const punchOrTap = (s, i) => (me(s).respawn > 0 ? say({ target: { x: -6, z: 0 }, punch: true }) : say({ punch: i % 30 === 0 }, 'brute'));
+  run(m, 600, punchOrTap, (s) => {
+    const kid = me(s);
+    if (kid.respawn > 0 && !out) {
+      waited++;
+      at ??= { x: kid.x, y: kid.y, z: kid.z };
+      assert.ok(!kid.invincible && kid.x === at.x && kid.y === at.y && kid.z === at.z && kid.move !== 'punch', 'out of play while it waits, taps and all');
+    } else if (!out && kid.invincible) out = kid;
+  });
+  const r = STAGE.ringOut, shelf = snapshot(m).shelves.find((s) => s.team === 'heroes');
   assert.ok(out, 'the kid was knocked off the front edge');
-  assert.ok(out.x >= r.x0 && out.x <= r.x1 && out.z <= r.z1 && out.y >= r.y, 'and is back in play on the same tick');
+  assert.equal(waited, RESPAWN_WAIT, `and waited ${RESPAWN_WAIT / TICK_HZ} s out of play`);
+  assert.ok(near(at.x, shelf.x) && at.y > shelf.y && at.z > shelf.z, 'with the snapshot saying where it drops in, above its shelf');
+  assert.ok(out.x >= r.x0 && out.x <= r.x1 && out.z <= r.z1 && out.y >= r.y, 'then drops back in, invincible');
   assert.equal(out.percent, 0, 'percent reset');
   assert.deepEqual(out.target, goal, 'still heading where it was going');
   const snap = run(m, 600);
@@ -442,6 +452,36 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
   run(m, 600, shelf);
   snap = run(m, 400, once({ kick: true }));
   assert.ok(me(snap).carrying, 'one kick moves the guard out of the way, and the grab follows without another tap');
+}
+
+// REUSE-SPEC.md §Scoring: kick the guard off its base and there's time to grab before it's back
+{
+  const m = createMatch([hero, dummy], STAGE);
+  const shelf = once({ target: { thing: 'shelf', team: 'badGuys' } }), guard = m.fighters.find((f) => f.id === 'dummy');
+  guard.y = -50;
+  run(m, 1200, shelf);
+  assert.ok(!me(snapshot(m)).carrying, 'the dummy guards its shelf');
+  guard.percent = 300;
+  let grabbed = null, back = null;
+  run(m, 2 * RESPAWN_WAIT, once({ kick: true }), (s) => {
+    if (!grabbed && me(s).carrying) grabbed = me(s, 'dummy');
+    if (grabbed && !back && !me(s, 'dummy').respawn) back = s.tick;
+  });
+  assert.ok(grabbed?.respawn > 0, `a kick knocks the guard off, and the grab follows while it waits (${grabbed?.respawn.toFixed(2)} s left)`);
+  assert.ok(back, 'then it drops back in');
+  assert.ok(RESPAWN_WAIT >= 2 * TICK_HZ && RESPAWN_WAIT <= 5 * TICK_HZ, 'the wait is the spec\'s 2-5 s');
+}
+
+{
+  const m = createMatch([hero, dummy], STAGE), out = m.fighters.find((f) => f.id === 'dummy');
+  out.y = -50;
+  tick(m, {});
+  Object.assign(m.fighters[0], { x: out.x - R, y: out.y, z: out.z, facing: 0, onGround: false, vy: 0 });
+  tick(m, {});
+  assert.equal(m.fighters[0].x, out.x - R, 'nothing bumps into a waiting fighter');
+  const hits = [];
+  run(m, 20, once({ punch: true }), (s) => hits.push(...s.hits));
+  assert.ok(me(snapshot(m), 'dummy').respawn > 0 && hits.length === 0, 'a punch right where a waiting fighter will drop in hits nothing');
 }
 
 // REUSE-SPEC.md §Stages and difficulty are separate: butter is slippery

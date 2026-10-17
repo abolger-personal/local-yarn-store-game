@@ -13,7 +13,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   score card between rounds. Dress up and tap 👍: you're still in the room, and everyone sees your new
   look. If the next round starts while you're dressing up, you wait with ⏳ and play the one after.
 - **Tricks.** Tap your gloves or your sword again for a ✨ sparkle, 🫧 bubbles or a 🔥 flame that pops out
-  when your punch lands. Tap again for the next one.
+  when your punch lands. Tap again for the next one. Your fighter shows it off on the dress-up page, so
+  you can see what each one does before you play.
 
 ### Levels
 - **Pick where to play.** 👍 in the lobby (instead of ▶️) shows the stages to choose from (🥞 breakfast
@@ -39,6 +40,10 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   with it. A wall one block high it just jumps; a taller wall it kicks down, one block at a time.
   Once it has one of your donuts, it goes home and guards its shelf, so you have to knock it out of
   the way to get your donut back. On level 2 it never hits you, only your blocks.
+- **The level 2 bad guy is slower.** It walks at a fifth of your speed and hops slowly too, so you can
+  catch it, and it can't hop out of the way of your punch.
+- **More room to knock the bad guy off on level 2.** The bad guys' deck, where their donuts are, is
+  twice as deep, so up there you can kick the bad guy off the end of the stage from anywhere along it.
 
 ### Fighting
 - **Everyone has their own start spot.** Each hero starts the match in a spot of their own, out in
@@ -52,6 +57,15 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   big 3, 2, 1 counts down over the spot where they'll drop back in. It's the same for you.
 - **You can put blocks in more places.** Right up against the deck, the fence or the end of your side,
   ⬇️ puts the block at your feet instead of shaking its head.
+- **Stacking blocks works every time.** Tapping one of your blocks while you carry another turns you to
+  face it, and ⬇️ stacks the new one on top. Before, the block you tapped could jump back into your
+  hands, or you got a head-shake, so you couldn't plug a gap with more than one block. Big fighters
+  (a cape, a sword) now put blocks down in front of them too, not short of where they're looking.
+- **Tapping a bad guy takes you the short way.** You walk straight up to it from the side you came
+  from, facing it, so your kick sends it off the way you were heading. Before, you were sometimes walked
+  all the way round it.
+- **Knocking a bad guy off doesn't send you to its donuts.** If you were chasing it, you stop where
+  you are instead of following it back to its shelf.
 - **You can't get stuck on top of your own blocks** any more, or a friend's: tap where you want to go
   and your fighter steps off.
 - **Syrup is easy to spot.** It's a darker, thicker syrup now, so you can see the sticky puddles on the

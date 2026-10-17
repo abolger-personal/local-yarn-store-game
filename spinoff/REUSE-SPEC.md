@@ -980,6 +980,11 @@ The on-screen model (the `ponytail:` note in the test) leaves out highlights and
 and side faces, and per-tablet GPU and panel differences, so a pair near its minimum is worth an eyeball on a
 real tablet.
 
+**Every new stage and theme passes the colour check before it ships** (decided 2026-10-17). A stage added to
+`STAGES` in `levels.js` is picked up on its own, generated seeds included; a new theme must list its `surfaces`
+in `scenery.js`. A failure is fixed by moving colours, never by loosening a rule to let it pass; a rule only
+changes when a tablet playtest says it is wrong.
+
 ## Theme: treats
 
 The spinoff is about donuts, not yarn (decided 2026-10-13). The yarn store keeps its `inventory/` untouched; the

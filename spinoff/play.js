@@ -7,7 +7,7 @@ import { KICK_COMBO, strikeOf } from './kicks.js';
 import { BAD_DONUT, BAD_GUY_FUR, MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
 import { BRICK, TICK_HZ, groundOf } from './match.js';
-import { levelBefore, levelFor } from './levels.js';
+import { beatLevel, levelBefore, levelFor, levelNumber } from './levels.js';
 import { makeStage } from './stage.js';
 import { SHELF_WOOD, THEMES } from './scenery.js';
 import { PIPING, box, donutMesh, sameLook } from './treats.js';
@@ -349,6 +349,8 @@ function showEnd(snap) {
     document.getElementById(`end-count-${s.team}`).textContent = String(s.donuts.length);
     card.querySelector(`.side.${s.team}`).classList.toggle('won', !snap.winner || snap.winner === s.team);
   }
+  // REUSE-SPEC.md §Fighter chooser: a hero whose end card shows their side won (a tie shows both) has beaten the level
+  if (fighters.get(ME)?.team === 'heroes' && snap.winner !== 'badGuys') beatLevel(levelNumber(level));
   card.hidden = false;
 }
 

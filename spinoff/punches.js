@@ -41,6 +41,15 @@ export const GLOVE = Object.freeze([
   key(0.27, { stretch: -0.45, size: 1.45 }), key(HOLD, { stretch: 0.15, size: 1.3 }), key(1, { stretch: 0, size: 1 }),
 ]);
 
+// The sword's world angle above forward (radians) through each punch, and how strongly its swoosh shows:
+// jab and cross chop down from over the shoulder, the uppercut slashes up from low in front
+export const SWORD_UP = 0.6;
+const swing = (wind, strike, hold) => Object.freeze([
+  key(0, { up: SWORD_UP, swoosh: 0 }), key(WIND, { up: wind, swoosh: 0 }), key(STRIKE, { up: strike, swoosh: 0.75 }),
+  key(HOLD, { up: hold, swoosh: 0 }), key(1, { up: SWORD_UP, swoosh: 0 }),
+]);
+export const SWING = Object.freeze({ jab: swing(1.9, -0.35, -0.25), cross: swing(2.2, -0.45, -0.35), uppercut: swing(0, 1.5, 1.4) });
+
 const ease = (k) => k * k * (3 - 2 * k);
 
 /** The keyframe values at progress t, eased between the keys either side. @returns {Record<string, number>} */

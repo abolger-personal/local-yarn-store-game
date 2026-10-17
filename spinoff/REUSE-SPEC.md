@@ -45,7 +45,7 @@ chooser is its own code in `spinoff/fighter.js`, with its own save.
 | `npc.js` | Species registry, `BASE_PARAMS` body proportions, `createCharacter` (procedural build → one rigid-skinned mesh per material family), `applyPose`, `groundCharacter`, `stepMotion`, `setViewMode` (`felted` / `grey` / `silhouette`), randomiser, `disposeCharacter` | `three`, `motion.js` |
 | `motion.js` | Spring-driven pose channels (19 joints + hold), interrupt-safe blending, idle layer (breath, weight shift, blinks, ear flicks), walk layer, `DANCES` step sequencer | nothing |
 | `llama.js`, `lion.js`, `owl.js` | Species kits: defaults, random ranges, presets (fleece / mane / feathers), per-species motion ranges, species `delighted` pose | `npc.js` |
-| `sparkle.js` | Timed particle burst on a character. Not used in the spinoff (decided 2026-10-13, amended 2026-10-16: the yarn store's sparkle reads as damage in a fighting game, not victory; the spinoff has its own effects in `spinoff/fx.js`) | `three` |
+| `sparkle.js` | Timed particle burst on a character. Only its star mesh is used, as the ✨ trick (see Costumes; decided 2026-10-13, amended 2026-10-17): the yarn store's burst over the head reads as damage in a fighting game, not victory, so hits use the spinoff's own effects in `spinoff/fx.js` | `three` |
 | `inventory/room-environment.js` | The lighting environment the felt look was tuned under | `three` |
 
 What matters more for a fighter than it did for a shop:
@@ -1029,7 +1029,7 @@ spinoff gets its own small `spinoff/treats.js` and reuses the generic parts.
 | `inventory/yarn-look.js` | `matcap` / `toon` shading, `oklch` frosting palette, `bakeVertexAO`, `makeHull` outlines, `CHARACTER_RANGE` (keeps treats from matching fur colours) | None; skip `applyHatching`, which is the yarn texture |
 | `inventory/notions.js` + `notion_processing.py --theme` | Flat treat pickups and icons (sprinkles, cookies, cherries) from black line art; colour is applied at runtime | A new `treats` theme of line-art PNGs next to `themes/cottage/` (brainstorm 2026-10-13) |
 | `inventory/yarn-geometry.js` | The pattern: a profile per family, lathed or tubed, seated on the floor | Copy the pattern into `treats.js`; the yarn file stays yarn |
-| `sparkle.js` | Not used: hits, steals and banking use the spinoff's own effects in `spinoff/fx.js` | None (decided 2026-10-13, amended 2026-10-16: the yarn store's sparkle reads as damage in a fighting game, not victory) |
+| `sparkle.js` | Only its stars, as the ✨ trick (`makeSparkle`'s mesh, timed by `fighter.js`); hits, steals and banking use the spinoff's own effects in `spinoff/fx.js` | None (decided 2026-10-13, amended 2026-10-16: the yarn store's sparkle reads as damage in a fighting game, not victory) |
 | `garments.js` bag (`GARMENTS.bag`, `buildBag`) | The fighter carries donuts in a worn bag, poking out | Donut meshes placed at the bag's opening in the spinoff; `garments.js` unchanged |
 | `inventory/catalog.js` | — | Not used; the treat list is a few lines in `treats.js` |
 
@@ -1046,10 +1046,32 @@ dough at 0.7: the shine difference does the work. Every new treat surface reuses
 The characters stay the yarn store's characters, so hats and capes stay knitwear from
 `garments.js`. Boxing gloves are the one costume piece that isn't knitted (see Costumes).
 
-## Costumes: hats, capes, bags, boxing gloves
+## Costumes: hats, capes, bags, boxing gloves or a sword
 
-Every fighter wears a bag and boxing gloves; a hat and a cape are the kid's choice (decided 2026-10-13). Each piece is
-in colours the kid picks.
+Every fighter wears a bag and boxing gloves or a sword; a hat and a cape are the kid's choice (decided 2026-10-13,
+amended 2026-10-17: a sword instead of gloves). Each piece is in colours the kid picks.
+
+- **A sword instead of the gloves** (decided 2026-10-17). The chooser's hands row offers 🥊 gloves or a sword,
+  never both (`look.hands`, `HANDS` in `fighter.js`; anything else reads back as gloves, so old saves and old
+  tablets still work). It shows only once this tablet's player has beaten level 1 (see Fighter chooser).
+  Bad guys and the training dummy keep gloves.
+  - **A toy, not a weapon:** a chunky flat blade with a rounded tip, a big rounded crossguard and a ball
+    pommel, about a third of the fighter's height. Blade and grip are in the gloves colour (the same swatch
+    row), with three slanted white candy stripes and a white guard and pommel (hot pink trim on a white sword).
+    The flat of the blade faces the match camera.
+  - **Held in the right hand** (joint side -1), or the owl's right wing tip where its glove would be. The
+    other hand is the bare paw or wing tip. Every punch of the string is swung with the sword arm, so it is
+    the near arm facing one way and the far arm facing the other.
+  - **The punch is a swing, nothing else changes.** The same punch string, timing and arm poses; the
+    blade keeps its own angle to the ground (`SWING` in `punches.js`): the jab and cross chop down from over
+    the shoulder, the uppercut slashes up from low in front, with a white swoosh fan behind the blade while
+    it lands. Hit spheres, reach (`entrantOf` still measures from the glove spots) and damage are the
+    gloves' exactly; `fighter.test.mjs` checks the reach.
+- **Tricks: tap the picked gloves or sword again** (decided 2026-10-17), the way a hat changes stitch.
+  A trick pops out of the hitting glove or the sword's tip while a punch lands, upright and turning:
+  ✨ sparkle (the yarn store's `characters/sparkle.js` stars), 🫧 bubbles, or 🔥 a cartoon flame.
+  Gloves go plain → ✨ → 🫧 → 🔥; a sword always has one, ✨ → 🫧 → 🔥 (`TRICKS`, `look.trick`).
+  Looks only, like the sword.
 
 - **Hats:** `garments.js` hat, as-is. Ten silhouettes already (beanie, beret, bucket, earflap,
   pixie, …); the chooser offers a handful.
@@ -1105,7 +1127,9 @@ only, pictures and colour, no words needed; every button has an `aria-label` for
 3. **Pick clothes.** Hat pictures and cape pictures (each with a "none" tile), bag pictures (no
    "none": every fighter carries a bag), each followed by its colour swatches (`CLOTH`: the riot
    colours plus white), then
-   glove colour. Icons are drawn in the colour currently picked. Tapping the hat or cape you
+   the hands row: 🥊 gloves, or a sword once you've beaten level 1, then their colour (decided 2026-10-17).
+   Tapping the gloves or sword you already have changes its trick, shown as a ✨ 🫧 🔥 badge on the icon,
+   and the preview throws a jab to show it off. Icons are drawn in the colour currently picked. Tapping the hat or cape you
    already wear knits it in the next stitch; the icon shows the stitch as a pattern. Each tap rebuilds the fighter
    (about 17 ms) on a gently turning preview.
 4. **Surprise me.** 🎲 runs the species' `randomise` plus a random outfit.
@@ -1125,7 +1149,15 @@ bad-guy grey, which is why a new fighter always starts from a `FUR` swatch.
 
 Trust boundary: `readFighter` is the only way in, from storage or from another tablet. It keeps
 only known param keys with the right type (finite numbers, booleans, `#rrggbb` colours, a name
-from the rig's `NAMES`), and only known hats, capes, bags and kid colours.
+from the rig's `NAMES`), and only known hats, capes, bags, hands, tricks and kid colours. The sword
+lock is the chooser's alone: a friend's sword from another tablet always shows.
+
+**The sword unlocks after level 1** (decided 2026-10-17). A hero whose end card shows the heroes won
+(a tie shows both sides won) has beaten that level; the tablet keeps the highest level beaten in
+`lys.progress.v1` (`{ "beaten": 1 }`, apart from the fighter; `levelsBeaten` / `beatLevel` in
+`levels.js`). Level 1 is the tutorial, recognised by its stage, since a guest's `start` doesn't carry
+the level number yet. Until then the chooser shows only gloves, and a saved or 🎲 sword becomes gloves.
+More unlocks behind later levels: brainstorm 2026-10-17.
 
 Not built yet: the silhouette reveal on the animal tiles (brainstorm 2026-10-13). There is no `help` control anywhere:
 scoring sets it (see Handicap).

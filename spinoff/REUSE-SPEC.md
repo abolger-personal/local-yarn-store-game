@@ -586,6 +586,15 @@ and smashers each get a round that is theirs.
   theirs as data; the generator draws them first (`startSpots` in `generate.js`), and the playability
   check fails a level whose spot is off the ground of the heroes' third, under a raised floor, or
   touches a brick, a patch or another spot. Bad guys still start beside their shelf.
+- **Every level fits the widest fighter** (decided 2026-10-17, playtest: level 2's fence gap was two
+  blocks wide, and a lion in a capelet is about 1.17). `WIDEST_FIGHTER` in `match.js` (1.25) is the widest
+  any outfit may be, which `fighter.test.mjs` holds every species in a capelet with a sword to. The
+  playability check (`check-level.mjs`) runs on every hand-made and generated level with a fighter that
+  wide: from its start spot it must get to its own shelf to bank, and to the bad guys' shelf through a
+  gap or by kicking a way in (a hole as wide as it needs). Walls built of floors, which can't be broken,
+  must leave a gap it fits: level 2's fence gap is three blocks wide, generated pillars leave 1.6 to 2,
+  and a step up to a tall deck is 1.4 wide. Tops a donut can land on are still checked with a typical
+  fighter (0.45), since any kid can fetch it.
 - **Blocks make stairs** (planned 2026-10-17). Two pieces:
   1. **Block tops are floors.** Route-finding knows the top of every block as somewhere to stand,
      so tapping the top of a wall walks you up any steps beside it, and a fighter can always walk

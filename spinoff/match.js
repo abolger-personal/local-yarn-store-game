@@ -25,6 +25,10 @@ export function outside(b, x, z) {
 /** Rectangles seen from above overlap by more than a rounding error. @param {{x0: number, x1: number, z0: number, z1: number}} a @param {{x0: number, x1: number, z0: number, z1: number}} b */
 export const overlaps = (a, b, e = 1e-9) => a.x0 < b.x1 - e && b.x0 < a.x1 - e && a.z0 < b.z1 - e && b.z0 < a.z1 - e;
 
+/** The widest a dressed-up fighter's body gets (a lion in a capelet is about 1.17): every stage lets one this wide
+ * reach both shelves, through a gap or a wall it can break (check-level.mjs); fighter.test.mjs keeps every outfit under it. */
+export const WIDEST_FIGHTER = 1.25;
+
 // REUSE-SPEC.md §Forts, Start spots come first
 export const MAX_HEROES = 6;
 /** A hero's block pile sits this far toward the middle from where the hero starts. */

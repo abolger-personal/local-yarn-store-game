@@ -49,12 +49,12 @@ const SHUT_IN = Object.freeze([-2, -1.6, -1.2, -0.8, -0.4, 0, 0.4, 0.8, 1.2, 1.6
 export const TUTORIAL = Object.freeze({ theme: 'breakfast', stage: Object.freeze({ ...TABLE, bricks: SHUT_IN }), breakIn: true, number: 1 });
 
 // REUSE-SPEC.md §Forts, Level 2: the building tutorial. A tall waffle fence (too high to jump onto from the ground, a step
-// up from the deck) closes off the yard in front of each shelf but for one obvious gap at the front, two blocks wide;
+// up from the deck) closes off the yard in front of each shelf but for one obvious gap at the front, three blocks wide (the widest fighter fits);
 // the kids start outside theirs with their piles. The bad guys' fort comes with the level: a two-high wall in front of
 // their deck, leaving its corner by the fence open, so the raider's way out is that corner and their gap.
 // The bad guys' deck twice as deep as breakfast's, so there is room to fight a bad guy up there and kick it off the end
 const BAD_DECK_FRONT = 0.4;
-const FENCE = /** @type {const} */ ({ kind: 'deck', x0: -6, x1: -5.6, z0: -2, z1: 1.2, y: 1.8 });
+const FENCE = /** @type {const} */ ({ kind: 'deck', x0: -6, x1: -5.6, z0: -2, z1: 0.8, y: 1.8 });
 /** @type {Level} */
 const BUILDING = Object.freeze({ theme: 'breakfast', number: 2, match: Object.freeze({ ...MATCH, badGuysHit: false, badGuyPace: 0.2 }), stage: Object.freeze({
   ...TABLE,

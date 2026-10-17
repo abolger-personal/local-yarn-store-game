@@ -53,7 +53,7 @@ function ends(r, stepUp) {
   /** @type {Floor} */
   const deck = { kind: 'deck', x0: -9, x1: -inner, z0: -2, z1: -0.8, y };
   /** @type {Floor} */
-  const step = { kind: 'deck', x0: -7, x1: -6, z0: -2, z1: -0.8, y: 0.9 };
+  const step = { kind: 'deck', x0: -7, x1: -5.6, z0: -2, z1: -0.8, y: 0.9 }; // wide enough to stand the widest fighter on
   return { floors: [...both(deck), ...(stepUp ? both(step) : [])], x: (9 + inner) / 2, y };
 }
 
@@ -63,9 +63,10 @@ function hill(r) {
   return { kind: 'hill', x0: -w / 2, x1: w / 2, z0: -d / 2, z1: d / 2, y: pick(r, 0.5, 0.8), round: r1(Math.min(w, d) / 3) };
 }
 
-/** Two pillars front and back, leaving one gap at ground level, in each team's third. A hop high, not more: every top must be reachable (a donut can land there). */
+/** Two pillars front and back, leaving one gap at ground level, in each team's third, wide enough for the widest fighter.
+ *  A hop high, not more: every top must be reachable (a donut can land there). */
 function choke(r) {
-  const gap = pick(r, 1, 1.4), z = pick(r, -0.6, 0.6);
+  const gap = pick(r, 1.6, 2), z = pick(r, -0.6, 0.6);
   /** @type {Floor} */
   const back = { kind: 'deck', x0: -3.8, x1: -3.2, z0: -2, z1: r1(z - gap / 2), y: 1.2 };
   return [...both(back), ...both({ ...back, z0: r1(z + gap / 2), z1: 2 })];

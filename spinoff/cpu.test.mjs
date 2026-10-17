@@ -50,7 +50,7 @@ const me = (s) => s.fighters.find((f) => f.id === 'cpu1');
 
 {
   // the kids' wall plugs their gap, two high: the raider kicks through it, a kick at a time
-  const plug = [1.2, 1.6].flatMap((z) => [0, BRICK].map((y) => ({ team: /** @type {const} */ ('heroes'), x: -6, z, y, hits: 2 })));
+  const plug = [0.8, 1.2, 1.6].flatMap((z) => [0, BRICK].map((y) => ({ team: /** @type {const} */ ('heroes'), x: -6, z, y, hits: 2 })));
   let kicked = 0, hitKid = 0, gap = Infinity, last = -Infinity;
   const end = play({ ...level.stage, bricks: [...level.stage.bricks, ...plug] }, 40, (s) => {
     if (s.hits.some((h) => h.on === 'fighter' && h.target === 'kid')) hitKid++;

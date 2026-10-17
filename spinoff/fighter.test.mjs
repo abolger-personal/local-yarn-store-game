@@ -11,6 +11,7 @@ import { wingShape } from '../characters/owl.js';
 import { floorGrid } from './roster.js';
 import { walkPhase } from '../characters/motion.js';
 import { SYRUP_SLOW, WALK_SPEED } from './sim.js';
+import { WIDEST_FIGHTER } from './match.js';
 
 const SHOP_VIEW_PX = LOOK.viewPx;
 LOOK.viewPx = 0;
@@ -139,11 +140,14 @@ for (const species of SPECIES) for (const cape of CAPES) {
   // ponytail: sampled, since species randomise() is Math.random only; 1.4 vs 1.26 widest of 600 is the margin
   for (let i = 0; i < BODIES; i++) {
     const f = randomFighter();
-    f.look = { ...f.look, cape: 'capelet', bag: 'crossbody pouch' };
+    f.look = { ...f.look, cape: 'capelet', bag: 'crossbody pouch', hands: 'sword' };
     const built = buildFighter(f);
     built.root.updateMatrixWorld(true);
     const size = new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3());
     assert.ok(size.x < cell && size.z < cell, `a ${built.species.id} (${size.x.toFixed(2)} × ${size.z.toFixed(2)}) spills out of its ${cell} lobby square`);
+    // the capelet sticks out furthest (a lion's about 1.17): every stage is checked with one WIDEST_FIGHTER wide (check-level.mjs)
+    const { width } = entrantOf(f, built, { id: 'a', team: 'heroes' });
+    assert.ok(width <= WIDEST_FIGHTER, `a ${built.species.id} in a capelet with a sword is ${width.toFixed(2)} wide, wider than every stage allows for (${WIDEST_FIGHTER})`);
     disposeFighter(built);
   }
 }

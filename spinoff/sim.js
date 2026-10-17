@@ -30,6 +30,8 @@ const JUMP_REACH = 1.2;
 const JUMP_COST = 2;
 const DROP_COST = 0.5;
 const SOFT_COST = 3;
+/** A squeeze deeper than a cell costs this much more for each cell deeper: only a wide body meets one, and goes round if it can. */
+const DEEP_COST = 200;
 const HOP_COST = 8;
 const WP_ARRIVE = 0.25;
 const ARRIVE = 0.02;
@@ -189,15 +191,23 @@ function cellKind(s, x, z, top, body) {
   return soft ? SOFT : OPEN;
 }
 
+/** How far into a body's room the taller floors at a soft cell reach: past a cell, a wide body is shoved hard (squeeze cost). */
+function squeezeAt(s, x, z, top, body) {
+  let most = 0;
+  for (const b of s.solids) if (b.kind === 'floor' && b.y1 > top + STEP && b.y0 < top + body.h) most = Math.max(most, body.r - toBox(b, x, z));
+  return most;
+}
+
 /** Each cell's floor top and whether a body of radius r fits there (open), hugs a raised floor (soft), must hop a one-high brick wall, or can't;
  *  how high a jump from it rises (a trampoline's launch, or the stage's jump); and which trampoline it is on or next to (index + 1, else 0). */
 function buildGrid(s, body) {
   const { nx, nz } = s.band, size = nx * nz;
-  const g = { ...s.band, top: new Float64Array(size), kind: new Uint8Array(size), up: new Float64Array(size), spring: new Uint8Array(size), jumpUp: s.jump.up };
+  const g = { ...s.band, top: new Float64Array(size), kind: new Uint8Array(size), squeeze: new Float64Array(size), up: new Float64Array(size), spring: new Uint8Array(size), jumpUp: s.jump.up };
   for (let n = 0; n < size; n++) {
     const p = { x: cellX(g, n), y: supportAt(s.floorBoxes, cellX(g, n), cellZ(g, n), Infinity), z: cellZ(g, n) };
     g.top[n] = p.y;
     g.kind[n] = cellKind(s, p.x, p.z, p.y, body);
+    if (g.kind[n] === SOFT) g.squeeze[n] = squeezeAt(s, p.x, p.z, p.y, body);
     g.up[n] = patchAt(s, s.stage.springs, p) < 0 ? s.jump.up : s.jump.springUp;
     g.spring[n] = patchAt(s, s.stage.springs, p, CELL) + 1;
   }
@@ -215,7 +225,8 @@ function stepCost(g, a, b, len) {
   if (g.kind[b] === BLOCKED || rise + (hopping ? BRICK : 0) > g.up[a]) return Infinity;
   const hop = (hopping ? HOP_COST : 0) + (g.spring[b] && !g.spring[a] ? HOP_COST : 0);
   const climb = (rise > STEP ? JUMP_COST : 0) + (rise < -STEP ? DROP_COST : 0);
-  return len * CELL * (g.kind[b] === SOFT ? SOFT_COST : 1) + hop + climb;
+  const soft = g.kind[b] === SOFT ? SOFT_COST + (DEEP_COST * Math.max(0, g.squeeze[b] - CELL)) / CELL : 1;
+  return len * CELL * soft + hop + climb;
 }
 
 const onGrid = (g, i, j) => i >= 0 && j >= 0 && i < g.nx && j < g.nz;
@@ -412,6 +423,12 @@ function plan(s, f) {
   if (start !== cellOf(g, f.x, f.z)) wps.unshift({ x: cellX(g, start), y: g.top[start], z: cellZ(g, start), jump: false, spring: -1 });
   const exact = found.reached && Math.hypot(goal.x - cellX(g, end), goal.z - cellZ(g, end)) <= CELL;
   if (exact) wps.push({ x: goal.x, y: goal.y, z: goal.z, jump: goal.y > (wps.at(-1)?.y ?? f.y) + STEP, spring: -1 });
+  // a jump lands where the body fits: a wide one can't land on a cell's middle up against a taller floor (playtest)
+  for (const w of wps) if (w.jump) {
+    const p = { x: w.x, y: w.y, z: w.z };
+    pushOut(s, p, f.r, f.h);
+    if (supportAt(s.solids, p.x, p.z, p.y) === w.y) Object.assign(w, { x: p.x, z: p.z });
+  }
   f.nav = { goal: { x: goal.x, y: goal.y, z: goal.z }, wps: pull(g, f, wps), k: 0, done: false, failed: false,
     blocked: !found.reached, at: s.tick, bricks: s.brickKey, end: null };
 }
@@ -486,7 +503,8 @@ function follow(s, f) {
   while (n.k < n.wps.length - 1 && !n.wps[n.k].jump && n.wps[n.k + 1].spring < 0 && flat(f, n.wps[n.k]) < WP_ARRIVE) n.k++;
   const wp = n.wps[n.k];
   if (arrived(f, n, wp)) { arrive(f); return; }
-  const leap = [wp, n.wps[n.k + 1]].find((w) => canLeap(s, f, w));
+  // the route's next jump, once in reach: a wide body may never stand on the last ground cells before it (playtest)
+  const leap = [wp, n.wps[n.k + 1], n.wps.slice(n.k).find((w) => w.jump)].find((w) => canLeap(s, f, w));
   if (leap && !f.attack) leapTo(s, f, leap);
   else f.walkTo = wp;
 }
@@ -510,10 +528,21 @@ function slide(s, f, dx, dz) {
   if (f.onGround) inStage(s, f);
 }
 
-/** Stuck: barely moving for STUCK_TICKS. On butter, barely moving for the speed it's sliding at, since it slows right down to settle. */
+/** How fast a fighter walks where it stands: its pace, slowed in syrup. */
+const topSpeed = (s, f) => WALK_SPEED * paceOf(s, f) * (patchAt(s, s.stage.puddles, f) < 0 ? 1 : SYRUP_SLOW);
+
+/**
+ * Stuck: barely closing on the waypoint over STUCK_TICKS, net, so jittering on the spot counts as stuck. On butter, barely
+ * moving for the speed it's sliding at, since it slows right down to settle.
+ */
 function stuckCheck(s, f, moved) {
-  if (moved == null || moved >= DT * 0.2 * (f.slick ? Math.hypot(f.vx, f.vz) : WALK_SPEED * paceOf(s, f))) f.stuck = 0;
-  else if (++f.stuck >= STUCK_TICKS) fail(f);
+  const slow = DT * 0.2 * (f.slick ? Math.hypot(f.vx, f.vz) : topSpeed(s, f));
+  if (moved == null) { f.stuck = 0; return; }
+  if (f.stuck === 0) f.gain = 0;
+  f.gain += moved;
+  if (++f.stuck < STUCK_TICKS) return;
+  if (f.gain < slow * STUCK_TICKS) fail(f);
+  f.stuck = 0;
 }
 
 // REUSE-SPEC.md §Mode: players wade straight through; ponytail: weight syrup cells in A* if NPCs should go round
@@ -523,8 +552,7 @@ function stuckCheck(s, f, moved) {
  * sliding off again. ponytail: routing ignores butter too.
  */
 function walkVelocity(s, f, to) {
-  const dx = to ? to.x - f.x : 0, dz = to ? to.z - f.z : 0, d = Math.hypot(dx, dz);
-  const top = WALK_SPEED * paceOf(s, f) * (patchAt(s, s.stage.puddles, f) < 0 ? 1 : SYRUP_SLOW);
+  const dx = to ? to.x - f.x : 0, dz = to ? to.z - f.z : 0, d = Math.hypot(dx, dz), top = topSpeed(s, f);
   const v = d > EPS ? Math.min(top, f.slick ? d * BUTTER_BRAKE : d / DT) / d : 0;
   if (!f.slick) { Object.assign(f, { vx: dx * v, vy: 0, vz: dz * v }); return d; }
   if (dx * f.vx + dz * f.vz < 0) f.passed = true;
@@ -539,7 +567,9 @@ function walkStep(s, f) {
   const to = paused ? null : f.walkTo, x0 = f.x, z0 = f.z, was = patchAt(s, s.stage.springs, f);
   const d = walkVelocity(s, f, to);
   slide(s, f, f.vx * DT, f.vz * DT);
-  stuckCheck(s, f, to && !f.attack && d > ARRIVE ? Math.hypot(f.x - x0, f.z - z0) : null);
+  // closing on the waypoint, not just moving: a body wedged between two things jitters on the spot without getting anywhere
+  const moved = f.slick ? Math.hypot(f.x - x0, f.z - z0) : d - flat(f, to ?? f);
+  stuckCheck(s, f, to && !f.attack && d > ARRIVE ? moved : null);
   const top = supportAt(s.solids, f.x, f.z, f.y);
   if (top < f.y - STEP) { f.onGround = false; f.airTo = f.walkTo; return; }
   f.y = top;
@@ -960,7 +990,7 @@ function spawnSpot(s, e, cursor) {
 function newFighter(e, at, y) {
   return { id: e.id, team: e.team, icing: e.look.frosting, block: null, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
     x: at.x, y, z: at.z, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, onGround: true, jumps: 1,
-    target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, fails: 0, stuck: 0, away: false, slick: false, passed: false, sprung: -1,
+    target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, fails: 0, stuck: 0, gain: 0, away: false, slick: false, passed: false, sprung: -1,
     attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, out: 0, percent: 0, calm: 0,
     carrying: null, touching: [], shelfDone: false, blocked: false };
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { generateStage } from './generate.js';
-import { checkLevel, ticksToShelf } from './check-level.mjs';
+import { NARROW, checkLevel, ticksToShelf } from './check-level.mjs';
 import { TICK_HZ } from './match.js';
 import { levelFor } from './levels.js';
 
@@ -18,8 +18,8 @@ for (const name of NAMES) for (const d of DIFFICULTIES)
     assert.deepEqual(stage.starts, generateStage(seed, d + 1, name).starts, `${at}: start spots come first, from the seed alone`);
     checkLevel(stage, at);
     // Fairness of the terrain: with the bad guys' pre-placed fort taken away and both teams starting beside their shelf, both raids take the same time.
-    const open = { ...stage, bricks: [], starts: undefined }, h = ticksToShelf(open, 'heroes'), b = ticksToShelf(open, 'badGuys');
-    raid.heroes.push(ticksToShelf(stage) / TICK_HZ);
+    const open = { ...stage, bricks: [], starts: undefined }, h = ticksToShelf(open, 'heroes', false, NARROW), b = ticksToShelf(open, 'badGuys', false, NARROW);
+    raid.heroes.push(ticksToShelf(stage, 'heroes', false, NARROW) / TICK_HZ);
     raid.badGuys.push(b / TICK_HZ);
     raid.ratio.push(h / b);
   }

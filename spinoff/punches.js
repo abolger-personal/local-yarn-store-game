@@ -12,7 +12,9 @@ export const COMBO_TICKS = 150;
 
 const REST = Object.freeze({ hit: 0, guard: 0, hitOut: POSES.rest.armOut, guardOut: POSES.rest.armOut, elbow: POSES.rest.elbowBend });
 const key = (t, p) => Object.freeze([t, Object.freeze({ ...REST, twist: 0, roll: 0, lean: 0, knee: 0, hip: 0, pitch: 0, ...p })]);
-const WIND = 0.14, STRIKE = 0.25, HOLD = 0.5;
+const WIND = 0.14, HOLD = 0.5;
+/** How far through a punch its glove lands. */
+export const STRIKE = 0.25;
 const timeline = (wind, strike, hold) => Object.freeze([key(0, {}), key(WIND, wind), key(STRIKE, strike), key(HOLD, hold), key(1, {})]);
 
 // hit/guard: each arm's forward swing (negative is forward); twist brings the hitting shoulder forward, roll lifts it;

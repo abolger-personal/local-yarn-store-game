@@ -5,7 +5,7 @@ import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import {
   BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, buildFighter, disposeFighter, gloveAnchors, isBadGuyCloth, isBadGuyFur, nearestSwatch,
-  IDLE, entrantOf, newFighter, randomFighter, readFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz,
+  IDLE, SHOW_OFF, entrantOf, newFighter, randomFighter, readFighter, seatDrop, setFur, showOffTrick, stepFighter, wobbleAt, wobbleHz,
 } from './fighter.js';
 import { wingShape } from '../characters/owl.js';
 import { floorGrid } from './roster.js';
@@ -259,6 +259,27 @@ for (const species of SPECIES) {
   assert.deepEqual(shown(1, 0.25), [false, true], 'only the hitting glove blows bubbles');
   assert.deepEqual(shown(-1, 0.25), [true, false]);
   assert.deepEqual(shown(-1, 0.8), [false, false], 'and only while the punch lands');
+  disposeFighter(built);
+}
+
+// The chooser's preview hits nothing, so after its jab lands the trick floats up off the hand to be seen.
+for (const [hands, trick] of [['sword', 'sparkle'], ['sword', 'flame'], ['gloves', 'bubble'], ['gloves', 'sparkle']]) {
+  const f = newFighter('lion'), built = buildFighter({ ...f, look: { ...f.look, hands, trick } });
+  const g = built.tricks.at(-1).userData.side === -1 ? built.tricks.at(-1) : built.tricks[0];
+  const meshes = () => { let n = 0; g.traverse((o) => { if (o instanceof THREE.Mesh && o.visible) n++; }); return n; };
+  showOffTrick(built, -1, 0.1);
+  const early = { y: g.userData.spin.position.y, size: g.scale.x };
+  showOffTrick(built, -1, SHOW_OFF * 0.6);
+  assert.ok(g.visible && meshes() > 0 && built.tricks.every((t) => t === g || !t.visible), `${hands} ${trick}: shows on the jabbing side, and only there`);
+  assert.ok(early.size >= 1.3 && g.userData.spin.position.y > early.y, `${hands} ${trick}: big, and floating up`);
+  showOffTrick(built, -1, SHOW_OFF);
+  assert.ok(!g.visible, `${hands} ${trick}: gone after the show-off`);
+  disposeFighter(built);
+}
+{
+  const f = newFighter('owl'), built = buildFighter(f);
+  showOffTrick(built, -1, 0.1);
+  assert.equal(built.tricks.length, 0, 'plain gloves show nothing');
   disposeFighter(built);
 }
 

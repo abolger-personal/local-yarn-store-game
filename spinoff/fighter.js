@@ -229,11 +229,9 @@ function swordGeometry() {
     new THREE.CylinderGeometry(0.02, 0.02, grip, 12).rotateX(Math.PI / 2),
     new THREE.CapsuleGeometry(wide / 2, blade, 6, 14).rotateX(Math.PI / 2).scale(thick / wide, 1, 1).translate(0, 0, at + blade / 2 + wide / 2),
   ]);
-  const stripes = [0.3, 0.55, 0.8].map((k) => new THREE.BoxGeometry(thick * 1.15, wide * 0.9, 0.024).rotateX(0.5).translate(0, 0, at + k * blade));
   const trim = mergeGeometries([
     new THREE.CapsuleGeometry(0.034, guard, 4, 12).translate(0, 0, at),
     new THREE.SphereGeometry(0.034, 14, 10).translate(0, 0, -grip / 2 - 0.018),
-    ...stripes,
   ]);
   const trail = new THREE.RingGeometry(at + 0.04, at + blade + wide / 2, 12, 1, 0, SWORD.trail).rotateY(-Math.PI / 2);
   swordGeo = { handle, trim, trail };
@@ -307,7 +305,7 @@ const bit = (geo, mat, [x, y, z], r) => {
 /** The trick's look, about a glove across, centred on its origin. */
 function trickMesh(kind, built) {
   const p = trickPartsOnce(), g = new THREE.Group();
-  if (kind === 'sparkle') g.add(makeSparkle(built).mesh);
+  if (kind === 'sparkle') g.add(Object.assign(makeSparkle(built).mesh, { visible: true }));
   if (kind === 'bubble') {
     for (const [x, y, z, r] of BUBBLES) g.add(bit(p.ball, p.bubble, [x, y, z], r));
   }
@@ -341,18 +339,29 @@ export function removeTricks(built) {
 
 const _q = new THREE.Quaternion(), _up = new THREE.Quaternion();
 
+/** Shows only `side`'s trick (none for null), upright, `size` times its own, turned and risen. */
+function poseTricks(built, side, size, turn, rise) {
+  for (const g of built.tricks ?? []) {
+    g.visible = g.userData.side === side;
+    if (!g.visible) continue;
+    g.quaternion.copy(g.parent.getWorldQuaternion(_q).invert().multiply(built.root.getWorldQuaternion(_up)));
+    g.scale.setScalar(size);
+    g.userData.spin.rotation.y = turn;
+    g.userData.spin.position.y = rise;
+  }
+}
+
 /** The hitting hand's trick pops up, upright and turning, through the swoosh of the punch. */
 export function stepTricks(built, punch) {
   const k = punch ? sample(SWING[punch.name], punch.step).swoosh / 0.75 : 0;
-  for (const g of built.tricks ?? []) {
-    g.visible = k > 0.02 && g.userData.side === punch.arm;
-    if (!g.visible) continue;
-    g.quaternion.copy(g.parent.getWorldQuaternion(_q).invert().multiply(built.root.getWorldQuaternion(_up)));
-    g.scale.setScalar(0.3 + k);
-    g.userData.spin.rotation.y = punch.step * 9;
-    g.userData.spin.position.y = 0.12 * punch.step;
-  }
+  poseTricks(built, k > 0.02 ? punch.arm : null, 0.3 + k, (punch?.step ?? 0) * 9, 0.12 * (punch?.step ?? 0));
 }
+
+// REUSE-SPEC.md §Fighter chooser: the preview never hits anything, so its trick stays out to be seen
+export const SHOW_OFF = 1.2;
+/** The chooser's trick, `t` seconds after its jab would land: big, floating up off the hand, gone after SHOW_OFF. */
+export const showOffTrick = (built, side, t) =>
+  poseTricks(built, t >= 0 && t < SHOW_OFF ? side : null, 1.4 * Math.min(1, 4 * (1 - t / SHOW_OFF)), t * 5, 0.35 * (t / SHOW_OFF));
 
 /** Same order as the shop's `dressedCharacter` (store/sim/cast.js): dress unmerged, then merge. @param {Fighter} f */
 export function buildFighter(f) {

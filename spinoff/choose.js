@@ -1,9 +1,10 @@
 import {
   BAGS, CAPES, CLOTH, FUR, HANDS, HATS, SPECIES, TEXTURES, TRICKS, animateFighter, buildFighter, disposeFighter, loadFighter, newFighter,
-  randomFighter, saveFighter, setFur, stepFighter,
+  randomFighter, saveFighter, setFur, showOffTrick, stepFighter,
 } from './fighter.js';
 import { POSES } from '../characters/npc.js';
 import { levelsBeaten } from './levels.js';
+import { STRIKE } from './punches.js';
 import { makeStage } from './stage.js';
 
 const ANIMAL = { lion: '🦁', llama: '🦙', owl: '🦉' };
@@ -49,7 +50,7 @@ const allowed = (f) => {
 const TRICK_ICON = { plain: '', sparkle: '✨', bubble: '🫧', flame: '🔥' };
 
 let fighter = allowed(loadFighter() ?? newFighter('lion'));
-let built = null, cheer = 0, spin = 0, swing = 1;
+let built = null, cheer = 0, spin = 0, swing = 1, landed = Infinity;
 const panel = document.getElementById('panel');
 
 const button = (action, value, label, inner, on) =>
@@ -159,7 +160,10 @@ stage.run((dt) => {
   cheer = Math.max(0, cheer - dt);
   spin += dt;
   built.root.rotation.y = 0.55 * Math.sin(spin * 0.5);
+  const was = swing;
   swing = Math.min(1, swing + dt / 0.7);
+  landed = was < STRIKE && swing >= STRIKE ? 0 : landed + dt;
   if (swing < 1) stepFighter(built, dt, POSES.rest, 0, { name: 'jab', arm: -1, step: swing });
   else animateFighter(built, dt, cheer > 0 ? 'delighted' : 'rest');
+  if (swing >= STRIKE) showOffTrick(built, -1, landed);
 });

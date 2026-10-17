@@ -1075,7 +1075,7 @@ amended 2026-10-17: a sword instead of gloves). Each piece is in colours the kid
   Bad guys and the training dummy keep gloves.
   - **A toy, not a weapon:** a chunky flat blade with a rounded tip, a big rounded crossguard and a ball
     pommel, about a third of the fighter's height. Blade and grip are in the gloves colour (the same swatch
-    row), with three slanted white candy stripes and a white guard and pommel (hot pink trim on a white sword).
+    row), plain, with a white guard and pommel (hot pink trim on a white sword).
     The flat of the blade faces the match camera.
   - **Held in the right hand** (joint side -1), or the owl's right wing tip where its glove would be. The
     other hand is the bare paw or wing tip. Every punch of the string is swung with the sword arm, so it is
@@ -1147,7 +1147,8 @@ only, pictures and colour, no words needed; every button has an `aria-label` for
    colours plus white), then
    the hands row: 🥊 gloves, or a sword once you've beaten level 1, then their colour (decided 2026-10-17).
    Tapping the gloves or sword you already have changes its trick, shown as a ✨ 🫧 🔥 badge on the icon,
-   and the preview throws a jab to show it off. Icons are drawn in the colour currently picked. Tapping the hat or cape you
+   and the preview throws a jab to show it off. The preview hits nothing, so once the jab lands its
+   trick floats up off the glove or sword tip, big, for 1.2 s (`showOffTrick`), so a kid sees what it does. Icons are drawn in the colour currently picked. Tapping the hat or cape you
    already wear knits it in the next stitch; the icon shows the stitch as a pattern. Each tap rebuilds the fighter
    (about 17 ms) on a gently turning preview.
 4. **Surprise me.** 🎲 runs the species' `randomise` plus a random outfit.

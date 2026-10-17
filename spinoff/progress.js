@@ -5,7 +5,7 @@ import { LEVELS, STAGES, levelOf } from './levels.js';
 
 /** @typedef {import('./generate.js').StageName} StageName @typedef {import('./match.js').Team} Team */
 /**
- * `beaten`: the highest level won or tied (the sword's unlock, REUSE-SPEC.md §Fighter chooser); `reached`: per stage,
+ * `beaten`: the highest level won (the sword's unlock, REUSE-SPEC.md §Fighter chooser); `reached`: per stage,
  * the highest level its player may pick (every stage they have starts at 1).
  * @typedef {{ beaten: number, reached: Partial<Record<StageName, number>> }} Progress
  * @typedef {{ beaten: number, reached: number, next: number }} Outcome
@@ -49,13 +49,12 @@ export const reachedOn = (p, name) => p.reached[name] ?? 1;
 
 /**
  * A hero's result on level `n` of stage `name` (0: a layout picked by address). A win reaches the next level and ▶️
- * plays it, if there is one; a loss or a tie replays. A tie still counts as beating the level, as the sword was built
- * (REUSE-SPEC.md §Fighter chooser), though it reaches nothing new.
+ * plays it, if there is one; a loss or a tie replays, and beats nothing (REUSE-SPEC.md §After the lobby).
  * @param {string} name @param {number} n @param {Team|null} winner @returns {Outcome}
  */
 export function outcomeOf(name, n, winner) {
   const won = winner === 'heroes' && n > 0;
-  return { beaten: winner === 'badGuys' ? 0 : n, reached: won ? n + 1 : 0, next: won && levelOf(name, n + 1) ? n + 1 : n };
+  return { beaten: won ? n : 0, reached: won ? n + 1 : 0, next: won && levelOf(name, n + 1) ? n + 1 : n };
 }
 
 /** Progress after an outcome on stage `name`: nothing is ever taken back. @param {Progress} p @param {string} name @param {Outcome} o @returns {Progress} */

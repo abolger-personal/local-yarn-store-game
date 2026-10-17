@@ -25,14 +25,15 @@ assert.deepEqual(readProgress({ beaten: 1 }), { beaten: 1, reached: {} }, "the s
 
 assert.deepEqual(outcomeOf('breakfast', 1, 'heroes'), { beaten: 1, reached: 2, next: 2 }, 'a win reaches the next level, and ▶️ plays it');
 assert.deepEqual(outcomeOf('breakfast', 2, 'badGuys'), { beaten: 0, reached: 0, next: 2 }, 'a loss replays');
-assert.deepEqual(outcomeOf('breakfast', 1, null), { beaten: 1, reached: 0, next: 1 }, 'a tie replays, though it beats level 1 for the sword');
+assert.deepEqual(outcomeOf('breakfast', 1, null), { beaten: 0, reached: 0, next: 1 }, 'a tie replays and beats nothing, not even level 1');
 assert.equal(outcomeOf('breakfast', LEVELS.breakfast.length, 'heroes').next, LEVELS.breakfast.length, 'past the last level there is nothing new to play');
 assert.deepEqual(outcomeOf('cake', 0, 'heroes'), { beaten: 0, reached: 0, next: 0 }, 'a layout picked by address unlocks nothing');
 
 store.clear();
 recordOutcome('breakfast', outcomeOf('breakfast', 1, null));
-assert.equal(levelsBeaten(), 1, 'a tie on level 1 unlocks the sword, saved straight away');
+assert.equal(levelsBeaten(), 0, 'a tie on level 1 does not unlock the sword');
 recordOutcome('breakfast', outcomeOf('breakfast', 1, 'heroes'));
+assert.equal(levelsBeaten(), 1, 'a win on level 1 does, saved straight away');
 recordOutcome('breakfast', outcomeOf('breakfast', 1, 'badGuys'));
 assert.deepEqual(loadProgress(), { beaten: 1, reached: { breakfast: 2 } }, 'a win reaches level 2, in the one save beside the sword\'s, and a loss takes nothing back');
 store.set(PROGRESS_KEY, JSON.stringify({ beaten: 3, reached: { breakfast: 4 } }));

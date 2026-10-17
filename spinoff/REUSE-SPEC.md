@@ -1216,8 +1216,8 @@ only known param keys with the right type (finite numbers, booleans, `#rrggbb` c
 from the rig's `NAMES`), and only known hats, capes, bags, hands, tricks and kid colours. The sword
 lock is the chooser's alone: a friend's sword from another tablet always shows.
 
-**The sword unlocks after level 1** (decided 2026-10-17). A hero whose end card shows the heroes won
-(a tie shows both sides won) has beaten that level; the tablet keeps the highest level beaten in
+**The sword unlocks after level 1** (decided 2026-10-17). A hero whose team won has beaten that level; a
+tie never counts, not even on level 1 (decided 2026-10-17); the tablet keeps the highest level beaten in
 the game save (`lys.progress.v1`'s `beaten`, apart from the fighter; `levelsBeaten` / `beatLevel` in
 `progress.js`), by the level number `start` carries. Until then the chooser shows only gloves, and a saved or 🎲 sword becomes gloves.
 More unlocks behind later levels: brainstorm 2026-10-17.
@@ -1263,8 +1263,8 @@ starts the match (the host in a room, or a tablet playing by itself). Built in t
   next round on whatever level it is.
 - **A win unlocks the next level** (decided 2026-10-17). Winning a level saves the next one as
   reached, and ▶️ on that end card plays it (if there is one); after a loss or a tie, ▶️ plays the
-  same level again (`outcomeOf`). Each hero's tablet saves its own. A tie still counts as beating the
-  level for the sword (Fighter chooser), so the sword's rule and the level rule differ on a tie.
+  same level again (`outcomeOf`). Each hero's tablet saves its own. A tie never beats a level, for
+  the sword or anything else (decided 2026-10-17).
 - **One game save per browser:** the highest level and the stages each player has reached are
   saved in their browser as the whole game's progress, apart from the fighter, so re-rolling or
   re-dressing a fighter keeps it (decided 2026-10-17). It travels with the fighter when they join a

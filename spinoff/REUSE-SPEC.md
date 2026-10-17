@@ -848,12 +848,14 @@ connect every time):
   the same room. The host's old page detaches as it sends `again`, so a guest that reloads first
   never gets the finished round's `start`. Guests' ▶️ on the end card and the ⏸ card is hidden,
   and so is their ⏸. 👋 goes back to the lobby's first screen, out of the room.
-- **Late joiners play the next round** (decided 2026-10-15; 0.0.3). The roster stays fixed for a round. The match is in the
+- **Late joiners play the next round** (decided 2026-10-15; 0.0.3; amended 2026-10-17: dressing up). The roster stays fixed for a round. The match is in the
   lobby's room, so a tablet that taps 🔑 mid-match meets the players there. One that isn't playing
-  (it arrives after `start`, or was still on the lobby screen at `start`) gets `playing` from the host, once, and its
+  (it arrives after `start`, or was still on the lobby screen at `start`) gets `playing` from the host, once per arrival (a tablet back from the chooser
+  arrives again, so it is told again), and its
   lobby shows ⏳ beside 👋 (its own fighter and the host's stand on the floor) until `go`, or until
   the host leaves the lobby room. The host's next round page sends `go` to everyone in the room
-  not on their way, so they load the match like any guest. `playing` is the only extra message: a joiner learns the room is
+  not on their way, so they load the match like any guest. `playing` and `dressing` (a tablet that went to the chooser
+  instead of the match, so the host stops waiting for it; A room session outlasts every screen) are the only extra messages: a joiner learns the room is
   mid-match from the host answering it, not from anything announced. The room code (the lobby's treats) shows on the end,
   ⏸ and ⏳ cards, never on the in-play HUD.
 
@@ -914,7 +916,7 @@ the sticker card and bad-guy players are brainstorm, see Bad guys).
 
 | Crosses | Stays local on each tablet |
 | --- | --- |
-| Join: the `lys.fighter.v1` save (species, params, outfit, gloves) and the sticker card (`lys.stamps.v1`, see Bad guys, Saving progress), about 2 KB of JSON sent once; never `help`, which the host sets; or, for a bad-guy player, only "bad guy" (the preset comes from the sorted ids) | Building the character from those params (`createCharacter` is deterministic from params; randomness lives only in `randomise*`) |
+| Join: the `lys.fighter.v1` save (species, params, outfit, gloves) and the sticker card (`lys.stamps.v1`, see Bad guys, Saving progress), about 2 KB of JSON sent on meeting and again whenever the fighter is changed in a room (amended 2026-10-17); never `help`, which the host sets; or, for a bad-guy player, only "bad guy" (the preset comes from the sorted ids) | Building the character from those params (`createCharacter` is deterministic from params; randomness lives only in `randomise*`) |
 | Inputs, guest → host | Spring rig, idle layer, blinks, ear flicks, tail sway (`motion.js` `Math.random`) |
 | Snapshots, host → guest: move id + step drives the guest's rig toward that move's pose | Camera, edge markers, sparkle effects, sound |
 

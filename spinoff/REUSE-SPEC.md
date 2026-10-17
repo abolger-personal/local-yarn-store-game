@@ -469,6 +469,10 @@ and smashers each get a round that is theirs.
   - **⬇️ puts it down in front of you.** A faint outline of the block shows in the grid cell you
     face (`inventory/grid.js`), moving as you walk and turn: on the floor, or on top of the stack
     already there. At the level's height limit the outline greys and ⬇️ only gets a head-shake.
+    **The height limit is high enough that nobody can jump over the wall** (decided 2026-10-17):
+    at least two blocks, as tall as level 1's wall, which the sim already treats as too tall to
+    hop. Cake jumps higher, so the playability check proves the limit can't be jumped on every
+    stage, not just breakfast.
   - **What's in your hands decides what a tap on a block does.** Carrying: tap a block and you walk
     up to it and face it, so ⬇️ stacks on top. Empty-handed: tap one of *your own* blocks on top of
     a stack and you pick it back up. That is the take-back: only a top block (nothing floats), only

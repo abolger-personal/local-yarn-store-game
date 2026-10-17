@@ -8,9 +8,10 @@
 <title>Donut fighters</title>
 <style>
   /* no pull-to-refresh: reloading this page drops every room */
-  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: #f6e7d4; touch-action: none; }
+  /* dvh: the height you can see, without the browser's bars, out of fullscreen too */
+  html, body { margin: 0; height: 100%; height: 100dvh; overflow: hidden; overscroll-behavior: none; background: #f6e7d4; touch-action: none; }
   #tap { width: 100%; height: 100%; border: 0; background: none; font-size: 30vmin; cursor: pointer; }
-  iframe { display: block; width: 100%; height: 100%; border: 0; }
+  iframe { display: block; width: 100%; height: 100%; height: 100dvh; border: 0; }
 </style>
 <script type="importmap">
 { "imports": { "trystero": "https://esm.sh/trystero@0.26.0" } }

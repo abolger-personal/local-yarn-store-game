@@ -48,28 +48,31 @@ button svg { width: 100%; height: 100%; }
 }
 
 /* lobby */
-body.lobby { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+/* buttons shrink with the screen's height so a tablet with its browser bars showing still fits the picker; if it
+   doesn't, the page scrolls rather than hiding the bottom row */
+body.lobby { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; height: 100dvh; overflow-y: auto;
+  --key: min(84px, 9dvh); --big: min(96px, 10dvh); --pic: min(120px, 13dvh); }
 .bar { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 10px; background: var(--panel); }
 .bar.hidden, .keypad.hidden, .start.hidden, .wait.hidden, button.hidden { display: none; }
 .wait .emoji { font-size: 60px; }
 .code { display: flex; gap: 6px; font-size: 44px; min-height: 56px; }
 .code span { width: 60px; height: 60px; display: grid; place-items: center; background: #fff; border-radius: 16px; border: 3px solid #e7d6c1; }
 .start { display: flex; gap: 28px; justify-content: center; padding: 14px; }
-.start button, .bar button { width: 96px; height: 96px; }
-.start .emoji, .bar .emoji { font-size: 50px; }
-.keypad { display: grid; grid-template-columns: repeat(3, 84px); gap: 12px; justify-content: center; padding: 12px; }
-.keypad button { width: 84px; height: 84px; }
-.keypad .emoji { font-size: 44px; }
+.start button, .bar button { width: var(--big, 96px); height: var(--big, 96px); }
+.start .emoji, .bar .emoji { font-size: calc(var(--big, 96px) * 0.52); }
+.keypad { display: grid; grid-template-columns: repeat(3, var(--key, 84px)); gap: min(12px, 1.2dvh) 12px; justify-content: center; padding: min(12px, 1.2dvh) 12px; }
+.keypad button { width: var(--key, 84px); height: var(--key, 84px); }
+.keypad .emoji { font-size: calc(var(--key, 84px) * 0.52); }
 /* after the lobby: a picture per stage, then a phone-keypad level dial where only unlocked levels are buttons */
 .stages { display: flex; gap: 20px; }
 .stages.hidden { display: none; }
-.stages button { width: 120px; height: 120px; }
-.stages .emoji { font-size: 70px; }
-.picker { flex-direction: column; gap: 16px; }
-.picker .menu { display: flex; justify-content: space-between; width: 276px; }
-.dial span, .dial button { width: 84px; height: 84px; box-sizing: border-box; border-radius: 50%; }
+.stages button { width: var(--pic, 120px); height: var(--pic, 120px); }
+.stages .emoji { font-size: calc(var(--pic, 120px) * 0.58); }
+.picker { flex-direction: column; gap: min(16px, 1.5dvh); }
+.picker .menu { display: flex; justify-content: space-between; width: calc(3 * var(--key, 84px) + 24px); }
+.dial span, .dial button { width: var(--key, 84px); height: var(--key, 84px); box-sizing: border-box; border-radius: 50%; }
 .dial span { border: 3px dashed #e7d6c1; }
-.dial button { font-size: 40px; font-weight: 800; color: var(--ink); }
+.dial button { font-size: calc(var(--key, 84px) * 0.48); font-weight: 800; color: var(--ink); }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .overlay > * { pointer-events: auto; }
 

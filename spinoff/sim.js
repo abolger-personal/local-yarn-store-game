@@ -342,8 +342,16 @@ function brickGoal(s, f, b) {
   return { ...pointGoal(s, f, q.x + ux * away, q.z + uz * away, b.y), face: { x: b.x + BRICK / 2, z: b.z + BRICK / 2 } };
 }
 
+function besideGoal(s, f, it) {
+  const side = f.x < it.x ? -1 : 1;
+  return { ...pointGoal(s, f, it.x + side * (it.r + f.r + FOLLOW_GAP), it.z, it.y), face: it };
+}
+
 function thingGoal(s, f, t) {
   if (t.thing === 'shelf') {
+    // REUSE-SPEC.md §Mode: a guarded shelf walks you up to the guard instead, facing it
+    const guard = t.team !== f.team && guardOf(s, t.team);
+    if (guard) return besideGoal(s, f, guard);
     const sh = shelfOf(s, t.team);
     return { ...pointGoal(s, f, sh.x, sh.z + f.r + SHELF_GAP, sh.y), face: sh };
   }
@@ -352,8 +360,7 @@ function thingGoal(s, f, t) {
   if (!it) return null;
   if (t.thing === 'brick') return brickGoal(s, f, it);
   if (t.thing === 'donut') return { ...pointGoal(s, f, it.x, it.z, it.y), face: it };
-  const side = f.x < it.x ? -1 : 1;
-  return { ...pointGoal(s, f, it.x + side * (it.r + f.r + FOLLOW_GAP), it.z, it.y), face: it };
+  return besideGoal(s, f, it);
 }
 
 function resolve(s, f) {
@@ -755,10 +762,20 @@ const standingAt = (f, sh, reach = SHELF_REACH) => f.onGround && Math.abs(f.y - 
   && Math.abs(f.x - sh.x) < sh.half && f.z >= sh.z && f.z - sh.z < f.r + reach;
 /** REUSE-SPEC.md §Mode: a guard blocks the grab. */
 const guarding = (s, f) => standingAt(f, shelfOf(s, f.team), GUARD_REACH);
+const guardOf = (s, team) => s.fighters.find((o) => o.team === team && guarding(s, o));
 
 function shelfStep(s, f) {
+  const t = f.target, guard = t?.thing === 'shelf' && t.team !== f.team && guardOf(s, t.team);
+  if (guard) {
+    // the guard shakes "no" (the full-bag event) once each time someone walks up for its donuts
+    const by = f.onGround && flat(f, guard) < f.r + guard.r + FOLLOW_GAP + WP_ARRIVE;
+    if (by && !f.blocked) s.fullBag.push(event(guard, guard));
+    f.blocked = by;
+    return;
+  }
+  f.blocked = false;
   const sh = s.shelves.find((o) => standingAt(f, o));
-  if (!sh) { f.shelfDone = false; f.blocked = false; return; }
+  if (!sh) { f.shelfDone = false; return; }
   if (sh.team === f.team) {
     if (f.carrying && bank(sh, f.carrying)) {
       f.carrying = null;
@@ -767,13 +784,6 @@ function shelfStep(s, f) {
     return;
   }
   if (f.shelfDone || f.target?.thing !== 'shelf' || f.target.team !== sh.team) return;
-  // REUSE-SPEC.md §Mode: a guard blocks the grab until they're out of the way; the guard shakes "no" like a full bag
-  const guard = s.fighters.find((o) => o.team === sh.team && guarding(s, o));
-  if (guard) {
-    if (!f.blocked) s.fullBag.push(event(guard, guard));
-    f.blocked = true;
-    return;
-  }
   f.shelfDone = true;
   if (f.carrying) s.fullBag.push(event(f, sh));
   else if ((f.carrying = grab(sh))) s.donutEvents.push({ ...event(f, sh), kind: 'steal' });

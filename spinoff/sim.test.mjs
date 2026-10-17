@@ -424,26 +424,24 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
 // REUSE-SPEC.md §Mode: a guard blocks the grab; a ring-out drops the dummy in on guard
 {
   const m = createMatch([hero, dummy], STAGE);
-  const held = m.fighters.find((f) => f.id === 'dummy');
-  held.y = -50;
+  m.fighters.find((f) => f.id === 'dummy').y = -50;
   const said = [];
   const log = (s) => said.push(...s.fullBag.map((e) => e.fighter));
-  const shelf = once({ target: { thing: 'shelf', team: 'badGuys' } }), beside = tap(8.6, -1.2, 1.1);
-  let snap = run(m, 1500, shelf, log);
+  const shelf = once({ target: { thing: 'shelf', team: 'badGuys' } });
+  run(m, 1200, shelf, log);
+  let { inPlace, snap } = jumpsDuring(m, 300, () => ({}));
+  const guard = me(snap, 'dummy');
   assert.ok(!me(snap).carrying, 'walking up to a guarded shelf grabs nothing');
-  assert.deepEqual(said, ['dummy'], 'the guard says no, once');
-  run(m, 600, beside);
+  assert.equal(inPlace, 0, 'the kid stops beside the guard instead of walking into it');
+  assert.ok(near(Math.abs(me(snap).x - guard.x), 2 * R + 0.15, 0.1) && near(Math.abs(Math.cos(me(snap).facing)), 1), 'beside it, facing it');
+  run(m, 600, tap(8.6, -1.2, 1.1), log);
   snap = run(m, 600, shelf, log);
-  assert.ok(!me(snap).carrying, 'shouldering in from beside the shelf still grabs nothing');
-  const guard = me(snap, 'dummy'), sh = snap.shelves.find((o) => o.team === 'badGuys');
-  run(m, 600, tap(sh.x + 0.6, guard.z, 1.1));
-  snap = run(m, 600, tap(guard.x, guard.z, 1.1));
+  assert.deepEqual(said, ['dummy', 'dummy'], 'the guard says no once each time someone walks up');
+  run(m, 600, tap(guard.x, guard.z, 1.1));
   assert.ok(near(me(snap, 'dummy').x, guard.x) && near(me(snap, 'dummy').z, guard.z), 'walking into a guard never moves it');
-  assert.deepEqual(said, ['dummy', 'dummy'], 'and the guard says no again');
-  run(m, 200, once({ target: { thing: 'fighter', id: 'dummy' } }));
-  run(m, 60, once({ kick: true }));
-  snap = run(m, 400, once({ target: { thing: 'shelf', team: 'badGuys' } }));
-  assert.ok(me(snap).carrying, 'one kick moves the guard out of the way, then the grab works');
+  run(m, 600, shelf);
+  snap = run(m, 400, once({ kick: true }));
+  assert.ok(me(snap).carrying, 'one kick moves the guard out of the way, and the grab follows without another tap');
 }
 
 // REUSE-SPEC.md §Stages and difficulty are separate: butter is slippery

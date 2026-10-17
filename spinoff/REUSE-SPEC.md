@@ -393,10 +393,12 @@ Later levels can bring new hand-made stages.
   it until the guard is fought or shoved out of there. Only where the guard stands counts, so
   a knockback or a ring-out clears the way. A guard holds its ground: walking into them doesn't
   shove them at all (foes are otherwise pushed apart half each), so a kid has to fight (playtest:
-  the dummy got shouldered aside with no hits). A grab that
-  is blocked isn't used up: a fighter still standing there with the shelf tapped grabs the moment
-  the guard is gone. The blocked grab shows on the guard, so a kid sees *who* is in the way
-  (the guard shakes "no" as a full bag does; the arms spreading is brainstorm 2026-10-16). It works the
+  the dummy got shouldered aside with no hits). Tapping a
+  guarded shelf walks you up beside the guard, facing it, so 🥊 and 🦶 land on it straight away
+  (playtest: walking at the shelf ran in place against the guard). The guard shakes "no" when you
+  get there, as a full bag does, so a kid sees *who* is in the way (the arms spreading is brainstorm
+  2026-10-16). The tap isn't used up: once the guard is knocked away, you walk in and grab without
+  tapping again. It works the
   same for both teams. Level 1 teaches it with no new behaviour: a ring-out drops the dummy back in
   above its own shelf (Scoring), so a kid who kicks it off finds it guarding the donuts and has to
   knock it out of the way to grab. Guarding is also what the CPU's Defend state (Bad guys) is for.

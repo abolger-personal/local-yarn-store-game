@@ -635,7 +635,7 @@ function airStep(s, f) {
 
 function drop(s, f, d) {
   if (!f.carrying) return;
-  s.donuts.push({ id: `d${s.nextDonut++}`, ...d, look: f.carrying });
+  s.donuts.push({ id: `d${s.nextDonut++}`, ...d, look: f.carrying, by: f.id });
   f.carrying = null;
 }
 
@@ -930,7 +930,6 @@ function shelfStep(s, f) {
   const sh = s.shelves.find((o) => standingAt(f, o));
   if (!sh) { f.shelfDone = false; return; }
   if (sh.team === f.team) {
-    f.stole = false;
     if (f.carrying && bank(sh, f.carrying)) {
       f.carrying = null;
       s.donutEvents.push({ ...event(f, sh), kind: 'bank' });
@@ -942,12 +941,10 @@ function shelfStep(s, f) {
   grabAt(s, f, sh);
 }
 
-/** REUSE-SPEC.md §Scoring: one donut a trip; knocked loose, it's back to your own shelf before grabbing again. */
+/** REUSE-SPEC.md §Scoring: one donut at a time; while one you dropped is loose, a shelf gives you nothing. */
 function grabAt(s, f, sh) {
-  if (f.carrying || f.stole) { s.fullBag.push(event(f, sh)); return; }
-  if (!(f.carrying = grab(sh))) return;
-  f.stole = true;
-  s.donutEvents.push({ ...event(f, sh), kind: 'steal' });
+  if (f.carrying || s.donuts.some((d) => d.by === f.id)) { s.fullBag.push(event(f, sh)); return; }
+  if ((f.carrying = grab(sh))) s.donutEvents.push({ ...event(f, sh), kind: 'steal' });
 }
 
 // --- the build round (REUSE-SPEC.md §Forts) ------------------------------------------------
@@ -1092,7 +1089,7 @@ function newFighter(e, at, y) {
     x: at.x, y, z: at.z, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, onGround: true, jumps: 1,
     target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, again: false, fails: 0, stuck: 0, gain: 0, away: false, slick: false, passed: false, sprung: -1,
     attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, out: 0, percent: 0, calm: 0,
-    carrying: null, stole: false, touching: [], shelfDone: false, shelfSpot: null, blocked: false };
+    carrying: null, touching: [], shelfDone: false, shelfSpot: null, blocked: false };
 }
 
 function refresh(s) {
@@ -1185,7 +1182,7 @@ function stepOf(f) {
 /** @returns {import('./match.js').FighterState} */
 const fighterView = (f) => ({
   id: f.id, team: f.team, x: f.x, y: f.y, z: f.z, vx: f.vx, vy: f.vy, vz: f.vz, facing: f.facing, height: f.h, width: f.w,
-  onGround: f.onGround, move: moveOf(f), step: stepOf(f), percent: f.percent, carrying: f.carrying ? { ...f.carrying } : null, stole: f.stole,
+  onGround: f.onGround, move: moveOf(f), step: stepOf(f), percent: f.percent, carrying: f.carrying ? { ...f.carrying } : null,
   invincible: f.inv > 0, respawn: f.out / TICK_HZ, target: f.dest ? { x: f.dest.x, y: f.dest.y, z: f.dest.z } : null, block: f.block,
 });
 
@@ -1202,7 +1199,7 @@ export function snapshot(s) {
     tick: s.tick, secondsLeft: Math.max(0, ROUND_SECONDS - played(s) / TICK_HZ), over: isOver(s), winner: winnerOf(s),
     phase: s.phase, ready: [...s.ready], piles: s.piles.map((p) => ({ ...p })),
     fighters: s.fighters.map(fighterView),
-    donuts: s.donuts.map((d) => ({ id: d.id, x: d.x, y: d.y, z: d.z, look: { ...d.look } })),
+    donuts: s.donuts.map((d) => ({ id: d.id, x: d.x, y: d.y, z: d.z, look: { ...d.look }, by: d.by })),
     hammers: s.hammers.map((h) => ({ owner: h.owner, x: h.x, y: h.y, z: h.z })),
     bricks: s.bricks.map((b) => ({ id: b.id, team: b.team, x: b.x, y: b.y, z: b.z, hits: b.hits, maxHits: b.maxHits, icing: b.icing })),
     shelves: s.shelves.map((sh) => ({ team: sh.team, x: sh.x, y: sh.y, z: sh.z, donuts: shelfLooks(sh) })),

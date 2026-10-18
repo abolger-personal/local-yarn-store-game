@@ -4,7 +4,7 @@
 import { BRICK, HIT_DEPTH, TICK_HZ } from './match.js';
 
 /** @typedef {import('./match.js').Snapshot} Snapshot @typedef {import('./match.js').FighterState} FighterState */
-/** @typedef {import('./match.js').Input} Input @typedef {import('./match.js').Target} Target */
+/** @typedef {import('./match.js').Input} Input @typedef {import('./match.js').Target} Target @typedef {import('./match.js').LooseDonut} LooseDonut */
 
 /** Fair to 4-year-olds: about half a second before acting on anything new, and at most one attack every 0.8 s. */
 export const REACT_TICKS = Math.round(0.5 * TICK_HZ);
@@ -27,11 +27,12 @@ const OTHER = /** @type {const} */ ({ heroes: 'badGuys', badGuys: 'heroes' });
 
 /**
  * Raid while its shelf holds no hero donuts, defend (home, standing guard) once it holds one, and run home to bank
- * whatever it carries, or empty-handed once its stolen donut is knocked loose (REUSE-SPEC.md §Forts, Level 2; §Scoring). Heroes' donuts are the ones without the villains' drizzle.
- * @param {Snapshot} snap @param {FighterState} me @returns {'raid'|'defend'|'home'}
+ * whatever it carries; knocked loose, it goes back for its donut first (REUSE-SPEC.md §Forts, Level 2; §Scoring). Heroes' donuts are the ones without the villains' drizzle.
+ * @param {Snapshot} snap @param {FighterState} me @returns {'raid'|'defend'|'home'|'scoop'}
  */
 export function modeOf(snap, me) {
-  if (me.carrying || me.stole) return 'home';
+  if (me.carrying) return 'home';
+  if (snap.donuts.some((d) => d.by === me.id)) return 'scoop';
   const home = snap.shelves.find((s) => s.team === me.team);
   return home?.donuts.some((d) => !d.stripe) ? 'defend' : 'raid';
 }
@@ -51,6 +52,8 @@ function aimFor(b, snap, me) {
   const mode = modeOf(snap, me);
   if (mode !== 'raid' || !snap.bricks.some((x) => x.id === b.brick)) b.brick = null;
   if (mode === 'raid' && !b.brick && me.move === 'blocked') b.brick = weakest(snap, me)?.id ?? null;
+  // ponytail: heads straight for its dropped donut; one it can't reach (in a gap, behind a wall) leaves it stuck there
+  if (mode === 'scoop') return { thing: 'donut', id: /** @type {LooseDonut} */ (snap.donuts.find((d) => d.by === me.id)).id };
   return b.brick ? { thing: 'brick', id: b.brick } : { thing: 'shelf', team: mode === 'raid' ? OTHER[me.team] : me.team };
 }
 

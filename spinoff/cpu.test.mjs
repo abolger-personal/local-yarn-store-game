@@ -71,16 +71,18 @@ const me = (s) => s.fighters.find((f) => f.id === 'cpu1');
   const shelf = (donuts) => ({ team: 'badGuys', x: 7.5, y: 1.1, z: -1.7, donuts });
   const f = /** @type {any} */ ({ id: 'cpu1', team: 'badGuys', carrying: null });
   const bad = { dough: '#241a1d', frosting: '#7b2fbf', stripe: true }, hero = { dough: '#e8c48a', frosting: '#ff3b7f', stripe: false };
-  const snapWith = (donuts) => /** @type {any} */ ({ shelves: [shelf(donuts)] });
+  const snapWith = (donuts, loose = []) => /** @type {any} */ ({ shelves: [shelf(donuts)], donuts: loose });
   assert.equal(modeOf(snapWith([bad, bad]), f), 'raid', 'it raids while its shelf holds no hero donuts');
   assert.equal(modeOf(snapWith([bad, hero]), f), 'defend', 'and defends once it holds one');
   assert.equal(modeOf(snapWith([bad]), { ...f, carrying: hero }), 'home', 'carrying, it runs home');
+  assert.equal(modeOf(snapWith([bad], [{ id: 'd0', by: 'cpu1' }]), f), 'scoop', 'knocked loose, it goes back for its donut');
+  assert.equal(modeOf(snapWith([bad], [{ id: 'd0', by: 'kid' }]), f), 'raid', 'but not for one someone else dropped');
 
   // REUSE-SPEC.md §Scoring: rung out, it waits with everyone else, then sets off again (the sim ignores taps while out)
   const cpu = createCpu('cpu1'), sent = [];
   for (let t = 0; t < 4 * REACT_TICKS; t++) {
     const respawn = t < 2 * REACT_TICKS ? 1 : 0;
-    const input = cpu.input(/** @type {any} */ ({ tick: t, phase: 'play', over: false, bricks: [], shelves: [shelf([bad])], fighters: [{ ...f, move: 'idle', respawn }] }));
+    const input = cpu.input(/** @type {any} */ ({ tick: t, phase: 'play', over: false, bricks: [], donuts: [], shelves: [shelf([bad])], fighters: [{ ...f, move: 'idle', respawn }] }));
     if (input.target) sent.push([t, respawn]);
   }
   assert.deepEqual(sent.map(([, r]) => r), [0], `it aims once, after the wait (${JSON.stringify(sent)})`);
@@ -163,7 +165,7 @@ const punched = (s) => me(s).move === 'punch' && s.hits.some((h) => h.on === 'fi
   const at = { team: 'badGuys', carrying: null, move: 'walk', respawn: 0, onGround: true, x: 0, y: 0, z: 0, facing: 0, width: 0.75, height: 0.97 };
   const cpu = createCpu('cpu1', 4), sent = [];
   for (let t = 0; t < 12 * TICK_HZ; t++) {
-    const input = cpu.input(/** @type {any} */ ({ tick: t, phase: 'play', over: false, bricks: [], hits: [], shelves: [shelf],
+    const input = cpu.input(/** @type {any} */ ({ tick: t, phase: 'play', over: false, bricks: [], hits: [], donuts: [], shelves: [shelf],
       fighters: [{ ...at, id: 'cpu1' }, { ...at, id: 'kid', team: 'heroes', x: -3, carrying: kid.look, width: 0.45, height: 0.9 }] }));
     if (input.target) sent.push([t, input.target.thing]);
     assert.equal(input.punch, false, 'out of reach, it never punches');
@@ -171,7 +173,7 @@ const punched = (s) => me(s).move === 'punch' && s.hits.some((h) => h.on === 'fi
   assert.deepEqual(sent, [[REACT_TICKS, 'fighter'], [4 * TICK_HZ + REACT_TICKS, 'shelf'], [7 * TICK_HZ + REACT_TICKS, 'fighter'], [11 * TICK_HZ + REACT_TICKS, 'shelf']],
     'it gives up after 4 s, and takes the chase up again 3 s later');
   const two = createCpu('cpu1'), early = [];
-  for (let t = 0; t < 2 * REACT_TICKS; t++) early.push(two.input(/** @type {any} */ ({ tick: t, phase: 'play', over: false, bricks: [], hits: [], shelves: [shelf],
+  for (let t = 0; t < 2 * REACT_TICKS; t++) early.push(two.input(/** @type {any} */ ({ tick: t, phase: 'play', over: false, bricks: [], hits: [], donuts: [], shelves: [shelf],
     fighters: [{ ...at, id: 'cpu1' }, { ...at, id: 'kid', team: 'heroes', x: -3, carrying: kid.look }] })).target?.thing);
   assert.equal(early.find(Boolean), 'shelf', 'before level 4 it never chases');
 }
@@ -192,16 +194,19 @@ const punched = (s) => me(s).move === 'punch' && s.hits.some((h) => h.on === 'fi
 console.log('cpu ok');
 
 {
-  // REUSE-SPEC.md §Scoring, one donut a trip (playtest: kicked back into the kids' shelf, it grabbed again and again)
-  let knocked = 0, regrabs = 0, stole = false, carried = false;
+  // REUSE-SPEC.md §Scoring, one donut at a time (playtest: kicked back into the kids' shelf, it grabbed again and again)
+  let knocked = 0, regrabs = 0, scooped = 0, loose = false, carried = false;
   const sh = level.stage.shelves.find((x) => x.team === 'heroes');
   const chase = (s) => (s.tick === 2 ? { target: { x: sh.x + SHELF_WIDTH, z: sh.z + 0.6 }, punch: false, kick: false }
     : me(s).carrying && s.tick % 12 === 0 ? { target: { thing: 'fighter', id: 'cpu1' }, punch: true, kick: false } : null);
   play(level.stage, 60, (s) => {
-    if (steals(s) && stole) regrabs++;
+    if (steals(s) && loose) regrabs++;
+    if (s.donutEvents.some((e) => e.fighter === 'cpu1' && e.kind === 'pickup')) scooped++;
     if (carried && !me(s).carrying && !banks(s)) knocked++;
-    ({ stole, carrying: carried } = { stole: me(s).stole, carrying: Boolean(me(s).carrying) });
+    loose = s.donuts.some((d) => d.by === 'cpu1');
+    carried = Boolean(me(s).carrying);
   }, chase);
   assert.ok(knocked >= 2, `the kid knocks the raider's donut loose (${knocked} times)`);
-  assert.equal(regrabs, 0, 'and it never grabs another before it has been home');
+  assert.equal(regrabs, 0, 'and it never grabs another while its own is loose');
+  assert.ok(scooped >= 2, `it goes back for its dropped donut instead of walking home empty (${scooped} pickups)`);
 }

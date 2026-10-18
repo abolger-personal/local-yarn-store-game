@@ -2,16 +2,16 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
-## 0.0.6 (in progress)
+## 0.0.6 — 2026-10-18: The Greathammer and the chasing level
 
 ### End card
 - **You'll know when you've won something new.** Beat a level that unlocks a sword or the scythe and a
   bouncing button pops up on the score card with the new thing, ✨ and ✏️ on it. Tap it to go and dress up.
 
 ### Donuts
-- **One donut a trip.** Knock a bad guy's donut loose and it can't grab a fresh one from your shelf until it's
-  been home, so kicking it back into your shelf no longer spills all your donuts on the floor. The same goes
-  for you: knocked loose, pick your donut back up, or go home before grabbing another.
+- **One donut at a time.** Knock a bad guy's donut loose and it can't grab a fresh one from your shelf while its
+  dropped one is still on the floor: it goes back to pick it up instead, so kicking it into your shelf no longer
+  spills all your donuts on the floor. The same goes for you: knocked loose, get your donut back first.
 
 ### Building
 - **Pancakes go where you tap.** Carrying a pancake, tap the spot you want it and your fighter walks up next

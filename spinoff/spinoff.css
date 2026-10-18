@@ -73,6 +73,14 @@ body.lobby { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; heig
 .dial span, .dial button { width: 84px; height: 84px; box-sizing: border-box; border-radius: 50%; }
 .dial span { border: 3px dashed #e7d6c1; }
 .dial button { font-size: 40px; font-weight: 800; color: var(--ink); }
+/* a phone upright is too narrow for four big buttons in a row: they shrink to fit, and the level picker stacks again */
+@media (max-width: 500px) {
+  .start, .bar { gap: 2.5vw; }
+  .start button, .bar button { width: min(96px, 20vw); height: min(96px, 20vw); }
+  .start .emoji, .bar .emoji { font-size: min(50px, 10.5vw); }
+  .picker { flex-direction: column; }
+  .picker .menu { flex-direction: row; gap: 28px; }
+}
 /* a phone on its side is too short for keys three across: the code's keys go in one row, the dial in rows of five */
 @media (orientation: landscape) and (max-height: 500px) {
   .keypad { grid-template-columns: repeat(7, 84px); }

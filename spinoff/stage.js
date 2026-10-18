@@ -24,12 +24,13 @@ function makeRenderer(container) {
   return renderer;
 }
 
-function followSize(container, renderer, camera) {
+function followSize(container, renderer, camera, refit) {
   const fit = () => {
     const { clientWidth: w, clientHeight: h } = container;
     renderer.setSize(w, h);
     camera.aspect = w / Math.max(h, 1);
     camera.updateProjectionMatrix();
+    refit();
   };
   new ResizeObserver(fit).observe(container);
   fit();
@@ -56,14 +57,17 @@ export function makeStage(container, { background = '#f6e7d4' } = {}) {
   const room = probe ? roomLights(camera, Number(env)) : [];
   if (!probe) scene.environment = new THREE.PMREMGenerator(renderer).fromScene(roomEnvironment(), 0.04).texture;
   scene.add(camera, ...studioLights(camera));
-  followSize(container, renderer, camera);
+  // what was framed is framed again whenever the space changes (playtest: fitted once, at the size the page opened with, a
+  // phone's lobby kept a tiny floor after it turned or its bars came and went)
+  let framed = null;
+  followSize(container, renderer, camera, () => framed && frame(camera, ...framed));
 
   const clock = new THREE.Timer();
   const run = (step) => renderer.setAnimationLoop(() => {
     step(Math.min(clock.update().getDelta(), 0.1));
     renderer.render(scene, camera);
   });
-  return { renderer, scene, camera, room, run, frame: (objects, opts) => frame(camera, objects, opts) };
+  return { renderer, scene, camera, room, run, frame: (objects, opts) => { framed = [objects, opts]; frame(camera, objects, opts); } };
 }
 
 const VIEW = new THREE.Vector3(0, 0.28, 1).normalize();

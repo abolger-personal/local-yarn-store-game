@@ -21,7 +21,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   and on the dress-up page.
 - **Playing on a phone works better.** On the dress-up page every hat, cape and bag shows, wrapping onto
   a second line instead of hiding off the edge. Turned sideways, the room code keys and the level numbers
-  spread out in wider rows, so they all fit on the screen.
+  spread out in wider rows, so they all fit on the screen. Held upright, the lobby's big buttons shrink just
+  enough to fit four in a row. The lobby's fighters fill the screen again after you turn the phone.
 - **The colour you pick stays in the middle of its circle** on the dress-up page. It used to slip off-centre.
 - **Punches, kicks and swords move on slower tablets.** They used to jump between a few still poses.
   Now every swing shows as a movement, even if it shows a moment late. On other players' tablets,

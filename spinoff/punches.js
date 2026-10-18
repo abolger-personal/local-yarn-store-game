@@ -46,6 +46,8 @@ export const GLOVE = Object.freeze([
 // REUSE-SPEC.md §Costumes: the sword's own string in the punches' places and timing, arm poses as PUNCHES plus
 // up: the blade's world angle above forward, swoosh: how strongly its trail shows, stab: 1 for a streak, 0 for a fan
 export const SWORD_UP = 0.6;
+/** The chop is raised by CHOP_UP and swings down until CHOP_DOWN, through the hit at STRIKE. */
+export const CHOP_UP = 0.1, CHOP_DOWN = 0.45;
 const blade = (stab, wind, strike, hold) => Object.freeze([
   key(0, { up: SWORD_UP, swoosh: 0, stab }), key(WIND, { swoosh: 0, stab, ...wind }), key(STRIKE, { swoosh: 0.75, stab, ...strike }),
   key(HOLD, { swoosh: 0, stab, ...hold }), key(1, { up: SWORD_UP, swoosh: 0, stab }),
@@ -56,12 +58,16 @@ export const SWORD_MOVES = Object.freeze({
     { hit: 0.3, guard: -0.2, hitOut: 0.3, guardOut: 0.4, elbow: 1.7, twist: -0.4, lean: -0.05, up: 0.05 },
     { hit: -1.55, guard: 0.6, hitOut: 0.05, guardOut: 0.5, elbow: 0, twist: 0.7, lean: 0.25, pitch: -0.1, up: -0.05 },
     { hit: -1.5, guard: 0.5, hitOut: 0.05, guardOut: 0.45, elbow: 0.05, twist: 0.6, lean: 0.22, pitch: -0.08, up: -0.05 }),
-  // slash: an overhead chop, raised up and back over the head, then swung down through the front. A flat sweep across
-  // the front read from neither the side nor the front (playtest): the blade can only swing by `up`, so it slid sideways
-  cross: blade(0,
-    { hit: -2.8, guard: -0.3, hitOut: 0.2, guardOut: 0.35, elbow: 0.5, twist: -0.3, lean: -0.15, pitch: 0.1, up: 2.1 },
-    { hit: -1.3, guard: 0.5, hitOut: 0.1, guardOut: 0.5, elbow: 0, twist: 0.6, lean: 0.35, hip: 0.1, pitch: -0.2, up: -0.6 },
-    { hit: -1.25, guard: 0.45, hitOut: 0.1, guardOut: 0.45, elbow: 0.05, twist: 0.5, lean: 0.3, hip: 0.08, pitch: -0.15, up: -0.5 }),
+  // slash: an overhead chop, raised fast up and back over the head, then one long swing down through the front that
+  // passes the hit and ends low (playtest: a flat sweep across the front read from neither the side nor the front, and
+  // a chop between the punches' keys was over in two frames)
+  cross: Object.freeze([
+    key(0, { up: SWORD_UP, swoosh: 0, stab: 0 }),
+    key(CHOP_UP, { hit: -3.1, guard: -0.3, hitOut: 0.2, guardOut: 0.35, elbow: 0.4, twist: -0.4, lean: -0.3, pitch: 0.2, up: 2.5, swoosh: 0, stab: 0 }),
+    key(CHOP_DOWN, { hit: -0.8, guard: 0.6, hitOut: 0.1, guardOut: 0.5, elbow: 0, twist: 0.7, lean: 0.5, hip: 0.25, knee: 0.5, pitch: -0.3, up: -1.2, swoosh: 0.8, stab: 0 }),
+    key(0.7, { hit: -0.85, guard: 0.5, hitOut: 0.1, guardOut: 0.45, elbow: 0.05, twist: 0.6, lean: 0.45, hip: 0.2, knee: 0.4, pitch: -0.25, up: -1.1, swoosh: 0, stab: 0 }),
+    key(1, { up: SWORD_UP, swoosh: 0, stab: 0 }),
+  ]),
   // upward stab: crouched with the blade low, then thrust up and forward to point at the sky
   uppercut: blade(1,
     { hit: 0.5, guard: -0.6, hitOut: 0.3, guardOut: 0.3, elbow: 1.3, twist: -0.4, lean: 0.4, knee: 1, hip: 0.5, pitch: 0.15, up: 0.4 },

@@ -1228,10 +1228,12 @@ like that keeps the big cape a choice rather than a handicap.
     cross's and uppercut's places in `COMBO`, with their timing, and have their own sword-arm poses and
     blade angles (`SWORD_MOVES` in `punches.js`). From the side: the **stab** draws the hand back to the
     chest with the blade level, then shoots the arm straight out along the blade, with white speed lines
-    streaking behind it. The **slash** is an overhead chop: the arm raises the blade up and back over the
-    head, then swings it down through the front to below level, with a white fan behind the blade (amended
-    2026-10-17, playtest: a flat sweep across the front at chest height read from neither the side-on camera
-    nor the chooser's front view; a chop moves up and down, which both see). The **upward
+    streaking behind it. The **slash** is an overhead chop: the arm raises the blade fast, straight up and
+    back over the head with a lean back, then swings it down in one long stroke through the front, through
+    the hit, to pointing steeply down with a forward lean and a knee dip, with a white fan behind the blade
+    (amended 2026-10-17, playtests: a flat sweep across the front at chest height read from neither the
+    side-on camera nor the chooser's front view, and a chop between the punches' keys was over in two
+    frames; the downswing now runs from a tenth to nearly half the move, `CHOP_UP` and `CHOP_DOWN`). The **upward
     stab** crouches with the blade low and level, then thrusts up and forward until the blade points at
     the sky, with the speed lines. The sim is untouched: hit timing, hit spheres and damage are the
     punches', and the reach is measured from the glove spots (`fighter.test.mjs` checks it). The

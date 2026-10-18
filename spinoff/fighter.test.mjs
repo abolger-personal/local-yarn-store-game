@@ -11,6 +11,7 @@ import { wingShape } from '../characters/owl.js';
 import { floorGrid } from './roster.js';
 import { walkPhase } from '../characters/motion.js';
 import { SYRUP_SLOW, WALK_SPEED } from './sim.js';
+import { CHOP_DOWN, CHOP_UP, STRIKE } from './punches.js';
 import { WIDEST_FIGHTER } from './match.js';
 
 const SHOP_VIEW_PX = LOOK.viewPx;
@@ -245,21 +246,23 @@ for (const species of SPECIES) {
       assert.ok(built.sword?.parent === hand && built.gloves.length === 0, `${species}: a ${held} in the right hand and no gloves`);
       const entrant = (b) => entrantOf(f, b, { id: 'a', team: 'heroes' });
       assert.deepEqual([entrant(built).reach, entrant(built).width], [entrant(gloved).reach, entrant(gloved).width], `${species}: the ${held} hits exactly as far as gloves, and is as wide`);
-      /** The blade's angle above level and its turn from straight ahead, in degrees, and which swoosh shows. */
+      /** The blade's angle above level, its turn from straight ahead and its angle round from ahead as the side-on camera sees it, in degrees, and which swoosh shows. */
       const blade = (name, step) => {
         for (let i = 0; i < 3; i++) stepFighter(built, 1e-4, POSES.rest, 0, { name, arm: 1, step });
         built.root.updateMatrixWorld(true);
         const d = built.sword.localToWorld(new THREE.Vector3(0, 0, 0.4)).sub(at(built.sword)).normalize();
         const { fan, streak } = built.sword.userData;
-        return { up: Math.asin(d.y) * 57.3, turn: Math.atan2(d.x, d.z) * 57.3, fan: fan.visible, streak: streak.visible };
+        return { up: Math.asin(d.y) * 57.3, turn: Math.atan2(d.x, d.z) * 57.3, side: Math.atan2(d.y, d.z) * 57.3, fan: fan.visible, streak: streak.visible };
       };
-      const stab = [blade('jab', 0.14), blade('jab', 0.25)], slash = [blade('cross', 0.14), blade('cross', 0.25)];
+      const stab = [blade('jab', 0.14), blade('jab', 0.25)], slash = [blade('cross', CHOP_UP), blade('cross', CHOP_DOWN)], mid = blade('cross', STRIKE);
       const lift = [blade('uppercut', 0.14), blade('uppercut', 0.25)];
       assert.ok(stab.every((b) => Math.abs(b.up) < 25 && Math.abs(b.turn) < 45) && stab[1].streak && !stab[1].fan,
         `${species} ${held}: a stab thrusts the blade level and straight ahead, with a streak (${JSON.stringify(stab)})`);
       // a chop, up and down where the side-on camera and the chooser's front view both see it (playtest: a level sweep read from neither)
-      assert.ok(slash[0].up > 30 && slash[1].up < -30 && Math.abs(slash[1].turn) < 45 && slash[1].fan && !slash[1].streak,
-        `${species} ${held}: a slash chops the blade down from over the head to below level in front, with a fan (${JSON.stringify(slash)})`);
+      assert.ok(slash[0].side > 100 && slash[1].side < -45 && slash[1].fan && !slash[1].streak,
+        `${species} ${held}: a slash chops the blade down from up and back over the head to well below level in front, with a fan (${JSON.stringify(slash)})`);
+      // still swinging as the hit lands: the downswing is long enough to see (playtest: over in two frames, it couldn't be)
+      assert.ok(mid.side < slash[0].side - 40 && mid.side > slash[1].side + 40, `${species} ${held}: the slash is mid-swing as it hits (${mid.side.toFixed(0)}°)`);
       assert.ok(lift[0].up < 20 && lift[1].up > 60 && lift[1].streak, `${species} ${held}: an upward stab ends pointing at the sky (${JSON.stringify(lift)})`);
       if (held === 'scythe') {
         const { tip, butt } = built.sword.userData, tall = entrant(gloved).height;

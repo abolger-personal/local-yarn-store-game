@@ -821,11 +821,20 @@ donut margin), in the games that player played. Losing again and again, as in re
 it; winning big lowers it. This replaces "not saved, reset every game" in the brainstorm below; the
 `help` number and its knobs are still the likely way it takes effect.
 
-**On level 3 it eases the bad guy** (decided 2026-10-17): the handicap sets the CPU bad guy's speed, how
-often it hits and how hard its hits are (damage and knockback). **The window is the last 5 games** and
-**every kid has their own handicap** (decided 2026-10-17: kids, and grownups with them, get better
-quickly, so a short window keeps up). Open: how a margin maps to the bad guy's speed and hits; and,
-since there is one bad guy, whose handicap sets it when kids of different handicaps play together.
+**From level 3 it works two ways** (decided 2026-10-17). **The window is the last 5 games** and
+**every kid has their own handicap** (kids, and grownups with them, get better quickly, so a short
+window keeps up).
+- **How hard you get hit is yours:** each kid's handicap sets the damage and knockback that kid takes,
+  from anyone. In a mixed group the same punch knocks the youngest back less, and nobody has to pick
+  whose handicap the bad guy uses.
+- **The bad guy's speed is fixed for the match** by the handicap of the most-helped kid in it (the
+  highest handicap), and so is how often it hits. Chosen over a speed that follows whichever kid is
+  nearest, which would flicker between two kids, can be gamed by standing beside the youngest, and
+  reads as random.
+
+Open: how a margin maps to a handicap and to the speed, hit rate and hits taken (a starting point to
+tune: average the last 5 games' donut margins; 0 or better is the game as designed; each donut of
+average loss is a step easier, up to 3, the easiest about 70% speed, half the hits and 40% softer).
 
 Players are 4–6 year olds and grownups in the same match (brainstorm 2026-10-13: no `help` in the code yet). Each player has one number, `help`,
 that nobody chooses: the game sets it from how they play (below). Every handicap knob is a straight

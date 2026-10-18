@@ -1,5 +1,5 @@
 import {
-  BAGS, CAPES, CLOTH, FUR, HANDS, HATS, SPECIES, TEXTURES, TRICKS, animateFighter, buildFighter, disposeFighter, loadFighter, newFighter,
+  BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, TRICKS, animateFighter, buildFighter, disposeFighter, handsFor, loadFighter, newFighter,
   randomFighter, saveFighter, setFur, showOffTrick, stepFighter,
 } from './fighter.js';
 import { POSES } from '../characters/npc.js';
@@ -22,6 +22,7 @@ const ICON = {
   'drawstring bag': '<path d="M12 16c-4 14-2 26 12 26s16-12 12-26Z"/><path d="M14 16c4-6 16-6 20 0" fill="none" stroke="currentColor" stroke-width="3"/>',
   gloves: '<path d="M14 24c0-10 5-15 13-15s12 6 12 14c0 6-3 10-7 12H20c-4-2-6-6-6-11Z"/><ellipse cx="13" cy="25" rx="5" ry="7"/><rect x="17" y="36" width="18" height="8" rx="3"/>',
   sword: '<g transform="rotate(35 24 24)"><path d="M20 30V9a4 4 0 0 1 8 0v21Z"/><rect x="11" y="29" width="26" height="6" rx="3"/><rect x="21" y="35" width="6" height="7" rx="2"/><circle cx="24" cy="44" r="3.5"/><path d="M20 14l8 4M20 21l8 4" stroke="#fff" stroke-width="2.5" opacity=".7"/></g>',
+  scythe: '<g transform="rotate(35 24 24)"><rect x="22" y="12" width="4" height="27" rx="2"/><path d="M24 2l5 11h-10Z"/><path d="M24 37l2.4 4.6 5 .6-3.7 3.4 1 5-4.7-2.5-4.7 2.5 1-5-3.7-3.4 5-.6Z"/><path d="M24 11c10 0 17 10 16 23-4-8-9-14-16-16Z" fill="#2f6bff"/></g>',
   'crossbody pouch': '<path d="M8 6 30 26" stroke="currentColor" stroke-width="3"/><rect x="18" y="22" width="24" height="18" rx="5"/>',
 };
 const INK = 'stroke="rgba(0,0,0,.3)" stroke-width="1.6" fill="none"';
@@ -40,8 +41,8 @@ const textured = (body, stitch) => (PATTERN[stitch] ? `${body}<g fill="url(#${pa
 
 const svg = (body, colour) => `<svg viewBox="0 0 48 48" fill="currentColor" style="color:${colour}" aria-hidden="true">${body}</svg>`;
 
-// REUSE-SPEC.md §Fighter chooser: the sword shows once this tablet's player has beaten level 1
-const hands = levelsBeaten() >= 1 ? HANDS : HANDS.filter((h) => h !== 'sword');
+// REUSE-SPEC.md §Fighter chooser: the sword shows once this tablet's player has beaten level 1, the scythe level 2
+const hands = handsFor(levelsBeaten());
 /** @param {import('./fighter.js').Fighter} f */
 const allowed = (f) => {
   if (!hands.includes(f.look.hands)) f.look.hands = hands[0];
@@ -98,7 +99,7 @@ function render() {
     garment('🎒', 'bag', BAGS, false),
     row('✊', 'hands', pictures(hands.map((v) => {
       const on = v === look.hands, badge = on && TRICK_ICON[look.trick] ? `<text x="38" y="14" font-size="18" text-anchor="middle">${TRICK_ICON[look.trick]}</text>` : '';
-      return button('hands', v, on ? `${v}, ${look.trick}, tap again to change` : v, svg(ICON[v] + badge, look.gloves), on);
+      return button('hands', v, on && TRICKS[v].length > 1 ? `${v}, ${look.trick}, tap again to change` : v, svg(ICON[v] + badge, look.gloves), on);
     }).join('')),
       colours(swatchRow('gloves', CLOTH, look.gloves))),
   ].join('');

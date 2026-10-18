@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   BASE_PARAMS, MOTION_DEFAULTS, NAMES, POSES, applyPose, createCharacter, deriveCoatColor, disposeCharacter, getSpecies, mergeCharacter,
   lowestResting, phaseStep, stepMotion, walkGain, walkLayer, walkPhase,
@@ -10,7 +10,7 @@ import { oklchOf } from '../inventory/yarn-look.js';
 import '../characters/llama.js';
 import { wingShape } from '../characters/owl.js';
 import { makeSparkle } from '../characters/sparkle.js';
-import { GLOVE, SWORD_MOVES, SWORD_UP, punchLayer, sample } from './punches.js';
+import { GLOVE, SWORD_MOVES, SWORD_UP, punchLayer, punchWeight, sample } from './punches.js';
 import { kickLayer, kickLunge } from './kicks.js';
 
 export const FIGHTER_KEY = 'lys.fighter.v1';
@@ -35,10 +35,16 @@ export const CAPES = Object.freeze(['cape', 'capelet']);
 export const BAGS = Object.freeze(['backpack', 'drawstring bag', 'crossbody pouch']);
 // REUSE-SPEC.md §Costumes: up to cable's weight; seed, puff and linen stitch cost 6–18× the triangles
 export const TEXTURES = Object.freeze(['stockinette', 'rib', 'garter', 'cable', 'single crochet', 'waffle', 'lace']);
-// REUSE-SPEC.md §Costumes: one or the other, in the `gloves` colour
-export const HANDS = Object.freeze(['gloves', 'sword']);
-// what flies off the hitting glove or the sword's tip as it lands; tapping the picked one goes to the next
-export const TRICKS = Object.freeze({ gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame']), sword: Object.freeze(['sparkle', 'bubble', 'flame']) });
+// REUSE-SPEC.md §Costumes: one of these, in the `gloves` colour
+export const HANDS = Object.freeze(['gloves', 'sword', 'scythe']);
+// what flies off the hitting glove or the blade's tip as it lands; tapping the picked one goes to the next. The scythe's is fixed.
+export const TRICKS = Object.freeze({
+  gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame']), sword: Object.freeze(['sparkle', 'bubble', 'flame']), scythe: Object.freeze(['music']),
+});
+// REUSE-SPEC.md §Fighter chooser: the levels a player must have beaten for the chooser to offer each
+const UNLOCK = Object.freeze({ sword: 1, scythe: 2 });
+/** The hands the chooser offers a player who has beaten `beaten` levels. */
+export const handsFor = (beaten) => HANDS.filter((h) => (UNLOCK[h] ?? 0) <= beaten);
 
 // spinoff/REUSE-SPEC.md §Bad guys: grey fur, black and dark purple, reserved from the kids' swatches
 export function isBadGuyCloth(hex) {
@@ -233,41 +239,129 @@ function swordGeometry() {
     new THREE.CapsuleGeometry(0.034, guard, 4, 12).translate(0, 0, at),
     new THREE.SphereGeometry(0.034, 14, 10).translate(0, 0, -grip / 2 - 0.018),
   ]);
-  const fan = new THREE.RingGeometry(at + 0.04, at + blade + wide / 2, 12, 1, Math.PI / 2, SWORD.trail).rotateX(Math.PI / 2);
-  const line = (y, z0, z1, w) => new THREE.PlaneGeometry(z1 - z0, w).rotateY(-Math.PI / 2).translate(0, y, (z0 + z1) / 2);
-  const streak = mergeGeometries([line(wide * 0.8, -0.3, at + blade * 0.5, 0.016), line(-wide * 0.8, -0.24, at + blade * 0.3, 0.016), line(0, -0.36, -0.08, 0.02)]);
-  swordGeo = { handle, trim, fan, streak };
+  swordGeo = { handle, trim, ...swooshGeometry(at + 0.04, at + blade + wide / 2, wide, at + blade * 0.5) };
   return swordGeo;
 }
 
-/** A toy sword in the right hand (joint side -1), or the owl's right wing tip; no gloves (REUSE-SPEC.md §Costumes). */
-export function addSword(built, color) {
+/** A slash's fan from `from` to `to` along the blade, and a stab's speed lines `wide` apart reaching to `reach`. */
+function swooshGeometry(from, to, wide, reach) {
+  const fan = new THREE.RingGeometry(from, to, 12, 1, Math.PI / 2, SWORD.trail).rotateX(Math.PI / 2);
+  const line = (y, z0, z1, w) => new THREE.PlaneGeometry(z1 - z0, w).rotateY(-Math.PI / 2).translate(0, y, (z0 + z1) / 2);
+  const streak = mergeGeometries([line(wide * 0.8, -0.3, reach, 0.016), line(-wide * 0.8, -0.24, reach - 0.06, 0.016), line(0, -0.36, -0.08, 0.02)]);
+  return { fan, streak };
+}
+
+const flat = (shape, depth) => mergeVertices(new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 2, curveSegments: 10 }))
+  .translate(0, 0, -depth / 2);
+// a shape drawn in (z, y), flat side to the camera like the sword's blade
+const sideOn = (shape, depth) => flat(shape, depth).rotateY(-Math.PI / 2);
+
+function starShape(r, inner = 0.45, points = 5) {
+  const s = new THREE.Shape();
+  for (let i = 0; i < points * 2; i++) {
+    const a = (i * Math.PI) / points, k = i % 2 ? r * inner : r;
+    if (i) s.lineTo(Math.sin(a) * k, Math.cos(a) * k);
+    else s.moveTo(0, k);
+  }
+  return s;
+}
+
+function heartShape(r) {
+  return new THREE.Shape().moveTo(0, -r).bezierCurveTo(-1.5 * r, -0.1 * r, -0.8 * r, 1.1 * r, 0, 0.45 * r)
+    .bezierCurveTo(0.8 * r, 1.1 * r, 1.5 * r, -0.1 * r, 0, -r);
+}
+
+// REUSE-SPEC.md §Costumes: the Music Scythe, about half a fighter tall; along +z, both hands at the origin, the crescent hooking down
+const SCYTHE = { butt: -0.19, top: 0.17, point: 0.09, r: 0.024 };
+let scytheGeo = null;
+
+function scytheGeometry() {
+  if (scytheGeo) return scytheGeo;
+  const { butt, top, point, r } = SCYTHE;
+  const pole = mergeGeometries([
+    new THREE.CylinderGeometry(r, r, top - butt, 12).rotateX(Math.PI / 2).translate(0, 0, (top + butt) / 2),
+    new THREE.CylinderGeometry(r * 1.35, r * 1.35, 0.014, 12).rotateX(Math.PI / 2).translate(0, 0, -0.03),
+    new THREE.ConeGeometry(r * 1.9, point, 12).rotateX(Math.PI / 2).translate(0, 0, top + point / 2),
+    new THREE.SphereGeometry(r * 0.45, 8, 6).translate(0, 0, top + point - r * 0.2),
+    sideOn(starShape(0.05), 0.03).translate(0, 0, butt - 0.03),
+  ]);
+  const crescent = sideOn(new THREE.Shape().moveTo(top, -0.01).bezierCurveTo(top, -0.15, 0.06, -0.22, -0.08, -0.2)
+    .bezierCurveTo(0.02, -0.16, 0.09, -0.1, 0.1, -0.01).lineTo(top, -0.01), 0.03);
+  // the handle's star, through the pole so it shows on both sides, under the hands
+  const star = sideOn(starShape(r * 1.5), r * 2.4);
+  const heart = sideOn(heartShape(r * 0.5), r * 2.6);
+  scytheGeo = { pole, crescent, star, heart, ...swooshGeometry(0.06, top + point, 0.11, top) };
+  return scytheGeo;
+}
+
+const candy = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.38, metalness: 0 });
+
+/** `parts` in the right hand (joint side -1), or the owl's right wing tip, with the slash's fan and the stab's streak; no gloves. */
+function holdBlade(built, parts, geo, userData) {
   removeTricks(built);
   removeGloves(built);
   removeSword(built);
-  const geo = swordGeometry(), { parent, at } = gloveAnchors(built)[0];
-  const candy = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.38, metalness: 0 });
-  const sword = new THREE.Group();
-  sword.add(new THREE.Mesh(geo.handle, candy(color)), new THREE.Mesh(geo.trim, candy(color === WHITE ? '#ff3b7f' : WHITE)));
-  for (const m of sword.children) m.castShadow = true;
+  const { parent, at } = gloveAnchors(built)[0], blade = new THREE.Group();
+  blade.add(...parts);
+  for (const m of blade.children) m.castShadow = true;
   const swoosh = new THREE.MeshBasicMaterial({ color: WHITE, transparent: true, depthWrite: false, side: THREE.DoubleSide });
   const fan = new THREE.Mesh(geo.fan, swoosh), streak = new THREE.Mesh(geo.streak, swoosh);
-  sword.add(fan, streak);
-  sword.position.set(...at);
-  sword.userData = { side: -1, fan, streak, tip: SWORD.grip / 2 + 0.012 + SWORD.blade + SWORD.wide / 2 };
-  parent.add(sword);
-  built.sword = sword;
+  blade.add(fan, streak);
+  blade.position.set(...at);
+  blade.userData = { side: -1, both: false, fan, streak, ...userData };
+  parent.add(blade);
+  built.sword = blade;
   swingSword(built, null);
-  return sword;
+  return blade;
 }
 
+/** A toy sword (REUSE-SPEC.md §Costumes). */
+export function addSword(built, color) {
+  const geo = swordGeometry();
+  return holdBlade(built, [new THREE.Mesh(geo.handle, candy(color)), new THREE.Mesh(geo.trim, candy(color === WHITE ? '#ff3b7f' : WHITE))], geo,
+    { tip: SWORD.grip / 2 + 0.012 + SWORD.blade + SWORD.wide / 2 });
+}
+
+const CRESCENT = '#2f6bff';
+/** The Music Scythe, held in both hands: a pole in `color`, a glowing blue crescent (REUSE-SPEC.md §Costumes). */
+export function addScythe(built, color) {
+  const geo = scytheGeometry();
+  const glow = new THREE.MeshStandardMaterial({ color: CRESCENT, emissive: CRESCENT, emissiveIntensity: 0.7, roughness: 0.3, metalness: 0 });
+  return holdBlade(built, [new THREE.Mesh(geo.pole, candy(color)), new THREE.Mesh(geo.crescent, glow),
+    new THREE.Mesh(geo.star, candy('#ffd21a')), new THREE.Mesh(geo.heart, candy('#8154ff'))], geo,
+  { tip: SCYTHE.top + SCYTHE.point, butt: SCYTHE.butt - 0.08, both: true, lower: -0.1 });
+}
+
+const _s = new THREE.Vector3(), _h = new THREE.Vector3(), _t = new THREE.Vector3(), _pole = new THREE.Line3();
+const _aim = new THREE.Quaternion(), _arm = new THREE.Quaternion(), _above = new THREE.Quaternion();
+/**
+ * The scythe's left hand turns its arm `w` of the way to the pole, below the right hand. The arms are too short to meet
+ * round a body, so it reaches on its own side for the spot the side-on camera sees on the pole.
+ */
+function reachPole(built, w) {
+  const blade = built.sword;
+  if (!blade?.userData.both || w <= 0) return;
+  const { parent, at } = gloveAnchors(built)[1], arm = built.joints.upperArm[1].node, { root } = built, { lower, butt } = blade.userData;
+  root.updateMatrixWorld(true);
+  const s = root.worldToLocal(arm.getWorldPosition(_s)), long = root.worldToLocal(parent.localToWorld(_h.set(...at))).distanceTo(s);
+  _pole.start.copy(root.worldToLocal(blade.localToWorld(_t.set(0, 0, lower)))).setX(s.x);
+  _pole.end.copy(root.worldToLocal(blade.localToWorld(_t.set(0, 0, butt)))).setX(s.x);
+  const near = _pole.closestPointToPoint(s, true, _t), d = near.distanceTo(s);
+  near.x += Math.sign(s.x) * Math.sqrt(Math.max(0, long * long - d * d));
+  root.localToWorld(near);
+  root.localToWorld(s);
+  _aim.identity().slerp(_arm.setFromUnitVectors(parent.localToWorld(_h.set(...at)).sub(s).normalize(), near.sub(s).normalize()), w);
+  arm.quaternion.copy(arm.parent.getWorldQuaternion(_above).invert().multiply(_aim).multiply(arm.getWorldQuaternion(_arm)));
+}
+
+/** Drops the sword or the scythe (`built.sword` is whichever blade is held). */
 export function removeSword(built) {
   built.sword?.removeFromParent();
   for (const o of built.sword?.children ?? []) if (o instanceof THREE.Mesh) o.material.dispose();
   built.sword = null;
 }
 
-/** Holds the blade at SWORD_MOVES' world angle above forward, whatever the arm is doing: a fan behind a slash, a streak behind a stab. */
+/** Holds the sword or scythe at SWORD_MOVES' world angle above forward, whatever the arm is doing: a fan behind a slash, a streak behind a stab. */
 export function swingSword(built, punch) {
   const { sword } = built;
   if (!sword) return;
@@ -284,6 +378,12 @@ export function swingSword(built, punch) {
 const BUBBLES = [[0, 0, 0, 0.05], [0.07, 0.06, 0.02, 0.035], [-0.05, 0.09, -0.02, 0.03], [0.02, 0.15, 0.01, 0.025], [-0.08, 0.01, 0.03, 0.04]];
 const FLAMES = [['#ff5a1f', 0.075], ['#ff9a1a', 0.055], ['#ffd21a', 0.035]];
 let trickParts = null;
+// REUSE-SPEC.md §Costumes: the scythe's stars, hearts and notes round the yarn store's sparkle, in riot colours
+/** @type {[string, string, [number, number, number], number][]} */
+const MUSIC = [
+  ['star', '#ffd21a', [0.13, 0.05, 0], 0.05], ['heart', '#ff3b7f', [-0.12, 0.08, 0.02], 0.045], ['note', '#5eccf6', [0.06, 0.17, -0.02], 0.08],
+  ['star', '#ff7a1a', [-0.06, -0.1, 0.03], 0.04], ['heart', '#fd9bd9', [0.1, -0.09, -0.03], 0.035], ['note', '#8be02a', [-0.17, -0.02, 0], 0.07],
+];
 
 function trickPartsOnce() {
   if (trickParts) return trickParts;
@@ -293,9 +393,16 @@ function trickPartsOnce() {
     bubble: new THREE.MeshStandardMaterial({ color: '#c8f2ff', roughness: 0.05, transparent: true, opacity: 0.55, depthWrite: false }),
     drop,
     flames: FLAMES.map(([color]) => new THREE.MeshBasicMaterial({ color, toneMapped: false })),
+    music: {
+      star: new THREE.ShapeGeometry(starShape(1)), heart: new THREE.ShapeGeometry(heartShape(1)),
+      note: mergeGeometries([new THREE.CircleGeometry(0.5, 14).scale(1.2, 0.85, 1).rotateZ(0.35), new THREE.PlaneGeometry(0.16, 1.6).translate(0.5, 0.8, 0),
+        new THREE.PlaneGeometry(0.5, 0.16).rotateZ(-0.6).translate(0.72, 1.45, 0)]),
+    },
+    paints: MUSIC.map(([, color]) => new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, toneMapped: false })),
   };
   return trickParts;
 }
+
 
 const bit = (geo, mat, [x, y, z], r) => {
   const m = new THREE.Mesh(geo, mat);
@@ -314,10 +421,14 @@ function trickMesh(kind, built) {
   if (kind === 'flame') {
     FLAMES.forEach(([, r], i) => g.add(bit(p.drop, p.flames[i], [0.035 * i, -0.04 - 0.01 * i, 0.035 * i], r)));
   }
+  if (kind === 'music') {
+    g.add(Object.assign(makeSparkle(built).mesh, { visible: true }));
+    MUSIC.forEach(([shape, , xyz, r], i) => g.add(bit(p.music[shape], p.paints[i], xyz, r)));
+  }
   return g;
 }
 
-/** A trick at the sword's tip, or at each glove; shared materials, so nothing to dispose. */
+/** A trick at the blade's tip, or at each glove; shared materials, so nothing to dispose. */
 export function addTricks(built, kind) {
   removeTricks(built);
   if (kind === 'plain') return;
@@ -373,8 +484,9 @@ export function buildFighter(f) {
   dress(built, outfitOf(f.look));
   mergeCharacter(built);
   if (f.look.hands === 'sword') addSword(built, f.look.gloves);
+  else if (f.look.hands === 'scythe') addScythe(built, f.look.gloves);
   else addGloves(built, f.look.gloves);
-  addTricks(built, f.look.trick);
+  addTricks(built, f.look.hands === 'scythe' ? 'music' : f.look.trick);
   return built;
 }
 
@@ -439,6 +551,7 @@ export function stepFighter(built, dt, pose, speed, strike = null) {
     if (kick) kickLayer(o, kick);
   });
   swingSword(built, punch);
+  reachPole(built, punch ? punchWeight(punch.step) : 0);
   stepTricks(built, punch);
   return out;
 }

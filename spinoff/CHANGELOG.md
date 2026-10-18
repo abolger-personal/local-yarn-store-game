@@ -4,6 +4,12 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 
 ## 0.0.5 (in progress)
 
+### Dress up
+- **The Music Scythe!** Beat level 2 and a third choice shows up next to the 🥊 gloves and the sword: a
+  short pole with a glowing blue moon-shaped blade, a point on top and a star at the bottom, drawn by
+  Stella. Hold it in both hands and it stabs and slashes just like the sword, with sparkles, stars, hearts
+  and music notes flying out every time you swing. The pole comes in any colour; the blade always glows blue.
+
 ### Building
 - **Stand in your gap to stop the bad guy.** Stand in a gap next to your blocks and the bad guy can't
   shove you out of the way any more: it stops and kicks your blocks, which gives you time to knock it

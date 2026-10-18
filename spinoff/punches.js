@@ -83,9 +83,12 @@ export function sample(keys, t) {
 /** The facing-keyed hitting arm: the one nearer the camera, or the far one on the combo's odd punches. */
 export const punchArm = (facing, n = 0) => (Math.cos(facing) >= 0 ? 1 : -1) * (n % 2 ? 1 : -1);
 
+/** How much a punch `step` through has taken the arms over from the walk: 0 at the ends, 1 from the wind-up to the hold. */
+export const punchWeight = (step) => Math.min(1, step / WIND, (1 - step) / (1 - HOLD));
+
 /** Writes punch `p` (from `moves`, PUNCHES or SWORD_MOVES) over a pose that already has the walk in it: arms take over, torso and legs add on. */
 export function punchLayer(out, { name, arm, step }, moves = PUNCHES) {
-  const s = sample(moves[name], step), w = Math.min(1, step / WIND, (1 - step) / (1 - HOLD));
+  const s = sample(moves[name], step), w = punchWeight(step);
   const mix = (k, v) => { out[k] = v + (out[k] - POSES.rest[k]) * (1 - w); };
   mix('armSwing', (s.hit + s.guard) / 2);
   mix('armSwingAlt', (-arm * (s.hit - s.guard)) / 2);

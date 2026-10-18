@@ -1186,10 +1186,10 @@ dough at 0.7: the shine difference does the work. Every new treat surface reuses
 The characters stay the yarn store's characters, so hats and capes stay knitwear from
 `garments.js`. Boxing gloves are the one costume piece that isn't knitted (see Costumes).
 
-## Costumes: hats, capes, bags, boxing gloves or a sword
+## Costumes: hats, capes, bags, boxing gloves, a sword or the Music Scythe
 
-Every fighter wears a bag and boxing gloves or a sword; a hat and a cape are the kid's choice (decided 2026-10-13,
-amended 2026-10-17: a sword instead of gloves). Each piece is in colours the kid picks.
+Every fighter wears a bag and boxing gloves, a sword or the Music Scythe; a hat and a cape are the kid's choice (decided 2026-10-13,
+amended 2026-10-17: a sword or the scythe instead of gloves). Each piece is in colours the kid picks.
 
 **A fighter bumps into things where it looks like it would** (decided 2026-10-17, playtest: a lion
 on its deck put a block in front of its shelf and was shoved off the deck, though it looked like it
@@ -1227,7 +1227,31 @@ like that keeps the big cape a choice rather than a handicap.
     measured: a hidden swoosh, speed line or trick never makes a fighter bigger.
   - **A full 360 spin with the sword: a later power move (brainstorm 2026-10-17).** It hits all around
     you, which normal hits don't, so it belongs on the power-bar ladder.
-- **Tricks: tap the picked gloves or sword again** (decided 2026-10-17), the way a hat changes stitch.
+- **The Music Scythe, a third choice** (decided 2026-10-17 by the designer and Stella, who drew it; the
+  sketches' B1 crescent). The hands row offers 🥊 gloves, a sword or the scythe (`HANDS`); it shows once
+  this tablet's player has beaten level 2 (see Fighter chooser). Bad guys and the training dummy keep gloves.
+  - **The look:** a short two-handed pole, about half the fighter's height (0.53 end to end), like Mira's
+    scythe in *KPop Demon Hunters*. A spear point on top does the stabbing; the bottom is a stopper shaped like a
+    star, not a second point. A glowing blue crescent hooks down from the top of the pole, back toward the
+    hands. The pole, the point and the star stopper are in the gloves colour (the same swatch row); the
+    crescent is always glowing blue. The pole is two pieces with a collar between them, and a yellow star
+    with a purple heart sits on it under the hands, from Stella's drawing. Flat side to the match camera,
+    like the sword (`addScythe` in `fighter.js`).
+  - **Both arms hold the pole on every move, for now.** It sits in the right hand like the sword. While a
+    move swings, the other arm turns toward the pole, a paw below the right hand (`reachPole`). The arms are
+    too short to meet round a round body, so it reaches on its own side, for the spot the side-on camera sees
+    on the pole: from the side both paws are on it; from the front they are either side of it. In a slash the
+    pole turns across the body, out of reach, and the paw is only in line with it. Standing still, the other
+    paw hangs free.
+  - **The sword's moves, exactly** (`SWORD_MOVES`): stab, slash, upward stab, with the sword's blade angles,
+    swooshes, timing, reach and hit spheres. No new hit timing or damage. As with the sword, the body is as
+    wide as before for bumping (`entrantOf`).
+  - **Its music comes out on every swing** (`look.trick` is always `music`; it is not a trick choice, so
+    tapping the scythe again changes nothing and its icon has no badge). Sparkles (`characters/sparkle.js`),
+    5-point stars, hearts and music notes in riot colours pop out of its spear point together as a move
+    lands, upright and turning, like the sword's tricks. Later, with sound, a swing plays music (planned
+    2026-10-17).
+- **Tricks: tap the picked gloves or sword again** (decided 2026-10-17), the way a hat changes stitch.- **Tricks: tap the picked gloves or sword again** (decided 2026-10-17), the way a hat changes stitch.
   A trick pops out of the hitting glove or the sword's tip while a punch lands, upright and turning:
   ✨ sparkle (the yarn store's `characters/sparkle.js` stars), 🫧 bubbles, or 🔥 a cartoon flame.
   Gloves go plain → ✨ → 🫧 → 🔥; a sword always has one, ✨ → 🫧 → 🔥 (`TRICKS`, `look.trick`).
@@ -1287,7 +1311,8 @@ only, pictures and colour, no words needed; every button has an `aria-label` for
 3. **Pick clothes.** Hat pictures and cape pictures (each with a "none" tile), bag pictures (no
    "none": every fighter carries a bag), each followed by its colour swatches (`CLOTH`: the riot
    colours plus white), then
-   the hands row: 🥊 gloves, or a sword once you've beaten level 1, then their colour (decided 2026-10-17).
+   the hands row: 🥊 gloves, a sword once you've beaten level 1, or the Music Scythe once you've beaten level 2,
+   then their colour (decided 2026-10-17).
    Tapping the gloves or sword you already have changes its trick, shown as a ✨ 🫧 🔥 badge on the icon,
    and the preview throws a move to show it off (jab or stab, then cross or slash, then uppercut or upward
    stab, in turn). The preview hits nothing, so once the move lands its
@@ -1312,12 +1337,13 @@ bad-guy grey, which is why a new fighter always starts from a `FUR` swatch.
 Trust boundary: `readFighter` is the only way in, from storage or from another tablet. It keeps
 only known param keys with the right type (finite numbers, booleans, `#rrggbb` colours, a name
 from the rig's `NAMES`), and only known hats, capes, bags, hands, tricks and kid colours. The sword
-lock is the chooser's alone: a friend's sword from another tablet always shows.
+lock is the chooser's alone: a friend's sword or scythe from another tablet always shows.
 
 **The sword unlocks after level 1** (decided 2026-10-17). A hero whose team won has beaten that level; a
 tie never counts, not even on level 1 (decided 2026-10-17); the tablet keeps the highest level beaten in
 the game save (`lys.progress.v1`'s `beaten`, apart from the fighter; `levelsBeaten` / `beatLevel` in
 `progress.js`), by the level number `start` carries. Until then the chooser shows only gloves, and a saved or 🎲 sword becomes gloves.
+**The Music Scythe unlocks after level 2** (decided 2026-10-17), the same way (`handsFor` in `fighter.js`).
 More unlocks behind later levels: brainstorm 2026-10-17.
 
 Not built yet: the silhouette reveal on the animal tiles (brainstorm 2026-10-13). There is no `help` control anywhere:

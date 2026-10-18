@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { BRICK, MAX_HEROES, TICK_HZ, WIDEST_FIGHTER, groundOf, outside, overlaps, spotRect } from './match.js';
 import { createMatch, snapshot, tick } from './sim.js';
 import { HEIGHT_LIMIT } from './build.js';
+import { MATCH } from './roster.js';
 
 const KINDS = ['ground', 'deck', 'hill'];
 const LOOK = { dough: '#e8c48a', frosting: '#14c4e0', stripe: false };
@@ -15,10 +16,10 @@ export const NARROW = 0.45;
 /**
  * Ticks until a fighter of `team`, tapped from its spawn to the other team's shelf, steals there; Infinity if not within a
  * minute. With `kicks`, stood blocked at a wall it taps the nearest block of it and kicks it down, then heads on, the way
- * a kid learns to break in: a wide one breaks block after block until the hole fits it.
+ * a kid learns to break in: a wide one breaks block after block until the hole fits it. `match`: the level's rules (double jumps).
  */
-export function ticksToShelf(stage, team = 'heroes', kicks = false, width = WIDEST_FIGHTER) {
-  const m = createMatch([kid(team, width)], stage), shelf = { thing: 'shelf', team: ENEMY[team] };
+export function ticksToShelf(stage, team = 'heroes', kicks = false, width = WIDEST_FIGHTER, match = MATCH) {
+  const m = createMatch([kid(team, width)], stage, { match }), shelf = { thing: 'shelf', team: ENEMY[team] };
   let brick = null, sent = null;
   for (let i = 0; i < 60 * TICK_HZ; i++) {
     const s = snapshot(m), [f] = s.fighters;
@@ -37,8 +38,8 @@ export function ticksToShelf(stage, team = 'heroes', kicks = false, width = WIDE
 }
 
 /** Whether a hero carrying a donut, tapped from its spawn to its own shelf, banks it within 30 seconds. */
-function banksHome(stage) {
-  const m = createMatch([kid('heroes')], stage);
+export function banksHome(stage, match = MATCH) {
+  const m = createMatch([kid('heroes')], stage, { match });
   m.fighters[0].carrying = LOOK;
   for (let i = 0; i < 30 * TICK_HZ; i++) {
     tick(m, i === 0 ? { kid: { target: { thing: 'shelf', team: 'heroes' }, punch: false, kick: false } } : {});
@@ -48,8 +49,8 @@ function banksHome(stage) {
 }
 
 /** Whether a hero tapped from its spawn onto the middle of `floor`'s top ends up standing there within 20 seconds, forts knocked down. */
-function reachesTop(stage, floor) {
-  const m = createMatch([kid('heroes', NARROW)], { ...stage, bricks: [] });
+function reachesTop(stage, floor, match) {
+  const m = createMatch([kid('heroes', NARROW)], { ...stage, bricks: [] }, { match });
   const x = (floor.x0 + floor.x1) / 2, z = (floor.z0 + floor.z1) / 2;
   for (let i = 0; i < 20 * TICK_HZ; i++) {
     tick(m, i === 0 ? { kid: { target: { x, z, y: floor.y }, punch: false, kick: false } } : {});
@@ -77,8 +78,8 @@ function checkStarts(stage, at) {
   });
 }
 
-/** Asserts a stage is playable; `at` names it in failures. `breakIn`: the bad guys' shelf must be walled in, reached only by kicking through. */
-export function checkLevel(stage, at, breakIn = false) {
+/** Asserts a stage is playable; `at` names it in failures. `breakIn`: the bad guys' shelf must be walled in, reached only by kicking through; `match`: the level's rules. */
+export function checkLevel(stage, at, breakIn = false, match = MATCH) {
   assert.ok(stage.floors.every((f) => KINDS.includes(f.kind)), `${at}: every floor is a ${KINDS.join('/')}`);
   assert.equal(stage.floors.filter((f) => f.kind === 'ground').length, 1, `${at}: exactly one ground`);
   const ground = groundOf(stage), raised = stage.floors.filter((f) => f.y > ground.y);
@@ -97,16 +98,16 @@ export function checkLevel(stage, at, breakIn = false) {
   const third = stage.zones.find((z) => z.team === 'heroes'), across = [];
   for (let z = stage.backWall; z < ground.z1 - 1e-9; z += BRICK)
     for (let k = 0; k < HEIGHT_LIMIT; k++) across.push({ team: 'heroes', x: third.x1 - 4 * BRICK, z, y: k * BRICK, hits: 2 });
-  assert.equal(ticksToShelf({ ...stage, bricks: across, starts: undefined }, 'badGuys', false, NARROW), Infinity,
+  assert.equal(ticksToShelf({ ...stage, bricks: across, starts: undefined }, 'badGuys', false, NARROW, match), Infinity,
     `${at}: a wall across the heroes' third as high as the height limit (${HEIGHT_LIMIT}) can't be got over`);
   // REUSE-SPEC.md §Mode: dropped donuts stay where they land, so any top one can land on must be reachable
-  assert.ok(banksHome(stage), `${at}: the widest fighter (${WIDEST_FIGHTER}) gets from its start spot to its own shelf to bank`);
-  for (const f of raised) assert.ok(reachesTop(stage, f), `${at}: the ${f.kind} top at x ${f.x0}..${f.x1}, y ${f.y} can be reached, or a donut landing there is lost`);
+  assert.ok(banksHome(stage, match), `${at}: the widest fighter (${WIDEST_FIGHTER}) gets from its start spot to its own shelf to bank`);
+  for (const f of raised) assert.ok(reachesTop(stage, f, match), `${at}: the ${f.kind} top at x ${f.x0}..${f.x1}, y ${f.y} can be reached, or a donut landing there is lost`);
   // a gap or a wall it can break lets the widest fighter in: some walls are only ever broken by the biggest kids
-  assert.ok(ticksToShelf(stage, 'heroes', true) < Infinity, `${at}: the widest fighter (${WIDEST_FIGHTER}) gets to the bad guys' shelf, through a gap or kicking a way in`);
+  assert.ok(ticksToShelf(stage, 'heroes', true, WIDEST_FIGHTER, match) < Infinity, `${at}: the widest fighter (${WIDEST_FIGHTER}) gets to the bad guys' shelf, through a gap or kicking a way in`);
   if (!breakIn) {
-    assert.ok(ticksToShelf(stage, 'heroes', false, NARROW) < Infinity, `${at}: a hero tapped from its spawn to the bad guys' shelf gets there without kicking`);
+    assert.ok(ticksToShelf(stage, 'heroes', false, NARROW, match) < Infinity, `${at}: a hero tapped from its spawn to the bad guys' shelf gets there without kicking`);
     return;
   }
-  assert.equal(ticksToShelf(stage, 'heroes', false, NARROW), Infinity, `${at}: there is no way round or over the bad guys' fort, so you have to break in`);
+  assert.equal(ticksToShelf(stage, 'heroes', false, NARROW, match), Infinity, `${at}: there is no way round or over the bad guys' fort, so you have to break in`);
 }

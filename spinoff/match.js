@@ -125,7 +125,7 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  *
  * What the level sets for a match: each hero's pile (`pieces`, with a build round first when there are any) and who can
  * hit whom (`match`, roster.js's MATCH).
- * @typedef {{ pieces?: number, match?: { friendlyFire: boolean, badGuysHit?: boolean, badGuyPace?: number } }} MatchOptions
+ * @typedef {{ pieces?: number, match?: { friendlyFire: boolean, badGuysHit?: boolean, badGuyPace?: number, doubleJump?: boolean } }} MatchOptions
  *
  * The sim's whole API, which sim.js implements:
  * @typedef {{ createMatch: (entrants: Entrant[], stage: Stage, opts?: MatchOptions) => any,

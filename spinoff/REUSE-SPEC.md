@@ -611,7 +611,7 @@ and smashers each get a round that is theirs.
     body (a lion in a cape is 0.75 wide: measured from its middle, it could never get near enough
     to hop onto a deck, and stood stuck in front of one). Any slower and it can't make the hop. The raider steals around 25 s and banks
     around 50 s of a 90 s round; `spinoff/cpu.test.mjs` checks the speeds and both.
-- **Level 3: the jumping level** (planned 2026-10-17, after kids beat level 2). Its lesson is double
+- **Level 3: the jumping level** (decided 2026-10-17, after kids beat level 2; built 2026-10-17). Its lesson is double
   jumps, so the field is pancake stacks you jump between. One new idea per level: the shelves stay one
   per team where they are (splitting them into several places is for later, brainstorm 2026-10-17:
   it spreads the bad guys and teaches choosing, but adds rules, shelves off-screen and thinner walls).
@@ -634,6 +634,18 @@ and smashers each get a round that is theirs.
     down isn't falling.
   - **Hand-made, like levels 1 and 2** (decided 2026-10-17); only the last breakfast level is generated
     (The breakfast stage is the tutorial stage).
+  - **Layout** (decided 2026-10-17, built: `JUMPING` in `levels.js`). Each shelf (where it was, x ±7.5,
+    z -1.7) stands on a tower 3 high, out of a double jump's reach from the floor (a route plans 1.3 for a
+    jump, 2.6 for a double): x -9..-6, z -2..0. In front of it a step 1.2 high, x -8.4..-6.6, z 0..1.2: the
+    floor to the step is a jump, the step to the tower a 1.8 rise, the double jump. Mirrored for the bad
+    guys. The middle is open floor with low stacks instead of the hill: one 0.8 high each side against the
+    back wall (x ±1.6..±2.8, z -2..-0.4) and one 1.8 high in the middle (x -0.6..0.6, z -0.6..0.6), a
+    double jump from the floor (the stacks are a fighter's width apart, so there's no stepping across).
+    All are decks nobody can break. Rules: `doubleJump`, `badGuyPace` 0.2, and the bad guy hits. A build
+    round with `piecesEach(3)` (5 pieces), no syrup or butter, level 2's start spots, and no bad-guy fort
+    (the bad guys start on the floor beside their step, as on every level). `checkLevel` takes the level's
+    rules, so level 3 is checked with double jumps on; `levels.test.mjs` shows a kid double jumps up the
+    bad guys' tower and, without double jumps, can't get up to its own shelf.
 - **Start spots come first** (decided 2026-10-17). Step 1 of making any level, hand-made or
   generated, on every stage: pick pseudo-random start spots for up to 6 heroes,
   each with room for the hero and their block pile beside them, and reserve them, so nothing

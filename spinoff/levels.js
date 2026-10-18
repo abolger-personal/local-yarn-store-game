@@ -66,8 +66,25 @@ const BUILDING = Object.freeze({ theme: 'breakfast', number: 2, match: Object.fr
   ]),
 }) });
 
+// REUSE-SPEC.md §Forts, Level 3: the jumping level. Each shelf's deck is a tower out of reach of a double jump from the
+// floor, with a step in front a jump high, so the way up is a jump and then a double jump; low stacks in the middle.
+const TOWER = /** @type {const} */ ({ kind: 'deck', x0: -9, x1: -6, z0: -2, z1: 0, y: 3 });
+const STEP_UP = /** @type {const} */ ({ kind: 'deck', x0: -8.4, x1: -6.6, z0: 0, z1: 1.2, y: 1.2 });
+const LOW_STACK = /** @type {const} */ ({ kind: 'deck', x0: -2.8, x1: -1.6, z0: -2, z1: -0.4, y: 0.8 });
+const mirrored = (f) => ({ ...f, x0: -f.x1, x1: -f.x0 });
+/** @type {Level} */
+const JUMPING = Object.freeze({ theme: 'breakfast', number: 3, match: Object.freeze({ ...MATCH, doubleJump: true, badGuyPace: 0.2 }), stage: Object.freeze({
+  ...TABLE,
+  floors: Object.freeze([TABLE.floors[0], ...[TOWER, STEP_UP, LOW_STACK].flatMap((f) => [f, mirrored(f)]),
+    { kind: 'deck', x0: -0.6, x1: 0.6, z0: -0.6, z1: 0.6, y: 1.8 }]),
+  shelves: Object.freeze(TABLE.shelves.map((sh) => ({ ...sh, y: TOWER.y }))),
+  puddles: Object.freeze([]),
+  starts: BUILDING.stage.starts,
+  bricks: Object.freeze([]),
+}) });
+
 /** Each stage's levels in order, the dial's numbers (REUSE-SPEC.md §After the lobby). @type {Readonly<Partial<Record<StageName, readonly Level[]>>>} */
-export const LEVELS = Object.freeze({ breakfast: Object.freeze([TUTORIAL, BUILDING]) });
+export const LEVELS = Object.freeze({ breakfast: Object.freeze([TUTORIAL, BUILDING, JUMPING]) });
 
 /** Level `n` of a stage, or null if there isn't one. @param {string} name @returns {Level|null} */
 export const levelOf = (name, n) => (Object.hasOwn(LEVELS, name) && LEVELS[name][n - 1]) || null;

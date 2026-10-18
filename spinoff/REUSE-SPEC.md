@@ -846,8 +846,8 @@ window keeps up).
 
 Open: how a margin maps to a handicap and to the speed, hit rate and hits taken (a starting point to
 tune: average the last 5 games' donut margins, a step for each donut of average margin, up to 3 each
-way; the easiest about 70% speed, half the hits and 40% softer, the hardest about 130% speed); and
-whether a negative handicap also makes the hits that kid takes harder.
+way; the easiest about 70% speed, half the hits and 40% softer, the hardest about 130% speed). A
+winning kid also takes harder hits (decided 2026-10-17): the hits taken scale both ways too.
 
 Players are 4–6 year olds and grownups in the same match (brainstorm 2026-10-13: no `help` in the code yet). Each player has one number, `help`,
 that nobody chooses: the game sets it from how they play (below). Every handicap knob is a straight

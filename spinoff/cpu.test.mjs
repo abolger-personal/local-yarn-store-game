@@ -14,9 +14,9 @@ const raider = { id: 'cpu1', team: 'badGuys', ...body, width: 0.75, height: 0.97
 // the raider's choices, at full speed so they come quickly; level 2's slow pace has its own check below
 const fullPace = { ...matchOptions(level), match: { ...level.match, badGuyPace: 1 } };
 
-/** Plays `seconds` of level 2 (build round skipped) with the CPU's inputs; `kidInput(snap)` drives the kid; `watch` sees each snapshot. */
-function play(stage, seconds, watch, kidInput = () => null, opts = fullPace) {
-  const m = createMatch([kid, raider], stage, opts), cpu = createCpu('cpu1');
+/** Plays `seconds` of level 2 (build round skipped) with the CPU's inputs; `kidInput(snap)` drives the kid (`hero`); `watch` sees each snapshot. */
+function play(stage, seconds, watch, kidInput = () => null, opts = fullPace, hero = kid) {
+  const m = createMatch([hero, raider], stage, opts), cpu = createCpu('cpu1');
   tick(m, { kid: { target: null, punch: false, kick: false, go: true } });
   let snap = snapshot(m);
   for (let i = 0; i < seconds * TICK_HZ; i++) {
@@ -100,6 +100,20 @@ const me = (s) => s.fighters.find((f) => f.id === 'cpu1');
   const walled = raid(choke), open = raid(at);
   assert.ok(walled.gone > 0 && walled.stole > walled.gone, `in its gap beside its blocks a kid holds the raider until it has kicked them down (${JSON.stringify(walled)})`);
   assert.ok(open.stole > 0 && walled.stole - open.stole > 3 * TICK_HZ, `with no blocks the raider shoves past (stole at ${open.stole}, ${walled.stole} with them)`);
+}
+
+// Bumping into the raider (playtest: it stood still the rest of the round): a lion-sized kid walking through it and away doesn't stop its raid
+{
+  let met = -1, stole = -1;
+  play({ ...level.stage, starts: [{ x: -3, z: 1.2 }] }, ROUND_SECONDS, (s) => {
+    if (steals(s)) { stole = s.tick; return true; }
+    return false;
+  }, (s) => {
+    const r = me(s);
+    if (met < 0 && r.x < -1.5) { met = s.tick; return { target: { x: r.x + 2.5, z: r.z, y: 0 }, punch: false, kick: false }; }
+    return met >= 0 && s.tick - met === 3 * TICK_HZ ? { target: { x: -4, z: -1.5, y: 0 }, punch: false, kick: false } : null;
+  }, matchOptions(level), { ...kid, width: 0.68 });
+  assert.ok(met > 0 && stole > met, `walked into and left, the raider still raids (met ${met}, stole ${stole})`);
 }
 
 {

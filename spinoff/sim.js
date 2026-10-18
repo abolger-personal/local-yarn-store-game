@@ -675,10 +675,10 @@ const walled = (s, f) => s.bricks.some((b) => b.team === f.team && b.y < f.y + f
 /** A guard at its shelf, or a kid standing still in a wall, isn't shoved by a fighter walking into it. */
 const holds = (s, f) => guarding(s, f) || (f.team === 'heroes' && f.onGround && !f.walkTo && walled(s, f));
 
-/** Pushed back off its way counts against a walker's progress, so walking into a fighter that holds is getting stuck. */
-function shove(s, f, px, pz) {
+/** Pushed back by a fighter that `holds` counts against a walker's progress, so walking into one is getting stuck; a bump isn't. */
+function shove(s, f, px, pz, holds) {
   const w = f.walkTo, d = w ? flat(f, w) : 0;
-  if (d > EPS) f.gain += (px * (w.x - f.x) + pz * (w.z - f.z)) / d;
+  if (holds && d > EPS) f.gain += (px * (w.x - f.x) + pz * (w.z - f.z)) / d;
   f.x += px;
   f.z += pz;
   pushOut(s, f, f.r, f.h);
@@ -694,7 +694,7 @@ function separate(s) {
       const held = [holds(s, a), holds(s, b)];
       for (const [f, sign, k] of [[a, -1, 0], [b, 1, 1]]) {
         const share = held[0] === held[1] ? 0.5 : Number(!held[k]);
-        shove(s, f, sign * ux * gap * share, sign * uz * gap * share);
+        shove(s, f, sign * ux * gap * share, sign * uz * gap * share, held[1 - k]);
       }
     }
   }

@@ -116,6 +116,18 @@ function play(n, hostInput = IDLE) {
   assert.ok(after.tick - drawn.G2.tick < TICK_HZ / SNAP_HZ, 'everything else on a guest is the host\'s latest snapshot');
 }
 
+// A strike on a guest moves every frame, between the 30 Hz snapshots, rather than jumping every other one (playtest: keyframes only)
+{
+  const steps = [];
+  for (let i = 0; i < 14; i++) {
+    play(1, i === 0 ? { ...IDLE, punch: true } : IDLE);
+    const h = at(drawn.G2, 'H');
+    if (h.move === 'punch') steps.push(h.step);
+  }
+  // from its second frame: the snapshot before its first wasn't a punch yet, so there is nothing to blend from
+  assert.ok(steps.length > 6 && steps.every((v, i) => i < 2 || v > steps[i - 1]), `a guest draws the host's punch moving on every frame (${steps.map((v) => v.toFixed(2))})`);
+}
+
 {
   const x = at(snapshot(state), 'G2').x;
   net.link('G1').send('input', { target: { x: x + 3, z: 0 }, punch: false, kick: false }, ['H']);

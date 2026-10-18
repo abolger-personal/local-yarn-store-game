@@ -3,7 +3,7 @@ import { POSES, setGeometryDetail } from '../characters/npc.js';
 import { attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
 import { countStrike, landHit, newCombo, strikerOf } from './punches.js';
-import { KICK_COMBO, strikeOf } from './kicks.js';
+import { KICK_COMBO, shownStrike, strikeOf } from './kicks.js';
 import { BAD_DONUT, BAD_GUY_FUR, MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
 import { BRICK, SHELF, SHELF_WIDTH, TICK_HZ, groundOf } from './match.js';
@@ -204,7 +204,8 @@ function placeCarried(m) {
 /** REUSE-SPEC.md §Navigation: a punch is upper body only (an uppercut dips the knees too) and layers over the walk; a kick takes the legs. */
 function strikeNow(m, f, tick) {
   const n = { punch: countStrike(m.combo.punch, f, tick), kick: countStrike(m.combo.kick, f, tick) }[f.move];
-  return n === undefined || m.t.joy ? null : strikeOf(f.move, n, f.facing, f.step);
+  m.shown = m.t.joy ? null : shownStrike(m.shown, n === undefined ? null : strikeOf(f.move, n, f.facing, f.step));
+  return m.shown;
 }
 
 const COUNT_UP = 1.3;

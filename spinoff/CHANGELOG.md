@@ -15,6 +15,11 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   shove you out of the way any more: it stops and kicks your blocks, which gives you time to knock it
   back. Without blocks beside you, it still pushes past.
 
+### Fixes
+- **Punches, kicks and swords move on slower tablets.** They used to jump between a few still poses.
+  Now every swing shows as a movement, even if it shows a moment late. On other players' tablets,
+  swings move smoothly too.
+
 ## 0.0.4 — 2026-10-17
 
 ### Dress up

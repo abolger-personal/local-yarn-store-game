@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { POSES, setGeometryDetail } from '../characters/npc.js';
 import { LOOK } from '../characters/garments.js';
 import { SPECIES, buildFighter, disposeFighter, newFighter, stepFighter } from './fighter.js';
-import { kickLeg } from './kicks.js';
+import { SHOWN_FRAMES, kickLeg, shownStrike } from './kicks.js';
 import { MOVES } from './sim.js';
 
 LOOK.viewPx = 0;
@@ -51,6 +51,28 @@ for (const species of SPECIES) {
     g.remove(built.root);
   }
   disposeFighter(built);
+}
+
+// A strike is drawn over at least SHOWN_FRAMES frames (playtest: slow tablets showed only keyframes)
+{
+  /** The steps drawn, frame by frame, for the sim's steps `live` (null once its strike has ended). */
+  const shown = (live) => {
+    let was = null;
+    const out = [];
+    for (const step of [...live, null, null, null, null, null, null, null, null]) {
+      was = shownStrike(was, step === null ? null : { name: 'jab', arm: 1, step });
+      if (was) out.push(was.step);
+    }
+    return out;
+  };
+  const fast = Array.from({ length: 16 }, (_, i) => i / 16);
+  assert.deepEqual(shown(fast), fast, 'at 60 frames a second, the strike drawn is the sim\'s');
+  const slow = shown([0, 0.4, 0.8]);
+  assert.ok(slow.length >= SHOWN_FRAMES && slow.every((v, i) => i === 0 || v - slow[i - 1] <= 1 / SHOWN_FRAMES + 1e-9),
+    `on a slow tablet, the strike moves in small steps over at least ${SHOWN_FRAMES} frames, playing out after the sim's (${slow})`);
+  let was = shownStrike(null, { name: 'jab', arm: 1, step: 0.5 });
+  was = shownStrike(was, { name: 'cross', arm: -1, step: 0.5 });
+  assert.deepEqual([was.name, was.step], ['cross', 1 / SHOWN_FRAMES], 'the next strike starts from its beginning');
 }
 
 console.log('kicks: ok');

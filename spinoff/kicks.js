@@ -35,6 +35,23 @@ export const strikeOf = (move, n, facing, step) => (move === 'punch'
   ? { name: COMBO[n], arm: punchArm(facing, n), step }
   : { name: KICK_COMBO[n], leg: kickLeg(facing), step });
 
+/** Every strike is drawn over at least this many frames, however slow the tablet (playtest: slow tablets showed only keyframes). */
+export const SHOWN_FRAMES = 6;
+
+/**
+ * The strike to draw this frame, from the one drawn last frame (`was`) and the sim's (`live`, null between strikes): it moves on at
+ * most 1 / SHOWN_FRAMES a frame and plays out once the sim's has ended, so a slow tablet sees it move, a little late; a new strike
+ * starts from its beginning. Look only: the sim's hits keep their timing. At 60 frames a second it is the sim's strike.
+ * @template {{ name: string, step: number }} S @param {(S & { from: number })|null} was @param {S|null} live
+ * @returns {(S & { from: number })|null}
+ */
+export function shownStrike(was, live) {
+  const s = live && (!was || was.name !== live.name || live.step < was.from) ? { ...live, from: 0, step: 0 } : was;
+  if (!s) return null;
+  const to = live?.step ?? 1, next = { ...(live ?? s), from: to, step: Math.min(to, s.step + 1 / SHOWN_FRAMES) };
+  return next.step < 1 ? next : null;
+}
+
 /** Writes kick `k` over the pose: legs, arms and lean take over from the walk, the head adds on. */
 export function kickLayer(out, { name, leg, step }) {
   const s = sample(KICKS[name], step), w = Math.min(1, step / WIND, (1 - step) / (1 - HOLD));

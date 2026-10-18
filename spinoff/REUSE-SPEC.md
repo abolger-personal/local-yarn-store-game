@@ -227,6 +227,13 @@ floor at an angle and follows your fighter.
   (2026-10-16): keep the deep lean, the flung arms and the lunge when retuning. Both use the leg nearer the camera.
   Keyframed over the kick's `step` like the punches (`spinoff/kicks.js`): the motion spring
   needs ~0.3 s to reach a pose, longer than the kick.
+- **A strike moves on a slow tablet too** (decided 2026-10-17, playtest: slow tablets showed punches,
+  kicks and sword swings as a few keyframes, the fighter teleporting between them). Drawing only: each
+  frame moves a drawn strike on at most a sixth of the way (`SHOWN_FRAMES`, `shownStrike` in
+  `kicks.js`), and one the sim has finished plays out, so every strike shows over at least 6 frames.
+  On a slow tablet it can show up to about half a second after the hit; the sim's hits keep their
+  timing. At 60 frames a second nothing changes. Guests blend a move's step between the host's 30 Hz
+  snapshots, like positions.
 - **Fort walls: around if there's a way, stop if there isn't** (decided 2026-10-13). On a
   floor you can walk around things, so a tap behind a wall routes through a gap if one exists.
   If the fort is closed, the fighter goes as close as it can and stands `'blocked'`, facing the

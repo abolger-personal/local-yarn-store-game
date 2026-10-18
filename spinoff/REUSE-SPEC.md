@@ -514,7 +514,8 @@ to the lobby), ⏸ pauses, 🏠 opens a room and 🔑 joins one. **A screen neve
 so there is never a question which one goes forward.
 
 **Holding 🥊 aims the Greathammer** (decided 2026-10-18): a tap is still a punch, everywhere; only a hero
-holding the hammer gets the hold, and it never fires by button-mashing (Costumes).
+holding the hammer gets the hold, and it never fires by button-mashing (Costumes). A bad guy holding one gets it too
+(decided 2026-10-18: bad guys have every weapon, Bad guys: Play a bad guy).
 
 ## Forts: build it, then knock it down
 

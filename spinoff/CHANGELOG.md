@@ -23,6 +23,10 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   run past it with a donut it chases you and punches. Get punched near the edge and you'll fly off!
 
 ### Dress up
+- **Play a bad guy! 🥷** Tap 🥷 on the fighter chooser and your fighter turns into a bad guy, in bad-guy grey,
+  black and purple. You still pick your animal, hat, cape, bag and weapon, and a bad guy gets every weapon.
+  Bad guys only play in a room with heroes: open one with 🏠 or join with 🔑, and you take the bad guy's place.
+  Tap 🥷 again to go back to your own colours.
 - **The Greathammer.** Beat level 4 and a fourth choice shows up: a ridiculously huge, spiked, grey-and-black hammer, bigger than you, that
   looks like it wandered in from a much scarier game: forged, faceted metal engraved with Celtic knots, cracks that glow in the
   colour you pick, and lightning crackling off it when it hits. It swings like the sword. Hold 🥊 and a see-through

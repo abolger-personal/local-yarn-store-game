@@ -39,7 +39,7 @@ const textured = (body, stitch) => (PATTERN[stitch] ? `${body}<g fill="url(#${pa
 
 const svg = (body, colour) => `<svg viewBox="0 0 48 48" fill="currentColor" style="color:${colour}" aria-hidden="true">${body}</svg>`;
 
-// REUSE-SPEC.md §Fighter chooser: the sword shows once this tablet's player has beaten level 1, the scythe level 2
+// REUSE-SPEC.md §Fighter chooser: the sword shows once this tablet's player has beaten level 1, the scythe level 2, the Greathammer level 4
 const hands = handsFor(levelsBeaten());
 /** @param {import('./fighter.js').Fighter} f */
 const allowed = (f) => {
@@ -96,7 +96,7 @@ function render() {
     garment('🦸', 'cape', CAPES, true),
     garment('🎒', 'bag', BAGS, false),
     row('✊', 'hands', pictures(hands.map((v) => {
-      const on = v === look.hands, badge = on && TRICK_ICON[look.trick] ? `<text x="38" y="14" font-size="18" text-anchor="middle">${TRICK_ICON[look.trick]}</text>` : '';
+      const on = v === look.hands, badge = on && TRICKS[v].length > 1 && TRICK_ICON[look.trick] ? `<text x="38" y="14" font-size="18" text-anchor="middle">${TRICK_ICON[look.trick]}</text>` : '';
       return button('hands', v, on && TRICKS[v].length > 1 ? `${v}, ${look.trick}, tap again to change` : v, svg(ICON[v] + badge, look.gloves), on);
     }).join('')),
       colours(swatchRow('gloves', CLOTH, look.gloves))),

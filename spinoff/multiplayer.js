@@ -58,7 +58,9 @@ export function readInput(raw) {
   if (!raw || typeof raw !== 'object' || typeof raw.punch !== 'boolean' || typeof raw.kick !== 'boolean') return null;
   const target = readTarget(raw.target);
   if (target === undefined || FLAGS.some((k) => raw[k] !== undefined && typeof raw[k] !== 'boolean')) return null;
-  return { target, punch: raw.punch, kick: raw.kick, ...Object.fromEntries(FLAGS.filter((k) => raw[k] !== undefined).map((k) => [k, raw[k]])) };
+  if (raw.throw !== undefined && !isNum(raw.throw)) return null;
+  return { target, punch: raw.punch, kick: raw.kick, ...Object.fromEntries(FLAGS.filter((k) => raw[k] !== undefined).map((k) => [k, raw[k]])),
+    ...(raw.throw !== undefined && { throw: raw.throw }) };
 }
 
 /** @returns {Seat|null} */
@@ -221,7 +223,7 @@ export function createGuest(link, me, themes, on) {
       return g.buf.length ? drawn(g, dt) : null;
     },
     /** @param {Input} input */
-    input(input) { if (g.host && (input.target || input.punch || input.kick || FLAGS.some((k) => input[k] !== undefined))) link.send('input', input, [g.host]); },
+    input(input) { if (g.host && (input.target || input.punch || input.kick || input.throw !== undefined || FLAGS.some((k) => input[k] !== undefined))) link.send('input', input, [g.host]); },
     left(id) { if (id === g.host) goneNow(); },
   };
 }

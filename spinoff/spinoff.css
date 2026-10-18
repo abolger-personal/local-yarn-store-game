@@ -112,6 +112,8 @@ body.play #stage canvas { touch-action: none; }
 /* the build round: 👍 fills a ring while held, and stays green-rimmed once tapped */
 .moves #ready { background: conic-gradient(#ffd21a calc(var(--fill, 0) * 1turn), #fff 0); }
 .moves #ready.on { border-color: #2fae5b; border-width: 9px; }
+/* holding 🥊 with the Greathammer in hand fills its ring the same way while the path shows */
+.moves #punch.aiming { background: conic-gradient(#ffd21a calc(var(--fill, 0) * 1turn), #fff 0); }
 .moves button.pop { animation: pop 320ms ease-out; }
 @keyframes pop { from { transform: scale(0.2); } 60% { transform: scale(1.25); } to { transform: scale(1); } }
 .hold { position: absolute; right: min(56px, 5vmin); bottom: calc(2 * min(56px, 5vmin) + min(112px, 15vmin)); margin: 0;
@@ -119,7 +121,7 @@ body.play #stage canvas { touch-action: none; }
 .hold.hidden { display: none; }
 .end { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(74, 58, 48, .45); }
 .end[hidden], .end .card[hidden] { display: none; }
-#score { cursor: pointer; }
+#score { cursor: pointer; position: relative; }
 .end .card { display: grid; grid-template-columns: 1fr 1fr; gap: min(24px, 2.5vmin) min(48px, 6vmin); padding: min(28px, 3vmin) min(48px, 6vmin); max-height: 96vh; background: var(--panel); border-radius: min(40px, 5vmin); border: 5px solid #e7d6c1; }
 .end .side { display: flex; flex-direction: column; align-items: center; gap: min(8px, 1vmin); opacity: .55; transform: scale(.85); }
 .end .side.won { opacity: 1; transform: scale(1.1); }
@@ -134,6 +136,12 @@ body.play #stage canvas { touch-action: none; }
 .end .again button.fresh { width: auto; display: flex; gap: min(6px, 1vmin); padding: 0 min(24px, 3vmin); border-radius: min(56px, 7.5vmin); border-color: var(--ring); animation: bounce 900ms ease-in-out infinite; }
 .end .again .fresh svg { width: min(72px, 10vmin); height: min(72px, 10vmin); filter: drop-shadow(0 0 1.2px rgba(74, 58, 48, .75)); }
 @keyframes bounce { 50% { transform: translateY(-10%) scale(1.06); } }
+/* REUSE-SPEC.md §After the lobby: the Greathammer unlocked, Dark Souls style, against the cute on purpose */
+.end .souls { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); padding: min(20px, 2.8vmin) 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(8, 6, 6, .82) 12% 88%, transparent); color: #d8b45c; text-align: center; text-transform: uppercase;
+  font: 500 min(54px, 7.2vmin)/1 'Trajan Pro', 'Cinzel', Georgia, 'Times New Roman', serif; letter-spacing: .14em; text-shadow: 0 0 14px rgba(216, 180, 92, .45);
+  animation: souls 3.5s ease-out both; }
+@keyframes souls { from { opacity: 0; letter-spacing: .04em; } 25% { opacity: 1; } }
 .end .code { grid-column: 1 / -1; justify-content: center; gap: min(6px, 1vmin); font-size: min(36px, 5vmin); min-height: 0; }
 .end .code:empty { display: none; }
 .end .code span { width: min(52px, 7.5vmin); height: min(52px, 7.5vmin); border-radius: min(14px, 2vmin); }

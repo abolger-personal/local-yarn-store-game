@@ -4,6 +4,7 @@ import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, HIT_DEPTH, PILE_DX, ROUND_SECON
 import { EMPTY, anySlot, footprint, lift, makeDisplay, place, topAt } from '../inventory/grid.js';
 import { MATCH, canHit } from './roster.js';
 import { facedCell, fortGrid, onTop } from './build.js';
+import { HAMMER, hammerPath, handOf } from './hammer.js';
 
 const DT = 1 / TICK_HZ;
 const EPS = 1e-6;
@@ -88,13 +89,17 @@ const BLOCK_HITS = 2;
  * @typedef {{ steps: number, active: [number, number], reach: { scale: number, min: number }|null,
  *             dy: number, r: number, damage: number, kb: { base: number, growth: number, angle: number },
  *             brick: number, walks: boolean, dive?: number, shows: 'punch'|'kick' }} Move
- * @type {Readonly<Record<'punch'|'kick'|'stomp', Move>>}
+ * `hammer` is the thrown Greathammer's hit: a kick's damage and knockback (REUSE-SPEC.md §Costumes), at its head.
  */
+/** @type {Move} */
+const KICK = { steps: 22, active: [7, 12], reach: { scale: 0.8, min: 0.3 }, dy: 0.3, r: 0.21, damage: 8,
+  kb: { base: 6, growth: 0.12, angle: 25 }, brick: 2, walks: false, shows: 'kick' };
+/** @type {Readonly<Record<'punch'|'kick'|'stomp'|'hammer', Move>>} */
 export const MOVES = Object.freeze({
   punch: { steps: 16, active: [4, 8], reach: { scale: 0.5, min: 0.2 }, dy: 0.6, r: 0.17, damage: 6,
     kb: { base: 5, growth: 0.1, angle: 50 }, brick: 1, walks: true, shows: 'punch' },
-  kick: { steps: 22, active: [7, 12], reach: { scale: 0.8, min: 0.3 }, dy: 0.3, r: 0.21, damage: 8,
-    kb: { base: 6, growth: 0.12, angle: 25 }, brick: 2, walks: false, shows: 'kick' },
+  kick: KICK,
+  hammer: { ...KICK, reach: null, dy: HAMMER.chest, r: HAMMER.r },
   stomp: { steps: 20, active: [2, 14], reach: null, dy: -0.05, r: 0.3, damage: 7,
     kb: { base: 4, growth: 0.1, angle: -60 }, brick: 2, walks: true, dive: 6, shows: 'kick' },
 });
@@ -764,8 +769,9 @@ function lungeFor(s, f, m) {
   return step > 0 ? { x: u.x * step, z: u.z * step } : null;
 }
 
-function strike(s, f, o, p) {
-  const m = MOVES[f.attack.id], u = ahead(f), broke = Boolean(o.carrying);
+/** `o` takes f's `id` hit at p, knocked along `u`. */
+function strike(s, f, o, p, { id, u } = { id: f.attack.id, u: ahead(f) }) {
+  const m = MOVES[id], broke = Boolean(o.carrying);
   drop(s, o, { x: o.x, y: o.y + o.h, z: o.z, vx: u.x * POP.vx, vy: POP.vy, vz: u.z * POP.vx });
   o.percent += m.damage;
   o.calm = 0;
@@ -774,22 +780,23 @@ function strike(s, f, o, p) {
   o.pending = { vx: u.x * along, vy: up, vz: u.z * along, stun: Math.round(STUN_TICKS + STUN_PER_SPEED * speed) };
   Object.assign(o, { attack: null, hitMove: speed >= LAUNCH_SPEED ? 'launched' : 'hurt', freeze: HITSTOP_TICKS });
   f.freeze = HITSTOP_TICKS;
-  f.attack.hit.push(o.id);
-  s.hits.push({ ...p, move: f.attack.id, on: 'fighter', target: o.id, broke });
+  if (id !== 'hammer') f.attack.hit.push(o.id);
+  s.hits.push({ ...p, move: id, on: 'fighter', target: o.id, broke });
 }
 
-function hitBrick(s, f, sp) {
+/** The nearest brick (not team `spare`'s) the sphere touches takes `id`'s hit. True if one did. */
+function hitBrick(s, sp, id, spare = null) {
   let best = null;
   for (const b of s.bricks) {
-    const c = brickContact(sp, b);
+    const c = b.team === spare ? null : brickContact(sp, b);
     if (c && (!best || c.d < best.d)) best = { ...c, b };
   }
-  if (!best) return;
-  const { b } = best, a = f.attack;
-  a.brickDone = true;
-  b.hits = Math.max(0, b.hits - MOVES[a.id].brick);
+  if (!best) return false;
+  const { b } = best;
+  b.hits = Math.max(0, b.hits - MOVES[id].brick);
   if (b.hits === 0) s.bricks = s.bricks.filter((o) => o !== b);
-  s.hits.push({ ...best.p, move: a.id, on: 'brick', target: b.id, broke: b.hits === 0 });
+  s.hits.push({ ...best.p, move: id, on: 'brick', target: b.id, broke: b.hits === 0 });
+  return true;
 }
 
 function attackStep(s, f) {
@@ -803,7 +810,38 @@ function attackStep(s, f) {
     const p = !a.hit.includes(o.id) && canStrike(s, f, o) ? bodyContact(sp, o) : null;
     if (p) strike(s, f, o, p);
   }
-  if (!a.brickDone) hitBrick(s, f, sp);
+  if (!a.brickDone) a.brickDone = hitBrick(s, sp, a.id);
+}
+
+// --- the Greathammer (REUSE-SPEC.md §Costumes) ---------------------------------------------
+
+/** Thrown once the path showed: ignored unless the hammer is in the hand of a fighter in play. */
+function throwHammer(s, f, k) {
+  if (typeof k !== 'number' || !Number.isFinite(k) || f.hands !== 'hammer' || f.out || f.stun > 0 || f.pending) return;
+  if (s.hammers.some((h) => h.owner === f.id)) return;
+  const from = handOf(f, f.h);
+  s.hammers.push({ owner: f.id, k: clamp(k, 0, 1), t: 0, from, x: from.x, y: from.y, z: from.z });
+}
+
+/** One tick of flight; false once it's back in the hand: a lap done, a hit, or its thrower rung out. */
+function flyHammer(s, hm) {
+  const f = s.fighters.find((o) => o.id === hm.owner);
+  if (f.out) return false;
+  hm.t += DT;
+  const p = hammerPath(hm.from, hm.k, hm.t, s.stage, handOf(f, f.h)), d = flat(p, hm);
+  if (hm.t >= p.T) return false;
+  const u = d > EPS ? { x: (p.x - hm.x) / d, z: (p.z - hm.z) / d } : ahead(f), sp = { x: p.x, y: p.y, z: p.z, r: HAMMER.r };
+  Object.assign(hm, { x: p.x, y: p.y, z: p.z });
+  for (const o of s.fighters) {
+    const c = o.team !== f.team && canStrike(s, { ...f, z: p.z }, o) ? bodyContact(sp, o) : null;
+    if (c) { strike(s, f, o, c, { id: 'hammer', u }); return false; }
+  }
+  return !hitBrick(s, sp, 'hammer', f.team);
+}
+
+function attacks(s) {
+  for (const f of s.fighters) attackStep(s, f);
+  s.hammers = s.hammers.filter((hm) => flyHammer(s, hm));
 }
 
 // --- bricks and donuts ----------------------------------------------------------------------
@@ -1006,6 +1044,7 @@ function applyInput(s, f, input) {
 
 /** @param {import('./match.js').Input} input */
 function attackInput(s, f, input) {
+  throwHammer(s, f, input.throw);
   if (busy(f) || !(input.kick || input.punch)) return;
   let id = 'punch';
   if (input.kick) id = f.onGround ? 'kick' : 'stomp';
@@ -1038,7 +1077,7 @@ function spawnSpot(s, e, cursor) {
 }
 
 function newFighter(e, at, y) {
-  return { id: e.id, team: e.team, icing: e.look.frosting, block: null, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
+  return { id: e.id, team: e.team, hands: e.hands ?? 'gloves', icing: e.look.frosting, block: null, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
     x: at.x, y, z: at.z, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, onGround: true, jumps: 1,
     target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, again: false, fails: 0, stuck: 0, gain: 0, away: false, slick: false, passed: false, sprung: -1,
     attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, out: 0, percent: 0, calm: 0,
@@ -1063,7 +1102,7 @@ function jumpsOn(stage) {
  */
 export function createMatch(entrants, stage, { pieces = 0, match = MATCH } = {}) {
   const s = { stage, band: bandOf(stage), jump: jumpsOn(stage), floorBoxes: stage.floors.map(floorBox), tick: 0, nextDonut: 0, fighters: [], donuts: [], shelves: [], solids: [], grids: new Map(), brickKey: '',
-    hits: [], fullBag: [], donutEvents: [], rules: match, phase: pieces > 0 ? 'build' : 'play', t0: 0, ready: new Set(), go: false, piles: [], nextBrick: 0,
+    hits: [], fullBag: [], donutEvents: [], hammers: [], rules: match, phase: pieces > 0 ? 'build' : 'play', t0: 0, ready: new Set(), go: false, piles: [], nextBrick: 0,
     bricks: stage.bricks.map((b, i) => ({ id: `b${i}`, team: b.team, x: b.x, y: b.y, z: b.z, vy: 0, hits: b.hits,
       maxHits: b.hits, icing: icingOf(entrants, b.team) })) };
   s.shelves = stage.shelves.map((spot) => makeShelf(spot, teamLooks(entrants, spot.team)));
@@ -1091,7 +1130,7 @@ export function tick(s, inputs) {
   applyInputs(s, inputs);
   for (const f of s.fighters) moveFighter(s, f);
   separate(s);
-  for (const f of s.fighters) attackStep(s, f);
+  attacks(s);
   settleBricks(s);
   refresh(s);
   for (const d of s.donuts) stepDonut(s, d);
@@ -1153,6 +1192,7 @@ export function snapshot(s) {
     phase: s.phase, ready: [...s.ready], piles: s.piles.map((p) => ({ ...p })),
     fighters: s.fighters.map(fighterView),
     donuts: s.donuts.map((d) => ({ id: d.id, x: d.x, y: d.y, z: d.z, look: { ...d.look } })),
+    hammers: s.hammers.map((h) => ({ owner: h.owner, x: h.x, y: h.y, z: h.z })),
     bricks: s.bricks.map((b) => ({ id: b.id, team: b.team, x: b.x, y: b.y, z: b.z, hits: b.hits, maxHits: b.maxHits, icing: b.icing })),
     shelves: s.shelves.map((sh) => ({ team: sh.team, x: sh.x, y: sh.y, z: sh.z, donuts: shelfLooks(sh) })),
     hits: s.hits.map((h) => ({ ...h })),

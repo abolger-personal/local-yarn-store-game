@@ -235,13 +235,15 @@ for (const species of SPECIES) {
   assert.equal(look('sword'), 'sword', 'a sword reads back');
   for (const junk of [undefined, null, 'axe', 3]) assert.equal(look(junk), 'gloves', `an old save or a junk ${junk} gets gloves`);
   assert.deepEqual([0, 1, 2].map(handsFor), [['gloves'], ['gloves', 'sword'], ['gloves', 'sword', 'scythe']], 'the sword after level 1, the scythe after level 2');
-  assert.deepEqual([[0, 1], [1, 2], [2, 2], [0, 2]].map(([b, a]) => newHands(b, a)), [['sword'], ['scythe'], [], ['sword', 'scythe']], 'the end card names only what this win unlocked');
+  assert.deepEqual([[0, 1], [1, 2], [2, 2], [0, 2], [3, 4]].map(([b, a]) => newHands(b, a)), [['sword'], ['scythe'], [], ['sword', 'scythe'], ['hammer']],
+    'the end card names only what this win unlocked: the Greathammer after level 4');
   const { hands, trick } = readFighter({ species: 'lion', params: {}, look: { hands: 'scythe', trick: 'flame' } }).look;
   assert.deepEqual([hands, trick], ['scythe', 'music'], 'a scythe reads back, always with its music');
+  assert.equal(readFighter({ species: 'lion', params: {}, look: { hands: 'hammer', trick: 'bubble' } }).look.trick, 'flame', 'the Greathammer is always aflame');
   for (const species of SPECIES) {
     const f = newFighter(species), gloved = buildFighter(f);
     assert.equal(gloved.tricks.length, 0, `${species}: plain gloves have no trick`);
-    for (const held of ['sword', 'scythe']) {
+    for (const held of ['sword', 'scythe', 'hammer']) {
       const built = buildFighter({ ...f, look: { ...f.look, hands: held, trick: 'sparkle' } });
       const hand = species === 'owl' ? built.joints.upperArm[0].node : built.holds[0].parent;
       assert.ok(built.sword?.parent === hand && built.gloves.length === 0, `${species}: a ${held} in the right hand and no gloves`);

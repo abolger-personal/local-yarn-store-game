@@ -232,6 +232,10 @@ floor at an angle and follows your fighter.
   If the fort is closed, the fighter goes as close as it can and stands `'blocked'`, facing the
   wall, and the kid smashes through. (In the flat version it always stopped; with a depth band
   that looked broken next to an open gap.)
+- **Blocked is a pause, never for good** (decided 2026-10-17, playtest: a bad guy that decided it was
+  blocked stood still the rest of the round). A fighter standing `'blocked'` looks for its way again
+  every 2 seconds (`RETRY_TICKS` in `sim.js`), so once a kid moves or a wall breaks it carries on.
+  Nothing in the game freezes for good.
 - **Two thumbs at once.** One thumb taps the stage while the other presses 🥊 or 🦶, tracked
   separately by `pointerId` (Pointer Events, `touch-action: none`). A touch that starts on a
   button never counts as a move. Tested 2026-10-13 on the Android tablet with

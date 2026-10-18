@@ -569,4 +569,15 @@ for (const [from, at] of [['the front', { x: -3, z: 1.6 }], ['the right', { x: -
   assert.ok(Math.hypot(me(snap).x - at.x, me(snap).z - at.z) < 0.5 && me(snap).target === null, `the kid stops, not off to the bad guys' shelf (at ${me(snap).x.toFixed(2)})`);
 }
 
+// Blocked is a pause, never for good (playtest: a raider that gave up stood still the rest of the round): a fighter that has given up
+// on a way it could take sets off again within a few seconds
+{
+  const m = createMatch([hero], STAGE), kid = m.fighters[0], to = { x: kid.x + 1, z: kid.z };
+  run(m, 1, tap(to.x, to.z));
+  Object.assign(kid, { fails: 99, nav: null });
+  const there = (snap) => Math.hypot(me(snap).x - to.x, me(snap).z - to.z) < 0.05;
+  assert.ok(!there(run(m, 30)), 'having given up, it waits');
+  assert.ok(there(run(m, 4 * TICK_HZ)), 'then tries again and gets there');
+}
+
 console.log('sim ok');

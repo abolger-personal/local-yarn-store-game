@@ -40,6 +40,8 @@ const OFF_SEARCH = 8;
 const REPLAN_TICKS = 10;
 const STUCK_TICKS = 20;
 const MAX_FAILS = 2;
+/** Blocked is a pause, never for good (playtest): a fighter that gave up on its way tries again this often. */
+const RETRY_TICKS = 2 * TICK_HZ;
 const FOLLOW_GAP = 0.15;
 const BRICK_GAP = 0.1;
 const TURN_SPEED = 0.05;
@@ -450,7 +452,7 @@ function plan(s, f) {
 function stale(s, f) {
   const n = f.nav;
   if (!n || n.failed) return true;
-  if (n.bricks !== s.brickKey) { f.fails = 0; return true; }
+  if (n.bricks !== s.brickKey || (n.blocked && s.tick - n.at >= RETRY_TICKS)) { f.fails = 0; return true; }
   const moved = flat(n.goal, f.dest) > CELL || Math.abs(n.goal.y - f.dest.y) > STEP;
   const pushed = n.done && (flat(f, n.end) > WP_ARRIVE || Math.abs(f.y - n.end.y) > STEP);
   return pushed || (moved && s.tick - n.at >= REPLAN_TICKS);

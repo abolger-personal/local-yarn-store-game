@@ -239,7 +239,7 @@ for (const species of SPECIES) {
     'the end card names only what this win unlocked: the Greathammer after level 4');
   const { hands, trick } = readFighter({ species: 'lion', params: {}, look: { hands: 'scythe', trick: 'flame' } }).look;
   assert.deepEqual([hands, trick], ['scythe', 'music'], 'a scythe reads back, always with its music');
-  assert.equal(readFighter({ species: 'lion', params: {}, look: { hands: 'hammer', trick: 'bubble' } }).look.trick, 'flame', 'the Greathammer is always aflame');
+  assert.equal(readFighter({ species: 'lion', params: {}, look: { hands: 'hammer', trick: 'bubble' } }).look.trick, 'lightning', 'the Greathammer always crackles with lightning');
   for (const species of SPECIES) {
     const f = newFighter(species), gloved = buildFighter(f);
     assert.equal(gloved.tricks.length, 0, `${species}: plain gloves have no trick`);

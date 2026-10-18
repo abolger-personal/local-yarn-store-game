@@ -1389,9 +1389,15 @@ like that keeps the big cape a choice rather than a handicap.
   Bad guys and the training dummy keep gloves. Passing it to a teammate is out for now (brainstorm, TEAMWORK-IDEAS.md).
   - **The look is the joke** (decided 2026-10-18): it does *not* match the riot-colour, cartoon-treat style.
     Excessively dramatic, high-texture, grey and black, like something out of *Dark Souls*: a long dark haft
-    with leather wraps and a massive blocky head, a rough noise texture with faint ember-glow cracks. It
-    ignores the gloves colour; its chooser icon is grey and black too. Its trick is always 🔥 (`look.trick`
-    is `flame`, not a choice, like the scythe's music).
+    with leather wraps and a massive head, a rough noise texture with faint glowing cracks. The iron
+    stays grey and black whatever the gloves colour; only the cracks glow in it (amended 2026-10-18, user: the
+    cracks were always ember red), on the hammer, its thrown copy and its chooser icon.
+  - **It looks like it's from a different video game** (decided 2026-10-18, user: the chunky edges still read as
+    cartoon). No rounded blocks: a forged eight-sided head with flared striking faces, a waist each side of a
+    raised collar, a spike on top, iron straps down the haft and an eight-sided pommel. Flat-shaded, mostly metal,
+    roughness from the noise, so hard facets catch the room's light like realistic metal, not candy.
+  - **Its one trick is lightning** (decided 2026-10-18, user): `look.trick` is always `lightning`, not a choice, like
+    the scythe's music: tilted bolts in electric blue with white cores crackle off it as a swing lands.
   - **Held, it is the sword's** (decided 2026-10-18): one-handed, `SWORD_MOVES` (stab, chop, upward stab),
     the same timing, reach and damage. Only the throw is new.
   - **Hold 🥊 to aim, let go to throw** (decided 2026-10-18; Buttons mean one thing everywhere). A press still

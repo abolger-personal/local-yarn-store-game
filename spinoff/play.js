@@ -592,9 +592,9 @@ function showEnd(snap) {
   card.hidden = false;
 }
 
-/** The Greathammer's thrown copy, spinning about its middle. */
-function spinner() {
-  const inner = new THREE.Group().add(...greathammerMeshes()), g = new THREE.Group().add(inner);
+/** The Greathammer's thrown copy, spinning about its middle, its cracks in `color`. */
+function spinner(color) {
+  const inner = new THREE.Group().add(...greathammerMeshes(color)), g = new THREE.Group().add(inner);
   inner.position.z = -0.2;
   g.visible = false;
   scene.add(g);
@@ -609,7 +609,7 @@ function cast(roster) {
     g.add(built.root);
     scene.add(g);
     const t = Object.fromEntries(FIGHTER_TIMERS.map((k) => [k, 0]));
-    const flyer = f.look.hands === 'hammer' ? spinner() : null;
+    const flyer = f.look.hands === 'hammer' ? spinner(f.look.gloves) : null;
     fighters.set(id, { g, built, flyer, team, t, vy: 0, ground: true, yaw: 0, recoil: new THREE.Vector3(), combo: { punch: newCombo(), kick: newCombo('kick', KICK_COMBO.length) }, seat: seatDrop(built), down: 0, cycles: fighters.size * 0.33, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
     endPicture(entrant);
     return entrant;

@@ -24,7 +24,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 
 ### Dress up
 - **The Greathammer.** Beat level 4 and a fourth choice shows up: a huge, grim, grey-and-black hammer that
-  looks like it wandered in from a much scarier game. It swings like the sword. Hold 🥊 and a see-through
+  looks like it wandered in from a much scarier game: forged, faceted metal with cracks that glow in the
+  colour you pick, and lightning crackling off it when it hits. It swings like the sword. Hold 🥊 and a see-through
   path shows where it will fly; keep holding and the loop gets bigger. Let go and it flies round the loop
   like a boomerang and comes back to your hand. If it hits a bad guy or a bad-guy block on the way, it
   knocks them flying and is back in your hand straight away.

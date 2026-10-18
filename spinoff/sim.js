@@ -675,10 +675,10 @@ const walled = (s, f) => s.bricks.some((b) => b.team === f.team && b.y < f.y + f
 /** A guard at its shelf, or a kid standing still in a wall, isn't shoved by a fighter walking into it. */
 const holds = (s, f) => guarding(s, f) || (f.team === 'heroes' && f.onGround && !f.walkTo && walled(s, f));
 
-/** Pushed back by a fighter that `holds` counts against a walker's progress, so walking into one is getting stuck; a bump isn't. */
-function shove(s, f, px, pz, holds) {
+/** Pushed back by a fighter that `held` its ground counts against a walker's progress, so walking into one is getting stuck; a bump isn't. */
+function shove(s, f, px, pz, held) {
   const w = f.walkTo, d = w ? flat(f, w) : 0;
-  if (holds && d > EPS) f.gain += (px * (w.x - f.x) + pz * (w.z - f.z)) / d;
+  if (held && d > EPS) f.gain += (px * (w.x - f.x) + pz * (w.z - f.z)) / d;
   f.x += px;
   f.z += pz;
   pushOut(s, f, f.r, f.h);

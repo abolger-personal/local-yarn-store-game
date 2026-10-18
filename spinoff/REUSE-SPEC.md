@@ -1630,20 +1630,35 @@ training dummy is built). A grownup can play one (below);
 the host fills the rest of the team with CPU bad guys from the presets nobody took. Silly, not
 scary, for 4–6 year olds.
 
-- **Eight tablets at most: 6 heroes and 2 played bad guys** (brainstorm 2026-10-13). Up to six
-  people play heroes. A seventh or eighth person plays a bad guy whether they tapped 🥷 or not:
-  the latest arrivals, in the order the host saw them join, so nobody who was already a hero is
-  moved. At most two people play bad guys; once two have, 🥷 greys out. A ninth tablet is
-  turned away with a "room full" picture. CPU bad guys fill the rest of the bad-guy team, up to 8.
-- **Grownups join as bad guys with one button** (brainstorm 2026-10-13). 🥷 in the lobby swaps your
-  fighter for a bad guy; tap it again to go back. Nothing to pick: you get the first preset no
-  other grownup in the room has. Which one is worked out the way `standingSpots` places people:
-  every tablet sorts the bad-guy players' ids and hands out presets in order, so all tablets agree
-  with no extra messages. Your own fighter stays saved; the bad guy is not written to
-  `lys.fighter.v1`.
-- **A bad-guy player sends only "bad guy", never a look.** Every tablet builds the preset from the
-  table in code, so `readFighter` still never lets a bad-guy colour in from the network, and a kid
-  still can't dress as one.
+- **Fourteen fighters at most, people and CPUs together** (decided 2026-10-18, user: "we don't need to cap bad guys
+  right now, we can cap the total player count instead"; replaces the brainstorm of 8 tablets, at most 2 of them bad
+  guys). Up to 6 heroes and up to 8 bad guys, `MAX_FIGHTERS` (14) in `roster.js`. Any number of people may play bad
+  guys; CPU bad guys only fill the seats people haven't taken, never past 14. Turning a tablet away from a full room
+  (a "room full" picture) is planned, not built: today a room past 14 can't start (`multiplayer.js`).
+- **Play a bad guy: 🥷 on the fighter chooser** (decided 2026-10-18, user; replaces the brainstorm of 🥷 in the lobby
+  and a fixed preset). Tap 🥷 on `choose.html` and your fighter *is* a bad guy: saved on it (`badGuy: true` in
+  `lys.fighter.v1`, checked by `readFighter` like every field), so it stays one until you tap 🥷 again. Being a bad guy
+  is a role, not a costume: an antagonist for an older player to add to the kids' game, not a game of its own.
+  - **You still pick your species, body, hat, cape, bag and weapon, never a colour** (decided 2026-10-18). A bad guy's
+    fur is the bad-guy grey and its hat, cape, bag and weapon colours come from the bad-guy black and purple; the
+    swatch rows don't show. Your hero colours stay saved underneath, so tapping 🥷 off brings them back. Colours never
+    cross the network for a bad guy: every tablet paints a fighter flagged `badGuy` itself (a look from another tablet
+    is still snapped to the kids' swatches by `readFighter`, so a kid can never dress in bad-guy colours). Two bad-guy
+    players get two different colour sets, by their sorted ids, so everyone can tell them apart.
+  - **Every weapon, always** (decided 2026-10-18, user: "for game balance we may need to turn that off later"): a bad
+    guy's chooser offers gloves, the sword, the scythe and the Greathammer whatever its tablet has beaten.
+  - **No playing alone** (decided 2026-10-18). A bad guy's lobby start screen has only ✏️, 🏠 and 🔑: no 👍 to play by
+    yourself. In a room, a bad-guy host's 👍 stays greyed out until at least one hero is in the room.
+  - **No unlocks, no say in the level** (decided 2026-10-18). A bad guy's tablet records no outcome (no win, no stamp),
+    and bad guys are left out of the room's level minimum (`roomLevels`), so a grownup's fresh save never holds the room
+    to level 1.
+  - **A person takes the CPU's seat** (decided 2026-10-18, user): on levels 2 to 4, with one bad guy, a person playing
+    one replaces the CPU raider; with more people than the level's count, there are no CPU bad guys at all (the count
+    is `badGuys(level, grownups)`, people included; Bad guys: The bad-guy team grows). On level 1 the training dummy
+    stays beside them.
+  - **CPU rules, for now** (decided 2026-10-18, user): a played bad guy moves at the level's `badGuyPace` like the CPU,
+    and follows `badGuysHit` (on level 2 its hits never land on a kid). No build round of its own in 0.0.6: no pile,
+    and it's ready at once like a CPU bad guy (building a bad-guy fort is planned).
 - **Bad-guy players get the penalty** (brainstorm 2026-10-13). A bad guy a person plays is fixed at
   `help -0.5`, the grownup end of the table, because the grownups are the ones playing them: more knockback taken, less damage dealt,
   smaller hit spheres, no input buffer, shorter respawn invincibility. Nobody picks that level: it

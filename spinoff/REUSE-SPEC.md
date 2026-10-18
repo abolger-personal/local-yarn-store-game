@@ -819,10 +819,12 @@ saved (beside the stamp card, so a new fighter never resets it) and comes from t
 on any level or stage: a rolling window of how badly the kids beat the bad guys, or lost to them (the
 donut margin), in the games that player played. Losing again and again, as in replaying a level, raises
 it; winning big lowers it. This replaces "not saved, reset every game" in the brainstorm below; the
-`help` number and its knobs are still the likely way it takes effect. Open: how many games the window
-holds and how a margin maps to `help`; whether it is per player or per tablet; whether it also eases the
-CPU bad guys (their pace, how often they raid) or only helps the kid; and how a match with kids of
-different handicaps plays (each kid's own knobs, one set of bad guys).
+`help` number and its knobs are still the likely way it takes effect.
+
+**On level 3 it eases the bad guy** (decided 2026-10-17): the handicap sets the CPU bad guy's speed, how
+often it hits and how hard its hits are (damage and knockback). Open: how many games the window holds
+and how a margin maps to those; whether it is per player or per tablet; and, since there is one bad
+guy, whose handicap sets it when kids of different handicaps play together.
 
 Players are 4–6 year olds and grownups in the same match (brainstorm 2026-10-13: no `help` in the code yet). Each player has one number, `help`,
 that nobody chooses: the game sets it from how they play (below). Every handicap knob is a straight

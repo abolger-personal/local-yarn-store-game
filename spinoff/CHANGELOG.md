@@ -2,42 +2,46 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
-## 0.0.5 (in progress)
+## 0.0.5 — 2026-10-17: The Music Scythe and the jumping level
 
 ### Dress up
 - **The Music Scythe!** Beat level 2 and a third choice shows up next to the 🥊 gloves and the sword: a
   short pole with a glowing blue moon-shaped blade, a point on top and a star at the bottom, drawn by
-  Stella. Hold it in both hands and it stabs and slashes just like the sword, with sparkles, stars, hearts
-  and music notes flying out every time you swing. The pole comes in any colour; the blade always glows blue.
+  Stella. Hold it in both hands and it stabs and chops just like the sword, with sparkles, stars, hearts
+  and music notes flying out past its point every time you swing. The pole comes in any colour; the blade
+  always glows blue.
 
 ### Levels
-- **Double jump by tapping twice.** Tap just above your fighter's head to jump, then tap there again any
-  time in the air: it jumps again at the top. No timing needed.
 - **Level 3: the jumping level.** Beat level 2 and level 3 opens. Each team's donut shelf is up on a tall
   pancake tower, too tall to jump onto from the floor. Jump onto the step in front of it, then tap the top:
   your fighter jumps, and jumps again in the air to get up. The middle has pancake stacks to jump on too.
-  There's a build round with 5 pancakes each, and one slow bad guy, but this one can knock you off!
+  There's a build round with 5 pancakes each, and one slow bad guy, but this one can knock you off. Try
+  punching it while it's jumping!
+
+### Fighting
+- **Double jump by tapping twice.** Tap just above your fighter's head to jump, then tap there again any
+  time in the air: it jumps again at the top. No timing needed.
+- **The sword and scythe slash is a big chop you can see.** The blade swings up over your head and down
+  in front, with a white swoosh behind it. The old flat swing round the front was hard to see.
+- **Bumping into someone never knocks you off a ledge.** Only a hit can send you over the edge.
 
 ### Building
 - **Stand in your gap to stop the bad guy.** Stand in a gap next to your blocks and the bad guy can't
   shove you out of the way any more: it stops and kicks your blocks, which gives you time to knock it
   back. Without blocks beside you, it still pushes past.
+- **The box showing where your pancake goes is easy to see.** Its outline is thick now, even on a phone.
 
 ### Fixes
-- **The sword and scythe slash is a big chop you can see.** The blade swings up over your head and down
-  in front, with a white swoosh behind it. The old flat swing round the front was hard to see from the side
-  and on the dress-up page.
-- **The box showing where your pancake goes is easy to see.** Its outline is thick now, even on a phone.
 - **Playing on a phone works better.** On the dress-up page every hat, cape and bag shows, wrapping onto
   a second line instead of hiding off the edge. Turned sideways, the room code keys and the level numbers
   spread out in wider rows, so they all fit on the screen. Held upright, the lobby's big buttons shrink just
   enough to fit four in a row. The lobby's fighters fill the screen again after you turn the phone.
-- **White outfits show on the dress-up page.** A white hat, cape, bag or sword now has an outline, so it
-  doesn't disappear into its white button.
-- **The colour you pick stays in the middle of its circle** on the dress-up page. It used to slip off-centre.
 - **Punches, kicks and swords move on slower tablets.** They used to jump between a few still poses.
   Now every swing shows as a movement, even if it shows a moment late. On other players' tablets,
   swings move smoothly too.
+- **White outfits show on the dress-up page.** A white hat, cape, bag or sword now has an outline, so it
+  doesn't disappear into its white button.
+- **The colour you pick stays in the middle of its circle** on the dress-up page. It used to slip off-centre.
 
 ## 0.0.4 — 2026-10-17
 

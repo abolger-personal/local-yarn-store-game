@@ -68,8 +68,9 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
 /**
  * @typedef {{ dough: string, frosting: string, stripe: boolean }} DonutLook
  * @typedef {{ x: number, z: number, y?: number } | { thing: 'donut'|'brick'|'fighter'|'pile', id: string }
- *           | { thing: 'shelf', team: Team } | { stop: true }} Target
- *   a point on the stage (y given when the tap landed on a raised top), a thing (a pile by its owner's id), or stop where you are
+ *           | { thing: 'shelf', team: Team } | { stop: true } | { jump: true }} Target
+ *   a point on the stage (y given when the tap landed on a raised top), a thing (a pile by its owner's id), stop where you are,
+ *   or jump (a tap just above your fighter: on the ground a jump, in the air the double jump, at the top of the first)
  * @typedef {'idle'|'walk'|'jump'|'fall'|'punch'|'kick'|'hurt'|'launched'|'blocked'|'sit'} MoveId
  *   'blocked': standing at a wall it can't hop, facing it; 'sit': away from the screen, sitting where it stopped
  *

@@ -45,7 +45,8 @@ const isArrays = (o, keys) => keys.every((k) => Array.isArray(o[k]));
 /** @returns {import('./match.js').Target|null|undefined} undefined when malformed */
 function readTarget(t) {
   if (t == null) return null;
-  if (t.stop === true) return { stop: true };
+  const flag = /** @type {('stop'|'jump')[]} */ (['stop', 'jump']).find((k) => t[k] === true);
+  if (flag) return /** @type {import('./match.js').Target} */ ({ [flag]: true });
   if (t.thing === 'shelf') return TEAMS.has(t.team) ? { thing: 'shelf', team: t.team } : undefined;
   if (THINGS.has(t.thing)) return isId(t.id) ? { thing: t.thing, id: t.id } : undefined;
   if (!isNum(t.x) || !isNum(t.z) || (t.y !== undefined && !isNum(t.y))) return undefined;

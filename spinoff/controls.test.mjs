@@ -44,6 +44,9 @@ assert.deepEqual(pickTarget(STAGE, snap, tap(2.5, 1, 0), 'me'), { thing: 'fighte
 const away = { ...snap, fighters: snap.fighters.map((f) => (f.id === 'dummy' ? { ...f, respawn: 2 } : f)) };
 assert.ok('x' in pickTarget(STAGE, away, tap(2.5, 0.6, 0), 'me'), 'a fighter waiting to drop back in is not there to tap');
 assert.deepEqual(pickTarget(STAGE, snap, tap(-4, 0.6, 0.5), 'me'), { stop: true }, 'a tap on myself stops');
+assert.deepEqual(pickTarget(STAGE, snap, tap(-4, 1.6, 0.5), 'me'), { jump: true }, 'a tap just above my head jumps');
+const jumping = { ...snap, fighters: snap.fighters.map((f) => (f.id === 'me' ? { ...f, y: 2, onGround: false } : f)) };
+assert.deepEqual(pickTarget(STAGE, jumping, tap(-4, 3.6, 0.5), 'me'), { jump: true }, 'and above it in the air too, where I am then');
 assert.ok('x' in pickTarget(STAGE, snap, tap(-3, 0.6, -1), 'me'), 'a teammate is not a foe');
 for (const s of snap.shelves) {
   assert.deepEqual(pickTarget(STAGE, snap, tap(s.x + 0.4, s.y + 0.9, s.z - 0.1), 'me'), { thing: 'shelf', team: s.team }, `the ${s.team} shelf`);

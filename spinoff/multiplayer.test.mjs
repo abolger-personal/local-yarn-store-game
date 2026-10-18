@@ -42,6 +42,7 @@ function guestOf(net, id) {
 {
   assert.deepEqual(readInput({ target: { x: 1, z: 2 }, punch: true, kick: false }), { target: { x: 1, z: 2 }, punch: true, kick: false });
   assert.deepEqual(readInput({ ...IDLE, away: true }), { ...IDLE, away: true });
+  assert.deepEqual(readInput({ ...IDLE, target: { jump: true, x: 9 } }), { ...IDLE, target: { jump: true } }, 'a jump tap comes through, and only as one');
   const cpu = rosterOf('H', newFighter('owl'), new Map(), 2);
   assert.deepEqual(cpu.slice(1), [{ id: 'cpu1', team: 'badGuys', cpu: true }], 'level 2 brings one CPU bad guy instead of the dummy');
   assert.deepEqual(readStart(JSON.parse(JSON.stringify({ theme: 'breakfast', stage: TUTORIAL.stage, roster: cpu, settings: { seconds: 90 } })), 'H', ['breakfast'])?.roster, cpu,

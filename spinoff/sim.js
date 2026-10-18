@@ -600,13 +600,16 @@ function walkStep(s, f) {
 
 /** Landing on a trampoline launches you, unless it's the one that just did, so a bounce settles rather than looping. */
 function land(s, f, top) {
-  Object.assign(f, { y: top, vx: 0, vy: 0, vz: 0, onGround: true, jumps: 1, airTo: null });
+  Object.assign(f, { y: top, vx: 0, vy: 0, vz: 0, onGround: true, jumps: 1, airTo: null, again: false });
   if (f.navJump && top < f.navJump.y - STEP) fail(f);
   f.navJump = null;
   const p = patchAt(s, s.stage.springs, f);
   if (p >= 0 && p !== f.sprung) launch(s, f, p);
   else f.sprung = -1;
 }
+
+/** A double jump, a route's or a jump tap's: the mid-air jump at the top of the first. */
+const doubleNow = (f) => Boolean(f.navJump?.double || f.again) && f.vy <= 0 && f.jumps > 0;
 
 function airStep(s, f) {
   const to = f.stun > 0 ? null : f.airTo;
@@ -616,8 +619,7 @@ function airStep(s, f) {
     f.vz = (to.z - f.z) * v;
   }
   if (f.attack?.id === 'stomp') f.vy = Math.min(f.vy, -MOVES.stomp.dive);
-  // a route's double jump: the mid-air jump at the top of the first
-  if (f.navJump?.double && f.vy <= 0 && f.jumps > 0) { f.jumps--; f.vy = s.jump.speed; }
+  if (doubleNow(f)) Object.assign(f, { jumps: f.jumps - 1, vy: s.jump.speed, again: false });
   f.vy -= GRAVITY * DT;
   slide(s, f, f.vx * DT, f.vz * DT);
   const prevY = f.y;
@@ -977,6 +979,14 @@ function aim(s, f, t) {
   if ('x' in t) tapAbove(s, f, t);
 }
 
+/** A jump tap (playtest: a second jump timed by hand was too hard to hit): on the ground a jump where you stand; in the air the
+ * double jump, saved for the top of the first however early it's tapped. */
+function jumpTap(s, f) {
+  if (f.stun > 0) return;
+  if (f.onGround) jump(s, f, { x: f.x, z: f.z });
+  else if (f.jumps > 0) f.again = true;
+}
+
 const busy = (f) => Boolean(f.attack || f.stun > 0 || f.freeze > 0 || f.pending || f.out);
 
 function setAway(s, f, away) {
@@ -988,7 +998,8 @@ function setAway(s, f, away) {
 function applyInput(s, f, input) {
   setAway(s, f, input?.away);
   if (f.away || !input) return;
-  if (input.target && !f.out) aim(s, f, input.target);
+  if (input.target && !f.out && 'jump' in input.target) jumpTap(s, f);
+  else if (input.target && !f.out) aim(s, f, input.target);
   if (s.phase === 'build') readyInput(s, f, input);
   else attackInput(s, f, input);
 }
@@ -1029,7 +1040,7 @@ function spawnSpot(s, e, cursor) {
 function newFighter(e, at, y) {
   return { id: e.id, team: e.team, icing: e.look.frosting, block: null, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
     x: at.x, y, z: at.z, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, onGround: true, jumps: 1,
-    target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, fails: 0, stuck: 0, gain: 0, away: false, slick: false, passed: false, sprung: -1,
+    target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, again: false, fails: 0, stuck: 0, gain: 0, away: false, slick: false, passed: false, sprung: -1,
     attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, out: 0, percent: 0, calm: 0,
     carrying: null, touching: [], shelfDone: false, shelfSpot: null, blocked: false };
 }

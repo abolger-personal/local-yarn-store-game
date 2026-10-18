@@ -11,6 +11,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   and music notes flying out every time you swing. The pole comes in any colour; the blade always glows blue.
 
 ### Levels
+- **Double jump by tapping twice.** Tap just above your fighter's head to jump, then tap there again any
+  time in the air: it jumps again at the top. No timing needed.
 - **Level 3: the jumping level.** Beat level 2 and level 3 opens. Each team's donut shelf is up on a tall
   pancake tower, too tall to jump onto from the floor. Jump onto the step in front of it, then tap the top:
   your fighter jumps, and jumps again in the air to get up. The middle has pancake stacks to jump on too.

@@ -37,7 +37,7 @@ export function createMatch(entrants, stage) {
 /** @param {Target} t @returns {{ x: number, z: number }|null} */
 function aimOf(state, f, t) {
   if ('x' in t) return { x: t.x, z: t.z };
-  if ('stop' in t) return null;
+  if ('stop' in t || 'jump' in t) return null;
   if (t.thing === 'shelf') return { x: t.team === 'heroes' ? -7.5 : 7.5, z: -1.2 };
   const o = { donut: state.donuts, brick: state.bricks, fighter: state.fighters }[t.thing].find((d) => d.id === t.id);
   if (!o) return null;

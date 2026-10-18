@@ -6,7 +6,7 @@ import { BRICK, outside } from './match.js';
 /** @typedef {import('./match.js').Input} Input @typedef {import('./match.js').FighterState} FighterState */
 /** @typedef {import('./match.js').Stage} Stage @typedef {{ x: number, y: number, z: number }} P3 @typedef {{ origin: P3, direction: P3 }} Ray */
 
-export const TAP_RADIUS = { donut: 0.55, foe: 0.55, me: 0.35, shelf: 0.75, brick: 0.4, pile: 0.5 };
+export const TAP_RADIUS = { donut: 0.55, foe: 0.55, me: 0.35, jump: 0.5, shelf: 0.75, brick: 0.4, pile: 0.5 };
 export const DONUT_UP = 0.2;
 export const SHELF_UP = 0.65;
 
@@ -46,6 +46,8 @@ export function rayDist({ origin: o, direction: d }, x, y, z) {
 
 /** @param {Ray} ray @param {FighterState} f */
 const fighterDist = (ray, f) => Math.min(...[0.3, 0.55, 0.8].map((k) => rayDist(ray, f.x, f.y + f.height * k, f.z)));
+/** How near a tap passes the space just above a fighter's head, where a tap is a jump. */
+const aboveDist = (ray, f) => Math.min(...[1.3, 1.65, 2].map((k) => rayDist(ray, f.x, f.y + f.height * k, f.z)));
 const shelfDist = (ray, s) => Math.min(...[-0.6, 0, 0.6].map((k) => rayDist(ray, s.x + k, s.y + SHELF_UP, s.z - 0.13)));
 const brickDist = (ray, b) => rayDist(ray, b.x + BRICK / 2, b.y + BRICK / 2, b.z + BRICK / 2);
 
@@ -74,6 +76,7 @@ export function pickTarget(stage, snap, ray, myId) {
   const foe = closest(snap.fighters.filter((f) => f.team !== me?.team && !f.respawn), (f) => fighterDist(ray, f), TAP_RADIUS.foe);
   if (foe) return { thing: 'fighter', id: foe.id };
   if (me && fighterDist(ray, me) <= TAP_RADIUS.me) return { stop: true };
+  if (me && aboveDist(ray, me) <= TAP_RADIUS.jump) return { jump: true };
   const shelf = closest(snap.shelves, (s) => shelfDist(ray, s), TAP_RADIUS.shelf);
   if (shelf) return { thing: 'shelf', team: shelf.team };
   // REUSE-SPEC.md §Forts: only your own pile is yours to take from

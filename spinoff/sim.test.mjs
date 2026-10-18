@@ -606,4 +606,18 @@ for (const [from, at] of [['the front', { x: -3, z: 1.6 }], ['the right', { x: -
   assert.equal(bad.y, deck.y, 'bumped at the deck\'s edge, it stays up');
 }
 
+// A jump tap (playtest: a hand double jump was too hard to time): on the ground a jump, and a second tap any time in the air a
+// double jump, saved for the top of the first
+{
+  /** The highest a fighter gets with jump taps on these ticks. */
+  const peak = (ticks) => {
+    const m = createMatch([hero], STAGE), kid = m.fighters[0];
+    let top = 0;
+    run(m, 2 * TICK_HZ, (_, i) => (ticks.includes(i) ? say({ target: { jump: true } }) : {}), () => { top = Math.max(top, kid.y); });
+    return top;
+  };
+  const once = peak([0]), twice = peak([0, 4]);
+  assert.ok(once > 1 && twice > 1.8 * once, `a second tap right after the first jumps again at the top (${once.toFixed(2)} once, ${twice.toFixed(2)} twice)`);
+}
+
 console.log('sim ok');

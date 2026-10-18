@@ -181,8 +181,10 @@ floor at an angle and follows your fighter.
 
 - **Tap a place:** the fighter goes to the nearest spot it can stand on there. A tap on a higher
   platform jumps there on its own (or bounces up off a trampoline): the host keeps a small map of
-  the stage's platforms with jump links between them and walks the route. A tap straight above the fighter is a jump; another
-  tap higher, in the air, is the next mid-air jump. There is no jump button.
+  the stage's platforms with jump links between them and walks the route. A tap just above the fighter's head is a jump
+  where it stands; another such tap any time in the air is the double jump, saved for the top of the first (amended
+  2026-10-17, playtest: a second jump timed by hand was too hard to hit, and a tap above the head used to land on the floor
+  behind, walking you there). There is no jump button.
 - **Tap a thing:** the fighter goes to it and acts. A bad guy: chase them. A loose donut: pick it
   up. The enemy shelf: grab. Your own shelf: bank. The fighter **ends facing what was tapped**.
   A fighter you tap is walked up to the short way, stopping on the side you came from (decided

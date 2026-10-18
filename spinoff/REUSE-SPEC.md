@@ -627,8 +627,10 @@ and smashers each get a round that is theirs.
     bump never shoves a fighter off a stack, only a hit's knockback.
   - **A gap's bottom is floor** (decided 2026-10-17): knocked into one, you land and climb back up. A
     bad guy can still knock you off the front or the ends of the stage for a ring-out, as on every level.
-  - Open questions: whether tapping the floor below walks you down off a stack on purpose; whether level 3 gets the
-    difficulty modifier (Handicap) now; two CPU bad guys from level 3 (Bad guys) as well.
+  - **One CPU bad guy, and it hits** (decided 2026-10-17): still the single raider of level 2, but
+    level 3's can hit kids and knock them off (level 2's never does, `badGuysHit: false`).
+  - **Level 3 has the difficulty modifier** (decided 2026-10-17; Handicap: a saved, golf-style handicap).
+  - Open question: whether tapping the floor below walks you down off a stack on purpose.
 - **Start spots come first** (decided 2026-10-17). Step 1 of making any level, hand-made or
   generated, on every stage: pick pseudo-random start spots for up to 6 heroes,
   each with room for the hero and their block pile beside them, and reserve them, so nothing
@@ -810,8 +812,17 @@ and smashers each get a round that is theirs.
 **A difficulty modifier is needed by level 3** (planned 2026-10-17, from the 0.0.4 playtest: the designer's
 four-year-old took about five tries to beat level 2 as launched in 0.0.4). Five tries is fine there,
 since level 2 has things to learn. But if each level asks that much more, the youngest kids stop
-progressing, so by level 3 the game needs something that eases it for a kid who keeps losing. The
-`help` number below is the likely way in; which knobs, and how it's set, isn't decided yet.
+progressing, so by level 3 the game needs something that eases it for a kid who keeps losing.
+
+**It's a saved handicap, like golf's** (planned 2026-10-17, from the designer). Each player's modifier is
+saved (beside the stamp card, so a new fighter never resets it) and comes from their last several games,
+on any level or stage: a rolling window of how badly the kids beat the bad guys, or lost to them (the
+donut margin), in the games that player played. Losing again and again, as in replaying a level, raises
+it; winning big lowers it. This replaces "not saved, reset every game" in the brainstorm below; the
+`help` number and its knobs are still the likely way it takes effect. Open: how many games the window
+holds and how a margin maps to `help`; whether it is per player or per tablet; whether it also eases the
+CPU bad guys (their pace, how often they raid) or only helps the kid; and how a match with kids of
+different handicaps plays (each kid's own knobs, one set of bad guys).
 
 Players are 4–6 year olds and grownups in the same match (brainstorm 2026-10-13: no `help` in the code yet). Each player has one number, `help`,
 that nobody chooses: the game sets it from how they play (below). Every handicap knob is a straight
@@ -1610,15 +1621,16 @@ scary, for 4–6 year olds.
   (brainstorm 2026-10-13).
 - **The bad-guy team grows level by level** (decided 2026-10-17; `badGuys` in `levels.js`, though there is no
   level 3 yet). The tutorial levels
-  keep it small: level 1 has the training dummy (decided 2026-10-17), which never raids, and level 2
-  has one CPU bad guy (Forts: Level 2). From level 3 the count grows by one CPU bad guy a level:
+  keep it small: level 1 has the training dummy (decided 2026-10-17), which never raids, and levels 2
+  and 3 have one CPU bad guy (Forts: Level 2; level 3 amended 2026-10-17: one, now able to knock you
+  off, so the jumping is the level's one new idea). From level 4 the count grows by one CPU bad guy a level:
 
   ```
-  badGuys(level, grownups) = 1 for levels 1 and 2, else min(8, max(grownups, 1) + level - 1)
+  badGuys(level, grownups) = 1 for levels 1 to 3, else min(8, max(grownups, 1) + level - 1)
   ```
 
-  Two grownups on level 3 face the kids with 2 CPU bad guys beside them; no grownups on level 3
-  is 3 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
+  Two grownups on level 4 face the kids with 3 CPU bad guys beside them; no grownups on level 4
+  is 4 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
   drops it (decided 2026-10-17; After the lobby: a win unlocks the next level).
 
   A grownup bad guy on level 1 (🥷 isn't built yet) can't attack the kids: they can only defend

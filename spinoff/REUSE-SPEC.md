@@ -630,7 +630,9 @@ and smashers each get a round that is theirs.
   - **One CPU bad guy, and it hits** (decided 2026-10-17): still the single raider of level 2, but
     level 3's can hit kids and knock them off (level 2's never does, `badGuysHit: false`).
   - **Level 3 has the difficulty modifier** (decided 2026-10-17; Handicap: a saved, golf-style handicap).
-  - Open question: whether tapping the floor below walks you down off a stack on purpose.
+  - **Tapping the floor walks you down off a stack on purpose** (decided 2026-10-17): choosing to get
+    down isn't falling.
+  - **Hand-made, like levels 1 and 2** (decided 2026-10-17): see The breakfast stage is the tutorial stage.
 - **Start spots come first** (decided 2026-10-17). Step 1 of making any level, hand-made or
   generated, on every stage: pick pseudo-random start spots for up to 6 heroes,
   each with room for the hero and their block pile beside them, and reserve them, so nothing
@@ -672,7 +674,9 @@ and smashers each get a round that is theirs.
   (Level 2, above), and a broken block is gone for the rest of the match. A
   match is short (90 s to start), so that's fine: this is short-term strategy, not a long siege.
   Revisit only if a playtest shows kids upset at their wall being gone.
-- **The breakfast stage is the tutorial stage** (decided 2026-10-17). The tutorial levels all play
+- **The breakfast stage is the tutorial stage** (decided 2026-10-17). Its levels are all hand-made,
+  never generated (amended 2026-10-17: level 3 too); the generated levels (`GENERATED-LEVELS.md`) are
+  for the other stages. The tutorial levels all play
   on breakfast (`LEVELS.breakfast`: level 1 breaking in, level 2 building and defending; the goody
   and tool levels aren't made yet), and between them they teach every basic mechanic once: breaking in, building,
   defending, and earning a goody and using a tool. They don't need every goody or tool, only one
@@ -832,9 +836,16 @@ window keeps up).
   nearest, which would flicker between two kids, can be gamed by standing beside the youngest, and
   reads as random.
 
+- **It goes both ways** (decided 2026-10-17). A handicap of 0 is the game as tuned today, which a
+  four-year-old beat level 2 in about five tries. Losing makes it easier; winning big (a negative,
+  low handicap) makes the bad guy faster, so an older kid or a grownup gets a faster bad guy and the
+  level stays worth replaying. Since the speed is set by the most-helped kid, a faster bad guy shows
+  only when everyone in the match has been winning.
+
 Open: how a margin maps to a handicap and to the speed, hit rate and hits taken (a starting point to
-tune: average the last 5 games' donut margins; 0 or better is the game as designed; each donut of
-average loss is a step easier, up to 3, the easiest about 70% speed, half the hits and 40% softer).
+tune: average the last 5 games' donut margins, a step for each donut of average margin, up to 3 each
+way; the easiest about 70% speed, half the hits and 40% softer, the hardest about 130% speed); and
+whether a negative handicap also makes the hits that kid takes harder.
 
 Players are 4–6 year olds and grownups in the same match (brainstorm 2026-10-13: no `help` in the code yet). Each player has one number, `help`,
 that nobody chooses: the game sets it from how they play (below). Every handicap knob is a straight

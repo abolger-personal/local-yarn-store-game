@@ -35,20 +35,23 @@ export const CAPES = Object.freeze(['cape', 'capelet']);
 export const BAGS = Object.freeze(['backpack', 'drawstring bag', 'crossbody pouch']);
 // REUSE-SPEC.md §Costumes: up to cable's weight; seed, puff and linen stitch cost 6–18× the triangles
 export const TEXTURES = Object.freeze(['stockinette', 'rib', 'garter', 'cable', 'single crochet', 'waffle', 'lace']);
-// REUSE-SPEC.md §Costumes: one of these, in the `gloves` colour
-export const HANDS = Object.freeze(['gloves', 'sword', 'scythe']);
+// REUSE-SPEC.md §Costumes: one of these, in the `gloves` colour (the Greathammer ignores it)
+export const HANDS = Object.freeze(['gloves', 'sword', 'scythe', 'hammer']);
 // their 48×48 icons, for the chooser and the end card's new-item button
 export const HAND_ICON = Object.freeze({
   gloves: '<path d="M14 24c0-10 5-15 13-15s12 6 12 14c0 6-3 10-7 12H20c-4-2-6-6-6-11Z"/><ellipse cx="13" cy="25" rx="5" ry="7"/><rect x="17" y="36" width="18" height="8" rx="3"/>',
   sword: '<g transform="rotate(35 24 24)"><path d="M20 30V9a4 4 0 0 1 8 0v21Z"/><rect x="11" y="29" width="26" height="6" rx="3"/><rect x="21" y="35" width="6" height="7" rx="2"/><circle cx="24" cy="44" r="3.5"/><path d="M20 14l8 4M20 21l8 4" stroke="#fff" stroke-width="2.5" opacity=".7"/></g>',
   scythe: '<g transform="rotate(35 24 24)"><rect x="22" y="12" width="4" height="27" rx="2"/><path d="M24 2l5 11h-10Z"/><path d="M24 37l2.4 4.6 5 .6-3.7 3.4 1 5-4.7-2.5-4.7 2.5 1-5-3.7-3.4 5-.6Z"/><path d="M24 11c10 0 17 10 16 23-4-8-9-14-16-16Z" fill="#2f6bff"/></g>',
+  hammer: '<g transform="rotate(35 24 24)"><rect x="21.5" y="14" width="5" height="33" rx="1.5" fill="#26221f"/><path d="M21 30h6M21 35h6M21 40h6" stroke="#5a4636" stroke-width="2.5"/>'
+    + '<rect x="9" y="1" width="30" height="16" rx="1" fill="#3a3a3e"/><path d="M9 6h30M14 1v16M33 1v16" stroke="#17171a" stroke-width="2"/><path d="M18 4l3 5-2 4M29 10l-4 3" stroke="#ff6a1f" stroke-width="1.4" fill="none"/></g>',
 });
 // what flies off the hitting glove or the blade's tip as it lands; tapping the picked one goes to the next. The scythe's is fixed.
 export const TRICKS = Object.freeze({
   gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame']), sword: Object.freeze(['sparkle', 'bubble', 'flame']), scythe: Object.freeze(['music']),
+  hammer: Object.freeze(['flame']),
 });
 // REUSE-SPEC.md §Fighter chooser: the levels a player must have beaten for the chooser to offer each
-const UNLOCK = Object.freeze({ sword: 1, scythe: 2 });
+const UNLOCK = Object.freeze({ sword: 1, scythe: 2, hammer: 4 });
 /** The hands the chooser offers a player who has beaten `beaten` levels. */
 export const handsFor = (beaten) => HANDS.filter((h) => (UNLOCK[h] ?? 0) <= beaten);
 /** The hands that are new to a player who had beaten `before` levels and now has `after` (REUSE-SPEC.md §After the lobby). */
@@ -341,6 +344,65 @@ export function addScythe(built, color) {
   { tip: SCYTHE.top + SCYTHE.point, butt: SCYTHE.butt - 0.08, both: true, lower: -0.1 });
 }
 
+// REUSE-SPEC.md §Costumes: the Greathammer, Dark Souls in a cartoon: a long dark haft with leather wraps, a massive iron block, ember cracks
+const GREATHAMMER = { butt: -0.12, top: 0.5, r: 0.021, head: [0.15, 0.32, 0.18], wraps: [-0.06, 0.02, 0.1, 0.18] };
+const NOISE = 64;
+let hammerGeo = null;
+const texture = (data) => Object.assign(new THREE.DataTexture(data, NOISE, NOISE), { wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping, needsUpdate: true });
+
+/** A rough iron noise in grey and black, and a glow map black but for its ember cracks; seeded, so every hammer is the same. */
+function ironMaps() {
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const iron = new Uint8Array(NOISE * NOISE * 4), glow = new Uint8Array(NOISE * NOISE * 4);
+  const coarse = Array.from({ length: 9 * 9 }, rnd);
+  for (let y = 0; y < NOISE; y++) for (let x = 0; x < NOISE; x++) {
+    const v = 28 + 40 * coarse[Math.floor(y / 8) * 9 + Math.floor(x / 8)] + 34 * rnd(), i = (y * NOISE + x) * 4;
+    iron.set([v, v, v + 4, 255], i);
+    glow.set([0, 0, 0, 255], i);
+  }
+  for (let c = 0; c < 5; c++) {
+    let x = rnd() * NOISE, y = rnd() * NOISE, a = rnd() * Math.PI * 2;
+    for (let n = 0; n < 40; n++, a += (rnd() - 0.5) * 1.2, x = (x + Math.cos(a) + NOISE) % NOISE, y = (y + Math.sin(a) + NOISE) % NOISE) {
+      const i = (Math.floor(y) * NOISE + Math.floor(x)) * 4;
+      iron.set([10, 8, 8], i);
+      glow.set([255, 80 + 60 * rnd(), 20], i);
+    }
+  }
+  return { map: Object.assign(texture(iron), { colorSpace: THREE.SRGBColorSpace }), glow: texture(glow) };
+}
+
+function greathammerGeometry() {
+  if (hammerGeo) return hammerGeo;
+  const { butt, top, r, head: [hx, hy, hz], wraps } = GREATHAMMER, at = top - hz / 2;
+  const haft = mergeGeometries([
+    new THREE.CylinderGeometry(r, r * 1.15, top - butt, 8).rotateX(Math.PI / 2).translate(0, 0, (top + butt) / 2),
+    new THREE.BoxGeometry(r * 3, r * 3, 0.04).translate(0, 0, butt),
+  ]);
+  const leather = mergeGeometries(wraps.map((z) => new THREE.CylinderGeometry(r * 1.35, r * 1.35, 0.05, 8).rotateX(Math.PI / 2).translate(0, 0, z)));
+  const head = mergeGeometries([
+    new THREE.BoxGeometry(hx, hy, hz).translate(0, 0, at),
+    new THREE.BoxGeometry(hx * 1.12, hy * 0.16, hz * 1.12).translate(0, hy * 0.3, at),
+    new THREE.BoxGeometry(hx * 1.12, hy * 0.16, hz * 1.12).translate(0, -hy * 0.3, at),
+    new THREE.BoxGeometry(hx * 0.7, hy * 0.7, 0.05).translate(0, 0, top + 0.02),
+  ]);
+  hammerGeo = { haft, leather, head, ...ironMaps(), ...swooshGeometry(0.06, top, hy, top - hz) };
+  return hammerGeo;
+}
+
+/** The Greathammer's haft, wraps and head, grey and black whatever the gloves (REUSE-SPEC.md §Costumes); also its thrown copy (play.js). */
+export function greathammerMeshes() {
+  const geo = greathammerGeometry(), dark = (color, roughness) => new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
+  const iron = new THREE.MeshStandardMaterial({ color: '#8a8a90', map: geo.map, bumpMap: geo.map, bumpScale: 3, emissive: '#ff5a1f', emissiveMap: geo.glow,
+    emissiveIntensity: 0.9, roughness: 0.85, metalness: 0.5 });
+  return [new THREE.Mesh(geo.haft, dark('#221e1b', 0.9)), new THREE.Mesh(geo.leather, dark('#4a3626', 0.75)), new THREE.Mesh(geo.head, iron)];
+}
+
+/** The Greathammer, held like the sword (REUSE-SPEC.md §Costumes): `built.sword`, so it swings on SWORD_MOVES. */
+export function addHammer(built) {
+  return holdBlade(built, greathammerMeshes(), greathammerGeometry(), { tip: GREATHAMMER.top - GREATHAMMER.head[2] / 2 });
+}
+
 const _s = new THREE.Vector3(), _h = new THREE.Vector3(), _t = new THREE.Vector3(), _pole = new THREE.Line3();
 const _aim = new THREE.Quaternion(), _arm = new THREE.Quaternion(), _above = new THREE.Quaternion();
 /**
@@ -512,8 +574,10 @@ export function buildFighter(f) {
   mergeCharacter(built);
   if (f.look.hands === 'sword') addSword(built, f.look.gloves);
   else if (f.look.hands === 'scythe') addScythe(built, f.look.gloves);
+  else if (f.look.hands === 'hammer') addHammer(built);
   else addGloves(built, f.look.gloves);
-  addTricks(built, f.look.hands === 'scythe' ? 'music' : f.look.trick);
+  const tricks = TRICKS[f.look.hands] ?? TRICKS.gloves;
+  addTricks(built, tricks.length === 1 ? tricks[0] : f.look.trick);
   return built;
 }
 
@@ -634,5 +698,5 @@ export function entrantOf(f, built, who) {
   const chest = built.chest.getWorldPosition(new THREE.Vector3());
   const tip = ({ parent, at, r }) => parent.localToWorld(new THREE.Vector3(...at)).distanceTo(chest) + r;
   const look = team === 'heroes' ? { dough: HERO_DOUGH, frosting: f.params.bodyColor, stripe: false } : BAD_DONUT;
-  return { id, team, height: size.y, width: built.root.userData.across, reach: Math.max(...gloveAnchors(built).map(tip)), look, ...(dummy && { dummy }) };
+  return { id, team, height: size.y, width: built.root.userData.across, reach: Math.max(...gloveAnchors(built).map(tip)), look, hands: f.look.hands, ...(dummy && { dummy }) };
 }

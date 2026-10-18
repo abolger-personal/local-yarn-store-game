@@ -5,7 +5,7 @@ import { attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
 import { countStrike, landHit, newCombo, strikerOf } from './punches.js';
 import { KICK_COMBO, shownStrike, strikeOf } from './kicks.js';
-import { BAD_DONUT, BAD_GUY_FUR, HAND_ICON, MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, newHands, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
+import { BAD_DONUT, BAD_GUY_FUR, HAND_ICON, MOVE_POSES, buildFighter, entrantOf, greathammerMeshes, loadFighter, newFighter, newHands, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
 import { BRICK, SHELF, SHELF_WIDTH, TICK_HZ, groundOf } from './match.js';
 import { levelBefore, levelFor, matchOptions } from './levels.js';
@@ -18,6 +18,7 @@ import { rosterOf } from './multiplayer.js';
 import { joinMatch } from './together.js';
 import { bye } from './net.js';
 import { createCpu } from './cpu.js';
+import { aimOf, hammerPath, handOf } from './hammer.js';
 
 /** @typedef {import('./match.js').Snapshot} Snapshot @typedef {import('./match.js').FighterState} FighterState */
 /** @typedef {import('./match.js').HitEvent} HitEvent @typedef {import('./match.js').DonutEvent} DonutEvent */
@@ -383,6 +384,53 @@ function hud(key, n) {
   hudEls[key].textContent = String(n);
 }
 
+// REUSE-SPEC.md §Costumes, The Greathammer: holding 🥊 shows its path on this tablet only, then letting go throws it
+const DOTS = 40, SPIN = 22;
+const preview = new THREE.InstancedMesh(new THREE.SphereGeometry(0.06, 8, 6),
+  new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.45, depthWrite: false, toneMapped: false }), DOTS);
+Object.assign(preview, { visible: false, frustumCulled: false });
+scene.add(preview);
+const _m = new THREE.Matrix4();
+let aimSince = 0, latest = null;
+const aimNow = () => (aimSince ? aimOf((performance.now() - aimSince) / 1000) : null);
+
+/** @param {FighterState|undefined} me */
+function drawPreview(me) {
+  const k = aimNow();
+  el('punch').classList.toggle('aiming', k !== null);
+  el('punch').style.setProperty('--fill', String(k ?? 0));
+  preview.visible = k !== null && Boolean(me);
+  if (!preview.visible) return;
+  const from = handOf(me, me.height), { T } = hammerPath(from, k, 0, level.stage);
+  for (let i = 0; i < DOTS; i++) {
+    const p = hammerPath(from, k, (T * i) / DOTS, level.stage);
+    preview.setMatrixAt(i, _m.makeTranslation(p.x, p.y, p.z));
+  }
+  preview.instanceMatrix.needsUpdate = true;
+}
+
+/** A tap is still only the punch, which went on press; held till the path shows, letting go throws at the size shown. */
+function attachAim(controls) {
+  const b = el('punch'), inHand = () => mine.look.hands === 'hammer' && !latest?.hammers?.some((h) => h.owner === ME);
+  b.addEventListener('pointerdown', () => { aimSince = inHand() ? performance.now() : 0; });
+  b.addEventListener('pointerup', () => { const k = aimNow(); if (k !== null) controls.throw(k); aimSince = 0; });
+  b.addEventListener('pointercancel', () => { aimSince = 0; });
+}
+
+/** A thrown hammer spins along its path; its thrower's hand is empty till it's back. @param {Snapshot} snap */
+function drawHammers(snap) {
+  latest = snap;
+  drawPreview(snap.fighters.find((f) => f.id === ME));
+  for (const [id, m] of fighters) {
+    if (!m.flyer) continue;
+    const h = snap.hammers?.find((o) => o.owner === id);
+    m.built.sword.visible = !h;
+    m.flyer.visible = Boolean(h);
+    if (h) m.flyer.position.set(h.x, h.y, h.z);
+    m.flyer.rotation.set(0.3, now * SPIN, 0);
+  }
+}
+
 /** @param {Snapshot} snap */
 function draw(snap, dt) {
   frame++;
@@ -393,6 +441,7 @@ function draw(snap, dt) {
   sync(piles, (snap.piles ?? NONE).map((p) => ({ ...p, id: p.owner })), newPile, drawPile, dt);
   showPhase(snap);
   drawOutline(snap, snap.fighters.find((f) => f.id === ME));
+  drawHammers(snap);
   for (const s of snap.shelves) {
     if (!shelves.has(s.team)) shelves.set(s.team, {});
     drawShelf(shelves.get(s.team), s);
@@ -512,6 +561,8 @@ function showFresh(items) {
   b.addEventListener('click', (e) => { e.stopPropagation(); goTo('choose.html')(); });
   document.querySelector('#score .again').append(b);
   freshLook(document.getElementById('edit'), items);
+  // the Greathammer's fourth-wall joke
+  if (items.includes('hammer')) document.getElementById('score').insertAdjacentHTML('beforeend', '<div class="souls">Greathammer acquired</div>');
 }
 
 /** @param {import('./match.js').Team|null} winner */
@@ -541,6 +592,15 @@ function showEnd(snap) {
   card.hidden = false;
 }
 
+/** The Greathammer's thrown copy, spinning about its middle. */
+function spinner() {
+  const inner = new THREE.Group().add(...greathammerMeshes()), g = new THREE.Group().add(inner);
+  inner.position.z = -0.2;
+  g.visible = false;
+  scene.add(g);
+  return g;
+}
+
 /** @param {import('./multiplayer.js').Seat[]} roster */
 function cast(roster) {
   return roster.map(({ id, team, fighter, dummy = false, cpu = false }) => {
@@ -549,7 +609,8 @@ function cast(roster) {
     g.add(built.root);
     scene.add(g);
     const t = Object.fromEntries(FIGHTER_TIMERS.map((k) => [k, 0]));
-    fighters.set(id, { g, built, team, t, vy: 0, ground: true, yaw: 0, recoil: new THREE.Vector3(), combo: { punch: newCombo(), kick: newCombo('kick', KICK_COMBO.length) }, seat: seatDrop(built), down: 0, cycles: fighters.size * 0.33, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
+    const flyer = f.look.hands === 'hammer' ? spinner() : null;
+    fighters.set(id, { g, built, flyer, team, t, vy: 0, ground: true, yaw: 0, recoil: new THREE.Vector3(), combo: { punch: newCombo(), kick: newCombo('kick', KICK_COMBO.length) }, seat: seatDrop(built), down: 0, cycles: fighters.size * 0.33, shadow: makeShadow(scene), carryR: built.params.headRadius * 0.7 });
     endPicture(entrant);
     return entrant;
   });
@@ -622,6 +683,7 @@ async function play() {
   const button = (id) => document.getElementById(id);
   attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: button('punch'), kick: button('kick'), drop: button('drop') } });
   attachReady(controls);
+  attachAim(controls);
   await warmUp();
   keepAwake();
   if (net?.guest) guest(controls);

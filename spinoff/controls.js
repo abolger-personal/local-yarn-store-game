@@ -89,11 +89,13 @@ export function pickTarget(stage, snap, ray, myId) {
 
 /** Pointer state per finger, turned into one Input per tick by `take`. @param {Stage} stage */
 export function createControls(myId, stage) {
-  const s = { finger: null, aim: null, fresh: false, punch: false, kick: false, drop: false, ready: undefined, go: false };
+  const s = { finger: null, aim: null, fresh: false, punch: false, kick: false, drop: false, ready: undefined, go: false, throw: undefined };
   return {
     /** 👍 tapped (on or back off), and 👍 held long enough to start the round. */
     ready(on) { s.ready = on; },
     go() { s.go = true; },
+    /** 🥊 let go after the Greathammer's path showed, at size `k` (hammer.js). */
+    throw(k) { s.throw = k; },
     /** @param {'stage'|'punch'|'kick'|'drop'} on @param {Ray|null} ray */
     down(pointerId, on, ray) {
       if (on !== 'stage') { s[on] = true; return; }
@@ -105,8 +107,8 @@ export function createControls(myId, stage) {
     /** @param {Snapshot} snap @returns {Input} */
     take(snap) {
       const input = { target: s.fresh && s.aim ? pickTarget(stage, snap, s.aim, myId) : null, punch: s.punch, kick: s.kick,
-        ...(s.drop && { drop: true }), ...(s.ready !== undefined && { ready: s.ready }), ...(s.go && { go: true }) };
-      Object.assign(s, { fresh: false, punch: false, kick: false, drop: false, ready: undefined, go: false });
+        ...(s.drop && { drop: true }), ...(s.ready !== undefined && { ready: s.ready }), ...(s.go && { go: true }), ...(s.throw !== undefined && { throw: s.throw }) };
+      Object.assign(s, { fresh: false, punch: false, kick: false, drop: false, ready: undefined, go: false, throw: undefined });
       return input;
     },
   };

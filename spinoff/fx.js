@@ -5,8 +5,8 @@ import { floorTop } from './controls.js';
 /** @typedef {import('./match.js').HitEvent} HitEvent */
 
 export const RIOT = Object.freeze(['#ff3b7f', '#ffd21a', '#14c4e0', '#8be02a', '#ff7a1a', '#8a4dff', '#ffffff']);
-const BAM_SIZE = { punch: 0.42, kick: 0.62, stomp: 0.85 };
-const SHAKE = { punch: 0, kick: 0.05, stomp: 0.1 };
+const BAM_SIZE = { punch: 0.42, kick: 0.62, stomp: 0.85, hammer: 0.62 };
+const SHAKE = { punch: 0, kick: 0.05, stomp: 0.1, hammer: 0.05 };
 const BAM_LIFE = 0.3, BIT_LIFE = 0.9, GRAVITY = 9;
 
 export const confettiMats = RIOT.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5 }));

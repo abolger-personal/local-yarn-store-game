@@ -78,8 +78,10 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  * one); `punch` / `kick` are true on the tick the button went down. `away` is sent when a guest's
  * screen is hidden (true) or back (false), and kept between: the fighter stops and sits.
  * In the build round, `drop` (⬇️) is true on the tick it went down, `ready` (👍) is sent when it changes and
- * `go` once, when 👍 has been held long enough to start the round for everyone.
- * @typedef {{ target: Target|null, punch: boolean, kick: boolean, away?: boolean, drop?: boolean, ready?: boolean, go?: boolean }} Input
+ * `go` once, when 👍 has been held long enough to start the round for everyone. `throw`: 🥊 let go after the Greathammer's path
+ * showed, its size 0 to 1 (hammer.js).
+ * @typedef {{ target: Target|null, punch: boolean, kick: boolean, away?: boolean, drop?: boolean, ready?: boolean, go?: boolean,
+ *             throw?: number }} Input
  *
  * @typedef {{ id: string, team: Team, x: number, y: number, z: number, vx: number, vy: number, vz: number,
  *             facing: number, height: number, width: number, onGround: boolean, move: MoveId, step: number,
@@ -90,10 +92,11 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  *   of the block it carries in the build round. `respawn`: seconds left out of play after a ring-out (0 in play): not
  *   drawn then, and x/y/z is where it will drop in.
  * @typedef {{ id: string, x: number, y: number, z: number, look: DonutLook }} LooseDonut
+ * @typedef {{ owner: string, x: number, y: number, z: number }} FlyingHammer  a thrown Greathammer, away from `owner`'s hand
  * @typedef {{ id: string, team: Team, x: number, y: number, z: number, hits: number, maxHits: number,
  *             icing: string }} BrickState
  * @typedef {{ team: Team, x: number, y: number, z: number, donuts: DonutLook[] }} ShelfState
- * @typedef {{ x: number, y: number, z: number, move: 'punch'|'kick'|'stomp', on: 'fighter'|'brick',
+ * @typedef {{ x: number, y: number, z: number, move: 'punch'|'kick'|'stomp'|'hammer', on: 'fighter'|'brick',
  *             target: string, broke: boolean }} HitEvent
  *   a hit that landed this tick, at its point of contact, on the fighter or brick `target` (its id),
  *   for the page's BAM burst and shake;
@@ -114,15 +117,15 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  * @typedef {{ owner: string, x: number, y: number, z: number, count: number, icing: string }} PileState
  *   a hero's blocks left to place, in a heap at (x, y, z)
  * @typedef {{ tick: number, secondsLeft: number, over: boolean, winner: Team|null,
- *             fighters: FighterState[], donuts: LooseDonut[], bricks: BrickState[],
+ *             fighters: FighterState[], donuts: LooseDonut[], hammers?: FlyingHammer[], bricks: BrickState[],
  *             shelves: ShelfState[], hits: HitEvent[], fullBag: FullBagEvent[],
  *             donutEvents: DonutEvent[], phase: 'build'|'play', ready: string[], piles: PileState[] }} Snapshot
  *
  * Who is in the match. height / width / reach come from the fighter's params (fighter.js) as plain
  * numbers; look is the donut frosting this entrant brings to its team's shelf, and the icing
- * colour of its bricks.
+ * colour of its bricks. `hands` is what it holds (fighter.js HANDS; gloves if left out): only the Greathammer plays differently.
  * @typedef {{ id: string, team: Team, height: number, width: number, reach: number,
- *             look: DonutLook, dummy?: boolean }} Entrant
+ *             look: DonutLook, dummy?: boolean, hands?: string }} Entrant
  *
  * What the level sets for a match: each hero's pile (`pieces`, with a build round first when there are any) and who can
  * hit whom (`match`, roster.js's MATCH).

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { POSES, setGeometryDetail } from '../characters/npc.js';
 import { attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
@@ -308,9 +309,13 @@ function drawPile(m, p) {
   placeShadow(level.stage, m.shadow, p, p.count ? 0.3 : 0.01);
 }
 
-// REUSE-SPEC.md §Forts: carrying a block, a faint outline shows the cell ⬇️ puts it in, greyed at the height limit
-const outline = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(BRICK, BRICK, BRICK)),
-  new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85 }));
+// REUSE-SPEC.md §Forts: carrying a block, an outline shows the cell ⬇️ puts it in, greyed at the height limit. Its edges are
+// bars, not lines: WebGL draws lines one pixel wide, which a phone barely shows (playtest)
+const EDGE_BAR = BRICK / 8;
+const edgeBars = (s, t) => mergeGeometries([-s / 2, s / 2].flatMap((a) => [-s / 2, s / 2].flatMap((b) => [
+  new THREE.BoxGeometry(s + t, t, t).translate(0, a, b), new THREE.BoxGeometry(t, s + t, t).translate(a, 0, b), new THREE.BoxGeometry(t, t, s + t).translate(a, b, 0),
+])));
+const outline = new THREE.Mesh(edgeBars(BRICK, EDGE_BAR), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85, toneMapped: false }));
 outline.visible = false;
 scene.add(outline);
 

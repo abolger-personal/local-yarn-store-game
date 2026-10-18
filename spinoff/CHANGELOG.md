@@ -10,6 +10,12 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   Stella. Hold it in both hands and it stabs and slashes just like the sword, with sparkles, stars, hearts
   and music notes flying out every time you swing. The pole comes in any colour; the blade always glows blue.
 
+### Levels
+- **Level 3: the jumping level.** Beat level 2 and level 3 opens. Each team's donut shelf is up on a tall
+  pancake tower, too tall to jump onto from the floor. Jump onto the step in front of it, then tap the top:
+  your fighter jumps, and jumps again in the air to get up. The middle has pancake stacks to jump on too.
+  There's a build round with 5 pancakes each, and one slow bad guy, but this one can knock you off!
+
 ### Building
 - **Stand in your gap to stop the bad guy.** Stand in a gap next to your blocks and the bad guy can't
   shove you out of the way any more: it stops and kicks your blocks, which gives you time to knock it
@@ -19,6 +25,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **The sword and scythe slash is a big chop you can see.** The blade swings up over your head and down
   in front, with a white swoosh behind it. The old flat swing round the front was hard to see from the side
   and on the dress-up page.
+- **The box showing where your pancake goes is easy to see.** Its outline is thick now, even on a phone.
 - **Playing on a phone works better.** On the dress-up page every hat, cape and bag shows, wrapping onto
   a second line instead of hiding off the edge. Turned sideways, the room code keys and the level numbers
   spread out in wider rows, so they all fit on the screen. Held upright, the lobby's big buttons shrink just

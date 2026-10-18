@@ -625,8 +625,9 @@ and smashers each get a round that is theirs.
   - **You only end up in a gap if a bad guy knocks you there** (decided 2026-10-17): the route only
     plans jumps that land, a double jump by hand goes straight up and lands where it started, and a
     bump never shoves a fighter off a stack, only a hit's knockback.
-  - Open questions: what's at the bottom of a gap (floor you climb back from, or a ring-out hole);
-    whether tapping the floor below walks you down off a stack on purpose; whether level 3 gets the
+  - **A gap's bottom is floor** (decided 2026-10-17): knocked into one, you land and climb back up. A
+    bad guy can still knock you off the front or the ends of the stage for a ring-out, as on every level.
+  - Open questions: whether tapping the floor below walks you down off a stack on purpose; whether level 3 gets the
     difficulty modifier (Handicap) now; two CPU bad guys from level 3 (Bad guys) as well.
 - **Start spots come first** (decided 2026-10-17). Step 1 of making any level, hand-made or
   generated, on every stage: pick pseudo-random start spots for up to 6 heroes,

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { LEVELS } from './levels.js';
 import {
-  PROGRESS_KEY, beatLevel, levelsBeaten, loadProgress, outcomeOf, readProgress, recordOutcome, roomLevels, roomStages, withOutcome,
+  PROGRESS_KEY, beatLevel, heroesProgress, levelsBeaten, loadProgress, outcomeOf, readProgress, recordOutcome, roomLevels, roomStages, withOutcome,
 } from './progress.js';
 
 const store = new Map();
@@ -50,6 +50,8 @@ assert.deepEqual(numbers(roomLevels('breakfast', [fresh])), [1], 'a new player h
 assert.deepEqual(numbers(roomLevels('breakfast', [along])), [1, 2], 'and a winner the next one too');
 assert.deepEqual(numbers(roomLevels('breakfast', [along, fresh])), [1], 'a room offers only what everyone in it has reached');
 assert.equal(roomLevels('breakfast', [readProgress({ reached: { breakfast: 9 } })]).length, LEVELS.breakfast.length, 'and only levels there are');
+const room = [{ fighter: { badGuy: true }, progress: fresh }, { fighter: {}, progress: along }];
+assert.deepEqual(numbers(roomLevels('breakfast', heroesProgress(/** @type {any} */ (room)))), [1, 2], 'a bad guy\'s fresh save doesn\'t hold the room to level 1');
 
 globalThis.localStorage = /** @type {any} */ ({ getItem() { throw new Error('private mode'); }, setItem() { throw new Error('private mode'); } });
 recordOutcome('breakfast', outcomeOf('breakfast', 1, 'heroes'));

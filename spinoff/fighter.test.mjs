@@ -4,8 +4,8 @@ import { POSES, applyPose, setGeometryDetail } from '../characters/npc.js';
 import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import {
-  BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, buildFighter, disposeFighter, gloveAnchors, handsFor, newHands, isBadGuyCloth, isBadGuyFur, nearestSwatch,
-  IDLE, SHOW_OFF, entrantOf, knotAt, newFighter, randomFighter, readFighter, seatDrop, setFur, showOffTrick, stepFighter, wobbleAt, wobbleHz,
+  BAGS, CAPES, CLOTH, FUR, HANDS, HATS, SPECIES, TEXTURES, badGuySets, buildFighter, disposeFighter, gloveAnchors, handsFor, newHands, isBadGuyCloth, isBadGuyFur, nearestSwatch,
+  IDLE, SHOW_OFF, entrantOf, knotAt, newFighter, paint, randomFighter, readFighter, seatDrop, setFur, showOffTrick, stepFighter, wobbleAt, wobbleHz,
 } from './fighter.js';
 import { wingShape } from '../characters/owl.js';
 import { floorGrid } from './roster.js';
@@ -93,6 +93,19 @@ for (const species of SPECIES) for (const cape of CAPES) {
   assert.ok(isBadGuyCloth('#111111') && isBadGuyCloth('#4b2466') && isBadGuyFur('#8c8c8c'), 'black, dark purple and grey are the bad guys\'');
   assert.ok(!isBadGuyCloth('#c9a8f0'), 'light lavender stays a kid colour');
   assert.ok(isBadGuyFur('#a0a6ba'), 'the rig\'s default blue-grey fur reads as a bad guy, so a kid never starts with it');
+
+  const hero = newFighter('owl'), bad = { ...hero, badGuy: true }, COLOURS = ['hatColor', 'capeColor', 'bagColor', 'gloves'];
+  const sets = [0, 1].map((n) => paint(bad, n));
+  for (const s of sets) assert.ok(isBadGuyFur(s.params.bodyColor) && COLOURS.every((k) => isBadGuyCloth(s.look[k])), 'a bad-guy player wears only bad-guy colours');
+  assert.notDeepEqual(sets[0].look, sets[1].look, 'two bad-guy players wear two sets');
+  assert.notEqual(sets[0].params.bodyColor, sets[1].params.bodyColor);
+  assert.equal(paint(hero, 1), hero, 'a hero keeps its colours');
+  assert.equal(bad.look.gloves, hero.look.gloves, 'the hero colours stay saved underneath');
+  assert.deepEqual([...badGuySets([['z', bad], ['h', hero], ['a', bad], ['c', undefined]])], [['a', 0], ['z', 1]], 'sets go by sorted id, bad-guy players only');
+  assert.deepEqual(handsFor(0, true), [...HANDS], 'a bad guy gets every weapon');
+  assert.equal(readFighter(JSON.parse(JSON.stringify(bad))).badGuy, true, 'being a bad guy is saved');
+  for (const v of ['yes', 1, false, null]) assert.ok(!('badGuy' in readFighter({ ...hero, badGuy: v })), `badGuy: ${v} is dropped`);
+  assert.ok(!isBadGuyCloth(readFighter(sets[1]).look.gloves), 'bad-guy colours from another tablet are snapped to a kid\'s swatch');
 }
 
 {

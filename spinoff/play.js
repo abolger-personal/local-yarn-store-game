@@ -5,7 +5,7 @@ import { attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
 import { countStrike, landHit, newCombo, strikerOf } from './punches.js';
 import { KICK_COMBO, shownStrike, strikeOf } from './kicks.js';
-import { BAD_DONUT, BAD_GUY_FUR, HAND_ICON, MOVE_POSES, buildFighter, entrantOf, greathammerMeshes, loadFighter, newFighter, newHands, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
+import { BAD_DONUT, HAND_ICON, MOVE_POSES, badGuySets, buildFighter, entrantOf, greathammerMeshes, loadFighter, newFighter, newHands, paint, seatDrop, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
 import { BRICK, SHELF, SHELF_WIDTH, TICK_HZ, groundOf } from './match.js';
 import { levelBefore, levelFor, matchOptions } from './levels.js';
@@ -39,7 +39,7 @@ const joining = mine ? joinMatch(location.search, mine, asked) : null;
 // everyone has their own fighter and the bad guy, and all but a guest know the level.
 const stage = makeStage(document.getElementById('stage'));
 const { scene, camera } = stage;
-const BAD_GUY = badGuyFighter(), prebuilt = { me: mine && buildFighter(mine), dummy: buildFighter(BAD_GUY) };
+const BAD_GUY = paint({ ...newFighter('lion'), badGuy: true }), prebuilt = { me: mine && buildFighter(paint(mine)), dummy: buildFighter(BAD_GUY) };
 const early = known && dress(known);
 const SAMPLE_BRICK = /** @type {any} */ ({ id: 'warm', team: 'heroes', icing: PIPING });
 const [net] = await Promise.all([joining, warmUp(...(prebuilt.me ? [prebuilt.me.root] : []), prebuilt.dummy.root, donutMesh(BAD_DONUT),
@@ -58,12 +58,6 @@ const _v = new THREE.Vector3(), _goal = new THREE.Vector3();
 const theme = THEMES[level.theme];
 scene.background = new THREE.Color(theme.background);
 const fx = createFx(scene, camera, level.stage);
-
-function badGuyFighter() {
-  const f = setFur(newFighter('lion'), BAD_GUY_FUR);
-  f.look = { ...f.look, hatColor: '#2a2030', capeColor: '#3b2152', bagColor: '#1d1a20', gloves: '#4b2a6b' };
-  return f;
-}
 
 function shelfFrame(s) {
   const w = SHELF_WIDTH, h = SHELF.rows * SHELF.row + 0.1, g = new THREE.Group();
@@ -338,7 +332,8 @@ function showPhase(snap) {
   if (phase === phaseShown) return;
   phaseShown = phase;
   const build = phase === 'build';
-  for (const id of ['drop', 'ready', 'hold']) el(id).classList.toggle('hidden', !build);
+  // REUSE-SPEC.md §Bad guys: a bad-guy player has no build round of its own
+  for (const id of ['drop', 'ready', 'hold']) el(id).classList.toggle('hidden', !build || mine.badGuy);
   for (const id of ['punch', 'kick']) {
     el(id).classList.toggle('hidden', build);
     if (!build) el(id).classList.add('pop');
@@ -603,8 +598,10 @@ function spinner(color) {
 
 /** @param {import('./multiplayer.js').Seat[]} roster */
 function cast(roster) {
+  const sets = badGuySets(roster.map((s) => [s.id, s.fighter]));
   return roster.map(({ id, team, fighter, dummy = false, cpu = false }) => {
-    const f = dummy || cpu ? BAD_GUY : fighter, built = (dummy || id === 'cpu1' ? prebuilt.dummy : id === ME && prebuilt.me) || buildFighter(f), g = new THREE.Group();
+    const set = sets.get(id) ?? 0, f = dummy || cpu ? BAD_GUY : paint(fighter, set);
+    const built = (dummy || id === 'cpu1' ? prebuilt.dummy : id === ME && !set && prebuilt.me) || buildFighter(f), g = new THREE.Group();
     const entrant = entrantOf(f, built, { id, team, dummy });
     g.add(built.root);
     scene.add(g);
@@ -702,4 +699,6 @@ document.getElementById('bye').addEventListener('click', bye);
 document.getElementById('quit').addEventListener('click', bye);
 document.getElementById('edit').addEventListener('click', goTo('choose.html'));
 document.getElementById('again').addEventListener('click', () => (net?.again ? net.again(nextSearch) : goTo(`play.html?${nextSearch}`)()));
-if (mine) play();
+// REUSE-SPEC.md §Bad guys, No playing alone
+if (mine?.badGuy && !net) location.replace('lobby.html');
+else if (mine) play();

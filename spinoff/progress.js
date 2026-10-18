@@ -73,3 +73,6 @@ export const roomStages = () => Object.keys(LEVELS);
 
 /** A stage's levels the room may pick: up to the lowest any player in it has reached, and only levels there are. @param {Progress[]} everyone */
 export const roomLevels = (name, everyone) => (LEVELS[name] ?? []).filter((l) => everyone.every((p) => l.number <= reachedOn(p, name)));
+
+/** The progress of the heroes among `players`: a bad guy has no say in the level (REUSE-SPEC.md §Bad guys). @param {{ fighter: import('./fighter.js').Fighter, progress: Progress }[]} players */
+export const heroesProgress = (players) => players.filter((p) => !p.fighter.badGuy).map((p) => p.progress);

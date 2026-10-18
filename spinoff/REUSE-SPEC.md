@@ -240,9 +240,10 @@ floor at an angle and follows your fighter.
   wall, and the kid smashes through. (In the flat version it always stopped; with a depth band
   that looked broken next to an open gap.)
 - **Blocked is a pause, never for good** (decided 2026-10-17, playtest: a bad guy that decided it was
-  blocked stood still the rest of the round). A fighter standing `'blocked'` looks for its way again
-  every 2 seconds (`RETRY_TICKS` in `sim.js`), so once a kid moves or a wall breaks it carries on.
-  Nothing in the game freezes for good.
+  blocked stood still the rest of the round). A fighter that gave up on its way, stuck against
+  something, looks for it again every 2 seconds (`RETRY_TICKS` in `sim.js`), so once a kid moves it
+  carries on. One with no way at all (walled off) looks again when a block breaks, which already
+  re-plans everyone. Nothing in the game freezes for good.
 - **Two thumbs at once.** One thumb taps the stage while the other presses 🥊 or 🦶, tracked
   separately by `pointerId` (Pointer Events, `touch-action: none`). A touch that starts on a
   button never counts as a move. Tested 2026-10-13 on the Android tablet with
@@ -1261,10 +1262,11 @@ like that keeps the big cape a choice rather than a handicap.
     wide as before for bumping (`entrantOf`).
   - **Its music comes out on every swing** (`look.trick` is always `music`; it is not a trick choice, so
     tapping the scythe again changes nothing and its icon has no badge). Sparkles (`characters/sparkle.js`),
-    5-point stars, hearts and music notes in riot colours pop out of its spear point together as a move
-    lands, upright and turning, like the sword's tricks. Later, with sound, a swing plays music (planned
-    2026-10-17).
-- **Tricks: tap the picked gloves or sword again** (decided 2026-10-17), the way a hat changes stitch.- **Tricks: tap the picked gloves or sword again** (decided 2026-10-17), the way a hat changes stitch.
+    5-point stars, hearts and music notes in riot colours come out together as a move lands: the sparkle
+    at the spear point like the sword's trick, the stars, hearts and notes in a line flying out past the
+    point along the blade, each twinkling (amended 2026-10-17, playtest: bunched round the tip they hid the
+    crescent). Later, with sound, a swing plays music (planned 2026-10-17).
+- **Tricks: tap the picked gloves or sword again** (decided 2026-10-17), the way a hat changes stitch.
   A trick pops out of the hitting glove or the sword's tip while a punch lands, upright and turning:
   ✨ sparkle (the yarn store's `characters/sparkle.js` stars), 🫧 bubbles, or 🔥 a cartoon flame.
   Gloves go plain → ✨ → 🫧 → 🔥; a sword always has one, ✨ → 🫧 → 🔥 (`TRICKS`, `look.trick`).

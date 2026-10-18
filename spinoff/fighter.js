@@ -424,7 +424,7 @@ function trickMesh(kind, built) {
   }
   if (kind === 'music') {
     g.add(Object.assign(makeSparkle(built).mesh, { visible: true }));
-    MUSIC.forEach(([shape, , xyz, r], i) => g.add(bit(p.music[shape], p.paints[i], xyz, r)));
+    g.userData.spray = MUSIC.map(([shape, , xyz, r], i) => g.add(bit(p.music[shape], p.paints[i], xyz, r)).children.at(-1));
   }
   return g;
 }
@@ -452,6 +452,8 @@ export function removeTricks(built) {
 }
 
 const _q = new THREE.Quaternion(), _up = new THREE.Quaternion();
+/** How far apart the scythe's music bits fly out past its point, in the trick's own size. */
+const SPRAY_GAP = 0.09;
 
 /** Shows only `side`'s trick (none for null), upright, `size` times its own, turned and risen. */
 function poseTricks(built, side, size, turn, rise) {
@@ -462,7 +464,23 @@ function poseTricks(built, side, size, turn, rise) {
     g.scale.setScalar(size);
     g.userData.spin.rotation.y = turn;
     g.userData.spin.position.y = rise;
+    if (g.userData.spin.userData.spray) spray(g, turn);
   }
+}
+
+const _out = new THREE.Vector3();
+/**
+ * The scythe's stars, hearts and notes fly out past the point, along the blade, each twinkling, so they
+ * mark the swing like the sword's trick without covering the crescent (playtest: round the tip, they hid the scythe).
+ */
+function spray(g, turn) {
+  const { spin } = g.userData;
+  spin.rotation.y = 0;
+  _out.set(0, 0, 1).applyQuaternion(_q.copy(g.quaternion).invert());
+  spin.userData.spray.forEach((m, i) => {
+    m.position.copy(_out).multiplyScalar(SPRAY_GAP * (i + 1.5));
+    m.rotation.y = turn * (i % 2 ? 1 : -1);
+  });
 }
 
 /** The hitting hand's trick pops up, upright and turning, through the swoosh of the punch. */

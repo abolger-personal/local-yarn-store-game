@@ -284,6 +284,15 @@ for (const species of SPECIES) {
         assert.ok(d.angleTo(along) < 0.35, `${species} ${held}: the stabbing arm reaches along the blade (${d.angleTo(along).toFixed(2)} rad off)`);
       }
       assert.ok(built.tricks.length === 1 && built.tricks[0].parent === built.sword && built.tricks[0].visible, `${species}: the ${held}'s trick at its tip as it lands`);
+      if (held === 'scythe') {
+        // the stars, hearts and notes fly out past the point through the chop, never over the crescent (playtest: they hid it)
+        const tipAt = () => built.sword.localToWorld(new THREE.Vector3(0, 0, built.sword.userData.tip));
+        for (const step of [0.2, 0.3, 0.4]) {
+          blade('cross', step);
+          const hand = at(built.sword), reach = tipAt().distanceTo(hand), spray = built.tricks[0].userData.spin.userData.spray;
+          assert.ok(spray.every((m) => at(m).distanceTo(hand) > reach), `${species}: the scythe's music flies out past its point (${step})`);
+        }
+      }
       disposeFighter(built);
     }
     disposeFighter(gloved);

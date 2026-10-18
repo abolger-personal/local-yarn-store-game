@@ -546,6 +546,11 @@ and smashers each get a round that is theirs.
     a deck, the fence, the stage's edge or the middle third), ⬇️ uses the cell at your feet instead
     (`PLACE_NEAR`, decided 2026-10-17, playtest: "places I should be able to put pancakes"), so the
     outline and ⬇️ give a head-shake far less often.
+  - **Carrying, a floor tap is where the block goes** (decided 2026-10-18, playtest: the fighter ended up where I
+    tapped and the pancake landed a step past it). Tap a buildable cell while carrying and your fighter walks up
+    beside that cell, facing it, the way a tapped block does, so ⬇️ puts it on the cell you tapped (`cellUnder` in
+    `build.js`). A tap where nothing can be built just walks you there, as before. Anything else carried to put
+    down later follows the same rule: the tap is where it goes, not where you stand.
   - **What's in your hands decides what a tap on a block does.** Carrying: tap a block and you walk
     up to it and face it, so ⬇️ stacks on top. Empty-handed: tap one of *your own* blocks on top of
     a stack and you pick it back up. That is the take-back: only a top block (nothing floats), only

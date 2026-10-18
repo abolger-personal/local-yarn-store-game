@@ -75,6 +75,13 @@ function cellAhead(grid, f, ahead) {
  */
 export const facedCell = (grid, f) => cellAhead(grid, f, f.width / 2 + PLACE_AHEAD) ?? cellAhead(grid, f, PLACE_NEAR);
 
+/** The buildable cell under point `p`: its corner on the floor, or null where no block can go. @param {{ x: number, z: number }} p */
+export function cellUnder(grid, p) {
+  if (!cellKeys(grid, p)) return null;
+  const { c, r } = cellOf(grid, p);
+  return { x: grid.ox + c * BRICK, y: grid.tops[r * grid.cols + c], z: grid.oz + r * BRICK };
+}
+
 /** Whether brick `i` (its index in the bricks the grid was built from) is on top of its stack. */
 export function onTop(grid, bricks, i) {
   const { c, r } = cellOf(grid, bricks[i]);

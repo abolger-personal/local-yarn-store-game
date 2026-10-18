@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { BRICK, PILE_DX, ROUND_SECONDS, SHELF_WIDTH } from './match.js';
 import { TUTORIAL, levelOf, piecesEach } from './levels.js';
 import { createMatch, snapshot, tick } from './sim.js';
-import { HEIGHT_LIMIT, facedCell, fortGrid } from './build.js';
+import { HEIGHT_LIMIT, cellUnder, facedCell, fortGrid } from './build.js';
 
 const { stage } = /** @type {import('./levels.js').Level} */ (levelOf('breakfast', 2));
 const body = { height: 0.9, width: 0.45, reach: 0.38 };
@@ -168,3 +168,15 @@ for (const from of [{ x: -7.4, z: -0.9 }, { x: -6.6, z: -1 }]) {
 }
 
 console.log('build ok');
+
+// REUSE-SPEC.md §Forts, Building is carrying blocks: carrying, a floor tap is where the block goes, not where you stand
+{
+  const m5 = createMatch([A], stage, { pieces: 5 });
+  for (const tap of [{ x: -3.3, z: 0.3 }, { x: -7.9, z: 1.1 }, { x: -4.5, z: -0.7 }, { x: -6.3, z: -1.5 }, { x: -5.5, z: 0.5 }]) {
+    assert.ok(cellUnder(fortGrid(stage, 'heroes', snapshot(m5).bricks, snapshot(m5).piles), tap), `${JSON.stringify(tap)} can be built on`);
+    fetch(m5, 'A');
+    act(m5, 'A', { target: tap }, (s) => who(s, 'A').move === 'idle');
+    const b = act(m5, 'A', { drop: true }).bricks.at(-1);
+    assert.ok(b.x <= tap.x && tap.x < b.x + BRICK && b.z <= tap.z && tap.z < b.z + BRICK, `the block lands on the tapped cell ${JSON.stringify(tap)}, not ${b.x}, ${b.z}`);
+  }
+}

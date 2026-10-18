@@ -3,7 +3,7 @@
 import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, HIT_DEPTH, PILE_DX, ROUND_SECONDS, SHELF_WIDTH, TICK_HZ, coreOf, groundOf, outside } from './match.js';
 import { EMPTY, anySlot, footprint, lift, makeDisplay, place, topAt } from '../inventory/grid.js';
 import { MATCH, canHit } from './roster.js';
-import { facedCell, fortGrid, onTop } from './build.js';
+import { cellUnder, facedCell, fortGrid, onTop } from './build.js';
 import { HAMMER, hammerPath, handOf } from './hammer.js';
 
 const DT = 1 / TICK_HZ;
@@ -434,7 +434,7 @@ function thingGoal(s, f, t) {
 
 function resolve(s, f) {
   const t = f.target;
-  if ('x' in t) return pointGoal(s, f, t.x, t.z, t.y);
+  if ('x' in t) return f.placeCell ? brickGoal(s, f, f.placeCell) : pointGoal(s, f, t.x, t.z, t.y);
   const g = thingGoal(s, f, t);
   if (!g) f.target = null;
   return g;
@@ -953,6 +953,7 @@ function putDown(s, f) {
   s.bricks.push({ id: `p${s.nextBrick++}`, team: f.team, owner: f.id, x: cell.x, y: cell.y, z: cell.z, vy: 0,
     hits: BLOCK_HITS, maxHits: BLOCK_HITS, icing: f.block });
   f.block = null;
+  f.placeCell = null;
   // a block tapped while carrying was only to face it: it isn't taken back the moment your hands are empty
   if (f.target?.thing === 'brick') f.target = null;
   s.donutEvents.push({ ...event(f, { x: cell.x + BRICK / 2, y: cell.y, z: cell.z + BRICK / 2 }), kind: 'place' });
@@ -1014,6 +1015,8 @@ function tapAbove(s, f, t) {
 
 function aim(s, f, t) {
   Object.assign(f, { target: 'stop' in t ? null : { ...t }, shelfSpot: null, nav: null, fails: 0, shelfDone: false, stuck: 0, passed: false });
+  // REUSE-SPEC.md §Forts, Building is carrying blocks: carrying, a floor tap is where the block goes, so you walk up facing that cell
+  f.placeCell = s.phase === 'build' && f.block && 'x' in t ? cellUnder(fortGrid(s.stage, f.team, s.bricks, s.piles), t) : null;
   if ('x' in t) tapAbove(s, f, t);
 }
 
@@ -1077,7 +1080,7 @@ function spawnSpot(s, e, cursor) {
 }
 
 function newFighter(e, at, y) {
-  return { id: e.id, team: e.team, hands: e.hands ?? 'gloves', icing: e.look.frosting, block: null, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
+  return { id: e.id, team: e.team, hands: e.hands ?? 'gloves', icing: e.look.frosting, block: null, placeCell: null, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
     x: at.x, y, z: at.z, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, onGround: true, jumps: 1,
     target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, again: false, fails: 0, stuck: 0, gain: 0, away: false, slick: false, passed: false, sprung: -1,
     attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, out: 0, percent: 0, calm: 0,

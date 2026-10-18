@@ -941,9 +941,9 @@ function shelfStep(s, f) {
   grabAt(s, f, sh);
 }
 
-/** REUSE-SPEC.md §Scoring: one donut at a time; while one you dropped is loose, a shelf gives you nothing. */
+/** REUSE-SPEC.md §Scoring: one donut at a time for a bad guy; while one it dropped is loose, a shelf gives it nothing. Kids are free. */
 function grabAt(s, f, sh) {
-  if (f.carrying || s.donuts.some((d) => d.by === f.id)) { s.fullBag.push(event(f, sh)); return; }
+  if (f.carrying || (f.team === 'badGuys' && s.donuts.some((d) => d.by === f.id))) { s.fullBag.push(event(f, sh)); return; }
   if ((f.carrying = grab(sh))) s.donutEvents.push({ ...event(f, sh), kind: 'steal' });
 }
 

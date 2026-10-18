@@ -248,7 +248,7 @@ for (const species of SPECIES) {
       const hand = species === 'owl' ? built.joints.upperArm[0].node : built.holds[0].parent;
       assert.ok(built.sword?.parent === hand && built.gloves.length === 0, `${species}: a ${held} in the right hand and no gloves`);
       const entrant = (b) => entrantOf(f, b, { id: 'a', team: 'heroes' });
-      const size = (b) => [entrant(b).reach, entrant(b).width, entrant(b).height];
+      const size = (b) => { const e = entrant(b); return [e.reach, e.width, e.height]; };
       assert.deepEqual(size(built), size(gloved), `${species}: the ${held} hits exactly as far as gloves, and is as wide and as tall`);
       /** The blade's angle above level, its turn from straight ahead and its angle round from ahead as the side-on camera sees it, in degrees, and which swoosh shows. */
       const blade = (name, step) => {

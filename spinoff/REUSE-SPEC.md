@@ -378,12 +378,13 @@ No lives, no elimination, and only a short wait after a ring-out (decided 2026-1
   A bigger bag comes later, as an unlock (see Open questions). Bad guys follow the same limit.
 - **One donut a trip** (decided 2026-10-18, playtest: a kid kicked the raider back into the kids' shelf six times
   running; each kick popped its donut and it grabbed a fresh one, until all the kids' donuts were on the floor and
-  they lost). While a donut you dropped is still loose on the stage, the other team's shelf gives you nothing; once
-  anyone picks it up, you can grab again (a loose donut remembers who dropped it, `by`; `grabAt` in `sim.js`). A CPU
-  bad guy whose donut is knocked loose goes back and picks it up (`scoop` in `cpu.js`), never home empty-handed
+  they lost). While a donut a bad guy dropped is still loose on the stage, the kids' shelf gives it nothing; once
+  anyone picks that donut up, it can grab again (a loose donut remembers who dropped it, `by`; `grabAt` in `sim.js`).
+  A CPU bad guy whose donut is knocked loose goes back and picks it up (`scoop` in `cpu.js`), never home empty-handed
   (amended 2026-10-18, user: "I don't want the bad guy walking home with no donut"; the first version sent it home
-  before it could grab again). Kids follow the same rule. `ponytail:` it heads straight for its donut, so one it
-  can't reach leaves it stuck there.
+  before it could grab again). `ponytail:` it heads straight for its donut, so one it can't reach leaves it stuck there.
+  **Kids are free of it** (decided 2026-10-18, user): a kid can't drop a donut on purpose yet, so the rule would only
+  puzzle them; it's the bad guy's exploit it stops. If kids ever can drop one, revisit (TEAMWORK-IDEAS.md).
 - **Spilling their donuts as a strategy** (brainstorm 2026-10-18, user; not now). The bug above, played on purpose:
   knocking a team's donuts off its shelf onto the floor lowers its score, since only shelved donuts count. A later
   move or level could make that a real tactic (and the scramble for the spill a real fight). Until then a shelf

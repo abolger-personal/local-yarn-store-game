@@ -282,18 +282,24 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
   assert.deepEqual(events, ['steal', 'full', 'bank'], 'one event each');
 }
 
-// REUSE-SPEC.md §Scoring: one donut at a time, so a raider knocked back into a shelf never grabs a fresh one (playtest)
+// REUSE-SPEC.md §Scoring: one donut at a time for bad guys, so a raider knocked back into a shelf never grabs a fresh one (playtest)
 {
-  const { m } = swing('punch', 0.3);
+  const m = createMatch([hero, dummy, brute], STAGE);
+  run(m, 600, tap(DUMMY.x - 2 * R - 0.3, DUMMY.z));
+  run(m, 5, tap(DUMMY.x - 2 * R - 0.29, DUMMY.z));
+  run(m, 60, once({ punch: true }));
   run(m, 120);
   const [loose] = m.donuts, steals = [];
-  const log = (s) => steals.push(...s.donutEvents.filter((e) => e.kind === 'steal'));
-  loose.by = 'kid';
-  let snap = run(m, 900, once({ target: { thing: 'shelf', team: 'badGuys' } }), log);
-  assert.ok(!me(snap).carrying && steals.length === 0, 'with a donut you dropped still loose, the shelf gives you nothing');
+  const log = (s) => steals.push(...s.donutEvents.filter((e) => e.kind === 'steal').map((e) => e.fighter));
+  loose.by = 'brute';
+  let snap = run(m, 1500, once({ target: { thing: 'shelf', team: 'heroes' } }, 'brute'), log);
+  assert.ok(!me(snap, 'brute').carrying && steals.length === 0, 'with a donut it dropped still loose, the shelf gives a bad guy nothing');
   loose.by = 'dummy';
-  snap = run(m, 120, once({ target: { thing: 'shelf', team: 'badGuys' } }), log);
-  assert.ok(me(snap).carrying && steals.length === 1, 'and it\'s only your own dropped donut that stops you');
+  snap = run(m, 120, once({ target: { thing: 'shelf', team: 'heroes' } }, 'brute'), log);
+  assert.ok(me(snap, 'brute').carrying && steals.length === 1, 'and only its own dropped donut stops it');
+  loose.by = 'kid';
+  snap = run(m, 1500, once({ target: { thing: 'shelf', team: 'badGuys' } }), log);
+  assert.ok(me(snap).carrying && steals.at(-1) === 'kid', 'kids are free: they can\'t drop a donut on purpose yet');
 }
 
 {

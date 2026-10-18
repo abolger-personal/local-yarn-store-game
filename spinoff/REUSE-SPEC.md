@@ -500,6 +500,9 @@ is no ✅ anywhere. ▶️ plays or plays on (in a room only the host starts a r
 to the lobby), ⏸ pauses, 🏠 opens a room and 🔑 joins one. **A screen never shows both ▶️ and 👍**,
 so there is never a question which one goes forward.
 
+**Holding 🥊 aims the Greathammer** (decided 2026-10-18): a tap is still a punch, everywhere; only a hero
+holding the hammer gets the hold, and it never fires by button-mashing (Costumes).
+
 ## Forts: build it, then knock it down
 
 Every level is two rounds (brainstorm 2026-10-13): a **build it** round, where each team fortifies
@@ -652,6 +655,25 @@ and smashers each get a round that is theirs.
     satisfying"). The slow bad guy's double jump hangs in the air, an easy target at just the right moment,
     and a punch sends it flying. Whatever tunes it later (the handicap's faster bad guy, its hops, its jump
     pace, `SLOWEST_JUMP`) keeps it in the air long enough to be punched there.
+- **Level 4: the chasing level** (decided 2026-10-18). Its lesson: the bad guy fights back. Its one CPU bad guy
+  (still one, user 2026-10-18) chases a kid carrying a donut and punches them, and enough punches send a kid
+  flying off the stage, exactly what a kid's punches can already do to it. Nothing a player can't do.
+  - **Terrain isn't the focus** (decided 2026-10-18, user: different from level 3, but simple). Hand-made
+    (`CHASE` in `levels.js`): mostly flat floor, each shelf on the floor near its end of the stage (about x ±8.5,
+    near the ring-out at ±11), so a fight at a shelf is near an edge, and a low stack or two in the middle.
+    Rules: `doubleJump`, the bad guy hits, `badGuyPace` 0.5, a build round with `piecesEach(4)` (5 pieces).
+  - **Chase** (decided 2026-10-18; Bad guys: AI is a fake player). Going home with a donut comes first, then
+    chasing, then raid or defend. A hero carrying a donut within 4 of it is chased (always, on level 4: the
+    chance roll waits for levels with more bad guys): it targets that hero, and punches when they are in reach
+    in front of it, standing, at most every `ATTACK_TICKS`. It gives up after 4 s, or when the kid banks,
+    drops the donut or is out. After its punch lands on a kid it leaves that kid alone for 3 s, which also
+    means no waiting at the edge for a falling kid.
+  - **No edge aiming** (decided 2026-10-18): it punches whenever it's close, wherever that sends you. Walking
+    round you to push you toward an edge is too mean for now.
+  - **Half a kid's speed, all level** (decided 2026-10-18). At level 3's fifth it could never catch anyone. It
+    isn't faster only while chasing, since the sim can't know a CPU's mode (it sends what a tablet sends), so
+    `badGuyPace` 0.5 is the level's; `cpu.test.mjs` checks the raid still steals and banks at a fair pace.
+  - **Beating it unlocks the Greathammer** (decided 2026-10-18; Costumes).
 - **Start spots come first** (decided 2026-10-17). Step 1 of making any level, hand-made or
   generated, on every stage: pick pseudo-random start spots for up to 6 heroes,
   each with room for the hero and their block pile beside them, and reserve them, so nothing
@@ -1338,6 +1360,31 @@ like that keeps the big cape a choice rather than a handicap.
     at the spear point like the sword's trick, the stars, hearts and notes in a line flying out past the
     point along the blade, each twinkling (amended 2026-10-17, playtest: bunched round the tip they hid the
     crescent). Later, with sound, a swing plays music (planned 2026-10-17).
+- **The Greathammer, a fourth choice** (decided 2026-10-18; working name, the kids may rename it). The
+  reward for beating level 4 (see Fighter chooser). The first hand item the sim knows about: it can be thrown.
+  Bad guys and the training dummy keep gloves. Passing it to a teammate is out for now (brainstorm, TEAMWORK-IDEAS.md).
+  - **The look is the joke** (decided 2026-10-18): it does *not* match the riot-colour, cartoon-treat style.
+    Excessively dramatic, high-texture, grey and black, like something out of *Dark Souls*: a long dark haft
+    with leather wraps and a massive blocky head, a rough noise texture with faint ember-glow cracks. It
+    ignores the gloves colour; its chooser icon is grey and black too. Its trick is always 🔥 (`look.trick`
+    is `flame`, not a choice, like the scythe's music).
+  - **Held, it is the sword's** (decided 2026-10-18): one-handed, `SWORD_MOVES` (stab, chop, upward stab),
+    the same timing, reach and damage. Only the throw is new.
+  - **Hold 🥊 to aim, let go to throw** (decided 2026-10-18; Buttons mean one thing everywhere). A press still
+    punches at once. Held 0.4 s, a see-through path appears on your own tablet and 🥊's ring fills like 👍's;
+    the path grows from small (about 2 long) to its biggest (about 8) at 2.5 s. You aim by facing (walk the way
+    you want to throw). Letting go once the path shows throws at the size shown (`Input.throw`, 0 to 1, clamped
+    by the host and ignored unless you hold a hammer that's in your hand); letting go sooner was only the punch.
+  - **It flies a boomerang oval** (decided 2026-10-18): flat, at chest height, the long side along your
+    facing, curving toward the camera and back, 0.35 as wide as it is long, kept inside the stage band, at a
+    steady 8 a second, ending back in your hand even if you've moved. The preview and the flight are one
+    function (`hammerPath`), so it flies exactly the path you saw. Harder to master than a punch, on purpose.
+  - **A hit sends it home** (decided 2026-10-18). The first bad guy or bad-guy block it touches takes a
+    kick's damage and knockback, pushed the way the hammer was flying, with the usual hit and sprinkles (no
+    new animation); then the hammer is back in your hand at once. A full lap with no hit also ends in your hand.
+    Rung out mid-flight, it's back at once. While it's away, 🥊 punches with bare gloves and holding does nothing.
+  - **Only kids who unlocked it can throw** (accepted 2026-10-18, user): each tablet keeps its own progress, so
+    at a playdate some kids have it and some don't. That's fine.
 - **Tricks: tap the picked gloves or sword again** (decided 2026-10-17), the way a hat changes stitch.
   A trick pops out of the hitting glove or the sword's tip while a punch lands, upright and turning:
   ✨ sparkle (the yarn store's `characters/sparkle.js` stars), 🫧 bubbles, or 🔥 a cartoon flame.
@@ -1431,6 +1478,7 @@ tie never counts, not even on level 1 (decided 2026-10-17); the tablet keeps the
 the game save (`lys.progress.v1`'s `beaten`, apart from the fighter; `levelsBeaten` / `beatLevel` in
 `progress.js`), by the level number `start` carries. Until then the chooser shows only gloves, and a saved or 🎲 sword becomes gloves.
 **The Music Scythe unlocks after level 2** (decided 2026-10-17), the same way (`handsFor` in `fighter.js`).
+**The Greathammer unlocks after level 4** (decided 2026-10-18), the same way (`UNLOCK.hammer`).
 More unlocks behind later levels: brainstorm 2026-10-17.
 
 Not built yet: the silhouette reveal on the animal tiles (brainstorm 2026-10-13). There is no `help` control anywhere:
@@ -1508,6 +1556,12 @@ starts the match (the host in a room, or a tablet playing by itself). Built in t
   reached, and ▶️ on that end card plays it (if there is one); after a loss or a tie, ▶️ plays the
   same level again (`outcomeOf`). Each hero's tablet saves its own. A tie never beats a level, for
   the sword or anything else (decided 2026-10-17).
+- **A new item says so on the end card** (decided 2026-10-18, playtest: a new item turned up in the chooser
+  and nobody knew). When a win unlocks a hand item on this tablet (`handsFor` before and after), the score
+  card shows one bouncing button beside 👍 with the new item's icon, ✨ and ✏️ together, so it's clear they go
+  together; ✏️ on the next card looks the same. Both open the chooser. Your fighter isn't switched to it:
+  picking it is yours. When the Greathammer is what unlocked, a *Dark Souls*-style banner (a dark band, gold
+  serif capitals, its name) crosses the score card too, the hammer's fourth-wall joke.
 - **One game save per browser:** the highest level and the stages each player has reached are
   saved in their browser as the whole game's progress, apart from the fighter, so re-rolling or
   re-dressing a fighter keeps it (decided 2026-10-17). It travels with the fighter when they join a
@@ -1633,7 +1687,7 @@ scary, for 4–6 year olds.
   | Raid | Default, bag not full | Heads for the kids' shelf, breaking through the fort (below) |
   | Grab | At the kids' shelf | Takes one donut about every second until the bag is full or the shelf is empty |
   | Run home | Bag full, or shelf empty | Heads home and banks |
-  | Chase | A kid carrying donuts comes in range and a chance roll says chase | Follows and attacks in reach; gives up after a few seconds, or when the kid banks or drops |
+  | Chase | A kid carrying donuts comes in range and a chance roll says chase | Follows and attacks in reach; gives up after a few seconds, or when the kid banks or drops (decided 2026-10-18 for level 4: range 4, 4 s, 3 s grace, no chance roll; Forts: Level 4) |
   | Defend | A kid is grabbing at the bad guys' shelf | The nearest bad guy goes home to stop them |
   | Scoop | A loose donut is close by | Picks it up on the way |
   | Power | Bar full | Fires an unlocked move at the nearest kid, with the normal wind-up |
@@ -1666,14 +1720,14 @@ scary, for 4–6 year olds.
   level 3 yet). The tutorial levels
   keep it small: level 1 has the training dummy (decided 2026-10-17), which never raids, and levels 2
   and 3 have one CPU bad guy (Forts: Level 2; level 3 amended 2026-10-17: one, now able to knock you
-  off, so the jumping is the level's one new idea). From level 4 the count grows by one CPU bad guy a level:
+  off, so the jumping is the level's one new idea; level 4 has one too, Forts: Level 4). From level 5 the count grows by one CPU bad guy a level:
 
   ```
-  badGuys(level, grownups) = 1 for levels 1 to 3, else min(8, max(grownups, 1) + level - 1)
+  badGuys(level, grownups) = 1 for levels 1 to 4, else min(8, max(grownups, 1) + level - 1)
   ```
 
-  Two grownups on level 4 face the kids with 3 CPU bad guys beside them; no grownups on level 4
-  is 4 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
+  (amended 2026-10-18, user: level 4 keeps one bad guy, so chasing is its one new idea.) Two grownups on
+  level 5 face the kids with 4 CPU bad guys beside them; no grownups on level 5 is 5 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
   drops it (decided 2026-10-17; After the lobby: a win unlocks the next level).
 
   A grownup bad guy on level 1 (🥷 isn't built yet) can't attack the kids: they can only defend

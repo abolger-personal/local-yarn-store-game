@@ -24,7 +24,6 @@ body { display: grid; grid-template-columns: 1fr minmax(320px, 44vw); }
 .choices { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px; }
 .choices button { flex: none; --tap: 52px; }
 .choices .dot { width: 34px; height: 34px; }
-.choices.pictures { flex-wrap: nowrap; overflow-x: auto; }
 .pictures button { --tap: 64px; }
 
 button {
@@ -74,6 +73,11 @@ body.lobby { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; heig
 .dial span, .dial button { width: 84px; height: 84px; box-sizing: border-box; border-radius: 50%; }
 .dial span { border: 3px dashed #e7d6c1; }
 .dial button { font-size: 40px; font-weight: 800; color: var(--ink); }
+/* a phone on its side is too short for keys three across: the code's keys go in one row, the dial in rows of five */
+@media (orientation: landscape) and (max-height: 500px) {
+  .keypad { grid-template-columns: repeat(7, 84px); }
+  .dial { grid-template-columns: repeat(5, 84px); }
+}
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .overlay > * { pointer-events: auto; }
 

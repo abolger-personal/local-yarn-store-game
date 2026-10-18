@@ -646,6 +646,10 @@ and smashers each get a round that is theirs.
     (the bad guys start on the floor beside their step, as on every level). `checkLevel` takes the level's
     rules, so level 3 is checked with double jumps on; `levels.test.mjs` shows a kid double jumps up the
     bad guys' tower and, without double jumps, can't get up to its own shelf.
+  - **Punching the bad guy in mid-air is the best bit, keep it** (decided 2026-10-17, playtest: "incredibly
+    satisfying"). The slow bad guy's double jump hangs in the air, an easy target at just the right moment,
+    and a punch sends it flying. Whatever tunes it later (the handicap's faster bad guy, its hops, its jump
+    pace, `SLOWEST_JUMP`) keeps it in the air long enough to be punched there.
 - **Start spots come first** (decided 2026-10-17). Step 1 of making any level, hand-made or
   generated, on every stage: pick pseudo-random start spots for up to 6 heroes,
   each with room for the hero and their block pile beside them, and reserve them, so nothing

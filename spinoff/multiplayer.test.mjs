@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { newFighter } from './fighter.js';
-import { STAGES, TUTORIAL } from './levels.js';
+import { STAGES, TUTORIAL, badGuys } from './levels.js';
+import { MAX_FIGHTERS } from './roster.js';
 import { ROUND_SECONDS, TICK_HZ } from './match.js';
 import { EVENT_TICKS, HOST_GONE_SECONDS, SNAP_HZ, createGuest, createHost, lateJoiners, readInput, readSnap, readStart, rosterOf } from './multiplayer.js';
 import { createMatch, snapshot, tick } from './sim.js';
@@ -47,6 +48,19 @@ function guestOf(net, id) {
   assert.deepEqual(cpu.slice(1), [{ id: 'cpu1', team: 'badGuys', cpu: true }], 'level 2 brings one CPU bad guy instead of the dummy');
   assert.deepEqual(readStart(JSON.parse(JSON.stringify({ theme: 'breakfast', stage: TUTORIAL.stage, roster: cpu, settings: { seconds: 90 } })), 'H', ['breakfast'])?.roster, cpu,
     'and a guest takes it from the host\'s start');
+  const bad = { ...newFighter('lion'), badGuy: true }, cpus = (r) => r.filter((s) => s.cpu).length;
+  const one = rosterOf('H', newFighter('owl'), new Map([['B', bad]]), 3);
+  assert.deepEqual(one.map((s) => [s.id, s.team]), [['H', 'heroes'], ['B', 'badGuys']], 'on levels 2 to 4 a bad-guy player takes the CPU\'s seat');
+  assert.equal(cpus(rosterOf('B', bad, new Map([['C', bad], ['H', newFighter('owl')]]), 4)), 0, 'with more bad-guy players than the level has, no CPUs');
+  const five = rosterOf('H', newFighter('owl'), new Map([['B', bad], ['C', bad]]), 5);
+  assert.equal(five.filter((s) => s.team === 'badGuys').length, badGuys(5, 2), 'level 5: two bad-guy players and CPUs make badGuys(5, 2)');
+  assert.equal(cpus(five), badGuys(5, 2) - 2);
+  assert.ok(rosterOf('H', newFighter('owl'), new Map([['B', bad]]), 1).some((s) => s.dummy), 'level 1 keeps the dummy beside a bad-guy player');
+  const crowd = new Map(Array.from({ length: 8 }, (_, i) => [`G${i}`, newFighter('owl')]).concat(Array.from({ length: 2 }, (_, i) => [`B${i}`, bad])));
+  assert.equal(rosterOf('H', newFighter('owl'), crowd, 9).length, MAX_FIGHTERS, 'CPUs never fill past fourteen');
+  assert.equal(rosterOf('H', newFighter('owl'), new Map([...crowd, ['G8', newFighter('owl')], ['G9', newFighter('owl')], ['G10', newFighter('owl')]]), 1).length, MAX_FIGHTERS, 'nor the dummy');
+  assert.equal(readStart(JSON.parse(JSON.stringify({ theme: 'breakfast', stage: TUTORIAL.stage, roster: one })), 'B', ['breakfast'])?.roster[1].fighter.badGuy, true,
+    'a guest knows a bad-guy player is one');
   const building = { ...IDLE, target: { thing: 'pile', id: 'G1' }, drop: true, ready: false, go: true };
   assert.deepEqual(readInput({ ...building, extra: 1 }), building, 'the build round\'s ⬇️, 👍 and hold come through, and a tap on a pile');
   for (const bad of [null, 'go', { target: null }, { ...IDLE, target: { x: 1e9, z: 0 } }, { ...IDLE, target: { x: Number.NaN, z: 0 } },

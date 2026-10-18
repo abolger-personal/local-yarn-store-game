@@ -32,6 +32,7 @@ button {
   transition: transform 90ms ease, border-color 90ms ease;
 }
 button:active { transform: scale(0.92); }
+button:disabled { opacity: .35; filter: grayscale(1); cursor: default; transform: none; }
 button[aria-pressed="true"] { border-color: var(--ring); border-width: 5px; transform: scale(1.08); }
 /* the thicker ring comes out of the padding, so a colour dot keeps its room and stays centred */
 button[aria-pressed="true"]:has(> .dot) { padding: 4px; }

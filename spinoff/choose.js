@@ -1,6 +1,6 @@
 import {
   BAGS, CAPES, CLOTH, FUR, HAND_ICON, HATS, SPECIES, TEXTURES, TRICKS, animateFighter, buildFighter, disposeFighter, handsFor, loadFighter, newFighter,
-  randomFighter, saveFighter, setFur, showOffTrick, stepFighter,
+  paint, randomFighter, saveFighter, setFur, showOffTrick, stepFighter,
 } from './fighter.js';
 import { POSES } from '../characters/npc.js';
 import { inRoom, openRoom } from './net.js';
@@ -40,9 +40,10 @@ const textured = (body, stitch) => (PATTERN[stitch] ? `${body}<g fill="url(#${pa
 const svg = (body, colour) => `<svg viewBox="0 0 48 48" fill="currentColor" style="color:${colour}" aria-hidden="true">${body}</svg>`;
 
 // REUSE-SPEC.md §Fighter chooser: the sword shows once this tablet's player has beaten level 1, the scythe level 2, the Greathammer level 4
-const hands = handsFor(levelsBeaten());
+const beaten = levelsBeaten();
 /** @param {import('./fighter.js').Fighter} f */
 const allowed = (f) => {
+  const hands = handsFor(beaten, f.badGuy);
   if (!hands.includes(f.look.hands)) f.look.hands = hands[0];
   if (!TRICKS[f.look.hands].includes(f.look.trick)) f.look.trick = TRICKS[f.look.hands][0];
   return f;
@@ -70,7 +71,7 @@ const swatchRow = (action, list, current) => list.map(({ hex, name }) =>
 
 /** @param {string} kind @param {readonly string[]} list @param {boolean} none */
 function pickRow(kind, list, none) {
-  const { look } = /** @type {{ look: Record<string, string> }} */ (/** @type {unknown} */ (fighter));
+  const { look } = /** @type {{ look: Record<string, string> }} */ (/** @type {unknown} */ (paint(fighter)));
   const { [kind]: current, [`${kind}Color`]: colour, [`${kind}Stitch`]: stitch } = look;
   return [...(none ? [null] : []), ...list].map((v) =>
     button(kind, v ?? '', v === current && stitch ? `${v}, ${stitch}, tap again to change` : v ?? 'none',
@@ -83,23 +84,27 @@ const colours = (html) => `<div class="choices">${html}</div>`;
 const row = (icon, label, ...lines) => `<div class="row" role="group" aria-label="${label}">`
   + `<span class="label" aria-hidden="true">${icon}</span><div class="lines">${lines.join('')}</div></div>`;
 
+// REUSE-SPEC.md §Bad guys, Play a bad guy: a bad guy picks everything but a colour
+const swatches = (html) => (fighter.badGuy ? '' : colours(html));
+
 const garment = (icon, kind, list, none) => row(icon, kind,
   pictures(pickRow(kind, list, none)),
-  colours(swatchRow(`${kind}Color`, CLOTH, fighter.look[`${kind}Color`])));
+  swatches(swatchRow(`${kind}Color`, CLOTH, fighter.look[`${kind}Color`])));
 
 function render() {
-  const { species, look, params } = fighter;
+  const { species, params, badGuy = false } = fighter, { look } = paint(fighter);
+  document.getElementById('bad').setAttribute('aria-pressed', String(badGuy));
   panel.innerHTML = [
     row('🐾', 'animal', pictures(SPECIES.map((s) => button('species', s, s, `<span class="emoji">${ANIMAL[s]}</span>`, s === species)).join(''))),
-    row('🎨', 'fur', colours(swatchRow('fur', FUR, params.bodyColor))),
+    ...(badGuy ? [] : [row('🎨', 'fur', colours(swatchRow('fur', FUR, params.bodyColor)))]),
     garment('🎩', 'hat', HATS, true),
     garment('🦸', 'cape', CAPES, true),
     garment('🎒', 'bag', BAGS, false),
-    row('✊', 'hands', pictures(hands.map((v) => {
+    row('✊', 'hands', pictures(handsFor(beaten, badGuy).map((v) => {
       const on = v === look.hands, badge = on && TRICKS[v].length > 1 && TRICK_ICON[look.trick] ? `<text x="38" y="14" font-size="18" text-anchor="middle">${TRICK_ICON[look.trick]}</text>` : '';
       return button('hands', v, on && TRICKS[v].length > 1 ? `${v}, ${look.trick}, tap again to change` : v, svg(ICON[v] + badge, look.gloves), on);
     }).join('')),
-      colours(swatchRow('gloves', CLOTH, look.gloves))),
+      swatches(swatchRow('gloves', CLOTH, fighter.look.gloves))),
   ].join('');
 }
 
@@ -110,8 +115,11 @@ function pickOrRestitch(kind, v) {
   else look[kind] = v || null;
 }
 
+/** @param {import('./fighter.js').Fighter} f */
+const keepRole = (f) => (fighter.badGuy ? { ...f, badGuy: true } : f);
+
 const ACTIONS = {
-  species: (v) => { fighter = newFighter(v); return true; },
+  species: (v) => { fighter = keepRole(newFighter(v)); return true; },
   fur: (v) => { setFur(fighter, v); },
   hat: (v) => pickOrRestitch('hat', v),
   cape: (v) => pickOrRestitch('cape', v),
@@ -142,7 +150,7 @@ const stage = makeStage(document.getElementById('stage'));
 
 function rebuild(reframe) {
   if (built) { stage.scene.remove(built.root); disposeFighter(built); }
-  built = buildFighter(fighter);
+  built = buildFighter(paint(fighter));
   stage.scene.add(built.root);
   if (reframe) stage.frame([built.root], { margin: 1.5 });
 }
@@ -153,9 +161,19 @@ panel.addEventListener('click', (e) => {
 });
 
 document.getElementById('dice').addEventListener('click', () => {
-  fighter = allowed(randomFighter());
+  fighter = allowed(keepRole(randomFighter()));
   saveFighter(fighter);
   rebuild(true);
+  cheer = 1.4;
+  render();
+});
+
+// REUSE-SPEC.md §Bad guys, Play a bad guy: 🥷 again is a hero, in the colours saved underneath
+document.getElementById('bad').addEventListener('click', () => {
+  const { badGuy: _, ...hero } = fighter;
+  fighter = allowed(fighter.badGuy ? hero : { ...fighter, badGuy: true });
+  saveFighter(fighter);
+  rebuild(false);
   cheer = 1.4;
   render();
 });

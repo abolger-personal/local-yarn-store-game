@@ -53,8 +53,8 @@ export const TRICKS = Object.freeze({
 });
 // REUSE-SPEC.md §Fighter chooser: the levels a player must have beaten for the chooser to offer each
 const UNLOCK = Object.freeze({ sword: 1, scythe: 2, hammer: 4 });
-/** The hands the chooser offers a player who has beaten `beaten` levels. */
-export const handsFor = (beaten) => HANDS.filter((h) => (UNLOCK[h] ?? 0) <= beaten);
+/** The hands the chooser offers a player who has beaten `beaten` levels; a bad guy gets every one (REUSE-SPEC.md §Bad guys). */
+export const handsFor = (beaten, badGuy = false) => HANDS.filter((h) => badGuy === true || (UNLOCK[h] ?? 0) <= beaten);
 /** The hands that are new to a player who had beaten `before` levels and now has `after` (REUSE-SPEC.md §After the lobby). */
 export const newHands = (before, after) => handsFor(after).filter((h) => !handsFor(before).includes(h));
 
@@ -83,7 +83,7 @@ export function nearestSwatch(list, hex) {
 /**
  * @typedef {{ hat: string|null, hatColor: string, hatStitch: string, cape: string|null, capeColor: string, capeStitch: string,
  *             bag: string, bagColor: string, gloves: string, hands: string, trick: string }} Look
- * @typedef {{ species: string, params: Record<string, any>, look: Look }} Fighter
+ * @typedef {{ species: string, params: Record<string, any>, look: Look, badGuy?: boolean }} Fighter
  */
 
 /** @returns {Look} */
@@ -150,7 +150,7 @@ function readLook(raw) {
 /** Untrusted JSON from storage or another tablet → a Fighter, or null. @returns {Fighter|null} */
 export function readFighter(raw) {
   if (!raw || typeof raw !== 'object' || !SPECIES.includes(raw.species)) return null;
-  return { species: raw.species, params: readParams(raw.species, raw.params), look: readLook(raw.look) };
+  return { species: raw.species, params: readParams(raw.species, raw.params), look: readLook(raw.look), ...(raw.badGuy === true && { badGuy: true }) };
 }
 
 export function loadFighter() {
@@ -720,6 +720,21 @@ export function seatDrop(built) {
 }
 
 export const BAD_GUY_FUR = '#8f8f96';
+// REUSE-SPEC.md §Bad guys, Play a bad guy: two sets, so two bad-guy players can be told apart
+const BAD_GUY_LOOKS = Object.freeze([
+  Object.freeze({ fur: BAD_GUY_FUR, hatColor: '#2a2030', capeColor: '#3b2152', bagColor: '#1d1a20', gloves: '#4b2a6b' }),
+  Object.freeze({ fur: '#5f5f66', hatColor: '#4b2a6b', capeColor: '#1d1a20', bagColor: '#3b2152', gloves: '#2a2030' }),
+]);
+
+/** A fighter as every tablet draws it: one flagged `badGuy` in bad-guy set `set`, painted here, never sent. @param {Fighter} f @returns {Fighter} */
+export function paint(f, set = 0) {
+  if (!f.badGuy) return f;
+  const { fur, ...colours } = BAD_GUY_LOOKS[set % BAD_GUY_LOOKS.length];
+  return setFur({ ...f, params: { ...f.params }, look: { ...f.look, ...colours } }, fur);
+}
+
+/** Each bad-guy player's set, by sorted id. @param {[string, Fighter|undefined][]} seats @returns {Map<string, number>} */
+export const badGuySets = (seats) => new Map(seats.filter(([, f]) => f?.badGuy).map(([id]) => id).sort().map((id, i) => [id, i]));
 
 // REUSE-SPEC.md §Mode: how donuts look
 export const HERO_DOUGH = '#e8c48e';

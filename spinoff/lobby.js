@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { setGeometryDetail } from '../characters/npc.js';
 import { makeGridLines } from '../inventory/notions.js';
-import { animateFighter, buildFighter, disposeFighter, loadFighter } from './fighter.js';
+import { animateFighter, badGuySets, buildFighter, disposeFighter, loadFighter, paint } from './fighter.js';
 import { debugging, inRoom, leaveRooms, openRoom, selfId, setRoom, showDebug } from './net.js';
 import { CODE_LENGTH, ROOM_TREATS, codeHtml, floorGrid, isCode, randomCode, standingSpots } from './roster.js';
 import { makeStage } from './stage.js';
-import { loadProgress, roomLevels, roomStages } from './progress.js';
+import { heroesProgress, loadProgress, roomLevels, roomStages } from './progress.js';
 
 // REUSE-SPEC.md §Performance: up to 14 small fighters on screen; 'high' is for the chooser's close-up
 setGeometryDetail('med');
@@ -19,7 +19,7 @@ const floor = makeGridLines(grid, 0, '#c9ae8c');
 floor.position.y = 0.002;
 stage.scene.add(floor);
 
-/** @type {Map<string, {built: any, cheer: number, progress: import('./progress.js').Progress}>} */
+/** @type {Map<string, {fighter: import('./fighter.js').Fighter, built: any, set: number, cheer: number, progress: import('./progress.js').Progress}>} */
 const cast = new Map();
 let room = null, typed = [], roomCode = [], playingHost = null;
 
@@ -34,10 +34,24 @@ function place() {
 
 function arrive(id, fighter, progress) {
   leave(id);
-  const built = buildFighter(fighter);
-  stage.scene.add(built.root);
-  cast.set(id, { built, cheer: 1.6, progress });
+  cast.set(id, { fighter, built: null, set: -1, cheer: 1.6, progress });
+  dress();
+}
+
+/** Builds whoever is new, and a bad guy whose colour set moved as bad guys came and went (REUSE-SPEC.md §Bad guys, Play a bad guy). */
+function dress() {
+  const sets = badGuySets([...cast].map(([id, f]) => [id, f.fighter]));
+  for (const [id, f] of cast) {
+    const set = sets.get(id) ?? -1;
+    if (f.built && f.set === set) continue;
+    if (f.built) { stage.scene.remove(f.built.root); disposeFighter(f.built); }
+    f.built = buildFighter(paint(f.fighter, set));
+    f.set = set;
+    stage.scene.add(f.built.root);
+  }
   place();
+  // REUSE-SPEC.md §Bad guys, No playing alone: a bad-guy host's 👍 waits for a hero
+  /** @type {HTMLButtonElement} */ (document.getElementById('go')).disabled = !heroesProgress([...cast.values()]).length;
 }
 
 function leave(id) {
@@ -47,7 +61,7 @@ function leave(id) {
   stage.scene.remove(f.built.root);
   disposeFighter(f.built);
   cast.delete(id);
-  place();
+  dress();
 }
 
 const show = (id, on) => document.getElementById(id).classList.toggle('hidden', !on);
@@ -87,7 +101,7 @@ const STAGE_PICTURE = { breakfast: '🥞', cake: '🎂' };
 const DIAL = 9;
 let picked = { stage: '', level: 0 };
 
-const everyone = () => (room ? [...cast.values()].map((f) => f.progress) : [loadProgress()]);
+const everyone = () => (room ? heroesProgress([...cast.values()]) : [loadProgress()]);
 
 function pick() {
   show('start', false);
@@ -174,6 +188,7 @@ buildKeypad();
 if (debugging()) showDebug();
 
 if (mine) {
+  show('play', !mine.badGuy);
   arrive(selfId, mine, loadProgress());
   stage.frame([floor], { margin: 1.05, view: new THREE.Vector3(0, 0.55, 1).normalize() });
   const session = inRoom();

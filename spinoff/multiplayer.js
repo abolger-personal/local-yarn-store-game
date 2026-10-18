@@ -29,6 +29,8 @@ const TEAMS = new Set(['heroes', 'badGuys']), THINGS = new Set(['donut', 'brick'
 const FLAGS = ['away', 'drop', 'ready', 'go'];
 /** @type {import('./match.js').Team} */
 const HEROES = 'heroes';
+/** @type {import('./match.js').Team} */
+const BAD_GUYS = 'badGuys';
 const IDLE = Object.freeze({ target: null, punch: false, kick: false });
 const DUMMY_ID = 'dummy';
 
@@ -95,14 +97,17 @@ export function readSnap(raw, ids) {
 }
 
 /**
- * Everyone in a match: the players as heroes, then the training dummy, or from level 2 the CPU bad guys.
+ * Everyone in a match: the players, each on the team their fighter is on, then the training dummy, or from level 2
+ * the CPU bad guys in the seats bad-guy players haven't taken, never past MAX_FIGHTERS (REUSE-SPEC.md §Bad guys).
  * @param {Map<string, import('./fighter.js').Fighter>} guests @param {number} [level] the level's number, if it has one @returns {Seat[]}
  */
-export const rosterOf = (me, mine, guests = new Map(), level = 0) => [
-  { id: me, team: HEROES, fighter: mine }, ...[...guests].map(([id, fighter]) => ({ id, team: HEROES, fighter })),
-  ...(level >= 2 ? Array.from({ length: badGuys(level) }, (_, i) => ({ id: `cpu${i + 1}`, team: /** @type {const} */ ('badGuys'), cpu: true }))
-    : [{ id: DUMMY_ID, team: /** @type {const} */ ('badGuys'), dummy: true }]),
-];
+export function rosterOf(me, mine, guests = new Map(), level = 0) {
+  const people = [[me, mine], ...guests].map(([id, fighter]) => ({ id, team: fighter.badGuy ? BAD_GUYS : HEROES, fighter }));
+  const grownups = people.filter((p) => p.team === BAD_GUYS).length, room = Math.max(0, MAX_FIGHTERS - people.length);
+  const cpus = Math.min(room, Math.max(0, badGuys(level, grownups) - grownups));
+  return [...people, ...(level >= 2 ? Array.from({ length: cpus }, (_, i) => ({ id: `cpu${i + 1}`, team: BAD_GUYS, cpu: true }))
+    : [{ id: DUMMY_ID, team: BAD_GUYS, dummy: true }].slice(0, room))];
+}
 
 /** @param {Input} input @param {Input} [was] */
 const merge = (input, was = IDLE) => ({ ...was, ...input, target: input.target ?? was.target, punch: was.punch || input.punch, kick: was.kick || input.kick,

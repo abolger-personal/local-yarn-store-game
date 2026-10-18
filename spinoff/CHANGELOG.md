@@ -2,6 +2,12 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
+## 0.0.6 (in progress)
+
+### End card
+- **You'll know when you've won something new.** Beat a level that unlocks a sword or the scythe and a
+  bouncing button pops up on the score card with the new thing, ✨ and ✏️ on it. Tap it to go and dress up.
+
 ## 0.0.5 — 2026-10-17: The Music Scythe and the jumping level
 
 ### Dress up

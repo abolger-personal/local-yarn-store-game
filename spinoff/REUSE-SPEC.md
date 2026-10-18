@@ -376,6 +376,16 @@ No lives, no elimination, and only a short wait after a ring-out (decided 2026-1
 - **Everyone carries one donut at a time to start** (decided 2026-10-13). A grab fills the bag;
   the carrier has to run home and bank before grabbing again, and any hit knocks the donut loose.
   A bigger bag comes later, as an unlock (see Open questions). Bad guys follow the same limit.
+- **One donut a trip** (decided 2026-10-18, playtest: a kid kicked the raider back into the kids' shelf six times
+  running; each kick popped its donut and it grabbed a fresh one, until all the kids' donuts were on the floor and
+  they lost). A grab counts for the whole trip: once your donut is knocked loose you can pick it, or any loose
+  donut, back up, but the other team's shelf gives you nothing more until you've been back to your own (`stole`
+  in `sim.js`, cleared at your own shelf, so a ring-out's drop-in clears it too). A CPU bad guy whose donut is
+  knocked loose goes home. Kids follow the same rule.
+- **Spilling their donuts as a strategy** (brainstorm 2026-10-18, user; not now). The bug above, played on purpose:
+  knocking a team's donuts off its shelf onto the floor lowers its score, since only shelved donuts count. A later
+  move or level could make that a real tactic (and the scramble for the spill a real fight). Until then a shelf
+  only loses a donut to a grab, one per trip.
 
 Starting numbers to tune: 12 donuts per shelf, one donut per bag, a ring-out spills the whole bag,
 a **90-second** match to start (decided 2026-10-13; the kids will say if it's too short), never

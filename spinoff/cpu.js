@@ -27,11 +27,11 @@ const OTHER = /** @type {const} */ ({ heroes: 'badGuys', badGuys: 'heroes' });
 
 /**
  * Raid while its shelf holds no hero donuts, defend (home, standing guard) once it holds one, and run home to bank
- * whatever it carries (REUSE-SPEC.md §Forts, Level 2). Heroes' donuts are the ones without the villains' drizzle.
+ * whatever it carries, or empty-handed once its stolen donut is knocked loose (REUSE-SPEC.md §Forts, Level 2; §Scoring). Heroes' donuts are the ones without the villains' drizzle.
  * @param {Snapshot} snap @param {FighterState} me @returns {'raid'|'defend'|'home'}
  */
 export function modeOf(snap, me) {
-  if (me.carrying) return 'home';
+  if (me.carrying || me.stole) return 'home';
   const home = snap.shelves.find((s) => s.team === me.team);
   return home?.donuts.some((d) => !d.stripe) ? 'defend' : 'raid';
 }

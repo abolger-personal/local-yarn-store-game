@@ -930,6 +930,7 @@ function shelfStep(s, f) {
   const sh = s.shelves.find((o) => standingAt(f, o));
   if (!sh) { f.shelfDone = false; return; }
   if (sh.team === f.team) {
+    f.stole = false;
     if (f.carrying && bank(sh, f.carrying)) {
       f.carrying = null;
       s.donutEvents.push({ ...event(f, sh), kind: 'bank' });
@@ -938,8 +939,15 @@ function shelfStep(s, f) {
   }
   if (f.shelfDone || f.target?.thing !== 'shelf' || f.target.team !== sh.team) return;
   f.shelfDone = true;
-  if (f.carrying) s.fullBag.push(event(f, sh));
-  else if ((f.carrying = grab(sh))) s.donutEvents.push({ ...event(f, sh), kind: 'steal' });
+  grabAt(s, f, sh);
+}
+
+/** REUSE-SPEC.md §Scoring: one donut a trip; knocked loose, it's back to your own shelf before grabbing again. */
+function grabAt(s, f, sh) {
+  if (f.carrying || f.stole) { s.fullBag.push(event(f, sh)); return; }
+  if (!(f.carrying = grab(sh))) return;
+  f.stole = true;
+  s.donutEvents.push({ ...event(f, sh), kind: 'steal' });
 }
 
 // --- the build round (REUSE-SPEC.md §Forts) ------------------------------------------------
@@ -1084,7 +1092,7 @@ function newFighter(e, at, y) {
     x: at.x, y, z: at.z, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, onGround: true, jumps: 1,
     target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, again: false, fails: 0, stuck: 0, gain: 0, away: false, slick: false, passed: false, sprung: -1,
     attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, out: 0, percent: 0, calm: 0,
-    carrying: null, touching: [], shelfDone: false, shelfSpot: null, blocked: false };
+    carrying: null, stole: false, touching: [], shelfDone: false, shelfSpot: null, blocked: false };
 }
 
 function refresh(s) {
@@ -1177,7 +1185,7 @@ function stepOf(f) {
 /** @returns {import('./match.js').FighterState} */
 const fighterView = (f) => ({
   id: f.id, team: f.team, x: f.x, y: f.y, z: f.z, vx: f.vx, vy: f.vy, vz: f.vz, facing: f.facing, height: f.h, width: f.w,
-  onGround: f.onGround, move: moveOf(f), step: stepOf(f), percent: f.percent, carrying: f.carrying ? { ...f.carrying } : null,
+  onGround: f.onGround, move: moveOf(f), step: stepOf(f), percent: f.percent, carrying: f.carrying ? { ...f.carrying } : null, stole: f.stole,
   invincible: f.inv > 0, respawn: f.out / TICK_HZ, target: f.dest ? { x: f.dest.x, y: f.dest.y, z: f.dest.z } : null, block: f.block,
 });
 

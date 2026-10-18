@@ -190,3 +190,18 @@ const punched = (s) => me(s).move === 'punch' && s.hits.some((h) => h.on === 'fi
 }
 
 console.log('cpu ok');
+
+{
+  // REUSE-SPEC.md §Scoring, one donut a trip (playtest: kicked back into the kids' shelf, it grabbed again and again)
+  let knocked = 0, regrabs = 0, stole = false, carried = false;
+  const sh = level.stage.shelves.find((x) => x.team === 'heroes');
+  const chase = (s) => (s.tick === 2 ? { target: { x: sh.x + SHELF_WIDTH, z: sh.z + 0.6 }, punch: false, kick: false }
+    : me(s).carrying && s.tick % 12 === 0 ? { target: { thing: 'fighter', id: 'cpu1' }, punch: true, kick: false } : null);
+  play(level.stage, 60, (s) => {
+    if (steals(s) && stole) regrabs++;
+    if (carried && !me(s).carrying && !banks(s)) knocked++;
+    ({ stole, carrying: carried } = { stole: me(s).stole, carrying: Boolean(me(s).carrying) });
+  }, chase);
+  assert.ok(knocked >= 2, `the kid knocks the raider's donut loose (${knocked} times)`);
+  assert.equal(regrabs, 0, 'and it never grabs another before it has been home');
+}

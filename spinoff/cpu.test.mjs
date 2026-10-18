@@ -14,16 +14,19 @@ const raider = { id: 'cpu1', team: 'badGuys', ...body, width: 0.75, height: 0.97
 // the raider's choices, at full speed so they come quickly; level 2's slow pace has its own check below
 const fullPace = { ...matchOptions(level), match: { ...level.match, badGuyPace: 1 } };
 
-/** Plays `seconds` of level 2 (build round skipped) with the CPU's inputs; `kidInput(snap)` drives the kid (`hero`); `watch` sees each snapshot. */
-function play(stage, seconds, watch, kidInput = () => null, opts = fullPace, hero = kid) {
-  const m = createMatch([hero, raider], stage, opts), cpu = createCpu('cpu1');
+/**
+ * Plays `seconds` of level 2 (build round skipped) with the CPU's inputs, a CPU of level `cpuLevel`; `kidInput(snap)` drives the
+ * kid (`hero`); `watch` sees each snapshot, and the match.
+ */
+function play(stage, seconds, watch, kidInput = () => null, opts = fullPace, hero = kid, cpuLevel = 2) {
+  const m = createMatch([hero, raider], stage, opts), cpu = createCpu('cpu1', cpuLevel);
   tick(m, { kid: { target: null, punch: false, kick: false, go: true } });
   let snap = snapshot(m);
   for (let i = 0; i < seconds * TICK_HZ; i++) {
     const k = kidInput(snap);
     tick(m, { cpu1: cpu.input(snap), ...(k && { kid: k }) });
     snap = snapshot(m);
-    if (watch(snap) === true) return snap;
+    if (watch(snap, m) === true) return snap;
   }
   return snap;
 }
@@ -129,6 +132,61 @@ const me = (s) => s.fighters.find((f) => f.id === 'cpu1');
   assert.ok(fastest <= 0.2 * WALK_SPEED + 1e-9, `the raider never walks faster than a fifth of a kid (${fastest.toFixed(2)})`);
   assert.ok(flew > 0 && flew <= 0.4 * AIR_SPEED + 1e-9, `and its hops are slow too, not a dodge (${flew.toFixed(2)} in the air)`);
   assert.ok(stole > 0 && banked > stole, `and still steals and banks within the round (stole ${stole}, banked ${banked})`);
+}
+
+// REUSE-SPEC.md §Forts, Level 4: the chasing level
+const chase = /** @type {import('./levels.js').Level} */ (levelOf('breakfast', 4));
+const kidOf = (s) => s.fighters.find((f) => f.id === 'kid');
+const punched = (s) => me(s).move === 'punch' && s.hits.some((h) => h.on === 'fighter' && h.target === 'kid');
+{
+  // a kid grabbing at the bad guys' shelf from its end, by the edge, is punched off the stage
+  let hit = -1;
+  const end = play({ ...chase.stage, starts: [{ x: 8.8, z: 0.5 }] }, 10, (s) => {
+    if (hit < 0 && punched(s)) hit = s.tick;
+    return kidOf(s).respawn > 0;
+  }, (s) => (s.tick === 2 ? { target: { thing: 'shelf', team: 'badGuys' }, punch: false, kick: false } : null), matchOptions(chase), kid, 4);
+  assert.ok(hit > 0 && kidOf(end).respawn > 0, `level 4: it punches a kid with a donut by its shelf, off the stage (hit ${hit}, out by ${end.tick})`);
+}
+{
+  // a kid always holding a donut, standing in the open: one punch, then 3 s left alone, again and again
+  const hits = [];
+  play({ ...chase.stage, starts: [{ x: 6, z: 0.5 }] }, 20, (s, m) => {
+    m.fighters[0].carrying ??= kid.look;
+    if (punched(s)) hits.push(s.tick);
+  }, () => null, matchOptions(chase), kid, 4);
+  const gaps = hits.slice(1).map((t, i) => t - hits[i]);
+  assert.ok(hits.length >= 2 && gaps.every((g) => g >= 3 * TICK_HZ), `after its punch lands it leaves that kid alone 3 s (hits at ${hits})`);
+}
+{
+  // a kid with a donut 3 away that it never reaches: chased 4 s, left 3 s, then chased again
+  const shelf = { team: 'badGuys', x: 8.5, y: 0, z: -1.7, donuts: [] };
+  const at = { team: 'badGuys', carrying: null, move: 'walk', respawn: 0, onGround: true, x: 0, y: 0, z: 0, facing: 0, width: 0.75, height: 0.97 };
+  const cpu = createCpu('cpu1', 4), sent = [];
+  for (let t = 0; t < 12 * TICK_HZ; t++) {
+    const input = cpu.input(/** @type {any} */ ({ tick: t, phase: 'play', over: false, bricks: [], hits: [], shelves: [shelf],
+      fighters: [{ ...at, id: 'cpu1' }, { ...at, id: 'kid', team: 'heroes', x: -3, carrying: kid.look, width: 0.45, height: 0.9 }] }));
+    if (input.target) sent.push([t, input.target.thing]);
+    assert.equal(input.punch, false, 'out of reach, it never punches');
+  }
+  assert.deepEqual(sent, [[REACT_TICKS, 'fighter'], [4 * TICK_HZ + REACT_TICKS, 'shelf'], [7 * TICK_HZ + REACT_TICKS, 'fighter'], [11 * TICK_HZ + REACT_TICKS, 'shelf']],
+    'it gives up after 4 s, and takes the chase up again 3 s later');
+  const two = createCpu('cpu1'), early = [];
+  for (let t = 0; t < 2 * REACT_TICKS; t++) early.push(two.input(/** @type {any} */ ({ tick: t, phase: 'play', over: false, bricks: [], hits: [], shelves: [shelf],
+    fighters: [{ ...at, id: 'cpu1' }, { ...at, id: 'kid', team: 'heroes', x: -3, carrying: kid.look }] })).target?.thing);
+  assert.equal(early.find(Boolean), 'shelf', 'before level 4 it never chases');
+}
+{
+  // half a kid's speed: the raid still steals and banks at a fair pace
+  let fastest = 0, stole = -1, banked = -1;
+  play(chase.stage, ROUND_SECONDS, (s) => {
+    const f = me(s);
+    if (f.onGround) fastest = Math.max(fastest, Math.hypot(f.vx, f.vz));
+    if (stole < 0 && steals(s)) stole = s.tick;
+    if (banked < 0 && banks(s)) banked = s.tick;
+    return banked >= 0;
+  }, () => null, matchOptions(chase), kid, 4);
+  assert.ok(fastest <= 0.5 * WALK_SPEED + 1e-9, `level 4's raider walks at half a kid's speed (${fastest.toFixed(2)})`);
+  assert.ok(stole > 0 && stole < 20 * TICK_HZ && banked > stole && banked < 40 * TICK_HZ, `and steals and banks well within the round (stole ${stole}, banked ${banked})`);
 }
 
 console.log('cpu ok');

@@ -37,6 +37,12 @@ export const BAGS = Object.freeze(['backpack', 'drawstring bag', 'crossbody pouc
 export const TEXTURES = Object.freeze(['stockinette', 'rib', 'garter', 'cable', 'single crochet', 'waffle', 'lace']);
 // REUSE-SPEC.md §Costumes: one of these, in the `gloves` colour
 export const HANDS = Object.freeze(['gloves', 'sword', 'scythe']);
+// their 48×48 icons, for the chooser and the end card's new-item button
+export const HAND_ICON = Object.freeze({
+  gloves: '<path d="M14 24c0-10 5-15 13-15s12 6 12 14c0 6-3 10-7 12H20c-4-2-6-6-6-11Z"/><ellipse cx="13" cy="25" rx="5" ry="7"/><rect x="17" y="36" width="18" height="8" rx="3"/>',
+  sword: '<g transform="rotate(35 24 24)"><path d="M20 30V9a4 4 0 0 1 8 0v21Z"/><rect x="11" y="29" width="26" height="6" rx="3"/><rect x="21" y="35" width="6" height="7" rx="2"/><circle cx="24" cy="44" r="3.5"/><path d="M20 14l8 4M20 21l8 4" stroke="#fff" stroke-width="2.5" opacity=".7"/></g>',
+  scythe: '<g transform="rotate(35 24 24)"><rect x="22" y="12" width="4" height="27" rx="2"/><path d="M24 2l5 11h-10Z"/><path d="M24 37l2.4 4.6 5 .6-3.7 3.4 1 5-4.7-2.5-4.7 2.5 1-5-3.7-3.4 5-.6Z"/><path d="M24 11c10 0 17 10 16 23-4-8-9-14-16-16Z" fill="#2f6bff"/></g>',
+});
 // what flies off the hitting glove or the blade's tip as it lands; tapping the picked one goes to the next. The scythe's is fixed.
 export const TRICKS = Object.freeze({
   gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame']), sword: Object.freeze(['sparkle', 'bubble', 'flame']), scythe: Object.freeze(['music']),
@@ -45,6 +51,8 @@ export const TRICKS = Object.freeze({
 const UNLOCK = Object.freeze({ sword: 1, scythe: 2 });
 /** The hands the chooser offers a player who has beaten `beaten` levels. */
 export const handsFor = (beaten) => HANDS.filter((h) => (UNLOCK[h] ?? 0) <= beaten);
+/** The hands that are new to a player who had beaten `before` levels and now has `after` (REUSE-SPEC.md §After the lobby). */
+export const newHands = (before, after) => handsFor(after).filter((h) => !handsFor(before).includes(h));
 
 // spinoff/REUSE-SPEC.md §Bad guys: grey fur, black and dark purple, reserved from the kids' swatches
 export function isBadGuyCloth(hex) {

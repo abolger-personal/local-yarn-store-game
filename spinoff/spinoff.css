@@ -131,6 +131,9 @@ body.play #stage canvas { touch-action: none; }
 .end .again { grid-column: 1 / -1; display: flex; justify-content: center; gap: 48px; }
 .end .again button { width: min(112px, 15vmin); height: min(112px, 15vmin); border-width: 5px; }
 .end .again .emoji { font-size: min(58px, 8vmin); }
+.end .again button.fresh { width: auto; display: flex; gap: min(6px, 1vmin); padding: 0 min(24px, 3vmin); border-radius: min(56px, 7.5vmin); border-color: var(--ring); animation: bounce 900ms ease-in-out infinite; }
+.end .again .fresh svg { width: min(72px, 10vmin); height: min(72px, 10vmin); filter: drop-shadow(0 0 1.2px rgba(74, 58, 48, .75)); }
+@keyframes bounce { 50% { transform: translateY(-10%) scale(1.06); } }
 .end .code { grid-column: 1 / -1; justify-content: center; gap: min(6px, 1vmin); font-size: min(36px, 5vmin); min-height: 0; }
 .end .code:empty { display: none; }
 .end .code span { width: min(52px, 7.5vmin); height: min(52px, 7.5vmin); border-radius: min(14px, 2vmin); }

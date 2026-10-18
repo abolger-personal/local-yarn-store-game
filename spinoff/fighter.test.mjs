@@ -4,7 +4,7 @@ import { POSES, applyPose, setGeometryDetail } from '../characters/npc.js';
 import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import {
-  BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, buildFighter, disposeFighter, gloveAnchors, handsFor, isBadGuyCloth, isBadGuyFur, nearestSwatch,
+  BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, buildFighter, disposeFighter, gloveAnchors, handsFor, newHands, isBadGuyCloth, isBadGuyFur, nearestSwatch,
   IDLE, SHOW_OFF, entrantOf, newFighter, randomFighter, readFighter, seatDrop, setFur, showOffTrick, stepFighter, wobbleAt, wobbleHz,
 } from './fighter.js';
 import { wingShape } from '../characters/owl.js';
@@ -235,6 +235,7 @@ for (const species of SPECIES) {
   assert.equal(look('sword'), 'sword', 'a sword reads back');
   for (const junk of [undefined, null, 'axe', 3]) assert.equal(look(junk), 'gloves', `an old save or a junk ${junk} gets gloves`);
   assert.deepEqual([0, 1, 2].map(handsFor), [['gloves'], ['gloves', 'sword'], ['gloves', 'sword', 'scythe']], 'the sword after level 1, the scythe after level 2');
+  assert.deepEqual([[0, 1], [1, 2], [2, 2], [0, 2]].map(([b, a]) => newHands(b, a)), [['sword'], ['scythe'], [], ['sword', 'scythe']], 'the end card names only what this win unlocked');
   const { hands, trick } = readFighter({ species: 'lion', params: {}, look: { hands: 'scythe', trick: 'flame' } }).look;
   assert.deepEqual([hands, trick], ['scythe', 'music'], 'a scythe reads back, always with its music');
   for (const species of SPECIES) {

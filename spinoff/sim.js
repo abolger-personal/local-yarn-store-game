@@ -40,7 +40,7 @@ const OFF_SEARCH = 8;
 const REPLAN_TICKS = 10;
 const STUCK_TICKS = 20;
 const MAX_FAILS = 2;
-/** Blocked is a pause, never for good (playtest): a fighter that gave up on its way tries again this often. */
+/** Blocked is a pause, never for good (playtest): a fighter that gave up on its way (stuck, not walled off: a broken wall replans) tries again this often. */
 const RETRY_TICKS = 2 * TICK_HZ;
 const FOLLOW_GAP = 0.15;
 const BRICK_GAP = 0.1;
@@ -446,13 +446,13 @@ function plan(s, f) {
     if (supportAt(s.solids, p.x, p.z, p.y) === w.y) Object.assign(w, { x: p.x, z: p.z });
   }
   f.nav = { goal: { x: goal.x, y: goal.y, z: goal.z }, wps: pull(g, f, wps), k: 0, done: false, failed: false,
-    blocked: !found.reached, at: s.tick, bricks: s.brickKey, end: null };
+    blocked: !found.reached, gaveUp: f.fails >= MAX_FAILS, at: s.tick, bricks: s.brickKey, end: null };
 }
 
 function stale(s, f) {
   const n = f.nav;
   if (!n || n.failed) return true;
-  if (n.bricks !== s.brickKey || (n.blocked && s.tick - n.at >= RETRY_TICKS)) { f.fails = 0; return true; }
+  if (n.bricks !== s.brickKey || (n.gaveUp && s.tick - n.at >= RETRY_TICKS)) { f.fails = 0; return true; }
   const moved = flat(n.goal, f.dest) > CELL || Math.abs(n.goal.y - f.dest.y) > STEP;
   const pushed = n.done && (flat(f, n.end) > WP_ARRIVE || Math.abs(f.y - n.end.y) > STEP);
   return pushed || (moved && s.tick - n.at >= REPLAN_TICKS);

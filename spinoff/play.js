@@ -5,11 +5,11 @@ import { attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
 import { countStrike, landHit, newCombo, strikerOf } from './punches.js';
 import { KICK_COMBO, shownStrike, strikeOf } from './kicks.js';
-import { BAD_DONUT, BAD_GUY_FUR, MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
+import { BAD_DONUT, BAD_GUY_FUR, HAND_ICON, MOVE_POSES, buildFighter, entrantOf, loadFighter, newFighter, newHands, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
 import { BRICK, SHELF, SHELF_WIDTH, TICK_HZ, groundOf } from './match.js';
 import { levelBefore, levelFor, matchOptions } from './levels.js';
-import { outcomeOf, recordOutcome } from './progress.js';
+import { loadProgress, outcomeOf, recordOutcome } from './progress.js';
 import { facedCell, fortGrid } from './build.js';
 import { makeStage } from './stage.js';
 import { SHELF_WOOD, THEMES } from './scenery.js';
@@ -495,10 +495,33 @@ function endPicture(e) {
 // What ▶️ on the end card plays: this level again, or after a win the next one (REUSE-SPEC.md §After the lobby)
 let nextSearch = location.search.slice(1);
 
+const goTo = (href) => () => { location.href = href; };
+
+// REUSE-SPEC.md §After the lobby, A new item says so: its icon in this player's gloves colour, ✨ and ✏️ as one bouncing button
+/** @param {HTMLElement} b @param {string[]} items */
+function freshLook(b, items) {
+  b.classList.add('fresh');
+  b.setAttribute('aria-label', `new: ${items.join(' and ')}, change my fighter`);
+  b.innerHTML = `${items.map((h) => `<svg viewBox="0 0 48 48" fill="currentColor" style="color:${mine?.look.gloves}" aria-hidden="true">${HAND_ICON[h]}</svg>`).join('')}<span class="emoji">✨✏️</span>`;
+}
+
+/** @param {string[]} items */
+function showFresh(items) {
+  const b = document.createElement('button');
+  freshLook(b, items);
+  b.addEventListener('click', (e) => { e.stopPropagation(); goTo('choose.html')(); });
+  document.querySelector('#score .again').append(b);
+  freshLook(document.getElementById('edit'), items);
+}
+
 /** @param {import('./match.js').Team|null} winner */
 function progress(winner) {
   const o = outcomeOf(level.theme, level.number ?? 0, winner);
-  if (fighters.get(ME)?.team === 'heroes') recordOutcome(level.theme, o);
+  if (fighters.get(ME)?.team === 'heroes') {
+    const before = loadProgress().beaten, fresh = newHands(before, Math.max(before, o.beaten));
+    recordOutcome(level.theme, o);
+    if (fresh.length) showFresh(fresh);
+  }
   if (!o.next) return;
   const q = new URLSearchParams(location.search);
   q.set('stage', level.theme);
@@ -607,7 +630,6 @@ async function play() {
   document.getElementById('wait').hidden = true;
 }
 
-const goTo = (href) => () => { location.href = href; };
 document.getElementById('leave').addEventListener('click', bye);
 // The score first; a tap on it brings up what's next: play again or leave, and the room code for a late friend.
 document.getElementById('score').addEventListener('click', () => {

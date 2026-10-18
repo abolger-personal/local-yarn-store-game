@@ -205,7 +205,8 @@ function squeezeAt(s, x, z, top, body) {
  *  how high a jump from it rises (a trampoline's launch, or the stage's jump); and which trampoline it is on or next to (index + 1, else 0). */
 function buildGrid(s, body) {
   const { nx, nz } = s.band, size = nx * nz;
-  const g = { ...s.band, top: new Float64Array(size), kind: new Uint8Array(size), squeeze: new Float64Array(size), up: new Float64Array(size), spring: new Uint8Array(size), jumpUp: s.jump.up };
+  const g = { ...s.band, top: new Float64Array(size), kind: new Uint8Array(size), squeeze: new Float64Array(size), up: new Float64Array(size), spring: new Uint8Array(size), jumpUp: s.jump.up,
+    again: s.rules.doubleJump ? s.jump.up : 0 };
   for (let n = 0; n < size; n++) {
     const p = { x: cellX(g, n), y: supportAt(s.floorBoxes, cellX(g, n), cellZ(g, n), Infinity), z: cellZ(g, n) };
     g.top[n] = p.y;
@@ -223,9 +224,12 @@ function navGrid(s, f) {
   return s.grids.get(key);
 }
 
+/** The highest a route climbs from cell a: a jump (or trampoline launch), and on a level with double jumps (REUSE-SPEC.md §Forts, Level 3) another on top. */
+const climbFrom = (g, a) => g.up[a] + g.again;
+
 function stepCost(g, a, b, len) {
   const hopping = g.kind[b] === HOP && g.kind[a] !== HOP, rise = g.top[b] - g.top[a];
-  if (g.kind[b] === BLOCKED || rise + (hopping ? BRICK : 0) > g.up[a]) return Infinity;
+  if (g.kind[b] === BLOCKED || rise + (hopping ? BRICK : 0) > climbFrom(g, a)) return Infinity;
   const hop = (hopping ? HOP_COST : 0) + (g.spring[b] && !g.spring[a] ? HOP_COST : 0);
   const climb = (rise > STEP ? JUMP_COST : 0) + (rise < -STEP ? DROP_COST : 0);
   const soft = g.kind[b] === SOFT ? SOFT_COST + (DEEP_COST * Math.max(0, g.squeeze[b] - CELL)) / CELL : 1;
@@ -332,7 +336,8 @@ function waypoints(g, cells) {
     const n = cells[i];
     if (g.kind[n] === HOP) { hopped = true; continue; }
     const a = cells[i - 1], up = g.top[n] > (out.at(-1)?.y ?? g.top[cells[0]]) + STEP;
-    out.push({ x: cellX(g, n), y: g.top[n], z: cellZ(g, n), jump: hopped || up, spring: up && g.up[a] > g.jumpUp ? g.spring[a] - 1 : -1 });
+    out.push({ x: cellX(g, n), y: g.top[n], z: cellZ(g, n), jump: hopped || up, spring: up && g.up[a] > g.jumpUp ? g.spring[a] - 1 : -1,
+      double: g.top[n] - g.top[a] > g.up[a] });
     hopped = false;
   }
   return out;
@@ -611,6 +616,8 @@ function airStep(s, f) {
     f.vz = (to.z - f.z) * v;
   }
   if (f.attack?.id === 'stomp') f.vy = Math.min(f.vy, -MOVES.stomp.dive);
+  // a route's double jump: the mid-air jump at the top of the first
+  if (f.navJump?.double && f.vy <= 0 && f.jumps > 0) { f.jumps--; f.vy = s.jump.speed; }
   f.vy -= GRAVITY * DT;
   slide(s, f, f.vx * DT, f.vz * DT);
   const prevY = f.y;
@@ -677,8 +684,12 @@ const walled = (s, f) => s.bricks.some((b) => b.team === f.team && b.y < f.y + f
 /** A guard at its shelf, or a kid standing still in a wall, isn't shoved by a fighter walking into it. */
 const holds = (s, f) => guarding(s, f) || (f.team === 'heroes' && f.onGround && !f.walkTo && walled(s, f));
 
-/** Pushed back by a fighter that `held` its ground counts against a walker's progress, so walking into one is getting stuck; a bump isn't. */
+/**
+ * Pushed back by a fighter that `held` its ground counts against a walker's progress, so walking into one is getting stuck; a bump isn't.
+ * A bump never shoves a fighter standing on a top off its edge: only a hit's knockback does (REUSE-SPEC.md §Forts, Level 3).
+ */
 function shove(s, f, px, pz, held) {
+  if (f.onGround && supportAt(s.solids, f.x + px, f.z + pz, f.y) < f.y - STEP) return;
   const w = f.walkTo, d = w ? flat(f, w) : 0;
   if (held && d > EPS) f.gain += (px * (w.x - f.x) + pz * (w.z - f.z)) / d;
   f.x += px;

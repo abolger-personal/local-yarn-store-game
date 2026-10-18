@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, ROUND_SECONDS, TICK_HZ, outside } from './match.js';
 import { STAGES, TUTORIAL } from './levels.js';
+import { MATCH } from './roster.js';
 import { CALM_DRAIN, CALM_TICKS, DUMMY, RESPAWN_WAIT, SPRING_LIFT, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
 import { BOUNCE } from './generate.js';
 
@@ -578,6 +579,31 @@ for (const [from, at] of [['the front', { x: -3, z: 1.6 }], ['the right', { x: -
   const there = (snap) => Math.hypot(me(snap).x - to.x, me(snap).z - to.z) < 0.05;
   assert.ok(!there(run(m, 30)), 'having given up, it waits');
   assert.ok(there(run(m, 4 * TICK_HZ)), 'then tries again and gets there');
+}
+
+// REUSE-SPEC.md §Forts, Level 3: on a level with double jumps, a tap on a top only a double jump reaches gets you there
+{
+  const TALL = { kind: 'deck', x0: 3, x1: 4.2, z0: -1, z1: 1, y: 2.2 }, stage = { ...STAGE, floors: [...STAGE.floors, TALL] };
+  const onTop = (match) => {
+    const m = createMatch([hero], stage, { match }), k = m.fighters[0];
+    Object.assign(k, { x: 1.8, z: 0, y: 0 });
+    let doubled = false;
+    run(m, 6 * TICK_HZ, (_, i) => (i === 0 ? say({ target: { x: 3.6, z: 0, y: TALL.y } }) : {}), () => { if (!k.onGround && k.jumps === 0) doubled = true; });
+    return { up: k.onGround && k.y === TALL.y, doubled };
+  };
+  assert.deepEqual(onTop(MATCH), { up: false, doubled: false }, 'a single jump can\'t get up there');
+  assert.deepEqual(onTop({ ...MATCH, doubleJump: true }), { up: true, doubled: true }, 'with double jumps, the route double jumps up');
+}
+
+// A bump never shoves a fighter standing on a top off its edge; only a hit's knockback does (REUSE-SPEC.md §Forts, Level 3)
+{
+  const m = createMatch([hero, dummy], STAGE), deck = STAGE.floors.find((f) => f.kind === 'deck' && f.x0 < 0);
+  const [kid, bad] = m.fighters;
+  // overlapping, so pushing them apart would shove it over the front edge
+  Object.assign(bad, { x: -7.5, z: deck.z1 - 0.05, y: deck.y, onGround: true });
+  Object.assign(kid, { x: -7.5, z: deck.z1 - 0.35, y: deck.y, onGround: true });
+  run(m, TICK_HZ);
+  assert.equal(bad.y, deck.y, 'bumped at the deck\'s edge, it stays up');
 }
 
 console.log('sim ok');

@@ -632,7 +632,8 @@ and smashers each get a round that is theirs.
   - **Level 3 has the difficulty modifier** (decided 2026-10-17; Handicap: a saved, golf-style handicap).
   - **Tapping the floor walks you down off a stack on purpose** (decided 2026-10-17): choosing to get
     down isn't falling.
-  - **Hand-made, like levels 1 and 2** (decided 2026-10-17): see The breakfast stage is the tutorial stage.
+  - **Hand-made, like levels 1 and 2** (decided 2026-10-17); only the last breakfast level is generated
+    (The breakfast stage is the tutorial stage).
 - **Start spots come first** (decided 2026-10-17). Step 1 of making any level, hand-made or
   generated, on every stage: pick pseudo-random start spots for up to 6 heroes,
   each with room for the hero and their block pile beside them, and reserve them, so nothing
@@ -674,9 +675,10 @@ and smashers each get a round that is theirs.
   (Level 2, above), and a broken block is gone for the rest of the match. A
   match is short (90 s to start), so that's fine: this is short-term strategy, not a long siege.
   Revisit only if a playtest shows kids upset at their wall being gone.
-- **The breakfast stage is the tutorial stage** (decided 2026-10-17). Its levels are all hand-made,
-  never generated (amended 2026-10-17: level 3 too); the generated levels (`GENERATED-LEVELS.md`) are
-  for the other stages. The tutorial levels all play
+- **The breakfast stage is the tutorial stage** (decided 2026-10-17). Its levels are hand-made (amended
+  2026-10-17: level 3 too), except the very last breakfast level, which is generated so players meet the
+  idea before the other stages, where levels are generated (`GENERATED-LEVELS.md`). The generator keeps
+  making breakfast layouts for that. The tutorial levels all play
   on breakfast (`LEVELS.breakfast`: level 1 breaking in, level 2 building and defending; the goody
   and tool levels aren't made yet), and between them they teach every basic mechanic once: breaking in, building,
   defending, and earning a goody and using a tool. They don't need every goody or tool, only one

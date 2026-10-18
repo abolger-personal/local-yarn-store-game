@@ -8,6 +8,11 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **You'll know when you've won something new.** Beat a level that unlocks a sword or the scythe and a
   bouncing button pops up on the score card with the new thing, ✨ and ✏️ on it. Tap it to go and dress up.
 
+### Levels
+- **Level 4: the bad guy fights back.** Beat level 3 and level 4 opens: a flat level where each team's
+  shelf sits near the edge of the stage. There's still only one bad guy, but it's faster now, and if you
+  run past it with a donut it chases you and punches. Get punched near the edge and you'll fly off!
+
 ### Dress up
 - **The Greathammer.** Beat level 4 and a fourth choice shows up: a huge, grim, grey-and-black hammer that
   looks like it wandered in from a much scarier game. It swings like the sword. Hold 🥊 and a see-through

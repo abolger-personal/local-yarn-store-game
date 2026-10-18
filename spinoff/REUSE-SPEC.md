@@ -673,6 +673,11 @@ and smashers each get a round that is theirs.
   - **Half a kid's speed, all level** (decided 2026-10-18). At level 3's fifth it could never catch anyone. It
     isn't faster only while chasing, since the sim can't know a CPU's mode (it sends what a tablet sends), so
     `badGuyPace` 0.5 is the level's; `cpu.test.mjs` checks the raid still steals and banks at a fair pace.
+  - **Built** (2026-10-18, `CHASE` in `levels.js`, chase in `cpu.js`): chasing is from level 4 on (`createCpu` takes
+    the level number), so levels 2 and 3 play as before. Giving up after 4 s starts the same 3 s leave-alone as a
+    landed punch, or it would pick the same kid straight back up. A punch lands on a kid at no damage, since the
+    leave-alone outlasts the drain (decided 2026-10-18, user: as is; chasing on is a future difficulty modifier,
+    Handicap). Raid on level 4: steals about 9 s in, banks about 18 s (level 2: 22 s, 47 s); watch it in the playtest.
   - **Beating it unlocks the Greathammer** (decided 2026-10-18; Costumes).
 - **Start spots come first** (decided 2026-10-17). Step 1 of making any level, hand-made or
   generated, on every stage: pick pseudo-random start spots for up to 6 heroes,
@@ -877,6 +882,10 @@ window keeps up).
   highest handicap), and so is how often it hits. Chosen over a speed that follows whichever kid is
   nearest, which would flicker between two kids, can be gamed by standing beside the youngest, and
   reads as random.
+- **A harder bad guy keeps chasing after a hit** (brainstorm 2026-10-18, user, a future difficulty modifier). Level 4's
+  chaser lets go once its punch lands, since the dropped donut ends the chase, then leaves that kid alone 3 s, so the
+  damage drains away first (`CALM_TICKS`) and punches never add up to a ring-out; only a punch near an edge rings a kid
+  out. A low handicap could keep it on the same kid after the hit for the rest of the chase, so the punches build up.
 
 - **It goes both ways** (decided 2026-10-17). A handicap of 0 is the game as tuned today, which a
   four-year-old beat level 2 in about five tries. Losing makes it easier; winning big (a negative,
@@ -1375,14 +1384,16 @@ like that keeps the big cape a choice rather than a handicap.
     the path grows from small (about 2 long) to its biggest (about 8) at 2.5 s. You aim by facing (walk the way
     you want to throw). Letting go once the path shows throws at the size shown (`Input.throw`, 0 to 1, clamped
     by the host and ignored unless you hold a hammer that's in your hand); letting go sooner was only the punch.
-  - **It flies a boomerang oval** (decided 2026-10-18): flat, at chest height, the long side along your
+  - **It flies a boomerang oval** (decided 2026-10-18; built `spinoff/hammer.js` 2026-10-18, starting from the
+    fighter's middle at punch height rather than the glove, and drifting toward where the hand is now): flat, at chest height, the long side along your
     facing, curving toward the camera and back, 0.35 as wide as it is long, kept inside the stage band, at a
     steady 8 a second, ending back in your hand even if you've moved. The preview and the flight are one
     function (`hammerPath`), so it flies exactly the path you saw. Harder to master than a punch, on purpose.
   - **A hit sends it home** (decided 2026-10-18). The first bad guy or bad-guy block it touches takes a
     kick's damage and knockback, pushed the way the hammer was flying, with the usual hit and sprinkles (no
     new animation); then the hammer is back in your hand at once. A full lap with no hit also ends in your hand.
-    Rung out mid-flight, it's back at once. While it's away, 🥊 punches with bare gloves and holding does nothing.
+    Rung out mid-flight, it's back at once. While it's away, 🥊 still punches (the held hammer is only hidden, not
+    swapped for gloves) and holding does nothing.
   - **Only kids who unlocked it can throw** (accepted 2026-10-18, user): each tablet keeps its own progress, so
     at a playdate some kids have it and some don't. That's fine.
 - **Tricks: tap the picked gloves or sword again** (decided 2026-10-17), the way a hat changes stitch.

@@ -611,6 +611,23 @@ and smashers each get a round that is theirs.
     body (a lion in a cape is 0.75 wide: measured from its middle, it could never get near enough
     to hop onto a deck, and stood stuck in front of one). Any slower and it can't make the hop. The raider steals around 25 s and banks
     around 50 s of a 90 s round; `spinoff/cpu.test.mjs` checks the speeds and both.
+- **Level 3: the jumping level** (planned 2026-10-17, after kids beat level 2). Its lesson is double
+  jumps, so the field is pancake stacks you jump between. One new idea per level: the shelves stay one
+  per team where they are (splitting them into several places is for later, brainstorm 2026-10-17:
+  it spreads the bad guys and teaches choosing, but adds rules, shelves off-screen and thinner walls).
+  - **Double jumps both ways** (decided 2026-10-17). Tapping a stack only a double jump reaches makes
+    the route double jump on its own, for kids and bad guys; a tap above your fighter in the air is
+    still a double jump by hand. A few optional spots may need the hand double jump.
+  - **The stacks are scenery nobody can break** (decided 2026-10-17), like the pancake hill in the
+    middle of level 1: floors in the level's data, not blocks. Jumping onto blocks that break is its
+    own lesson on a later level, probably level 4 (brainstorm 2026-10-17; Blocks make stairs is
+    the planned way to stand on them).
+  - **You only end up in a gap if a bad guy knocks you there** (decided 2026-10-17): the route only
+    plans jumps that land, a double jump by hand goes straight up and lands where it started, and a
+    bump never shoves a fighter off a stack, only a hit's knockback.
+  - Open questions: what's at the bottom of a gap (floor you climb back from, or a ring-out hole);
+    whether tapping the floor below walks you down off a stack on purpose; whether level 3 gets the
+    difficulty modifier (Handicap) now; two CPU bad guys from level 3 (Bad guys) as well.
 - **Start spots come first** (decided 2026-10-17). Step 1 of making any level, hand-made or
   generated, on every stage: pick pseudo-random start spots for up to 6 heroes,
   each with room for the hero and their block pile beside them, and reserve them, so nothing

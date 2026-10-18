@@ -5,7 +5,7 @@ import { groundOf } from './match.js';
  * `short`..`long`: the oval's length at k 0 and 1, `wide` its width for its length; `speed` a second along it; `chest` the
  * height it flies at, for the thrower's height; `r` the head's hit radius. 🥊 held `aim` seconds shows the path, full size at `full`.
  */
-export const HAMMER = Object.freeze({ short: 2, long: 8, wide: 0.35, speed: 8, chest: 0.6, r: 0.25, aim: 0.4, full: 2.5 });
+export const HAMMER = Object.freeze({ short: 2, long: 8, wide: 0.35, speed: 8, chest: 0.6, r: 0.35, aim: 0.4, full: 2.5 });
 const SEG = 64;
 
 /** The path's size for 🥊 held `held` seconds, or null before the path shows. */

@@ -11,6 +11,7 @@ import '../characters/llama.js';
 import { wingShape } from '../characters/owl.js';
 import { makeSparkle } from '../characters/sparkle.js';
 import { GLOVE, SWORD_MOVES, SWORD_UP, punchLayer, punchWeight, sample } from './punches.js';
+import { HAMMER } from './hammer.js';
 import { kickLayer, kickLunge } from './kicks.js';
 
 export const FIGHTER_KEY = 'lys.fighter.v1';
@@ -345,7 +346,9 @@ export function addScythe(built, color) {
 }
 
 // REUSE-SPEC.md §Costumes: the Greathammer, Dark Souls in a cartoon: a long dark haft with leather wraps, a massive iron block, ember cracks
-const GREATHAMMER = { butt: -0.12, top: 0.5, r: 0.021, head: [0.15, 0.32, 0.18], wraps: [-0.06, 0.02, 0.1, 0.18] };
+// ridiculous on purpose (user: not a carpentry hammer): longer than its wielder is tall, the head wider than their body,
+// and as long as it hits when thrown (HAMMER.r, REUSE-SPEC.md §Things are as big as they look)
+const GREATHAMMER = { butt: -0.16, top: 0.95, r: 0.034, head: [0.4, 2 * HAMMER.r, 0.44], wraps: [-0.08, 0.02, 0.12, 0.22, 0.32] };
 const NOISE = 256;
 /** The knotwork's diagonal spacing in texels, a strand's half-width and the dark gap round it (REUSE-SPEC.md §Costumes). */
 const KNOT = { cell: 32, strand: 5, gap: 2 };
@@ -396,23 +399,32 @@ function ironMaps() {
   return { map: Object.assign(texture(iron), { colorSpace: THREE.SRGBColorSpace }), glow: texture(glow) };
 }
 
-function greathammerGeometry() {
-  if (hammerGeo) return hammerGeo;
-  const { butt, top, r, head: [hx, hy, hz], wraps } = GREATHAMMER, at = top - hz / 2;
-  const haft = new THREE.CylinderGeometry(r, r * 1.15, top - butt, 8).rotateX(Math.PI / 2).translate(0, 0, (top + butt) / 2);
-  const leather = mergeGeometries(wraps.map((z) => new THREE.CylinderGeometry(r * 1.3, r * 1.3, 0.05, 8).rotateX(Math.PI / 2).translate(0, 0, z)));
-  // a forged eight-sided head, flared striking faces, a waist each side of a raised collar; a spike, iron straps and a pommel
-  const L = hy / 2, R = (hx + hz) / 4;
-  const face = (sign) => [[0.8, L], [0.94, L - 0.012], [1, L - 0.03], [0.82, L - 0.07]].map(([k, y]) => [k * R, sign * y]);
-  const profile = [...face(-1), [0.84 * R, -0.03], [1.08 * R, -0.022], [1.08 * R, 0.022], [0.84 * R, 0.03], ...face(1).reverse()];
-  const head = mergeGeometries([
+const spike = (r0, h, [x, y, z], turn) => new THREE.ConeGeometry(r0, h, 4)
+  .applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(...turn)).setPosition(x, y, z));
+
+/** A forged eight-sided head, flared striking faces, a waist each side of a raised collar, spiked all over; iron straps and a spiked pommel. */
+function greathammerIron() {
+  const { butt, top, r, head: [hx, hy, hz] } = GREATHAMMER, at = top - hz / 2, L = hy / 2, R = (hx + hz) / 4;
+  const face = (sign) => [[0.8, 1], [0.94, 0.92], [1, 0.81], [0.82, 0.56]].map(([k, y]) => [k * R, sign * y * L]);
+  const profile = [...face(-1), [0.84 * R, -0.19 * L], [1.08 * R, -0.14 * L], [1.08 * R, 0.14 * L], [0.84 * R, 0.19 * L], ...face(1).reverse()];
+  return mergeGeometries([
     new THREE.LatheGeometry([[0, -L], ...profile, [0, L]].map(([x, y]) => new THREE.Vector2(x, y)), 8, Math.PI / 8).translate(0, 0, at),
-    new THREE.ConeGeometry(R * 0.32, 0.13, 4).rotateX(Math.PI / 2).translate(0, 0, at + R + 0.05),
-    ...[-1, 1].map((side) => new THREE.BoxGeometry(0.007, r * 2.2, 0.15).translate(side * r * 1.08, 0, at - R - 0.06)),
+    spike(R * 0.3, 0.34, [0, 0, at + R + 0.15], [Math.PI / 2, 0, 0]),
+    ...[-1, 1].map((side) => spike(R * 0.34, 0.2, [0, side * (L + 0.09), at], [0, 0, side < 0 ? Math.PI : 0])),
+    ...[-1, 1].map((side) => spike(R * 0.22, 0.18, [side * (1.08 * R + 0.08), 0, at], [0, 0, -side * Math.PI / 2])),
+    spike(r * 1.6, 0.12, [0, 0, butt - 0.1], [-Math.PI / 2, 0, 0]),
+    ...[-1, 1].map((side) => new THREE.BoxGeometry(0.01, r * 2.2, 0.26).translate(side * r * 1.08, 0, at - R - 0.12)),
     new THREE.LatheGeometry([[0, 0], [r * 1.9, 0.004], [r * 2.1, 0.02], [r * 1.4, 0.045], [r, 0.05]].map(([x, y]) => new THREE.Vector2(x, y)), 8)
       .rotateX(Math.PI / 2).translate(0, 0, butt - 0.045),
   ].map((g) => g.toNonIndexed()));
-  hammerGeo = { haft, leather, head, ...ironMaps(), ...swooshGeometry(0.06, top, hy, top - hz) };
+}
+
+function greathammerGeometry() {
+  if (hammerGeo) return hammerGeo;
+  const { butt, top, r, head: [, hy, hz], wraps } = GREATHAMMER;
+  const haft = new THREE.CylinderGeometry(r, r * 1.15, top - butt, 8).rotateX(Math.PI / 2).translate(0, 0, (top + butt) / 2);
+  const leather = mergeGeometries(wraps.map((z) => new THREE.CylinderGeometry(r * 1.3, r * 1.3, 0.05, 8).rotateX(Math.PI / 2).translate(0, 0, z)));
+  hammerGeo = { haft, leather, head: greathammerIron(), ...ironMaps(), ...swooshGeometry(0.06, top, hy, top - hz) };
   return hammerGeo;
 }
 
@@ -736,7 +748,10 @@ function visibleBox(root) {
 export function entrantOf(f, built, who) {
   const { id, team, dummy = false } = who;
   built.root.updateMatrixWorld(true);
+  // REUSE-SPEC.md §Costumes: a held blade isn't body, so a Greathammer held high doesn't make its wielder tall
+  if (built.sword) built.sword.visible = false;
   const size = visibleBox(built.root).getSize(new THREE.Vector3());
+  if (built.sword) built.sword.visible = true;
   const chest = built.chest.getWorldPosition(new THREE.Vector3());
   const tip = ({ parent, at, r }) => parent.localToWorld(new THREE.Vector3(...at)).distanceTo(chest) + r;
   const look = team === 'heroes' ? { dough: HERO_DOUGH, frosting: f.params.bodyColor, stripe: false } : BAD_DONUT;

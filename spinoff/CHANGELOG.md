@@ -23,7 +23,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   run past it with a donut it chases you and punches. Get punched near the edge and you'll fly off!
 
 ### Dress up
-- **The Greathammer.** Beat level 4 and a fourth choice shows up: a huge, grim, grey-and-black hammer that
+- **The Greathammer.** Beat level 4 and a fourth choice shows up: a ridiculously huge, spiked, grey-and-black hammer, bigger than you, that
   looks like it wandered in from a much scarier game: forged, faceted metal engraved with Celtic knots, cracks that glow in the
   colour you pick, and lightning crackling off it when it hits. It swings like the sword. Hold 🥊 and a see-through
   path shows where it will fly; keep holding and the loop gets bigger. Let go and it flies round the loop

@@ -1396,6 +1396,12 @@ like that keeps the big cape a choice rather than a handicap.
     cartoon). No rounded blocks: a forged eight-sided head with flared striking faces, a waist each side of a
     raised collar, a spike on top, iron straps down the haft and an eight-sided pommel. Flat-shaded, mostly metal,
     roughness from the noise, so hard facets catch the room's light like realistic metal, not candy.
+  - **Bigger than its wielder, and spiked** (decided 2026-10-18, user: "still looks like something the character could
+    wield while doing carpentry"; "bigger and more ridiculous", more evil). About 1.6 end to end beside a fighter about
+    0.9 to 1.2 tall, the head wider than their body, with a long spike on top, one out of each striking face, two out of
+    the collar and one at the butt. Thrown, it hits as big as it looks: its head is `HAMMER.r` (0.35) to each face, one
+    number for the drawing and the sim (Things are as big as they look). Held, it isn't body: a fighter's height is
+    measured without the blade in hand, like its width without the outfit, so the hammer changes nobody's size in the sim.
   - **Engraved with Celtic knotwork** (decided 2026-10-18, user: "bonus points … without a performance hit"). A true
     plait, two families of diagonal strands going over and under in turn at every crossing (`knotAt`), drawn into the
     same generated texture the iron already uses for its colour, bumps and roughness. No new material, mesh or draw

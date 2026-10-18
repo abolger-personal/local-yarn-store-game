@@ -1396,6 +1396,11 @@ like that keeps the big cape a choice rather than a handicap.
     cartoon). No rounded blocks: a forged eight-sided head with flared striking faces, a waist each side of a
     raised collar, a spike on top, iron straps down the haft and an eight-sided pommel. Flat-shaded, mostly metal,
     roughness from the noise, so hard facets catch the room's light like realistic metal, not candy.
+  - **Engraved with Celtic knotwork** (decided 2026-10-18, user: "bonus points … without a performance hit"). A true
+    plait, two families of diagonal strands going over and under in turn at every crossing (`knotAt`), drawn into the
+    same generated texture the iron already uses for its colour, bumps and roughness. No new material, mesh or draw
+    call: the texture is 256 square instead of 64, built once on load (about 14 ms), smooth and mipmapped so the
+    knotwork doesn't shimmer as the hammer moves.
   - **Its one trick is lightning** (decided 2026-10-18, user): `look.trick` is always `lightning`, not a choice, like
     the scythe's music: tilted bolts in electric blue with white cores crackle off it as a swing lands.
   - **Held, it is the sword's** (decided 2026-10-18): one-handed, `SWORD_MOVES` (stab, chop, upward stab),

@@ -346,29 +346,53 @@ export function addScythe(built, color) {
 
 // REUSE-SPEC.md §Costumes: the Greathammer, Dark Souls in a cartoon: a long dark haft with leather wraps, a massive iron block, ember cracks
 const GREATHAMMER = { butt: -0.12, top: 0.5, r: 0.021, head: [0.15, 0.32, 0.18], wraps: [-0.06, 0.02, 0.1, 0.18] };
-const NOISE = 64;
+const NOISE = 256;
+/** The knotwork's diagonal spacing in texels, a strand's half-width and the dark gap round it (REUSE-SPEC.md §Costumes). */
+const KNOT = { cell: 32, strand: 5, gap: 2 };
 let hammerGeo = null;
-const texture = (data) => Object.assign(new THREE.DataTexture(data, NOISE, NOISE), { wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping, needsUpdate: true });
+// smooth and mipmapped: a DataTexture's default nearest sampling would shimmer the knotwork on a small, moving hammer
+const texture = (data) => Object.assign(new THREE.DataTexture(data, NOISE, NOISE), { wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping,
+  magFilter: THREE.LinearFilter, minFilter: THREE.LinearMipmapLinearFilter, generateMipmaps: true, needsUpdate: true });
 
-/** A rough iron noise in grey and black, and a glow map black but for its white cracks, tinted by the glow colour; seeded, so every hammer is the same. */
-function ironMaps() {
-  let seed = 7;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const iron = new Uint8Array(NOISE * NOISE * 4), glow = new Uint8Array(NOISE * NOISE * 4);
-  const coarse = Array.from({ length: 9 * 9 }, rnd);
-  for (let y = 0; y < NOISE; y++) for (let x = 0; x < NOISE; x++) {
-    const v = 28 + 40 * coarse[Math.floor(y / 8) * 9 + Math.floor(x / 8)] + 34 * rnd(), i = (y * NOISE + x) * 4;
-    iron.set([v, v, v + 4, 255], i);
-    glow.set([0, 0, 0, 255], i);
+/**
+ * Celtic plaitwork at texel (x, y): two families of diagonal strands, over and under in turn at every crossing.
+ * 1 on a strand, 0 in the dark gap round one, null on the bare iron between. Tiles seamlessly across NOISE.
+ */
+export function knotAt(x, y) {
+  const { cell, strand, gap } = KNOT, off = (n) => { const m = ((n % cell) + cell) % cell; return Math.min(m, cell - m) / Math.SQRT2; };
+  const a = off(x + y), b = off(x - y), aOver = (Math.floor((x + y + cell / 2) / cell) + Math.floor((x - y + cell / 2) / cell)) % 2 === 0;
+  for (const d of aOver ? [a, b] : [b, a]) {
+    if (d < strand) return 1;
+    if (d < strand + gap) return 0;
   }
-  for (let c = 0; c < 5; c++) {
-    let x = rnd() * NOISE, y = rnd() * NOISE, a = rnd() * Math.PI * 2;
-    for (let n = 0; n < 40; n++, a += (rnd() - 0.5) * 1.2, x = (x + Math.cos(a) + NOISE) % NOISE, y = (y + Math.sin(a) + NOISE) % NOISE) {
-      const i = (Math.floor(y) * NOISE + Math.floor(x)) * 4;
+  return null;
+}
+
+/** One wandering crack, two texels wide, black in the iron and white in the glow map. */
+function crack(iron, glow, rnd, S) {
+  let x = rnd() * NOISE, y = rnd() * NOISE, a = rnd() * Math.PI * 2;
+  for (let n = 0; n < 40 * S; n++, a += (rnd() - 0.5) * 1.2 / S, x = (x + Math.cos(a) + NOISE) % NOISE, y = (y + Math.sin(a) + NOISE) % NOISE) {
+    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+      const i = (((Math.floor(y) + dy) % NOISE) * NOISE + ((Math.floor(x) + dx) % NOISE)) * 4;
       iron.set([10, 8, 8], i);
       glow.fill(170 + 85 * rnd(), i, i + 3);
     }
   }
+}
+
+/** Grey-and-black iron noise engraved with knotwork, and a glow map black but for its white cracks, tinted by the glow colour; seeded. */
+function ironMaps() {
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647), S = NOISE / 64;
+  const iron = new Uint8Array(NOISE * NOISE * 4), glow = new Uint8Array(NOISE * NOISE * 4);
+  const coarse = Array.from({ length: 9 * 9 }, rnd);
+  for (let y = 0; y < NOISE; y++) for (let x = 0; x < NOISE; x++) {
+    const k = knotAt(x, y), i = (y * NOISE + x) * 4;
+    const v = (k === 0 ? 8 : 28 + 40 * coarse[Math.floor(y / 8 / S) * 9 + Math.floor(x / 8 / S)] + (k ? 40 : 0)) + 34 * rnd();
+    iron.set([v, v, v + 4, 255], i);
+    glow.set([0, 0, 0, 255], i);
+  }
+  for (let c = 0; c < 5; c++) crack(iron, glow, rnd, S);
   return { map: Object.assign(texture(iron), { colorSpace: THREE.SRGBColorSpace }), glow: texture(glow) };
 }
 

@@ -5,7 +5,7 @@ import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import {
   BAGS, CAPES, CLOTH, FUR, HATS, SPECIES, TEXTURES, buildFighter, disposeFighter, gloveAnchors, handsFor, newHands, isBadGuyCloth, isBadGuyFur, nearestSwatch,
-  IDLE, SHOW_OFF, entrantOf, newFighter, randomFighter, readFighter, seatDrop, setFur, showOffTrick, stepFighter, wobbleAt, wobbleHz,
+  IDLE, SHOW_OFF, entrantOf, knotAt, newFighter, randomFighter, readFighter, seatDrop, setFur, showOffTrick, stepFighter, wobbleAt, wobbleHz,
 } from './fighter.js';
 import { wingShape } from '../characters/owl.js';
 import { floorGrid } from './roster.js';
@@ -358,3 +358,10 @@ for (const [hands, trick] of [['sword', 'sparkle'], ['sword', 'flame'], ['gloves
 }
 
 console.log('fighter ok');
+
+{
+  // REUSE-SPEC.md §Costumes: the Greathammer's knotwork is a true plait, each strand over then under at its crossings
+  const tops = [0, 1, 2, 3, 4, 5].map((n) => knotAt(16 * n + 4, -16 * n - 4));
+  assert.deepEqual(tops, [1, 0, 1, 0, 1, 0], `over, under, over along one strand (${tops})`);
+  assert.ok([0, 64, 200].every((y) => knotAt(0, y) === knotAt(256, y) && knotAt(y, 0) === knotAt(y, 256)), 'and it tiles seamlessly');
+}

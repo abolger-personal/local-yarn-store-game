@@ -1228,14 +1228,15 @@ like that keeps the big cape a choice rather than a handicap.
     cross's and uppercut's places in `COMBO`, with their timing, and have their own sword-arm poses and
     blade angles (`SWORD_MOVES` in `punches.js`). From the side: the **stab** draws the hand back to the
     chest with the blade level, then shoots the arm straight out along the blade, with white speed lines
-    streaking behind it. The **slash** starts with the arm out to the side and the blade pointing back,
-    then sweeps it flat across the front at chest height, with a white fan behind the blade. The **upward
+    streaking behind it. The **slash** is an overhead chop: the arm raises the blade up and back over the
+    head, then swings it down through the front to below level, with a white fan behind the blade (amended
+    2026-10-17, playtest: a flat sweep across the front at chest height read from neither the side-on camera
+    nor the chooser's front view; a chop moves up and down, which both see). The **upward
     stab** crouches with the blade low and level, then thrusts up and forward until the blade points at
     the sky, with the speed lines. The sim is untouched: hit timing, hit spheres and damage are the
     punches', and the reach is measured from the glove spots (`fighter.test.mjs` checks it). The
-    sword does make the body wider (Dress-up can change how you play), so its hits land a little
-    further out and it is a bigger target; kept on purpose (decided 2026-10-17). Only what shows is
-    measured: a hidden swoosh, speed line or trick never makes a fighter bigger.
+    sword doesn't make the body wider: a body is as wide as it is across before it's dressed (A fighter
+    bumps into things where it looks like it would).
   - **A full 360 spin with the sword: a later power move (brainstorm 2026-10-17).** It hits all around
     you, which normal hits don't, so it belongs on the power-bar ladder.
 - **The Music Scythe, a third choice** (decided 2026-10-17 by the designer and Stella, who drew it; the
@@ -1251,8 +1252,7 @@ like that keeps the big cape a choice rather than a handicap.
   - **Both arms hold the pole on every move, for now.** It sits in the right hand like the sword. While a
     move swings, the other arm turns toward the pole, a paw below the right hand (`reachPole`). The arms are
     too short to meet round a round body, so it reaches on its own side, for the spot the side-on camera sees
-    on the pole: from the side both paws are on it; from the front they are either side of it. In a slash the
-    pole turns across the body, out of reach, and the paw is only in line with it. Standing still, the other
+    on the pole: from the side both paws are on it; from the front they are either side of it. Standing still, the other
     paw hangs free.
   - **The sword's moves, exactly** (`SWORD_MOVES`): stab, slash, upward stab, with the sword's blade angles,
     swooshes, timing, reach and hit spheres. No new hit timing or damage. As with the sword, the body is as

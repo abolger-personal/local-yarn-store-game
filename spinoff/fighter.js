@@ -224,7 +224,7 @@ export function removeGloves(built) {
 }
 
 // REUSE-SPEC.md §Costumes: a toy sword, chunky with a rounded tip; along +z, gripped at the origin, flat side to the camera
-const SWORD = { grip: 0.08, guard: 0.2, blade: 0.3, wide: 0.11, thick: 0.036, trail: 1.3 };
+const SWORD = { grip: 0.08, guard: 0.2, blade: 0.3, wide: 0.11, thick: 0.036, trail: 2.2 };
 const WHITE = '#ffffff';
 let swordGeo = null;
 
@@ -245,7 +245,8 @@ function swordGeometry() {
 
 /** A slash's fan from `from` to `to` along the blade, and a stab's speed lines `wide` apart reaching to `reach`. */
 function swooshGeometry(from, to, wide, reach) {
-  const fan = new THREE.RingGeometry(from, to, 12, 1, Math.PI / 2, SWORD.trail).rotateX(Math.PI / 2);
+  // upright behind the blade, from it back up the way a chop came down
+  const fan = new THREE.RingGeometry(from, to, 12, 1, 0, SWORD.trail).rotateY(-Math.PI / 2);
   const line = (y, z0, z1, w) => new THREE.PlaneGeometry(z1 - z0, w).rotateY(-Math.PI / 2).translate(0, y, (z0 + z1) / 2);
   const streak = mergeGeometries([line(wide * 0.8, -0.3, reach, 0.016), line(-wide * 0.8, -0.24, reach - 0.06, 0.016), line(0, -0.36, -0.08, 0.02)]);
   return { fan, streak };

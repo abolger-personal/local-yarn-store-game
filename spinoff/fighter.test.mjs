@@ -257,8 +257,9 @@ for (const species of SPECIES) {
       const lift = [blade('uppercut', 0.14), blade('uppercut', 0.25)];
       assert.ok(stab.every((b) => Math.abs(b.up) < 25 && Math.abs(b.turn) < 45) && stab[1].streak && !stab[1].fan,
         `${species} ${held}: a stab thrusts the blade level and straight ahead, with a streak (${JSON.stringify(stab)})`);
-      assert.ok(slash.every((b) => Math.abs(b.up) < 30) && Math.abs(slash[1].turn - slash[0].turn) > 120 && slash[1].fan && !slash[1].streak,
-        `${species} ${held}: a slash sweeps the blade level across the front, with a fan (${JSON.stringify(slash)})`);
+      // a chop, up and down where the side-on camera and the chooser's front view both see it (playtest: a level sweep read from neither)
+      assert.ok(slash[0].up > 30 && slash[1].up < -30 && Math.abs(slash[1].turn) < 45 && slash[1].fan && !slash[1].streak,
+        `${species} ${held}: a slash chops the blade down from over the head to below level in front, with a fan (${JSON.stringify(slash)})`);
       assert.ok(lift[0].up < 20 && lift[1].up > 60 && lift[1].streak, `${species} ${held}: an upward stab ends pointing at the sky (${JSON.stringify(lift)})`);
       if (held === 'scythe') {
         const { tip, butt } = built.sword.userData, tall = entrant(gloved).height;

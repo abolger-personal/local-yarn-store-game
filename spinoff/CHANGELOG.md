@@ -16,6 +16,9 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   back. Without blocks beside you, it still pushes past.
 
 ### Fixes
+- **The sword and scythe slash is a big chop you can see.** The blade swings up over your head and down
+  in front, with a white swoosh behind it. The old flat swing round the front was hard to see from the side
+  and on the dress-up page.
 - **Punches, kicks and swords move on slower tablets.** They used to jump between a few still poses.
   Now every swing shows as a movement, even if it shows a moment late. On other players' tablets,
   swings move smoothly too.

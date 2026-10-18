@@ -56,11 +56,12 @@ export const SWORD_MOVES = Object.freeze({
     { hit: 0.3, guard: -0.2, hitOut: 0.3, guardOut: 0.4, elbow: 1.7, twist: -0.4, lean: -0.05, up: 0.05 },
     { hit: -1.55, guard: 0.6, hitOut: 0.05, guardOut: 0.5, elbow: 0, twist: 0.7, lean: 0.25, pitch: -0.1, up: -0.05 },
     { hit: -1.5, guard: 0.5, hitOut: 0.05, guardOut: 0.45, elbow: 0.05, twist: 0.6, lean: 0.22, pitch: -0.08, up: -0.05 }),
-  // slash: arm out to the side at chest height, swept flat across the front
+  // slash: an overhead chop, raised up and back over the head, then swung down through the front. A flat sweep across
+  // the front read from neither the side nor the front (playtest): the blade can only swing by `up`, so it slid sideways
   cross: blade(0,
-    { hit: -1.2, guard: -0.2, hitOut: 1.4, guardOut: 0.3, elbow: 0.3, twist: -0.9, up: 0.1 },
-    { hit: -1.45, guard: 0.5, hitOut: -0.3, guardOut: 0.5, elbow: 0.1, twist: 1, lean: 0.25, hip: 0.1, up: 0 },
-    { hit: -1.4, guard: 0.45, hitOut: -0.4, guardOut: 0.45, elbow: 0.15, twist: 0.9, lean: 0.2, up: 0 }),
+    { hit: -2.8, guard: -0.3, hitOut: 0.2, guardOut: 0.35, elbow: 0.5, twist: -0.3, lean: -0.15, pitch: 0.1, up: 2.1 },
+    { hit: -1.3, guard: 0.5, hitOut: 0.1, guardOut: 0.5, elbow: 0, twist: 0.6, lean: 0.35, hip: 0.1, pitch: -0.2, up: -0.6 },
+    { hit: -1.25, guard: 0.45, hitOut: 0.1, guardOut: 0.45, elbow: 0.05, twist: 0.5, lean: 0.3, hip: 0.08, pitch: -0.15, up: -0.5 }),
   // upward stab: crouched with the blade low, then thrust up and forward to point at the sky
   uppercut: blade(1,
     { hit: 0.5, guard: -0.6, hitOut: 0.3, guardOut: 0.3, elbow: 1.3, twist: -0.4, lean: 0.4, knee: 1, hip: 0.5, pitch: 0.15, up: 0.4 },

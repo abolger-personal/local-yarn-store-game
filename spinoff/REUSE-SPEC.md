@@ -822,9 +822,10 @@ it; winning big lowers it. This replaces "not saved, reset every game" in the br
 `help` number and its knobs are still the likely way it takes effect.
 
 **On level 3 it eases the bad guy** (decided 2026-10-17): the handicap sets the CPU bad guy's speed, how
-often it hits and how hard its hits are (damage and knockback). Open: how many games the window holds
-and how a margin maps to those; whether it is per player or per tablet; and, since there is one bad
-guy, whose handicap sets it when kids of different handicaps play together.
+often it hits and how hard its hits are (damage and knockback). **The window is the last 5 games** and
+**every kid has their own handicap** (decided 2026-10-17: kids, and grownups with them, get better
+quickly, so a short window keeps up). Open: how a margin maps to the bad guy's speed and hits; and,
+since there is one bad guy, whose handicap sets it when kids of different handicaps play together.
 
 Players are 4–6 year olds and grownups in the same match (brainstorm 2026-10-13: no `help` in the code yet). Each player has one number, `help`,
 that nobody chooses: the game sets it from how they play (below). Every handicap knob is a straight

@@ -83,8 +83,21 @@ const JUMPING = Object.freeze({ theme: 'breakfast', number: 3, match: Object.fre
   bricks: Object.freeze([]),
 }) });
 
+// REUSE-SPEC.md §Forts, Level 4: the chasing level. Flat floor, each shelf on it near its end (a fight there is near an
+// edge), level 3's low stacks by the back wall in the middle.
+const CHASE_SHELF_X = 8.5;
+/** @type {Level} */
+const CHASE = Object.freeze({ theme: 'breakfast', number: 4, match: Object.freeze({ ...MATCH, doubleJump: true, badGuyPace: 0.5 }), stage: Object.freeze({
+  ...TABLE,
+  floors: Object.freeze([TABLE.floors[0], LOW_STACK, mirrored(LOW_STACK)]),
+  shelves: Object.freeze(TABLE.shelves.map((sh) => ({ ...sh, x: Math.sign(sh.x) * CHASE_SHELF_X, y: 0 }))),
+  puddles: Object.freeze([]),
+  starts: BUILDING.stage.starts,
+  bricks: Object.freeze([]),
+}) });
+
 /** Each stage's levels in order, the dial's numbers (REUSE-SPEC.md §After the lobby). @type {Readonly<Partial<Record<StageName, readonly Level[]>>>} */
-export const LEVELS = Object.freeze({ breakfast: Object.freeze([TUTORIAL, BUILDING, JUMPING]) });
+export const LEVELS = Object.freeze({ breakfast: Object.freeze([TUTORIAL, BUILDING, JUMPING, CHASE]) });
 
 /** Level `n` of a stage, or null if there isn't one. @param {string} name @returns {Level|null} */
 export const levelOf = (name, n) => (Object.hasOwn(LEVELS, name) && LEVELS[name][n - 1]) || null;
@@ -97,9 +110,9 @@ export const matchOptions = (level) => ({ pieces: (level.number ?? 0) >= 2 ? pie
 
 /**
  * REUSE-SPEC.md §Bad guys, the bad-guy team grows level by level: CPU bad guys beside the grownups playing them. Level 1's
- * is the training dummy, levels 2 and 3 have one raider (level 3's knocks you off).
+ * is the training dummy, levels 2 to 4 have one raider (level 3's knocks you off, level 4's chases you).
  */
-export const badGuys = (level, grownups = 0) => (level <= 3 ? 1 : Math.min(8, Math.max(grownups, 1) + level - 1));
+export const badGuys = (level, grownups = 0) => (level <= 4 ? 1 : Math.min(8, Math.max(grownups, 1) + level - 1));
 
 // Cake is spongy, so it goes crazy tall: decks a sponge jump high (too high on breakfast), and a tower in the
 // middle only a trampoline gets you up, from the icing pad at its foot. Each pad is a way up only where it touches the top's edge.

@@ -602,7 +602,7 @@ async function play() {
   await warmUp();
   keepAwake();
   if (net?.guest) guest(controls);
-  else host(api.createMatch(entrants, level.stage, matchOptions(asked)), controls, roster.filter((r) => r.cpu).map((r) => createCpu(r.id)));
+  else host(api.createMatch(entrants, level.stage, matchOptions(asked)), controls, roster.filter((r) => r.cpu).map((r) => createCpu(r.id, asked.number)));
   // play.html shows ⏳ from the start; the first frame is drawn in the same paint that takes it away
   document.getElementById('wait').hidden = true;
 }

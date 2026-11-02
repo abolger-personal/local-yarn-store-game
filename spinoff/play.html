@@ -74,6 +74,12 @@
   }
 }
 </script>
+<!-- 👋 works even if play.js's imports never arrive -->
+<script>document.getElementById('wait-bye').onclick = () => parent.donutRooms.then((r) => { r.leaveAll(); location.href = 'lobby.html'; });</script>
+<!-- A Kindle on a local https server refuses most new connections and retries, and now and then a module request
+     never comes back: no error, the page just waits. play.js not started (no 3D canvas) by then, so load again:
+     the room is the tap page's. -->
+<script>setTimeout(() => { if (!document.querySelector('#stage canvas')) location.reload(); }, 12000);</script>
 <script type="module" src="play.js"></script>
 </body>
 </html>

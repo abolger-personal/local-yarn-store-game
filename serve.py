@@ -58,9 +58,10 @@ class Server(ThreadingHTTPServer):
             try:
                 request = self.tls.wrap_socket(request, server_side=True)
             except ssl.SSLError as e:
-                # a tablet that tapped past the self-signed warning still drops some speculative connections
-                # this way; the page loads over its next one, so it isn't worth a traceback
+                # a Kindle that tapped past the self-signed warning still refuses most new connections this way
+                # and retries; once in a while a module request never comes back from that (play.html reloads)
                 if e.reason in UNTRUSTED:
+                    print(f"{client_address[0]} - - refused the certificate: {e.reason}", file=sys.stderr)
                     return None
                 raise
         return super().finish_request(request, client_address)

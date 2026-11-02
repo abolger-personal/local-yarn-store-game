@@ -317,7 +317,10 @@ scene.add(outline);
 
 /** @param {Snapshot} snap @param {FighterState|undefined} me */
 function drawOutline(snap, me) {
-  const cell = snap.phase === 'build' && me?.block ? facedCell(fortGrid(level.stage, me.team, snap.bricks, snap.piles), me) : null;
+  const carrying = snap.phase === 'build' && Boolean(me?.block);
+  const cell = carrying ? facedCell(fortGrid(level.stage, me.team, snap.bricks, snap.piles), me) : null;
+  // playtest: kids didn't see why a pancake wouldn't go down; outside your area, or at the height limit, ⬇️ isn't there
+  document.getElementById('drop').classList.toggle('cant', carrying && !cell?.ok);
   outline.visible = Boolean(cell);
   if (!cell) return;
   outline.position.set(cell.x + BRICK / 2, cell.y + BRICK / 2, cell.z + BRICK / 2);

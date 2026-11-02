@@ -114,6 +114,8 @@ body.play #stage canvas { touch-action: none; }
 .keys[hidden] { display: none; }
 .keys dt, .keys dd { margin: 0; display: flex; gap: 4px; }
 .keys kbd { font: inherit; min-width: 1.6em; padding: 1px 6px; text-align: center; background: #fff; border: 2px solid #e7d6c1; border-bottom-width: 4px; border-radius: 8px; }
+/* there, but nowhere to put the pancake: hidden in place, so 👍 doesn't slide under a finger */
+.moves #drop.cant { visibility: hidden; }
 .moves button.down { background: #ffd21a; border-color: var(--ring); transform: scale(1.1); }
 /* the build round: 👍 fills a ring while held, and stays green-rimmed once tapped */
 .moves #ready { background: conic-gradient(#ffd21a calc(var(--fill, 0) * 1turn), #fff 0); }

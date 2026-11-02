@@ -23,8 +23,9 @@ export const HOST_GONE_SECONDS = 60;
 // Bricks and shelves (over half the bytes) ride along only for half a second after they change, and every REFRESH-th snapshot.
 export const EVENT_TICKS = TICK_HZ / 2;
 const REFRESH = 15;
-// Guests draw other fighters one to two snapshots back (BEHIND ticks at most), between the two either side.
-const BEHIND = 2 * (TICK_HZ / SNAP_HZ), KEEP = 8;
+// Guests draw every fighter one to four snapshots back (BEHIND ticks at most), between the two either side: a Kindle host's
+// snapshots come unevenly, and with only two of slack a 120 Hz guest froze on a quarter of its frames (playtest: walkers stuttered)
+const BEHIND = 4 * (TICK_HZ / SNAP_HZ), AHEAD = TICK_HZ / SNAP_HZ, KEEP = 8;
 const TEAMS = new Set(['heroes', 'badGuys']), THINGS = new Set(['donut', 'brick', 'fighter', 'pile']), FAR = 1e6;
 const FLAGS = ['away', 'drop', 'ready', 'go'];
 /** @type {import('./match.js').Team} */
@@ -243,7 +244,7 @@ function keep(g, raw) {
 
 function drawn(g, dt) {
   const { tick } = g.buf.at(-1);
-  g.t = Math.min(tick - BEHIND / 2, Math.max(tick - BEHIND, g.t + dt * TICK_HZ));
+  g.t = Math.min(tick - AHEAD, Math.max(tick - BEHIND, g.t + dt * TICK_HZ));
   const out = { ...blend(g.buf, g.t), ...g.fresh };
   g.fresh = noEvents();
   return out;

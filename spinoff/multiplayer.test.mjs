@@ -118,9 +118,9 @@ function play(n, hostInput = IDLE) {
   g1.input({ target: { x: at(before, 'G1').x + 2, z: 0 }, punch: false, kick: false });
   net.flush();
   const walking = play(20), seen = at(drawn.G2, 'G1').x;
-  assert.ok(seen < at(walking, 'G1').x - 0.07 && seen > at(walking, 'G1').x - 0.3, 'other guests draw a walking fighter a snapshot or two behind');
+  assert.ok(seen < at(walking, 'G1').x - 0.07 && seen > at(walking, 'G1').x - 0.5, 'other guests draw a walking fighter a few snapshots behind');
   const own = at(drawn.G1, 'G1').x;
-  assert.ok(own < at(walking, 'G1').x - 0.07 && own > at(walking, 'G1').x - 0.3, 'its own guest draws it smoothly, a snapshot or two behind too');
+  assert.ok(own < at(walking, 'G1').x - 0.07 && own > at(walking, 'G1').x - 0.5, 'its own guest draws it smoothly, a few snapshots behind too');
   const after = play(70);
   assert.ok(at(after, 'G1').x > at(before, 'G1').x + 1.5, 'a guest\'s input moves its fighter on the host');
   assert.ok(Math.abs(at(after, 'G2').x - at(before, 'G2').x) < 0.05, 'and only its own fighter');
@@ -265,6 +265,39 @@ function play(n, hostInput = IDLE) {
   late.arrive('L2');
   lobby.flush();
   assert.deepEqual(heard.L2, ['playing', 'playing'], 'and again if it left and came back');
+}
+
+// A Kindle host draws frames 22-40 ms apart and posts from them; the wifi takes 15-45 ms; a laptop guest draws at 120 Hz.
+// A walking fighter on the guest's screen keeps walking every frame rather than stopping and jumping (playtest).
+{
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const wire = network(), roster = rosterOf('H', newFighter('owl'), new Map([['G1', newFighter('lion')], ['G2', newFighter('llama')]]));
+  const [w1, w2] = ['G1', 'G2'].map((id) => guestOf(wire, id));
+  const h = createHost(wire.link('H'), { ...start, roster }, 'H');
+  wire.flush();
+  await w2.started;
+  const m = createMatch(roster.map((s) => ({ id: s.id, team: s.team, ...BODY, ...(s.dummy && { dummy: true }) })), start.stage);
+  const kid = (snap) => at(snap, 'G1');
+  tick(m, { G1: { ...IDLE, target: { x: kid(snapshot(m)).x + 9, z: 0 } } });
+  const due = [];
+  let now = 0, hostAt = 0, acc = 0, last = null, frames = 0, frozen = 0;
+  for (; now < 2.5; now += 1 / 120) {
+    while (hostAt <= now) {
+      const dt = 0.022 + rnd() * 0.018;
+      hostAt += dt;
+      for (acc += dt; acc >= 1 / TICK_HZ; acc -= 1 / TICK_HZ) { tick(m, { ...h.inputs() }); h.seen(snapshot(m)); }
+      const sent = wire.queue.length;
+      h.post(false, dt);
+      if (wire.queue.length > sent) due.push({ at: hostAt + 0.015 + rnd() * 0.03, msgs: wire.queue.splice(sent) });
+    }
+    for (const d of due.filter((o) => o.at <= now)) { due.splice(due.indexOf(d), 1); for (const msg of d.msgs) msg.run(); }
+    const x = kid(w2.frame(1 / 120) ?? { fighters: [{ id: 'G1', x: NaN }] }).x;
+    if (now > 0.5 && last !== null && kid(snapshot(m)).move === 'walk') { frames++; if (!(x - last > 1e-4)) frozen++; }
+    last = x;
+  }
+  assert.ok(frames > 150 && frozen <= frames * 0.02, `a 120 Hz guest draws a walking fighter moving on ${frames - frozen} of ${frames} frames`);
+  void w1;
 }
 
 console.log('multiplayer: ok');

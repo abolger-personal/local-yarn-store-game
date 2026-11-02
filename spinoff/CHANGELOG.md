@@ -4,36 +4,39 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 
 ## 0.0.6 — 2026-10-18: The Greathammer and the chasing level
 
-### End card
-- **You'll know when you've won something new.** Beat a level that unlocks a sword or the scythe and a
-  bouncing button pops up on the score card with the new thing, ✨ and ✏️ on it. Tap it to go and dress up.
-
-### Donuts
-- **One donut at a time for bad guys.** Knock a bad guy's donut loose and it can't grab a fresh one from your shelf
-  while its dropped one is still on the floor: it goes back to pick it up instead, so kicking it into your shelf no
-  longer spills all your donuts on the floor.
-
-### Building
-- **Pancakes go where you tap.** Carrying a pancake, tap the spot you want it and your fighter walks up next
-  to that spot, facing it, so ⬇️ puts the pancake right where you tapped, not a step past you.
+### Dress up
+- **The Greathammer.** Beat level 4 and a fourth choice shows up: a ridiculously huge, spiked, grey-and-black
+  hammer, bigger than you, that looks like it wandered in from a much scarier game. It's forged, faceted metal
+  engraved with Celtic knots, with cracks that glow in the colour you pick and lightning crackling off it when it
+  hits. It swings like the sword. Hold 🥊 and a see-through path shows where it will fly; keep holding and the
+  loop gets bigger. Let go and it flies round the loop like a boomerang and comes back to your hand. If it hits
+  a bad guy or a bad-guy block on the way, it knocks them flying and is back in your hand straight away.
+- **Play a bad guy! 🥷** Tap 🥷 on the fighter chooser and your fighter turns into a bad guy, in bad-guy grey,
+  black and purple. You still pick your animal, hat, cape, bag and weapon, and a bad guy gets every weapon,
+  Greathammer throw and all. Bad guys only play in a room with heroes: open one with 🏠 or join with 🔑, and you
+  take the bad guy's place. Tap 🥷 again to go back to your own colours.
 
 ### Levels
 - **Level 4: the bad guy fights back.** Beat level 3 and level 4 opens: a flat level where each team's
   shelf sits near the edge of the stage. There's still only one bad guy, but it's faster now, and if you
   run past it with a donut it chases you and punches. Get punched near the edge and you'll fly off!
 
-### Dress up
-- **Play a bad guy! 🥷** Tap 🥷 on the fighter chooser and your fighter turns into a bad guy, in bad-guy grey,
-  black and purple. You still pick your animal, hat, cape, bag and weapon, and a bad guy gets every weapon,
-  Greathammer throw and all.
-  Bad guys only play in a room with heroes: open one with 🏠 or join with 🔑, and you take the bad guy's place.
-  Tap 🥷 again to go back to your own colours.
-- **The Greathammer.** Beat level 4 and a fourth choice shows up: a ridiculously huge, spiked, grey-and-black hammer, bigger than you, that
-  looks like it wandered in from a much scarier game: forged, faceted metal engraved with Celtic knots, cracks that glow in the
-  colour you pick, and lightning crackling off it when it hits. It swings like the sword. Hold 🥊 and a see-through
-  path shows where it will fly; keep holding and the loop gets bigger. Let go and it flies round the loop
-  like a boomerang and comes back to your hand. If it hits a bad guy or a bad-guy block on the way, it
-  knocks them flying and is back in your hand straight away.
+### Building
+- **Pancakes go where you tap.** Carrying a pancake, tap the spot you want it and your fighter walks up next
+  to that spot, facing it, so ⬇️ puts the pancake right where you tapped, not a step past you.
+
+### Donuts
+- **One donut at a time for bad guys.** Knock a bad guy's donut loose and it can't grab a fresh one from your
+  shelf while its dropped one is still on the floor: it goes back to pick it up instead, so kicking it into your
+  shelf no longer spills all your donuts on the floor.
+
+### End card
+- **You'll know when you've won something new.** Beat a level that unlocks a sword or the scythe and a
+  bouncing button pops up on the score card with the new thing, ✨ and ✏️ on it. Tap it to go and dress up.
+
+### Fixes
+- **No more getting stuck on ⏳.** A tablet that's slow to load the round tries again by itself after a few
+  seconds, and 👋 under ⏳ always takes you back to the lobby.
 
 ## 0.0.5 — 2026-10-17: The Music Scythe and the jumping level
 

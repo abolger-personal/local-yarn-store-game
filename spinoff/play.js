@@ -16,7 +16,7 @@ import { SHELF_WOOD, THEMES } from './scenery.js';
 import { PIPING, box, donutMesh, sameLook } from './treats.js';
 import { rosterOf } from './multiplayer.js';
 import { joinMatch } from './together.js';
-import { bye } from './net.js';
+import { bye, note } from './net.js';
 import { createCpu } from './cpu.js';
 import { aimOf, hammerPath, handOf } from './hammer.js';
 
@@ -38,6 +38,7 @@ const joining = mine ? joinMatch(location.search, mine, asked) : null;
 // While ⏳ waits for the other tablets, everything the network doesn't decide is built and its shaders compiled:
 // everyone has their own fighter and the bad guy, and all but a guest know the level.
 const stage = makeStage(document.getElementById('stage'));
+stage.renderer.domElement.addEventListener('webglcontextlost', () => note('webgl context lost'));
 const { scene, camera } = stage;
 const BAD_GUY = paint({ ...newFighter('lion'), badGuy: true }), prebuilt = { me: mine && buildFighter(paint(mine)), dummy: buildFighter(BAD_GUY) };
 const early = known && dress(known);

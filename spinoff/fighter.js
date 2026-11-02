@@ -10,7 +10,7 @@ import { oklchOf } from '../inventory/yarn-look.js';
 import '../characters/llama.js';
 import { wingShape } from '../characters/owl.js';
 import { makeSparkle } from '../characters/sparkle.js';
-import { GLOVE, SWORD_MOVES, SWORD_UP, punchLayer, punchWeight, sample } from './punches.js';
+import { GLOVE, STRIKE, SWORD_MOVES, SWORD_UP, punchLayer, punchWeight, sample } from './punches.js';
 import { HAMMER } from './hammer.js';
 import { kickLayer, kickLunge } from './kicks.js';
 
@@ -523,6 +523,7 @@ function trickPartsOnce() {
 const bit = (geo, mat, [x, y, z], r) => {
   const m = new THREE.Mesh(geo, mat);
   m.position.set(x, y, z);
+  m.userData.base = m.position.clone();
   m.scale.setScalar(r);
   return m;
 };
@@ -559,11 +560,13 @@ export function addTricks(built, kind) {
   if (kind === 'plain') return;
   const spots = built.sword
     ? [{ parent: built.sword, at: [0, 0, built.sword.userData.tip], side: built.sword.userData.side }]
-    : gloveAnchors(built).map(({ parent, at }, i) => ({ parent, at, side: i ? 1 : -1 }));
-  built.tricks = spots.map(({ parent, at, side }) => {
+    : gloveAnchors(built).map((anchor, i) => ({ parent: built.root, at: [0, 0, 0], side: i ? 1 : -1, anchor }));
+  // a glove's trick isn't on the glove: it leaves the fist as the punch lands and flies on, so the fist going back
+  // doesn't take it along (playtest); a blade's rides its tip
+  built.tricks = spots.map(({ parent, at, side, anchor }) => {
     const spin = trickMesh(kind, built), g = new THREE.Group().add(spin);
     g.position.set(...at);
-    g.userData = { side, spin };
+    g.userData = { side, spin, anchor, from: new THREE.Vector3(), dir: new THREE.Vector3(0, 0, 1), start: new THREE.Vector3() };
     g.visible = false;
     parent.add(g);
     return g;
@@ -575,21 +578,50 @@ export function removeTricks(built) {
   built.tricks = [];
 }
 
-const _q = new THREE.Quaternion(), _up = new THREE.Quaternion();
+const _q = new THREE.Quaternion(), _up = new THREE.Quaternion(), _now = new THREE.Vector3();
 /** How far apart the scythe's music bits fly out past its point, in the trick's own size. */
 const SPRAY_GAP = 0.09;
 
-/** Shows only `side`'s trick (none for null), upright, `size` times its own, turned and risen. */
-function poseTricks(built, side, size, turn, rise) {
+// a glove's trick flies this far along the punch over SHOW_OFF, and spreads to this many times its own size
+const DRIFT = 0.7, SPREAD = 3;
+
+/** Shows only `side`'s trick (none for null), upright, `size` times its own, turned, and `k` (0-1) of the way out:
+ * a blade's rises off its tip, a glove's flies along its punch, spreading out. */
+function poseTricks(built, side, size, turn, k) {
   for (const g of built.tricks ?? []) {
     g.visible = g.userData.side === side;
     if (!g.visible) continue;
+    const { spin, anchor, from, dir } = g.userData;
     g.quaternion.copy(g.parent.getWorldQuaternion(_q).invert().multiply(built.root.getWorldQuaternion(_up)));
     g.scale.setScalar(size);
-    g.userData.spin.rotation.y = turn;
-    g.userData.spin.position.y = rise;
-    if (g.userData.spin.userData.spray) spray(g, turn);
+    spin.rotation.y = turn;
+    spin.position.y = anchor ? 0 : 0.35 * k;
+    if (anchor) {
+      g.position.copy(from).addScaledVector(dir, DRIFT * k);
+      for (const m of spin.children) if (m.userData.base) m.position.copy(m.userData.base).multiplyScalar(1 + (SPREAD - 1) * k);
+    }
+    if (spin.userData.spray) spray(g, turn);
   }
+}
+
+/**
+ * On the fist until it lands, then off along the force: the way the fist went from the swoosh's start to the hit,
+ * as the side-on camera sees it (across the body would fly at the camera) and never back behind the fighter.
+ */
+function aimTrick(built, g, first) {
+  const now = gloveAt(built, g.userData.anchor, _now), { from, dir, start } = g.userData;
+  if (first) start.copy(now);
+  from.copy(now);
+  dir.copy(now).sub(start).setX(0);
+  dir.z = Math.max(dir.z, 0);
+  if (dir.lengthSq() < 1e-8) dir.set(0, 0, 1);
+  dir.normalize();
+}
+
+/** Where a glove is now, in its fighter's own space. */
+function gloveAt(built, { parent, at }, out) {
+  parent.updateWorldMatrix(true, false);
+  return built.root.worldToLocal(parent.localToWorld(out.set(...at)));
 }
 
 const _out = new THREE.Vector3();
@@ -607,17 +639,23 @@ function spray(g, turn) {
   });
 }
 
-/** The hitting hand's trick pops up, upright and turning, through the swoosh of the punch. */
-export function stepTricks(built, punch) {
-  const k = punch ? sample(SWORD_MOVES[punch.name], punch.step).swoosh / 0.75 : 0;
-  poseTricks(built, k > 0.02 ? punch.arm : null, 0.3 + k, (punch?.step ?? 0) * 9, 0.12 * (punch?.step ?? 0));
-}
-
 // REUSE-SPEC.md §Fighter chooser: the preview never hits anything, so its trick stays out to be seen
 export const SHOW_OFF = 1.2;
 /** The chooser's trick, `t` seconds after its jab would land: big, floating up off the hand, gone after SHOW_OFF. */
 export const showOffTrick = (built, side, t) =>
-  poseTricks(built, t >= 0 && t < SHOW_OFF ? side : null, 1.4 * Math.min(1, 4 * (1 - t / SHOW_OFF)), t * 5, 0.35 * (t / SHOW_OFF));
+  poseTricks(built, t >= 0 && t < SHOW_OFF ? side : null, 1.4 * Math.min(1, 4 * (1 - t / SHOW_OFF)), t * 5, t / SHOW_OFF);
+
+/** The hitting hand's trick pops off it as the swoosh starts and floats up, as big and as long as the chooser's show-off
+ * (playtest: shown only through the swoosh, at a third of that size, it was all but invisible in a fight). */
+export function stepTricks(built, punch, dt) {
+  const on = Boolean(punch) && sample(SWORD_MOVES[punch.name], punch.step).swoosh > 0.015;
+  const g = punch && built.tricks?.find((o) => o.userData.anchor && o.userData.side === punch.arm);
+  if (g && on && punch.step <= STRIKE) aimTrick(built, g, !built.trickOn);
+  if (on && !built.trickOn) Object.assign(built, { trickT: 0, trickSide: punch.arm });
+  built.trickOn = on;
+  built.trickT = (built.trickT ?? SHOW_OFF) + dt;
+  showOffTrick(built, built.trickSide ?? null, built.trickT);
+}
 
 /** Same order as the shop's `dressedCharacter` (store/sim/cast.js): dress unmerged, then merge. @param {Fighter} f */
 export function buildFighter(f) {
@@ -697,7 +735,7 @@ export function stepFighter(built, dt, pose, speed, strike = null) {
   });
   swingSword(built, punch);
   reachPole(built, punch ? punchWeight(punch.step) : 0);
-  stepTricks(built, punch);
+  stepTricks(built, punch, dt);
   return out;
 }
 

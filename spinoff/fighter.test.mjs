@@ -324,13 +324,17 @@ for (const species of SPECIES) {
   assert.equal(trick('gloves', 'rocket'), 'plain', 'an unknown trick is plain gloves');
   assert.equal(trick(undefined, undefined), 'plain', 'an old save is plain gloves');
   const f = newFighter('llama'), built = buildFighter({ ...f, look: { ...f.look, trick: 'bubble' } });
-  const shown = (arm, step) => {
-    stepFighter(built, 1e-4, POSES.rest, 0, { name: 'cross', arm, step });
+  const shown = (arm, step, dt = 1e-4) => {
+    stepFighter(built, dt, POSES.rest, 0, step === null ? null : { name: 'cross', arm, step });
     return built.tricks.map((g) => g.visible);
   };
+  assert.deepEqual(shown(1, 0.1), [false, false], 'nothing before the swoosh');
   assert.deepEqual(shown(1, 0.25), [false, true], 'only the hitting glove blows bubbles');
-  assert.deepEqual(shown(-1, 0.25), [true, false]);
-  assert.deepEqual(shown(-1, 0.8), [false, false], 'and only while the punch lands');
+  shown(1, null, SHOW_OFF / 2);
+  assert.deepEqual(built.tricks.map((g) => g.visible), [false, true], 'they stay out after the punch, as on the chooser');
+  assert.ok(built.tricks[1].scale.x > 1, `as big as the chooser's (${built.tricks[1].scale.x.toFixed(2)}): a third of that was invisible in a fight`);
+  assert.deepEqual(shown(1, null, SHOW_OFF), [false, false], 'and float away after SHOW_OFF');
+  assert.deepEqual(shown(-1, 0.25), [true, false], 'the next punch blows them from its own glove');
   disposeFighter(built);
 }
 
@@ -339,13 +343,26 @@ for (const [hands, trick] of [['sword', 'sparkle'], ['sword', 'flame'], ['gloves
   const f = newFighter('lion'), built = buildFighter({ ...f, look: { ...f.look, hands, trick } });
   const g = built.tricks.at(-1).userData.side === -1 ? built.tricks.at(-1) : built.tricks[0];
   const meshes = () => { let n = 0; g.traverse((o) => { if (o instanceof THREE.Mesh && o.visible) n++; }); return n; };
+  const where = () => built.root.worldToLocal(g.userData.spin.getWorldPosition(new THREE.Vector3()));
   showOffTrick(built, -1, 0.1);
-  const early = { y: g.userData.spin.position.y, size: g.scale.x };
+  const early = { at: where(), size: g.scale.x };
   showOffTrick(built, -1, SHOW_OFF * 0.6);
   assert.ok(g.visible && meshes() > 0 && built.tricks.every((t) => t === g || !t.visible), `${hands} ${trick}: shows on the jabbing side, and only there`);
-  assert.ok(early.size >= 1.3 && g.userData.spin.position.y > early.y, `${hands} ${trick}: big, and floating up`);
+  assert.ok(early.size >= 1.3 && where().distanceTo(early.at) > 0.1, `${hands} ${trick}: big, and flying off`);
   showOffTrick(built, -1, SHOW_OFF);
   assert.ok(!g.visible, `${hands} ${trick}: gone after the show-off`);
+  disposeFighter(built);
+}
+// A glove's trick leaves the fist along the punch's force, the way the fist was going as it landed, and keeps going
+// while the fist comes back (playtest: riding the glove home, it looked like the bubbles were sucked back in).
+for (const [name, axis] of [['jab', 'z'], ['cross', 'z'], ['uppercut', 'y']]) {
+  const f = newFighter('lion'), built = buildFighter({ ...f, look: { ...f.look, trick: 'bubble' } });
+  const g = built.tricks.find((t) => t.userData.side === 1), where = () => built.root.worldToLocal(g.userData.spin.getWorldPosition(new THREE.Vector3()));
+  for (let i = 0; i <= 16; i++) stepFighter(built, 1 / 60, POSES.rest, 0, { name, arm: 1, step: i / 16 });
+  const { dir } = g.userData, mid = where();
+  assert.ok(dir[axis] > 0.6, `${name}: the trick flies ${axis === 'y' ? 'up' : 'forward'} (${dir.toArray().map((v) => v.toFixed(2))})`);
+  for (let i = 0; i < 20; i++) stepFighter(built, 1 / 60, POSES.rest, 0, null);
+  assert.ok(g.visible && where()[axis] > mid[axis], `${name}: and keeps going after the punch, while the fist comes back`);
   disposeFighter(built);
 }
 {

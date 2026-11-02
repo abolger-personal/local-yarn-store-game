@@ -545,6 +545,9 @@ function endPicture(e) {
 let nextSearch = location.search.slice(1);
 
 const goTo = (href) => () => { location.href = href; };
+// every prize so far is something to hold, so ✏️ after one opens the dress-up page on the hands row
+const PRIZE_ROW = 'choose.html?show=hands';
+let editHref = 'choose.html';
 
 // REUSE-SPEC.md §After the lobby, A new item says so: its icon in this player's gloves colour, ✨ and ✏️ as one bouncing button
 /** @param {HTMLElement} b @param {string[]} items */
@@ -558,9 +561,10 @@ function freshLook(b, items) {
 function showFresh(items) {
   const b = document.createElement('button');
   freshLook(b, items);
-  b.addEventListener('click', (e) => { e.stopPropagation(); goTo('choose.html')(); });
+  b.addEventListener('click', (e) => { e.stopPropagation(); goTo(PRIZE_ROW)(); });
   document.querySelector('#score .again').append(b);
   freshLook(document.getElementById('edit'), items);
+  editHref = PRIZE_ROW;
   // the Greathammer's fourth-wall joke
   if (items.includes('hammer')) document.getElementById('score').insertAdjacentHTML('beforeend', '<div class="souls">Greathammer acquired</div>');
 }
@@ -702,7 +706,7 @@ document.getElementById('score').addEventListener('click', () => {
 });
 document.getElementById('bye').addEventListener('click', bye);
 document.getElementById('quit').addEventListener('click', bye);
-document.getElementById('edit').addEventListener('click', goTo('choose.html'));
+document.getElementById('edit').addEventListener('click', () => goTo(editHref)());
 document.getElementById('again').addEventListener('click', () => (net?.again ? net.again(nextSearch) : goTo(`play.html?${nextSearch}`)()));
 // REUSE-SPEC.md §Bad guys, No playing alone
 if (mine?.badGuy && !net) location.replace('lobby.html');

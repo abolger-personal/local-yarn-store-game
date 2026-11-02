@@ -145,6 +145,9 @@ function choose(action, value) {
 
 // The choices are painted before the 3D stage and fighter are built, so there's something to see straight away
 render();
+// ?show=<row> (its label, as `hands`) opens on that row: a prize from the end card is in view, not below the fold
+const show = new URLSearchParams(location.search).get('show');
+[...panel.querySelectorAll('.row')].find((r) => r.getAttribute('aria-label') === show)?.scrollIntoView({ block: 'center' });
 await new Promise((r) => { requestAnimationFrame(() => setTimeout(r)); });
 const stage = makeStage(document.getElementById('stage'));
 

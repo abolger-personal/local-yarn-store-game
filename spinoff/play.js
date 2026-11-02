@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { POSES, setGeometryDetail } from '../characters/npc.js';
-import { attachControls, createControls } from './controls.js';
+import { KEYS, attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
 import { countStrike, landHit, newCombo, strikerOf } from './punches.js';
 import { KICK_COMBO, shownStrike, strikeOf } from './kicks.js';
@@ -408,9 +408,13 @@ function drawPreview(me) {
 /** A tap is still only the punch, which went on press; held till the path shows, letting go throws at the size shown. */
 function attachAim(controls) {
   const b = el('punch'), inHand = () => mine.look.hands === 'hammer' && !latest?.hammers?.some((h) => h.owner === ME);
-  b.addEventListener('pointerdown', () => { aimSince = inHand() ? performance.now() : 0; });
-  b.addEventListener('pointerup', () => { const k = aimNow(); if (k !== null) controls.throw(k); aimSince = 0; });
+  const holdAim = () => { aimSince = inHand() ? performance.now() : 0; };
+  const letGo = () => { const k = aimNow(); if (k !== null) controls.throw(k); aimSince = 0; };
+  b.addEventListener('pointerdown', holdAim);
+  b.addEventListener('pointerup', letGo);
   b.addEventListener('pointercancel', () => { aimSince = 0; });
+  addEventListener('keydown', (e) => { if (e.code === KEYS.punch && !e.repeat && !(e.metaKey || e.ctrlKey || e.altKey)) holdAim(); });
+  addEventListener('keyup', (e) => { if (e.code === KEYS.punch) letGo(); });
 }
 
 /** A thrown hammer spins along its path; its thrower's hand is empty till it's back. @param {Snapshot} snap */
@@ -679,7 +683,7 @@ async function play() {
   const roster = net?.start.roster ?? rosterOf(ME, mine, undefined, asked.number), entrants = cast(roster);
   const controls = createControls(ME, level.stage);
   const button = (id) => document.getElementById(id);
-  attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: button('punch'), kick: button('kick'), drop: button('drop') } });
+  attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: button('punch'), kick: button('kick'), drop: button('drop') }, keyHelp: button('keys') });
   attachReady(controls);
   attachAim(controls);
   await warmUp();

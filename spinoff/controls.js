@@ -87,28 +87,61 @@ export function pickTarget(stage, snap, ray, myId) {
   return pointTarget(stage, ray);
 }
 
-/** Pointer state per finger, turned into one Input per tick by `take`. @param {Stage} stage */
+// A laptop: arrows walk (↑ toward the back wall), Space jumps, Z punches (held, aims the Greathammer), X kicks
+export const KEYS = Object.freeze({ punch: 'KeyZ', kick: 'KeyX', jump: 'Space' });
+const ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+// a held arrow walks toward a point this far ahead, sent again every WALK_EVERY takes so it never arrives
+const WALK_STEP = 1, WALK_EVERY = 6;
+
+/** Where a held arrow walks to: a step ahead, past the edge too, as a tap there is. @param {Stage} stage @returns {Target} */
+export function walkTarget(stage, me, dx, dz) {
+  const n = Math.hypot(dx, dz), x = me.x + (dx / n) * WALK_STEP, z = me.z + (dz / n) * WALK_STEP;
+  const y = floorTop(stage, x, z) ?? 0;
+  return y > 0 ? { x, z, y } : { x, z };
+}
+
+/**
+ * A tap wins; else Space; else a held arrow, sent again now and then; else letting go of the arrows stops you.
+ * @param {Stage} stage @param {Snapshot} snap @returns {Target|null}
+ */
+function targetOf(s, stage, snap, myId) {
+  if (s.fresh && s.aim) return pickTarget(stage, snap, s.aim, myId);
+  if (s.jump) return { jump: true };
+  const [dx, dz] = s.walk;
+  if (!dx && !dz) {
+    const was = s.walked;
+    s.walked = false;
+    return was ? { stop: true } : null;
+  }
+  const me = snap.fighters.find((f) => f.id === myId);
+  if (!me || s.since++ % WALK_EVERY) return null;
+  s.walked = true;
+  return walkTarget(stage, me, dx, dz);
+}
+
+/** Pointer state per finger, and held keys, turned into one Input per tick by `take`. @param {Stage} stage */
 export function createControls(myId, stage) {
-  const s = { finger: null, aim: null, fresh: false, punch: false, kick: false, drop: false, ready: undefined, go: false, throw: undefined };
+  const s = { finger: null, aim: null, fresh: false, punch: false, kick: false, drop: false, ready: undefined, go: false, throw: undefined,
+    jump: false, walk: [0, 0], walked: false, since: 0 };
   return {
+    /** Arrows held now, as a direction (0, 0 for none), and Space. */
+    walk(dx, dz) { Object.assign(s, { since: dx === s.walk[0] && dz === s.walk[1] ? s.since : 0, walk: [dx, dz] }); },
+    jump() { s.jump = true; },
     /** 👍 tapped (on or back off), and 👍 held long enough to start the round. */
     ready(on) { s.ready = on; },
     go() { s.go = true; },
     /** 🥊 let go after the Greathammer's path showed, at size `k` (hammer.js). */
     throw(k) { s.throw = k; },
     /** @param {'stage'|'punch'|'kick'|'drop'} on @param {Ray|null} ray */
-    down(pointerId, on, ray) {
-      if (on !== 'stage') { s[on] = true; return; }
-      Object.assign(s, { finger: pointerId, aim: ray, fresh: true });
-    },
+    down(pointerId, on, ray) { Object.assign(s, on === 'stage' ? { finger: pointerId, aim: ray, fresh: true } : { [on]: true }); },
     /** @param {Ray} ray */
     move(pointerId, ray) { if (pointerId === s.finger) Object.assign(s, { aim: ray, fresh: true }); },
     up(pointerId) { if (pointerId === s.finger) s.finger = null; },
     /** @param {Snapshot} snap @returns {Input} */
     take(snap) {
-      const input = { target: s.fresh && s.aim ? pickTarget(stage, snap, s.aim, myId) : null, punch: s.punch, kick: s.kick,
+      const input = { target: targetOf(s, stage, snap, myId), punch: s.punch, kick: s.kick,
         ...(s.drop && { drop: true }), ...(s.ready !== undefined && { ready: s.ready }), ...(s.go && { go: true }), ...(s.throw !== undefined && { throw: s.throw }) };
-      Object.assign(s, { fresh: false, punch: false, kick: false, drop: false, ready: undefined, go: false, throw: undefined });
+      Object.assign(s, { fresh: false, punch: false, kick: false, drop: false, ready: undefined, go: false, throw: undefined, jump: false });
       return input;
     },
   };
@@ -127,9 +160,10 @@ function pointerRay(camera, canvas, e) {
 /**
  * Pointer Events per finger, as verified in touch-test.html.
  * @param {ReturnType<typeof createControls>} controls
- * @param {{ camera: THREE.Camera, canvas: HTMLElement, buttons: Record<string, HTMLElement> }} opts
+ * @param {{ camera: THREE.Camera, canvas: HTMLElement, buttons: Record<string, HTMLElement>, keyHelp: HTMLElement }} opts
+ *   `keyHelp`: the card of keyboard keys
  */
-export function attachControls(controls, { camera, canvas, buttons }) {
+export function attachControls(controls, { camera, canvas, buttons, keyHelp }) {
   const at = (e) => pointerRay(camera, canvas, e);
   canvas.addEventListener('pointerdown', (e) => { canvas.setPointerCapture(e.pointerId); controls.down(e.pointerId, 'stage', at(e)); });
   canvas.addEventListener('pointermove', (e) => controls.move(e.pointerId, at(e)));
@@ -145,4 +179,28 @@ export function attachControls(controls, { camera, canvas, buttons }) {
     for (const type of ['pointerup', 'pointercancel']) b.addEventListener(type, () => b.classList.remove('down'));
   }
   document.addEventListener('contextmenu', (e) => e.preventDefault());
+  attachKeys(controls, buttons, keyHelp);
+}
+
+/** Arrows, Space, Z and X; any other key shows `keyHelp`, the keys that play, and playing hides it: a tablet never sees it.
+ * @param {ReturnType<typeof createControls>} controls @param {Record<string, HTMLElement>} buttons @param {HTMLElement} keyHelp */
+function attachKeys(controls, buttons, keyHelp) {
+  const held = new Set();
+  const walk = () => controls.walk(...[...held].reduce(([x, z], k) => [x + ARROWS[k][0], z + ARROWS[k][1]], [0, 0]));
+  const press = { [KEYS.punch]: 'punch', [KEYS.kick]: 'kick' };
+  addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    keyHelp.hidden = e.code in ARROWS || e.code === KEYS.jump || e.code in press;
+    if (e.code in ARROWS) { held.add(e.code); walk(); } else if (e.code === KEYS.jump) { if (!e.repeat) controls.jump(); }
+    else if (e.code in press) { if (!e.repeat) { buttons[press[e.code]].classList.add('down'); controls.down('key', press[e.code], null); } }
+    else return;
+    // arrows and Space would scroll the page, and Space would press whichever button was clicked last
+    e.preventDefault();
+  });
+  addEventListener('keyup', (e) => {
+    if (e.code in ARROWS) { held.delete(e.code); walk(); }
+    if (e.code in press) buttons[press[e.code]].classList.remove('down');
+  });
+  // a key let go in another window never comes back up here
+  addEventListener('blur', () => { held.clear(); walk(); });
 }

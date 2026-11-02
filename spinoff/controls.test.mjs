@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { createControls, floorPoint, floorTop, pickTarget } from './controls.js';
+import { createControls, floorPoint, floorTop, pickTarget, walkTarget } from './controls.js';
+import { createMatch as createSim, snapshot as simSnap, tick as simTick } from './sim.js';
 import { createMatch, snapshot, tick } from './fake-match.js';
 import { ROUND_SECONDS, TICK_HZ } from './match.js';
 import { TUTORIAL } from './levels.js';
@@ -122,6 +123,41 @@ assert.deepEqual(pickTarget(STAGE, snap, tap(front.x + 0.2, 0.2, front.z + 0.2),
   c.go();
   assert.deepEqual(c.take(snap), { target: null, punch: false, kick: false, drop: true, ready: true, go: true }, '⬇️, 👍 and the hold go out once');
   assert.deepEqual(c.take(snap), { target: null, punch: false, kick: false }, 'and only once');
+}
+
+{
+  const c = createControls('me', STAGE), me = snap.fighters[0];
+  c.walk(1, 0);
+  assert.deepEqual(c.take(snap).target, { x: me.x + 1, z: me.z }, '→ walks toward a step to the right');
+  for (let i = 1; i < 6; i++) assert.equal(c.take(snap).target, null, 'held, it isn\'t sent again every tick');
+  assert.ok(c.take(snap).target, 'but now and then, so the fighter never gets there and stops');
+  c.jump();
+  assert.deepEqual(c.take(snap).target, { jump: true }, 'Space jumps while walking');
+  c.walk(0, 0);
+  assert.deepEqual(c.take(snap).target, { stop: true }, 'letting go of the arrows stops you');
+  assert.equal(c.take(snap).target, null, 'once');
+  const front = STAGE.floors.reduce((z, f) => Math.max(z, f.z1), -Infinity);
+  assert.ok(walkTarget(STAGE, { x: 0, z: front - 0.1 }, 0, 1).z > front, '↓ at the front edge aims past it, as a tap there does');
+  const deck = STAGE.floors.find((f) => f.kind === 'deck');
+  assert.equal(walkTarget(STAGE, { x: deck.x1 + 0.5, z: deck.z0 + 0.3 }, -1, 0).y, deck.y, '← into a deck aims up onto it, as a tap there does');
+}
+
+{
+  const m = createSim([{ id: 'kid', team: 'heroes', height: 0.9, width: 0.45, reach: 0.38, look: look('#14c4e0') }], STAGE);
+  const c = createControls('kid', STAGE), x0 = simSnap(m).fighters[0].x;
+  c.walk(1, 0);
+  for (let i = 0; i < TICK_HZ; i++) simTick(m, { kid: c.take(simSnap(m)) });
+  const walked = simSnap(m).fighters[0].x;
+  assert.ok(walked > x0 + 1, `held → for a second walks right (${x0.toFixed(2)} → ${walked.toFixed(2)})`);
+  c.walk(0, 0);
+  for (let i = 0; i < TICK_HZ / 2; i++) simTick(m, { kid: c.take(simSnap(m)) });
+  const stopped = simSnap(m).fighters[0].x;
+  for (let i = 0; i < TICK_HZ; i++) simTick(m, { kid: c.take(simSnap(m)) });
+  assert.ok(Math.abs(simSnap(m).fighters[0].x - stopped) < 1e-6, 'and letting go stops it where it is');
+  c.walk(0, 1);
+  for (let i = 0; i < TICK_HZ * 4; i++) simTick(m, { kid: c.take(simSnap(m)) });
+  const kid = simSnap(m).fighters[0], front = STAGE.floors.reduce((z, f) => Math.max(z, f.z1), -Infinity);
+  assert.ok(!kid.respawn && kid.y >= 0 && kid.z < front, 'holding ↓ stops at the front edge, as a tap past it does: walking never rings you out');
 }
 
 console.log('controls ok');

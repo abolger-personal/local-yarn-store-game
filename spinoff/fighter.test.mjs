@@ -5,7 +5,7 @@ import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import {
   BAGS, CAPES, CLOTH, FUR, HANDS, HATS, SPECIES, TEXTURES, badGuySets, buildFighter, disposeFighter, gloveAnchors, handsFor, newHands, isBadGuyCloth, isBadGuyFur, nearestSwatch,
-  IDLE, SHOW_OFF, entrantOf, knotAt, newFighter, paint, randomFighter, readFighter, seatDrop, setFur, showOffTrick, stepFighter, wobbleAt, wobbleHz,
+  EFFECTS, IDLE, ROLL, SHOW_OFF, TRICKS, addTricks, entrantOf, fromRecipe, knotAt, rollEffect, newFighter, paint, randomFighter, readFighter, seatDrop, setFur, showOffTrick, stepFighter, wobbleAt, wobbleHz,
 } from './fighter.js';
 import { wingShape } from '../characters/owl.js';
 import { floorGrid } from './roster.js';
@@ -300,7 +300,10 @@ for (const species of SPECIES) {
         const d = built.sword.localToWorld(new THREE.Vector3(0, 0, 0.4)).sub(at(built.sword)).normalize();
         assert.ok(d.angleTo(along) < 0.35, `${species} ${held}: the stabbing arm reaches along the blade (${d.angleTo(along).toFixed(2)} rad off)`);
       }
-      assert.ok(built.tricks.length === 1 && built.tricks[0].parent === built.sword && built.tricks[0].visible, `${species}: the ${held}'s trick at its tip as it lands`);
+      const tipAt = built.sword.localToWorld(new THREE.Vector3(0, 0, built.sword.userData.tip)), trickAt = at(built.tricks[0]);
+      // a sword's leaves the tip there and flies on (playtest: riding the blade home it floated into the face); the scythe's and the hammer's ride it
+      assert.ok(built.tricks.length === 1 && built.tricks[0].visible && trickAt.distanceTo(tipAt) < 0.12 && (held === 'scythe' || held === 'hammer') === (built.tricks[0].parent === built.sword),
+        `${species}: the ${held}'s trick at its tip as it lands (${trickAt.distanceTo(tipAt).toFixed(3)} off)`);
       if (held === 'scythe') {
         // the stars, hearts and notes fly out past the point through the chop, never over the crescent (playtest: they hid it)
         const tipAt = () => built.sword.localToWorld(new THREE.Vector3(0, 0, built.sword.userData.tip));
@@ -315,6 +318,9 @@ for (const species of SPECIES) {
     disposeFighter(gloved);
   }
 }
+
+// Every trick a hand offers has a look and a motion in EFFECTS: a new effect is one entry there.
+for (const [hands, list] of Object.entries(TRICKS)) for (const t of list) assert.ok(t === 'plain' || EFFECTS[t]?.parts, `${hands}: ${t} has an EFFECTS entry`);
 
 // Tapping the picked hands goes through its tricks; a trick the other hands don't have falls back to their first.
 {
@@ -355,14 +361,45 @@ for (const [hands, trick] of [['sword', 'sparkle'], ['sword', 'flame'], ['gloves
 }
 // A glove's trick leaves the fist along the punch's force, the way the fist was going as it landed, and keeps going
 // while the fist comes back (playtest: riding the glove home, it looked like the bubbles were sucked back in).
-for (const [name, axis] of [['jab', 'z'], ['cross', 'z'], ['uppercut', 'y']]) {
+{
   const f = newFighter('lion'), built = buildFighter({ ...f, look: { ...f.look, trick: 'bubble' } });
   const g = built.tricks.find((t) => t.userData.side === 1), where = () => built.root.worldToLocal(g.userData.spin.getWorldPosition(new THREE.Vector3()));
-  for (let i = 0; i <= 16; i++) stepFighter(built, 1 / 60, POSES.rest, 0, { name, arm: 1, step: i / 16 });
-  const { dir } = g.userData, mid = where();
-  assert.ok(dir[axis] > 0.6, `${name}: the trick flies ${axis === 'y' ? 'up' : 'forward'} (${dir.toArray().map((v) => v.toFixed(2))})`);
-  for (let i = 0; i < 20; i++) stepFighter(built, 1 / 60, POSES.rest, 0, null);
-  assert.ok(g.visible && where()[axis] > mid[axis], `${name}: and keeps going after the punch, while the fist comes back`);
+  for (const [name, axis] of [['jab', 'z'], ['cross', 'z'], ['uppercut', 'y']]) {
+    for (let i = 0; i <= 16; i++) stepFighter(built, 1 / 60, POSES.rest, 0, { name, arm: 1, step: i / 16 });
+    const { dir } = g.userData, mid = where();
+    assert.ok(dir[axis] > 0.6, `${name}: the trick flies ${axis === 'y' ? 'up' : 'forward'} (${dir.toArray().map((v) => v.toFixed(2))})`);
+    for (let i = 0; i < 20; i++) stepFighter(built, 1 / 60, POSES.rest, 0, null);
+    assert.ok(g.visible && where()[axis] > mid[axis], `${name}: and keeps going after the punch, while the fist comes back`);
+  }
+  // dev mode's randomizer: a seed rolls the same effect every time, inside ROLL's bounds, and it goes on like a named one
+  const roll = rollEffect(42), { motion, count } = ROLL;
+  assert.equal(roll.recipe, rollEffect(42).recipe, 'a seed rolls the same effect every time');
+  assert.notEqual(roll.recipe, rollEffect(43).recipe, 'and another seed another');
+  for (const [k, [lo, hi]] of Object.entries(motion)) assert.ok(roll[k] >= lo && roll[k] <= hi, `rolled ${k} ${roll[k]} is within ${lo}-${hi}`);
+  addTricks(built, roll);
+  const bits = built.tricks[0].userData.spin.children.length;
+  assert.ok(built.tricks.length === 2 && bits >= count[0] && bits <= count[1] && built.tricks[0].userData.anchor, `a rolled effect goes on both gloves, ${bits} bits, flying off along the punch`);
+  // a blast spreads round; `stream` strings its bits out along the punch, and `stretch` makes a long jet
+  const shape = (over) => {
+    addTricks(built, { ...rollEffect(7), turn: 0, spread: 2, drift: 1, ...over });
+    for (let i = 0; i <= 16; i++) stepFighter(built, 1 / 60, POSES.rest, 0, { name: 'jab', arm: 1, step: i / 16 });
+    for (let i = 0; i < 25; i++) stepFighter(built, 1 / 60, POSES.rest, 0, null);
+    const g = built.tricks.find((t) => t.userData.side === 1), { dir } = g.userData, ext = (a) => Math.max(...a) - Math.min(...a);
+    const ps = g.userData.spin.children.map((m) => built.root.worldToLocal(m.getWorldPosition(new THREE.Vector3())));
+    return ext(ps.map((q) => q.dot(dir))) / ext(ps.map((q) => q.clone().addScaledVector(dir, -q.dot(dir)).length()));
+  };
+  const [blast, stream, jet] = [{ stream: 0, stretch: 1 }, { stream: 1, stretch: 1 }, { stream: 0, stretch: 4 }].map(shape);
+  assert.ok(blast < 1.3 && stream > blast + 0.3 && jet > 3, `long along the punch for its width: a blast ${blast.toFixed(1)}, a stream ${stream.toFixed(1)}, a jet ${jet.toFixed(1)}`);
+  // each finish is its own surface, and a glow has its halo; a recipe from before finishes is flat
+  const surface = (finish) => {
+    addTricks(built, fromRecipe({ finish, bits: [{ shape: 'star', colour: '#ffd21a', at: [0, 0, 0], r: 0.05, turn: 0, beat: 0 }] }));
+    return built.tricks[0].userData.spin.children[0];
+  };
+  const kinds = ROLL.finishes.map((finish) => surface(finish).material.type);
+  assert.equal(new Set(kinds).size, 4, `flat and glow are paper, toon, glossy and knit each their own (${kinds})`);
+  assert.ok(surface('glow').children[0]?.isSprite && !surface('flat').children.length, 'only a glow has a halo');
+  assert.equal(surface(undefined).material.type, kinds[0], 'a recipe without a finish is flat');
+  assert.ok(ROLL.finishes.includes(JSON.parse(roll.recipe).finish) && JSON.parse(roll.recipe).family in ROLL.families, 'a roll names its finish and colour family');
   disposeFighter(built);
 }
 {

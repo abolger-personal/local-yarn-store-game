@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-  BASE_PARAMS, MOTION_DEFAULTS, NAMES, POSES, applyPose, createCharacter, deriveCoatColor, disposeCharacter, getSpecies, mergeCharacter,
+  BASE_PARAMS, MOTION_DEFAULTS, NAMES, POSES, applyPose, createCharacter, deriveCoatColor, disposeCharacter, getSpecies, knitMaterial, mergeCharacter,
   lowestResting, phaseStep, stepMotion, walkGain, walkLayer, walkPhase,
 } from '../characters/npc.js';
 import { deriveManeColor } from '../characters/lion.js';
@@ -48,7 +48,7 @@ export const HAND_ICON = Object.freeze({
 });
 // what flies off the hitting glove or the blade's tip as it lands; tapping the picked one goes to the next. The scythe's is fixed.
 export const TRICKS = Object.freeze({
-  gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame']), sword: Object.freeze(['sparkle', 'bubble', 'flame']), scythe: Object.freeze(['music']),
+  gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame', 'bebop']), sword: Object.freeze(['sparkle', 'bubble', 'flame', 'bebop']), scythe: Object.freeze(['music']),
   hammer: Object.freeze(['lightning']),
 });
 // REUSE-SPEC.md §Fighter chooser: the levels a player must have beaten for the chooser to offer each
@@ -487,7 +487,12 @@ export function swingSword(built, punch) {
 }
 
 const BUBBLES = [[0, 0, 0, 0.05], [0.07, 0.06, 0.02, 0.035], [-0.05, 0.09, -0.02, 0.03], [0.02, 0.15, 0.01, 0.025], [-0.08, 0.01, 0.03, 0.04]];
-const FLAMES = [['#ff5a1f', 0.075], ['#ff9a1a', 0.055], ['#ffd21a', 0.035]];
+// The flame (playtest: of three tried, this beat a spray of little flames, and the old stacked blob looked cheap): one
+// cartoon flame, orange round a yellow heart, with star embers round it thrown wider as it spreads; x, y, z, size
+const FLAMES = ['#ff5a1f', '#ffd21a'];
+const EMBERS = [[0.13, 0.08, 0, 0.03], [-0.12, 0.12, 0.02, 0.025], [0.05, -0.1, -0.02, 0.022], [-0.1, -0.07, 0.03, 0.028]];
+const BLAZE = [[0, -0.5], [0.55, -0.5, 0.7, 0.1, 0.35, 0.6], [0.45, 0.35, 0.25, 0.3, 0.2, 0.45], [0.25, 0.9, 0.05, 1.1, 0, 1.5],
+  [-0.15, 1.05, -0.4, 0.95, -0.3, 0.6], [-0.45, 0.75, -0.55, 0.5, -0.5, 0.3], [-0.7, 0, -0.45, -0.5, 0, -0.5]];
 // REUSE-SPEC.md §Costumes: the Greathammer's crackle, zigzag bolts round its head, a white core on each; x, y, size, tilt
 const BOLTS = [[0, 0, 0.11, 0], [0.09, 0.06, 0.07, 1.1], [-0.08, 0.07, 0.06, -1]];
 const BOLT = [[-0.15, 1], [0.3, 1], [0.05, 0.2], [0.38, 0.2], [-0.25, -1], [0, -0.1], [-0.32, -0.1]];
@@ -501,12 +506,10 @@ const MUSIC = [
 
 function trickPartsOnce() {
   if (trickParts) return trickParts;
-  const drop = mergeGeometries([new THREE.SphereGeometry(1, 12, 8), new THREE.ConeGeometry(1, 2.2, 12).translate(0, 1.1, 0)]);
   trickParts = {
     ball: new THREE.SphereGeometry(1, 14, 10),
     bubble: new THREE.MeshStandardMaterial({ color: '#c8f2ff', roughness: 0.05, transparent: true, opacity: 0.55, depthWrite: false }),
-    drop,
-    flames: FLAMES.map(([color]) => new THREE.MeshBasicMaterial({ color, toneMapped: false })),
+    flats: FLAMES.map((color) => new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, toneMapped: false })),
     bolt: new THREE.ShapeGeometry(new THREE.Shape(BOLT.map(([x, y]) => new THREE.Vector2(x, y)))),
     zap: ['#7fd4ff', '#ffffff'].map((color) => new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, toneMapped: false })),
     music: {
@@ -536,33 +539,168 @@ function addBolts(g, p) {
   }
 }
 
-/** The trick's look, about a glove across, centred on its origin. */
-function trickMesh(kind, built) {
-  const p = trickPartsOnce(), g = new THREE.Group();
-  if (kind === 'sparkle') g.add(Object.assign(makeSparkle(built).mesh, { visible: true }));
-  if (kind === 'bubble') {
-    for (const [x, y, z, r] of BUBBLES) g.add(bit(p.ball, p.bubble, [x, y, z], r));
+const flick = (m, phase) => { Object.assign(m.userData, { flick: phase, r: m.scale.x }); return m; };
+
+/** The flame in two crossed planes, so it shows from the side and from the front, flickering; star embers round it, half
+ * turned the other way for the same reason. */
+const blazeOf = (p) => (p.blaze ??= new THREE.ShapeGeometry(BLAZE.slice(1).reduce((sh, c) => sh.bezierCurveTo(...c), new THREE.Shape().moveTo(...BLAZE[0])), 12));
+
+function addFlame(g, p) {
+  blazeOf(p);
+  for (const turn of [0, Math.PI / 2]) {
+    const outer = flick(bit(p.blaze, p.flats[0], [0, -0.05, 0], 0.11), turn * 3), inner = flick(bit(p.blaze, p.flats[1], [0, -0.07, 0], 0.06), turn * 3 + 1);
+    for (const m of [outer, inner]) m.rotation.y = turn;
+    g.add(outer, inner);
   }
-  if (kind === 'flame') {
-    FLAMES.forEach(([, r], i) => g.add(bit(p.drop, p.flames[i], [0.035 * i, -0.04 - 0.01 * i, 0.035 * i], r)));
-  }
-  if (kind === 'lightning') addBolts(g, p);
-  if (kind === 'music') {
-    g.add(Object.assign(makeSparkle(built).mesh, { visible: true }));
+  EMBERS.forEach(([x, y, z, r], i) => { g.add(bit(p.music.star, p.paints[i % 2 ? 3 : 0], [x, y, z], r)).children.at(-1).rotation.y = (i % 2) * Math.PI / 2; });
+}
+
+const sparkleOf = (built) => Object.assign(makeSparkle(built).mesh, { visible: true });
+const scatter = (g, geo, mat, list) => { for (const [x, y, z, r] of list) g.add(bit(geo, mat, [x, y, z], r)); };
+
+/**
+ * Every trick, by name (TRICKS lists which hands get which). `parts(g, p, built)` builds its look into `g`, about a glove
+ * across round its origin, from the shared parts `p` (trickPartsOnce); a bit made with `bit` spreads, and one marked with
+ * `flick` flickers. The rest override EFFECT, how it moves once shown; a new effect is one entry here, or a recipe from dev
+ * mode's randomizer pasted into fromRecipe.
+ * @typedef {{ life: number, size: number, turn: number, drift: number, spread: number, stream: number, stretch: number, rise: number, rides: boolean, flicker: number }} Motion
+ * @type {Record<string, { parts: (g: THREE.Group, p: any, built: any) => void } & Partial<Motion>>}
+ */
+export const EFFECTS = Object.freeze({
+  // found with dev mode's randomizer (2026-11-01): notes and bubbles, orange, yellow and green, spinning and spreading wide
+  bebop: fromRecipe({ life: 1.698, size: 2.036, turn: 8.331, drift: 0.405, spread: 4.473, flicker: 0.241, bits: [
+    { shape: 'note', colour: '#ff7a1a', at: [0.002, 0, 0.15], r: 0.048, turn: 0, beat: 0.287 },
+    { shape: 'note', colour: '#ff7a1a', at: [-0.125, 0.14, 0.122], r: 0.051, turn: 1.571, beat: 0.82 },
+    { shape: 'bubble', colour: '#8be02a', at: [-0.14, 0.121, -0.027], r: 0.049, turn: 0, beat: 0.799 },
+    { shape: 'note', colour: '#ffd21a', at: [-0.067, 0.079, 0.066], r: 0.028, turn: 1.571, beat: 2.409 },
+    { shape: 'bubble', colour: '#ffd21a', at: [0.086, -0.13, 0.138], r: 0.026, turn: 0, beat: 3.199 },
+    { shape: 'note', colour: '#ffd21a', at: [-0.159, -0.001, -0.016], r: 0.03, turn: 1.571, beat: 4.802 },
+    { shape: 'note', colour: '#ffd21a', at: [0.008, 0.126, -0.139], r: 0.04, turn: 0, beat: 3.143 },
+    { shape: 'note', colour: '#ff7a1a', at: [-0.131, 0.026, 0.027], r: 0.035, turn: 1.571, beat: 0.051 },
+    { shape: 'bubble', colour: '#ff7a1a', at: [0.001, 0.062, 0.128], r: 0.051, turn: 0, beat: 0.228 },
+  ] }),
+  sparkle: { parts: (g, _p, built) => g.add(sparkleOf(built)) },
+  bubble: { parts: (g, p) => scatter(g, p.ball, p.bubble, BUBBLES) },
+  flame: { parts: addFlame, flicker: 0.3 },
+  // the scythe's stars, hearts and notes fly out past its point, along the blade (spray)
+  music: { parts: (g, p, built) => {
+    g.add(sparkleOf(built));
     g.userData.spray = MUSIC.map(([shape, , xyz, r], i) => g.add(bit(p.music[shape], p.paints[i], xyz, r)).children.at(-1));
+  }, rides: true },
+  lightning: { parts: addBolts, rides: true },
+});
+
+/**
+ * How a trick moves, unless its EFFECTS entry says otherwise. Shown for `life` seconds from the hit, `size` times its own,
+ * shrinking away over the last quarter, turning `turn` radians a second. Off a glove or a blade it leaves as the hit lands
+ * and flies `drift` along the hit's force, its bits spreading to `spread` times their gaps (`stretch` times that along the
+ * force: a jet), leaving together (`stream` 0: a blast) or one after another (1: a stream); one that `rides` stays on the
+ * blade's head and floats `rise` up off it. `flicker`: how far a flicking bit stretches, as a share of its size.
+ */
+/** @type {Readonly<Motion>} */
+export const EFFECT = Object.freeze({ life: 1.2, size: 1.4, turn: 5, drift: 0.7, spread: 3, stream: 0, stretch: 1, rise: 0.35, rides: false, flicker: 0 });
+/** With `stream` 1, the last bit leaves this far through the effect's life. */
+const STREAM_WAIT = 0.7;
+
+// ponytail: a trial randomizer for new effects (the bad-guy dress-up rolls one when you tap your gloves or sword again); a seed
+// that looks good is copied into EFFECTS by hand. What a roll draws from: its shapes, colours, how many bits how far out and
+// how big, and each EFFECT setting between these bounds.
+export const ROLL = Object.freeze({
+  shapes: ['ball', 'bubble', 'star', 'heart', 'note', 'blaze', 'bolt'],
+  // a roll's colours come from one family (playtest: mixed ones looked muddled); riot is the old anything-goes
+  families: {
+    sunset: ['#ff3b7f', '#ff7a1a', '#ffd21a'], sea: ['#2f6bff', '#5eccf6', '#ffffff'], berry: ['#cf4bfc', '#ff3b7f', '#fd9bd9'],
+    lime: ['#8be02a', '#ffd21a', '#ffffff'], candle: ['#ffd21a', '#ffffff', '#ff7a1a'],
+    riot: ['#ff3b7f', '#ffd21a', '#5eccf6', '#8be02a', '#ff7a1a', '#cf4bfc', '#ffffff', '#2f6bff'],
+  },
+  finishes: ['flat', 'glow', 'toon', 'glossy', 'knit'],
+  count: [3, 10], reach: 0.16, bit: [0.02, 0.07],
+  motion: { life: [0.8, 1.8], size: [0.9, 2.2], turn: [0, 10], drift: [0.3, 1.5], spread: [1, 5], stream: [0, 1], stretch: [1, 4], flicker: [0, 0.45] },
+});
+
+const TWO = THREE.DoubleSide;
+/** What a bit's surface is made of, by finish: flat paper, a glow (flat, with a halo: see rolledBit), cartoon shading,
+ * shiny candy, or yarn. Shared per finish and colour. */
+const FINISH = {
+  flat: (color) => new THREE.MeshBasicMaterial({ color, side: TWO, toneMapped: false }),
+  glow: (color) => new THREE.MeshBasicMaterial({ color, side: TWO, toneMapped: false }),
+  toon: (color) => new THREE.MeshToonMaterial({ color, side: TWO }),
+  glossy: (color) => new THREE.MeshStandardMaterial({ color, side: TWO, roughness: 0.12, metalness: 0 }),
+  knit: (color) => Object.assign(knitMaterial(color), { side: TWO }),
+};
+
+/** A soft dot, white in the middle fading to clear: a glow's halo, tinted per colour. */
+function haloOf(p, color) {
+  if (!p.haloMap) {
+    const n = 32, px = new Uint8Array(n * n * 4);
+    for (let i = 0; i < n * n; i++) {
+      const d = Math.hypot((i % n) - n / 2 + 0.5, Math.floor(i / n) - n / 2 + 0.5) / (n / 2);
+      px.set([255, 255, 255, Math.round(255 * Math.max(0, 1 - d) ** 2)], i * 4);
+    }
+    p.haloMap = Object.assign(new THREE.DataTexture(px, n, n), { needsUpdate: true });
   }
+  return new THREE.SpriteMaterial({ map: p.haloMap, color, transparent: true, opacity: 0.7, depthWrite: false, toneMapped: false });
+}
+
+/** One bit of a rolled effect, in `colour` and `finish`, flicking on its own beat; flat shapes cross the camera every other
+ * way. A bubble is always the glass bubble. */
+function rolledBit(g, p, { shape, colour, at, r, turn, beat }, finish) {
+  const mats = (p.finished ??= new Map()), key = `${finish} ${colour}`;
+  if (!mats.has(key)) mats.set(key, (FINISH[finish] ?? FINISH.flat)(colour));
+  const geo = { ball: p.ball, bubble: p.ball, star: p.music.star, heart: p.music.heart, note: p.music.note, blaze: blazeOf(p), bolt: p.bolt }[shape];
+  const m = flick(bit(geo, shape === 'bubble' ? p.bubble : mats.get(key), at, r), beat);
+  m.rotation.y = turn;
+  if (finish === 'glow' && shape !== 'bubble') {
+    if (!mats.has(`halo ${colour}`)) mats.set(`halo ${colour}`, haloOf(p, colour));
+    const halo = new THREE.Sprite(mats.get(`halo ${colour}`));
+    halo.scale.set(3.2, 3.2, 1);
+    m.add(halo);
+  }
+  g.add(m);
+}
+
+/** @typedef {{ shape: string, colour: string, at: number[], r: number, turn: number, beat: number }} Bit
+ * @typedef {Partial<Motion> & { bits: Bit[], finish?: string, family?: string }} Recipe */
+/** An effect from a recipe: its motion, and its bits as rolledBit draws them (what dev mode shows, to paste into EFFECTS). @param {Recipe} recipe */
+export function fromRecipe({ bits, finish = 'flat', family: _, ...motion }) {
+  return { ...motion, parts: (g, p) => { for (const b of bits) rolledBit(g, p, b, finish); } };
+}
+
+/** The effect seed `seed` rolls from ROLL, the same every time; for gloves and the sword (the scythe and hammer keep theirs).
+ * `recipe` is everything it rolled, rounded, to paste into EFFECTS through fromRecipe (a seed only lasts until ROLL changes). */
+export function rollEffect(seed) {
+  let n = (Math.abs(Math.floor(seed)) % 2147483646) + 1;
+  const rnd = () => ((n = (n * 16807) % 2147483647) / 2147483647), pick = (list) => list[Math.floor(rnd() * list.length)];
+  const span = (/** @type {readonly number[]} */ [a, b]) => a + (b - a) * rnd(), off = () => (rnd() * 2 - 1) * ROLL.reach;
+  const motion = Object.fromEntries(Object.entries(ROLL.motion).map(([k, range]) => [k, span(range)]));
+  const family = pick(Object.keys(ROLL.families)), finish = pick(ROLL.finishes), colours = ROLL.families[family];
+  const shapes = [pick(ROLL.shapes), pick(ROLL.shapes)];
+  const bits = Array.from({ length: Math.round(span(ROLL.count)) }, (_, i) => ({ shape: pick(shapes), colour: pick(colours),
+    at: [off(), off(), off()], r: span(ROLL.bit), turn: (i % 2) * Math.PI / 2, beat: rnd() * 6 }));
+  // rounded first, so what's shown is exactly what's drawn
+  const recipe = JSON.stringify({ finish, family, ...motion, bits }, (_, v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v));
+  return { ...fromRecipe(JSON.parse(recipe)), recipe };
+}
+
+/** An effect's look, with its EFFECT, in `g.userData.fx`; `kind` an EFFECTS name or an effect itself (as rollEffect's). */
+function trickMesh(kind, built) {
+  const g = new THREE.Group(), effect = typeof kind === 'string' ? EFFECTS[kind] : kind;
+  effect.parts(g, trickPartsOnce(), built);
+  g.userData.fx = { ...EFFECT, ...effect };
   return g;
 }
 
 /** A trick at the blade's tip, or at each glove; shared materials, so nothing to dispose. */
+/** @param {string|{ parts: Function, rides?: boolean }} kind an EFFECTS name, or an effect itself (as rollEffect's) */
 export function addTricks(built, kind) {
   removeTricks(built);
   if (kind === 'plain') return;
-  const spots = built.sword
-    ? [{ parent: built.sword, at: [0, 0, built.sword.userData.tip], side: built.sword.userData.side }]
+  // a trick isn't on the glove or the blade: it leaves as the hit lands and flies on, so the fist or blade going back
+  // doesn't take it along (playtest: riding the sword home it floated into the face), unless it `rides`
+  const tip = built.sword && { parent: built.sword, at: [0, 0, built.sword.userData.tip], side: built.sword.userData.side };
+  const spots = tip
+    ? [(typeof kind === 'string' ? EFFECTS[kind] : kind).rides ? tip : { parent: built.root, at: [0, 0, 0], side: tip.side, anchor: tip }]
     : gloveAnchors(built).map((anchor, i) => ({ parent: built.root, at: [0, 0, 0], side: i ? 1 : -1, anchor }));
-  // a glove's trick isn't on the glove: it leaves the fist as the punch lands and flies on, so the fist going back
-  // doesn't take it along (playtest); a blade's rides its tip
   built.tricks = spots.map(({ parent, at, side, anchor }) => {
     const spin = trickMesh(kind, built), g = new THREE.Group().add(spin);
     g.position.set(...at);
@@ -582,25 +720,43 @@ const _q = new THREE.Quaternion(), _up = new THREE.Quaternion(), _now = new THRE
 /** How far apart the scythe's music bits fly out past its point, in the trick's own size. */
 const SPRAY_GAP = 0.09;
 
-// a glove's trick flies this far along the punch over SHOW_OFF, and spreads to this many times its own size
-const DRIFT = 0.7, SPREAD = 3;
+const _along = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
+/** A trick off a glove or a blade, `k` (0-1) through its life: along the force from where it left, spreading out; with
+ * `stream` its bits leave one after another, and with `stretch` they spread further along the force than across it. */
+function fly(g, spin, fx, k) {
+  const { from, dir } = g.userData, bits = spin.children.filter((m) => m.userData.base), size = Math.max(g.scale.x, 1e-3);
+  g.position.copy(from).addScaledVector(dir, fx.drift * k);
+  _along.copy(dir).applyAxisAngle(UP, -spin.rotation.y);
+  bits.forEach((m, i) => {
+    // the last bit leaves STREAM_WAIT of the way through, and each makes its whole flight in the time it has left
+    const wait = fx.stream * STREAM_WAIT * (bits.length > 1 ? i / (bits.length - 1) : 0), own = Math.min(1, Math.max(0, (k - wait) / (1 - wait)));
+    const along = m.userData.base.dot(_along);
+    m.position.copy(m.userData.base).addScaledVector(_along, along * (fx.stretch - 1)).multiplyScalar(1 + (fx.spread - 1) * own)
+      .addScaledVector(_along, (fx.drift * (own - k)) / size);
+  });
+}
 
-/** Shows only `side`'s trick (none for null), upright, `size` times its own, turned, and `k` (0-1) of the way out:
- * a blade's rises off its tip, a glove's flies along its punch, spreading out. */
-function poseTricks(built, side, size, turn, k) {
+/** Each flicking bit stretches and squashes on its own beat. */
+function flicker(spin, fx, t) {
+  for (const m of spin.children) {
+    const { flick: beat, r } = m.userData;
+    if (beat !== undefined) m.scale.set(r, r * (1 + fx.flicker * Math.sin(t * fx.turn * 3 + beat)), r);
+  }
+}
+
+/** Shows only `side`'s trick (none for null), `t` seconds after its hit, upright, moving as its EFFECT says. */
+function poseTricks(built, side, t) {
   for (const g of built.tricks ?? []) {
-    g.visible = g.userData.side === side;
+    const { spin, anchor } = g.userData, { fx } = spin.userData, k = t / fx.life;
+    g.visible = g.userData.side === side && t >= 0 && k < 1;
     if (!g.visible) continue;
-    const { spin, anchor, from, dir } = g.userData;
     g.quaternion.copy(g.parent.getWorldQuaternion(_q).invert().multiply(built.root.getWorldQuaternion(_up)));
-    g.scale.setScalar(size);
-    spin.rotation.y = turn;
-    spin.position.y = anchor ? 0 : 0.35 * k;
-    if (anchor) {
-      g.position.copy(from).addScaledVector(dir, DRIFT * k);
-      for (const m of spin.children) if (m.userData.base) m.position.copy(m.userData.base).multiplyScalar(1 + (SPREAD - 1) * k);
-    }
-    if (spin.userData.spray) spray(g, turn);
+    g.scale.setScalar(fx.size * Math.min(1, 4 * (1 - k)));
+    spin.rotation.y = t * fx.turn;
+    spin.position.y = anchor ? 0 : fx.rise * k;
+    if (anchor) fly(g, spin, fx, k);
+    if (spin.userData.spray) spray(g, t * fx.turn);
+    flicker(spin, fx, t);
   }
 }
 
@@ -640,20 +796,19 @@ function spray(g, turn) {
 }
 
 // REUSE-SPEC.md §Fighter chooser: the preview never hits anything, so its trick stays out to be seen
-export const SHOW_OFF = 1.2;
-/** The chooser's trick, `t` seconds after its jab would land: big, floating up off the hand, gone after SHOW_OFF. */
-export const showOffTrick = (built, side, t) =>
-  poseTricks(built, t >= 0 && t < SHOW_OFF ? side : null, 1.4 * Math.min(1, 4 * (1 - t / SHOW_OFF)), t * 5, t / SHOW_OFF);
+export const SHOW_OFF = EFFECT.life;
+/** The chooser's trick, `t` seconds after its jab would land, as in a fight. */
+export const showOffTrick = (built, side, t) => poseTricks(built, side, t);
 
-/** The hitting hand's trick pops off it as the swoosh starts and floats up, as big and as long as the chooser's show-off
- * (playtest: shown only through the swoosh, at a third of that size, it was all but invisible in a fight). */
+/** The hitting hand's trick pops off it as the swoosh starts, as big and as long as the chooser's show-off (playtest: shown
+ * only through the swoosh, at a third of that size, it was all but invisible in a fight). */
 export function stepTricks(built, punch, dt) {
   const on = Boolean(punch) && sample(SWORD_MOVES[punch.name], punch.step).swoosh > 0.015;
   const g = punch && built.tricks?.find((o) => o.userData.anchor && o.userData.side === punch.arm);
   if (g && on && punch.step <= STRIKE) aimTrick(built, g, !built.trickOn);
   if (on && !built.trickOn) Object.assign(built, { trickT: 0, trickSide: punch.arm });
   built.trickOn = on;
-  built.trickT = (built.trickT ?? SHOW_OFF) + dt;
+  built.trickT = (built.trickT ?? Infinity) + dt;
   showOffTrick(built, built.trickSide ?? null, built.trickT);
 }
 

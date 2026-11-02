@@ -12,7 +12,8 @@ export const COMBO_TICKS = 150;
 
 const REST = Object.freeze({ hit: 0, guard: 0, hitOut: POSES.rest.armOut, guardOut: POSES.rest.armOut, elbow: POSES.rest.elbowBend });
 const key = (t, p) => Object.freeze([t, Object.freeze({ ...REST, twist: 0, roll: 0, lean: 0, knee: 0, hip: 0, pitch: 0, ...p })]);
-const WIND = 0.14, HOLD = 0.5;
+// HOLD: the reach is held to here, so a punch is seen out, not just passed through (playtest: only the cross read)
+const WIND = 0.14, HOLD = 0.65;
 /** How far through a punch its glove lands. */
 export const STRIKE = 0.25;
 const timeline = (wind, strike, hold) => Object.freeze([key(0, {}), key(WIND, wind), key(STRIKE, strike), key(HOLD, hold), key(1, {})]);
@@ -21,19 +22,19 @@ const timeline = (wind, strike, hold) => Object.freeze([key(0, {}), key(WIND, wi
 // one elbow for both arms
 export const PUNCHES = Object.freeze({
   jab: timeline(
-    { hit: 0.2, guard: -0.3, hitOut: 0.25, guardOut: 0.3, elbow: 1.3, twist: -0.35, lean: -0.05 },
-    { hit: -1.75, guard: 0.7, hitOut: 0.12, guardOut: 0.45, elbow: 0, twist: 0.6, lean: 0.2, pitch: -0.1 },
-    { hit: -1.65, guard: 0.6, hitOut: 0.14, guardOut: 0.4, elbow: 0.1, twist: 0.5, lean: 0.18, pitch: -0.08 },
+    { hit: 0.75, guard: -0.5, hitOut: 0.3, guardOut: 0.3, elbow: 1.4, twist: -0.7, lean: -0.15 },
+    { hit: -1.85, guard: 0.85, hitOut: 0.1, guardOut: 0.5, elbow: 0, twist: 1, lean: 0.35, hip: 0.1, pitch: -0.12 },
+    { hit: -1.75, guard: 0.75, hitOut: 0.12, guardOut: 0.45, elbow: 0.08, twist: 0.9, lean: 0.3, hip: 0.08, pitch: -0.1 },
   ),
   cross: timeline(
-    { hit: 0.8, guard: -0.6, hitOut: 0.35, guardOut: 0.3, elbow: 1.2, twist: -0.8, lean: -0.15 },
-    { hit: -1.8, guard: 0.95, hitOut: 0.1, guardOut: 0.55, elbow: 0, twist: 1.1, lean: 0.4, hip: 0.15, pitch: -0.15 },
-    { hit: -1.7, guard: 0.85, hitOut: 0.12, guardOut: 0.5, elbow: 0.1, twist: 1, lean: 0.35, hip: 0.12, pitch: -0.12 },
+    { hit: 1, guard: -0.7, hitOut: 0.35, guardOut: 0.3, elbow: 1.3, twist: -1, lean: -0.22 },
+    { hit: -1.85, guard: 1, hitOut: 0.1, guardOut: 0.55, elbow: 0, twist: 1.3, lean: 0.48, hip: 0.2, pitch: -0.18 },
+    { hit: -1.75, guard: 0.9, hitOut: 0.12, guardOut: 0.5, elbow: 0.08, twist: 1.2, lean: 0.42, hip: 0.16, pitch: -0.15 },
   ),
   uppercut: timeline(
-    { hit: 0.5, guard: -0.8, hitOut: 0.3, guardOut: 0.2, elbow: 1.5, twist: -0.5, roll: -0.2, lean: 0.4, knee: 1, hip: 0.5, pitch: 0.15 },
-    { hit: -2.9, guard: 0.6, hitOut: 0.2, guardOut: 0.5, elbow: 0.15, twist: 0.4, roll: 0.45, lean: -0.3, hip: -0.15, pitch: -0.35 },
-    { hit: -2.8, guard: 0.5, hitOut: 0.2, guardOut: 0.45, elbow: 0.2, twist: 0.35, roll: 0.4, lean: -0.25, hip: -0.1, pitch: -0.3 },
+    { hit: 0.8, guard: -0.8, hitOut: 0.3, guardOut: 0.2, elbow: 1.6, twist: -0.7, roll: -0.25, lean: 0.6, knee: 1.4, hip: 0.75, pitch: 0.2 },
+    { hit: -2.4, guard: 0.7, hitOut: 0.15, guardOut: 0.5, elbow: 0.35, twist: 0.8, roll: 0.5, lean: -0.15, hip: -0.1, pitch: -0.3 },
+    { hit: -2.3, guard: 0.6, hitOut: 0.15, guardOut: 0.45, elbow: 0.4, twist: 0.7, roll: 0.45, lean: -0.12, hip: -0.08, pitch: -0.25 },
   ),
 });
 

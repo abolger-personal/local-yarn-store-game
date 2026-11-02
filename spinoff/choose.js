@@ -1,9 +1,9 @@
 import {
   BAGS, CAPES, CLOTH, FUR, HAND_ICON, HATS, SPECIES, TEXTURES, TRICKS, animateFighter, buildFighter, disposeFighter, handsFor, loadFighter, newFighter,
-  paint, randomFighter, saveFighter, setFur, showOffTrick, stepFighter,
+  addTricks, paint, randomFighter, rollEffect, saveFighter, setFur, showOffTrick, stepFighter,
 } from './fighter.js';
 import { POSES } from '../characters/npc.js';
-import { inRoom, openRoom } from './net.js';
+import { debugging, inRoom, openRoom } from './net.js';
 import { levelsBeaten } from './progress.js';
 import { STRIKE } from './punches.js';
 import { makeStage } from './stage.js';
@@ -48,10 +48,13 @@ const allowed = (f) => {
   if (!TRICKS[f.look.hands].includes(f.look.trick)) f.look.trick = TRICKS[f.look.hands][0];
   return f;
 };
-const TRICK_ICON = { plain: '', sparkle: '✨', bubble: '🫧', flame: '🔥' };
+const TRICK_ICON = { plain: '', sparkle: '✨', bubble: '🫧', flame: '🔥', bebop: '🎷' };
 
 let fighter = allowed(loadFighter() ?? newFighter('lion'));
 let built = null, cheer = 0, spin = 0, swing = 1, landed = Infinity, shows = -1;
+/** Dev mode (🧪, only with ?debug=1): gloves or the sword tapped again try a random effect, `rolled` its seed, until other
+ * hands are picked or dev mode is left. */
+let dev = false, rolled = null;
 const SHOW_MOVES = ['jab', 'cross', 'uppercut'];
 const panel = document.getElementById('panel');
 
@@ -101,10 +104,12 @@ function render() {
     garment('🦸', 'cape', CAPES, true),
     garment('🎒', 'bag', BAGS, false),
     row('✊', 'hands', pictures(handsFor(beaten, badGuy).map((v) => {
-      const on = v === look.hands, badge = on && TRICKS[v].length > 1 && TRICK_ICON[look.trick] ? `<text x="38" y="14" font-size="18" text-anchor="middle">${TRICK_ICON[look.trick]}</text>` : '';
+      const on = v === look.hands, icon = on && rolled !== null ? '🎲' : on && TRICKS[v].length > 1 && TRICK_ICON[look.trick];
+      const badge = icon ? `<text x="38" y="14" font-size="18" text-anchor="middle">${icon}</text>` : '';
       return button('hands', v, on && TRICKS[v].length > 1 ? `${v}, ${look.trick}, tap again to change` : v, svg(ICON[v] + badge, look.gloves), on);
     }).join('')),
-      swatches(swatchRow('gloves', CLOTH, fighter.look.gloves))),
+      swatches(swatchRow('gloves', CLOTH, fighter.look.gloves)),
+      rolled === null ? '' : `<p class="rolled">🎲 ${rolled}</p><pre class="rolled-fx">${rollEffect(rolled).recipe}</pre>`),
   ].join('');
 }
 
@@ -126,7 +131,9 @@ const ACTIONS = {
   bag: (v) => { fighter.look.bag = v; },
   hands: (v) => {
     const { look } = fighter, tricks = TRICKS[v];
-    if (v === look.hands) look.trick = tricks[(tricks.indexOf(look.trick) + 1) % tricks.length];
+    // ponytail: the effects randomizer's try-out (fighter.js ROLL), in dev mode on gloves or the sword only
+    rolled = dev && v === look.hands && (v === 'gloves' || v === 'sword') ? Math.floor(Math.random() * 1e6) : null;
+    if (rolled === null && v === look.hands) look.trick = tricks[(tricks.indexOf(look.trick) + 1) % tricks.length];
     else look.hands = v;
     allowed(fighter);
     swing = 0;
@@ -154,6 +161,7 @@ const stage = makeStage(document.getElementById('stage'));
 function rebuild(reframe) {
   if (built) { stage.scene.remove(built.root); disposeFighter(built); }
   built = buildFighter(paint(fighter));
+  if (rolled !== null) addTricks(built, rollEffect(rolled));
   stage.scene.add(built.root);
   if (reframe) stage.frame([built.root], { margin: 1.5 });
 }
@@ -178,6 +186,17 @@ document.getElementById('bad').addEventListener('click', () => {
   saveFighter(fighter);
   rebuild(false);
   cheer = 1.4;
+  render();
+});
+
+// dev mode: the effects randomizer, for whoever opened the game with ?debug=1; a kid never sees 🧪
+const devButton = document.getElementById('dev');
+devButton.hidden = !debugging();
+devButton.addEventListener('click', () => {
+  dev = !dev;
+  rolled = null;
+  devButton.setAttribute('aria-pressed', String(dev));
+  rebuild(false);
   render();
 });
 

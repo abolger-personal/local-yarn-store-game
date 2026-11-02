@@ -2,7 +2,7 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
-## 0.0.6 — 2026-10-18: The Greathammer and the chasing level
+## 0.0.6 — 2026-11-01: The Greathammer and the chasing level
 
 ### Dress up
 - **The Greathammer.** Beat level 4 and a fourth choice shows up: a ridiculously huge, spiked, grey-and-black
@@ -21,7 +21,23 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   shelf sits near the edge of the stage. There's still only one bad guy, but it's faster now, and if you
   run past it with a donut it chases you and punches. Get punched near the edge and you'll fly off!
 
+### Fighting
+- **Every punch reads.** The jab now winds up and turns almost as far as the cross, the uppercut crouches deeper
+  and comes up higher, and every punch stays out at full reach a little longer before it comes back. It's still the
+  same punch, just as fast: you can see which one it was.
+- **Bubbles, sparkles and flames you can see in a fight.** They used to flicker at a third of their size for a
+  moment. Now every punch shows them as big as on the dress-up page, and off a glove they fly on the way the punch
+  went (forward for a jab or cross, up for an uppercut), spreading out, instead of going back with your fist.
+
+### Playing on a laptop
+- **Keyboard keys.** ← → walk, ↑ walks to the back and ↓ to the front, Space jumps (twice for the double jump),
+  Z punches (hold it to aim the Greathammer, just like holding 🥊) and X kicks. Clicking does what a tap does. Press
+  any other key and a card in the corner shows the keys; it goes away as soon as you play. Walking with the keys
+  stops at the edge, just like tapping.
+
 ### Building
+- **⬇️ only shows where your pancake can go.** Carrying a pancake, walk out of your end of the stage, or up to a
+  stack that's already as tall as it can be, and ⬇️ disappears. Walk back and it's there again.
 - **Pancakes go where you tap.** Carrying a pancake, tap the spot you want it and your fighter walks up next
   to that spot, facing it, so ⬇️ puts the pancake right where you tapped, not a step past you.
 
@@ -32,11 +48,14 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 
 ### End card
 - **You'll know when you've won something new.** Beat a level that unlocks a sword or the scythe and a
-  bouncing button pops up on the score card with the new thing, ✨ and ✏️ on it. Tap it to go and dress up.
+  bouncing button pops up on the score card with the new thing, ✨ and ✏️ on it. Tap it to go and dress up: the
+  dress-up page opens on the weapons, so your new one is right there.
 
 ### Fixes
 - **No more getting stuck on ⏳.** A tablet that's slow to load the round tries again by itself after a few
   seconds, and 👋 under ⏳ always takes you back to the lobby.
+- **Other players walk smoothly on a fast screen.** On a laptop or other fast screen in someone else's room,
+  walking players stuttered, stopping and jumping, while the bad guy looked fine. Now everyone walks smoothly.
 
 ## 0.0.5 — 2026-10-17: The Music Scythe and the jumping level
 

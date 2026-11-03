@@ -23,9 +23,10 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   - 🪄 **Magic star**: a spiral of glowing mint hearts and twinkles that corkscrews out of your fist.
   - 💞 **Heart blast**: a star of outlined pink, purple, blue and white hearts blasted out wide.
   - ☀️ **Smite of light**: glowing streaks of light that shoot out one after another and curve up, like a beam.
+  - 💨 **Speed lines**: shiny silver streaks that zip out of your punch.
 - **New tricks for your sword.** 🌠 **Shooting star**: a trail of tiny glowing stars along your swing. The sword
   can do 🍬 **Bubblegum pop** too, swelling right on its tip, and ☀️ **Smite of light**, which spreads its streaks
-  of light along your swing.
+  of light along your swing, and 💨 **Speed lines** too.
 - **A new trick for the Greathammer.** Tap the hammer again: 🌩️ lightning, or 💥 **Zap**, a big glowing green
   ZAP! on the hammer's head.
 - **The flame is a real fire.** 🔥 is now a cartoon flame with embers flying off it, and off your gloves it flies

@@ -48,7 +48,7 @@ export const HAND_ICON = Object.freeze({
 });
 // what flies off the hitting glove or the blade's tip as it lands; tapping the picked one goes to the next. The scythe's is fixed.
 export const TRICKS = Object.freeze({
-  gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame', 'bebop', 'starPunch', 'fireball', 'loveTap', 'bubblegumPop', 'powerPuff', 'magicStar', 'heartBlast', 'smiteOfLight']), sword: Object.freeze(['sparkle', 'bubble', 'flame', 'bebop', 'shootingStar', 'bubblegumPop', 'smiteOfLight']), scythe: Object.freeze(['music']),
+  gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame', 'bebop', 'starPunch', 'fireball', 'loveTap', 'bubblegumPop', 'powerPuff', 'magicStar', 'heartBlast', 'smiteOfLight', 'speedLines']), sword: Object.freeze(['sparkle', 'bubble', 'flame', 'bebop', 'shootingStar', 'bubblegumPop', 'smiteOfLight', 'speedLines']), scythe: Object.freeze(['music']),
   // lightning first: a trick the hammer doesn't have falls back to it
   hammer: Object.freeze(['lightning', 'zap']),
 });
@@ -780,6 +780,18 @@ export const EFFECTS = Object.freeze({
     { shape: 'streak', colour: '#fff27a', at: [0, 0, 0], r: 0.188, turn: 1.571, beat: 2.217 },
     { shape: 'streak', colour: '#ff8fd1', at: [0, 0, 0], r: 0.071, turn: 0, beat: 5.328 },
     { shape: 'streak', colour: '#ff8fd1', at: [0, 0, 0], r: 0.127, turn: 1.571, beat: 0.088 },
+  ] }),
+  // found 2026-11-03: chrome speed lines, white and a little yellow, shot out one after another, dipping a little and
+  // braking hard. All its bits start in the middle, so spreading wouldn't do anything (left out)
+  speedLines: fromRecipe({ finish: 'chrome', life: 1.24, turn: 2.55, drift: 1.986, stream: 1, flicker: 0.26, arc: -0.26, ease: 0.967, grow: -0.02, hue: 0.8, bits: [
+    { shape: 'streak', colour: '#ffffff', at: [0, 0, 0], r: 0.098, turn: 0, beat: 3.569 },
+    { shape: 'streak', colour: '#ffffff', at: [0, 0, 0], r: 0.101, turn: 1.571, beat: 1.503 },
+    { shape: 'streak', colour: '#ffffff', at: [0, 0, 0], r: 0.081, turn: 0, beat: 2.861 },
+    { shape: 'streak', colour: '#ffd21a', at: [0, 0, 0], r: 0.127, turn: 1.571, beat: 5.577 },
+    { shape: 'streak', colour: '#ffffff', at: [0, 0, 0], r: 0.097, turn: 0, beat: 2.895 },
+    { shape: 'streak', colour: '#ffd21a', at: [0, 0, 0], r: 0.143, turn: 1.571, beat: 2.917 },
+    { shape: 'streak', colour: '#ffffff', at: [0, 0, 0], r: 0.182, turn: 0, beat: 1.975 },
+    { shape: 'streak', colour: '#ffffff', at: [0, 0, 0], r: 0.129, turn: 1.571, beat: 5.944 },
   ] }),
   sparkle: { parts: (g, _p, built) => g.add(sparkleOf(built)) },
   bubble: { parts: (g, p) => scatter(g, p.ball, p.bubble, BUBBLES) },

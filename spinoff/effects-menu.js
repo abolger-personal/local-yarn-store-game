@@ -111,10 +111,21 @@ function recipeFolder(m) {
   const f = m.gui.addFolder('recipe');
   f.add(m.state, 'recipe').name('now');
   f.add({ copy: () => navigator.clipboard?.writeText(m.state.recipe).catch(() => {}) }, 'copy').name('📋 copy recipe');
-  f.add({ paste: () => {
-    const text = prompt('paste a recipe');
-    try { if (text) load(m, upgradeRecipe(JSON.parse(text))); } catch { /* not a recipe */ }
-  } }, 'paste').name('📥 paste a recipe');
+  f.add({ paste: () => pasteRecipe(m) }, 'paste').name('📥 paste a recipe');
+}
+
+/** The recipe on the clipboard (copy one, then tap 📥), or typed into a box if the browser won't share the clipboard;
+ * what went wrong shows in the recipe line instead of nothing happening (playtest: paste seemed not to work). */
+async function pasteRecipe(m) {
+  const text = await navigator.clipboard?.readText().catch(() => null) ?? prompt('paste a recipe');
+  if (!text) return;
+  try {
+    load(m, upgradeRecipe(JSON.parse(text)));
+  } catch (e) {
+    console.warn('📥 not a recipe', e, text);
+    m.state.recipe = `📥 not a recipe: ${e.message}`;
+    m.gui.controllersRecursive().forEach((c) => c.updateDisplay());
+  }
 }
 
 /**

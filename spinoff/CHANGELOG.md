@@ -20,24 +20,31 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   - 💗 **Love tap**: one big shiny pink heart that drifts out slowly.
   - 🍬 **Bubblegum pop**: a big bubble that shoots out, bobs, swells up and turns pink as it pops.
   - ⚡ **Power puff**: a ring of neon lightning that bursts forward off your punch.
+  - 🪄 **Magic star**: a spiral of glowing mint hearts and twinkles that corkscrews out of your fist.
+  - 💞 **Heart blast**: a star of outlined pink, purple, blue and white hearts blasted out wide.
+  - ☀️ **Smite of light**: glowing streaks of light that shoot out one after another and curve up, like a beam.
 - **New tricks for your sword.** 🌠 **Shooting star**: a trail of tiny glowing stars along your swing. The sword
-  can do 🍬 **Bubblegum pop** too, swelling right on its tip.
+  can do 🍬 **Bubblegum pop** too, swelling right on its tip, and ☀️ **Smite of light**, which spreads its streaks
+  of light along your swing.
+- **A new trick for the Greathammer.** Tap the hammer again: 🌩️ lightning, or 💥 **Zap**, a big glowing green
+  ZAP! on the hammer's head.
 - **The flame is a real fire.** 🔥 is now a cartoon flame with embers flying off it, and off your gloves it flies
   the way you punched.
 
 ### For grown-ups: the trick workshop
 - **Make new tricks.** Open the fighter chooser with `?debug=1` and a 🧪 button shows up: tap your gloves or your
-  sword again to roll a random trick and see its recipe. Open it with `?debug_menu=1` for the full workshop:
-  sliders down the left for everything about a trick, your fighter at the size it is in a real fight, punching
-  on a loop so you can watch, and buttons to copy a recipe out and paste one back in. Sliders that don't do
-  anything for the trick you've got go grey, and hovering says why.
+  sword again to roll a random trick and see its recipe. Open it with `?debug_menu=1` for the full workshop: sliders
+  down the left for everything about a trick, your fighter at the size it is in a real fight, punching on a loop so
+  you can watch, and buttons to copy a recipe out and paste one back in (📥 reads the clipboard, and says what's
+  wrong if it isn't a recipe). Sliders that don't do anything for the trick you've got go grey, and hovering says
+  why.
 - **What a trick can be.** A trick is lots of little bits:
   - **Shapes:** balls, bubbles, stars, hearts, music notes, flames, lightning bolts, streaks, twinkles, donuts,
     balls of yarn, gems, teardrops, petals, swirls, and words or emoji (POW!, BAM!, ZAP!, 🍩, 💖, ✨…). Each
     trick has one main shape, and can have small twinkles sprinkled in.
   - **Colours:** one family per trick: sunset, sea, berry, lime, candle, mint, ice, gold, bubblegum, galaxy,
     grape, ember, or riot (a bit of everything).
-  - **Finishes:** flat paper, glowing, neon (glows that add up to white where they overlap), cartoon, sticker
+  - **Finishes:** flat paper, glowing, neon (a white-hot middle in a bright glow of its colour), cartoon, sticker
     (cartoon with a white outline), shiny candy, chrome, glitter, or knitted yarn. Everything but paper and the
     glows is puffy, so the light catches it.
   - **Where the bits start:** a scattered ball, all in the middle, a ring, a line, a spiral, a heart or a star.

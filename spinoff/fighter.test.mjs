@@ -253,7 +253,7 @@ for (const species of SPECIES) {
     'the end card names only what this win unlocked: the Greathammer after level 4');
   const { hands, trick } = readFighter({ species: 'lion', params: {}, look: { hands: 'scythe', trick: 'flame' } }).look;
   assert.deepEqual([hands, trick], ['scythe', 'music'], 'a scythe reads back, always with its music');
-  assert.equal(readFighter({ species: 'lion', params: {}, look: { hands: 'hammer', trick: 'bubble' } }).look.trick, 'lightning', 'the Greathammer always crackles with lightning');
+  assert.equal(readFighter({ species: 'lion', params: {}, look: { hands: 'hammer', trick: 'bubble' } }).look.trick, 'lightning', 'a trick the Greathammer doesn\'t have falls back to its lightning');
   for (const species of SPECIES) {
     const f = newFighter(species), gloved = buildFighter(f);
     assert.equal(gloved.tricks.length, 0, `${species}: plain gloves have no trick`);
@@ -429,7 +429,10 @@ for (const [hands, trick] of [['sword', 'sparkle'], ['sword', 'flame'], ['gloves
   const paper = ['flat', 'glow', 'neon'], basic = (f) => kinds[ROLL.finishes.indexOf(f)] === 'MeshBasicMaterial';
   assert.ok(ROLL.finishes.every((f) => basic(f) === paper.includes(f)), `paper finishes are flat colour, the rest lit or shined (${kinds})`);
   assert.ok(surface('glow').children[0]?.isSprite && surface('neon').children[0]?.isSprite && !surface('flat').children.length, 'a glow and neon have a halo');
-  assert.ok(surface('neon').material.blending === THREE.AdditiveBlending && surface('sticker').children[0]?.material.side === THREE.BackSide, 'neon adds up; a sticker is outlined');
+  const neon = surface('neon');
+  // not added light: on the stages' near-white backgrounds that only ever made white spots
+  assert.ok(neon.material.blending === THREE.NormalBlending && neon.children.filter((c) => c.isMesh && c.material.color.getHexString() === 'ffffff').length === 2, 'neon is its colour with a white-hot middle');
+  assert.ok(surface('sticker').children[0]?.material.side === THREE.BackSide, 'a sticker is outlined');
   assert.notEqual(surface('chrome').material.matcap, surface('glitter').material.matcap, 'chrome and glitter shine differently');
   const thick = (finish) => {
     const { geometry } = surface(finish);

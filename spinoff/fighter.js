@@ -48,8 +48,9 @@ export const HAND_ICON = Object.freeze({
 });
 // what flies off the hitting glove or the blade's tip as it lands; tapping the picked one goes to the next. The scythe's is fixed.
 export const TRICKS = Object.freeze({
-  gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame', 'bebop', 'starPunch', 'fireball', 'loveTap', 'bubblegumPop', 'powerPuff']), sword: Object.freeze(['sparkle', 'bubble', 'flame', 'bebop', 'shootingStar', 'bubblegumPop']), scythe: Object.freeze(['music']),
-  hammer: Object.freeze(['lightning']),
+  gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame', 'bebop', 'starPunch', 'fireball', 'loveTap', 'bubblegumPop', 'powerPuff', 'magicStar', 'heartBlast', 'smiteOfLight']), sword: Object.freeze(['sparkle', 'bubble', 'flame', 'bebop', 'shootingStar', 'bubblegumPop', 'smiteOfLight']), scythe: Object.freeze(['music']),
+  // lightning first: a trick the hammer doesn't have falls back to it
+  hammer: Object.freeze(['lightning', 'zap']),
 });
 // REUSE-SPEC.md §Fighter chooser: the levels a player must have beaten for the chooser to offer each
 const UNLOCK = Object.freeze({ sword: 1, scythe: 2, hammer: 4 });
@@ -675,6 +676,111 @@ export const EFFECTS = Object.freeze({
     { shape: 'bolt', colour: '#ffffff', at: [0, 0.302, -0.235], r: 0.251, turn: 1.571, beat: 2.444 },
     { shape: 'bolt', colour: '#ffffff', at: [0, 0.362, -0.124], r: 0.205, turn: 0, beat: 3.145 },
   ] }),
+  // found 2026-11-03: a spiral of neon mint and white hearts, twinkles among them, streaming out one after another and
+  // corkscrewing, shooting out and slowing, spreading wide and wiggling a little
+  magicStar: fromRecipe({ finish: 'neon', life: 0.904, turn: 1.152, drift: 2.1, spreadAlong: 3.314, spreadAcross: 4.418, stream: 1, flicker: 0.288,
+    amplitude: 0.05, frequency: 1.947, ease: 0.89, twist: 1.069, grow: 0.222, bits: [
+    { shape: 'twinkle', colour: '#b8ffe6', at: [0, 0, 0], r: 0.047, turn: 0, beat: 2.224 },
+    { shape: 'twinkle', colour: '#ffffff', at: [0, 0.011, 0.007], r: 0.046, turn: 1.571, beat: 5.63 },
+    { shape: 'heart', colour: '#3ee8b5', at: [0, 0.012, 0.024], r: 0.051, turn: 0, beat: 0.758 },
+    { shape: 'heart', colour: '#b8ffe6', at: [0, -0.003, 0.04], r: 0.059, turn: 1.571, beat: 4.322 },
+    { shape: 'heart', colour: '#3ee8b5', at: [0, -0.031, 0.044], r: 0.056, turn: 0, beat: 4.413 },
+    { shape: 'heart', colour: '#3ee8b5', at: [0, -0.062, 0.027], r: 0.062, turn: 1.571, beat: 2.607 },
+    { shape: 'heart', colour: '#3ee8b5', at: [0, -0.08, -0.011], r: 0.071, turn: 0, beat: 2.207 },
+    { shape: 'heart', colour: '#ffffff', at: [0, -0.073, -0.059], r: 0.087, turn: 1.571, beat: 5.302 },
+    { shape: 'heart', colour: '#b8ffe6', at: [0, -0.036, -0.101], r: 0.068, turn: 0, beat: 3.443 },
+    { shape: 'heart', colour: '#ffffff', at: [0, 0.025, -0.119], r: 0.074, turn: 1.571, beat: 0.825 },
+    { shape: 'heart', colour: '#b8ffe6', at: [0, 0.092, -0.098], r: 0.063, turn: 0, beat: 4.453 },
+    { shape: 'heart', colour: '#ffffff', at: [0, 0.142, -0.04], r: 0.082, turn: 1.571, beat: 5.206 },
+    { shape: 'heart', colour: '#ffffff', at: [0, 0.155, 0.044], r: 0.045, turn: 0, beat: 2.566 },
+    { shape: 'heart', colour: '#3ee8b5', at: [0, 0.119, 0.128], r: 0.087, turn: 1.571, beat: 1.818 },
+    { shape: 'twinkle', colour: '#3ee8b5', at: [0, 0.038, 0.184], r: 0.04, turn: 0, beat: 0.632 },
+    { shape: 'heart', colour: '#3ee8b5', at: [0, -0.068, 0.19], r: 0.071, turn: 1.571, beat: 1.004 },
+    { shape: 'heart', colour: '#3ee8b5', at: [0, -0.167, 0.136], r: 0.054, turn: 0, beat: 5.365 },
+    { shape: 'twinkle', colour: '#ffffff', at: [0, -0.226, 0.031], r: 0.036, turn: 1.571, beat: 5.064 },
+    { shape: 'heart', colour: '#3ee8b5', at: [0, -0.222, -0.096], r: 0.086, turn: 0, beat: 5.739 },
+    { shape: 'twinkle', colour: '#ffffff', at: [0, -0.147, -0.209], r: 0.048, turn: 1.571, beat: 5.182 },
+    { shape: 'heart', colour: '#ffffff', at: [0, -0.018, -0.268], r: 0.09, turn: 0, beat: 2.913 },
+    { shape: 'heart', colour: '#b8ffe6', at: [0, 0.13, -0.251], r: 0.071, turn: 1.571, beat: 1.874 },
+    { shape: 'heart', colour: '#3ee8b5', at: [0, 0.253, -0.154], r: 0.05, turn: 0, beat: 2.583 },
+    { shape: 'heart', colour: '#3ee8b5', at: [0, 0.309, 0], r: 0.053, turn: 1.571, beat: 5.894 },
+  ] }),
+  // found 2026-11-03: a ring of glowing golden donuts and twinkles, spinning fast and streaming out wide, swelling and
+  // flickering. Kept for a special occasion: on no hands in TRICKS yet, so nobody can pick it till something earns it
+  goldenDonut: fromRecipe({ finish: 'glow', life: 1.227, turn: 8.784, drift: 2.811, spreadAlong: 2.287, spreadAcross: 5.034, stream: 1, flicker: 1,
+    amplitude: 0.147, frequency: 1.514, ease: 0.315, grow: 0.757, bits: [
+    { shape: 'donut', colour: '#fff4c2', at: [0, 0.285, 0], r: 0.12, turn: 0, beat: 1.397 },
+    { shape: 'donut', colour: '#fff4c2', at: [0, 0.274, 0.077], r: 0.114, turn: 1.571, beat: 3.469 },
+    { shape: 'donut', colour: '#ffd21a', at: [0, 0.243, 0.148], r: 0.13, turn: 0, beat: 5.503 },
+    { shape: 'donut', colour: '#ffb300', at: [0, 0.194, 0.208], r: 0.04, turn: 1.571, beat: 5.037 },
+    { shape: 'donut', colour: '#ffd21a', at: [0, 0.131, 0.253], r: 0.034, turn: 0, beat: 5.918 },
+    { shape: 'twinkle', colour: '#ffb300', at: [0, 0.058, 0.279], r: 0.076, turn: 1.571, beat: 0.152 },
+    { shape: 'donut', colour: '#ffd21a', at: [0, -0.019, 0.284], r: 0.087, turn: 0, beat: 5.271 },
+    { shape: 'twinkle', colour: '#ffb300', at: [0, -0.095, 0.268], r: 0.053, turn: 1.571, beat: 2.172 },
+    { shape: 'donut', colour: '#fff4c2', at: [0, -0.164, 0.232], r: 0.076, turn: 0, beat: 0.011 },
+    { shape: 'twinkle', colour: '#fff4c2', at: [0, -0.221, 0.18], r: 0.031, turn: 1.571, beat: 4.827 },
+    { shape: 'donut', colour: '#ffb300', at: [0, -0.261, 0.113], r: 0.101, turn: 0, beat: 2.645 },
+    { shape: 'donut', colour: '#ffd21a', at: [0, -0.282, 0.039], r: 0.078, turn: 1.571, beat: 2.959 },
+    { shape: 'donut', colour: '#ffb300', at: [0, -0.282, -0.039], r: 0.036, turn: 0, beat: 2.087 },
+    { shape: 'twinkle', colour: '#ffb300', at: [0, -0.261, -0.113], r: 0.061, turn: 1.571, beat: 4.133 },
+    { shape: 'donut', colour: '#fff4c2', at: [0, -0.221, -0.18], r: 0.118, turn: 0, beat: 2.721 },
+    { shape: 'donut', colour: '#ffd21a', at: [0, -0.164, -0.232], r: 0.1, turn: 1.571, beat: 5.753 },
+    { shape: 'donut', colour: '#ffd21a', at: [0, -0.095, -0.268], r: 0.059, turn: 0, beat: 0.004 },
+    { shape: 'twinkle', colour: '#ffd21a', at: [0, -0.019, -0.284], r: 0.086, turn: 1.571, beat: 3.89 },
+    { shape: 'twinkle', colour: '#ffd21a', at: [0, 0.058, -0.279], r: 0.068, turn: 0, beat: 0.799 },
+    { shape: 'twinkle', colour: '#ffd21a', at: [0, 0.131, -0.253], r: 0.063, turn: 1.571, beat: 1.575 },
+    { shape: 'donut', colour: '#ffd21a', at: [0, 0.194, -0.208], r: 0.07, turn: 0, beat: 0.789 },
+    { shape: 'donut', colour: '#ffd21a', at: [0, 0.243, -0.148], r: 0.053, turn: 1.571, beat: 2.958 },
+    { shape: 'twinkle', colour: '#ffd21a', at: [0, 0.274, -0.077], r: 0.082, turn: 0, beat: 0.539 },
+  ] }),
+  // found 2026-11-03: one big glowing green ZAP! for the Greathammer, swelling on its head as it swings. A blade's trick
+  // stays on the tip, so only what works there is kept (its life, flicker, swelling, and spreading off the head)
+  zap: fromRecipe({ finish: 'glow', life: 1.943, turn: 0, spreadAcross: 3.532, flicker: 0.255, ease: 0.554, grow: 0.963, bits: [
+    { shape: 'text', colour: '#8be02a', at: [0.085, -0.101, -0.104], r: 0.291, turn: 0, beat: 3.666, text: 'ZAP!' },
+  ] }),
+  // found 2026-11-03: a star of outlined galaxy hearts, pink, violet, blue and white, blasted out together and spreading
+  // wide as it flies, wiggling a little and slowing
+  heartBlast: fromRecipe({ finish: 'sticker', life: 1.784, turn: 0, drift: 2.861, spreadAlong: 2.683, spreadAcross: 4.343, flicker: 0,
+    amplitude: 0.2, frequency: 1.378, ease: 0.51, bits: [
+    { shape: 'heart', colour: '#ff6bd6', at: [0, 0.323, 0], r: 0.03, turn: 0, beat: 0.568 },
+    { shape: 'heart', colour: '#7a4cff', at: [0, 0.165, 0.066], r: 0.041, turn: 1.571, beat: 3.832 },
+    { shape: 'heart', colour: '#ff6bd6', at: [0, 0.108, 0.205], r: 0.084, turn: 0, beat: 2.091 },
+    { shape: 'heart', colour: '#2f6bff', at: [0, 0.055, 0.255], r: 0.069, turn: 1.571, beat: 0.804 },
+    { shape: 'heart', colour: '#2f6bff', at: [0, -0.062, 0.142], r: 0.114, turn: 0, beat: 5.016 },
+    { shape: 'heart', colour: '#ffffff', at: [0, -0.228, 0.182], r: 0.077, turn: 1.571, beat: 1.052 },
+    { shape: 'heart', colour: '#ffffff', at: [0, -0.19, 0.073], r: 0.058, turn: 0, beat: 2.594 },
+    { shape: 'heart', colour: '#2f6bff', at: [0, -0.19, -0.073], r: 0.076, turn: 1.571, beat: 2.348 },
+    { shape: 'heart', colour: '#ffffff', at: [0, -0.228, -0.182], r: 0.1, turn: 0, beat: 2.277 },
+    { shape: 'heart', colour: '#2f6bff', at: [0, -0.062, -0.142], r: 0.13, turn: 1.571, beat: 2.327 },
+    { shape: 'heart', colour: '#2f6bff', at: [0, 0.055, -0.255], r: 0.046, turn: 0, beat: 5.778 },
+    { shape: 'heart', colour: '#ffffff', at: [0, 0.108, -0.205], r: 0.075, turn: 1.571, beat: 4.245 },
+    { shape: 'heart', colour: '#ff6bd6', at: [0, 0.165, -0.066], r: 0.112, turn: 0, beat: 4.395 },
+  ] }),
+  // found 2026-11-03: neon streaks of yellow, blue and pink with twinkles among them, shot out one after another and
+  // bending up, slowing hard at the end: a beam off a glove, spread along the arc off a sword. All its bits start in the
+  // middle, so spreading wouldn't do anything (left out)
+  smiteOfLight: fromRecipe({ finish: 'neon', life: 0.94, turn: 0.828, drift: 1.986, stream: 1, flicker: 0, arc: 0.761, ease: 0.967, grow: 0.24, bits: [
+    { shape: 'streak', colour: '#fff27a', at: [0, 0, 0], r: 0.075, turn: 0, beat: 3.569 },
+    { shape: 'streak', colour: '#fff27a', at: [0, 0, 0], r: 0.08, turn: 1.571, beat: 1.503 },
+    { shape: 'streak', colour: '#fff27a', at: [0, 0, 0], r: 0.047, turn: 0, beat: 2.861 },
+    { shape: 'streak', colour: '#8fd8ff', at: [0, 0, 0], r: 0.121, turn: 1.571, beat: 5.577 },
+    { shape: 'streak', colour: '#fff27a', at: [0, 0, 0], r: 0.073, turn: 0, beat: 2.895 },
+    { shape: 'streak', colour: '#8fd8ff', at: [0, 0, 0], r: 0.147, turn: 1.571, beat: 2.917 },
+    { shape: 'streak', colour: '#fff27a', at: [0, 0, 0], r: 0.21, turn: 0, beat: 1.975 },
+    { shape: 'twinkle', colour: '#fff27a', at: [0, 0, 0], r: 0.075, turn: 1.571, beat: 5.944 },
+    { shape: 'twinkle', colour: '#fff27a', at: [0, 0, 0], r: 0.058, turn: 0, beat: 2.542 },
+    { shape: 'twinkle', colour: '#fff27a', at: [0, 0, 0], r: 0.048, turn: 1.571, beat: 4.605 },
+    { shape: 'streak', colour: '#ff8fd1', at: [0, 0, 0], r: 0.168, turn: 0, beat: 2.848 },
+    { shape: 'streak', colour: '#fff27a', at: [0, 0, 0], r: 0.157, turn: 1.571, beat: 2.298 },
+    { shape: 'streak', colour: '#fff27a', at: [0, 0, 0], r: 0.081, turn: 0, beat: 0.205 },
+    { shape: 'streak', colour: '#fff27a', at: [0, 0, 0], r: 0.079, turn: 1.571, beat: 0.344 },
+    { shape: 'twinkle', colour: '#fff27a', at: [0, 0, 0], r: 0.05, turn: 0, beat: 2.988 },
+    { shape: 'twinkle', colour: '#ff8fd1', at: [0, 0, 0], r: 0.113, turn: 1.571, beat: 4.3 },
+    { shape: 'streak', colour: '#8fd8ff', at: [0, 0, 0], r: 0.17, turn: 0, beat: 5.708 },
+    { shape: 'streak', colour: '#fff27a', at: [0, 0, 0], r: 0.188, turn: 1.571, beat: 2.217 },
+    { shape: 'streak', colour: '#ff8fd1', at: [0, 0, 0], r: 0.071, turn: 0, beat: 5.328 },
+    { shape: 'streak', colour: '#ff8fd1', at: [0, 0, 0], r: 0.127, turn: 1.571, beat: 0.088 },
+  ] }),
   sparkle: { parts: (g, _p, built) => g.add(sparkleOf(built)) },
   bubble: { parts: (g, p) => scatter(g, p.ball, p.bubble, BUBBLES) },
   flame: { parts: addFlame, flicker: 0.3 },
@@ -758,14 +864,14 @@ const LAYOUT = {
 };
 
 const TWO = THREE.DoubleSide;
-const ADD = { blending: THREE.AdditiveBlending, depthWrite: false };
-/** What a bit's surface is made of, by finish: flat paper; a glow (flat, with a halo: see adorn); neon, a glow whose
- * overlaps add up towards white; cartoon shading, and a sticker (that, outlined in white); shiny candy; chrome and glitter
+/** What a bit's surface is made of, by finish: flat paper; a glow (flat, with a halo: see adorn); neon, a white-hot
+ * middle in a strong glow of its colour (adorn; not added light: on the stages' near-white backgrounds that only ever
+ * made white spots, playtest); cartoon shading, and a sticker (that, outlined in white); shiny candy; chrome and glitter
  * (pictures of a shine, turning with the bit, so lit the same anywhere); or yarn. Shared per finish and colour. */
 const FINISH = {
   flat: (color) => new THREE.MeshBasicMaterial({ color, side: TWO, toneMapped: false }),
   glow: (color) => new THREE.MeshBasicMaterial({ color, side: TWO, toneMapped: false }),
-  neon: (color) => new THREE.MeshBasicMaterial({ color, side: TWO, toneMapped: false, ...ADD }),
+  neon: (color) => new THREE.MeshBasicMaterial({ color, side: TWO, toneMapped: false }),
   toon: (color) => new THREE.MeshToonMaterial({ color, side: TWO }),
   sticker: (color) => new THREE.MeshToonMaterial({ color, side: TWO }),
   glossy: (color) => new THREE.MeshStandardMaterial({ color, side: TWO, roughness: 0.12, metalness: 0 }),
@@ -796,7 +902,7 @@ function matcapOf(p, kind) {
   return maps[kind];
 }
 
-/** A soft dot, white in the middle fading to clear: a glow's halo, tinted per colour; neon's adds up. */
+/** A soft dot, white in the middle fading to clear: a glow's halo, tinted per colour; neon's is stronger. */
 function haloOf(p, color, neon) {
   if (!p.haloMap) {
     const n = 32, px = new Uint8Array(n * n * 4);
@@ -806,7 +912,7 @@ function haloOf(p, color, neon) {
     }
     p.haloMap = Object.assign(new THREE.DataTexture(px, n, n), { needsUpdate: true });
   }
-  return new THREE.SpriteMaterial({ map: p.haloMap, color, transparent: true, opacity: 0.7, depthWrite: false, toneMapped: false, ...(neon ? ADD : {}) });
+  return new THREE.SpriteMaterial({ map: p.haloMap, color, transparent: true, opacity: neon ? 1 : 0.7, depthWrite: false, toneMapped: false });
 }
 
 /** A w by h box turned by `a` round its middle, at (x, y). */
@@ -855,13 +961,19 @@ function geometryOf(p, shape, finish) {
     ?? ((p.paper ??= {})[shape] ??= new THREE.ShapeGeometry(PUFFY[shape](), 12));
 }
 
-/** A glow's or neon's halo round bit `m`, or a sticker's white outline (its shape again, a little bigger, seen from inside). */
+/** A glow's or neon's halo round bit `m`, and neon's white-hot middle on each face; or a sticker's white outline (its
+ * shape again, a little bigger, seen from inside). */
 function adorn(m, p, finish, colour) {
   const mats = p.finished;
   if (finish === 'glow' || finish === 'neon') {
     if (!mats.has(`halo ${finish} ${colour}`)) mats.set(`halo ${finish} ${colour}`, haloOf(p, colour, finish === 'neon'));
     m.add(new THREE.Sprite(mats.get(`halo ${finish} ${colour}`)));
     m.children.at(-1).scale.set(3.2, 3.2, 1);
+  }
+  if (finish === 'neon') {
+    mats.set('core', mats.get('core') ?? new THREE.MeshBasicMaterial({ color: '#ffffff', side: TWO, toneMapped: false }));
+    for (const z of [-0.05, 0.05]) m.add(Object.assign(new THREE.Mesh(m.geometry, mats.get('core')), { renderOrder: 1 })).children.at(-1).position.z = z;
+    for (const core of m.children.slice(-2)) core.scale.setScalar(0.45);
   }
   if (finish === 'sticker') {
     mats.set('outline', mats.get('outline') ?? new THREE.MeshBasicMaterial({ color: '#ffffff', side: THREE.BackSide }));

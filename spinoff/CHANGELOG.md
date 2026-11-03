@@ -8,6 +8,44 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **A bad guy who walks past you still gets hit.** If there's nothing to hit in front of you and a bad guy is
   right behind you, 🥊 or 🦶 turns you round to face them first. Punching while you walk away works too: you
   keep facing them until the punch is done. Gloves, sword, scythe and hammer all do it, on a tablet or a keyboard.
+- **Sword tricks follow the swing.** A sword's trick now stays on the tip of the blade all the way through the
+  swing. Some leave a trail: their bits drop off the tip one by one along the arc and fly on the way the blade was
+  going, so a swing draws a streak of stars through the air.
+- **Tricks fade away.** At the end, a trick now fades out where it is instead of shrinking back into a dot.
+
+### Dress up
+- **New tricks for your gloves.** Tap your gloves again to go through them:
+  - 🌟 **Star punch**: a line of shiny stars fired straight out of your fist.
+  - ☄️ **Fireball**: a glowing ball of flames and lightning bolts.
+  - 💗 **Love tap**: one big shiny pink heart that drifts out slowly.
+  - 🍬 **Bubblegum pop**: a big bubble that shoots out, bobs, swells up and turns pink as it pops.
+  - ⚡ **Power puff**: a ring of neon lightning that bursts forward off your punch.
+- **New tricks for your sword.** 🌠 **Shooting star**: a trail of tiny glowing stars along your swing. The sword
+  can do 🍬 **Bubblegum pop** too, swelling right on its tip.
+- **The flame is a real fire.** 🔥 is now a cartoon flame with embers flying off it, and off your gloves it flies
+  the way you punched.
+
+### For grown-ups: the trick workshop
+- **Make new tricks.** Open the fighter chooser with `?debug=1` and a 🧪 button shows up: tap your gloves or your
+  sword again to roll a random trick and see its recipe. Open it with `?debug_menu=1` for the full workshop:
+  sliders down the left for everything about a trick, your fighter at the size it is in a real fight, punching
+  on a loop so you can watch, and buttons to copy a recipe out and paste one back in. Sliders that don't do
+  anything for the trick you've got go grey, and hovering says why.
+- **What a trick can be.** A trick is lots of little bits:
+  - **Shapes:** balls, bubbles, stars, hearts, music notes, flames, lightning bolts, streaks, twinkles, donuts,
+    balls of yarn, gems, teardrops, petals, swirls, and words or emoji (POW!, BAM!, ZAP!, 🍩, 💖, ✨…). Each
+    trick has one main shape, and can have small twinkles sprinkled in.
+  - **Colours:** one family per trick: sunset, sea, berry, lime, candle, mint, ice, gold, bubblegum, galaxy,
+    grape, ember, or riot (a bit of everything).
+  - **Finishes:** flat paper, glowing, neon (glows that add up to white where they overlap), cartoon, sticker
+    (cartoon with a white outline), shiny candy, chrome, glitter, or knitted yarn. Everything but paper and the
+    glows is puffy, so the light catches it.
+  - **Where the bits start:** a scattered ball, all in the middle, a ring, a line, a spiral, a heart or a star.
+  - **How they move:** how long they last, how fast they spin, how far they fly, how much they spread along the
+    punch and across it, all at once or one after another, bending up or down, wiggling, corkscrewing, shooting
+    out and slowing down, growing or shrinking, flickering, and changing colour as they go.
+- **Better rolls.** The dice now roll inside what's been picked as favourites so far, instead of anywhere: spins
+  that are still, slow or fast, never in between, 6 to 24 bits or one big one, and so on.
 
 ## 0.0.6 — 2026-11-01: The Greathammer and the chasing level
 

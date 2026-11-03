@@ -48,6 +48,19 @@ function roomLights(camera, strength) {
   return [probe, fill];
 }
 
+/** The match camera (play.js): down at the floor at `pitch`, fitting `viewW` by `viewH` of the stage on the screen. */
+export const GAME_VIEW = Object.freeze({ pitch: THREE.MathUtils.degToRad(35), viewW: 7, viewH: 4.8 });
+const BACK = new THREE.Vector3(0, Math.sin(GAME_VIEW.pitch), Math.cos(GAME_VIEW.pitch));
+
+/** Points `camera` at `aim` as the match does. `share`: how much of the screen's width and height this canvas has, so a
+ * smaller canvas (the effects menu's) shows things the size a match would. */
+export function aimGameCamera(camera, aim, share = { w: 1, h: 1 }) {
+  const vFov = THREE.MathUtils.degToRad(camera.fov) / 2, hFov = Math.atan(Math.tan(vFov) * camera.aspect);
+  const dist = Math.max((GAME_VIEW.viewW * share.w) / 2 / Math.tan(hFov), (GAME_VIEW.viewH * share.h) / 2 / Math.tan(vFov));
+  camera.position.copy(aim).addScaledVector(BACK, dist);
+  camera.lookAt(aim);
+}
+
 export function makeStage(container, { background = '#f6e7d4' } = {}) {
   const renderer = makeRenderer(container);
   const scene = new THREE.Scene();

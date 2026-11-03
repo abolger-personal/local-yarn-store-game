@@ -11,7 +11,7 @@ import { BRICK, SHELF, SHELF_WIDTH, TICK_HZ, groundOf } from './match.js';
 import { levelBefore, levelFor, matchOptions } from './levels.js';
 import { loadProgress, outcomeOf, recordOutcome } from './progress.js';
 import { facedCell, fortGrid } from './build.js';
-import { makeStage } from './stage.js';
+import { aimGameCamera, makeStage } from './stage.js';
 import { SHELF_WOOD, THEMES } from './scenery.js';
 import { PIPING, box, donutMesh, sameLook } from './treats.js';
 import { rosterOf } from './multiplayer.js';
@@ -47,8 +47,7 @@ const [net] = await Promise.all([joining, warmUp(...(prebuilt.me ? [prebuilt.me.
   ...Object.values(THEMES).map((t) => t.brick(SAMPLE_BRICK).g), ...confettiMats.map((m) => new THREE.Mesh(undefined, m)))]);
 const level = net?.start ?? asked, ground = groundOf(level.stage);
 const ME = net?.me ?? 'me';
-const CAMERA = { pitch: THREE.MathUtils.degToRad(35), viewW: 7, viewH: 4.8, xMin: ground.x0 + 3, xMax: ground.x1 - 3 };
-const BACK = new THREE.Vector3(0, Math.sin(CAMERA.pitch), Math.cos(CAMERA.pitch));
+const CAMERA = { xMin: ground.x0 + 3, xMax: ground.x1 - 3 };
 const TIMERS = { squash: 0.22, no: 0.6, joy: 0.9, pop: 0.35, pulse: 0.45, wobble: 0.35, hop: 0.4, land: 0.5, pad: 0.45 };
 const FIGHTER_TIMERS = ['squash', 'no', 'joy', 'pop', 'pulse', 'land'];
 // REUSE-SPEC.md §Stages and difficulty are separate: on a spongy stage every landing springs
@@ -458,13 +457,10 @@ function draw(snap, dt) {
 
 const aim = new THREE.Vector3(-4.5, 0.8, 0.1);
 
-/** Down at the floor at CAMERA.pitch, following your fighter in x and z, about a third of the stage wide. */
+/** The match camera (GAME_VIEW), following your fighter in x and z. */
 function follow(me, dt) {
   if (me) aim.lerp(_goal.set(THREE.MathUtils.clamp(me.x, CAMERA.xMin, CAMERA.xMax), 0.8 + me.y * 0.4, -0.1 + me.z * 0.4), Math.min(1, dt * 4));
-  const vFov = THREE.MathUtils.degToRad(camera.fov) / 2, hFov = Math.atan(Math.tan(vFov) * camera.aspect);
-  const dist = Math.max(CAMERA.viewW / 2 / Math.tan(hFov), CAMERA.viewH / 2 / Math.tan(vFov));
-  camera.position.copy(aim).addScaledVector(BACK, dist);
-  camera.lookAt(aim);
+  aimGameCamera(camera, aim);
 }
 
 /** @template T @param {Iterable<T>} items @param {(o: T) => { x: number, z: number }} at @returns {T|null} */

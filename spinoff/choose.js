@@ -1,12 +1,13 @@
+import * as THREE from 'three';
 import {
   BAGS, CAPES, CLOTH, FUR, HAND_ICON, HATS, SPECIES, TEXTURES, TRICKS, animateFighter, buildFighter, disposeFighter, handsFor, loadFighter, newFighter,
-  addTricks, paint, randomFighter, rollEffect, saveFighter, setFur, showOffTrick, stepFighter,
+  addTricks, paint, randomFighter, rollEffect, saveFighter, setFur, stepFighter, stepTricks,
 } from './fighter.js';
 import { POSES } from '../characters/npc.js';
-import { debugging, inRoom, openRoom } from './net.js';
+import { debugMenu, debugging, inRoom, openRoom } from './net.js';
 import { levelsBeaten } from './progress.js';
 import { STRIKE } from './punches.js';
-import { makeStage } from './stage.js';
+import { aimGameCamera, makeStage } from './stage.js';
 
 const ANIMAL = { lion: '🦁', llama: '🦙', owl: '🦉' };
 const NONE = '<circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" stroke-width="4"/><path d="M13 35 35 13" stroke="currentColor" stroke-width="4"/>';
@@ -48,13 +49,15 @@ const allowed = (f) => {
   if (!TRICKS[f.look.hands].includes(f.look.trick)) f.look.trick = TRICKS[f.look.hands][0];
   return f;
 };
-const TRICK_ICON = { plain: '', sparkle: '✨', bubble: '🫧', flame: '🔥', bebop: '🎷' };
+const TRICK_ICON = { plain: '', sparkle: '✨', bubble: '🫧', flame: '🔥', bebop: '🎷', starPunch: '🌟', fireball: '☄️', loveTap: '💗', shootingStar: '🌠', bubblegumPop: '🍬', powerPuff: '⚡' };
 
 let fighter = allowed(loadFighter() ?? newFighter('lion'));
 let built = null, cheer = 0, spin = 0, swing = 1, landed = Infinity, shows = -1;
 /** Dev mode (🧪, only with ?debug=1): gloves or the sword tapped again try a random effect, `rolled` its seed, until other
  * hands are picked or dev mode is left. */
 let dev = false, rolled = null;
+/** ?debug_menu=1: the effects menu (effects-menu.js), and the effect it put on the fighter. */
+let menu = null, menuEffect = null;
 const SHOW_MOVES = ['jab', 'cross', 'uppercut'];
 const panel = document.getElementById('panel');
 
@@ -161,9 +164,11 @@ const stage = makeStage(document.getElementById('stage'));
 function rebuild(reframe) {
   if (built) { stage.scene.remove(built.root); disposeFighter(built); }
   built = buildFighter(paint(fighter));
-  if (rolled !== null) addTricks(built, rollEffect(rolled));
+  if (menuEffect) addTricks(built, menuEffect);
+  else if (rolled !== null) addTricks(built, rollEffect(rolled));
   stage.scene.add(built.root);
   if (reframe) stage.frame([built.root], { margin: 1.5 });
+  menu?.refresh();
 }
 
 panel.addEventListener('click', (e) => {
@@ -205,15 +210,39 @@ document.getElementById('done').addEventListener('click', () => {
   location.href = 'lobby.html';
 });
 
+// the effects menu shows the fighter as a match does: side-on, at the size it is on a whole screen in a round
+const MENU_AIM = new THREE.Vector3(0, 0.8, -0.1);
+function inGameView() {
+  const canvas = stage.renderer.domElement;
+  built.root.rotation.y = Math.PI / 2;
+  aimGameCamera(stage.camera, MENU_AIM, { w: canvas.clientWidth / innerWidth, h: canvas.clientHeight / innerHeight });
+}
+
 rebuild(true);
+if (debugMenu()) {
+  menu = (await import('./effects-menu.js')).effectsMenu({
+    apply: (effect) => { menuEffect = effect; addTricks(built, effect); },
+    retune: (motion) => {
+      Object.assign(menuEffect, motion);
+      for (const g of built.tricks ?? []) Object.assign(g.userData.spin.userData.fx, motion);
+    },
+    hands: () => fighter.look.hands,
+  });
+}
 stage.run((dt) => {
+  // the effects menu: punch again once the last effect is gone
+  if (menu?.looping && swing >= 1 && landed > menu.life() + 0.3) { swing = 0; shows++; }
   cheer = Math.max(0, cheer - dt);
   spin += dt;
-  built.root.rotation.y = 0.55 * Math.sin(spin * 0.5);
+  if (menu) inGameView();
+  else built.root.rotation.y = 0.55 * Math.sin(spin * 0.5);
   const was = swing;
   swing = Math.min(1, swing + dt / 0.7);
   landed = was < STRIKE && swing >= STRIKE ? 0 : landed + dt;
   if (swing < 1) stepFighter(built, dt, POSES.rest, 0, { name: SHOW_MOVES[shows % SHOW_MOVES.length], arm: -1, step: swing });
-  else animateFighter(built, dt, cheer > 0 ? 'delighted' : 'rest');
-  if (swing >= STRIKE) showOffTrick(built, -1, landed);
+  else {
+    animateFighter(built, dt, cheer > 0 ? 'delighted' : 'rest');
+    // the trick plays on, on the clock the swing started, as in a fight
+    stepTricks(built, null, dt);
+  }
 });

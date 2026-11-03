@@ -16,16 +16,20 @@ const rooms = await roomsOf();
 
 export const { selfId, note, homeOnly, inRoom, setRoom } = rooms;
 
-/** `?debug=1` (or `=0`) sticks through every page after it, until the tap page opens again without it. */
-export function debugging() {
-  const flag = new URLSearchParams(location.search).get('debug');
+/** A `?name=1` switch that sticks through every page after it, until the tap page opens again without it. */
+function flagged(name) {
+  const flag = new URLSearchParams(location.search).get(name);
   try {
-    if (flag !== null) sessionStorage.setItem('donut.debug', flag);
-    return sessionStorage.getItem('donut.debug') === '1';
+    if (flag !== null) sessionStorage.setItem(`donut.${name}`, flag);
+    return sessionStorage.getItem(`donut.${name}`) === '1';
   } catch {
     return flag === '1';
   }
 }
+/** `?debug=1` (or `=0`): the 🐞 panel, and 🧪 on the dress-up page. */
+export const debugging = () => flagged('debug');
+/** `?debug_menu=1`: the dress-up page with the effects menu (effects-menu.js). */
+export const debugMenu = () => flagged('debug_menu');
 
 /** Puts the status lines on the page, collapsed under 🐞, refreshed every second (see `debugging`). */
 export function showDebug() {

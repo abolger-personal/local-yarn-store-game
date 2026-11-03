@@ -187,6 +187,15 @@ function swing(button, gap, dz = 0) {
   assert.equal(swing('kick', 0.2, 1.2).events.length, 0, 'nothing lands a lane away in depth');
 }
 
+// A foe that walked past you is hit: an attack turns you round to it, and a punch on the walk away still lands (playtest)
+for (const [button, walkOn] of [['punch', true], ['kick', false]]) {
+  const m = createMatch([hero, dummy], STAGE), past = DUMMY.x + 2 * R + 0.3;
+  Object.assign(m.fighters[0], { x: past, z: DUMMY.z, facing: 0 });
+  let at = run(m, 1, once({ [button]: true, ...(walkOn && { target: { x: past + 3, z: DUMMY.z, y: 0 } }) }));
+  for (let i = 0; i < 40 && !at.hits.length; i++) at = run(m, 1);
+  assert.ok(at.hits.length === 1 && at.hits[0].target === 'dummy', `a ${button} turns round to the dummy behind${walkOn ? ', walking away' : ''}`);
+}
+
 for (const [button, gap] of [['punch', 0.3], ['kick', 0.45]]) {
   const { m, at } = swing(button, gap);
   const still = (s) => [me(s), me(s, 'dummy')].map((f) => [f.x, f.y, f.z, f.step]);

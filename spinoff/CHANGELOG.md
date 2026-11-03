@@ -2,6 +2,13 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
+## 0.0.7
+
+### Fighting
+- **A bad guy who walks past you still gets hit.** If there's nothing to hit in front of you and a bad guy is
+  right behind you, 🥊 or 🦶 turns you round to face them first. Punching while you walk away works too: you
+  keep facing them until the punch is done. Gloves, sword, scythe and hammer all do it, on a tablet or a keyboard.
+
 ## 0.0.6 — 2026-11-01: The Greathammer and the chasing level
 
 ### Dress up

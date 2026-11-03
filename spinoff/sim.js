@@ -675,8 +675,9 @@ function moveFighter(s, f) {
   if (f.onGround) walkStep(s, f);
   else airStep(s, f);
   lungeStep(s, f);
-  // Facing is set on the ground and by a jump, then held in the air: drifting back toward a ledge mustn't spin you round
-  if (f.onGround && f.stun === 0 && Math.hypot(f.vx, f.vz) > TURN_SPEED) f.facing = Math.atan2(f.vz, f.vx);
+  // Facing is set on the ground and by a jump, then held in the air: drifting back toward a ledge mustn't spin you round.
+  // An attack holds it too, so one turned to a foe behind you still lands while you walk on (playtest)
+  if (f.onGround && f.stun === 0 && !f.attack && Math.hypot(f.vx, f.vz) > TURN_SPEED) f.facing = Math.atan2(f.vz, f.vx);
   ringOut(s, f);
 }
 
@@ -760,6 +761,17 @@ function frontGap(s, f) {
     best = Math.min(best, along - f.r);
   }
   return best;
+}
+
+/** playtest: a foe that walks past you got away, so with nothing to hit in front an attack turns you to the nearest foe a step away. */
+function faceFoe(s, f, m) {
+  if (!m.reach || frontGap(s, f) <= LUNGE_RANGE) return;
+  let best = null, bestGap = LUNGE_RANGE;
+  for (const o of s.fighters) {
+    const gap = flat(f, o) - f.r - o.r;
+    if (canStrike(s, f, o) && Math.abs(o.y - f.y) <= f.h && gap <= bestGap) [best, bestGap] = [o, gap];
+  }
+  if (best && flat(f, best) > EPS) f.facing = Math.atan2(best.z - f.z, best.x - f.x);
 }
 
 function lungeFor(s, f, m) {
@@ -1056,6 +1068,7 @@ function attackInput(s, f, input) {
   if (busy(f) || !(input.kick || input.punch)) return;
   let id = 'punch';
   if (input.kick) id = f.onGround ? 'kick' : 'stomp';
+  faceFoe(s, f, MOVES[id]);
   f.attack = { id, t: 0, hit: [], brickDone: false, lunge: lungeFor(s, f, MOVES[id]) };
 }
 

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { POSES, setGeometryDetail } from '../characters/npc.js';
 import { LOOK } from '../characters/garments.js';
 import { SPECIES, buildFighter, disposeFighter, newFighter, stepFighter } from './fighter.js';
-import { COMBO, COMBO_TICKS, PUNCHES, countStrike, landHit, newCombo, punchArm, strikerOf } from './punches.js';
+import { COMBO, COMBO_TICKS, PUNCHES, countStrike, landHit, newCombo, punchArm } from './punches.js';
 import { KICKS, KICK_COMBO } from './kicks.js';
 import { HITSTOP_TICKS } from './match.js';
 import { MOVES, createMatch, snapshot, tick } from './sim.js';
@@ -106,15 +106,6 @@ for (const string of STRINGS) {
   }
 }
 
-const fighter = (id, team, x, move = 'punch') => ({ id, team, x, z: 0, move });
-const ring = [fighter('hero', 'heroes', 0), fighter('bad', 'badGuys', 0.6, 'hurt'), fighter('bad2', 'badGuys', 0.5), fighter('dummy', 'badGuys', 2, 'idle')];
-const hitOn = (on, target, x, move = 'punch') => ({ x, y: 0.5, z: 0, move, on, target, broke: false });
-assert.equal(strikerOf(hitOn('fighter', 'bad', 0.45), ring)?.id, 'hero', 'a teammate of the one hit never gets the hit, however near');
-assert.equal(strikerOf(hitOn('brick', 'b3', 0.45), ring)?.id, 'bad2', 'a brick hit counts for the nearest puncher, like a fighter hit');
-assert.equal(strikerOf(hitOn('fighter', 'dummy', 1.8), ring)?.id, 'hero', 'the dummy counts like any foe');
-const kickers = [...ring, fighter('kid', 'heroes', 1.2, 'kick'), fighter('bad3', 'badGuys', 0.9, 'kick')];
-assert.equal(strikerOf(hitOn('fighter', 'bad', 0.45, 'kick'), kickers)?.id, 'kid', 'a kick goes to the nearest kicker, never a teammate of the one hit');
-assert.equal(strikerOf(hitOn('brick', 'b3', 0.45, 'kick'), kickers)?.id, 'bad3', 'a kick on a brick counts for the nearest kicker');
 assert.ok(Object.keys(PUNCHES).every((p) => COMBO.includes(p)), 'every punch is in the combo');
 assert.ok(Object.keys(KICKS).every((p) => KICK_COMBO.includes(p)), 'every kick is in the kick string');
 {
@@ -137,7 +128,7 @@ for (const [move, S] of STRINGS) {
     tick(m, { kid: { target: near ? null : { thing: 'fighter', id: 'dummy' }, punch: near && move === 'punch', kick: near && move === 'kick' } });
     const s = snapshot(m), f = s.fighters.find((x) => x.id === 'kid');
     if (f.move === move && was !== move) string.push(S[landed % S.length]);
-    for (const h of s.hits) if (h.move === move && strikerOf(h, s.fighters)?.id === 'kid') {
+    for (const h of s.hits) if (h.move === move && h.by === 'kid') {
       landHit(c);
       landed++;
     }

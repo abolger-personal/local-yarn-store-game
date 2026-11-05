@@ -14,6 +14,7 @@ const SLOW = [
 
 const FAST = [
   'characters/motion.test.mjs',
+  'characters/glitter.test.mjs',
   'characters/visit.test.mjs',
   'characters/guestbook.test.mjs',
   'characters/wip.test.mjs',
@@ -26,6 +27,7 @@ const FAST = [
   'inventory/grid.test.mjs',
   'inventory/pick-place.test.mjs',
   'spinoff/fighter.test.mjs',
+  'spinoff/tricks.test.mjs',
   'spinoff/punches.test.mjs',
   'spinoff/kicks.test.mjs',
   'spinoff/stage.test.mjs',

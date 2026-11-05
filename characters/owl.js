@@ -1,7 +1,7 @@
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
   addConeEars, addEyes, addTail, createCharacter, deriveCoatColor,
-  feltMaterial, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh,
+  feltMaterial, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh, tailBaseHeight,
 } from './npc.js';
 
 export {
@@ -46,7 +46,7 @@ export const DEFAULT_PARAMS = {
   featherWings:  true,
   featherWingScale: 0.62,
 
-  tailLength:    0.110,
+  tailLength:    0.250,
   tailThick:     0.030,
   tailDroop:    -0.75,
   tailStiff:     380,
@@ -84,7 +84,7 @@ export const RANDOM_RANGES = Object.freeze({
   wingWidth:   [0.175, 0.260],
   wingDepth:   [0.280, 0.440],
   beakSize:    [0.070, 0.110],
-  tailLength:  [0.080, 0.140],
+  tailLength:  [0.160, 0.450],
 });
 
 const headScale = (P) => [P.headRadius * 1.06, P.headRadius, P.headRadius * 0.98];
@@ -201,6 +201,8 @@ function addTailFan(node, len, ctx, P) {
 
 export function randomiseInto(P) {
   randomiseBase(P, RANDOM_RANGES);
+  // a long tail only on an owl high enough off the floor for it, as the lion's
+  P.tailLength = Math.min(P.tailLength, 0.9 * tailBaseHeight(P));
   applyFeatherPreset(P, Math.floor(Math.random() * FEATHER_PRESETS.length));
   P.featherColor = deriveCoatColor(P.bodyColor);
   return P;

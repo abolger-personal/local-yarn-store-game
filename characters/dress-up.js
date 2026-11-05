@@ -6,8 +6,9 @@ import {
   TONE_MAPPING, POSES, GEO_DETAIL, BUILD, MOTION_DEFAULTS,
   createCharacter, setViewMode, disposeCharacter, setGeometryDetail, getSpecies,
   stepMotion, resetMotion, motionOf, walkPhase, walkLayer, walkGain, phaseStep,
-  DANCES, DANCE_NAMES, makeDance, stepDance,
+  DANCES, DANCE_NAMES, makeDance, stepDance, placeDancer,
 } from './npc.js';
+import { stepGlitter } from './glitter.js';
 import { randomTraits } from './visit.js';
 import {
   GARMENTS, STITCHES_BY_CRAFT, COLOURWORKS, EDGES, formsOf, accessoriesOf, CRAFTS, SLEEVES, WEIGHTS, FIBRES, craftStitch,
@@ -307,10 +308,6 @@ function stepDanceFor(id, character, slot, dt) {
     if (state.repeat) slot.perf = makeDance(state.dance);
     else { slot.perf = null; state.dance = 'none'; restoreSpring(slot); buildGui(); }
   }
-  character.root.position.x = slotX(id) + d.shift;
-  character.root.position.z = d.travel;
-  character.root.rotation.y = d.turn;
-  slot.rise = d.rise;
   return d;
 }
 
@@ -329,7 +326,8 @@ function stepSlot(id, dt) {
   slot.phase = (slot.phase + phaseStep(speed * dt, speed, L, slot.opts)) % 1;
   stepMotion(character, d ? d.pose : POSES[state.pose], dt, slot.opts,
     walking ? (out) => walkLayer(out, w, gain, slot.opts) : null);
-  if (slot.rise) character.root.position.y += slot.rise;
+  if (d) placeDancer(character, d, { x: slotX(id) });
+  slot.glitter = stepGlitter(slot.glitter, character, slot.perf, d, dt);
 }
 
 function restoreSpring(slot) {
@@ -343,7 +341,6 @@ function setDance(name) {
   if (name !== 'none' && !state.play) setPlay(true);
   for (const id of SLOTS) {
     const slot = slotState[id];
-    slot.rise = 0;
     if (name === 'none') {
       slot.perf = null;
       restoreSpring(slot);
@@ -362,7 +359,7 @@ function resetPlacement(id) {
   const root = built[id]?.root;
   if (!root) return;
   root.position.set(slotX(id), root.position.y, 0);
-  root.rotation.y = 0;
+  root.rotation.set(0, 0, 0);
 }
 
 let openItem = 'scarf';

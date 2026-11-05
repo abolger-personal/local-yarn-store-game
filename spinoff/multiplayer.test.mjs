@@ -125,7 +125,9 @@ function play(n, hostInput = IDLE) {
   assert.ok(at(after, 'G1').x > at(before, 'G1').x + 1.5, 'a guest\'s input moves its fighter on the host');
   assert.ok(Math.abs(at(after, 'G2').x - at(before, 'G2').x) < 0.05, 'and only its own fighter');
   const sent = JSON.parse(JSON.stringify(at(after, 'G1'), (_, v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v)));
-  assert.deepEqual(at(drawn.G1, 'G1'), sent, 'a guest\'s own fighter that has stopped is drawn exactly where the host has it');
+  // the power bar fills every tick, so a few ticks behind it is a little lower
+  const placed = (f) => ({ ...f, power: 0 });
+  assert.deepEqual(placed(at(drawn.G1, 'G1')), placed(sent), 'a guest\'s own fighter that has stopped is drawn exactly where the host has it');
   assert.ok(net.snaps.some((d) => !('bricks' in d)), 'snapshots leave out bricks and shelves that stood still');
   assert.deepEqual([drawn.G2.bricks.length, drawn.G2.shelves.length], [after.bricks.length, 2], 'and guests keep drawing them');
   assert.ok(after.tick - drawn.G2.tick < TICK_HZ / SNAP_HZ, 'everything else on a guest is the host\'s latest snapshot');

@@ -1,6 +1,6 @@
 // A CPU bad guy is a fake player on the host (REUSE-SPEC.md §Bad guys, AI is a fake player): it reads the snapshot a
 // tablet draws and answers with the Input a tablet sends, so it can do nothing a player can't.
-// ponytail: one state machine for every CPU bad guy; Scoop and Power wait for the levels that bring them.
+// ponytail: one state machine for every CPU bad guy; Power waits for the level that brings it.
 import { BRICK, HIT_DEPTH, TICK_HZ } from './match.js';
 
 /** @typedef {import('./match.js').Snapshot} Snapshot @typedef {import('./match.js').FighterState} FighterState */
@@ -67,7 +67,7 @@ function kickNow(b, snap, me) {
 
 const leftAlone = (b, snap, id) => snap.tick < (b.grace.get(id) ?? 0);
 const holding = (f) => Boolean(f?.carrying) && !f.respawn;
-const landed = (snap, me, id) => me.move === 'punch' && snap.hits.some((h) => h.on === 'fighter' && h.target === id);
+const landed = (snap, me, id) => snap.hits.some((h) => h.by === me.id && h.move === 'punch' && h.target === id);
 
 /** The nearest hero carrying a donut within CHASE_RANGE that it isn't leaving alone. @returns {FighterState|null} */
 function carrier(b, snap, me) {

@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { POSES, setGeometryDetail } from '../characters/npc.js';
+import { DANCES, POSES, holdMiddle, makeDance, placeDancer, setGeometryDetail, stepDance } from '../characters/npc.js';
+import { stepGlitter } from '../characters/glitter.js';
 import { KEYS, attachControls, createControls } from './controls.js';
 import * as match from './sim.js';
-import { countStrike, landHit, newCombo, strikerOf } from './punches.js';
+import { countStrike, landHit, newCombo } from './punches.js';
 import { KICK_COMBO, shownStrike, strikeOf } from './kicks.js';
-import { BAD_DONUT, HAND_ICON, MOVE_POSES, badGuySets, buildFighter, entrantOf, greathammerMeshes, loadFighter, newFighter, newHands, paint, seatDrop, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
+import { BAD_DONUT, HAND_ICON, MOVE_POSES, poseShotTrick, shotTrick, badGuySets, buildFighter, entrantOf, greathammerMeshes, loadFighter, newFighter, newHands, paint, seatDrop, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
 import { confettiMats, createFx, makeShadow, placeShadow } from './fx.js';
 import { BRICK, SHELF, SHELF_WIDTH, TICK_HZ, groundOf } from './match.js';
 import { levelBefore, levelFor, matchOptions } from './levels.js';
@@ -111,7 +112,7 @@ function sync(drawn, list, make, update, dt) {
   }
 }
 
-const fighters = new Map(), donuts = new Map(), bricks = new Map(), shelves = new Map(), piles = new Map();
+const fighters = new Map(), donuts = new Map(), bricks = new Map(), shelves = new Map(), piles = new Map(), shots = new Map();
 
 function tickDown(t, keys, dt) {
   for (const k of keys) t[k] = Math.max(0, t[k] - dt / TIMERS[k]);
@@ -122,12 +123,38 @@ const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 function poseOf(m, f) {
   if (f.move === 'sit') return MOVE_POSES.sit;
   if (m.t.joy > 0) return POSES.delighted;
-  if (f.move === 'hurt' || f.move === 'launched') return MOVE_POSES.hurt;
+  if (f.move === 'hurt' || f.move === 'launched' || f.move === 'tripped') return MOVE_POSES.hurt;
   const base = f.onGround ? POSES.rest : MOVE_POSES.air;
   if (!m.t.no) return base;
   // a new object each frame: the motion only takes up a target that is a different object
   return { ...base, headYaw: Math.sin(m.t.no * 28) * 0.8 };
 }
+
+const HANG = match.MOVES.stomp.hang / match.MOVES.stomp.steps;
+/** How far round a stomp has turned while it hangs in the air (a spin or a backflip, `f.turn`), fast then settling. @param {FighterState} f */
+const stompTurn = (f) => (!f.onGround && f.move === 'kick' && f.turn ? 2 * Math.PI * (1 - (1 - Math.min(1, f.step / HANG)) ** 2) : 0);
+
+
+/** How far into its swing a fighter winding up for a shot holds it (REUSE-SPEC.md §Trick shots). */
+const WINDUP = 0.1;
+const SWEEP = DANCES['wuxia-turn'], SWEEP_SECONDS = match.MOVES.sweep.steps / TICK_HZ;
+/** The wuxia sweep is its dance, posed from how far through the move the fighter is. @param {FighterState} f */
+function sweepFrame(f) {
+  if (f.move !== 'sweep') return null;
+  const perf = makeDance('wuxia-turn');
+  return { perf, d: stepDance(perf, f.step * SWEEP_SECONDS) };
+}
+
+/** Turns the body with the sweep and draws its action line; straightens it again after. */
+function danceBody(m, sweep, dt) {
+  if (sweep) placeDancer(m.built, sweep.d);
+  else if (m.danced) m.built.root.quaternion.identity();
+  m.danced = Boolean(sweep);
+  m.look = stepGlitter(m.look, m.built, sweep?.perf ?? null, sweep?.d ?? null, dt);
+}
+
+/** A tripped fighter goes down on its back fast, lies there, and gets up at the end of its stun. @param {FighterState} f */
+const trippedTilt = (f) => (Math.PI / 2) * Math.min(1, f.step / 0.15, (1 - f.step) / 0.25);
 
 /** @param {FighterState} f */
 function placeFighter(m, f, dt) {
@@ -135,9 +162,11 @@ function placeFighter(m, f, dt) {
   m.yaw += turn(Math.PI / 2 - f.facing - m.yaw) * Math.min(1, dt * 14);
   m.cycles += wobbleHz(f.percent) * dt;
   const tilt = wobbleAt(f.percent, m.cycles);
-  m.g.rotation.set(tilt.x, m.yaw + Math.sin(no * 26) * 0.3 * no, tilt.z, 'ZXY');
+  m.g.rotation.set(tilt.x, m.yaw + (f.turn === 'spin' ? stompTurn(f) : 0) + Math.sin(no * 26) * 0.3 * no, tilt.z, 'ZXY');
   m.down += ((f.move === 'sit' ? 1 : 0) - m.down) * Math.min(1, dt * 6);
   m.g.position.set(f.x + m.recoil.x * s, f.y - m.seat * m.down, f.z + m.recoil.z * s);
+  if (f.turn === 'flip' && stompTurn(f)) holdMiddle(m.g, f.height / 2, (g) => g.rotateX(-stompTurn(f)));
+  if (f.move === 'tripped') holdMiddle(m.g, f.width / 2, (g) => g.rotateX(-trippedTilt(f)));
   const spring = 0.3 * m.t.land * Math.sin(m.t.land * Math.PI * 3);
   m.g.scale.set(1 + 0.2 * s + 0.6 * spring, 1 - 0.28 * s - spring, 1 + 0.2 * s + 0.6 * spring);
 }
@@ -171,7 +200,7 @@ function hold(m, icing) {
 /** Out in front of the chest; a fetched block flies there in the donut grab's arc. */
 function placeHeld(m) {
   const P = m.built.params, k = 1 - m.t.pop * m.t.pop;
-  m.g.updateMatrixWorld(true);
+  m.built.chest.updateWorldMatrix(true, false);
   m.built.chest.localToWorld(_v.set(0, 0, P.torsoD + BRICK * 0.6));
   m.held.position.copy(m.t.pop > 0 ? _goal.copy(m.from).lerp(_v, k) : _v);
   m.held.position.y += FLY_ARC * Math.sin(Math.PI * k);
@@ -189,7 +218,7 @@ function carry(m, look) {
 /** REUSE-SPEC.md §Mode: oversized, out of the bag over the shoulder, facing the camera; a grabbed one flies there in an arc, growing. */
 function placeCarried(m) {
   const P = m.built.params, { pop, pulse } = m.t, k = 1 - pop * pop;
-  m.g.updateMatrixWorld(true);
+  m.built.chest.updateWorldMatrix(true, false);
   m.built.chest.localToWorld(_v.set(0, P.torsoH * 1.1, -(P.torsoD + m.carryR)));
   m.carried.position.copy(pop > 0 ? _goal.copy(m.from).lerp(_v, k) : _v);
   m.carried.position.y += FLY_ARC * Math.sin(Math.PI * k);
@@ -243,7 +272,12 @@ function drawFighter(m, f, dt, tick) {
   bounces(m, f);
   placeFighter(m, f, dt);
   const speed = f.onGround && f.move !== 'blocked' ? Math.hypot(f.vx, f.vz) : 0;
-  stepFighter(m.built, dt, poseOf(m, f), speed, strikeNow(m, f, tick));
+  const sweep = sweepFrame(f), strike = f.move === 'charge' ? strikeOf('punch', 0, f.facing, WINDUP) : strikeNow(m, f, tick);
+  // the shot is the trick, so neither the wind-up nor its swing shows the trick of its own (playtest: two atomic balls)
+  m.built.noTrick = f.move === 'charge' || Boolean(f.shooting);
+  m.built.spring = sweep && SWEEP;
+  stepFighter(m.built, dt, sweep ? sweep.d.pose : poseOf(m, f), speed, strike);
+  danceBody(m, sweep, dt);
   carry(m, f.carrying);
   if (m.carried) placeCarried(m);
   hold(m, f.block ?? null);
@@ -391,12 +425,35 @@ scene.add(preview);
 const _m = new THREE.Matrix4();
 let aimSince = 0, latest = null;
 const aimNow = () => (aimSince ? aimOf((performance.now() - aimSince) / 1000) : null);
+// REUSE-SPEC.md §Trick shots: 🥊 held with a trick on gloves, sword or scythe charges its shot, filling 🥊; past full it
+// fizzles (the fill goes), and 🦶 meanwhile drops it
+let shotSince = 0;
+const myShot = () => mine.look.hands !== 'hammer' && Boolean(match.SHOTS[mine.look.trick]);
+const shotNow = () => (shotSince ? match.shotCharge(mine.look.trick, (performance.now() - shotSince) / 1000) : null);
+
+// REUSE-SPEC.md §Discoverable moves: 🦶 held this long and let go sweeps; its button fills meanwhile. The press's kick
+// went on press, as 🥊's punch does under the Greathammer's aim
+const SWEEP_HOLD = 0.4;
+let kickSince = 0;
+const sweepCharge = () => (kickSince ? Math.min(1, (performance.now() - kickSince) / 1000 / SWEEP_HOLD) : 0);
+
+function attachSweep(controls) {
+  const b = el('kick'), charge = () => { kickSince = performance.now(); if (shotSince) controls.charge(false); shotSince = 0; };
+  const letGo = () => { if (sweepCharge() >= 1) controls.sweep(); kickSince = 0; };
+  b.addEventListener('pointerdown', charge);
+  b.addEventListener('pointerup', letGo);
+  b.addEventListener('pointercancel', () => { kickSince = 0; });
+  addEventListener('keydown', (e) => { if (e.code === KEYS.kick && !e.repeat && !(e.metaKey || e.ctrlKey || e.altKey)) charge(); });
+  addEventListener('keyup', (e) => { if (e.code === KEYS.kick) letGo(); });
+}
 
 /** @param {FighterState|undefined} me */
 function drawPreview(me) {
-  const k = aimNow();
-  el('punch').classList.toggle('aiming', k !== null);
-  el('punch').style.setProperty('--fill', String(k ?? 0));
+  el('kick').classList.toggle('aiming', kickSince > 0);
+  el('kick').style.setProperty('--fill', String(sweepCharge()));
+  const k = aimNow(), shot = shotNow();
+  el('punch').classList.toggle('aiming', k !== null || shot !== null);
+  el('punch').style.setProperty('--fill', String(k ?? shot ?? 0));
   preview.visible = k !== null && Boolean(me);
   if (!preview.visible) return;
   const from = handOf(me, me.height), { T } = hammerPath(from, k, 0, level.stage);
@@ -407,21 +464,42 @@ function drawPreview(me) {
   preview.instanceMatrix.needsUpdate = true;
 }
 
-/** A tap is still only the punch, which went on press; held till the path shows, letting go throws at the size shown. */
+/** Let go of 🥊 held for a shot: a tap swings (the punch kept back on the press), a charge swings and throws, a fizzle neither. */
+function letGoShot(controls) {
+  const held = (performance.now() - shotSince) / 1000, k = shotNow();
+  if (held < match.SHOT_TAP) controls.down('key', 'punch', null);
+  else if (k !== null) controls.shot(k);
+  controls.charge(false);
+  shotSince = 0;
+}
+
+/** With the Greathammer a tap is only the punch, which went on press; held till the path shows, letting go throws at the
+ * size shown. With a trick (§Trick shots) the press winds up instead, and letting go swings. */
 function attachAim(controls) {
   const b = el('punch'), inHand = () => mine.look.hands === 'hammer' && !latest?.hammers?.some((h) => h.owner === ME);
-  const holdAim = () => { aimSince = inHand() ? performance.now() : 0; };
-  const letGo = () => { const k = aimNow(); if (k !== null) controls.throw(k); aimSince = 0; };
+  const holdAim = () => {
+    aimSince = inHand() ? performance.now() : 0;
+    shotSince = myShot() ? performance.now() : 0;
+    if (shotSince) controls.charge(true);
+  };
+  const letGo = () => {
+    const k = aimNow();
+    if (k !== null) controls.throw(k);
+    if (shotSince) letGoShot(controls);
+    aimSince = 0;
+  };
+  const drop = () => { aimSince = 0; if (shotSince) controls.charge(false); shotSince = 0; };
   b.addEventListener('pointerdown', holdAim);
   b.addEventListener('pointerup', letGo);
-  b.addEventListener('pointercancel', () => { aimSince = 0; });
+  b.addEventListener('pointercancel', drop);
   addEventListener('keydown', (e) => { if (e.code === KEYS.punch && !e.repeat && !(e.metaKey || e.ctrlKey || e.altKey)) holdAim(); });
   addEventListener('keyup', (e) => { if (e.code === KEYS.punch) letGo(); });
 }
 
-/** A thrown hammer spins along its path; its thrower's hand is empty till it's back. @param {Snapshot} snap */
-function drawHammers(snap) {
+/** A thrown hammer spins along its path; its thrower's hand is empty till it's back. Trick shots fly. @param {Snapshot} snap */
+function drawHammers(snap, dt) {
   latest = snap;
+  sync(shots, snap.shots ?? NONE, newShot, drawShot, dt);
   drawPreview(snap.fighters.find((f) => f.id === ME));
   for (const [id, m] of fighters) {
     if (!m.flyer) continue;
@@ -431,6 +509,20 @@ function drawHammers(snap) {
     if (h) m.flyer.position.set(h.x, h.y, h.z);
     m.flyer.rotation.set(0.3, now * SPIN, 0);
   }
+}
+
+/** A trick's shot in flight is the trick itself (playtest: a stand-in star flew while the trick went its own way), built
+ * once per thrower and kept, as each has one shot in the air at a time. */
+function newShot(t) {
+  const m = fighters.get(t.by);
+  if (m.shotFx?.userData.trick !== t.trick) m.shotFx = Object.assign(shotTrick(t.trick, m.built), { userData: { trick: t.trick } });
+  scene.add(m.shotFx);
+  return { g: m.shotFx, t0: now, left0: t.left, at: new THREE.Vector3(), dir: new THREE.Vector3() };
+}
+function drawShot(m, t) {
+  m.at.set(t.x, t.y, t.z);
+  m.dir.set(t.ux, 0, t.uz);
+  poseShotTrick(m.g, m.at, m.dir, m.left0 > 0 ? 1 - t.left / m.left0 : 1, now - m.t0);
 }
 
 /** @param {Snapshot} snap */
@@ -443,7 +535,7 @@ function draw(snap, dt) {
   sync(piles, (snap.piles ?? NONE).map((p) => ({ ...p, id: p.owner })), newPile, drawPile, dt);
   showPhase(snap);
   drawOutline(snap, snap.fighters.find((f) => f.id === ME));
-  drawHammers(snap);
+  drawHammers(snap, dt);
   for (const s of snap.shelves) {
     if (!shelves.has(s.team)) shelves.set(s.team, {});
     drawShelf(shelves.get(s.team), s);
@@ -463,35 +555,21 @@ function follow(me, dt) {
   aimGameCamera(camera, aim);
 }
 
-/** @template T @param {Iterable<T>} items @param {(o: T) => { x: number, z: number }} at @returns {T|null} */
-function closestTo(items, p, at, r = Infinity) {
-  let best = null, bestD = r;
-  for (const o of items) {
-    const q = at(o), d = Math.hypot(q.x - p.x, q.z - p.z);
-    if (d < bestD) [best, bestD] = [o, d];
-  }
-  return best;
-}
-
-const posOf = (m) => m.g.position;
-
 /** @param {HitEvent} h @param {Snapshot} snap */
 function onHit(h, snap) {
   fx.bam(h);
-  const by = strikerOf(h, snap.fighters), combo = by && fighters.get(by.id)?.combo[h.move];
+  const combo = fighters.get(h.by)?.combo[h.move];
   if (combo) landHit(combo);
   if (h.on === 'brick') { brickHit(h); return; }
-  const hurt = snap.fighters.filter((f) => f.move === 'hurt' || f.move === 'launched');
-  const f = closestTo(hurt.length ? hurt : snap.fighters, h, (o) => o);
-  const m = f && fighters.get(f.id);
-  if (!m) return;
+  const f = snap.fighters.find((o) => o.id === h.target), m = fighters.get(h.target);
+  if (!f || !m) return;
   m.t.squash = 1;
   m.recoil.set(f.x - h.x, 0, f.z - h.z).normalize().multiplyScalar(0.18);
 }
 
 /** @param {HitEvent} h */
 function brickHit(h) {
-  const m = closestTo(bricks.values(), h, posOf, 1);
+  const m = bricks.get(h.target);
   if (!m) return;
   m.wobble = 1;
   fx.burst(h, confettiMats, 4, 1.4);
@@ -501,7 +579,7 @@ function brickHit(h) {
 function onFullBag(e) {
   const m = fighters.get(e.fighter);
   if (m) Object.assign(m.t, { no: 1, pulse: 1 });
-  const d = closestTo(donuts.values(), e, posOf, 1);
+  const d = e.donut && donuts.get(e.donut);
   if (d) d.hop = 1;
 }
 
@@ -689,6 +767,7 @@ async function play() {
   attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: button('punch'), kick: button('kick'), drop: button('drop') }, keyHelp: button('keys') });
   attachReady(controls);
   attachAim(controls);
+  attachSweep(controls);
   await warmUp();
   keepAwake();
   if (net?.guest) guest(controls);

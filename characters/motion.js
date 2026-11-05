@@ -1,6 +1,6 @@
 // Rules and invariant: ai_planning_sessions/characters/MOTION.md
 export const POSE_KEYS = [
-  'armSwing', 'armSwingAlt', 'armOut', 'armOutAlt', 'elbowBend', 'legSwing', 'kneeBend',
+  'armSwing', 'armSwingAlt', 'armOut', 'armOutAlt', 'elbowBend', 'legSwing', 'kneeBend', 'legOut', 'legOutAlt',
   'hipFlex', 'spineBend', 'spineRoll', 'spineTwist', 'earPerk', 'earSplay',
   'headYaw', 'headPitch', 'headTilt', 'tailLift', 'tailWag', 'earFlap',
 ];
@@ -12,7 +12,7 @@ const TAU = Math.PI * 2;
 
 export const REST_POSE = Object.freeze({
   armSwing: 0, armSwingAlt: 0, armOut: 0, armOutAlt: 0, elbowBend: 0, legSwing: 0, kneeBend: 0,
-  hipFlex: 0, spineBend: 0, spineRoll: 0, spineTwist: 0, earPerk: 0, earSplay: 0,
+  hipFlex: 0, legOut: 0, legOutAlt: 0, spineBend: 0, spineRoll: 0, spineTwist: 0, earPerk: 0, earSplay: 0,
   headYaw: 0, headPitch: 0, headTilt: 0, tailLift: 0, tailWag: 0, earFlap: 0,
   holdItem: false, blink: 0,
 });
@@ -36,10 +36,12 @@ export const POSES = definePoses({
 
 // ponytail: `shift` moves the whole root, so the feet slide with the hips; upgrade is hip abduction plus grounding that follows it.
 const resolveExtras = (steps) => {
-  let cur = { turn: 0, rise: 0, travel: 0, shift: 0 };
+  let cur = { turn: 0, rise: 0, travel: 0, shift: 0, flip: 0, roll: 0 };
   return steps.map((s) => {
     cur = {
       turn: s.turn ?? cur.turn,
+      flip: s.flip ?? cur.flip,
+      roll: s.roll ?? cur.roll,
       rise: s.rise ?? cur.rise,
       travel: s.travel ?? cur.travel,
       shift: s.shift ?? cur.shift,
@@ -49,7 +51,7 @@ const resolveExtras = (steps) => {
 };
 
 const resolveWalk = (steps, dance) => Object.freeze(steps.map((s) => s.walk ?? dance ?? 0));
-const NO_EXTRAS = Object.freeze({ turn: 0, rise: 0, travel: 0, shift: 0 });
+const NO_EXTRAS = Object.freeze({ turn: 0, rise: 0, travel: 0, shift: 0, flip: 0, roll: 0 });
 
 const defineDances = (raw) => Object.freeze(Object.fromEntries(
   Object.entries(raw).map(([name, d]) => [name, Object.freeze({
@@ -92,6 +94,37 @@ export const DANCE_POSES = definePoses({
   },
   'pir-open':  { armOut: 0.90, armOutAlt: 0.35, elbowBend: 0.50, armSwing: -0.30, hipFlex: 0.18, kneeBend: 0.45, earPerk: 0.30 },
 
+  // the wuxia sweep turn, sao tang tui (DANCES.md §Gymnastics): crouched on one leg, the other straight out to the side
+  // on the floor (legSwing = hipFlex keeps the out leg's thigh level while the standing one folds); both hands down
+  // through the sweep, then one thrown up for the freeze; all measured per species
+  'wx-crouch': { kneeBend: 1.6, hipFlex: 0.55, spineBend: 0.25, armSwing: 0.6, armOut: 0.35, elbowBend: 0.3, headPitch: 0.1 },
+  'wx-sweep': {
+    legSwing: 0.55, hipFlex: 0.55, kneeBend: 2.3, legOut: 0.6, legOutAlt: 0.6,
+    spineBend: 0.8, armSwing: -0.2, armOut: 0.35, elbowBend: 0.05, headPitch: -0.3, earSplay: 0.2,
+  },
+  'wx-freeze': {
+    legSwing: 0.55, hipFlex: 0.55, kneeBend: 2.3, legOut: 0.6, legOutAlt: 0.6,
+    spineBend: 0.55, spineRoll: 0.4, armSwing: -0.55, armSwingAlt: 0.55, armOut: 1.5, armOutAlt: -0.8, elbowBend: 0, headPitch: -0.25, headYaw: -0.35, earPerk: 0.35,
+  },
+
+  // the back tuck (DANCES.md §Gymnastics, Flips worked out): crouch with the arms back, up into a tuck, open out
+  // coming down so the legs are straight for the landing, soak it, then the salute
+  'bt-crouch': { kneeBend: 1.4, hipFlex: 0.6, spineBend: 0.35, armSwing: 0.8, armOut: 0.2, elbowBend: 0.2, headPitch: 0.1 },
+  'bt-tuck': { kneeBend: 2.3, hipFlex: 1.8, spineBend: 0.5, armSwing: -0.9, armOut: 0.25, elbowBend: 1.3, headPitch: 0.35, earPerk: -0.3 },
+  'bt-open': { kneeBend: 0.3, hipFlex: 0.15, spineBend: -0.1, armSwing: -2.4, armOut: 0.4, elbowBend: 0.1, headPitch: -0.2 },
+  'bt-land': { kneeBend: 1.3, hipFlex: 0.5, spineBend: 0.25, armSwing: -1.2, armOut: 0.5, elbowBend: 0.2 },
+  salute: { armOut: 2.5, elbowBend: 0.05, kneeBend: 0.1, spineBend: -0.2, headPitch: -0.3, earPerk: 0.4, tailLift: 0.5 },
+  // tumbling: no hands on the floor (a chibi head is lower than its raised hands upside down), so the run-in is the
+  // hands-free versions, an aerial round-off (a star, legs wide) and a whip back (arched, arms reaching back)
+  'tb-reach': { armSwing: -2.7, armOut: 0.2, elbowBend: 0.05, kneeBend: 0.5, hipFlex: 0.35, spineBend: 0.15 },
+  'tb-star': { armSwing: -2.8, armOut: 0.55, elbowBend: 0, legOut: 0.55, kneeBend: 0.05, spineBend: -0.1, headPitch: -0.2 },
+  'tb-whip': { armSwing: -2.9, armOut: 0.2, elbowBend: 0, kneeBend: 0.2, hipFlex: -0.5, spineBend: -0.65, headPitch: -0.5 },
+  'tb-pike': { hipFlex: 1.8, kneeBend: 0.05, spineBend: 0.4, armSwing: -1.3, armOut: 0.2, elbowBend: 0.05, headPitch: 0.3 },
+  // the wolf: squatting on one leg, the other nearly straight in front, its foot just off the floor; the free leg
+  // is the one turned out a little (`legOutAlt`), which is what straightens its knee
+  wolf: { hipFlex: 1.5, kneeBend: 2.2, legOut: 0.25, legOutAlt: 0.25, spineBend: 0.3, armOut: 1.3, elbowBend: 0.05, headPitch: -0.1 },
+  'tb-layout': { armSwing: 0.1, armOut: 0.35, elbowBend: 0.05, kneeBend: 0.05, spineBend: -0.15, headPitch: -0.1 },
+
   'uf-step-l': { spineTwist: 0.22, spineRoll: -0.20, armSwingAlt: 0.40, armOut: 0.30, elbowBend: 0.60, headYaw: -0.15, earPerk: 0.20 },
   'uf-step-r': { spineTwist: -0.22, spineRoll: 0.20, armSwingAlt: -0.40, armOut: 0.30, elbowBend: 0.60, headYaw: 0.15, earPerk: 0.20 },
   'uf-snap-l': {
@@ -105,6 +138,25 @@ export const DANCE_POSES = definePoses({
     legSwing: 0.40, kneeBend: 0.60,
   },
 });
+
+// the floor passes' run-in (DANCES.md §Gymnastics): a reach, an aerial round-off, a whip back, a rebound. All one way
+// round in the world: the round-off's half `turn` leaves the body facing back, so the same `flip` direction is a
+// back salto from then on; the pass travels the way the body first faced
+const RUN_IN = [
+  { pose: 'tb-reach', hold: 0.30, travel: 0.10 },
+  { pose: 'tb-star', hold: 0.32, air: true, rise: 0.70, flip: Math.PI, turn: Math.PI / 2, travel: 0.30 },
+  { pose: 'bt-open', hold: 0.30, air: true, rise: 0, flip: TAU, turn: Math.PI, travel: 0.50 },
+  { pose: 'bt-land', hold: 0.12, travel: 0.55 },
+  { pose: 'tb-whip', hold: 0.30, air: true, rise: 0.70, flip: 3 * Math.PI, travel: 0.75 },
+  { pose: 'bt-open', hold: 0.28, air: true, rise: 0, flip: 2 * TAU, travel: 0.95 },
+  { pose: 'bt-land', hold: 0.14, travel: 1.00 },
+];
+const BEAM_DISMOUNT = [
+  { pose: 'bt-crouch', hold: 0.30 },
+  { pose: 'bt-tuck', hold: 0.75, air: true, rise: 0.95, flip: -TAU, turn: TAU },
+  { pose: 'bt-open', hold: 0.70, air: true, rise: 0, flip: -2 * TAU, turn: 2 * TAU },
+  { pose: 'bt-land', hold: 0.30 },
+];
 
 export const DANCES = defineDances({
   riverdance: {
@@ -145,8 +197,93 @@ export const DANCES = defineDances({
       { pose: 'pir-open', hold: 0.55, rise: 0 },
     ],
   },
+  // crouch, one turn low with the leg sweeping the floor, then a dead-still film freeze in the same shape;
+  // stiff and critically damped so the freeze stops rather than settles
+  // the jump is two `air` steps, up to the top tucking and down opening out, so grounding lets go for both and the
+  // legs are straight again by the landing; the turns are whole, so it lands upright
+  'back-tuck': {
+    stiff: 700, zeta: 0.85, loop: false, walk: 0,
+    steps: [
+      { pose: 'bt-crouch', hold: 0.28 },
+      { pose: 'bt-tuck', hold: 0.36, air: true, rise: 0.7, flip: -Math.PI },
+      { pose: 'bt-open', hold: 0.34, air: true, rise: 0, flip: -TAU },
+      { pose: 'bt-land', hold: 0.30 },
+      { pose: 'salute', hold: 0.90 },
+    ],
+  },
+  // Simone Biles's beam dismount, the Biles (2019): a double back tuck with two twists, here from a standing jump;
+  // the twists (`turn`) spread through both flips, about the flipping body. Far slower than hers: at a real ~1 s in the
+  // air it was a blur on a small figure (playtest), so it hangs like a cartoon jump
+  'biles-beam': {
+    stiff: 700, zeta: 0.85, loop: false, walk: 0,
+    // Rio 2016 beam final: mostly red, blue and silver stripes at the neck
+    glitter: { colours: ['#e8102f', '#e8102f', '#e8102f', '#1f4fd8', '#dfe3ec'] },
+    steps: [...BEAM_DISMOUNT, { pose: 'salute', hold: 0.90 }],
+  },
+  // the Biles on floor (2013): the run-in, then a double layout with the half twist in the second flip
+  biles: {
+    stiff: 700, zeta: 0.85, loop: false, walk: 0,
+    // the Rio 2016 Games' colours
+    glitter: { colours: ['#00b34a', '#ffd100', '#ff7a00', '#0080e0'], twinkle: 0.6 },
+    steps: [
+      ...RUN_IN,
+      { pose: 'tb-layout', hold: 0.75, air: true, rise: 0.95, flip: 3 * TAU, travel: 1.15 },
+      { pose: 'tb-layout', hold: 0.70, air: true, rise: 0, flip: 4 * TAU, turn: TAU, travel: 1.30 },
+      { pose: 'bt-land', hold: 0.30 },
+      { pose: 'salute', hold: 0.90 },
+    ],
+  },
+  // the triple-double (2019): the run-in, then a double back tuck with three twists
+  'biles-ii': {
+    stiff: 700, zeta: 0.85, loop: false, walk: 0,
+    // Tokyo team final: red to white to blue, top to bottom
+    glitter: { colours: ['#e8102f', '#ffffff', '#1f4fd8'], bands: true, count: 24 },
+    steps: [
+      ...RUN_IN,
+      { pose: 'bt-tuck', hold: 0.75, air: true, rise: 0.95, flip: 3 * TAU, turn: 4 * Math.PI, travel: 1.15 },
+      { pose: 'bt-open', hold: 0.70, air: true, rise: 0, flip: 4 * TAU, turn: 7 * Math.PI, travel: 1.30 },
+      { pose: 'bt-land', hold: 0.30 },
+      { pose: 'salute', hold: 0.90 },
+    ],
+  },
+  // the Biles II vault (2023), a Yurchenko double pike: the run-in stands in for the board and table
+  'biles-ii-vault': {
+    stiff: 700, zeta: 0.85, loop: false, walk: 0,
+    // Paris vault final, her 7th gold: "power color" red, dense
+    glitter: { colours: ['#b0001c', '#ff2847', '#ff8fa3'], count: 30, twinkle: 0.25 },
+    steps: [
+      ...RUN_IN,
+      { pose: 'tb-pike', hold: 0.75, air: true, rise: 0.95, flip: 3 * TAU, travel: 1.15 },
+      { pose: 'bt-open', hold: 0.70, air: true, rise: 0, flip: 4 * TAU, travel: 1.30 },
+      { pose: 'bt-land', hold: 0.30 },
+      { pose: 'salute', hold: 0.90 },
+    ],
+  },
+  // the beam dismount ending in a 2½ wolf turn instead of the salute, the one she made famous at Rio 2016
+  'biles-wolf': {
+    stiff: 700, zeta: 0.85, loop: false, walk: 0,
+    // Paris "Luminous Legacy": a night sky with a constellation of crystals
+    glitter: { colours: ['#1a237e', '#ffffff', '#a9c1ff', '#ffffff'], twinkle: 0.95 },
+    steps: [
+      ...BEAM_DISMOUNT,
+      { pose: 'wolf', hold: 1.40, turn: 9 * Math.PI },
+      { pose: 'wolf', hold: 0.60 },
+    ],
+  },
+  'wuxia-turn': {
+    stiff: 420, zeta: 1.00, loop: false, walk: 0,
+    // an action line: the sweeping foot draws an ink stroke round the floor
+    glitter: { colours: ['#1c1c24'], line: ['lowerLeg', 1] },
+    steps: [
+      { pose: 'wx-crouch', hold: 0.22 },
+      { pose: 'wx-sweep', hold: 0.60, turn: TAU },
+      { pose: 'wx-freeze', hold: 1.50 },
+    ],
+  },
   'uptown-funk': {
     stiff: 340, zeta: 0.70, loop: false, walk: 0.85,
+    // sunglasses for the strut, and neon speed lines off every snap (the designer)
+    glitter: { colours: ['#ff2bd6', '#19e6ff', '#ffe81a'], count: 0, shades: true, snap: 'uf-snap' },
     steps: [
       { pose: 'uf-step-l', hold: 0.26, travel: 0.42 },
       { pose: 'uf-snap-l', hold: 0.40, travel: 0.42, walk: 0 },
@@ -181,22 +318,35 @@ function extrasBefore(d, extras) {
   return d.looped ? extras[extras.length - 1] : NO_EXTRAS;
 }
 
+/**
+ * How far through a step each extra is. On the ground, an S-curve. In the air (`air` steps, DANCES.md §Gymnastics)
+ * a jump's two halves are a parabola's: fast off the floor and slow at the top going up (`launch` follows it, for
+ * placeDancer to lift from the crouch), slow at the top and fast at the floor coming down; and turns are fastest
+ * at the top, tucked, starting slow off the floor (turning at once swung the head into it) and settling at the landing.
+ */
+function curves(step, raw, from, to) {
+  const u = sCurve(raw);
+  if (!step.air) return { u, spin: u, lift: u, launch: 1 };
+  const rising = to.rise > from.rise, lift = rising ? 1 - (1 - raw) ** 2 : raw * raw;
+  return { u, spin: rising ? raw * raw : 1 - (1 - raw) ** 2, lift, launch: rising ? lift : 1 };
+}
+
 export function stepDance(d, dt) {
   const dance = DANCES[d.name];
   const { steps, extras, walkAt } = dance;
   advanceDance(d, dance, dt);
   const step = steps[d.i];
   const raw = d.done ? 1 : Math.min(1, d.t / step.hold);
-  const u = sCurve(raw);
   const from = extrasBefore(d, extras);
   const to = extras[d.i];
+  const { u, spin, lift, launch } = curves(step, raw, from, to);
   const hop = (step.hop ?? 0) * Math.sin(Math.PI * raw);
   return {
     pose: DANCE_POSES[step.pose],
-    turn: mix(from.turn, to.turn, u),
-    rise: mix(from.rise, to.rise, u) + hop,
-    travel: mix(from.travel, to.travel, u),
-    shift: mix(from.shift, to.shift, u),
+    turn: mix(from.turn, to.turn, spin), flip: mix(from.flip, to.flip, spin), roll: mix(from.roll, to.roll, spin),
+    rise: mix(from.rise, to.rise, lift) + hop,
+    travel: mix(from.travel, to.travel, u), shift: mix(from.shift, to.shift, u),
+    air: Boolean(step.air) && !d.done, launch,
     walk: walkAt[d.i],
     done: d.done,
   };

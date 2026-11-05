@@ -135,15 +135,21 @@ reused: `inventory/grid.js` for the lobby floor, team shelves and forts, and
   attacks, each with its own button, so a 4-year-old never needs a combo to kick.
   The rig already kicks: `motion.js` has `rd-kick-l` / `rd-kick-r` poses on the `legSwing`,
   `hipFlex` and `kneeBend` channels, used in a dance. A kick reaches further and launches flatter
-  than a punch, and is a little slower. In the air it becomes a diving stomp. The owl kicks like
+  than a punch, and is a little slower. In the air it becomes a diving stomp (amended 2026-11-03, playtest:
+you fell too fast to land one, and only hit someone right under you): it hops up first (2 a second for 18
+ticks), then dives, steering at up to 5 a second onto the nearest foe below within 1 of its body, picked once
+when pressed (`MOVES.stomp`, `stompTarget` in `sim.js`). Pressed while rising it's drawn as a spinning jump
+kick, while falling as a backflip (`turn` in the snapshot, `stompTurn` in `play.js`). The owl kicks like
   the others (decided 2026-10-13, amended 2026-10-16: no talon swipe; its short-legged kick looks fine).
 - **Moves** (brainstorm 2026-10-13; per-step hit spheres as data are decided): ~6–10 per species as keyframed timelines. Each move also carries its hit
   spheres per step (offset, radius, active steps), authored as data, not read off live joints
   (see Multiplayer: the spring rig is cosmetic and differs per tablet).
 - **Hurt spheres** (decided 2026-10-13): sized from params (`headRadius`, `torsoW/H/D`, `legHeight`), fixed to the
   fighter's body position, not to animated joints.
-- **Touch controls, and nothing else** (decided 2026-10-13). No keyboard path, not even for development. Development
-  is tested by scripted inputs in node and on a real tablet. See Navigation: tap to move.
+- **Touch controls first** (decided 2026-10-13, amended 2026-11-01: keyboard keys for laptops, 0.0.6). Tablets
+  play by touch; a laptop gets ← → ↑ ↓ to walk, Space to jump, Z punch (hold to aim the Greathammer), X kick
+  and C a power (`KEYS` in `controls.js`). Development is tested by scripted inputs in node and on a real
+  tablet. See Navigation: tap to move.
 - **Per-tablet camera** (decided 2026-10-13 for following your own fighter; framing the nearest
   opponents and edge markers are brainstorm 2026-10-13): each tablet frames its own fighter and the nearest opponents, with
   edge markers for fighters off screen. Purely local; nothing about it crosses the network.
@@ -211,7 +217,8 @@ floor at an angle and follows your fighter.
 - **The punch string is look only** (decided 2026-10-15). The sim has one punch; each tablet draws
   it as the next of jab, cross, uppercut, uppercut (then round again; the hook was dropped 2026-10-15, as from the side-on camera it read the same as a cross), counting the
   punches that landed: hit events on an enemy fighter, the dummy or a fort brick, credited to the
-  nearest puncher not on the target's team. The move is picked when the punch starts, from the
+  hit's attacker, `h.by` (amended 2026-11-03: hit events carry the attacker's id, so tablets and the CPU no
+  longer guess the striker by position). The move is picked when the punch starts, from the
   hits landed before it, so a miss shows the move that's next and leaves the count waiting; a
   punch starting more than `COMBO_TICKS` (150, 2.5 s) after the last starts again at jab (41 reset while kids chased a knocked-back target, so the later moves hardly ever showed: 2026-10-15). No network data:
   every tablet counts from the same snapshots and once-only hit events (`spinoff/punches.js`).
@@ -253,23 +260,84 @@ floor at an angle and follows your fighter.
   alongside ("like a piano keyboard"). Still to test on an iPad.
 - **Buttons are big,** sized for small hands.
 
+## Discoverable moves (prototype 2026-11-04)
+
+**Decided 2026-11-04 (the designer):** the dances and gymnastics are moves found in the fight, not only victory
+dances. **Moves are never won or unlocked: every fighter has them from the start, and a tutorial shows each one**
+(not built: TODO.md). Tricks and weapons are what levels give.
+
+**Built, prototype: the wuxia sweep, as "holding 🦶 spins"** (below, §Power moves). Hold 🦶 (or X) for 0.4 s, the
+button filling, and let go: the tablet sends `sweep` once (play.js times the hold, as 🥊's Greathammer aim). On the
+ground only, cutting short the kick the press started: `sweep` in sim.js, 58 steps (0.97 s: the crouch, the turn, a
+0.15 s freeze), a hit under the body (reach null, low, r 0.55) for steps 14-49, so it lands on every foe round you.
+**It trips**: each foe is knocked a little way out from the sweeper, low (kb 3 at 20°), and lies on its back
+(`tripped`; play.js lays it back and stands it up) till the sweep is over and half a second more (`trip` 30 steps), so
+the sweeper is always up first (playtest: down a fixed 0.8 s from the hit, they were up before the sweeper). The tablet poses the sweep from the `wuxia-turn` dance at the
+move's step, with the dance's spring, and draws its action line.
+
+**Hit while down, a fighter skids** (decided and built 2026-11-04, the designer: "hilarious"). Any hit on a fighter
+lying tripped on the floor sends it skidding away from the hitter, flat on its back, at the hit's whole knockback
+speed, slowing at 6 m/s² (`SLIDE_DRAG`) till it stops; it stays down till then and a moment more. A skid that reaches
+an edge goes over it. **Brainstorm, not decided:** knockdowns beyond the sweep (the third hit in a row, a hit from
+behind, a balance meter), a moment on getting up when you can't be knocked down again, and whether bad guys can knock
+heroes down.
+
+Tried first, and dropped (playtest 2026-11-04): a kick pressed again in a kick's follow-through. A kick's job is to
+knock the foe away, so the sweep turned round at nobody; only off a kick that landed, it was too hard to find; with a
+press kept and a grace period, it fired after every landed kick and stopped you dead while they wandered off.
+
+**Open:** what each other move does (an escape, a dodge, a taunt that fills the bar; a backing-up retreat sweep is
+an idea for the round-off or back tuck), fight speed against readable speed, how each is found (combos, drawn shapes,
+situations), whether bad guys get them, and whether they work with a weapon in hand or are a reward for fighting
+bare-handed (the sweep is a leg move, so it works with any for now).
+
+## Trick shots (built 2026-11-04)
+
+The designer, playing a sword with a streaming trick, wanted to use its trail as a projectile. **Decided:** every
+trick on gloves, sword or scythe throws a shot; the Greathammer doesn't (holding 🥊 throws the hammer itself, and its
+trick rides it). Hold 🥊: the fighter winds up, its swing held at its start (`charge`, sent on press and on letting
+go, so every tablet shows it), filling 🥊; letting go swings, and the shot leaves as the swing strikes, the trick
+flying as the shot (the swing shows none of its own: playtest, a punch on the press and a shot on letting go made two
+atomic balls). A tap swings at once on letting go. **How far it flies is
+how long you held**, up to the trick's reach (sim.js `SHOTS`, 1.5 to 4 m; 0.3 s of hold a metre). Held past full,
+it stays full 0.4 s, then **fizzles**: the fill goes and letting go throws nothing. A tap (under 0.15 s) is only the
+swing. 🦶 during the hold drops it. The balance (the designer): charging means not punching, and holding too long
+loses it, so a shot takes a little skill. `shotCharge` is the one rule for the tablet's fill and the host's check.
+
+On the host a shot flies straight the way the fighter faces, at its trick's speed (8 m/s; a bubble 3, lightning 14),
+from the hand, and hits the first foe it touches (`shot` in MOVES: 4 damage, a small knock; a downed foe skids). One of
+yours in the air at a time. Flies through walls for now. **Drawn as the trick itself**, its whole look from the fist
+(spreading, growing, turning colour) played over the flight, so it flares as it arrives. **Open:** whether shots carry or knock loose donuts
+(§Power moves, tricks that steal), and whether bad guys throw them.
+
 ## Power moves: gestures behind a power bar
 
 Many-finger gestures are extra moves inside the fighter, unlocked only when a power bar is full
-(brainstorm 2026-10-13). Tap to move and the two buttons stay the whole game for a kid who never finds
-a gesture.
+(brainstorm 2026-10-13; the bar and one power built in the sim 2026-11-03, below). Tap to move and the two
+buttons stay the whole game for a kid who never finds a gesture.
 
 - **One finger always moves.** Two or more fingers on the stage at once is a gesture, and only
-  when the bar is full; otherwise extra fingers are ignored and the first one steers.
+  when the bar is full; otherwise extra fingers are ignored and the first one steers. Built but off
+  (2026-11-03): `controls.js` keeps every finger's screen path, and with a full bar a second finger, or the
+  steering finger once it has dragged `DRAW_PX` (80 px), becomes a drawing. It only runs when
+  `createControls` gets `{ draw: true }`, which `play.js` doesn't pass yet.
 - **The bar is a donut filling with icing**, next to the buttons. It fills a little with time,
   and more for landing hits, picking up donuts and banking, so even a kid who is struggling gets a
   power now and then. A full donut glows, and a ghost hand shows one gesture as a picture, no words.
-  Using a power empties it.
+  Using a power empties it. The bar is built in the sim (2026-11-03): host-owned, `power` 0 to 1 in the
+  snapshot, filling in play 1/45 a second, +0.06 a hit, +0.12 for a ring-out you're credited with, +0.05 a
+  pickup, +0.15 a steal, +0.25 a bank (`POWER` in `sim.js`), and emptied only when a power fires. Not drawn
+  yet: no icing donut.
+- **Hit chain** (built in the sim 2026-11-03, not drawn yet): `chain` per fighter in the snapshot, +1 a landed
+  hit, back to 0 on a miss (an attack or a hammer lap that hit nothing), on being hit, or after 2.5 s without
+  a hit.
 - **Any gesture works when the bar is full.** Whatever a kid does with several fingers, something
   big happens (the slap, below, is the fallback). A deliberate player chooses which.
 - **Recognised on the tablet, sent as one input.** The tablet turns the finger tracks into "power
   X at point P" and sends that to the host, a few bytes. The recogniser is a pure function of
-  pointer tracks, tested in node with scripted tracks.
+  pointer tracks, tested in node with scripted tracks. The input is built (2026-11-03): `power: { kind, on }`
+  (a fighter id, not a point), checked by the host (`readInput` in `multiplayer.js`) and by the sim (bar
+  full). The recogniser isn't: today only the keyboard's C fires a power, the first one at the nearest bad guy.
 - **Same gestures, species flavour.** Each gesture does the same job for every fighter but looks
   like its species: the lion's slap is a roar, the llama's a stomp, the owl's a wing gust.
 
@@ -292,8 +360,38 @@ so the two ladders can't drift apart. A first ladder, for tuning:
 | 5 | Species extra: headbutt / roar / glide |
 | 6 | Spread: gust; dash punch (🥊 while running) |
 | 7 | Two-finger tap on your shelf: icing dome |
-| 8 | Wall-kick jump; charged swing (hold 🥊) |
+| 8 | Wall-kick jump; charged swing (hold 🥊; clashes with hold 🥊 aiming the Greathammer, decided 2026-10-18) |
 | 9+ | The rest of the gesture table, one per level |
+
+**Holding 🦶 spins** (decided 2026-11-03; built 2026-11-04 as the wuxia sweep, §Discoverable moves). Hold kick, let go, and the fighter spins,
+hitting all the way round: the Zelda spin attack. It mirrors holding 🥊, which aims the Greathammer,
+and it needs no second button, so it can't fire by accident when small hands mash both. A tap is
+still a kick, and 🦶 in the air is still the stomp. It is the wuxia sweep, a 0.4 s hold,
+and never unlocked: every fighter has it (§Discoverable moves).
+
+**A power turns bad guys into weird objects** (decided 2026-11-03; the Final Fantasy toad spell; sim side
+built 2026-11-03, objects not drawn yet). For a few seconds a bad guy is a silly thing, a cotton ball, a rubber
+duck, a teapot, a sock, and drops any donut it carried. It can't attack or grab, and a hit sends it bouncing
+further than usual. Then it pops back. As built: the only power (`toy`, `POWERS` and `TOY` in `sim.js`), fired
+at one bad guy with a full bar, 3 s, can't attack, grab or throw, knocked back 1.5×, `toy` in the snapshot.
+Still open: how a hero gets it (a power-bar gesture, a pickup on the stage, or a level unlock), whether it
+hits one bad guy or everyone near you, whether a wrapped bad guy can still hop about, and which objects. No
+donuts among them, since donuts are what you collect.
+
+**No status effects** (decided 2026-11-03, from the designer). Hits never leave lasting effects: no burn,
+poison, freeze or slow ticking away on a fighter. A hit is its damage, knockback and stun, and then it's over.
+Tricks may change what a hit does in the moment (open), but never leave anything behind on the fighter hit. The
+one exception is the object power above, which is a full bar spent on purpose, not a side effect of a hit; it
+stays the only timed state on a fighter (`toy`).
+
+**Idea: tricks that steal donuts** (brainstorm 2026-11-03, from the designer: "some of the tricks should
+actually let you steal donuts"). A hit with such a trick takes the donut a fighter carries: straight into your
+bag if it's empty (pickpocket), or popped toward you instead of away, or floated to you in a bubble; the thrown
+Greathammer could fetch back a loose donut on its lap. Knocking donuts off the enemy shelf with a trail is the
+hard one: trick bits exist only in the drawing, so the sim would have to model each trick's shape. First step
+for any of them: the sim learns each fighter's trick (today `entrantOf` sends only `hands`). Open: which tricks,
+on every hit or only some (a stomp; a string's last punch needs the sim to own the string count), whether bad
+guys can, and whether a shelf swipe gets round the guard.
 
 **Idea: a falling attack off something tall** (brainstorm 2026-10-14, from a playtest, kept for later). The owl
 falling off a tall waffle stack swung round toward the stack on the way down. That was a facing
@@ -301,7 +399,9 @@ bug, now fixed (facing holds in the air), but the swing looked like a wind-up, s
 move: press 🦶 while falling from a height and the fighter turns, tucks and drops onto whatever
 is below, landing harder the further it fell (a bigger BAM, a longer hit-stop, knocks fort
 pieces loose). It's the big brother of the air stomp (Level 1 below), so it slots in as a later
-unlock or a power move.
+unlock or a power move. **Not built** (2026-11-03): nothing lands harder from higher. The air stomp's hop and
+homing (What the fighter needs: Kicking) are a different thing. All that exists is the number it would need: a
+hit event's `fell`, how far the hitter had dropped.
 
 Candidate gestures (brainstorm 2026-10-13; first ones to try are marked ★):
 
@@ -349,7 +449,9 @@ Visual indicators, so each kid can tell what their teammates are doing:
   fur colour, so "I'm going for the shelf" is visible without talking. The target already goes
   to the host as an input, so this costs one more snapshot field.
 - **The network side is small.** Each fighter's bar level (one byte), current target and power
-  state ride in the snapshot; the host alone decides whether a power joined a window.
+  state ride in the snapshot; the host alone decides whether a power joined a window. Built so far
+  (2026-11-03): `target` and `power` are in the snapshot, and fired powers are `powers` events. Not built:
+  the join window, the ribbon, combos, footprints and the teammates' bars on screen.
 
 ## Scoring: everyone plays the whole time
 
@@ -626,7 +728,7 @@ and smashers each get a round that is theirs.
     (raid, kicking walls on the way, grab and run home) or defend (stand guard); they never attack
     a hero, so the fairness rules (Bad guys) only start to matter on the level that brings Chase.
     A grownup playing a bad guy follows the same rule: their 🥊 and 🦶 break walls but never land
-    on a hero (brainstorm 2026-10-17, since 🥷 isn't built yet).
+    on a hero (decided 2026-10-18 with 🥷: Bad guys, Play a bad guy, CPU rules).
   - **The bad guys walk at a fifth of a kid's speed on level 2** (decided 2026-10-17, playtest: the
     raider was far too fast. It moves without waiting on a tap or a screen scroll, on a perfect
     path, so a kid could never catch it). The level's `match` rule `badGuyPace: 0.2`, read by
@@ -653,7 +755,7 @@ and smashers each get a round that is theirs.
     bad guy can still knock you off the front or the ends of the stage for a ring-out, as on every level.
   - **One CPU bad guy, and it hits** (decided 2026-10-17): still the single raider of level 2, but
     level 3's can hit kids and knock them off (level 2's never does, `badGuysHit: false`).
-  - **Level 3 has the difficulty modifier** (decided 2026-10-17; Handicap: a saved, golf-style handicap).
+  - **Level 3 has the difficulty modifier** (decided 2026-10-17, not built yet; Handicap: a saved, golf-style handicap).
   - **Tapping the floor walks you down off a stack on purpose** (decided 2026-10-17): choosing to get
     down isn't falling.
   - **Hand-made, like levels 1 and 2** (decided 2026-10-17); only the last breakfast level is generated
@@ -739,6 +841,28 @@ and smashers each get a round that is theirs.
   (Level 2, above), and a broken block is gone for the rest of the match. A
   match is short (90 s to start), so that's fine: this is short-term strategy, not a long siege.
   Revisit only if a playtest shows kids upset at their wall being gone.
+- **Twenty levels: four areas of five** (decided 2026-11-03, from the designer). Breakfast (the pancake stage)
+  is the first area, the five tutorial levels; three more areas of five are still to choose. Today breakfast has
+  four (`LEVELS.breakfast`: breaking in, building, jumping, the chase), so it needs one more: by the bullet below,
+  breakfast's last level is the generated one. The other three areas are mostly generated too
+  (GENERATED-LEVELS.md): difficulty is the level number, so levels 6-20 are `generateStage(seed, difficulty,
+  stage)` at difficulty 6-20, and a kind of problem is first met in a hand-made level, so each new area opens
+  with a hand-made level teaching its own rule (cake's trampolines; a train's timed crossing) before generated
+  ones use it. That means each area is a hand-made first level, then generated ones; the generator's tables
+  (`UNLOCK`, the difficulty table) stop at 5 today and need extending to 20. Candidates: cake (the generator
+  already makes cake layouts), then the kids' own places in STAGE-IDEAS.md (Candy Train and Chocolate Waterfall
+  are its suggested first). Open: which three and in what order; whether levels number 1-20 through the game or
+  1-5 in each area (the save keeps both a highest level, `beaten`, and how far each stage got, `reached`; the
+  generator's difficulty wants the 1-20 number); how many of an area's five are hand-made; and how the weapon unlocks (now levels 1, 2 and 4, all inside breakfast), the
+  move ladder (§Power moves, up to 9+) and earned tricks spread over twenty.
+- **Every area ends in a boss** (decided 2026-11-03, from the designer). Levels 5, 10, 15 and 20 each have a
+  boss, or something else that makes them hard to win. What it is (brainstorm 2026-11-03): a CPU bad guy who
+  is bigger (things are as big as they look, so it is harder to knock out and blocks more), or more
+  interesting, or a different species from the rest; or one that does the recorded dances
+  (`characters/motion.js` DANCES: riverdance, floss, attitude, pirouette) as its moves, e.g. a riverdance
+  that stamps out a shockwave, a pirouette that spins and hits all round. A boss's hits keep the no-status-effects
+  rule. Open: one boss per area or one kind for all four; whether breakfast's level 5 (planned as the generated
+  one, below) is a boss on a generated layout; what beating it earns (a weapon, a trick, the 🏅 golden donut at 20).
 - **The breakfast stage is the tutorial stage** (decided 2026-10-17). Its levels are hand-made (amended
   2026-10-17: level 3 too), except the very last breakfast level, which is generated so players meet the
   idea before the other stages, where levels are generated (`GENERATED-LEVELS.md`). The generator keeps
@@ -1411,8 +1535,9 @@ like that keeps the big cape a choice rather than a handicap.
     same generated texture the iron already uses for its colour, bumps and roughness. No new material, mesh or draw
     call: the texture is 256 square instead of 64, built once on load (about 14 ms), smooth and mipmapped so the
     knotwork doesn't shimmer as the hammer moves.
-  - **Its one trick is lightning** (decided 2026-10-18, user): `look.trick` is always `lightning`, not a choice, like
-    the scythe's music: tilted bolts in electric blue with white cores crackle off it as a swing lands.
+  - **Its trick is lightning** (decided 2026-10-18, user; amended 2026-11-03, 0.0.7: tapping the hammer again
+    gives 💥 Zap, a big glowing green ZAP! on its head, `TRICKS.hammer`): tilted bolts in electric blue with white
+    cores crackle off it as a swing lands.
   - **Held, it is the sword's** (decided 2026-10-18): one-handed, `SWORD_MOVES` (stab, chop, upward stab),
     the same timing, reach and damage. Only the throw is new.
   - **Hold 🥊 to aim, let go to throw** (decided 2026-10-18; Buttons mean one thing everywhere). A press still
@@ -1436,7 +1561,11 @@ like that keeps the big cape a choice rather than a handicap.
   A trick pops out of the hitting glove or the sword's tip while a punch lands, upright and turning:
   ✨ sparkle (the yarn store's `characters/sparkle.js` stars), 🫧 bubbles, or 🔥 a cartoon flame.
   Gloves go plain → ✨ → 🫧 → 🔥; a sword always has one, ✨ → 🫧 → 🔥 (`TRICKS`, `look.trick`).
-  Looks only, like the sword.
+  So far looks only, like the sword; tricks may later change what a hit does in the moment, never leaving a
+  status effect (amended 2026-11-03, see §Power moves, No status effects, and Tricks that steal donuts). Amended 2026-11-03 (0.0.7): many more tricks for gloves and sword, a trick is
+  a recipe of little bits (shape, colour family, finish, start, motion; `EFFECTS` in `fighter.js`), and a
+  grown-up workshop makes new ones (`?debug=1` rolls a random one, `?debug_menu=1` the full menu). The list is
+  `TRICKS` in `fighter.js`; CHANGELOG.md 0.0.7 names them.
 
 - **Hats:** `garments.js` hat, as-is. Ten silhouettes already (beanie, beret, bucket, earflap,
   pixie, …); the chooser offers a handful.
@@ -1494,7 +1623,7 @@ only, pictures and colour, no words needed; every button has an `aria-label` for
    colours plus white), then
    the hands row: 🥊 gloves, a sword once you've beaten level 1, or the Music Scythe once you've beaten level 2,
    then their colour (decided 2026-10-17).
-   Tapping the gloves or sword you already have changes its trick, shown as a ✨ 🫧 🔥 badge on the icon,
+   Tapping the gloves, sword or hammer you already have changes its trick, shown as a badge on the icon,
    and the preview throws a move to show it off (jab or stab, then cross or slash, then uppercut or upward
    stab, in turn). The preview hits nothing, so once the move lands its
    trick floats up off the glove or sword tip, big, for 1.2 s (`showOffTrick`), so a kid sees what it does. Icons are drawn in the colour currently picked. Tapping the hat or cape you
@@ -1609,6 +1738,72 @@ starts the match (the host in a room, or a tablet playing by itself). Built in t
   together; ✏️ on the next card looks the same. Both open the chooser. Your fighter isn't switched to it:
   picking it is yours. When the Greathammer is what unlocked, a *Dark Souls*-style banner (a dark band, gold
   serif capitals, its name) crosses the score card too, the hammer's fourth-wall joke.
+- **Tricks are earned, like weapons** (decided 2026-11-03, from the designer; not built: today every trick is
+  open from the start). A trick is earned once and is then open on every weapon it belongs on at once. A few are
+  there from the start (✨ 🫧 🔥), 🎵 comes with the scythe and 🌩️ with the Greathammer (each is its weapon's
+  fallback); the rest are earned by beating levels (amended 2026-11-03: by levels, not by doing things; doing
+  things earns dances, below), about one a level across the twenty. Which level gives which is open; a first
+  order, easy looks first and the big ones at the bosses: 🎷 🌟 🍬 💗 in breakfast, ☄️ 🌠 💨 🪄 by level 10,
+  💞 ⛈️ ☀️ ⚛️ by 15, ⚡ 💥 and the rest by 20, the 🏅 golden donut for beating the level-20 boss. Open: whether a
+  locked trick shows greyed out with the level that brings it, or not at all; and how this sits with the
+  weapons (levels 1, 2 and 4 today), for instance weapons moving to the bosses.
+- **Kids dance too** (decided 2026-11-03, from the designer: dances are not only a boss's). The recorded dances
+  (`characters/motion.js` DANCES: riverdance, floss, attitude, pirouette) are a fighter's to earn.
+- **Dancing is celebration** (decided 2026-11-03). A dance does nothing to the match: no power bar, no hit. The
+  3 s after a ring-out, while the fighter rung out is gone (`RESPAWN_WAIT`), is the dance moment; with one bad
+  guy there's no risk in it, so a reward would just be free bar after every ring-out.
+- **The move that rings someone out teaches its dance** (brainstorm 2026-11-03, from the designer). A punch
+  ring-out teaches the floss, a kick attitude, a stomp the riverdance, the Greathammer Hammer Time, the hold-🦶
+  spin the pirouette (more finishers in the table below); the first one of each earns it, with the big pop-up as for tricks. After that, in the dance
+  moment the dance that matches how you rang them out is yours to do: the dance button glows, or tapping your
+  own fighter dances. Needs the ring-out event to say what move it was (`lastHit` keeps the move as well as
+  `by`). Open: the button or tap; whether the dance shows on the end card as a victory pose; teammates dancing
+  together in step. (Replaces "earned by learning combos", brainstorm the same day.)
+- **Which finisher teaches which dance** (brainstorm 2026-11-03, from the designer; the Greathammer's and the
+  teapot's are the designer's own). The finisher is the hit that sent them off (the ring-out's credit, `lastHit`).
+
+  | Finisher | Dance |
+  | --- | --- |
+  | punch | Floss (recorded) |
+  | kick | Attitude (recorded) |
+  | stomp | Riverdance (recorded) |
+  | thrown Greathammer | Hammer Time (the wide shuffle) |
+  | hold-🦶 spin | Pirouette (recorded) |
+  | a bad guy who is a toy object | I'm a Little Teapot |
+  | two heroes hit it in the last second (`crowd` 2) | Row, Row, Row Your Boat: face each other, hold hands, rock |
+  | three (`crowd` 3) | London Bridge: two make the arch, the third goes under, then it falls down |
+  | four (`crowd` 4) | Ring Around the Rosie: a circle, then all fall down |
+  | five or six (`crowd` 5+) | a conga line: everyone falls in behind the first, kicking out to the side, each a beat after the one in front |
+  | hit while flying (`air`) | the Robot |
+  | stomp from high up (`fell`) | the Worm |
+  | it was carrying a donut (`broke`) | the butt shake: turns its back to the camera, bends, and wiggles hips and tail at you, glancing back (the designer's: a taunt) |
+  | the end of 5+ hits in a row (`chain`) | the Dab |
+  | uppercut (the punch string's) | the Travolta point: a finger up high, then down across the body, over and over, with a hula-hoop hip sway, hugely exaggerated |
+  | thrust kick (the kick string's) | Can-can |
+  | just off a trampoline (`bounced`) | the horse-riding dance |
+  | a sword's swing / a scythe's | a fencing salute / the Thriller zombie walk |
+  | finished with your own damage at 100% or more | the Running Man |
+
+  Spare for bosses or the golden donut: the Chicken Dance, Baby Shark, the Twist, the Sprinkler. When several
+  are true, the rarest wins: teapot, team-up, donut thief, big drop, juggle, trampoline, chain, then the move.
+  Fighters have little arms (they read thanks to the gloves, §Arms read), so dances made of legs and the whole
+  body read best (riverdance, can-can, the butt shake, the worm, running man, horse-riding, and the chicken dance's
+  little flapping elbows); arm-shape dances (the dab, the Travolta point, the teapot's spout) need the
+  gloves big and may need the whole body leaning. Keep them silent or with our own music, never the songs.
+- **Gymnastics for the skilful finishers** (planned 2026-11-03, from the designer: the rest of the table's
+  pop-culture dances weren't up to snuff, and dances need to read as distinct). Flips, cartwheels and spins turn
+  about different axes, so they can't be confused. First, every skill named after Simone Biles is built and
+  compared; the plan is in ai_planning_sessions/characters/DANCES.md §Gymnastics. Then they replace the table's
+  remaining pop-culture rows (e.g. a trampoline strike: a twisting layout; a 5+ chain: the favourite Biles skill).
+- **A weapon disappears while its fighter dances** (brainstorm 2026-11-03, from the designer). The sword,
+  scythe or Greathammer goes for the dance and comes back after; the gloves show meanwhile, so arm dances read
+  for every fighter.
+- **A new trick gets a big pop-up and opens selected** (decided 2026-11-03, from the designer; not built). On
+  the end card a big pop-up names it ("You earned ☄️ Fireball!") alongside the new-item button. ✏️ (the
+  button, or the next card's) opens the chooser scrolled to the trick row, the way a new weapon opens on the
+  hands row, and with the new trick picked, unlike a weapon, which is left for the player to pick. Open: whether
+  weapons should now be picked too, to match; and when the fighter holds a weapon the trick isn't on (the
+  scythe), whether picking it switches to one that has it.
 - **One game save per browser:** the highest level and the stages each player has reached are
   saved in their browser as the whole game's progress, apart from the fighter, so re-rolling or
   re-dressing a fighter keeps it (decided 2026-10-17). It travels with the fighter when they join a
@@ -1776,10 +1971,10 @@ scary, for 4–6 year olds.
   falling kid off again; powers aim where the kid was about half a second ago. Chase chance,
   reaction delay, attack pace and grace time are plain numbers that auto-scaling can tune later.
 - **First states: Raid (with wall breaking), Grab, Run home and Defend** (decided 2026-10-17), for
-  level 2, switched by its raid-or-defend rule (Forts: Level 2). Chase, Scoop and Power come later
-  (brainstorm 2026-10-13).
-- **The bad-guy team grows level by level** (decided 2026-10-17; `badGuys` in `levels.js`, though there is no
-  level 3 yet). The tutorial levels
+  level 2, switched by its raid-or-defend rule (Forts: Level 2). Chase came with level 4 and Scoop with
+  one donut a trip (both decided and built 2026-10-18); Power comes later (brainstorm 2026-10-13).
+- **The bad-guy team grows level by level** (decided 2026-10-17; `badGuys` in `levels.js`; only levels 1 to 4
+  exist, so it hasn't grown past one yet). The tutorial levels
   keep it small: level 1 has the training dummy (decided 2026-10-17), which never raids, and levels 2
   and 3 have one CPU bad guy (Forts: Level 2; level 3 amended 2026-10-17: one, now able to knock you
   off, so the jumping is the level's one new idea; level 4 has one too, Forts: Level 4). From level 5 the count grows by one CPU bad guy a level:
@@ -1792,7 +1987,7 @@ scary, for 4–6 year olds.
   level 5 face the kids with 4 CPU bad guys beside them; no grownups on level 5 is 5 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
   drops it (decided 2026-10-17; After the lobby: a win unlocks the next level).
 
-  A grownup bad guy on level 1 (🥷 isn't built yet) can't attack the kids: they can only defend
+  A grownup bad guy on level 1 (🥷, built 0.0.6) can't attack the kids: they can only defend
   their base, by standing guard at their shelf (brainstorm 2026-10-17).
 - **Saving progress: a sticker card per player** (brainstorm 2026-10-14, replacing "only the highest
   level"). Every player has a stamp card, saved on their own tablet under its own key
@@ -1931,7 +2126,9 @@ faster than the attack pace) and steals without ever hitting the kid at the wall
    up, snapshots down at 30 Hz with events that survive a lost one, interpolation, a per-tablet
    camera, pause / away / host-left, and ▶️ again for everyone. Tested in node only; still to
    try on real tablets on home Wi-Fi.
-3. **Kids vs bad guys** (brainstorm 2026-10-13). Up to eight tablets (six heroes, two played bad guys), the bad-guy team from its 8 presets,
+3. **Kids vs bad guys** (brainstorm 2026-10-13; partly built by 0.0.7: CPU bad guys, 🥷 bad-guy players,
+   two shelves on a wide stage, the match timer, team shelf score and donut pickups. Not built: the 8
+   presets, the `ninja` hat, edge markers, `selfie.js` portraits). Up to eight tablets (six heroes, two played bad guys), the bad-guy team from its 8 presets,
    `ninja` hat and AI, two shelves on a stage wider than a screen, edge markers, the match timer
    and team shelf score, donut pickups, a results screen with `selfie.js` portraits.
 4. **Content** (brainstorm 2026-10-13). Full move lists per species, stages, alternate costumes, item drops with

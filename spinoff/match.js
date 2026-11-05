@@ -71,7 +71,7 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  *           | { thing: 'shelf', team: Team } | { stop: true } | { jump: true }} Target
  *   a point on the stage (y given when the tap landed on a raised top), a thing (a pile by its owner's id), stop where you are,
  *   or jump (a tap just above your fighter: on the ground a jump, in the air the double jump, at the top of the first)
- * @typedef {'idle'|'walk'|'jump'|'fall'|'punch'|'kick'|'hurt'|'launched'|'blocked'|'sit'} MoveId
+ * @typedef {'idle'|'walk'|'jump'|'fall'|'punch'|'kick'|'sweep'|'charge'|'hurt'|'launched'|'tripped'|'blocked'|'sit'} MoveId
  *   'blocked': standing at a wall it can't hop, facing it; 'sit': away from the screen, sitting where it stopped
  *
  * One player's input for one tick. `target` is sent only when it changes (null keeps the last
@@ -79,14 +79,19 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  * screen is hidden (true) or back (false), and kept between: the fighter stops and sits.
  * In the build round, `drop` (⬇️) is true on the tick it went down, `ready` (👍) is sent when it changes and
  * `go` once, when 👍 has been held long enough to start the round for everyone. `throw`: 🥊 let go after the Greathammer's path
- * showed, its size 0 to 1 (hammer.js).
+ * showed, its size 0 to 1 (hammer.js). `sweep`: 🦶 let go after a hold (REUSE-SPEC.md §Discoverable moves).
+ * `shot`: 🥊 let go after a hold, how much of the trick's reach its shot flies, 0 to 1 (sim.js shotCharge); `charge`, sent
+ * when it changes: 🥊 held for a shot (the fighter winds up), or not.
  * @typedef {{ target: Target|null, punch: boolean, kick: boolean, away?: boolean, drop?: boolean, ready?: boolean, go?: boolean,
- *             throw?: number }} Input
+ *             throw?: number, power?: { kind: string, on: string }, sweep?: boolean, shot?: number, charge?: boolean }} Input
+ *   `power`: a full power bar fired at fighter `on`, once the tablet recognised the gesture (sim.js POWERS)
  *
  * @typedef {{ id: string, team: Team, x: number, y: number, z: number, vx: number, vy: number, vz: number,
  *             facing: number, height: number, width: number, onGround: boolean, move: MoveId, step: number,
  *             percent: number, carrying: DonutLook|null, invincible: boolean, respawn: number,
- *             target: { x: number, y: number, z: number }|null, block: string|null }} FighterState
+ *             target: { x: number, y: number, z: number }|null, block: string|null,
+ *             power: number, chain: number, toy: string|null, turn?: 'spin'|'flip', shooting?: boolean }} FighterState
+ *   `turn`: how a stomp turns in the air, a spin if it started rising, else a backflip. `power`: the power bar, 0 to 1 (full fires one). `chain`: hits landed in a row. `toy`: the silly object it is (sim.js TOY), or null.
  *   `facing` is the yaw in radians (0 faces +x, PI/2 faces +z, toward the camera). `step` is the
  *   move's progress, 0 to 1. `target` is where it is heading, for teammates' footprints. `block`: the icing
  *   of the block it carries in the build round. `respawn`: seconds left out of play after a ring-out (0 in play): not
@@ -96,19 +101,26 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  * @typedef {{ id: string, team: Team, x: number, y: number, z: number, hits: number, maxHits: number,
  *             icing: string }} BrickState
  * @typedef {{ team: Team, x: number, y: number, z: number, donuts: DonutLook[] }} ShelfState
- * @typedef {{ x: number, y: number, z: number, move: 'punch'|'kick'|'stomp'|'hammer', on: 'fighter'|'brick',
- *             target: string, broke: boolean }} HitEvent
+ * @typedef {{ x: number, y: number, z: number, move: 'punch'|'kick'|'stomp'|'hammer'|'sweep'|'shot', on: 'fighter'|'brick',
+ *             target: string, broke: boolean, by: string, air?: boolean, bounced?: boolean, fell?: number,
+ *             crowd?: number, chain?: number }} HitEvent
  *   a hit that landed this tick, at its point of contact, on the fighter or brick `target` (its id),
  *   for the page's BAM burst and shake;
- *   both fighters freeze for HITSTOP_TICKS on contact. `broke`: the brick (or bag) gave way.
+ *   both fighters freeze for HITSTOP_TICKS on contact. `broke`: the brick (or bag) gave way. `by`: who hit. On a fighter, what
+ *   kind of hit: `air` it was in the air, `bounced` the hitter was off a trampoline, `fell` how far the hitter had dropped,
+ *   `crowd` how many fighters hit it in the last second, `chain` the hitter's hits in a row with this one.
  * @typedef {{ fighter: string, kind: 'steal'|'bank'|'pickup'|'fetch'|'place', x: number, y: number, z: number }} DonutEvent
  *   a donut changed hands this tick: taken from the enemy shelf (`steal`), put on your own shelf
  *   (`bank`), or picked up off the floor (`pickup`), at that spot, for the page's celebrations; or in the
  *   build round a block was taken from a pile or a stack (`fetch`) or put down (`place`).
- * @typedef {{ fighter: string, x: number, y: number, z: number }} FullBagEvent
+ * @typedef {{ fighter: string, x: number, y: number, z: number, donut?: string }} FullBagEvent
  *   a fighter already carrying a donut touched a loose donut or reached the enemy shelf this tick,
  *   at that donut or shelf, so the page can show "your bag holds one"; or a guard (the fighter, where
- *   they stand) kept someone from grabbing off their shelf.
+ *   they stand) kept someone from grabbing off their shelf. `donut`: the loose donut's id, when it was one.
+ * @typedef {{ fighter: string, by: string|null, x: number, y: number, z: number }} RingOutEvent
+ *   a fighter left the stage at (x, y, z), knocked out by `by` if it hit them in the last few seconds
+ * @typedef {{ fighter: string, kind: string, on: string, x: number, y: number, z: number }} PowerEvent
+ *   `fighter` fired power `kind` at `on`, standing at (x, y, z)
  *
  * Everything the page draws, every tick. No three.js objects, only numbers and strings, so it
  * can cross the network unchanged in milestone 2. `over` is true once the clock runs out;
@@ -118,14 +130,16 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  *   a hero's blocks left to place, in a heap at (x, y, z)
  * @typedef {{ tick: number, secondsLeft: number, over: boolean, winner: Team|null,
  *             fighters: FighterState[], donuts: LooseDonut[], hammers?: FlyingHammer[], bricks: BrickState[],
+ *             shots?: { id: string, by: string, trick: string, x: number, y: number, z: number, ux: number, uz: number, left: number }[],
  *             shelves: ShelfState[], hits: HitEvent[], fullBag: FullBagEvent[],
- *             donutEvents: DonutEvent[], phase: 'build'|'play', ready: string[], piles: PileState[] }} Snapshot
+ *             donutEvents: DonutEvent[], ringOuts: RingOutEvent[], powers: PowerEvent[], phase: 'build'|'play', ready: string[], piles: PileState[] }} Snapshot
  *
  * Who is in the match. height / width / reach come from the fighter's params (fighter.js) as plain
  * numbers; look is the donut frosting this entrant brings to its team's shelf, and the icing
  * colour of its bricks. `hands` is what it holds (fighter.js HANDS; gloves if left out): only the Greathammer plays differently.
  * @typedef {{ id: string, team: Team, height: number, width: number, reach: number,
- *             look: DonutLook, dummy?: boolean, hands?: string }} Entrant
+ *             look: DonutLook, dummy?: boolean, hands?: string, trick?: string }} Entrant
+ *   `trick`: the trick on its hands, which says how far its shot flies (sim.js SHOTS)
  *
  * What the level sets for a match: each hero's pile (`pieces`, with a build round first when there are any) and who can
  * hit whom (`match`, roster.js's MATCH).

@@ -7,8 +7,9 @@ import {
   createCharacter, applyPose, setViewMode, disposeCharacter,
   setGeometryDetail, getSpecies, speciesList, slugify, shareRandomParams,
   stepMotion, resetMotion, motionOf, walkPhase, walkLayer, walkGain, phaseStep,
-  DANCES, DANCE_NAMES, makeDance, stepDance,
+  DANCES, DANCE_NAMES, makeDance, stepDance, placeDancer,
 } from './npc.js';
+import { stepGlitter } from './glitter.js';
 import { randomTraits } from './visit.js';
 
 console.info('LYS build', BUILD);
@@ -35,6 +36,8 @@ const state = {
   speed: 0.5,
   dance: 'none',
   repeat: true,
+  side: false,
+  slow: 1,
   slots: {
     A: { speciesId: 'owl', params: null },
     B: { speciesId: 'llama', params: null },
@@ -229,7 +232,7 @@ function save() {
     exposure: state.exposure, toneMapping: state.toneMapping, spacing: state.spacing,
     linkShared: state.linkShared,
     play: state.play, speed: state.speed, idle: state.idle, walk: state.walk,
-    repeat: state.repeat,
+    repeat: state.repeat, side: state.side, slow: state.slow,
     slots: Object.fromEntries(SLOTS.map((id) => [id, {
       speciesId: state.slots[id].speciesId,
       params: state.slots[id].params,
@@ -254,6 +257,7 @@ function load() {
     const saved = JSON.parse(raw);
     Object.assign(state, saved, { slots: state.slots });
     if (!(state.pose in POSES)) state.pose = 'rest';
+    if (!(state.slow >= 1 && state.slow <= 10)) state.slow = 1;
     for (const id of SLOTS) restoreSlot(id, saved.slots?.[id]);
   } catch { /* corrupt save, fall back to defaults */ }
 }
@@ -325,7 +329,6 @@ function setPlay(on) {
     for (const id of SLOTS) {
       const slot = state.slots[id];
       slot.perf = null;
-      slot.rise = 0;
       restoreSpring(slot);
       if (built[id]) resetPlacement(id);
     }
@@ -364,18 +367,18 @@ function stepDanceFor(id, character, slot, dt) {
     if (state.repeat) slot.perf = makeDance(state.dance);
     else { slot.perf = null; state.dance = 'none'; restoreSpring(slot); buildGui(); }
   }
-  character.root.position.x = slotX(id) + d.shift;
-  character.root.position.z = d.travel;
-  character.root.rotation.y = d.turn;
-  slot.rise = d.rise;
   return d;
 }
+
+// side on, a pass that travels starts half its length back, so it ends as far past the slot
+const passOf = (perf) => (state.side && DANCES[perf?.name]?.extras.at(-1).travel) || 0;
 
 function stepSlot(id, dt) {
   const character = built[id];
   if (!character) return;
   const slot = state.slots[id];
   slot.opts.idleAmount = state.idle ? 1 : 0;
+  const pass = passOf(slot.perf);
   const d = stepDanceFor(id, character, slot, dt);
   const walking = d ? d.walk > 0 : state.walk;
   const dial = state.walk ? state.speed : 0;
@@ -386,7 +389,8 @@ function stepSlot(id, dt) {
   slot.phase = (slot.phase + phaseStep(speed * dt, speed, L, slot.opts)) % 1;
   stepMotion(character, d ? d.pose : POSES[state.pose], dt, slot.opts,
     walking ? (out) => walkLayer(out, w, gain, slot.opts) : null);
-  if (slot.rise) character.root.position.y += slot.rise;
+  if (d) placeDancer(character, d, { x: slotX(id) - pass / 2, yaw: state.side ? Math.PI / 2 : 0 });
+  slot.glitter = stepGlitter(slot.glitter, character, slot.perf, d, dt);
 }
 
 function stepAll(dt) {
@@ -404,7 +408,6 @@ function setDance(name) {
   if (name !== 'none' && !state.play) setPlay(true);
   for (const id of SLOTS) {
     const slot = state.slots[id];
-    slot.rise = 0;
     if (name === 'none') {
       slot.perf = null;
       restoreSpring(slot);
@@ -423,7 +426,7 @@ function resetPlacement(id) {
   const { root } = built[id];
   root.position.x = slotX(id);
   root.position.z = 0;
-  root.rotation.y = 0;
+  root.rotation.set(0, 0, 0);
 }
 
 function addControl(folder, params, entry, onChange) {
@@ -476,6 +479,9 @@ function addMotionFolder() {
   const dances = gui.addFolder('victory dances');
   dances.add(state, 'dance', ['none', ...DANCE_NAMES]).name('dance').onChange(setDance);
   dances.add(state, 'repeat').name('repeat one-shots').onChange(save);
+  // a flip seen from the front is a nod (DANCES.md §Gymnastics, Reading them)
+  dances.add(state, 'side').name('side view (flips)').onChange(save);
+  dances.add(state, 'slow', 1, 10, 0.5).name('slow motion (× slower)').onChange(save);
   for (const name of DANCE_NAMES) {
     dances.add({ f: () => { setDance('none'); setDance(name); } }, 'f').name(`▶ ${name}`);
   }
@@ -565,7 +571,7 @@ frameAll();
 
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.update().getDelta(), 0.1);
-  if (state.play) stepAll(dt);
+  if (state.play) stepAll(dt / state.slow);
   controls.update();
   renderer.render(scene, camera);
   SLOTS.forEach(positionPlate);

@@ -914,6 +914,7 @@ function t(all, over = {}) {
     for (const e of d.extras) {
       assert.equal(e.turn, 0, `${name} loops, so it may not turn the root`);
       assert.equal(e.travel, 0, `${name} loops, so it may not travel`);
+      assert.ok(e.flip === 0 && e.roll === 0, `${name} loops, so it may not flip or roll`);
     }
   }
 }

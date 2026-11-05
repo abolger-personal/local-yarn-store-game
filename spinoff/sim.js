@@ -60,6 +60,19 @@ export const CALM_TICKS = 1.5 * TICK_HZ;
 export const CALM_DRAIN = 30;
 export const STUN_TICKS = 8;
 export const STUN_PER_SPEED = 2;
+/** A hit chain (REUSE-SPEC.md §Power moves): hits landed with no miss, no hit taken, and no pause this long. */
+const CHAIN_TICKS = 2.5 * TICK_HZ;
+/** A fighter hit while down on its back skids along the floor, slowing at this (m/s²) (REUSE-SPEC.md §Discoverable moves). */
+const SLIDE_DRAG = 6;
+/** A ring-out counts for whoever hit the fighter last, if that was this recent. */
+const CREDIT_TICKS = 5 * TICK_HZ;
+/** Fighters hitting the same foe this close together are a crowd (the fight cloud). */
+const CROWD_TICKS = TICK_HZ;
+/** The power bar, 0 to 1: a little a second in play, and more for each of these. */
+export const POWER = Object.freeze({ perSecond: 1 / 45, hit: 0.06, ringOut: 0.12, pickup: 0.05, steal: 0.15, bank: 0.25 });
+/** What a full bar fires (Input.power): `toy` turns a foe into one of TOY's silly objects for a while. */
+export const POWERS = Object.freeze(['toy']);
+export const TOY = Object.freeze({ ticks: 3 * TICK_HZ, knock: 1.5, kinds: Object.freeze(['cottonBall', 'rubberDuck', 'teapot', 'sock']) });
 export const POP = Object.freeze({ vx: 1.5, vy: 6 });
 const DONUT_REACH = 0.25;
 const DONUT_EDGE = 0.1;
@@ -88,20 +101,32 @@ const BLOCK_HITS = 2;
  * hits; knockback speed = base + growth × percent, at angle degrees.
  * @typedef {{ steps: number, active: [number, number], reach: { scale: number, min: number }|null,
  *             dy: number, r: number, damage: number, kb: { base: number, growth: number, angle: number },
- *             brick: number, walks: boolean, dive?: number, shows: 'punch'|'kick' }} Move
+ *             brick: number, walks: boolean, dive?: number, hang?: number, pop?: number, home?: { reach: number, speed: number }, trip?: number, shows: 'punch'|'kick'|'sweep' }} Move
+ * A stomp rises at `pop` for `hang` steps (the tablet draws a backflip; playtest: pressed late in a jump, a pause alone
+ * flipped near the floor), then dives, steering at `home.speed` onto the nearest foe
+ * below within `home.reach` of its body when it started (playtest: you fell too fast to stomp anyone, and only straight down).
  * `hammer` is the thrown Greathammer's hit: a kick's damage and knockback (REUSE-SPEC.md §Costumes), at its head.
  */
 /** @type {Move} */
 const KICK = { steps: 22, active: [7, 12], reach: { scale: 0.8, min: 0.3 }, dy: 0.3, r: 0.21, damage: 8,
   kb: { base: 6, growth: 0.12, angle: 25 }, brick: 2, walks: false, shows: 'kick' };
-/** @type {Readonly<Record<'punch'|'kick'|'stomp'|'hammer', Move>>} */
+/** @type {Readonly<Record<'punch'|'kick'|'stomp'|'hammer'|'sweep'|'shot', Move>>} */
 export const MOVES = Object.freeze({
   punch: { steps: 16, active: [4, 8], reach: { scale: 0.5, min: 0.2 }, dy: 0.6, r: 0.17, damage: 6,
     kb: { base: 5, growth: 0.1, angle: 50 }, brick: 1, walks: true, shows: 'punch' },
   kick: KICK,
   hammer: { ...KICK, reach: null, dy: HAMMER.chest, r: HAMMER.r },
-  stomp: { steps: 20, active: [2, 14], reach: null, dy: -0.05, r: 0.3, damage: 7,
-    kb: { base: 4, growth: 0.1, angle: -60 }, brick: 2, walks: true, dive: 6, shows: 'kick' },
+  stomp: { steps: 38, active: [20, 32], reach: null, dy: -0.05, r: 0.3, damage: 7,
+    kb: { base: 4, growth: 0.1, angle: -60 }, brick: 2, walks: true, dive: 6, hang: 18, pop: 2, home: { reach: 1, speed: 5 }, shows: 'kick' },
+  // the wuxia sweep (characters/DANCES.md §Gymnastics), 🦶 held and let go: crouch, one low turn with the leg along the
+  // floor hitting all the way round, a short freeze; timed to the dance's own steps (0.22, 0.60 s). It trips: a low, short
+  // knock away from the sweeper, on their back till the sweep is over and `trip` steps more (playtest: knocked up and
+  // away, they wandered off; down a fixed while, they were up again before the sweeper)
+  // a trick's shot (§Trick shots): `shoots` from the hand, flying, not an attack the fighter makes; listed for its hit
+  shot: { steps: 1, active: [0, 0], reach: null, dy: 0, r: 0.2, damage: 4, kb: { base: 3, growth: 0.08, angle: 30 },
+    brick: 0, walks: true, shows: 'punch' },
+  sweep: { steps: 58, active: [14, 49], reach: null, dy: 0.12, r: 0.55, damage: 7,
+    kb: { base: 3, growth: 0.06, angle: 20 }, trip: 30, brick: 1, walks: false, shows: 'sweep' },
 });
 
 const OPEN = 0, SOFT = 1, HOP = 2, BLOCKED = 3;
@@ -578,6 +603,7 @@ function stuckCheck(s, f, moved) {
  * sliding off again. ponytail: routing ignores butter too.
  */
 function walkVelocity(s, f, to) {
+  if (f.sliding) return skid(f);
   const dx = to ? to.x - f.x : 0, dz = to ? to.z - f.z : 0, d = Math.hypot(dx, dz), top = topSpeed(s, f);
   const v = d > EPS ? Math.min(top, f.slick ? d * BUTTER_BRAKE : d / DT) / d : 0;
   if (!f.slick) { Object.assign(f, { vx: dx * v, vy: 0, vz: dz * v }); return d; }
@@ -586,6 +612,13 @@ function walkVelocity(s, f, to) {
   const over = f.passed ? (Math.hypot(f.vx, f.vz) * DT) / Math.max(d, EPS) : 0;
   if (over > 1) Object.assign(f, { vx: f.vx / over, vz: f.vz / over });
   return d;
+}
+
+/** Down on its back and hit, a fighter skids, slowing, till it stops. */
+function skid(f) {
+  const v = Math.hypot(f.vx, f.vz), k = v > EPS ? Math.max(0, v - SLIDE_DRAG * DT) / v : 0;
+  Object.assign(f, { vx: f.vx * k, vy: 0, vz: f.vz * k, sliding: k > 0 });
+  return 0;
 }
 
 function walkStep(s, f) {
@@ -623,9 +656,11 @@ function airStep(s, f) {
     f.vx = (to.x - f.x) * v;
     f.vz = (to.z - f.z) * v;
   }
-  if (f.attack?.id === 'stomp') f.vy = Math.min(f.vy, -MOVES.stomp.dive);
-  if (doubleNow(f)) Object.assign(f, { jumps: f.jumps - 1, vy: s.jump.speed, again: false });
-  f.vy -= GRAVITY * DT;
+  if (stompAir(s, f)) f.vy = MOVES.stomp.pop;
+  else {
+    if (doubleNow(f)) Object.assign(f, { jumps: f.jumps - 1, vy: s.jump.speed, again: false });
+    f.vy -= GRAVITY * DT;
+  }
   slide(s, f, f.vx * DT, f.vz * DT);
   const prevY = f.y;
   f.y += f.vy * DT;
@@ -644,10 +679,11 @@ function ringOut(s, f) {
   if (f.x >= r.x0 && f.x <= r.x1 && f.z <= r.z1 && f.y >= r.y) return;
   const b = s.band, x = clamp(f.x, b.x0 + DONUT_EDGE, b.x1 - DONUT_EDGE), z = clamp(f.z, b.z0 + DONUT_EDGE, b.z1 - DONUT_EDGE);
   drop(s, f, { x, y: supportAt(s.solids, x, z, Infinity), z, vx: 0, vy: 0, vz: 0 });
+  s.ringOuts.push({ fighter: f.id, by: f.lastHit && s.tick - f.lastHit.at <= CREDIT_TICKS ? f.lastHit.by : null, x: f.x, y: f.y, z: f.z });
   const sh = shelfOf(s, f.team);
   Object.assign(f, { x: sh.x, y: sh.y + RESPAWN_Y, z: sh.z + RESPAWN_DZ, vx: 0, vy: 0, vz: 0, onGround: false,
     jumps: 1, airTo: null, attack: null, stun: 0, pending: null, freeze: 0, percent: 0, calm: 0, inv: 0, out: RESPAWN_WAIT,
-    nav: null, navJump: null, stuck: 0 });
+    nav: null, navJump: null, stuck: 0, chain: 0, lastHit: null, hitBy: [], toy: null, peak: sh.y + RESPAWN_Y });
 }
 
 function lungeStep(s, f) {
@@ -658,7 +694,11 @@ function lungeStep(s, f) {
 function release(f) {
   const k = f.pending;
   f.pending = null;
-  if (k) Object.assign(f, { vx: k.vx, vy: k.vy, vz: k.vz, onGround: false, airTo: null, navJump: null, stun: k.stun, stunMax: k.stun });
+  if (!k) return;
+  Object.assign(f, { vx: k.vx, vy: k.vy, vz: k.vz, onGround: false, airTo: null, navJump: null, stun: k.stun, stunMax: k.stun, sliding: k.slide });
+  // a skid stays on the floor (landing would stop it dead), still flat on its back: the tablet lays a tripped fighter
+  // down over its stun's first 15% (play.js trippedTilt)
+  if (k.slide) Object.assign(f, { onGround: true, stunMax: Math.round(k.stun / 0.85) });
 }
 
 function moveFighter(s, f) {
@@ -674,6 +714,7 @@ function moveFighter(s, f) {
   navigate(s, f);
   if (f.onGround) walkStep(s, f);
   else airStep(s, f);
+  f.peak = f.onGround ? f.y : Math.max(f.peak, f.y);
   lungeStep(s, f);
   // Facing is set on the ground and by a jump, then held in the air: drifting back toward a ledge mustn't spin you round.
   // An attack holds it too, so one turned to a foe behind you still lands while you walk on (playtest)
@@ -774,6 +815,31 @@ function faceFoe(s, f, m) {
   if (best && flat(f, best) > EPS) f.facing = Math.atan2(best.z - f.z, best.x - f.x);
 }
 
+/** A stomp steers onto its foe, and hangs before it dives. True while it hangs. */
+function stompAir(s, f) {
+  const a = f.attack;
+  if (a?.id !== 'stomp') return false;
+  const m = MOVES.stomp, o = s.fighters.find((p) => p.id === a.on);
+  if (o && canStrike(s, f, o)) {
+    const d = flat(f, o), v = d > EPS ? Math.min(m.home.speed, d / DT) / d : 0;
+    Object.assign(f, { vx: (o.x - f.x) * v, vz: (o.z - f.z) * v });
+  }
+  if (a.t < m.hang) return true;
+  f.vy = Math.min(f.vy, -m.dive);
+  return false;
+}
+
+/** The foe a stomp starting now homes onto: the nearest one below within reach, faced. */
+function stompTarget(s, f) {
+  let best = null, bestGap = MOVES.stomp.home.reach;
+  for (const o of s.fighters) {
+    const gap = flat(f, o) - f.r - o.r;
+    if (canStrike(s, f, o) && o.y < f.y && gap <= bestGap) [best, bestGap] = [o, gap];
+  }
+  if (best && flat(f, best) > EPS) f.facing = Math.atan2(best.z - f.z, best.x - f.x);
+  return best?.id ?? null;
+}
+
 function lungeFor(s, f, m) {
   const gap = frontGap(s, f);
   if (!m.reach || gap > LUNGE_RANGE) return null;
@@ -782,18 +848,47 @@ function lungeFor(s, f, m) {
 }
 
 /** `o` takes f's `id` hit at p, knocked along `u`. */
+/** On its back on the floor: a trip's stun. Hit there, it skids instead (playtest: hilarious). */
+const downed = (o) => o.hitMove === 'tripped' && o.stun > 0 && o.onGround;
+/** The whole hit flat along the floor, away from the hitter; down at least till the skid has stopped, and a little more. */
+const skidFrom = (o, u, speed) => ({ vx: u.x * speed, vy: 0, vz: u.z * speed, slide: true,
+  stun: Math.max(o.stun, Math.round((speed / SLIDE_DRAG) * TICK_HZ) + STUN_TICKS) });
+/** A trip keeps them down till the sweep is over, and `trip` steps more: the sweeper is always up first. */
+const tripFor = (f, m) => (m.trip ? m.steps - f.attack.t + m.trip : 0);
+const hitMoveOf = (m, speed) => {
+  if (m.trip) return 'tripped';
+  return speed >= LAUNCH_SPEED ? 'launched' : 'hurt';
+};
+/** The flat direction from f out to o (f's facing if they stand on the same spot). */
+function awayFrom(f, o) {
+  const d = flat(f, o);
+  return d > EPS ? { x: (o.x - f.x) / d, z: (o.z - f.z) / d } : ahead(f);
+}
+
 function strike(s, f, o, p, { id, u } = { id: f.attack.id, u: ahead(f) }) {
   const m = MOVES[id], broke = Boolean(o.carrying);
   drop(s, o, { x: o.x, y: o.y + o.h, z: o.z, vx: u.x * POP.vx, vy: POP.vy, vz: u.z * POP.vx });
   o.percent += m.damage;
   o.calm = 0;
-  const speed = m.kb.base + m.kb.growth * o.percent, a = (m.kb.angle * Math.PI) / 180, along = Math.cos(a) * speed;
+  const speed = (m.kb.base + m.kb.growth * o.percent) * (o.toy ? TOY.knock : 1), a = (m.kb.angle * Math.PI) / 180, along = Math.cos(a) * speed;
   const up = o.onGround ? Math.abs(Math.sin(a) * speed) : Math.sin(a) * speed;
-  o.pending = { vx: u.x * along, vy: up, vz: u.z * along, stun: Math.round(STUN_TICKS + STUN_PER_SPEED * speed) };
-  Object.assign(o, { attack: null, hitMove: speed >= LAUNCH_SPEED ? 'launched' : 'hurt', freeze: HITSTOP_TICKS });
+  o.pending = downed(o) ? skidFrom(o, u, speed)
+    : { vx: u.x * along, vy: up, vz: u.z * along, stun: Math.round(STUN_TICKS + STUN_PER_SPEED * speed) + tripFor(f, m) };
+  Object.assign(o, { attack: null, charging: false, hitMove: downed(o) ? 'tripped' : hitMoveOf(m, speed), freeze: HITSTOP_TICKS });
   f.freeze = HITSTOP_TICKS;
-  if (id !== 'hammer') f.attack.hit.push(o.id);
-  s.hits.push({ ...p, move: id, on: 'fighter', target: o.id, broke });
+  if (f.attack?.id === id) f.attack.hit.push(o.id);
+  s.hits.push({ ...p, move: id, on: 'fighter', target: o.id, broke, by: f.id, ...credit(s, f, o) });
+}
+
+const chainOf = (s, f) => (s.tick - f.chainAt <= CHAIN_TICKS ? f.chain : 0);
+
+/** f's chain goes on and o's ends; o remembers f, for a ring-out's credit and a crowd. What else the hit was (HitEvent). */
+function credit(s, f, o) {
+  Object.assign(f, { chain: chainOf(s, f) + 1, chainAt: s.tick });
+  o.chain = 0;
+  o.lastHit = { by: f.id, at: s.tick };
+  o.hitBy = [...o.hitBy.filter((h) => s.tick - h.at < CROWD_TICKS && h.by !== f.id), o.lastHit];
+  return { air: !o.onGround, bounced: !f.onGround && f.sprung >= 0, fell: Math.max(0, f.peak - f.y), crowd: o.hitBy.length, chain: f.chain };
 }
 
 /** The nearest brick (not team `spare`'s) the sphere touches takes `id`'s hit. True if one did. */
@@ -811,16 +906,27 @@ function hitBrick(s, sp, id, spare = null) {
   return true;
 }
 
+/** An attack that hit nothing ends the chain. */
+function endAttack(f) {
+  if (!f.attack.hit.length && !f.attack.brickDone) f.chain = 0;
+  f.attack = null;
+}
+
+
 function attackStep(s, f) {
   const a = f.attack;
   if (!a || f.still || f.freeze > 0) return;
   const m = MOVES[a.id];
-  if (++a.t >= m.steps) { f.attack = null; return; }
-  if (a.t < m.active[0] || a.t > m.active[1]) return;
+  if (++a.t >= m.steps) { endAttack(f); return; }
+  if (a.t >= m.active[0] && a.t <= m.active[1]) strikeAround(s, f, a, m);
+}
+
+function strikeAround(s, f, a, m) {
+  if (a.shot && a.t === m.active[0]) launchShot(s, f, a.shot);
   const sp = hitSphere(f, m);
   for (const o of s.fighters) {
     const p = !a.hit.includes(o.id) && canStrike(s, f, o) ? bodyContact(sp, o) : null;
-    if (p) strike(s, f, o, p);
+    if (p) strike(s, f, o, p, { id: a.id, u: m.trip || downed(o) ? awayFrom(f, o) : ahead(f) });
   }
   if (!a.brickDone) a.brickDone = hitBrick(s, sp, a.id);
 }
@@ -829,7 +935,7 @@ function attackStep(s, f) {
 
 /** Thrown once the path showed: ignored unless the hammer is in the hand of a fighter in play. */
 function throwHammer(s, f, k) {
-  if (typeof k !== 'number' || !Number.isFinite(k) || f.hands !== 'hammer' || f.out || f.stun > 0 || f.pending) return;
+  if (typeof k !== 'number' || !Number.isFinite(k) || f.hands !== 'hammer' || f.out || f.stun > 0 || f.pending || f.toy) return;
   if (s.hammers.some((h) => h.owner === f.id)) return;
   const from = handOf(f, f.h);
   s.hammers.push({ owner: f.id, k: clamp(k, 0, 1), t: 0, from, x: from.x, y: from.y, z: from.z });
@@ -841,7 +947,7 @@ function flyHammer(s, hm) {
   if (f.out) return false;
   hm.t += DT;
   const p = hammerPath(hm.from, hm.k, hm.t, s.stage, handOf(f, f.h)), d = flat(p, hm);
-  if (hm.t >= p.T) return false;
+  if (hm.t >= p.T) { f.chain = 0; return false; }
   const u = d > EPS ? { x: (p.x - hm.x) / d, z: (p.z - hm.z) / d } : ahead(f), sp = { x: p.x, y: p.y, z: p.z, r: HAMMER.r };
   Object.assign(hm, { x: p.x, y: p.y, z: p.z });
   for (const o of s.fighters) {
@@ -854,6 +960,66 @@ function flyHammer(s, hm) {
 function attacks(s) {
   for (const f of s.fighters) attackStep(s, f);
   s.hammers = s.hammers.filter((hm) => flyHammer(s, hm));
+  s.shots = s.shots.filter((t) => flyShot(s, t));
+}
+
+/** Doing something already: attacking, hit, or out. */
+const busy = (f) => Boolean(f.attack || f.stun > 0 || f.freeze > 0 || f.pending || f.out || f.toy);
+
+// --- trick shots (REUSE-SPEC.md §Trick shots) ------------------------------------------------
+
+/** How far each trick's shot can fly (m), and how fast (m/s, SHOT_SPEED if left out); a trick not here has none. */
+export const SHOTS = Object.freeze({
+  sparkle: { reach: 2 }, bubble: { reach: 1.5, speed: 3 }, flame: { reach: 2 }, bebop: { reach: 2 }, starPunch: { reach: 3 },
+  fireball: { reach: 3.5 }, loveTap: { reach: 1.5 }, bubblegumPop: { reach: 1.5, speed: 4 }, powerPuff: { reach: 2 },
+  magicStar: { reach: 3 }, heartBlast: { reach: 2.5 }, smiteOfLight: { reach: 3 }, speedLines: { reach: 3.5, speed: 12 },
+  lightningStorm: { reach: 2.5, speed: 14 }, atomicBall: { reach: 2.5 }, shootingStar: { reach: 4, speed: 10 }, music: { reach: 2.5 },
+});
+export const SHOT_TAP = 0.15;
+const SHOT_SPEED = 8, SHOT_HOLD_PER_M = 0.3, SHOT_FIZZLE = 0.4;
+
+/**
+ * 🥊 held `seconds` with `trick`: how much of its reach a shot let go now flies (0 to 1), or null for none: a tap (only the
+ * punch it pressed), or held past full so long it fizzled. The tablet fills 🥊 with it; the host trusts only 0 to 1.
+ */
+export function shotCharge(trick, seconds) {
+  const shot = SHOTS[trick];
+  if (!shot || !(seconds >= SHOT_TAP)) return null;
+  const full = shot.reach * SHOT_HOLD_PER_M;
+  return seconds > full + SHOT_FIZZLE ? null : Math.min(1, seconds / full);
+}
+
+const canShoot = (f) => Boolean(SHOTS[f.trick]) && f.hands !== 'hammer';
+
+/** 🥊 held: the fighter winds up, its swing held at its start (`charge`), till let go or 🦶; any press ends it. */
+function chargeInput(f, input) {
+  if (input.charge !== undefined) f.charging = input.charge === true && canShoot(f) && !busy(f);
+  if (input.kick || input.punch || input.shot !== undefined) f.charging = false;
+}
+
+/** Let go with `k` of its reach: the swing, and its shot leaves as it strikes (`launchShot`); one of yours in the air at a time. */
+function shoot(s, f, k) {
+  if (!canShoot(f) || typeof k !== 'number' || !(k > 0 && k <= 1) || busy(f) || s.shots.some((t) => t.by === f.id)) return;
+  startAttack(s, f, 'punch');
+  f.attack.shot = k;
+}
+
+function launchShot(s, f, k) {
+  const shot = SHOTS[f.trick], from = handOf(f, f.h), u = ahead(f);
+  s.nextShot += 1;
+  s.shots.push({ id: `shot${s.nextShot}`, by: f.id, trick: f.trick, ux: u.x, uz: u.z, left: k * shot.reach, speed: shot.speed ?? SHOT_SPEED, ...from });
+}
+
+/** One tick of a shot's flight; false once it hit someone or ran out. ponytail: flies through walls; stop at bricks if it shows. */
+function flyShot(s, t) {
+  const f = s.fighters.find((o) => o.id === t.by), step = Math.min(t.left, t.speed * DT);
+  Object.assign(t, { x: t.x + t.ux * step, z: t.z + t.uz * step, left: t.left - step });
+  const sp = { x: t.x, y: t.y, z: t.z, r: MOVES.shot.r };
+  for (const o of s.fighters) {
+    const c = o.team !== f.team && canStrike(s, f, o) ? bodyContact(sp, o) : null;
+    if (c) { strike(s, f, o, c, { id: 'shot', u: { x: t.ux, z: t.uz } }); return false; }
+  }
+  return t.left > EPS;
 }
 
 // --- bricks and donuts ----------------------------------------------------------------------
@@ -916,7 +1082,7 @@ function touchDonuts(s, f) {
   const now = s.donuts.filter((d) => touching(f, d));
   for (const d of now) {
     // A full bag says so once per touch; a tapped donut is picked up even if it landed on you first
-    if (f.carrying) { if (!f.touching.includes(d.id)) s.fullBag.push(event(f, d)); }
+    if (f.carrying) { if (!f.touching.includes(d.id)) s.fullBag.push({ ...event(f, d), donut: d.id }); }
     else if (f.target?.thing === 'donut' && f.target.id === d.id) {
       f.carrying = d.look;
       s.donuts = s.donuts.filter((o) => o !== d);
@@ -1045,7 +1211,6 @@ function jumpTap(s, f) {
   else if (f.jumps > 0) f.again = true;
 }
 
-const busy = (f) => Boolean(f.attack || f.stun > 0 || f.freeze > 0 || f.pending || f.out);
 
 function setAway(s, f, away) {
   if (away == null || away === f.away) return;
@@ -1062,14 +1227,46 @@ function applyInput(s, f, input) {
   else attackInput(s, f, input);
 }
 
+/** 🦶 let go after a hold sweeps; otherwise a free fighter punches, kicks or stomps. */
+// REUSE-SPEC.md §Discoverable moves: 🦶 held and let go is the sweep (the tablet times the hold), on the ground; it cuts
+// short the kick the press started
+const sweeps = (f, input) => input.sweep && f.onGround && !f.stun && !f.freeze && !f.pending && !f.out && !f.toy
+  && (!f.attack || f.attack.id === 'kick');
+
+function nextMove(f, input) {
+  if (sweeps(f, input)) return 'sweep';
+  if (busy(f) || !(input.kick || input.punch)) return null;
+  if (!input.kick) return 'punch';
+  return f.onGround ? 'kick' : 'stomp';
+}
+
 /** @param {import('./match.js').Input} input */
 function attackInput(s, f, input) {
+  usePower(s, f, input.power);
   throwHammer(s, f, input.throw);
-  if (busy(f) || !(input.kick || input.punch)) return;
-  let id = 'punch';
-  if (input.kick) id = f.onGround ? 'kick' : 'stomp';
+  chargeInput(f, input);
+  shoot(s, f, input.shot);
+  const id = nextMove(f, input);
+  if (id) startAttack(s, f, id);
+}
+
+function startAttack(s, f, id) {
+  if (f.attack) endAttack(f);
   faceFoe(s, f, MOVES[id]);
-  f.attack = { id, t: 0, hit: [], brickDone: false, lunge: lungeFor(s, f, MOVES[id]) };
+  // a stomp on the way up is a spinning jump kick, on the way down a backflip (playtest: both read well, each at its time)
+  f.attack = { id, t: 0, hit: [], brickDone: false, lunge: lungeFor(s, f, MOVES[id]), on: id === 'stomp' ? stompTarget(s, f) : null,
+    turn: id === 'stomp' && (f.vy > 0 ? 'spin' : 'flip') };
+}
+
+/** A full bar fires `power`, recognised on the tablet; the host ignores one it can't fire. */
+function usePower(s, f, power) {
+  if (!power || f.power < 1 || f.out || f.toy || !POWERS.includes(power.kind)) return;
+  const o = s.fighters.find((x) => x.id === power.on);
+  if (!o || !canHit(f, o, s.rules) || o.out || o.toy) return;
+  f.power = 0;
+  drop(s, o, { x: o.x, y: o.y + o.h, z: o.z, vx: 0, vy: POP.vy, vz: 0 });
+  Object.assign(o, { attack: null, toy: { kind: TOY.kinds[s.tick % TOY.kinds.length], t: TOY.ticks } });
+  s.powers.push({ fighter: f.id, kind: power.kind, on: o.id, x: o.x, y: o.y, z: o.z });
 }
 
 // --- the match ------------------------------------------------------------------------------
@@ -1098,15 +1295,18 @@ function spawnSpot(s, e, cursor) {
 }
 
 function newFighter(e, at, y) {
-  return { id: e.id, team: e.team, hands: e.hands ?? 'gloves', icing: e.look.frosting, block: null, placeCell: null, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
+  return { id: e.id, team: e.team, hands: e.hands ?? 'gloves', trick: e.trick ?? null, icing: e.look.frosting, block: null, placeCell: null, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
     x: at.x, y, z: at.z, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, onGround: true, jumps: 1,
     target: null, dest: null, nav: null, walkTo: null, airTo: null, navJump: null, again: false, fails: 0, stuck: 0, gain: 0, away: false, slick: false, passed: false, sprung: -1,
-    attack: null, stun: 0, stunMax: 1, hitMove: 'hurt', pending: null, freeze: 0, still: false, inv: 0, out: 0, percent: 0, calm: 0,
-    carrying: null, touching: [], shelfDone: false, shelfSpot: null, blocked: false };
+    attack: null, charging: false, stun: 0, stunMax: 1, hitMove: 'hurt', sliding: false, pending: null, freeze: 0, still: false, inv: 0, out: 0, percent: 0, calm: 0,
+    carrying: null, touching: [], shelfDone: false, shelfSpot: null, blocked: false,
+    chain: 0, chainAt: -Infinity, lastHit: null, hitBy: [], peak: y, power: 0, toy: null };
 }
 
 function refresh(s) {
   s.solids = [...s.floorBoxes, ...s.shelves.map(shelfBox(s.band.z0)), ...s.bricks.map(brickBox)];
+  // routes replan once a falling brick lands, not on every tick of its fall (each replan rebuilds every body size's grid)
+  if (s.bricks.some((b) => b.vy)) return;
   const key = s.bricks.map((b) => `${b.id}@${b.y.toFixed(3)}`).join(',');
   if (key !== s.brickKey) { s.brickKey = key; s.grids.clear(); }
 }
@@ -1123,7 +1323,7 @@ function jumpsOn(stage) {
  */
 export function createMatch(entrants, stage, { pieces = 0, match = MATCH } = {}) {
   const s = { stage, band: bandOf(stage), jump: jumpsOn(stage), floorBoxes: stage.floors.map(floorBox), tick: 0, nextDonut: 0, fighters: [], donuts: [], shelves: [], solids: [], grids: new Map(), brickKey: '',
-    hits: [], fullBag: [], donutEvents: [], hammers: [], rules: match, phase: pieces > 0 ? 'build' : 'play', t0: 0, ready: new Set(), go: false, piles: [], nextBrick: 0,
+    hits: [], fullBag: [], donutEvents: [], ringOuts: [], powers: [], hammers: [], shots: [], nextShot: 0, rules: match, phase: pieces > 0 ? 'build' : 'play', t0: 0, ready: new Set(), go: false, piles: [], nextBrick: 0,
     bricks: stage.bricks.map((b, i) => ({ id: `b${i}`, team: b.team, x: b.x, y: b.y, z: b.z, vy: 0, hits: b.hits,
       maxHits: b.hits, icing: icingOf(entrants, b.team) })) };
   s.shelves = stage.shelves.map((spot) => makeShelf(spot, teamLooks(entrants, spot.team)));
@@ -1147,7 +1347,7 @@ function applyInputs(s, inputs) {
 /** One fixed 1/TICK_HZ step. @param {Record<string, import('./match.js').Input>} inputs */
 export function tick(s, inputs) {
   if (isOver(s)) return;
-  Object.assign(s, { hits: [], fullBag: [], donutEvents: [] });
+  Object.assign(s, { hits: [], fullBag: [], donutEvents: [], ringOuts: [], powers: [] });
   applyInputs(s, inputs);
   for (const f of s.fighters) moveFighter(s, f);
   separate(s);
@@ -1156,14 +1356,35 @@ export function tick(s, inputs) {
   refresh(s);
   for (const d of s.donuts) stepDonut(s, d);
   for (const f of s.fighters) {
-    touchDonuts(s, f);
-    (s.phase === 'build' ? fetchStep : shelfStep)(s, f);
-    if (f.still) continue;
-    f.stun = Math.max(0, f.stun - 1);
-    f.inv = Math.max(0, f.inv - 1);
-    if (++f.calm > CALM_TICKS) f.percent = Math.max(0, f.percent - CALM_DRAIN / TICK_HZ);
+    if (!f.toy) grabStep(s, f);
+    if (!f.still) countDown(f);
   }
+  powerUp(s);
   s.tick++;
+}
+
+/** A tick off each timer: a toy, stun, invincibility; percent drains once calm. */
+function countDown(f) {
+  if (f.toy && --f.toy.t <= 0) f.toy = null;
+  f.stun = Math.max(0, f.stun - 1);
+  f.inv = Math.max(0, f.inv - 1);
+  if (++f.calm > CALM_TICKS) f.percent = Math.max(0, f.percent - CALM_DRAIN / TICK_HZ);
+}
+
+/** Donuts and blocks: what a fighter touches or stands at. A toy (TOY) grabs nothing. */
+function grabStep(s, f) {
+  touchDonuts(s, f);
+  (s.phase === 'build' ? fetchStep : shelfStep)(s, f);
+}
+
+/** The bar fills a little a second in play, and more for what this tick's events say each fighter did. */
+function powerUp(s) {
+  if (s.phase !== 'play') return;
+  const byId = new Map(s.fighters.map((f) => [f.id, f])), gain = (f, k) => { if (f) f.power = Math.min(1, f.power + k); };
+  for (const f of s.fighters) if (!f.out) gain(f, POWER.perSecond / TICK_HZ);
+  for (const h of s.hits) if (h.on === 'fighter') gain(byId.get(h.by), POWER.hit);
+  for (const e of s.ringOuts) if (e.by) gain(byId.get(e.by), POWER.ringOut);
+  for (const e of s.donutEvents) if (e.kind in POWER) gain(byId.get(e.fighter), POWER[e.kind]);
 }
 
 // --- the snapshot ---------------------------------------------------------------------------
@@ -1181,6 +1402,7 @@ function shelfLooks(sh) {
 function moveOf(f) {
   if (f.pending || f.stun > 0) return f.hitMove;
   if (f.attack) return MOVES[f.attack.id].shows;
+  if (f.charging) return 'charge';
   if (!f.onGround) return f.vy > 0 ? 'jump' : 'fall';
   if (f.away) return 'sit';
   if (f.nav?.done && f.nav.blocked) return 'blocked';
@@ -1193,10 +1415,11 @@ function stepOf(f) {
 }
 
 /** @returns {import('./match.js').FighterState} */
-const fighterView = (f) => ({
+const fighterView = (s, f) => ({
   id: f.id, team: f.team, x: f.x, y: f.y, z: f.z, vx: f.vx, vy: f.vy, vz: f.vz, facing: f.facing, height: f.h, width: f.w,
-  onGround: f.onGround, move: moveOf(f), step: stepOf(f), percent: f.percent, carrying: f.carrying ? { ...f.carrying } : null,
+  onGround: f.onGround, move: moveOf(f), step: stepOf(f), shooting: Boolean(f.attack?.shot), percent: f.percent, carrying: f.carrying ? { ...f.carrying } : null,
   invincible: f.inv > 0, respawn: f.out / TICK_HZ, target: f.dest ? { x: f.dest.x, y: f.dest.y, z: f.dest.z } : null, block: f.block,
+  power: f.power, chain: chainOf(s, f), toy: f.toy?.kind ?? null, ...(f.attack?.turn && { turn: f.attack.turn }),
 });
 
 function winnerOf(s) {
@@ -1211,14 +1434,17 @@ export function snapshot(s) {
   return {
     tick: s.tick, secondsLeft: Math.max(0, ROUND_SECONDS - played(s) / TICK_HZ), over: isOver(s), winner: winnerOf(s),
     phase: s.phase, ready: [...s.ready], piles: s.piles.map((p) => ({ ...p })),
-    fighters: s.fighters.map(fighterView),
+    fighters: s.fighters.map((f) => fighterView(s, f)),
     donuts: s.donuts.map((d) => ({ id: d.id, x: d.x, y: d.y, z: d.z, look: { ...d.look }, by: d.by })),
     hammers: s.hammers.map((h) => ({ owner: h.owner, x: h.x, y: h.y, z: h.z })),
+    shots: s.shots.map((t) => ({ id: t.id, by: t.by, trick: t.trick, x: t.x, y: t.y, z: t.z, ux: t.ux, uz: t.uz, left: t.left })),
     bricks: s.bricks.map((b) => ({ id: b.id, team: b.team, x: b.x, y: b.y, z: b.z, hits: b.hits, maxHits: b.maxHits, icing: b.icing })),
     shelves: s.shelves.map((sh) => ({ team: sh.team, x: sh.x, y: sh.y, z: sh.z, donuts: shelfLooks(sh) })),
     hits: s.hits.map((h) => ({ ...h })),
     fullBag: s.fullBag.map((e) => ({ ...e })),
     donutEvents: s.donutEvents.map((e) => ({ ...e })),
+    ringOuts: s.ringOuts.map((e) => ({ ...e })),
+    powers: s.powers.map((e) => ({ ...e })),
   };
 }
 

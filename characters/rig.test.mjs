@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import {
   POSES, POSE_KEYS, MOTION_DEFAULTS, BASE_PARAMS, createCharacter, stepMotion, applyPose,
   valueOf, walkPhase, walkLayer, speciesIds, getSpecies, resetMotion,
-  DANCES, DANCE_NAMES, makeDance, stepDance, LIMB_TAPER,
+  DANCES, DANCE_NAMES, makeDance, stepDance, LIMB_TAPER, placeDancer,
   motionOf, walkGain, tailBaseHeight, seatedHipsAlong, lowestResting, GEO,
 } from './npc.js';
 import { CHAIR_BACK_Z, CHAIR_W } from './store/core/config.js';
@@ -222,6 +222,42 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
 }
 
 {
+  /** A flip played through on `b`, placed as a page places it: how high its middle went, how close the knees came to the
+   * chest, the lowest body part and foot in the air, the smallest gap under the body while upside down, how it landed. */
+  function tumble(b, name) {
+    const o = { ...MOTION_DEFAULTS, idleAmount: 0, stiff: DANCES[name].stiff, zeta: DANCES[name].zeta };
+    const perf = makeDance(name), mid = b.params.legHeight + b.params.hipInset + b.params.torsoH / 2;
+    const middleY = () => b.root.localToWorld(new THREE.Vector3(0, mid, 0)).y;
+    const knees = () => Math.min(...[1, -1].map((s) => limb(b, 'lowerLeg', s).getWorldPosition(new THREE.Vector3())
+      .distanceTo(b.joints.chest.getWorldPosition(new THREE.Vector3()))));
+    const legs = new Set();
+    for (const s of [1, -1]) limb(b, 'lowerLeg', s).traverse((n) => legs.add(n));
+    pose(b, {});
+    const stand = middleY(), t = { apart: knees(), jump: Math.max(...DANCES[name].extras.map((e) => e.rise)),
+      top: -Infinity, lowest: Infinity, feet: Infinity, tuck: Infinity, flipGap: Infinity, d: null };
+    for (let i = 0; i < 330; i++) {
+      t.d = stepDance(perf, 1 / 60);
+      stepMotion(b, t.d.pose, 1 / 60, o);
+      placeDancer(b, t.d);
+      b.root.updateMatrixWorld(true);
+      t.top = Math.max(t.top, middleY() - stand);
+      if (!t.d.air) continue;
+      const over = Math.abs(t.d.flip) % (2 * Math.PI), upsideDown = over > 1 && over < 5.3;
+      t.tuck = Math.min(t.tuck, knees());
+      t.feet = Math.min(t.feet, ...[1, -1].map((s) => tipOf(b, limb(b, 'lowerLeg', s)).y));
+      b.root.traverse((m) => {
+        if (!m.isMesh || legs.has(m)) return;
+        const y = new THREE.Box3().setFromObject(m).min.y;
+        t.lowest = Math.min(t.lowest, y);
+        if (upsideDown) t.flipGap = Math.min(t.flipGap, y);
+      });
+    }
+    t.tilt = new THREE.Vector3(0, 1, 0).applyQuaternion(b.root.quaternion).angleTo(new THREE.Vector3(0, 1, 0));
+    t.z = b.root.position.z;
+    t.soles = [1, -1].map((s) => tipOf(b, limb(b, 'lowerLeg', s)).y - 0.012).sort((p, q) => p - q);
+    return t;
+  }
+
   function perform(built, name, seconds = 3) {
     const o = { ...MOTION_DEFAULTS, idleAmount: 0, stiff: DANCES[name].stiff, zeta: DANCES[name].zeta };
     const perf = makeDance(name);
@@ -309,6 +345,66 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     const pir = perform(build(id), 'pirouette');
     assert.ok(Math.abs(pir.turn - Math.PI * 2) < 1e-6, `${id}: a pirouette turns a full circle`);
     assert.ok(pir.rise > 0.01, `${id}: ...rising onto the standing leg as it goes`);
+
+    // DANCES.md §Gymnastics: a leg swung out to the side (`legOut`, `legOutAlt`) still stands on the floor: grounding follows
+    // the turn out as well as the swing, so the lowest foot lands where the rest pose's does, whatever the legs do
+    {
+      const b = build(id), rested = (pose(b, {}), Math.min(tipOf(b, limb(b, 'lowerLeg', 1)).y, tipOf(b, limb(b, 'lowerLeg', -1)).y));
+      let worst = 0, seed = 7;
+      const r = (lo, hi) => { seed = (seed * 16807) % 2147483647; return lo + (hi - lo) * (seed / 2147483647); };
+      for (let i = 0; i < 40; i++) {
+        pose(b, { legSwing: r(-0.8, 0.8), hipFlex: r(-0.4, 1.2), kneeBend: r(0, 2.3), legOut: r(0, 1.2), legOutAlt: r(-0.6, 0.6) });
+        const low = Math.min(tipOf(b, limb(b, 'lowerLeg', 1)).y, tipOf(b, limb(b, 'lowerLeg', -1)).y);
+        worst = Math.max(worst, Math.abs(low - rested));
+      }
+      assert.ok(worst < 0.012, `${id}: with legs swung out the lowest foot still stands on the floor (worst ${worst.toFixed(4)} off)`);
+    }
+
+    // DANCES.md §Gymnastics: the wuxia sweep turn ends frozen low, the sweeping leg straight out to the side with its
+    // foot on the floor, the middle hand (the swept leg's side, between the feet) down at the floor steadying it and
+    // the outside one raised beside the head (the designer's correction)
+    {
+      const b = build(id), o = { ...MOTION_DEFAULTS, idleAmount: 0, stiff: DANCES['wuxia-turn'].stiff, zeta: DANCES['wuxia-turn'].zeta };
+      const perf = makeDance('wuxia-turn');
+      let d;
+      for (let i = 0; i < 150; i++) stepMotion(b, (d = stepDance(perf, 1 / 60)).pose, 1 / 60, o);
+      const free = tipOf(b, limb(b, 'lowerLeg', 1)), up = tipOf(b, limb(b, 'upperArm', -1)), low = tipOf(b, limb(b, 'upperArm', 1));
+      assert.ok(Math.abs(d.turn - Math.PI * 2) < 1e-6, `${id}: the wuxia turn spins a full circle`);
+      assert.ok(b.root.position.y < -0.10, `${id}: ...and freezes low (hips down ${(-b.root.position.y).toFixed(3)})`);
+      assert.ok(free.y < 0.05 && free.x > 0.22, `${id}: ...the sweeping leg out to the side, foot on the floor (${free.x.toFixed(3)}, ${free.y.toFixed(3)})`);
+      assert.ok(low.y > -0.01 && low.y < 0.08 && low.x > 0, `${id}: ...the middle hand down at the floor, not through it (${low.y.toFixed(3)})`);
+      assert.ok(up.y - low.y > 0.35, `${id}: ...and the other raised high (${up.y.toFixed(3)})`);
+      const shoulder = new THREE.Vector3().setFromMatrixPosition(limb(b, 'upperArm', 1).matrixWorld);
+      const reach = Math.hypot(low.x - shoulder.x, low.z - shoulder.z);
+      assert.ok(reach > 0.11 && low.z > shoulder.z, `${id}: ...the low hand reaching out and forward to the floor, not tucked under the body (${reach.toFixed(3)} out)`);
+    }
+
+    // DANCES.md §Gymnastics, Flips worked out: a flip jumps, tucks, turns over about its middle, and lands upright on
+    // its feet; in the air nothing goes through the floor (the body, and the feet by their joints: a foot mesh tilts
+    // with the shin in any crouch, there being no ankle), and upside down the head is clearly off it (playtest: at
+    // 0.6 high the llama's long neck passed 5 cm over the floor, a head-smack)
+    const flips = [['back-tuck', true], ['biles-beam', true], ['biles', false], ['biles-ii', true], ['biles-ii-vault', false], ['biles-wolf', true]];
+    for (const [name, tucks] of flips) {
+      const t = tumble(build(id), name), last = DANCES[name].extras.at(-1);
+      assert.ok(t.top > 0.9 * t.jump, `${id} ${name}: jumps (middle up ${t.top.toFixed(3)})`);
+      assert.ok(!tucks || t.tuck < 0.6 * t.apart, `${id} ${name}: ...tucks, knees to the chest (${t.tuck.toFixed(3)} from ${t.apart.toFixed(3)})`);
+      assert.ok(t.lowest > -0.01 && t.feet > -0.02, `${id} ${name}: ...nothing through the floor in the air (body ${t.lowest.toFixed(3)}, feet ${t.feet.toFixed(3)})`);
+      assert.ok(t.flipGap > 0.1, `${id} ${name}: ...the head clearly off the floor upside down (${t.flipGap.toFixed(3)} clear)`);
+      assert.ok(Math.abs(t.d.flip - last.flip) < 1e-9 && Math.abs(t.d.turn - last.turn) < 1e-9 && t.tilt < 1e-6,
+        `${id} ${name}: ...turns over and twists exactly as written, and lands upright`);
+      if (name === 'biles-wolf') {
+        // the wolf squats on one leg, the other nearly straight in front with its foot just off the floor
+        assert.ok(Math.abs(t.soles[0]) < 0.01 && t.soles[1] > 0.02 && t.soles[1] < 0.08,
+          `${id} ${name}: ...ends on one foot, the other just off the floor (${t.soles.map((y) => y.toFixed(3))})`);
+      } else assert.ok(Math.abs(t.soles[0]) < 0.01 && Math.abs(t.soles[1]) < 0.01, `${id} ${name}: ...on both feet`);
+      assert.ok(Math.abs(t.z - last.travel) < 0.01, `${id} ${name}: ...as far along as written (${t.z.toFixed(3)})`);
+    }
+    {
+      const b = build(id), end = { ...stepDance(makeDance('biles'), 99), air: false };
+      placeDancer(b, end, { yaw: Math.PI / 2 });
+      assert.ok(Math.abs(b.root.position.x - 1.3) < 0.01 && Math.abs(b.root.position.z) < 0.01,
+        `${id}: a pass travels the way the body faces, side on too (${b.root.position.x.toFixed(3)}, ${b.root.position.z.toFixed(3)})`);
+    }
 
     const uf = perform(build(id), 'uptown-funk');
     assert.ok(uf.travel > 1.0, `${id}: the strut travels -- got ${uf.travel.toFixed(2)}`);
@@ -1018,6 +1114,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     const torsoH = id === 'lion' ? D.torsoH * 0.72 * 0.92 : R.torsoH[0];
     const worst = { ...D, legHeight: R.legHeight[0], torsoH };
     worst.tailLength = id === 'lion' ? 1.0 * tailBaseHeight(worst) : R.tailLength[1];
+    if (id === 'owl') worst.tailLength = Math.min(worst.tailLength, 0.9 * tailBaseHeight(worst));
     for (const [name, P] of [['default', D], ['worst corner', worst]]) {
       const lo = lowestWalking(P, id);
       assert.ok(lo > 0.01, `${id} ${name}: a tucked tail walking dips to ${lo.toFixed(3)} -- through the floor`);

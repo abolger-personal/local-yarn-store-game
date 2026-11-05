@@ -16,7 +16,7 @@ const floorY = (stage, x, z) => Math.max(0, ...stage.floors.filter((f) => x >= f
 /** @param {Entrant} e */
 const fighterOf = (e, carrying) => ({
   id: e.id, team: e.team, ...START[e.team], y: 0, vx: 0, vy: 0, vz: 0, facing: e.team === 'heroes' ? 0 : Math.PI, height: e.height,
-  onGround: true, move: 'idle', step: 0, percent: 0, carrying, invincible: false, respawn: 0, target: null, touching: null,
+  onGround: true, move: 'idle', step: 0, percent: 0, carrying, invincible: false, respawn: 0, target: null, touching: null, power: 0, chain: 0, toy: null,
 });
 
 /** @param {Entrant[]} entrants @param {import('./match.js').Stage} stage */
@@ -60,7 +60,7 @@ function strike(state, f) {
   const brick = !foe && state.bricks.find((b) => inReach({ x: b.x, z: b.z + BRICK / 2 }));
   const at = foe ?? (brick && { x: brick.x, z: brick.z + BRICK / 2 });
   if (!at) return;
-  state.hits.push({ x: (f.x + at.x) / 2, y: f.y + f.height * 0.55, z: (f.z + at.z) / 2, move: f.move, on: foe ? 'fighter' : 'brick', broke: Boolean(foe?.carrying) });
+  state.hits.push({ x: (f.x + at.x) / 2, y: f.y + f.height * 0.55, z: (f.z + at.z) / 2, move: f.move, on: foe ? 'fighter' : 'brick', target: (foe ?? brick).id, by: f.id, broke: Boolean(foe?.carrying) });
   state.frozen = HITSTOP_TICKS;
   if (foe) knock(state, f, foe);
 }
@@ -145,5 +145,5 @@ export function tick(state, inputs) {
 export const snapshot = (state) => structuredClone({
   tick: state.tick, secondsLeft: Math.max(0, ROUND_SECONDS - state.tick / TICK_HZ), over: state.over, winner: state.winner,
   fighters: state.fighters, donuts: state.donuts, bricks: state.bricks, shelves: state.shelves,
-  hits: state.hits, fullBag: state.fullBag, donutEvents: state.donutEvents, phase: /** @type {const} */ ('play'), ready: [], piles: [],
+  hits: state.hits, fullBag: state.fullBag, donutEvents: state.donutEvents, ringOuts: [], powers: [], phase: /** @type {const} */ ('play'), ready: [], piles: [],
 });

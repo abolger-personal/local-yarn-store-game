@@ -55,6 +55,8 @@ export const BASE_PARAMS = Object.freeze({
   legSwing:      0.00,
   kneeBend:      0.00,
   hipFlex:       0.00,
+  legOut:        0.00,
+  legOutAlt:     0.00,
   spineBend:     0.00,
   spineRoll:     0.00,
   earPerk:       0.00,
@@ -645,9 +647,13 @@ function limbSegment(node, material, radius, length, cap = true) {
   if (cap) node.add(part(GEO.sphere, material, { scale: [radius, radius * 0.92, radius] }));
 }
 
-// BODIES.md §Legs and grounding: leading leg bends, trailing stays straight
-const kneeAmount = (kneeBend, legSwing, side) =>
-  kneeBend * (1 - 0.85 * Math.max(0, Math.tanh(legSwing * side * 4)));
+// BODIES.md §Legs and grounding: leading leg bends, trailing stays straight; a leg swung out to the side
+// (`legOut`, DANCES.md §Gymnastics) stays straight too, as in a sweep or a split
+const kneeAmount = (kneeBend, legSwing, side, out = 0) =>
+  kneeBend * (1 - 0.85 * Math.max(0, Math.tanh(legSwing * side * 4), Math.tanh(out * 4)));
+
+/** How far out to the side a leg is swung: `legOut` both, `legOutAlt` one more than the other, as `armOutAlt` does arms. */
+const legOutOf = (pose, side) => (pose.legOut ?? 0) + side * (pose.legOutAlt ?? 0);
 
 const swingKnee = (pose, side) => Math.max(0, side * (pose.kneeSwing ?? 0));
 
@@ -689,12 +695,13 @@ function buildLeg(side, P, mat, joints) {
   const upperLeg = joint(new THREE.Group(), `${sideName(side)}UpperLeg`);
   upperLeg.position.set(side * P.legSpread, P.hipInset, 0);
   upperLeg.rotation.x = P.legSwing * side - P.hipFlex;
+  upperLeg.rotation.z = side * legOutOf(P, side);
   limbSegment(upperLeg, mat.body, P.limbThick, thigh, false);
   joints.upperLeg.push({ node: upperLeg, side });
 
   const lowerLeg = joint(new THREE.Group(), `${sideName(side)}LowerLeg`);
   lowerLeg.position.y = -thigh;
-  lowerLeg.rotation.x = kneeAmount(P.kneeBend, P.legSwing, side);
+  lowerLeg.rotation.x = kneeAmount(P.kneeBend, P.legSwing, side, legOutOf(P, side));
   limbSegment(lowerLeg, mat.body, P.limbThick * LIMB_TAPER, shin);
   const foot = buildFoot(shin, mat, side);
   lowerLeg.add(foot);
@@ -963,9 +970,11 @@ function lowestFoot(P, pose) {
   let lowest = Infinity;
 
   for (const side of [-1, 1]) {
-    const hip = pose.legSwing * side - (pose.hipFlex ?? 0);
-    const knee = hip + kneeAmount(pose.kneeBend, pose.legSwing, side) + swingKnee(pose, side);
-    const y = total - Math.cos(hip) * thigh - Math.cos(knee) * shin;
+    // the thigh turns out (z) inside its swing (x), the Euler order the leg uses; with no turn out it's cos(hip + knee)
+    const hip = pose.legSwing * side - (pose.hipFlex ?? 0), out = legOutOf(pose, side);
+    const knee = kneeAmount(pose.kneeBend, pose.legSwing, side, out) + swingKnee(pose, side);
+    const drop = Math.cos(out) * Math.cos(hip) * (thigh + Math.cos(knee) * shin) - Math.sin(knee) * Math.sin(hip) * shin;
+    const y = total - drop;
     if (y < lowest) lowest = y;
   }
   return lowest;
@@ -974,6 +983,35 @@ function lowestFoot(P, pose) {
 export function groundCharacter(built, pose = built.params) {
   const y = (built.groundOffset ?? 0) + FOOT_SOLE - lowestFoot(built.params, pose);
   if (Number.isFinite(y)) built.root.position.y = y;
+}
+
+const _mid = new THREE.Vector3(), _midNow = new THREE.Vector3(), _spin = new THREE.Quaternion(), _turn = new THREE.Quaternion();
+const _eul = new THREE.Euler(), _up = new THREE.Vector3(0, 1, 0);
+
+/** Turns `obj` by `rotate` about a point `mid` above its origin, not the origin, so that point stays put: a body
+ * flipping about its middle rather than its feet (the spinoff's stomp, and dances' flips). */
+export function holdMiddle(obj, mid, rotate) {
+  _mid.set(0, mid, 0).applyQuaternion(obj.quaternion);
+  rotate(obj);
+  obj.position.add(_mid).sub(_midNow.set(0, mid, 0).applyQuaternion(obj.quaternion));
+}
+
+/**
+ * A dance frame's root extras (DANCES.md §Root extras, §Gymnastics) on a character `stepMotion` just posed: `shift`
+ * and `travel` from (x, z) the way it faces (`yaw`), then flip, roll and turn about the body's middle. On the ground `rise`
+ * adds to the grounded height; in the air grounding lets go: the body lifts from where it took off to standing
+ * height as it rises (`launch`), then follows `rise` alone, so a tuck's raised feet don't drop it.
+ */
+export function placeDancer(built, d, { x = 0, z = 0, yaw = 0 } = {}) {
+  const { root, params: P } = built, grounded = root.position.y, stand = (built.groundOffset ?? 0) + FOOT_SOLE;
+  if (!d.air) built.takeoffY = grounded;
+  const from = built.takeoffY ?? stand;
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  root.position.set(x + d.shift * c + d.travel * s, (d.air ? from + (stand - from) * d.launch : grounded) + d.rise,
+    z - d.shift * s + d.travel * c);
+  root.quaternion.setFromEuler(_eul.set(0, yaw, 0));
+  holdMiddle(root, P.legHeight + P.hipInset + P.torsoH / 2, (r) =>
+    r.quaternion.multiply(_spin.setFromEuler(_eul.set(d.flip ?? 0, 0, d.roll ?? 0))).multiply(_turn.setFromAxisAngle(_up, d.turn)));
 }
 
 // BODIES.md §Head and neck
@@ -995,9 +1033,10 @@ function applyLimbs(joints, pose, out) {
   for (const { node } of joints.lowerArm) node.rotation.x = -pose.elbowBend;
   for (const { node, side } of joints.upperLeg) {
     node.rotation.x = pose.legSwing * side - (pose.hipFlex ?? 0);
+    node.rotation.z = side * legOutOf(pose, side);
   }
   for (const { node, side } of joints.lowerLeg) {
-    node.rotation.x = kneeAmount(pose.kneeBend, pose.legSwing, side) + swingKnee(pose, side);
+    node.rotation.x = kneeAmount(pose.kneeBend, pose.legSwing, side, legOutOf(pose, side)) + swingKnee(pose, side);
   }
 }
 
@@ -1171,6 +1210,7 @@ export const BASE_GUI = Object.freeze({
   pose: [
     ['armSwing', -1.6, 1.6], ['armOut', -1.0, 3.0], ['elbowBend', -0.2, 2.4],
     ['legSwing', -1.0, 1.0], ['kneeBend', -0.4, 2.4], ['hipFlex', -0.6, 1.9],
+    ['legOut', -0.2, 1.6], ['legOutAlt', -0.8, 0.8],
     ['spineBend', -0.7, 1.2], ['spineRoll', -0.8, 0.8],
     ['earPerk', -1.2, 1.2], ['earSplay', -0.8, 1.2],
     ['armSwingAlt', -1.0, 1.0], ['armOutAlt', -1.5, 1.5], ['spineTwist', -1.2, 1.2],

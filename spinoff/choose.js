@@ -49,7 +49,7 @@ const allowed = (f) => {
   if (!TRICKS[f.look.hands].includes(f.look.trick)) f.look.trick = TRICKS[f.look.hands][0];
   return f;
 };
-const TRICK_ICON = { plain: '', sparkle: '✨', bubble: '🫧', flame: '🔥', bebop: '🎷', starPunch: '🌟', fireball: '☄️', loveTap: '💗', shootingStar: '🌠', bubblegumPop: '🍬', powerPuff: '⚡', magicStar: '🪄', heartBlast: '💞', smiteOfLight: '☀️', speedLines: '💨', goldenDonut: '🏅', lightning: '🌩️', zap: '💥' };
+const TRICK_ICON = { plain: '', sparkle: '✨', bubble: '🫧', flame: '🔥', bebop: '🎷', starPunch: '🌟', fireball: '☄️', loveTap: '💗', shootingStar: '🌠', bubblegumPop: '🍬', powerPuff: '⚡', magicStar: '🪄', heartBlast: '💞', smiteOfLight: '☀️', speedLines: '💨', lightningStorm: '⛈️', atomicBall: '⚛️', goldenDonut: '🏅', lightning: '🌩️', zap: '💥' };
 
 let fighter = allowed(loadFighter() ?? newFighter('lion'));
 let built = null, cheer = 0, spin = 0, swing = 1, landed = Infinity, shows = -1;

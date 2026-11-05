@@ -48,7 +48,7 @@ export const HAND_ICON = Object.freeze({
 });
 // what flies off the hitting glove or the blade's tip as it lands; tapping the picked one goes to the next. The scythe's is fixed.
 export const TRICKS = Object.freeze({
-  gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame', 'bebop', 'starPunch', 'fireball', 'loveTap', 'bubblegumPop', 'powerPuff', 'magicStar', 'heartBlast', 'smiteOfLight', 'speedLines']), sword: Object.freeze(['sparkle', 'bubble', 'flame', 'bebop', 'shootingStar', 'bubblegumPop', 'smiteOfLight', 'speedLines']), scythe: Object.freeze(['music']),
+  gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame', 'bebop', 'starPunch', 'fireball', 'loveTap', 'bubblegumPop', 'powerPuff', 'magicStar', 'heartBlast', 'smiteOfLight', 'speedLines', 'lightningStorm', 'atomicBall']), sword: Object.freeze(['sparkle', 'bubble', 'flame', 'bebop', 'shootingStar', 'bubblegumPop', 'smiteOfLight', 'speedLines', 'lightningStorm', 'atomicBall']), scythe: Object.freeze(['music']),
   // lightning first: a trick the hammer doesn't have falls back to it
   hammer: Object.freeze(['lightning', 'zap']),
 });
@@ -793,6 +793,37 @@ export const EFFECTS = Object.freeze({
     { shape: 'streak', colour: '#ffffff', at: [0, 0, 0], r: 0.182, turn: 0, beat: 1.975 },
     { shape: 'streak', colour: '#ffffff', at: [0, 0, 0], r: 0.129, turn: 1.571, beat: 5.944 },
   ] }),
+  lightningStorm: fromRecipe({ finish: 'neon', life: 0.84, turn: 0.669, drift: 1.2, spreadAlong: 2.733, spreadAcross: 1.619, stream: 1, flicker: 1, amplitude: 0.061, frequency: 1.71, ease: 1, grow: -1, bits: [
+    { shape: 'bolt', colour: '#ff7a1a', at: [0, 0, 0], r: 0.197, turn: 0, beat: 1.497 },
+    { shape: 'bolt', colour: '#ffffff', at: [0, 0.026, 0.02], r: 0.162, turn: 1.571, beat: 3.232 },
+    { shape: 'bolt', colour: '#ffd21a', at: [0, 0.016, 0.063], r: 0.173, turn: 0, beat: 0.408 },
+    { shape: 'twinkle', colour: '#ff7a1a', at: [0, -0.039, 0.09], r: 0.113, turn: 1.571, beat: 3.222 },
+    { shape: 'bolt', colour: '#ffd21a', at: [0, -0.115, 0.062], r: 0.199, turn: 0, beat: 1.416 },
+    { shape: 'bolt', colour: '#ffffff', at: [0, -0.161, -0.027], r: 0.164, turn: 1.571, beat: 5.922 },
+    { shape: 'bolt', colour: '#ffd21a', at: [0, -0.133, -0.144], r: 0.16, turn: 0, beat: 3.508 },
+    { shape: 'bolt', colour: '#ffd21a', at: [0, -0.019, -0.228], r: 0.197, turn: 1.571, beat: 4.152 },
+    { shape: 'bolt', colour: '#ffffff', at: [0, 0.143, -0.219], r: 0.178, turn: 0, beat: 0.95 },
+    { shape: 'bolt', colour: '#ff7a1a', at: [0, 0.278, -0.095], r: 0.194, turn: 1.571, beat: 1.264 },
+    { shape: 'bolt', colour: '#ffffff', at: [0, 0.309, 0.106], r: 0.165, turn: 0, beat: 0.933 },
+    { shape: 'twinkle', colour: '#ffd21a', at: [0, 0.196, 0.3], r: 0.123, turn: 1.571, beat: 1.177 },
+    { shape: 'bolt', colour: '#ff7a1a', at: [0, -0.032, 0.39], r: 0.166, turn: 0, beat: 4.8 },
+    { shape: 'bolt', colour: '#ffd21a', at: [0, -0.287, 0.312], r: 0.182, turn: 1.571, beat: 0.388 },
+    { shape: 'bolt', colour: '#ffffff', at: [0, -0.451, 0.075], r: 0.192, turn: 0, beat: 1.616 },
+    { shape: 'bolt', colour: '#ffd21a', at: [0, -0.43, -0.233], r: 0.184, turn: 1.571, beat: 4.22 },
+    { shape: 'twinkle', colour: '#ffd21a', at: [0, -0.21, -0.478], r: 0.122, turn: 0, beat: 5.992 },
+    { shape: 'bolt', colour: '#ffd21a', at: [0, 0.136, -0.538], r: 0.198, turn: 1.571, beat: 1.847 },
+    { shape: 'twinkle', colour: '#ffffff', at: [0, 0.464, -0.361], r: 0.121, turn: 0, beat: 1.717 },
+    { shape: 'bolt', colour: '#ff7a1a', at: [0, 0.62, 0], r: 0.185, turn: 1.571, beat: 3.198 },
+  ] }),
+  atomicBall: fromRecipe({ finish: 'neon', life: 1.24, turn: 15.58, drift: 1.44, stream: 0.16, flicker: 0.84, amplitude: 0.19, frequency: 0.665, ease: 1, grow: 5.23, hue: -0.84, bits: [
+    { shape: 'donut', colour: '#ff7a1a', at: [0, 0, 0], r: 0.047, turn: 0, beat: 5.468 },
+    { shape: 'donut', colour: '#ff3b7f', at: [0, 0, 0], r: 0.065, turn: 1.571, beat: 0.716 },
+    { shape: 'donut', colour: '#ff7a1a', at: [0, 0, 0], r: 0.066, turn: 0, beat: 4.565 },
+    { shape: 'donut', colour: '#ff7a1a', at: [0, 0, 0], r: 0.041, turn: 1.571, beat: 5.057 },
+    { shape: 'donut', colour: '#ff7a1a', at: [0, 0, 0], r: 0.067, turn: 0, beat: 4.221 },
+    { shape: 'donut', colour: '#ffd21a', at: [0, 0, 0], r: 0.071, turn: 1.571, beat: 1.896 },
+    { shape: 'donut', colour: '#ff7a1a', at: [0, 0, 0], r: 0.04, turn: 0, beat: 2.456 },
+  ] }),
   sparkle: { parts: (g, _p, built) => g.add(sparkleOf(built)) },
   bubble: { parts: (g, p) => scatter(g, p.ball, p.bubble, BUBBLES) },
   flame: { parts: addFlame, flicker: 0.3 },
@@ -1250,6 +1281,30 @@ function flicker(spin, fx, t) {
   }
 }
 
+/** A trick's look to fly as its shot (REUSE-SPEC.md §Trick shots), from `built`, the thrower. */
+export function shotTrick(kind, built) {
+  const g = new THREE.Group();
+  g.add(trickMesh(kind, built));
+  return g;
+}
+
+/**
+ * A shot's trick at `at`, flying along `dir`, `done` (0-1) of the way through its flight, `t` seconds in: its whole
+ * look from the fist (spreading, twisting, growing, turning colour, flickering) played over the flight, so it flares
+ * as it arrives, but at the shot rather than drifting off on its own, and never fading (playtest: smaller and flat).
+ */
+export function poseShotTrick(g, at, dir, done, t) {
+  const spin = g.children[0], { fx } = spin.userData, k = 0.75 * done;
+  g.scale.setScalar(fx.size);
+  g.userData.from = at;
+  g.userData.dir = dir;
+  fade(spin, fx, k);
+  spin.rotation.y = t * fx.turn;
+  fly(g, spin, fx, k);
+  g.position.copy(at);
+  flicker(spin, fx, k * fx.life);
+}
+
 /** Shows only `side`'s trick (none for null), `t` seconds after its hit, upright, moving as its EFFECT says. */
 function poseTricks(built, side, t) {
   for (const g of built.tricks ?? []) {
@@ -1381,6 +1436,9 @@ export function squashGloves(built, punch) {
 }
 
 /** @param {import('./punches.js').Punch|import('./kicks.js').Kick|null} [strike] layered over the walk */
+/** `built.spring` (a dance's stiff and zeta) stands in for the idle spring while a move plays a dance. */
+const springOf = (built) => (built.spring ? { ...IDLE, stiff: built.spring.stiff, zeta: built.spring.zeta } : IDLE);
+
 export function stepFighter(built, dt, pose, speed, strike = null) {
   const L = built.params.legHeight + built.params.hipInset;
   const at = built.walkAt ?? 0;
@@ -1391,14 +1449,14 @@ export function stepFighter(built, dt, pose, speed, strike = null) {
   const punch = strike && 'arm' in strike ? { ...strike, arm: built.sword?.userData.side ?? strike.arm } : null;
   squashGloves(built, punch);
   built.root.position.z = kick ? kickLunge(built.params, kick) : 0;
-  const out = stepMotion(built, pose, dt, IDLE, (o) => {
+  const out = stepMotion(built, pose, dt, springOf(built), (o) => {
     if (gain > 0) walkLayer(o, w, gain, IDLE);
     if (punch) punchLayer(o, punch, built.sword ? SWORD_MOVES : undefined);
     if (kick) kickLayer(o, kick);
   });
   swingSword(built, punch);
   reachPole(built, punch ? punchWeight(punch.step) : 0);
-  stepTricks(built, punch, dt);
+  stepTricks(built, built.noTrick ? null : punch, dt);
   return out;
 }
 
@@ -1471,5 +1529,5 @@ export function entrantOf(f, built, who) {
   const chest = built.chest.getWorldPosition(new THREE.Vector3());
   const tip = ({ parent, at, r }) => parent.localToWorld(new THREE.Vector3(...at)).distanceTo(chest) + r;
   const look = team === 'heroes' ? { dough: HERO_DOUGH, frosting: f.params.bodyColor, stripe: false } : BAD_DONUT;
-  return { id, team, height: size.y, width: built.root.userData.across, reach: Math.max(...gloveAnchors(built).map(tip)), look, hands: f.look.hands, ...(dummy && { dummy }) };
+  return { id, team, height: size.y, width: built.root.userData.across, reach: Math.max(...gloveAnchors(built).map(tip)), look, hands: f.look.hands, trick: f.look.trick, ...(dummy && { dummy }) };
 }

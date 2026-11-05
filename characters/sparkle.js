@@ -18,7 +18,7 @@ export function sparkleScale(t) {
   return pop * pulse * clamp01((SPARKLE_TIME - t) / 0.5);
 }
 
-function star(x, y, z, r) {
+export function star(x, y, z, r) {
   const s = new THREE.Shape();
   for (let i = 0; i < 8; i++) {
     const a = (i * Math.PI) / 4, k = i % 2 ? 0.26 * r : r;

@@ -64,6 +64,14 @@ assert.deepEqual(pickTarget(STAGE, snap, tap(front.x + 0.2, 0.2, front.z + 0.2),
   assert.deepEqual(c.take(snap), { target: null, punch: false, kick: false }, 'a press lasts one tick');
 }
 
+// REUSE-SPEC.md §Discoverable moves: 🦶 let go after a hold (play.js times it) goes out once, as `sweep`
+{
+  const c = createControls('me', STAGE);
+  c.sweep();
+  assert.equal(c.take(snap).sweep, true, 'a held 🦶 let go sends sweep');
+  assert.equal(c.take(snap).sweep, undefined, '...once');
+}
+
 {
   const c = createControls('me', STAGE);
   c.down(1, 'stage', tap(-1.5, 0, 1.6));
@@ -161,3 +169,52 @@ assert.deepEqual(pickTarget(STAGE, snap, tap(front.x + 0.2, 0.2, front.z + 0.2),
 }
 
 console.log('controls ok');
+
+// A full power bar: a long drag turns from steering into a drawing for the gesture recogniser, and a second finger
+// only draws; with the bar not full the same drag steers all the way and draws nothing (REUSE-SPEC.md §Power moves)
+{
+  const withBar = (power) => ({ ...snap, fighters: snap.fighters.map((f) => (f.id === 'me' ? { ...f, power } : f)) });
+  const drag = (c, full) => {
+    c.take(withBar(full ? 1 : 0.5));
+    c.down(1, 'stage', tap(-1.5, 0, 1.6), { x: 0, y: 0, t: 0 });
+    c.take(withBar(full ? 1 : 0.5));
+    let steered = 0;
+    for (let i = 1; i <= 10; i++) {
+      c.move(1, tap(-1.5 + i * 0.1, 0, 1.6), { x: i * 20, y: 0, t: i * 16 });
+      if (c.take(withBar(full ? 1 : 0.5)).target) steered++;
+    }
+    c.up(1);
+    return steered;
+  };
+  const full = createControls('me', STAGE, { draw: true }), half = createControls('me', STAGE, { draw: true });
+  assert.ok(drag(full, true) < 5, 'with a full bar a long drag stops steering');
+  const [stroke] = full.strokes();
+  assert.equal(stroke?.length, 11, 'and comes out as one stroke, every point of it');
+  assert.equal(full.strokes().length, 0, 'once');
+  assert.equal(drag(half, false), 10, 'without one it steers all the way');
+  assert.equal(half.strokes().length, 0, 'and draws nothing');
+  full.down(1, 'stage', tap(-1.5, 0, 1.6), { x: 0, y: 0, t: 0 });
+  full.down(2, 'stage', tap(2, 0, 0), { x: 300, y: 0, t: 0 });
+  assert.ok(Math.abs(/** @type {any} */ (full.take(withBar(1)).target).x + 1.5) < 1e-9, 'a second finger with a full bar doesn\'t steer');
+  full.up(2);
+  assert.equal(full.strokes().length, 1, 'it draws');
+}
+
+// Until the shape recogniser is in, drawing is off: a full bar never stops a drag from steering (playtest risk: the bar
+// fills in a minute and nothing could empty it). A keyboard's C fires the power at the nearest bad guy instead.
+{
+  const withBar = (power) => ({ ...snap, fighters: snap.fighters.map((f) => (f.id === 'me' ? { ...f, power } : f)) });
+  const c = createControls('me', STAGE);
+  c.take(withBar(1));
+  c.down(1, 'stage', tap(-1.5, 0, 1.6), { x: 0, y: 0, t: 0 });
+  c.take(withBar(1));
+  c.move(1, tap(0, 0, 1.6), { x: 400, y: 0, t: 100 });
+  assert.ok(c.take(withBar(1)).target, 'a long drag with a full bar still steers');
+  c.up(1);
+  assert.equal(c.strokes().length, 0, 'and draws nothing');
+  c.power();
+  assert.equal(c.take(withBar(0.5)).power, undefined, 'C with the bar not full does nothing');
+  c.power();
+  assert.deepEqual(c.take(withBar(1)).power, { kind: 'toy', on: 'dummy' }, 'C with a full bar fires at the nearest bad guy');
+  assert.equal(c.take(withBar(1)).power, undefined, 'once');
+}

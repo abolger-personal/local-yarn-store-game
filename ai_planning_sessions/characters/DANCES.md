@@ -26,6 +26,7 @@ Three things the rig can and cannot do shape every pose, all measured rather tha
 | **Standing on one leg** | `hipFlex = -legSwing`. `legSwing` is anti-symmetric (`legSwing * side`), `hipFlex` is symmetric, so equal-and-opposite cancels one leg and doubles the other. Planted foot holds at y+0.01 while the free leg lifts +0.36 behind or +0.25 in front. |
 | **Both feet planted, one behind** | The same two channels with `hipFlex` at **zero**: both legs rotate by equal and opposite angles, both feet rise the same amount, and grounding sets the body down on both. `legSwing` 0.72 puts a foot 0.155 back with the feet level to 0.0002, squatting the hips ~0.06. Needs a straight knee — `kneeAmount` bends the trailing leg harder, so a bent knee hovers the back foot. |
 | **Asymmetric arms** | needs `armOutAlt` (added for this). Before it the arms were mirrored by construction — measured across `armOut`, `armSwing` and `armSwingAlt`, the two hands never differed laterally by more than 0.00. |
+| **A leg out to the side** | `legOut` (both legs) and `legOutAlt` (one more than the other, like `armOutAlt`), added 2026-11-03 for the wuxia sweep. Each thigh turns out (`rotation.z`) inside its swing; a leg turned out keeps its knee straight, as a leg swung back does (`kneeAmount`); and `lowestFoot` follows the turn out, so the lowest foot still lands on the floor (rig.test: 40 random leg poses per species, within 1.2 cm; ignoring the turn out misses by 21 cm). With `legSwing = hipFlex` the out leg's thigh stays level while the standing leg folds: that's how one leg crouches while the other lies out. |
 | **Turning the body** | no pose channel does it. `applyPose` never writes `root.rotation.y`, and `spineTwist` (also added for this) turns the chest against the hips but not the whole character. A pirouette's turn is therefore a **root extra**. |
 
 ### Root extras
@@ -87,6 +88,159 @@ more key poses.
   reach each other in front of a deep belly, so the clap may need to meet higher, at the chest.
 - [ ] **Wiggle** — not built. The Withdrawal 4+ finisher's dance: a small happy shimmy, upper
   body only, feet planted, looping.
+
+---
+
+## Gymnastics (planned 2026-11-03)
+
+For Donut Fighters' ring-out finishers (spinoff/REUSE-SPEC.md §After the lobby: the skilful finishers get a
+gymnastics move instead of a dance). Whole-body rotations are what a chibi figure reads best, and a flip, a
+cartwheel and a spin turn about three different axes, so they can't be mistaken for each other. First goal:
+build every skill named after Simone Biles, play them side by side in the species checker, and pick the
+favourite. The skills were checked 2026-11-03 against news coverage and Wikipedia's "Gymnastics elements named
+after Simone Biles": five named skills, two on floor, one on beam, two on vault.
+
+### Two new root extras: `flip` and `roll`
+
+Like `turn`, they are absolute angles from where the move started, carried forward by a step that omits them,
+returned as data and never written to the root by `motion.js`.
+
+| extra | axis | + means |
+| --- | --- | --- |
+| `turn` (exists) | the body's own long axis | a spin; in the air, the twist |
+| `flip` | the body's side axis | forward (a front tuck); − is backward |
+| `roll` | the body's front axis | sideways, a cartwheel |
+
+- **Rotate about the body's middle, not the feet.** The root sits at the feet; turning it there swings the body
+  through the floor. Pivot at half the character's height, then move the root so the middle stays put. The
+  spinoff's stomp backflip already does exactly this (`flip()` in spinoff/play.js), measured: the middle doesn't
+  move, the head goes back first, the feet end where they started.
+- **Order: placement, then flip, then roll, then turn.** So a twist spins about the *flipping* body, which is
+  what a twisting somersault is; applying the spin first would just swing a flip round.
+- **One helper, not three copies.** The species checker and dress-up each apply `turn`/`rise`/`travel`/`shift`
+  to the root by hand. Add one function in `motion.js` that turns a dance frame into a quaternion and a root
+  offset for a given pivot height, and have both pages (and the spinoff) call it.
+- **In the air the rotation is linear.** Extras ease on an S-curve within a step; on a step with a `hop`, `flip`,
+  `roll` and `turn` should instead ride the step's linear progress, as the hop does, or the body hangs still at
+  take-off and whips round at the landing.
+- **Looping dances may not use them**, like `turn` and `travel` (they accumulate); `motion.test.mjs` already
+  asserts that for `turn`.
+- **Every flip lands upright.** A move's final `flip` and `roll` are whole turns (multiples of 2π), and its last
+  step's `rise` is 0. Asserted.
+
+### Every flip is crouch, jump, land
+
+1. **Crouch** (wind-up): knees bent, arms swung back, a short hold.
+2. **Jump and rotate**: one step that hops *high* and rotates. The riverdance's hops are about 5 cm; a flip needs
+   about half the character's height of hop for a single turn to read, and more for doubles. Hold ~0.6 s for a
+   single, ~0.9 s for a double; exaggerate, these are cartoons.
+3. **Land**: knees soak it, then **the salute** (arms up in a V, chest out, chin up: "stuck it").
+
+### New key poses
+
+| pose | how |
+| --- | --- |
+| **crouch** | deep `kneeBend`, `hipFlex` forward, arms swung back |
+| **tuck** | both legs pulled up (`hipFlex` is symmetric, so it lifts both), knees fully bent, arms hugging the shins (`armSwing` forward, `elbowBend` high) |
+| **pike** | `hipFlex` high with knees straight, arms reaching for the toes |
+| **layout** | straight body, arms by the sides or overhead |
+| **hands-down** | arms straight overhead, for a handspring or a round-off passing through a handstand |
+| **salute** | both arms up and out (`armOut` high), chest out (`spineBend` back), `headPitch` up |
+| **sweep freeze** | built as `wx-freeze`: crouched on one leg, the other straight out to the side on the floor, the middle hand (the swept leg's side) at the floor and the outside one raised (`armOutAlt` −1.5), a slight lean toward the low hand. A raised arm can't clear these big chibi heads (a hand tops out at about 0.65 of a standing body), so "up" means up beside the head |
+| **wolf** | standing knee deep, the other leg straight out in front (`legSwing` + `hipFlex` isolation from the table above; `kneeAmount` already straightens the swung leg), arms out |
+
+No props: no beam, no vault table, no floor springs. Everything happens on the stage floor, and a vault's
+"hands on the table" becomes a handspring on the floor.
+
+### The Biles skills, one entry each
+
+| entry | the skill | built as |
+| --- | --- | --- |
+| `biles` | floor: the Biles (2013), a double layout with the half twist in the second flip | built 2026-11-04. A reach, an **aerial round-off** (`tb-star`, legs wide: `flip` π with `turn` π/2, so it is a cartwheel upside down, then on to 2π and π, landing facing back), a short rebound, a **whip back** (`tb-whip`, arched hard: the waist back 0.65 and both legs behind the hips, `hipFlex` −0.5, deepened from 0.35 when the designer saw it fly straight; `flip` on to 4π), a rebound, then the double layout (`tb-layout`, nearly straight on purpose: a layout is a stretched body, and judges take off for a pike or a big arch; `rise` 0.95: `flip` on to 8π in 1.45 s, the half twist all in the second flip, `turn` to 2π), land, salute. The flip runs one way throughout: once the round-off has turned the body to face back, the same world rotation is a back salto. The pass travels 1.3 the way the body first faced. Hands never touch the floor: with arms straight overhead the hands stop 21-56 cm short of the head's top (owl least, llama most), so upside down the head would land first; the hands-free versions are real skills (the whip is a hands-free back handspring). The run-in jumps are 0.7 high, like the back tuck: at 0.45 the llama's head went 6-9 cm through the floor, and tucking the chin swung the big head further out |
+| `biles-ii` | floor: the triple-double (2019; some call it the Biles II on floor), a double back tuck with three twists | built 2026-11-04: the shared run-in (`RUN_IN` in motion.js, the floor Biles's), then tucked (`bt-tuck`), `flip` on to 8π with three twists spread through both flips (`turn` π to 7π), 1.45 s in the air like the others; lands facing back |
+| `biles-beam` | beam: the Biles (2019), a double-twisting double back dismount | built 2026-11-03, from a standing jump (no beam): crouch, then up tucked (`rise` 0.95, `flip` −2π, `turn` 2π in 0.75 s) and down opening out (`flip` −4π, `turn` 4π in 0.70 s); 1.45 s in the air (tried 1.65, a touch slow), slowed from 0.96 because at real speed it was a blur on a small figure (the designer), so it hangs like a cartoon jump, land, salute. The twists spread evenly through both flips. Clearance upside down: llama 30 cm, lion 39, owl 55 |
+| `biles-vault` | vault: the Biles, later Biles I (2018), Yurchenko half-on, straight front salto with two twists off; she no longer competes it | **skipped** (the designer, 2026-11-04): it is the one pass that needs hands on a table, and without hands the "onto the vault" moment is only a hop |
+| `biles-ii-vault` | vault: the Biles II (2023), the Yurchenko double pike | built 2026-11-04: the run-in stands in for the board and the table, then a pike (`tb-pike`: `hipFlex` 1.8, knees straight, reaching for the toes), `flip` on to 8π, no twist; lands facing back |
+| `wuxia-turn` | built 2026-11-03. Not a gymnastics skill: the *sǎo táng tuǐ* (扫堂腿), the hall-sweeping leg, from wushu, as wuxia films freeze it (the designer's; her video's frames: a deep squat on one leg, the other straight out to the side on the floor, both hands down). Crouch, one turn low with both hands down, then a dead-still freeze in the same shape with one arm thrown up. The arm up is for show: a fighter guards the face with it, wuxia raises it because it looks better | `wx-crouch`, `wx-sweep` (`legOut`/`legOutAlt` 0.6, `legSwing` = `hipFlex` 0.55, `kneeBend` 2.3: the out foot 30 cm to the side on the floor; `spineBend` 0.8 brings both hands within 6-10 cm of the floor) with `turn` 2π, then `wx-freeze` (the middle hand, on the swept leg's side between the feet, stays at the floor steadying the crouch, and the outside one goes up beside the head, the designer's correction; a `spineRoll` of 0.25 toward the low hand balances the two). Stiff and critically damped so the freeze stops dead. The spin turns about the root, between the feet, so the standing foot circles about 10 cm; a pivot on the standing foot is the upgrade if it shows |
+| `biles-wolf` | a wolf-turn flourish instead of the salute: not named after her, but she made the 2½ wolf turn famous on beam at Rio 2016 | built 2026-11-04 on the beam dismount, for comparison with its salute: `wolf`, then `turn` 5π more in 1.4 s on the floor, and held. The rig straightens a knee only on a leg swung back or turned out, and a leg swung back drops lowest and becomes the one stood on; so both thighs fold the same (`hipFlex` 1.5) and the free leg turns out a little (`legOut`/`legOutAlt` 0.25), which straightens it: its foot 20 cm in front and 5 cm off the floor, the standing foot under the body |
+
+### Leotards (built 2026-11-04)
+
+Each Biles move wears one of her leotards as sparkle (the designer: sparkles, bright colours, some red, white and
+blue, some Rio). `glitter` on the dance in `motion.js`, drawn by `characters/glitter.js`: small stars that cling to
+the chest and twinkle the whole move, and in the air shed a trail that draws the flip's circle. Both lab pages show
+it; the spinoff can use the same `stepGlitter` when the dances become celebrations.
+
+| move | leotard | glitter |
+| --- | --- | --- |
+| `biles-beam` | Rio 2016 beam final: mostly red, blue and silver stripes along the V-neck | red, some blue and silver |
+| `biles` | the Rio 2016 Games' colours (her Rio team and all-around leotard colours weren't confirmed) | green, yellow, orange, blue |
+| `biles-ii` | Tokyo team final: a tri-colour fade top to bottom, 7,600 crystals | red, white, blue in bands, top to bottom |
+| `biles-ii-vault` | Paris vault final, her 7th gold: "power color" red, 3,600 crystals | dense ruby, steady |
+| `biles-wolf` | Paris "Luminous Legacy": a night-sky palette, a constellation of 10,000+ crystals | navy, white and pale blue, twinkling hard |
+
+No goat: she wore it for her club; Olympic team leotards carry no personal imagery.
+
+### Reading them
+
+- **They read best side-on.** A flip about the side axis seen from the front is foreshortened to a nod. In the
+  game fighters mostly face left or right, which is side-on; the species checker shows characters facing the
+  camera, so it needs a "side view" toggle (or each move starts with a quarter `turn`) to judge them.
+- **Travel goes the way the body faces.** A tumbling pass travels; `placeDancer` turns `travel` and `shift` by the facing `yaw` (built 2026-11-04), and the species checker's side view starts the pass half its length back so it ends as far past the slot.
+- Judge at `D` and under `B`, as for the dances. Three twists in under a second may blur into a shimmer;
+  if so, slow the twist, not the flip.
+
+### Flips, worked out (planned 2026-11-03)
+
+- **In the air, grounding has to let go.** Every frame `applyPose` sets the root's height so the lowest foot touches the
+  floor (`groundCharacter`). A tuck pulls the feet up to the hips, so grounding would drop the whole body by a leg's
+  length the moment the tuck starts, then pop it back at the landing. On a step with a `hop`, the body's **middle**
+  follows the hop's arc instead (standing middle height + the hop), and grounding is skipped until the landing step.
+  This is the one thing the plan above missed.
+- **The pivot is the body's middle at rest**, half its standing height, measured once per character (species and
+  size differ), so a lion and an owl flip about their own centres.
+- **How high.** A real flip of airtime t needs a jump of g·t²/8: 0.6 s is 0.44 m, about 45% of a standing critter.
+  Start a single at `hop` 0.45 of height and 0.6 s, a double at 0.8 and 0.85 s; cartoon-high is fine, and it is
+  the dial to tune first. Rotation speed follows from turns ÷ airtime, linear in the air.
+- **Upright at the end, feet first.** The air step's `flip`/`roll` end exactly on whole turns, and the landing
+  step's pose has knees bent, so the feet meet the floor before the body settles.
+- **One helper** in `motion.js`: given a dance frame and the pivot height, it returns the root's quaternion
+  (placement × flip × roll × turn) and position (the pivot held on its arc), so the species checker, dress-up and
+  the spinoff all place a flipping critter the same way. The spinoff's stomp `flip()` in play.js is the same maths
+  and can move onto it later.
+- **A side-view toggle in the species checker**, because a flip seen from the front is a nod. The game's fighters
+  already face sideways.
+- **`legOut` may need tuning on the way** (the designer): a tuck and a pike pull the legs in close, and a star jump
+  or a round-off needs them wide, so check `legOut`'s range and knee rule as those poses get built.
+
+**Built 2026-11-03: `back-tuck`**, and what building it changed:
+- `flip`, `roll` and `air` are step settings in `motion.js`; `placeDancer` and `holdMiddle` in `npc.js` place a dancing
+  character (the species checker, dress-up, and the spinoff's stomp all use them; the stomp's own `flip()` is gone).
+  The species checker has a "side view (flips)" toggle.
+- **The jump is two air steps**, up into the tuck and down opening out, not one: one step would land still tucked,
+  and grounding would drop the body as it came back. On the way up the body lifts from where it crouched to
+  standing height (`launch`), so leaving the crouch doesn't pop.
+- **Turns are fastest at the top**, slow off the floor and settling at the landing, as a tucked gymnast's are.
+- **0.7 high, not 0.45:** at 0.45 the curled head's ears went 7-9 cm through the floor just past upside down (the
+  llama's most); at 0.6 nothing went through, but the llama's long neck passed 5 cm over the floor, which reads as
+  smacking its head (the designer). At 0.7 the llama clears by about 16 cm, and the test asks for 10 cm clear
+  upside down. The owl then jumps higher than it needs; a jump scaled to how far each body's head reaches from its
+  middle is the upgrade if that shows.
+- A foot mesh dips below the floor in any crouch (it tilts with the shin, no ankle); the test checks the body, and
+  the feet by their joints, instead.
+
+**Tests for the back tuck, per species** (rig.test, as for the sweep): the middle rises at least 90% of the hop
+at the top; the rotation totals −2π and ends upright; nothing goes through the floor during the air step (the
+body's lowest point stays above it); both feet are on the floor after the landing; and a tuck's knees are near the
+chest (the tuck reads). Each move after it gets the same checks with its own turns and twists.
+
+### Build order
+
+1. `flip` and `roll` extras, the shared helper, both pages using it, the tests above.
+2. The new key poses.
+3. **One back tuck** first (crouch, jump, tuck, `flip` −2π, land, salute) to tune hop height and hold.
+4. The five Biles entries and the wolf flourish; play them side by side in the species checker.
+5. Pick the favourites, then wire them into the spinoff's finisher table.
 
 ---
 

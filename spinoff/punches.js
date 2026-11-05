@@ -116,17 +116,6 @@ export function punchLayer(out, { name, arm, step }, moves = PUNCHES) {
 /** A count of landed `of` moves (punch or kick) for a string `length` long. @returns {ComboCount} */
 export const newCombo = (of = 'punch', length = COMBO.length) => ({ of, length, move: '', step: 0, at: -Infinity, hits: 0, ahead: 0, n: 0 });
 
-/**
- * Who threw hit event `h`: the nearest fighter showing that move to the contact point not on the target's team
- * (friendly fire is off), or failing that, as a guest draws a few ticks behind, the nearest such fighter.
- * @param {import('./match.js').HitEvent} h @param {import('./match.js').FighterState[]} fighters
- */
-export function strikerOf(h, fighters) {
-  const team = h.on === 'fighter' ? fighters.find((f) => f.id === h.target)?.team : null;
-  const by = (f) => (f.move === MOVES[h.move].shows ? 0 : 1e3) + Math.hypot(f.x - h.x, f.z - h.z);
-  return fighters.filter((f) => f.team !== team).sort((a, b) => by(a) - by(b))[0] ?? null;
-}
-
 /** A hit landed; one this tablet hasn't drawn the start of yet counts once it has. */
 export function landHit(c) {
   if (c.move === c.of && c.step <= MOVES[c.of].active[1] / MOVES[c.of].steps) c.hits++;

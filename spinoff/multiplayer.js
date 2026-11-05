@@ -3,6 +3,7 @@
 // together.js gives it the Trystero one from net.js.
 import { readFighter } from './fighter.js';
 import { ROUND_SECONDS, TICK_HZ } from './match.js';
+import { POWERS } from './sim.js';
 import { MAX_FIGHTERS } from './roster.js';
 import { badGuys } from './levels.js';
 
@@ -13,7 +14,7 @@ import { badGuys } from './levels.js';
  *   a player, the training dummy, or a CPU bad guy, whose inputs the host makes (cpu.js)
  * @typedef {{ theme: string, stage: import('./match.js').Stage, number: number, roster: Seat[], settings: { seconds: number } }} Start
  *   `theme` is the stage's name and `number` the level's (0 for a layout picked by address, not off the level dial)
- * @typedef {{ tick: number, hits: Snapshot['hits'], fullBag: Snapshot['fullBag'], donutEvents: Snapshot['donutEvents'] }} Events
+ * @typedef {{ tick: number, hits: Snapshot['hits'], fullBag: Snapshot['fullBag'], donutEvents: Snapshot['donutEvents'], ringOuts: Snapshot['ringOuts'], powers: Snapshot['powers'] }} Events
  * @typedef {Snapshot & { seq: number, paused: boolean }} Drawn
  */
 
@@ -27,7 +28,9 @@ const REFRESH = 15;
 // snapshots come unevenly, and with only two of slack a 120 Hz guest froze on a quarter of its frames (playtest: walkers stuttered)
 const BEHIND = 4 * (TICK_HZ / SNAP_HZ), AHEAD = TICK_HZ / SNAP_HZ, KEEP = 8;
 const TEAMS = new Set(['heroes', 'badGuys']), THINGS = new Set(['donut', 'brick', 'fighter', 'pile']), FAR = 1e6;
-const FLAGS = ['away', 'drop', 'ready', 'go'];
+const FLAGS = ['away', 'drop', 'ready', 'go', 'sweep', 'charge'];
+/** A snapshot's once-only event lists, sent with the tick they happened on until every guest has surely had them. */
+const EVENTS = /** @type {const} */ (['hits', 'fullBag', 'donutEvents', 'ringOuts', 'powers']);
 /** @type {import('./match.js').Team} */
 const HEROES = 'heroes';
 /** @type {import('./match.js').Team} */
@@ -56,14 +59,18 @@ function readTarget(t) {
   return t.y === undefined ? { x: t.x, z: t.z } : { x: t.x, y: t.y, z: t.z };
 }
 
+/** A thrown hammer's size, a shot's, and a power fired at a fighter, are well-formed if there. */
+const extrasOk = (raw) => (raw.throw === undefined || isNum(raw.throw)) && (raw.shot === undefined || isNum(raw.shot))
+  && (raw.power === undefined || (POWERS.includes(raw.power?.kind) && isId(raw.power.on)));
+
 /** A guest's Input as the host trusts it, or null. */
 export function readInput(raw) {
   if (!raw || typeof raw !== 'object' || typeof raw.punch !== 'boolean' || typeof raw.kick !== 'boolean') return null;
   const target = readTarget(raw.target);
   if (target === undefined || FLAGS.some((k) => raw[k] !== undefined && typeof raw[k] !== 'boolean')) return null;
-  if (raw.throw !== undefined && !isNum(raw.throw)) return null;
+  if (!extrasOk(raw)) return null;
   return { target, punch: raw.punch, kick: raw.kick, ...Object.fromEntries(FLAGS.filter((k) => raw[k] !== undefined).map((k) => [k, raw[k]])),
-    ...(raw.throw !== undefined && { throw: raw.throw }) };
+    ...(raw.throw !== undefined && { throw: raw.throw }), ...(raw.shot !== undefined && { shot: raw.shot }), ...(raw.power && { power: { kind: raw.power.kind, on: raw.power.on } }) };
 }
 
 /** @returns {Seat|null} */
@@ -94,7 +101,7 @@ export function readSnap(raw, ids) {
   if (!sane(raw) || !Number.isInteger(raw?.seq) || !Number.isInteger(raw.tick) || typeof raw.paused !== 'boolean') return null;
   if (!isArrays(raw, ['fighters', 'donuts', 'events']) || !raw.fighters.every((f) => ids.has(f?.id))) return null;
   if (['bricks', 'shelves'].some((k) => k in raw && !Array.isArray(raw[k]))) return null;
-  return raw.events.every((e) => Number.isInteger(e?.tick) && isArrays(e, ['hits', 'fullBag', 'donutEvents'])) ? raw : null;
+  return raw.events.every((e) => Number.isInteger(e?.tick) && isArrays(e, EVENTS)) ? raw : null;
 }
 
 /**
@@ -113,13 +120,13 @@ export function rosterOf(me, mine, guests = new Map(), level = 0) {
 /** @param {Input} input @param {Input} [was] */
 const merge = (input, was = IDLE) => ({ ...was, ...input, target: input.target ?? was.target, punch: was.punch || input.punch, kick: was.kick || input.kick,
   ...((was.drop || input.drop) && { drop: true }), ...((was.go || input.go) && { go: true }) });
-const eventsOf = (s) => (s.hits.length + s.fullBag.length + s.donutEvents.length
-  ? [{ tick: s.tick, hits: s.hits, fullBag: s.fullBag, donutEvents: s.donutEvents }] : []);
+const eventsOf = (s) => (EVENTS.some((k) => s[k].length) ? [{ tick: s.tick, ...Object.fromEntries(EVENTS.map((k) => [k, s[k]])) }] : []);
 const round = (_, v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v);
 
 /** @param {Snapshot} snap @param {{ paused: boolean, seq: number, events: Events[], still: boolean }} o */
 function wire(snap, { paused, seq, events, still }) {
-  const { hits: _h, fullBag: _f, donutEvents: _d, bricks, shelves, ...rest } = snap;
+  const { bricks, shelves, ...rest } = snap;
+  for (const k of EVENTS) delete rest[k];
   return JSON.parse(JSON.stringify({ ...rest, ...(!still && { bricks, shelves }), seq, paused, events }, round));
 }
 
@@ -196,7 +203,7 @@ function blend(buf, t) {
   return { ...last, fighters: last.fighters.map((f) => between(from.get(f.id), to.get(f.id), k) ?? f) };
 }
 
-const noEvents = () => ({ hits: [], fullBag: [], donutEvents: [] });
+const noEvents = () => Object.fromEntries(EVENTS.map((k) => [k, []]));
 
 /** The first good start message; its sender is the host from then on. @returns {Promise<Start>} */
 function whenStarted(link, g, me, themes) {
@@ -229,7 +236,7 @@ export function createGuest(link, me, themes, on) {
       return g.buf.length ? drawn(g, dt) : null;
     },
     /** @param {Input} input */
-    input(input) { if (g.host && (input.target || input.punch || input.kick || input.throw !== undefined || FLAGS.some((k) => input[k] !== undefined))) link.send('input', input, [g.host]); },
+    input(input) { if (g.host && (input.target || input.punch || input.kick || input.throw !== undefined || input.shot !== undefined || input.power || FLAGS.some((k) => input[k] !== undefined))) link.send('input', input, [g.host]); },
     left(id) { if (id === g.host) goneNow(); },
   };
 }
@@ -238,7 +245,7 @@ export function createGuest(link, me, themes, on) {
 function keep(g, raw) {
   const last = g.buf.at(-1), snap = raw && { bricks: last?.bricks, shelves: last?.shelves, ...raw };
   if (!snap?.bricks || !snap.shelves || snap.seq <= g.seq) return;
-  for (const e of snap.events) if (e.tick > g.seen) for (const k of ['hits', 'fullBag', 'donutEvents']) g.fresh[k].push(...e[k]);
+  for (const e of snap.events) if (e.tick > g.seen) for (const k of EVENTS) g.fresh[k].push(...e[k]);
   Object.assign(g, { seq: snap.seq, seen: Math.max(g.seen, snap.tick), quiet: 0, buf: [...g.buf.filter((s) => s.tick < snap.tick), snap].slice(-KEEP) });
 }
 

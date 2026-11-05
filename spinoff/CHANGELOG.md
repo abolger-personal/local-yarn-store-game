@@ -2,12 +2,24 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
-## 0.0.7
+## 0.0.7 — 2026-11-04: Tricks, trick shots and the sweep
 
 ### Fighting
+- **A secret move: the sweep.** Hold 🦶 (or X) until the button fills, then let go: you drop low and sweep your
+  leg all the way round the floor, tripping every bad guy around you onto their back for a moment, then freeze in a
+  kung fu pose. An ink line follows your foot round. A tap is still a kick.
+- **Trick shots.** With a trick on your gloves, sword or scythe, hold 🥊: you wind up, the button fills, and the
+  longer you hold, the further your trick flies off your swing when you let go. Each trick has its own range (a shooting star goes furthest, a bubble
+  drifts slowly). Hold too long and it fizzles, and 🦶 while you hold drops it. A tap is still a punch.
+- **Hit someone while they're down and they skid.** A bad guy on their back slides away along the floor when you
+  punch or kick them, still lying flat, and you can skid them right off the edge.
 - **A bad guy who walks past you still gets hit.** If there's nothing to hit in front of you and a bad guy is
   right behind you, 🥊 or 🦶 turns you round to face them first. Punching while you walk away works too: you
   keep facing them until the punch is done. Gloves, sword, scythe and hammer all do it, on a tablet or a keyboard.
+- **Stomps you can actually land.** 🦶 in the air now pops you up a little into a backflip, then you
+  dive. On the way down you steer onto the nearest bad guy below you, so you don't have to be right on top of
+  them, just close. Press 🦶 on the way up instead and you spin round in a jump kick.
+- **Smoother when walls come down.** A wall knocked over no longer makes the game stutter while its blocks fall.
 - **Sword tricks follow the swing.** A sword's trick now stays on the tip of the blade all the way through the
   swing. Some leave a trail: their bits drop off the tip one by one along the arc and fly on the way the blade was
   going, so a swing draws a streak of stars through the air.
@@ -24,13 +36,28 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   - 💞 **Heart blast**: a star of outlined pink, purple, blue and white hearts blasted out wide.
   - ☀️ **Smite of light**: glowing streaks of light that shoot out one after another and curve up, like a beam.
   - 💨 **Speed lines**: shiny silver streaks that zip out of your punch.
+  - ⛈️ **Lightning storm**: a spiral of glowing orange, yellow and white bolts that flicker and shrink away.
+  - ⚛️ **Atomic ball**: glowing sunset donuts whirling round each other that swell up as they fly.
 - **New tricks for your sword.** 🌠 **Shooting star**: a trail of tiny glowing stars along your swing. The sword
   can do 🍬 **Bubblegum pop** too, swelling right on its tip, and ☀️ **Smite of light**, which spreads its streaks
-  of light along your swing, and 💨 **Speed lines** too.
+  of light along your swing, 💨 **Speed lines**, ⛈️ **Lightning storm** and ⚛️ **Atomic ball** too.
 - **A new trick for the Greathammer.** Tap the hammer again: 🌩️ lightning, or 💥 **Zap**, a big glowing green
   ZAP! on the hammer's head.
+- **Owls get proper tails.** A new owl's tail is longer, and random owls get anything from short to very long,
+  so owls look more different from each other (the longest go to owls with long legs, so tails stay off the floor).
 - **The flame is a real fire.** 🔥 is now a cartoon flame with embers flying off it, and off your gloves it flies
   the way you punched.
+
+### For grown-ups: the dance lab
+- **Gymnastics in the species checker.** A back tuck, a wuxia sweep turn (one low spin with the leg along the
+  floor, then a kung fu freeze), and Simone Biles's skills: her beam dismount, her floor Biles, the triple-double,
+  the Yurchenko double pike, and the beam dismount ending in her 2½ wolf turn. A "side view" switch shows the flips
+  side on, and a slow-motion dial slows any dance down.
+- **Leotards.** Each Biles move sparkles in one of her leotards' colours: Rio 2016 red, the Rio Games' colours,
+  Tokyo's red-white-blue fade, Paris "power red", and Paris's night-sky blue. The sparkles cling to the body and
+  leave a trail through the air that draws each flip.
+- **Uptown Funk** gets sunglasses for the strut and neon speed lines off every snap; the wuxia sweep leaves an ink
+  line round the floor.
 
 ### For grown-ups: the trick workshop
 - **Make new tricks.** Open the fighter chooser with `?debug=1` and a 🧪 button shows up: tap your gloves or your

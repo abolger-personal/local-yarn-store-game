@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, ROUND_SECONDS, TICK_HZ, outside } from './match.js';
 import { STAGES, TUTORIAL } from './levels.js';
 import { MATCH } from './roster.js';
-import { CALM_DRAIN, CALM_TICKS, DUMMY, RESPAWN_WAIT, SPRING_LIFT, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
+import { CALM_DRAIN, CALM_TICKS, DUMMY, MOVES, POWER, SHOTS, shotCharge, TOY, RESPAWN_WAIT, SPRING_LIFT, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
 import { BOUNCE } from './generate.js';
+import { BAM_SIZE, SHAKE } from './fx.js';
 
 // The tutorial's layout and syrup with the gapped wall (the hand-made stages' fort), so routing has gaps to find; heroes start beside their shelf
 const STAGE = { ...TUTORIAL.stage, bricks: STAGES.breakfast.stage.bricks, starts: undefined };
@@ -194,6 +195,171 @@ for (const [button, walkOn] of [['punch', true], ['kick', false]]) {
   let at = run(m, 1, once({ [button]: true, ...(walkOn && { target: { x: past + 3, z: DUMMY.z, y: 0 } }) }));
   for (let i = 0; i < 40 && !at.hits.length; i++) at = run(m, 1);
   assert.ok(at.hits.length === 1 && at.hits[0].target === 'dummy', `a ${button} turns round to the dummy behind${walkOn ? ', walking away' : ''}`);
+}
+
+// Every move's hit has a BAM and a shake (playtest: the first sweep to land had neither, and the view went blank)
+for (const id of Object.keys(MOVES)) {
+  assert.ok(Number.isFinite(BAM_SIZE[id]) && Number.isFinite(SHAKE[id]), `fx.js has a BAM size and a shake for a ${id}`);
+}
+
+// The wuxia sweep (REUSE-SPEC.md §Discoverable moves): 🦶 held and let go (`sweep`, timed on the tablet), on the ground,
+// cutting short the kick the press started. A low turn that trips foes on both sides: each knocked a little way out from
+// the sweeper, low, and left on its back a while (playtest: knocked up and away, they wandered off). Mashed taps only kick
+{
+  const m = createMatch([hero, dummy, dummy2], STAGE), [kid, d1, d2] = m.fighters, moves = new Set();
+  Object.assign(kid, { x: DUMMY.x - 2 * R - 0.3, z: DUMMY.z, facing: 0 });
+  Object.assign(d2, { x: kid.x - 2 * R - 0.3, z: DUMMY.z });
+  run(m, 60, () => say({ kick: true }), (snap) => moves.add(me(snap).move));
+  assert.ok(!moves.has('sweep'), 'mashed kicks never sweep');
+  run(m, 120);
+  Object.assign(kid, { x: DUMMY.x - 2 * R - 0.3, z: DUMMY.z, facing: 0 });
+  for (const d of [d1, d2]) Object.assign(d, { vx: 0, vy: 0, vz: 0, stun: 0, pending: null, percent: 0, onGround: true, y: kid.y });
+  Object.assign(d1, { x: kid.x + 2 * R + 0.25, z: kid.z });
+  Object.assign(d2, { x: kid.x - 2 * R - 0.25, z: kid.z });
+  const from = [d1.x, d2.x];
+  run(m, 3, once({ kick: true }));
+  assert.equal(me(run(m, 1, once({ sweep: true }))).move, 'sweep', 'let go after a hold, sweeps, cutting the kick short');
+  const hits = [], downAfter = { dummy: 0, dummy2: 0 };
+  let high = 0, up = false;
+  run(m, 120, () => ({}), (snap) => {
+    hits.push(...snap.hits.filter((h) => h.move === 'sweep'));
+    up ||= hits.length > 0 && me(snap).move === 'idle';
+    for (const id of ['dummy', 'dummy2']) {
+      const d = me(snap, id);
+      if (up && d.move === 'tripped') downAfter[id] += 1;
+      high = Math.max(high, d.y - kid.y);
+    }
+  });
+  assert.deepEqual(hits.map((h) => h.target).sort(), ['dummy', 'dummy2'], 'it trips foes on both sides');
+  assert.ok(d1.x > from[0] && d2.x < from[1], '...each knocked out away from the sweeper');
+  assert.ok(Math.abs(d1.x - from[0]) < 1 && Math.abs(d2.x - from[1]) < 1 && high < 0.3,
+    `...low and not far (${(d1.x - from[0]).toFixed(2)}, ${(from[1] - d2.x).toFixed(2)} out, ${high.toFixed(2)} up)`);
+  assert.ok(downAfter.dummy >= 25 && downAfter.dummy2 >= 25,
+    `...and still on its back well after the sweeper is up (${downAfter.dummy}, ${downAfter.dummy2} ticks; playtest)`);
+
+  // hit while down, they skid away along the floor on their back (playtest: hilarious), and stop
+  run(m, 120);
+  for (const d of [d1, d2]) Object.assign(d, { vx: 0, vy: 0, vz: 0, stun: 0, pending: null, onGround: true, y: kid.y });
+  Object.assign(d1, { x: kid.x + 2 * R + 0.25, z: kid.z });
+  Object.assign(d2, { x: kid.x - 6, z: kid.z });
+  run(m, 1, once({ sweep: true }));
+  for (let i = 0; i < 80 && me(run(m, 1)).move !== 'idle'; i++);
+  Object.assign(kid, { x: d1.x - 2 * R - 0.3, facing: 0 });
+  const was = d1.x;
+  let flat = true, slid = 0;
+  run(m, 1, once({ kick: true }));
+  run(m, 90, () => ({}), (snap) => {
+    const d = me(snap, 'dummy');
+    if (d.x - was > 0.05 && d.move === 'tripped') slid = d.x - was;
+    flat &&= d.y - kid.y < 0.02;
+  });
+  assert.ok(slid > 1 && flat, `a kick at a tripped dummy skids it along the floor on its back (${slid.toFixed(2)} m)`);
+  assert.ok(Math.abs(d1.vx) < 1e-9, '...till it stops');
+
+  Object.assign(kid, { vy: 3, onGround: false, y: kid.y + 0.5 });
+  assert.notEqual(me(run(m, 1, once({ sweep: true }))).move, 'sweep', 'not in the air');
+}
+
+// Trick shots (REUSE-SPEC.md §Trick shots): 🥊 held charges a shot as far as its hold, up to the trick's reach; a tap is
+// only the punch, and held too long past full it fizzles. It flies the way you face and hits the first foe it meets
+{
+  const full = SHOTS.fireball.reach * 0.3;
+  assert.equal(shotCharge('fireball', 0.05), null, 'a tap is no shot');
+  assert.ok(near(shotCharge('fireball', full / 2), 0.5, 1e-9) && shotCharge('fireball', full) === 1, 'held, it charges to full');
+  assert.equal(shotCharge('fireball', full + 0.3), 1, '...and stays full a moment');
+  assert.equal(shotCharge('fireball', full + 1), null, '...then fizzles');
+  assert.equal(shotCharge('plain', 1), null, 'no trick, no shot');
+
+  const shooter = (hands = 'gloves') => {
+    const m = createMatch([{ ...hero, hands, trick: 'fireball' }, dummy], STAGE);
+    Object.assign(m.fighters[0], { x: DUMMY.x - 3, z: DUMMY.z, facing: 0 });
+    return m;
+  };
+  const fire = (m, k) => {
+    const hits = [];
+    run(m, 1, once({ shot: k }));
+    run(m, 90, () => ({}), (snap) => hits.push(...snap.hits.filter((h) => h.move === 'shot')));
+    return hits;
+  };
+  assert.deepEqual(fire(shooter(), 1).map((h) => h.target), ['dummy'], 'a full fireball reaches a dummy 3 m off');
+  assert.equal(fire(shooter(), 0.3).length, 0, '...one let go early falls short');
+  const m = shooter();
+  run(m, 1, once({ charge: true }));
+  assert.equal(me(run(m, 1)).move, 'charge', 'held, it winds up');
+  run(m, 1, once({ shot: 1 }));
+  assert.ok(me(run(m, 1)).move === 'punch' && me(run(m, 1)).shooting, '...let go, it swings, the shot coming off the swing');
+  run(m, 10);
+  assert.equal(run(m, 1, once({ shot: 1 })).shots.length, 1, 'one shot of yours in the air at a time');
+  run(m, 60);
+  run(m, 1, once({ charge: true }));
+  assert.equal(me(run(m, 1, once({ kick: true }))).move, 'kick', '🦶 drops the wind-up');
+  assert.equal(fire(shooter('hammer'), 1).length, 0, 'the Greathammer throws itself instead');
+}
+
+// Pressed on the way up, a stomp is a spinning jump kick instead (playtest)
+{
+  const m = createMatch([hero], STAGE);
+  run(m, 3, once({ target: { jump: true } }));
+  assert.equal(me(run(m, 1, once({ kick: true }))).turn, 'spin', 'a stomp on the way up spins');
+}
+
+// Who did what (REUSE-SPEC.md §Power moves): a hit says who landed it and what kind it was, a chain counts hits in a row
+// until a miss, a ring-out credits the last hitter, and the power bar fills from all of it
+{
+  const { m, at } = swing('punch', 0.3), h = at.hits[0];
+  assert.deepEqual([h.by, h.chain, h.crowd, h.air], ['kid', 1, 1, false], 'a hit names its hitter, and is the first of a chain');
+  assert.equal(me(at).chain, 1, 'the snapshot carries the chain');
+  assert.equal(me(run(m, 30)).chain, 1, 'the chain holds while the dummy flies off');
+  const missed = run(m, 40, once({ punch: true }));
+  assert.equal(me(missed).chain, 0, 'a punch at nothing ends it');
+  const kid = m.fighters[0], d = m.fighters[1];
+  d.lastHit = { by: 'kid', at: m.tick };
+  Object.assign(d, { y: -5, onGround: false });
+  const out = run(m, 1);
+  assert.deepEqual(out.ringOuts.map((e) => [e.fighter, e.by]), [['dummy', 'kid']], 'a ring-out after a hit credits the hitter');
+  run(m, 6 * TICK_HZ);
+  Object.assign(d, { y: -5, onGround: false });
+  assert.equal(run(m, 1).ringOuts[0]?.by, null, 'a fall with nobody\'s hit for a while credits nobody');
+  kid.power = 0;
+  const filled = run(m, TICK_HZ);
+  assert.ok(near(me(filled).power, POWER.perSecond, 1e-6), 'the bar fills a little a second');
+}
+
+// A full bar turns a foe into a silly object for a while: it drops its donut and can't attack or grab
+{
+  const m = createMatch([hero, dummy], STAGE), [kid, d] = m.fighters, fire = once({ power: { kind: 'toy', on: 'dummy' } });
+  d.carrying = { ...LOOK };
+  let snap = run(m, 1, fire);
+  assert.equal(me(snap, 'dummy').toy, null, 'a bar that isn\'t full fires nothing');
+  kid.power = 1;
+  snap = run(m, 1, fire);
+  assert.ok(TOY.kinds.includes(me(snap, 'dummy').toy) && me(snap, 'dummy').carrying === null, 'a full one turns the dummy into a toy, and it drops its donut');
+  assert.deepEqual([snap.powers[0]?.fighter, snap.powers[0]?.on], ['kid', 'dummy'], 'says so');
+  assert.ok(me(snap).power < 0.01, 'and empties the bar');
+  snap = run(m, 1, once({ kick: true }, 'dummy'));
+  assert.equal(me(snap, 'dummy').move === 'kick', false, 'a toy can\'t attack');
+  snap = run(m, TOY.ticks);
+  assert.equal(me(snap, 'dummy').toy, null, 'and pops back after a while');
+}
+
+// A stomp hops up a little at the top of a jump, then steers onto a foe beside you, not only one right under you (playtest: you fell too fast to stomp anyone)
+for (const [gap, lands] of [[0.6, true], [1.5, false]]) {
+  const m = createMatch([hero, dummy], STAGE), x = DUMMY.x + 2 * R + gap;
+  Object.assign(m.fighters[0], { x, z: DUMMY.z });
+  let at = run(m, 1, once({ target: { jump: true } }));
+  while (at.fighters[0].vy > 0) at = run(m, 1);
+  const pressed = run(m, 1, once({ kick: true })), top = pressed.fighters[0].y, hits = [];
+  assert.equal(pressed.fighters[0].turn, 'flip', 'pressed at the top of the jump, it backflips');
+  let y = top;
+  for (let i = 0; i < 15; i++) {
+    const now = run(m, 1).fighters[0].y;
+    assert.ok(now >= y, `a stomp hops up, not down, before it dives (tick ${i + 1})`);
+    y = now;
+  }
+  assert.ok(y > top + 0.3, `high enough to flip in (${(y - top).toFixed(2)} m)`);
+  run(m, 60, () => ({}), (s) => hits.push(...s.hits));
+  assert.ok(!lands || hits.find((h) => h.move === 'stomp').fell > 0.2, 'and says how far it fell');
+  assert.equal(hits.some((h) => h.move === 'stomp' && h.target === 'dummy'), lands, `a stomp ${gap} m beside the dummy ${lands ? 'lands on it' : 'misses: out of reach'}`);
 }
 
 for (const [button, gap] of [['punch', 0.3], ['kick', 0.45]]) {

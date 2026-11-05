@@ -122,7 +122,7 @@ body.play #stage canvas { touch-action: none; }
 .moves #ready { background: conic-gradient(#ffd21a calc(var(--fill, 0) * 1turn), #fff 0); }
 .moves #ready.on { border-color: #2fae5b; border-width: 9px; }
 /* holding 🥊 with the Greathammer in hand fills its ring the same way while the path shows */
-.moves #punch.aiming { background: conic-gradient(#ffd21a calc(var(--fill, 0) * 1turn), #fff 0); }
+.moves #punch.aiming, .moves #kick.aiming { background: conic-gradient(#ffd21a calc(var(--fill, 0) * 1turn), #fff 0); }
 .moves button.pop { animation: pop 320ms ease-out; }
 @keyframes pop { from { transform: scale(0.2); } 60% { transform: scale(1.25); } to { transform: scale(1); } }
 .hold { position: absolute; right: min(56px, 5vmin); bottom: calc(2 * min(56px, 5vmin) + min(112px, 15vmin)); margin: 0;

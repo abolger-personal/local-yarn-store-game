@@ -1,5 +1,16 @@
 # To do
 
+- [ ] **0.0.8: the other dances and gymnastics as moves** (added 2026-11-04). The wuxia sweep worked (playtest:
+  "fun and entertaining", the sweep "a success"), so the rest of the dance lab comes into the fight the same way:
+  each a discoverable move, always unlocked, with a job, a way to do it, and its own look (REUSE-SPEC.md
+  §Discoverable moves). Ideas: the round-off or back tuck as an escape that backs you up, Uptown Funk as a taunt,
+  the Biles passes as big committed moves. Also: curved paths for trick shots (lob, bob, wave, spiral, one homing),
+  knockdowns beyond the sweep, and a tutorial for each move.
+- [ ] **Art pass: characters that look alive** (added 2026-11-04, from Audubon's Carolina Parrot plate). In a side-on
+  fighter they look vacant ("drugged"). First: heads that turn to the camera when idle and to the foe when fighting,
+  pupils leading; a glint in each eye. Then a contrasting ring round the eye, one hot accent colour around the face,
+  and patterning as one shared texture. Judge from the match camera in the species checker before the game.
+
 - [ ] **Twenty levels: four areas of five** (added 2026-11-03). Breakfast is the five-level tutorial area and
   has four; it needs a fifth, and three more areas need choosing and building. REUSE-SPEC.md §Forts, near
   "The breakfast stage is the tutorial stage". Every area's fifth level (5, 10, 15, 20) is a boss; ideas

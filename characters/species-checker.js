@@ -11,6 +11,7 @@ import {
 } from './npc.js';
 import { stepGlitter } from './glitter.js';
 import { randomTraits } from './visit.js';
+import { PAINT } from './paint.js';
 
 console.info('LYS build', BUILD);
 
@@ -503,6 +504,22 @@ function addSceneFolder() {
     .onChange((v) => (renderer.toneMapping = TONE_MAPPING[v]));
 }
 
+// BODIES.md §Painterly: a rig param, set on both slots; the knobs are shared uniforms, live
+function addPaintControls() {
+  const folder = gui.folders.find((f) => f._title === 'style') ?? gui.addFolder('style');
+  const style = { painterly: Boolean(activeSlot().params.painterly) };
+  folder.add(style, 'painterly').onChange((on) => {
+    for (const id of SLOTS) state.slots[id].params.painterly = on;
+    buildAll();
+    save();
+  });
+  folder.add(PAINT.bands, 'value', 2, 6, 1).name('paint bands');
+  folder.add(PAINT.brush, 'value', 0, 1, 0.01).name('brush strength');
+  folder.add(PAINT.light, 'value', 0.3, 1.6, 0.01).name('paint light');
+  folder.add(PAINT.fray, 'value', 0, 0.4, 0.01).name('ink fray');
+  folder.add(PAINT.feather, 'value', 0, 0.4, 0.01).name('feather rows');
+}
+
 function buildGui() {
   gui?.destroy();
   gui = new GUI({ title: 'species checker' });
@@ -511,6 +528,7 @@ function buildGui() {
   addTopControls(species);
   addMotionFolder();
   addSceneFolder();
+  addPaintControls();
   addSlotFolders(species, slot.params, rebuildActive);
   gui.onFinishChange(save);
 }

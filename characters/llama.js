@@ -278,6 +278,8 @@ export const llama = registerSpecies({
   coatBulge,
   coatColorKey: 'fleeceColor',
   randomise: randomiseInto,
+  // BODIES.md §Painterly
+  paint: { style: 'fur' },
   onPresetChange: applyFleecePreset,
   presetKey: 'fleecePreset',
   // The arms vanish against the fleece, so the ears carry the cheer.

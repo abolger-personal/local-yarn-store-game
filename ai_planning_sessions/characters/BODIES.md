@@ -108,6 +108,34 @@ Everything is judged at play distance: characters are ~150px tall.
   float off at extreme spread/lift. The ear pivots at its base. Ear shapes: `cone` (owl tufts) and
   `leaf` (a flattened ellipsoid: the mammal ear).
 
+## Painterly
+
+Built 2026-11-04, off by default (`painterly`, per character; the species checker's style folder, "painterly", set on both slots).
+`characters/paint.js`.
+
+- **Fur** (lion, llama), from Franz Marc's Blue Horse I: no highlights (roughness 1, sheen, specular and
+  clearcoat off, and the lighting replaced); light to shadow is a colour shift: the light falling on a
+  fragment (direct plus indirect diffuse, as a share of what the base colour gets) picks a place on a ramp
+  from a shadow colour (hue turned -0.22 rad, saturation x1.6, value x0.62) through the base to a light
+  colour (washed 55% toward white), in 3 soft bands. A brushstroke texture on the existing UVs (which run
+  round each sphere and capsule, so strokes follow the form) shakes the band edges and adds a faint value
+  streak. The llama gets fur too: its fleece is a broad pale mass, like the horse, and its scalloped fleece
+  geometry already gives the wool its edge; ink pooling would grey a cream fleece toward dirty, and a fray
+  on top of the scallops reads moth-eaten (the cute rule).
+- **Ink wash** (owl), from Ohara Koson's crow and Bada Shanren's Two Chicks: a ramp in the body colour's
+  own family (value x0.55 to 22% paler), darker where the ink pools toward the silhouette (N·V), faint
+  feather rows (a scallop texture, plumage only) and a frayed outline: near the rim (N·V under 2x `fray`)
+  plumage fragments are discarded on a brush-noise pattern. Alpha-test discard, not blending: no sorting,
+  one draw. Only the plumage frays (the owl's `feather` material); the body sphere under it never does, so a
+  fray opens only at the outline (worst case from the match camera: 59 of 2746 px, all within 2 px of the
+  outline). Merged, plumage is marked by its uv lifted by 2 whole tiles.
+- One shader variant per style (`customProgramCacheKey`), every painted felt material one family
+  (`paint-fur`, `paint-ink`), so a merged character is still one felt draw and the cast shares a material.
+  The knobs are shared uniforms (`PAINT`: bands, soft, brush, streak, light, pool, fray, feather), live in the
+  species checker's style folder. Cost: two 128x128 canvas textures for the whole cast (a grey pixel in
+  node), two or three texture reads a fragment, no extra meshes, draws or passes.
+- Off, the felt is exactly as before (same material, no shader hook).
+
 ## Tail
 
 - Every species has one, a chain of joints on the **chest** (rides the spine's lean and roll), leaving

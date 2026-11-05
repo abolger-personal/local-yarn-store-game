@@ -254,6 +254,8 @@ export const owl = registerSpecies({
   wingShape,
   coatColorKey: 'featherColor',
   randomise: randomiseInto,
+  // BODIES.md §Painterly
+  paint: { style: 'ink', plume: 'feather' },
   onPresetChange: applyFeatherPreset,
   presetKey: 'featherPreset',
 });

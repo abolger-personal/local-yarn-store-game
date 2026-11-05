@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeMotion, integrate, compose, tailStep, POSE_KEYS, POSES } from './motion.js';
+import { paintMaterial } from './paint.js';
 
 export const BUILD = '2026-09-26.8-tails';
 
@@ -96,6 +97,7 @@ export const BASE_PARAMS = Object.freeze({
   faceAccent:    false,
   faceAccentSize:  1.00,
   faceAccentColor: '',
+  painterly:     false,
 
   bodyColor:     '#a0a6ba',
   footColor:     '#e0a53c',
@@ -283,6 +285,7 @@ function sharedMaterial(source) {
     shared.vertexColors = true;
     shared.userData.family = family;
     shared.userData.shared = true;
+    if (source.userData.paint) paintMaterial(shared, source.userData.paint, false);
     sharedMaterials.set(family, shared);
   }
   return sharedMaterials.get(family);
@@ -986,10 +989,18 @@ export function createCharacter(P, species) {
   const ctx = { ...body, joints, materials, mat, addMaterial, params: P, species: kit, bulge,
                 motion: makeMotion(POSES.rest), groundOffset: 0, seatDrop: 0 };
   kit.buildKit(ctx, P);
+  if (P.painterly && kit.paint) paintCharacter(ctx, kit.paint);
   if (!P.partShadows) disableShadowCasting(body.root);
   if (P.mergeMeshes !== false) mergeCharacter(ctx);
   applyPose(ctx, P);
   return ctx;
+}
+
+/** BODIES.md §Painterly: every felt material of the character in the species' style; `plume` names its plumage. */
+function paintCharacter({ materials, mat }, { style, plume }) {
+  for (const material of materials) {
+    if (material.userData.family === 'felt') paintMaterial(material, style, material === mat[plume]);
+  }
 }
 
 function staticMeshes(node, out = []) {
@@ -1005,6 +1016,11 @@ function bakedGeometry(mesh, toJointSpace) {
   const local = new THREE.Matrix4().multiplyMatrices(toJointSpace, mesh.matrixWorld);
   const geometry = mesh.geometry.clone().applyMatrix4(local);
   for (const name of mesh.userData.dropOnMerge ?? []) geometry.deleteAttribute(name);
+  // BODIES.md §Painterly: merged, plumage is marked by uv lifted 2 (whole tiles, so the textures don't move)
+  if (mesh.material.userData.plume) {
+    const { uv } = geometry.attributes;
+    for (let i = 0; i < uv.count; i++) uv.setY(i, uv.getY(i) + 2);
+  }
   return paintGeometry(geometry, mesh.material.color);
 }
 

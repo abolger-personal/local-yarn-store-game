@@ -12,6 +12,7 @@ import {
 import { stepGlitter } from './glitter.js';
 import { randomTraits } from './visit.js';
 import { aimGameCamera } from '../spinoff/stage.js';
+import { PAINT } from './paint.js';
 
 console.info('LYS build', BUILD);
 
@@ -28,6 +29,7 @@ const STYLE_SWITCHES = Object.freeze([
   { key: 'eyeGlint', name: 'eye glint' },
   { key: 'eyeRing', name: 'eye ring' },
   { key: 'faceAccent', name: 'face accent' },
+  { key: 'painterly', name: 'painterly' },
 ]);
 const STYLE = Object.freeze(Object.fromEntries(STYLE_SWITCHES.map(({ key }) => [key, BASE_PARAMS[key]])));
 const STORE_KEY = 'lys.speciesChecker.v1';
@@ -534,6 +536,15 @@ function addSceneFolder() {
     .onChange((v) => (renderer.toneMapping = TONE_MAPPING[v]));
 }
 
+// BODIES.md §Painterly: the knobs are shared uniforms, live
+function addPaintKnobs(folder) {
+  folder.add(PAINT.bands, 'value', 2, 6, 1).name('paint bands');
+  folder.add(PAINT.brush, 'value', 0, 1, 0.01).name('brush strength');
+  folder.add(PAINT.light, 'value', 0.3, 1.6, 0.01).name('paint light');
+  folder.add(PAINT.fray, 'value', 0, 0.4, 0.01).name('ink fray');
+  folder.add(PAINT.feather, 'value', 0, 0.4, 0.01).name('feather rows');
+}
+
 /** @param {{ key: string, live?: boolean }} row */
 function setStyle({ key, live }) {
   for (const id of SLOTS) state.slots[id].params[key] = state.style[key];
@@ -563,6 +574,7 @@ function addStyleFolder() {
   for (const row of STYLE_SWITCHES) folder.add(state.style, row.key).name(row.name).onChange(() => setStyle(row));
   folder.add(state, 'lookAtOther').name('look at the other slot').onChange(save);
   folder.add(state, 'matchCamera').name('match camera').onChange(setMatchCamera);
+  addPaintKnobs(folder);
 }
 
 function buildGui() {

@@ -421,6 +421,8 @@ export const lion = registerSpecies({
   coatBulge,
   coatColorKey: 'maneColor',
   randomise: randomiseInto,
+  // BODIES.md §Painterly
+  paint: { style: 'fur' },
   onPresetChange: applyManePreset,
   presetKey: 'manePreset',
   // The arms vanish against the mane, so the tail carries the cheer: lifted clear of the body.

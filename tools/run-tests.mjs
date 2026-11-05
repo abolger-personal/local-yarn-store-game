@@ -15,6 +15,7 @@ const SLOW = [
 
 const FAST = [
   'characters/motion.test.mjs',
+  'characters/paint.test.mjs',
   'characters/glitter.test.mjs',
   'characters/visit.test.mjs',
   'characters/guestbook.test.mjs',

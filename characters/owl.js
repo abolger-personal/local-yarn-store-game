@@ -1,8 +1,10 @@
+import * as THREE from 'three';
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
   addConeEars, addEyes, addTail, createCharacter, deriveCoatColor,
   feltMaterial, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh, tailBaseHeight,
 } from './npc.js';
+import { MOUTHS, addMouth, mouthFor, named, onFront, softGeometry } from './faces.js';
 
 export {
   TONE_MAPPING, POSES, POSE_KEYS, GEO_DETAIL, NAMES,
@@ -27,6 +29,8 @@ export const DEFAULT_PARAMS = {
   tuftTilt:      0.800,
   beakSize:      0.090,
   beakColor:     '#e0a53c',
+  shapedFaces:   false,
+  mouth:         'smile',
   wingLength:    0.349,
   wingWidth:     0.200,
   wingDepth:     0.360,
@@ -149,7 +153,44 @@ function addTorsoPlumage(ctx, P) {
   if (shell) ctx.chest.add(shell);
 }
 
+// BODIES.md §Shaped faces: a short beak whose blunt tip curls gently down, a small lower mandible, a soft cere
+const BEAK = Object.freeze({ wide: 0.50, tall: 0.42, length: 1.45, buried: 0.60, curl: 0.85, rings: 6 });
+
+const curledBeak = () => {
+  const g = new THREE.CylinderGeometry(0.18, 1, 1, 12, BEAK.rings), pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) pos.setZ(i, pos.getZ(i) + BEAK.curl * (pos.getY(i) + 0.5) ** 3);
+  g.translate(0, 0.5, 0).computeVertexNormals();
+  return g;
+};
+let beakGeometry = null;
+
+// the mandible drops for an 'o', tilts for a smug one
+const MANDIBLE = Object.freeze({ smile: [0, 0], smug: [0, 0.18], deadpan: [0, 0], o: [0.14, 0] });
+
+function addShapedBeak(ctx, P) {
+  const s = P.beakSize, y = -P.headRadius * 0.10, head = { at: [0, 0, 0], size: headScale(P) };
+  const skin = onFront(head, 0, y)[2];
+  beakGeometry ??= curledBeak();
+  ctx.head.add(named(part(beakGeometry, ctx.mat.beak, {
+    pos: [0, y, skin - s * BEAK.buried], scale: [s * BEAK.wide, s * BEAK.length, s * BEAK.tall], rot: [Math.PI * 0.5, 0, 0],
+  }), 'beak'));
+  const [drop, tilt] = MANDIBLE[P.mouth] ?? MANDIBLE.smile;
+  ctx.head.add(named(part(softGeometry(), ctx.mat.beak, {
+    pos: onFront(head, 0, y - s * (0.40 + drop)), scale: [s * 0.36, s * 0.20, s * 0.42], rot: [0, 0, tilt],
+  }), 'mandible'));
+  ctx.head.add(named(part(softGeometry(), ctx.mat.beak, {
+    pos: onFront(head, 0, y + s * 0.42, -s * 0.14), scale: [s * 0.55, s * 0.26, s * 0.32],
+  }), 'cere'));
+  addMouth(ctx.head, P, {
+    on: head, width: s * 1.6, drop: -y + s * 0.30, material: ctx.addMaterial(feltMaterial(P, P.pupilColor)), dot: [s * 0.2, s * 0.07, s * 0.35],
+  });
+}
+
 function addBeak(ctx, P) {
+  if (P.shapedFaces) {
+    addShapedBeak(ctx, P);
+    return;
+  }
   ctx.head.add(part(GEO.cone, ctx.mat.beak, {
     pos: [0, -P.headRadius * 0.10, P.headRadius * 0.86],
     scale: [P.beakSize, P.beakSize * 2.1, P.beakSize],
@@ -210,6 +251,7 @@ export function randomiseInto(P) {
   P.tailLength = Math.min(P.tailLength, 0.9 * tailBaseHeight(P));
   applyFeatherPreset(P, Math.floor(Math.random() * FEATHER_PRESETS.length));
   P.featherColor = deriveCoatColor(P.bodyColor);
+  P.mouth = mouthFor(P);
   return P;
 }
 
@@ -220,7 +262,7 @@ export function randomParams(overrides = {}) {
 export const OWL_GUI = Object.freeze({
   'face & tufts': [
     ['tuftSize', 0.01, 0.14], ['tuftSpread', 0.1, 1.1], ['tuftTilt', -1.5, 1.5],
-    ['beakSize', 0.01, 0.18], ['beakColor', 'color'],
+    ['beakSize', 0.01, 0.18], ['beakColor', 'color'], ['mouth', MOUTHS],
   ],
   feathers: [
     ['feathers', 'bool'], ['featherColor', 'color'],

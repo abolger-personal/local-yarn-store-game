@@ -30,8 +30,9 @@ const STYLE_SWITCHES = Object.freeze([
   { key: 'eyeRing', name: 'eye ring' },
   { key: 'faceAccent', name: 'face accent' },
   { key: 'painterly', name: 'painterly' },
+  { key: 'shapedFaces', name: 'shaped faces' },
 ]);
-const STYLE = Object.freeze(Object.fromEntries(STYLE_SWITCHES.map(({ key }) => [key, BASE_PARAMS[key]])));
+const STYLE = Object.freeze(Object.fromEntries(STYLE_SWITCHES.map(({ key }) => [key, BASE_PARAMS[key] ?? false])));
 const STORE_KEY = 'lys.speciesChecker.v1';
 
 const state = {

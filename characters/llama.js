@@ -3,6 +3,7 @@ import {
   addEars, addEyes, addTail, createCharacter, deriveCoatColor, touchingScallopSize,
   feltMaterial, POSES, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh,
 } from './npc.js';
+import { MOUTHS, addMouth, mouthFor, named, softGeometry } from './faces.js';
 
 export const DEFAULT_PARAMS = {
   ...BASE_PARAMS,
@@ -30,6 +31,8 @@ export const DEFAULT_PARAMS = {
   muzzleColor:   '#efe6d5',
   noseColor:     '#141013',
   noseSize:      0.60,
+  shapedFaces:   false,
+  mouth:         'smile',
   earLength:     0.140,
   earWidth:      0.032,
   earFlatten:    0.45,
@@ -155,10 +158,32 @@ function addMuzzle(ctx, P) {
     scale: [r, len, r * 0.92],
     rot: [Math.PI * 0.5, 0, 0],
   }));
+  if (P.shapedFaces) {
+    addLips(ctx, P, { y, end: start + len, r });
+    return;
+  }
   ctx.head.add(part(GEO.sphere, ctx.mat.muzzle, {
     pos: [0, y, start + len],
     scale: [r, r * 0.96, r * 0.80],
   }));
+}
+
+// BODIES.md §Shaped faces: two soft lobes with the llama's cleft between, a jaw a hair further forward, a mouth
+const LIP = Object.freeze({ out: 0.38, w: 0.64, h: 0.84, d: 0.78 });
+const JAW = Object.freeze({ down: 0.66, w: 0.50, h: 0.32, d: 0.55, underbite: 0.04 });
+
+function addLips(ctx, P, { y, end, r }) {
+  for (const side of [-1, 1]) {
+    ctx.head.add(named(part(softGeometry(), ctx.mat.muzzle, {
+      pos: [side * r * LIP.out, y, end], scale: [r * LIP.w, r * LIP.h, r * LIP.d],
+    }), 'lip'));
+  }
+  const jaw = {
+    at: [0, y - r * JAW.down, end + r * (LIP.d + JAW.underbite - JAW.d)],
+    size: [r * JAW.w, r * JAW.h, r * JAW.d],
+  };
+  ctx.head.add(named(part(softGeometry(), ctx.mat.muzzle, { pos: jaw.at, scale: jaw.size }), 'jaw'));
+  addMouth(ctx.head, P, { on: jaw, width: r * 0.6, drop: -r * 0.10, material: ctx.mat.nose });
 }
 
 function addNose(ctx, P) {
@@ -232,6 +257,7 @@ export function randomiseInto(P) {
   randomiseBase(P, RANDOM_RANGES);
   applyFleecePreset(P, Math.floor(Math.random() * FLEECE_PRESETS.length));
   P.fleeceColor = deriveCoatColor(P.bodyColor);
+  P.mouth = mouthFor(P);
   return P;
 }
 
@@ -242,7 +268,7 @@ export function randomParams(overrides = {}) {
 export const LLAMA_GUI = Object.freeze({
   'muzzle & ears': [
     ['muzzleLength', 0.05, 0.40], ['muzzleThick', 0.02, 0.14], ['muzzleDrop', 0, 0.8],
-    ['muzzleColor', 'color'], ['noseColor', 'color'], ['noseSize', 0.2, 1.4],
+    ['muzzleColor', 'color'], ['noseColor', 'color'], ['noseSize', 0.2, 1.4], ['mouth', MOUTHS],
     ['earLength', 0.03, 0.30], ['earWidth', 0.008, 0.07], ['earFlatten', 0.15, 1.0],
     ['earSpread', 0.1, 0.9], ['earTilt', -0.6, 0.9],
   ],

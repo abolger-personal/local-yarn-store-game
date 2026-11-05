@@ -5,6 +5,7 @@ import {
   lowestResting, phaseStep, stepMotion, walkGain, walkLayer, walkPhase,
 } from '../characters/npc.js';
 import { deriveManeColor } from '../characters/lion.js';
+import { MOUTHS } from '../characters/faces.js';
 import { CRAFTS, STITCHES_BY_CRAFT, defaultItem, dress, undress, usualTool } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import '../characters/llama.js';
@@ -123,6 +124,8 @@ export function randomFighter(rng = Math.random, species = pickOf(SPECIES, rng))
   return setFur(f, pickOf(FUR, rng).hex);
 }
 
+const oneOf = (list, v, fallback) => (list.includes(v) ? v : fallback);
+
 function readParams(species, raw) {
   const { defaults } = getSpecies(species), out = structuredClone(defaults);
   if (!raw || typeof raw !== 'object') return out;
@@ -132,7 +135,8 @@ function readParams(species, raw) {
     else if (typeof d === 'boolean' && typeof v === 'boolean') out[k] = v;
     else if (typeof d === 'string' && HEX.test(d) && HEX.test(v)) out[k] = v;
   }
-  if (NAMES.includes(raw.name)) out.name = raw.name;
+  out.name = oneOf(NAMES, raw.name, out.name);
+  out.mouth = oneOf(MOUTHS, raw.mouth, out.mouth);
   return out;
 }
 

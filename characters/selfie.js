@@ -393,7 +393,8 @@ export function seenShare(built, camera, parts, samples = 30, look = idLook(buil
   return n ? seen / n : 0;
 }
 
-const eyesOf = (built) => built.joints.eye.flatMap(({ node }) => (node.visible ? node.children.filter((c) => c.isMesh) : []));
+const meshesIn = (node) => { const out = []; node.traverse((c) => { if (c.isMesh) out.push(c); }); return out; };
+const eyesOf = (built) => built.joints.eye.flatMap(({ node }) => (node.visible ? meshesIn(node) : []));
 
 function frame(built, camera, style, subject) {
   applyPose(built, style.pose);

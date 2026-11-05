@@ -7,6 +7,7 @@ const LIMIT_MS = 2000;
 const SLOW = [
   ['spinoff/generate.test.mjs', { SEEDS: '20' }],
   'characters/rig.test.mjs',
+  'characters/face.test.mjs',
   'characters/craft-anim.test.mjs',
   'characters/garments.test.mjs',
   'characters/store/walk.test.mjs',

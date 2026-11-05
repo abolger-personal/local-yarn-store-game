@@ -19,6 +19,9 @@ export const DEFAULT_PARAMS = {
 
   headYawMax:    4.60,
 
+  // BODIES.md §Face
+  faceAccentSize:  1.00,
+
   tuftSize:      0.049,
   tuftSpread:    0.694,
   tuftTilt:      0.800,
@@ -85,6 +88,8 @@ export const RANDOM_RANGES = Object.freeze({
   wingDepth:   [0.280, 0.440],
   beakSize:    [0.070, 0.110],
   tailLength:  [0.160, 0.450],
+  eyeRingWidth: [0.200, 0.450],
+  faceAccentSize: [0.70, 1.30],
 });
 
 const headScale = (P) => [P.headRadius * 1.06, P.headRadius, P.headRadius * 0.98];

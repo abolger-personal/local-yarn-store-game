@@ -108,6 +108,49 @@ Everything is judged at play distance: characters are ~150px tall.
   float off at extreme spread/lift. The ear pivots at its base. Ear shapes: `cone` (owl tufts) and
   `leaf` (a flattened ellipsoid: the mammal ear).
 
+## Look-at
+
+Built 2026-11-04 (the art pass: "less drugged"; Audubon's Carolina Parrot plate: body side on, head 3/4 to
+the viewer so both eyes show).
+
+- **Decided.** `built.lookTarget` (a world point, or null) and `lookAt` (a param, on by default). Inside
+  `stepMotion`, after the pose and its layers, the head turns toward the target: yaw clamped to 0.8 rad
+  (3/4 on to a side-on body), pitch to 0.35, eased at 5/s. The pupils take whatever the head does not
+  (clamped to 1 rad, eased at 18/s), so they glance ahead of a turn and finish it when the head is clamped.
+- **Decided: blend out, per channel, rather than add with a clamp.** A target pose that sets `headYaw` or
+  `headTilt` itself (a dance's head turn, the full-bag head shake) blends the yaw out over the first 0.1 rad
+  it sets; one that sets `headPitch` (hurt, the flips) blends the pitch out. Added on top, a 0.45 dance
+  turn plus a 0.8 look would land somewhere neither meant. Off its feet (a flip, a trip) the look fades with
+  how far the body is from upright.
+- A pupil slides over its white, held on the white's surface, only as far as the white shows above the
+  skin in that direction (sampled at build), so it never goes under the skull. Each pupil is a joint (a
+  bone when merged), so it moves and blinks with its eye after the merge.
+- The spinoff's tablet picks the target from the snapshot (`play.js lookTarget`): the fighter it traded a
+  hit with for 1.5 s (HitEvent `by`/`target`), the nearest foe while it punches, kicks, sweeps or winds up,
+  else the camera. No sim or network change.
+- Measured from the match camera (species checker "match camera", 800x500 px): head 90° from the camera
+  turns to 41°; eye pixels owl 104+31 → 168+106, llama 159+41 → 175+87, lion 74+18 → 113+65
+  (`face.test.mjs`).
+
+## Face
+
+Built 2026-11-04 (the same plate: a pale ring round each eye inside a hot face, a glint in each eye).
+
+- **Glint** (`eyeGlint`): a white glassy dot up and out on each pupil, a child of the pupil so it moves with
+  it, in the eye family (no new draw). The head turns to the camera, so the pupil's front is lit.
+- **Eye ring** (`eyeRing`, `eyeRingWidth` in eye radii, `eyeRingColor`): a band of skin round the eye's
+  white, lifted 6 mm off the skull. Blank colour = derived: dark on a face lighter than L* 70, else pale, in
+  the face's hue. Its inner edge is solved at build where it clears the white, so it frames the eye without
+  covering it.
+- **Face accent** (`faceAccent`, `faceAccentSize`, `faceAccentColor`): a mask round the eyes, 3 mm off the
+  skull, under the ring. Blank colour = derived from the fur: the first hot hue (scarlet, orange, amber,
+  pink) at least 0.15 round from the fur's hue, saturated. The owl's reads as a facial disc. Cheek blush was
+  tried on the lion and sat hidden under the muzzle and mane from the match camera (0 px), so every species
+  wears the mask, sized per species (owl 1.0, llama 0.8 on its big eyes, lion 1.0 eye radii).
+- Ring and accent are patches of a sphere around the skin point under the eye, scaled onto the head
+  ellipsoid: they lie on the skull at any head shape, are felt (merged, no new draw), and a hat brim
+  presses them like the skull.
+
 ## Tail
 
 - Every species has one, a chain of joints on the **chest** (rides the spine's lean and roll), leaving

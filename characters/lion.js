@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
   addEars, addEyes, addTail, createCharacter, hsl, pick, rand, tailBaseHeight, touchingScallopSize,
-  feltMaterial, LIMB_TAPER, POSES, part, randomiseBase, registerSpecies, scallopAngles,
+  feltMaterial, lightness, LIMB_TAPER, POSES, part, randomiseBase, registerSpecies, scallopAngles,
   scallopBases, scallopGeometry, scallopMesh,
 } from './npc.js';
 
@@ -33,6 +33,9 @@ export const DEFAULT_PARAMS = {
   footColor:     '#6b5336',
 
   headYawMax:    1.30,
+
+  // BODIES.md §Face
+  faceAccentSize:  1.00,
 
   shoulderOut:   0.88,
   shoulderLift:  0.32,
@@ -134,6 +137,8 @@ export const RANDOM_RANGES = Object.freeze({
   eyeRadius:    [0.058, 0.082],
   eyeSpread:    [0.360, 0.480],
   eyeFront:     [0.620, 0.740],
+  eyeRingWidth: [0.200, 0.450],
+  faceAccentSize: [0.80, 1.30],
 });
 
 const HEAD_SHAPE = Object.freeze([1.04, 0.94, 1.00]);
@@ -307,11 +312,7 @@ function solveSnout(P) {
   P.muzzleStart = (front - MIN_MUZZLE) / P.headRadius;
 }
 
-export function lightness(hex) {
-  const c = new THREE.Color(hex);
-  const y = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-  return y > 216 / 24389 ? 116 * Math.cbrt(y) - 16 : (24389 / 27) * y;
-}
+export { lightness };
 
 // BODIES.md §Lion: mane colour
 const MIN_MANE_CONTRAST = 28;

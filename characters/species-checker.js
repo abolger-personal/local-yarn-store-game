@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { roomEnvironment } from '../inventory/room-environment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
-  TONE_MAPPING, POSES, GEO_DETAIL, BUILD, MOTION_DEFAULTS,
+  TONE_MAPPING, POSES, GEO_DETAIL, BUILD, MOTION_DEFAULTS, BASE_PARAMS,
   createCharacter, applyPose, setViewMode, disposeCharacter,
   setGeometryDetail, getSpecies, speciesList, slugify, shareRandomParams,
   stepMotion, resetMotion, motionOf, walkPhase, walkLayer, walkGain, phaseStep,
@@ -11,6 +11,7 @@ import {
 } from './npc.js';
 import { stepGlitter } from './glitter.js';
 import { randomTraits } from './visit.js';
+import { aimGameCamera } from '../spinoff/stage.js';
 
 console.info('LYS build', BUILD);
 
@@ -19,6 +20,16 @@ import './llama.js';
 import './lion.js';
 
 const SLOTS = ['A', 'B'];
+
+// BODIES.md §Face, §Look-at: one row per style switch, a boolean rig param set on both slots (default from
+// BASE_PARAMS); `live` switches take effect on the next frame, the rest rebuild the slots
+const STYLE_SWITCHES = Object.freeze([
+  { key: 'lookAt', name: 'look-at', live: true },
+  { key: 'eyeGlint', name: 'eye glint' },
+  { key: 'eyeRing', name: 'eye ring' },
+  { key: 'faceAccent', name: 'face accent' },
+]);
+const STYLE = Object.freeze(Object.fromEntries(STYLE_SWITCHES.map(({ key }) => [key, BASE_PARAMS[key]])));
 const STORE_KEY = 'lys.speciesChecker.v1';
 
 const state = {
@@ -38,6 +49,9 @@ const state = {
   repeat: true,
   side: false,
   slow: 1,
+  style: { ...STYLE },
+  lookAtOther: false,
+  matchCamera: false,
   slots: {
     A: { speciesId: 'owl', params: null },
     B: { speciesId: 'llama', params: null },
@@ -98,6 +112,9 @@ function slotX(id) {
   return (id === 'A' ? -1 : 1) * state.spacing;
 }
 
+// the match camera sees fighters side on, facing each other (spinoff/play.js placeFighter)
+const slotYaw = (id) => (state.matchCamera ? (id === 'A' ? 1 : -1) * Math.PI / 2 : 0);
+
 function measureHeight(root) {
   const box = new THREE.Box3().setFromObject(root);
   return Math.max(box.max.y - box.min.y, 0.01);
@@ -114,8 +131,10 @@ function buildSlot(id) {
   disposeSlot(id);
   const slot = state.slots[id];
   slot.params ??= freshParams(slot.speciesId);
+  Object.assign(slot.params, state.style);
   const character = createCharacter(slot.params, slot.speciesId);
   character.root.position.x = slotX(id);
+  character.root.rotation.y = slotYaw(id);
   setViewMode(character.root, state.view);
   scene.add(character.root);
   built[id] = character;
@@ -233,6 +252,7 @@ function save() {
     linkShared: state.linkShared,
     play: state.play, speed: state.speed, idle: state.idle, walk: state.walk,
     repeat: state.repeat, side: state.side, slow: state.slow,
+    style: state.style, lookAtOther: state.lookAtOther, matchCamera: state.matchCamera,
     slots: Object.fromEntries(SLOTS.map((id) => [id, {
       speciesId: state.slots[id].speciesId,
       params: state.slots[id].params,
@@ -258,6 +278,10 @@ function load() {
     Object.assign(state, saved, { slots: state.slots });
     if (!(state.pose in POSES)) state.pose = 'rest';
     if (!(state.slow >= 1 && state.slow <= 10)) state.slow = 1;
+    state.style = { ...STYLE };
+    for (const k of Object.keys(STYLE)) if (typeof saved.style?.[k] === 'boolean') state.style[k] = saved.style[k];
+    state.lookAtOther = saved.lookAtOther === true;
+    state.matchCamera = saved.matchCamera === true;
     for (const id of SLOTS) restoreSlot(id, saved.slots?.[id]);
   } catch { /* corrupt save, fall back to defaults */ }
 }
@@ -389,8 +413,15 @@ function stepSlot(id, dt) {
   slot.phase = (slot.phase + phaseStep(speed * dt, speed, L, slot.opts)) % 1;
   stepMotion(character, d ? d.pose : POSES[state.pose], dt, slot.opts,
     walking ? (out) => walkLayer(out, w, gain, slot.opts) : null);
-  if (d) placeDancer(character, d, { x: slotX(id) - pass / 2, yaw: state.side ? Math.PI / 2 : 0 });
+  if (d) placeDancer(character, d, { x: slotX(id) - pass / 2, yaw: state.side ? Math.PI / 2 : slotYaw(id) });
   slot.glitter = stepGlitter(slot.glitter, character, slot.perf, d, dt);
+  character.lookTarget = lookTargetFor(id, slot);
+}
+
+function lookTargetFor(id, slot) {
+  const other = built[id === 'A' ? 'B' : 'A'];
+  if (!state.lookAtOther || !other) return camera.position;
+  return other.joints.head.getWorldPosition(slot.lookAt ??= new THREE.Vector3());
 }
 
 function stepAll(dt) {
@@ -426,14 +457,14 @@ function resetPlacement(id) {
   const { root } = built[id];
   root.position.x = slotX(id);
   root.position.z = 0;
-  root.rotation.set(0, 0, 0);
+  root.rotation.set(0, slotYaw(id), 0);
 }
 
 function addControl(folder, params, entry, onChange) {
   const [key, a, b, step] = entry;
   if (!(key in params)) return;
   if (a === 'color') folder.addColor(params, key).onChange(onChange);
-  else if (a === 'bool') folder.add(params, key).onChange(onChange);
+  else if (a === 'bool' || a === 'text') folder.add(params, key).onChange(onChange);
   else if (Array.isArray(a)) folder.add(params, key, a).onChange(onChange);
   else folder.add(params, key, a, b, step ?? 0.001).onChange(onChange);
 }
@@ -503,12 +534,44 @@ function addSceneFolder() {
     .onChange((v) => (renderer.toneMapping = TONE_MAPPING[v]));
 }
 
+/** @param {{ key: string, live?: boolean }} row */
+function setStyle({ key, live }) {
+  for (const id of SLOTS) state.slots[id].params[key] = state.style[key];
+  if (!live) buildAll();
+  save();
+}
+
+const MATCH_AIM = new THREE.Vector3(0, 0.8, -0.1);
+
+/** Frames both slots as spinoff/stage.js aimGameCamera frames a match, its 30° lens and all. */
+function setMatchCamera(on) {
+  state.matchCamera = on;
+  SLOTS.forEach((id) => built[id] && resetPlacement(id));
+  camera.fov = on ? 30 : 35;
+  camera.filmOffset = 0;
+  camera.updateProjectionMatrix();
+  if (on) {
+    aimGameCamera(camera, MATCH_AIM);
+    controls.target.copy(MATCH_AIM);
+    controls.update();
+  } else frameAll();
+  save();
+}
+
+function addStyleFolder() {
+  const folder = gui.addFolder('style');
+  for (const row of STYLE_SWITCHES) folder.add(state.style, row.key).name(row.name).onChange(() => setStyle(row));
+  folder.add(state, 'lookAtOther').name('look at the other slot').onChange(save);
+  folder.add(state, 'matchCamera').name('match camera').onChange(setMatchCamera);
+}
+
 function buildGui() {
   gui?.destroy();
   gui = new GUI({ title: 'species checker' });
   const slot = activeSlot();
   const species = getSpecies(slot.speciesId);
   addTopControls(species);
+  addStyleFolder();
   addMotionFolder();
   addSceneFolder();
   addSlotFolders(species, slot.params, rebuildActive);
@@ -567,7 +630,8 @@ renderer.toneMappingExposure = state.exposure;
 buildAll();
 setView(state.view);
 buildGui();
-frameAll();
+if (state.matchCamera) setMatchCamera(true);
+else frameAll();
 
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.update().getDelta(), 0.1);

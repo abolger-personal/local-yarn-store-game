@@ -182,8 +182,10 @@ for (const id of speciesIds()) {
   }
   undress(built);
   const face = [];
+  // the eye ring and face accent are skin (BODIES.md §Face): a brim presses them as it does the skull
+  const skin = new Set(['eyeRing', 'faceAccent']);
   head.traverse((o) => {
-    if (o.isMesh && o !== mane && head.worldToLocal(new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3())).z > 0.05) face.push([o, o.geometry]);
+    if (o.isMesh && o !== mane && !skin.has(o.name) && head.worldToLocal(new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3())).z > 0.05) face.push([o, o.geometry]);
   });
   for (const silhouette of GARMENTS.hat.silhouettes) {
     dress(built, { hat: item('hat', { silhouette, fit: 1 }) });
@@ -1530,7 +1532,7 @@ for (const id of speciesIds()) for (const silhouette of GARMENTS.sweater.silhoue
     const made = built.garments.filter((g) => g.userData.worn.includes(type));
     const madeSeen = seenShare(built, cam, made, 120);
     assert.ok(madeSeen > 0.15, `${id}: ${(madeSeen * 100).toFixed(0)}% of the ${what} can be seen in its selfie`);
-    const eyes = built.joints.eye.flatMap(({ node }) => node.children.filter((c) => c.isMesh));
+    const eyes = built.joints.eye.flatMap(({ node }) => { const out = []; node.traverse((c) => { if (c.isMesh) out.push(c); }); return out; });
     const eyesSeen = seenShare(built, cam, eyes, 120);
     assert.ok(eyesSeen > (shot ? 0.25 : 0.3), `${id} ${what}: ${(eyesSeen * 100).toFixed(0)}% of the eyes can be seen in the selfie`);
     for (const { node } of shot?.behind ? [] : built.joints.eye) {

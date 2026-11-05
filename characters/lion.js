@@ -34,6 +34,9 @@ export const DEFAULT_PARAMS = {
 
   headYawMax:    1.30,
 
+  // BODIES.md §Face
+  faceAccentSize:  1.00,
+
   shoulderOut:   0.88,
   shoulderLift:  0.32,
   clampArmOut:   true,
@@ -134,6 +137,8 @@ export const RANDOM_RANGES = Object.freeze({
   eyeRadius:    [0.058, 0.082],
   eyeSpread:    [0.360, 0.480],
   eyeFront:     [0.620, 0.740],
+  eyeRingWidth: [0.200, 0.450],
+  faceAccentSize: [0.80, 1.30],
 });
 
 const HEAD_SHAPE = Object.freeze([1.04, 0.94, 1.00]);

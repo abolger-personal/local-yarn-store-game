@@ -2,6 +2,16 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
+## 0.0.8
+
+### Characters that look alive
+- **They look at you.** Standing about, a fighter turns its head toward you, so both eyes show; while it
+  punches or kicks it looks at the bad guy it is going for, and after a hit it looks at whoever it traded
+  the hit with. The eyes move a moment before the head does.
+- **A glint in every eye**, and **a ring round each eye** in a colour that stands out from the face.
+- **A bright face**: a hot-coloured patch round the eyes (red, orange, amber or pink, picked to stand out
+  from the fur).
+
 ## 0.0.7 — 2026-11-04: Tricks, trick shots and the sweep
 
 ### Fighting

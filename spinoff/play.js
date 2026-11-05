@@ -49,8 +49,8 @@ const [net] = await Promise.all([joining, warmUp(...(prebuilt.me ? [prebuilt.me.
 const level = net?.start ?? asked, ground = groundOf(level.stage);
 const ME = net?.me ?? 'me';
 const CAMERA = { xMin: ground.x0 + 3, xMax: ground.x1 - 3 };
-const TIMERS = { squash: 0.22, no: 0.6, joy: 0.9, pop: 0.35, pulse: 0.45, wobble: 0.35, hop: 0.4, land: 0.5, pad: 0.45 };
-const FIGHTER_TIMERS = ['squash', 'no', 'joy', 'pop', 'pulse', 'land'];
+const TIMERS = { foe: 1.5, squash: 0.22, no: 0.6, joy: 0.9, pop: 0.35, pulse: 0.45, wobble: 0.35, hop: 0.4, land: 0.5, pad: 0.45 };
+const FIGHTER_TIMERS = ['foe', 'squash', 'no', 'joy', 'pop', 'pulse', 'land'];
 // REUSE-SPEC.md §Stages and difficulty are separate: on a spongy stage every landing springs
 const SPONGY = (level.stage.bounce ?? 1) > 1;
 const NONE = Object.freeze([]);
@@ -265,8 +265,28 @@ function waiting(m, f) {
   return true;
 }
 
-/** @param {FighterState} f */
-function drawFighter(m, f, dt, tick) {
+const ATTACKS = new Set(['punch', 'kick', 'sweep', 'charge']);
+/** The fighter `id`, else the nearest foe of `f` in play when `attacking`, else null; a plain loop, as it runs every frame. @param {FighterState} f */
+function foeOf(f, all, id, attacking) {
+  let best = null, far = Infinity;
+  for (const o of all) {
+    if (o.id === id) return o;
+    const d = attacking && o.team !== f.team && !o.respawn ? Math.hypot(o.x - f.x, o.z - f.z) : Infinity;
+    if (d < far) { best = o; far = d; }
+  }
+  return best;
+}
+
+/** BODIES.md §Look-at: at whoever a fighter just traded a hit with, at the nearest foe while it attacks, else at us.
+ * @param {FighterState} f @param {Snapshot} snap */
+function lookTarget(m, f, snap) {
+  const foe = foeOf(f, snap.fighters, m.t.foe > 0 ? m.foe : null, ATTACKS.has(f.move));
+  return foe ? (m.lookAt ??= new THREE.Vector3()).set(foe.x, foe.y + foe.height * 0.8, foe.z) : camera.position;
+}
+
+/** @param {FighterState} f @param {Snapshot} snap */
+function drawFighter(m, f, dt, snap) {
+  const { tick } = snap;
   if (waiting(m, f)) return;
   tickDown(m.t, FIGHTER_TIMERS, dt);
   bounces(m, f);
@@ -276,6 +296,7 @@ function drawFighter(m, f, dt, tick) {
   // the shot is the trick, so neither the wind-up nor its swing shows the trick of its own (playtest: two atomic balls)
   m.built.noTrick = f.move === 'charge' || Boolean(f.shooting);
   m.built.spring = sweep && SWEEP;
+  m.built.lookTarget = lookTarget(m, f, snap);
   stepFighter(m.built, dt, sweep ? sweep.d.pose : poseOf(m, f), speed, strike);
   danceBody(m, sweep, dt);
   carry(m, f.carrying);
@@ -529,7 +550,7 @@ function drawShot(m, t) {
 function draw(snap, dt) {
   frame++;
   now += dt;
-  for (const f of snap.fighters) drawFighter(fighters.get(f.id), f, dt, snap.tick);
+  for (const f of snap.fighters) drawFighter(fighters.get(f.id), f, dt, snap);
   sync(donuts, snap.donuts, newLoose, drawLoose, dt);
   sync(bricks, snap.bricks, newBrick, drawBrick, dt);
   sync(piles, (snap.piles ?? NONE).map((p) => ({ ...p, id: p.owner })), newPile, drawPile, dt);
@@ -563,6 +584,9 @@ function onHit(h, snap) {
   if (h.on === 'brick') { brickHit(h); return; }
   const f = snap.fighters.find((o) => o.id === h.target), m = fighters.get(h.target);
   if (!f || !m) return;
+  const by = fighters.get(h.by);
+  if (by) Object.assign(by, { foe: h.target }).t.foe = 1;
+  Object.assign(m, { foe: h.by }).t.foe = 1;
   m.t.squash = 1;
   m.recoil.set(f.x - h.x, 0, f.z - h.z).normalize().multiplyScalar(0.18);
 }

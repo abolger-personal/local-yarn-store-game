@@ -4,7 +4,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 
 ## 0.0.8
 
-### Characters that look alive
+### Characters that look alive (in the species checker's style menu to try; not in the game yet)
 - **They look at you.** Standing about, a fighter turns its head toward you, so both eyes show; while it
   punches or kicks it looks at the bad guy it is going for, and after a hit it looks at whoever it traded
   the hit with. The eyes move a moment before the head does.

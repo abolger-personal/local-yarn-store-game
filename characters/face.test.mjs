@@ -12,7 +12,10 @@ import { lightness } from './lion.js';
 // BODIES.md §Look-at, §Face, seen as the match sees them (spinoff/stage.js aimGameCamera)
 setGeometryDetail('med');
 const STILL = { ...MOTION_DEFAULTS, idleAmount: 0 };
-const paramsOf = (id, extra = {}) => ({ ...BASE_PARAMS, ...getSpecies(id).defaults, mergeMeshes: false, ...extra });
+// off by default, so the game looks as it did till the designer picks them (the species checker's style folder)
+const STYLE = { lookAt: true, eyeGlint: true, eyeRing: true, faceAccent: true };
+for (const k of Object.keys(STYLE)) assert.equal(BASE_PARAMS[k], false, `${k} is off by default`);
+const paramsOf = (id, extra = {}) => ({ ...BASE_PARAMS, ...getSpecies(id).defaults, ...STYLE, mergeMeshes: false, ...extra });
 
 /** A fighter side on at the origin, facing +x, as placeFighter turns one; the match camera on it. */
 function matchView(id, extra) {

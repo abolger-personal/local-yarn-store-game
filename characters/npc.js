@@ -88,12 +88,12 @@ export const BASE_PARAMS = Object.freeze({
   eyeRough:      0.22,
   eyeClearcoat:  0.70,
 
-  lookAt:        true,
-  eyeGlint:      true,
-  eyeRing:       true,
+  lookAt:        false,
+  eyeGlint:      false,
+  eyeRing:       false,
   eyeRingWidth:  0.30,
   eyeRingColor:  '',
-  faceAccent:    true,
+  faceAccent:    false,
   faceAccentSize:  1.00,
   faceAccentColor: '',
 

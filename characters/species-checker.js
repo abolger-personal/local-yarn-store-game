@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { roomEnvironment } from '../inventory/room-environment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
-  TONE_MAPPING, POSES, GEO_DETAIL, BUILD, MOTION_DEFAULTS,
+  TONE_MAPPING, POSES, GEO_DETAIL, BUILD, MOTION_DEFAULTS, BASE_PARAMS,
   createCharacter, applyPose, setViewMode, disposeCharacter,
   setGeometryDetail, getSpecies, speciesList, slugify, shareRandomParams,
   stepMotion, resetMotion, motionOf, walkPhase, walkLayer, walkGain, phaseStep,
@@ -20,6 +20,16 @@ import './llama.js';
 import './lion.js';
 
 const SLOTS = ['A', 'B'];
+
+// BODIES.md §Face, §Look-at: one row per style switch, a boolean rig param set on both slots (default from
+// BASE_PARAMS); `live` switches take effect on the next frame, the rest rebuild the slots
+const STYLE_SWITCHES = Object.freeze([
+  { key: 'lookAt', name: 'look-at', live: true },
+  { key: 'eyeGlint', name: 'eye glint' },
+  { key: 'eyeRing', name: 'eye ring' },
+  { key: 'faceAccent', name: 'face accent' },
+]);
+const STYLE = Object.freeze(Object.fromEntries(STYLE_SWITCHES.map(({ key }) => [key, BASE_PARAMS[key]])));
 const STORE_KEY = 'lys.speciesChecker.v1';
 
 const state = {
@@ -39,8 +49,7 @@ const state = {
   repeat: true,
   side: false,
   slow: 1,
-  // BODIES.md §Face, §Look-at: each a rig param, set on both slots
-  style: { lookAt: true, eyeGlint: true, eyeRing: true, faceAccent: true },
+  style: { ...STYLE },
   lookAtOther: false,
   matchCamera: false,
   slots: {
@@ -48,8 +57,6 @@ const state = {
     B: { speciesId: 'llama', params: null },
   },
 };
-
-const STYLE = Object.freeze({ ...state.style });
 
 const freshParams = (speciesId) => Object.assign(
   structuredClone(getSpecies(speciesId).defaults),
@@ -527,9 +534,10 @@ function addSceneFolder() {
     .onChange((v) => (renderer.toneMapping = TONE_MAPPING[v]));
 }
 
-function setStyle(key) {
+/** @param {{ key: string, live?: boolean }} row */
+function setStyle({ key, live }) {
   for (const id of SLOTS) state.slots[id].params[key] = state.style[key];
-  if (key !== 'lookAt') buildAll();
+  if (!live) buildAll();
   save();
 }
 
@@ -552,8 +560,7 @@ function setMatchCamera(on) {
 
 function addStyleFolder() {
   const folder = gui.addFolder('style');
-  const names = { lookAt: 'look-at', eyeGlint: 'eye glint', eyeRing: 'eye ring', faceAccent: 'face accent' };
-  for (const key of Object.keys(STYLE)) folder.add(state.style, key).name(names[key] ?? key).onChange(() => setStyle(key));
+  for (const row of STYLE_SWITCHES) folder.add(state.style, row.key).name(row.name).onChange(() => setStyle(row));
   folder.add(state, 'lookAtOther').name('look at the other slot').onChange(save);
   folder.add(state, 'matchCamera').name('match camera').onChange(setMatchCamera);
 }

@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
   BASE_PARAMS, GEO, POSES, MOTION_DEFAULTS, createCharacter, getSpecies, speciesIds, stepMotion, setGeometryDetail,
-  placePupils, lightness, deriveAccentColor, ringColorFor,
+  placePupils, deriveAccentColor, ringColorFor,
 } from './npc.js';
 import { aimGameCamera } from '../spinoff/stage.js';
 import './owl.js';
 import './llama.js';
-import './lion.js';
+import { lightness } from './lion.js';
 
 // BODIES.md §Look-at, §Face, seen as the match sees them (spinoff/stage.js aimGameCamera)
 setGeometryDetail('med');

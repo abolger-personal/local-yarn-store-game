@@ -200,13 +200,6 @@ export function deriveCoatColor(bodyHex) {
   return hsl(h, s, l);
 }
 
-/** CIE L* (0 black to 100 white) of a hex colour. */
-export function lightness(hex) {
-  const c = new THREE.Color(hex);
-  const y = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-  return y > 216 / 24389 ? 116 * Math.cbrt(y) - 16 : (24389 / 27) * y;
-}
-
 // BODIES.md §Face: the first hot hue far enough round from the fur's, else the farthest
 const HOT_HUES = [0.03, 0.08, 0.12, 0.95];
 const HOT_GAP = 0.15;
@@ -219,13 +212,14 @@ export function deriveAccentColor(bodyHex) {
   return hsl(h, 0.85, 0.55);
 }
 
-// BODIES.md §Face: pale on a dark face, dark on a pale one, in the face's hue
-const RING_SWITCH = 70;
+// BODIES.md §Face: pale on a dark face, dark on a pale one, in the face's hue; the switch is L* 70 as luminance
+const RING_SWITCH = 0.4075;
 
 export function ringColorFor(faceHex) {
   const face = {};
   new THREE.Color(faceHex).getHSL(face);
-  return lightness(faceHex) > RING_SWITCH ? hsl(face.h, Math.min(face.s, 0.5), 0.14) : hsl(face.h, 0.4, 0.93);
+  const c = new THREE.Color(faceHex);
+  return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b > RING_SWITCH ? hsl(face.h, Math.min(face.s, 0.5), 0.14) : hsl(face.h, 0.4, 0.93);
 }
 
 export const accentColorOf = (P) => P.faceAccentColor || deriveAccentColor(P.bodyColor);

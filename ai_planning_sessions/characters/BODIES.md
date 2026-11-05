@@ -238,9 +238,41 @@ Everything is judged at play distance: characters are ~150px tall.
 - Motion: heavy and deliberate — unhurried but committed. Stiff 70–210, idle rate 0.55–1.35, head arc
   0.70–1.30, some bounce 0.01–0.05, stride 1.30–1.75, knee lift 0.45–1.05 (a cat pads). Starting values.
 
+## Shaped faces
+
+*Built 2026-11-04.* Cartoon animals are expressive in the face, but there's no budget for animating
+beaks or mouths at fighter size, so the effort goes into **static** shapes: built once, merged with the
+character, no per-frame cost. `shapedFaces` (per species, default **off**: off is today's face exactly)
+switches them on; the species checker has it as **style → shaped faces**. Code: `characters/faces.js`
+plus each species' face builders; checks in `characters/faces.test.mjs`.
+
+- **Cute is a hard rule.** Small, soft, rounded shapes, set low, so the big eyes stay the focus. No
+  teeth, gums, fangs, big jaws, wide-open mouths, sneers or raptor hooks; nothing that sharpens or ages
+  a face. When unsure, smaller and rounder. Everything is sized from existing params (beak size, muzzle
+  thickness, muzzle width/depth), so every random-range corner works; the test walks min, max and
+  random corners with every mouth.
+- **Owl:** a short beak (protrudes under `beakSize`) whose blunt tip curls gently down — a tapered
+  cylinder bent by t³, 0.36 beakSize of drop at the tip; a small lower mandible; a soft cere bump where
+  the beak meets the face; gape corners either side of the beak, felt in the pupil colour.
+- **Llama:** the muzzle's round tip becomes two soft lobes with the llama cleft between (the nose's stem
+  runs down into it); a small jaw below, its front only a hint past the lips (0.04 muzzle thickness,
+  tested under 0.08); the mouth line along the jaw's top, in nose colour.
+- **Lion:** a small rounded inverted-triangle nose (same place and size as the old one), two puffy
+  whisker pads in muzzle colour with three dots each, a tiny mouth line under them.
+- **Mouth** (`mouth`, in each species' face GUI folder): `smile` (default, corners up), `smug` (one
+  corner curls up), `deadpan` (short and straight), `o` (a tiny surprised dot; the owl's mandible drops a
+  touch to show it). A random character's mouth is read off its drawn head size, not a fresh draw, so
+  seeded random streams (craft-anim, generate) stay as they were. Saved spinoff fighters keep it.
+- **Triangles** (default params, high detail, merged): owl +952; llama −1792 and lion −1312, because the
+  shaped parts use small fixed low-poly spheres (16×12, dots 8×6) where the old tip and nose used the
+  48×32 `GEO.sphere`. The mouth line is a 16×4 tube.
+
 ## Open questions
 
 - Lion: a second mane shell on the chest if the head-anchored mane reads too light.
 - Lion: quantise the drawn mane values if a big crowd shows the per-lion geometry memory.
+- Shaped faces (brainstorm 2026-11-04): the low-poly face spheres ignore geometry detail; tie them to
+  `GEO_DETAIL` if faces get close-ups. The owl's cere and beak root sit near eye height (tested only
+  below the eyes' tops), as the old beak did.
 - Blink: see MOTION-TODO.md §Known ceilings (`characters/MOTION-TODO.md`).
 - Lion motion ranges still to be tuned in the motion lab, as the llama's were.

@@ -503,6 +503,16 @@ function addSceneFolder() {
     .onChange((v) => (renderer.toneMapping = TONE_MAPPING[v]));
 }
 
+function addShapedFaces() {
+  const style = gui.folders.find((f) => f._title === 'style') ?? gui.addFolder('style');
+  const face = { on: SLOTS.every((id) => state.slots[id].params?.shapedFaces) };
+  style.add(face, 'on').name('shaped faces').onChange((on) => {
+    for (const id of SLOTS) state.slots[id].params.shapedFaces = on;
+    buildAll();
+    save();
+  });
+}
+
 function buildGui() {
   gui?.destroy();
   gui = new GUI({ title: 'species checker' });
@@ -511,6 +521,7 @@ function buildGui() {
   addTopControls(species);
   addMotionFolder();
   addSceneFolder();
+  addShapedFaces();
   addSlotFolders(species, slot.params, rebuildActive);
   gui.onFinishChange(save);
 }

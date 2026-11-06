@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { BRICK, MAX_HEROES, TICK_HZ, WIDEST_FIGHTER, groundOf, outside, overlaps, spotRect } from './match.js';
 import { createMatch, snapshot, tick } from './sim.js';
 import { HEIGHT_LIMIT } from './build.js';
-import { MATCH } from './roster.js';
+import { MATCH } from './combat.js';
 
 const KINDS = ['ground', 'deck', 'hill'];
 const LOOK = { dough: '#e8c48a', frosting: '#14c4e0', stripe: false };

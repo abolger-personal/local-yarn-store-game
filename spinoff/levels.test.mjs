@@ -3,7 +3,7 @@ import { LEVELS, LEVEL_5_SEED, STAGES, TUTORIAL, badGuys, levelBefore, levelFor,
 import { banksHome, checkLevel } from './check-level.mjs';
 import { createMatch, snapshot, tick } from './sim.js';
 import { generateStage } from './generate.js';
-import { MATCH } from './roster.js';
+import { MATCH } from './combat.js';
 
 checkLevel(TUTORIAL.stage, 'tutorial', true);
 for (const [name, { stage }] of Object.entries(STAGES)) checkLevel(stage, `${name} stage`);

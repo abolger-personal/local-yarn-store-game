@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { newFighter } from './fighter.js';
 import { homeOnly } from './rooms.js';
 import {
-  CLOCK_SLACK_S, MATCH, MAX_FIGHTERS, ROOM_TREATS, canHit, clockSlack, floorGrid, isCode, isHomeAddress, isHomeRoute, netProblem, randomCode,
+  CLOCK_SLACK_S, MAX_FIGHTERS, ROOM_TREATS, clockSlack, floorGrid, isCode, isHomeAddress, isHomeRoute, netProblem, randomCode,
   remoteOf, roomName, routeNote, standingSpots,
 } from './roster.js';
+import { MATCH, canHit } from './combat.js';
 
 {
   const ids = ['peer-c', 'peer-a', 'self', 'peer-b'];

@@ -2,13 +2,13 @@
 // (REUSE-SPEC.md §Stages and difficulty are separate). Pure data, checked by levels.test.mjs.
 // Bad guys, the fort pile and moves are formulas of the difficulty (§Bad guys, §Forts, §Power moves), not data here.
 import { BRICK } from './match.js';
-import { MATCH } from './roster.js';
+import { MATCH } from './combat.js';
 import { BOUNCE, generateStage } from './generate.js';
 
 /** @typedef {import('./match.js').Stage} Stage @typedef {import('./match.js').Floor} Floor @typedef {import('./generate.js').StageName} StageName
  * @typedef {{ theme: StageName, stage: Stage, breakIn?: boolean, number?: number, match?: import('./match.js').MatchOptions['match'] }} Level
  *   breakIn: the bad guys' shelf is walled in, so the only way to it is to punch and kick through; number: its place in
- *   the stage's run of levels (LEVELS), for the ones the level dial picks; match: who can hit whom, if not roster.js's MATCH */
+ *   the stage's run of levels (LEVELS), for the ones the level dial picks; match: who can hit whom, if not combat.js's MATCH */
 
 const wall = (team, x, z, y = 0) => ({ team, x, z, y, hits: 2 });
 

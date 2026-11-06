@@ -142,7 +142,7 @@ export const groundOf = (stage) => stage.floors.find((f) => f.kind === 'ground')
  *   `trick`: the trick on its hands, which says how far its shot flies (sim.js SHOTS)
  *
  * What the level sets for a match: each hero's pile (`pieces`, with a build round first when there are any) and who can
- * hit whom (`match`, roster.js's MATCH).
+ * hit whom (`match`, combat.js's MATCH).
  * @typedef {{ pieces?: number, match?: { friendlyFire: boolean, badGuysHit?: boolean, badGuyPace?: number, doubleJump?: boolean } }} MatchOptions
  *
  * The sim's whole API, which sim.js implements:

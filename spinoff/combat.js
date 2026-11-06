@@ -4,10 +4,17 @@
 // State it reads: world.js's, `s.fighters`, `s.bricks`, `s.hits`, `s.hammers`, `s.shots`, `s.powers`, `s.rules`, `s.tick`,
 // and `s.drop(s, o, fling)`: the game drops what `o` carries, flung at `fling` ({ x, y, z, vx, vy, vz }); true if it had any.
 import { BRICK, HITSTOP_TICKS, HIT_DEPTH, TICK_HZ } from './match.js';
-import { canHit } from './roster.js';
 import { HAMMER, hammerPath, handOf } from './hammer.js';
 import { DT, EPS, clamp, flat } from './world.js';
 import { SLIDE_DRAG, slide } from './walk.js';
+
+// REUSE-SPEC.md §Mode: kids can't hit each other for now, but it is a match setting, not a rule baked in; so is whether
+// bad guys may hit heroes (§Forts, Level 2: they don't there), CPU or grownup alike
+/** @type {Readonly<{ friendlyFire: boolean, badGuysHit: boolean }>} */
+export const MATCH = Object.freeze({ friendlyFire: false, badGuysHit: true });
+/** @param {{ id: string, team: string }} a @param {{ id: string, team: string }} b @param {{ friendlyFire: boolean, badGuysHit?: boolean }} [match] */
+export const canHit = (a, b, match = MATCH) => a.id !== b.id && (a.team !== b.team || match.friendlyFire)
+  && (match.badGuysHit !== false || a.team !== 'badGuys' || b.team !== 'heroes');
 
 export const LUNGE = 0.3;
 export const LUNGE_RANGE = 0.8;

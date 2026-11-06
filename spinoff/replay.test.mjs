@@ -1,4 +1,4 @@
-// The refactor's safety net (0.0.9, splitting sim.js into world, nav, combat and the donut game): seeded matches with
+// The refactor's safety net (0.0.9, splitting sim.js into world, walk, combat, build and the donut game): seeded matches with
 // CPU players on both teams and a kid mashing every input, every snapshot hashed. Moving code must not change a tick.
 // A change meant to change play updates HASHES (run with REPLAY=print to see the new ones).
 import assert from 'node:assert/strict';

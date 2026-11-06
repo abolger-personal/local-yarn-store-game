@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, ROUND_SECONDS, TICK_HZ, outside } from './match.js';
 import { STAGES, TUTORIAL } from './levels.js';
-import { MATCH } from './roster.js';
-import { DUMMY, POWER, RESPAWN_WAIT, createMatch, snapshot, tick } from './sim.js';
+import { MATCH } from './combat.js';
+import { createMatch, snapshot, tick } from './sim.js';
+import { DUMMY, POWER, RESPAWN_WAIT } from './donut-game.js';
 import { CALM_DRAIN, CALM_TICKS, MOVES, SHOTS, TOY, shotCharge } from './combat.js';
 import { SPRING_LIFT, SYRUP_SLOW, WALK_SPEED } from './walk.js';
 import { BOUNCE } from './generate.js';

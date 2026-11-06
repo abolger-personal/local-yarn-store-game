@@ -7,7 +7,7 @@ import { BAD_DONUT, BAD_GUY_FUR, FUR, HERO_DOUGH } from './fighter.js';
 import { generateStage } from './generate.js';
 import { LEVELS as NUMBERED, STAGES, TUTORIAL } from './levels.js';
 import { SHELF_WOOD, THEMES } from './scenery.js';
-import { BAD_ICING } from './sim.js';
+import { BAD_ICING } from './donut-game.js';
 import { ROOM_SH } from './stage.js';
 
 /** @typedef {import('./scenery.js').Paint} Paint @typedef {import('./levels.js').Level} Level */

@@ -4,6 +4,10 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 
 ## 0.0.8
 
+### Fighting
+- **A knocked-loose donut flies with whoever was carrying it**, landing just past them, so a big hit doesn't
+  leave you metres from your donut while a bad guy lands right on top of its own.
+
 ### Game face paint
 - **Pick your face paint** in the fighter chooser (🎭): rings round the eyes, slashes on the cheekbones, or a
   heart on one cheek, in the colour opposite your fur on the colour wheel. Computer fighters wear it too.

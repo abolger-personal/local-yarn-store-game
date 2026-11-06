@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, ROUND_SECONDS, TICK_HZ, outside } from './match.js';
 import { STAGES, TUTORIAL } from './levels.js';
 import { MATCH } from './roster.js';
-import { CALM_DRAIN, CALM_TICKS, DUMMY, MOVES, POWER, SHOTS, shotCharge, TOY, RESPAWN_WAIT, SPRING_LIFT, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
+import { CALM_DRAIN, CALM_TICKS, DUMMY, GRAVITY, MOVES, POWER, SHOTS, shotCharge, TOY, RESPAWN_WAIT, SPRING_LIFT, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
 import { BOUNCE } from './generate.js';
 import { BAM_SIZE, SHAKE } from './fx.js';
 
@@ -410,6 +410,21 @@ function launch(button) {
   assert.ok(speeds.length >= 4, `the dummy was hit again and again (${speeds.length})`);
   for (let k = 1; k < 4; k++) assert.ok(speeds[k] > speeds[k - 1], `knockback grows with percent (${speeds.map((v) => v?.toFixed(2))})`);
   assert.ok(nearHill > 0 && inside === 0, `knocked against the hill, it stops at its side (${inside} ticks inside)`);
+}
+
+// the donut flies with the hit: it lands near its carrier however battered (playtest: a fixed pop left a fresh bad
+// guy on top of its donut and a kid with a high percent metres past theirs)
+for (const button of ['punch', 'kick']) for (const pct of [0, 40, 100]) {
+  const m = createMatch([hero, dummy], STAGE), d = m.fighters[1];
+  run(m, 600, tap(DUMMY.x - 2 * R - 0.3, DUMMY.z));
+  Object.assign(d, { carrying: { ...LOOK }, percent: pct });
+  run(m, 1, once({ [button]: true }));
+  for (let i = 0; i < 40 && d.carrying; i++) run(m, 1);
+  const [donut] = m.donuts, k = d.pending ?? d;
+  // its vy has had a tick of gravity already
+  assert.ok(donut && Math.abs(donut.vx - k.vx) < 1e-9 && Math.abs(donut.vz - k.vz) < 1e-9 && Math.abs(donut.vy - k.vy) <= GRAVITY / TICK_HZ + 1e-9,
+    `${button} at ${pct}%: the donut leaves at (${donut?.vx.toFixed(2)}, ${donut?.vy.toFixed(2)}), its carrier at (${k.vx.toFixed(2)}, ${k.vy.toFixed(2)})`);
+  assert.ok(Math.hypot(donut.vx, donut.vz) > (pct ? 5 : 3), `${button} at ${pct}%: a soft pop (${Math.hypot(donut.vx, donut.vz).toFixed(2)} m/s)`);
 }
 
 {

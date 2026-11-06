@@ -73,7 +73,7 @@ export const POWER = Object.freeze({ perSecond: 1 / 45, hit: 0.06, ringOut: 0.12
 /** What a full bar fires (Input.power): `toy` turns a foe into one of TOY's silly objects for a while. */
 export const POWERS = Object.freeze(['toy']);
 export const TOY = Object.freeze({ ticks: 3 * TICK_HZ, knock: 1.5, kinds: Object.freeze(['cottonBall', 'rubberDuck', 'teapot', 'sock']) });
-export const POP = Object.freeze({ vx: 1.5, vy: 6 });
+export const POP = Object.freeze({ vy: 6 });
 const DONUT_REACH = 0.25;
 const DONUT_EDGE = 0.1;
 export const SHELF_REACH = 0.3;
@@ -867,7 +867,6 @@ function awayFrom(f, o) {
 
 function strike(s, f, o, p, { id, u } = { id: f.attack.id, u: ahead(f) }) {
   const m = MOVES[id], broke = Boolean(o.carrying);
-  drop(s, o, { x: o.x, y: o.y + o.h, z: o.z, vx: u.x * POP.vx, vy: POP.vy, vz: u.z * POP.vx });
   o.percent += m.damage;
   o.calm = 0;
   const speed = (m.kb.base + m.kb.growth * o.percent) * (o.toy ? TOY.knock : 1), a = (m.kb.angle * Math.PI) / 180, along = Math.cos(a) * speed;
@@ -876,6 +875,10 @@ function strike(s, f, o, p, { id, u } = { id: f.attack.id, u: ahead(f) }) {
     : { vx: u.x * along, vy: up, vz: u.z * along, stun: Math.round(STUN_TICKS + STUN_PER_SPEED * speed) + tripFor(f, m) };
   Object.assign(o, { attack: null, charging: false, hitMove: downed(o) ? 'tripped' : hitMoveOf(m, speed), freeze: HITSTOP_TICKS });
   f.freeze = HITSTOP_TICKS;
+  // REUSE-SPEC.md §Scoring: the donut flies with the hit, so it lands just past its carrier however hard the hit
+  // (playtest: a fixed pop left a fresh bad guy on top of its donut and a battered kid metres past theirs)
+  const k = o.pending;
+  drop(s, o, { x: o.x, y: o.y + o.h / 2, z: o.z, vx: k.vx, vy: k.vy, vz: k.vz });
   if (f.attack?.id === id) f.attack.hit.push(o.id);
   s.hits.push({ ...p, move: id, on: 'fighter', target: o.id, broke, by: f.id, ...credit(s, f, o) });
 }

@@ -473,7 +473,12 @@ No lives, no elimination, and only a short wait after a ring-out (decided 2026-1
 - **Anyone can grab the spilled donuts**, the faller included, on the way back in. A ring-out
   turns into a scramble instead of a pause.
 - **Any hit pops the carried donut** out of the bag as a pickup, so carrying is risky even
-  without ring-outs.
+  without ring-outs. **The donut flies with the hit** (decided 2026-11-05): it leaves the carrier's middle at the
+  carrier's own knockback velocity, so it lands just past the carrier, about 0.2 to 0.5 m, however hard the hit
+  (`strike` in `sim.js`). Playtest, level 4: a fixed pop (6 m/s up, 1.5 along) always landed 0.8 m from the hit,
+  while the carrier flew 1 m at 0% and 7 m at 100%, so a fresh bad guy landed on its donut and a kid with a high
+  percent (chased, never calm) landed metres past theirs. Same rule for both teams. Getting the other side's
+  donut is stealing, its own mechanic (not this pop).
 
 - **Everyone carries one donut at a time to start** (decided 2026-10-13). A grab fills the bag;
   the carrier has to run home and bank before grabbing again, and any hit knocks the donut loose.

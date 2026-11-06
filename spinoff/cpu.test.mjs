@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { BRICK, ROUND_SECONDS, SHELF_WIDTH, TICK_HZ } from './match.js';
 import { levelOf, matchOptions } from './levels.js';
-import { AIR_SPEED, GUARD_REACH, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
+import { GUARD_REACH, createMatch, snapshot, tick } from './sim.js';
+import { AIR_SPEED, WALK_SPEED } from './walk.js';
 import { ATTACK_TICKS, REACT_TICKS, createCpu, modeOf } from './cpu.js';
 
 const level = /** @type {import('./levels.js').Level} */ (levelOf('breakfast', 2));

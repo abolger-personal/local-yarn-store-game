@@ -7,7 +7,7 @@ import { LOOKS, BAGS, CAPES, CLOTH, FUR, HANDS, HATS, SPECIES, TEXTURES, badGuyS
 import { wingShape } from '../characters/owl.js';
 import { floorGrid } from './roster.js';
 import { walkPhase } from '../characters/motion.js';
-import { SYRUP_SLOW, WALK_SPEED } from './sim.js';
+import { SYRUP_SLOW, WALK_SPEED } from './walk.js';
 import { CHOP_DOWN, CHOP_UP, STRIKE } from './punches.js';
 import { WIDEST_FIGHTER } from './match.js';
 

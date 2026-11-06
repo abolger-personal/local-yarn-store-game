@@ -1,6 +1,6 @@
 // The stage as terrain: the solids a body stands on and is pushed out of, the patches it stands in (syrup, butter,
 // trampolines), the band it stays in (REUSE-SPEC.md §Navigation). Knows nothing of fighting or donuts: any game on these
-// stages can use it. State it reads: `s.stage`, `s.band`, `s.solids`.
+// stages can use it. State it reads: `s.stage`, `s.band`, `s.solids`; bricks: `s.bricks`, `s.floorBoxes`.
 import { BRICK, TICK_HZ, coreOf, groundOf, outside } from './match.js';
 
 export const DT = 1 / TICK_HZ;
@@ -75,4 +75,22 @@ export function floorFor(s, x, z, y) {
   for (const fl of s.stage.floors)
     if (inXZ(fl, x, z) && (!best || Math.abs(fl.y - y) < Math.abs(best.y - y))) best = fl;
   return best ? best.y : s.band.y;
+}
+
+// bricks are terrain that falls: one knocked out from under drops the one above (REUSE-SPEC.md §Forts)
+function brickFloor(s, b) {
+  let floor = supportAt(s.floorBoxes, b.x + BRICK / 2, b.z + BRICK / 2, b.y);
+  for (const o of s.bricks)
+    if (o !== b && Math.abs(o.x - b.x) < BRICK - EPS && Math.abs(o.z - b.z) < BRICK - EPS && o.y + BRICK <= b.y + EPS)
+      floor = Math.max(floor, o.y + BRICK);
+  return floor;
+}
+
+export function settleBricks(s) {
+  for (const b of [...s.bricks].sort((p, q) => p.y - q.y)) {
+    const floor = brickFloor(s, b);
+    b.vy = b.y <= floor + EPS ? 0 : b.vy - GRAVITY * DT;
+    b.y = Math.max(floor, b.y + b.vy * DT);
+    if (b.y === floor) b.vy = 0;
+  }
 }

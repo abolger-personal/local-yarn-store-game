@@ -1,11 +1,11 @@
 // The match host: one fixed tick of pure logic, no three.js, no Math.random. REUSE-SPEC.md §Milestones 1.
 // The stage is a depth band (§Navigation): fighters walk in x/z on floor tops and jump in y.
-import { BRICK, DONUTS_PER_SHELF, PILE_DX, ROUND_SECONDS, SHELF_WIDTH, TICK_HZ, outside } from './match.js';
+import { BRICK, DONUTS_PER_SHELF, ROUND_SECONDS, SHELF_WIDTH, TICK_HZ, outside } from './match.js';
 import { EMPTY, anySlot, footprint, lift, makeDisplay, place, topAt } from '../inventory/grid.js';
 import { MATCH } from './roster.js';
-import { cellUnder, facedCell, fortGrid, onTop } from './build.js';
+import { cellUnder, fetchStep, fortGrid, pilesFor, readyInput, startWhenReady } from './build.js';
 import {
-  CELL, DT, EPS, GRAVITY, STEP, bandOf, brickBox, clamp, flat, floorBox, inXZ, supportAt,
+  CELL, DT, GRAVITY, STEP, bandOf, brickBox, clamp, flat, floorBox, inXZ, settleBricks, supportAt,
 } from './world.js';
 import {
   FOLLOW_GAP, JUMP_SPEED, SPRING_LIFT, TURN_SPEED, WP_ARRIVE, airStep, besideGoal, brickGoal, facingGoal, jump, navigate,
@@ -41,9 +41,6 @@ const DEFAULT_LOOKS = Object.freeze({
   badGuys: Object.freeze({ dough: '#2a1a14', frosting: '#7a2bbf', stripe: true }),
 });
 export const BAD_ICING = '#4a1d6b';
-/** How close to its pile, or past a block's edge, a fighter reaches to pick a block up. */
-const FETCH_REACH = 0.35;
-const BLOCK_HITS = 2;
 
 
 
@@ -160,23 +157,6 @@ function holds(s, f) {
 
 // --- bricks and donuts ----------------------------------------------------------------------
 
-function brickFloor(s, b) {
-  let floor = supportAt(s.floorBoxes, b.x + BRICK / 2, b.z + BRICK / 2, b.y);
-  for (const o of s.bricks)
-    if (o !== b && Math.abs(o.x - b.x) < BRICK - EPS && Math.abs(o.z - b.z) < BRICK - EPS && o.y + BRICK <= b.y + EPS)
-      floor = Math.max(floor, o.y + BRICK);
-  return floor;
-}
-
-function settleBricks(s) {
-  for (const b of [...s.bricks].sort((p, q) => p.y - q.y)) {
-    const floor = brickFloor(s, b);
-    b.vy = b.y <= floor + EPS ? 0 : b.vy - GRAVITY * DT;
-    b.y = Math.max(floor, b.y + b.vy * DT);
-    if (b.y === floor) b.vy = 0;
-  }
-}
-
 function stepDonut(s, d) {
   const prev = { x: d.x, y: d.y, z: d.z }, { band } = s;
   d.vy -= GRAVITY * DT;
@@ -259,69 +239,6 @@ function shelfStep(s, f) {
 function grabAt(s, f, sh) {
   if (f.carrying || (f.team === 'badGuys' && s.donuts.some((d) => d.by === f.id))) { s.fullBag.push(event(f, sh)); return; }
   if ((f.carrying = grab(sh))) s.donutEvents.push({ ...event(f, sh), kind: 'steal' });
-}
-
-// --- the build round (REUSE-SPEC.md §Forts) ------------------------------------------------
-
-function shake(s, f) { s.fullBag.push(event(f, f)); }
-
-/** ⬇️: the carried block goes on the faced cell of your own third, unless the stack there is at the height limit. */
-function putDown(s, f) {
-  const cell = f.block && f.onGround ? facedCell(fortGrid(s.stage, f.team, s.bricks, s.piles), { ...f, width: f.w }) : null;
-  if (!cell?.ok) { shake(s, f); return; }
-  s.bricks.push({ id: `p${s.nextBrick++}`, team: f.team, owner: f.id, x: cell.x, y: cell.y, z: cell.z, vy: 0,
-    hits: BLOCK_HITS, maxHits: BLOCK_HITS, icing: f.block });
-  f.block = null;
-  f.placeCell = null;
-  // a block tapped while carrying was only to face it: it isn't taken back the moment your hands are empty
-  if (f.target?.thing === 'brick') f.target = null;
-  s.donutEvents.push({ ...event(f, { x: cell.x + BRICK / 2, y: cell.y, z: cell.z + BRICK / 2 }), kind: 'place' });
-}
-
-/** Arriving empty-handed at your pile takes a block from it; at your own block on top of a stack, takes that back. */
-function fetchStep(s, f) {
-  if (f.block || !f.target) return;
-  if (f.target.thing === 'pile') fromPile(s, f);
-  if (f.target?.thing === 'brick') fromStack(s, f, f.target.id);
-}
-
-function fromPile(s, f) {
-  const pile = s.piles.find((p) => p.owner === f.id);
-  if (!pile?.count || flat(f, pile) > f.r + FETCH_REACH) return;
-  pile.count--;
-  take(s, f, pile.icing, pile);
-}
-
-function fromStack(s, f, id) {
-  const i = s.bricks.findIndex((b) => b.id === id), b = s.bricks[i];
-  if (!b || !f.nav?.done || flat(f, { x: clamp(f.x, b.x, b.x + BRICK), z: clamp(f.z, b.z, b.z + BRICK) }) > f.r + FETCH_REACH) return;
-  f.target = null;
-  if (b.owner !== f.id || !onTop(fortGrid(s.stage, f.team, s.bricks, s.piles), s.bricks, i)) { shake(s, f); return; }
-  s.bricks = s.bricks.filter((o) => o !== b);
-  take(s, f, b.icing, { x: b.x + BRICK / 2, y: b.y, z: b.z + BRICK / 2 });
-}
-
-function take(s, f, icing, from) {
-  f.block = icing;
-  f.target = null;
-  s.donutEvents.push({ ...event(f, from), kind: 'fetch' });
-}
-
-/** 👍 and its take-back, and the 2-second hold that starts the round for everyone. */
-function readyInput(s, f, input) {
-  if (input.ready === true) s.ready.add(f.id);
-  if (input.ready === false) s.ready.delete(f.id);
-  if (input.go) s.go = true;
-  if (input.drop) putDown(s, f);
-}
-
-/** The round starts when every hero here has 👍 (CPU bad guys are ready at once), or someone held 👍: piles and carried blocks go. */
-function startWhenReady(s) {
-  const heroes = s.fighters.filter((f) => f.team === 'heroes' && !f.dummy && !f.away);
-  if (!s.go && !(heroes.length && heroes.every((f) => s.ready.has(f.id)))) return;
-  Object.assign(s, { phase: 'play', t0: s.tick, piles: [], go: false });
-  s.ready.clear();
-  for (const f of s.fighters) f.block = null;
 }
 
 // --- input ----------------------------------------------------------------------------------
@@ -426,8 +343,7 @@ export function createMatch(entrants, stage, { pieces = 0, match = MATCH } = {})
   const cursor = { dummies: 0, starts: 0 };
   s.fighters = entrants.map((e) => newFighter(e, spawnSpot(s, e, cursor), s.band.y));
   for (const f of s.fighters) if (f.dummy) f.carrying = grab(shelfOf(s, f.team));
-  if (s.phase === 'build') s.piles = s.fighters.filter((f) => f.team === 'heroes' && !f.dummy)
-    .map((f) => ({ owner: f.id, x: f.x + PILE_DX, y: f.y, z: f.z, count: pieces, icing: f.icing }));
+  if (s.phase === 'build') s.piles = pilesFor(s.fighters, pieces);
   return s;
 }
 

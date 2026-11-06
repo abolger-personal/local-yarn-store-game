@@ -2,6 +2,7 @@
 // on inventory/grid.js, rebuilt from the bricks standing there, so the sim and the page find the same cells.
 import { BRICK, PILE_DX, SHELF_WIDTH, groundOf, outside, overlaps, spotRect } from './match.js';
 import { dropLayer, fits, footprint, makeDisplay, place, topAt } from '../inventory/grid.js';
+import { clamp, flat } from './world.js';
 
 /** Blocks a stack may hold: two is as tall as level 1's wall, which nobody hops (the playability check proves it). */
 export const HEIGHT_LIMIT = 2;
@@ -86,4 +87,80 @@ export function cellUnder(grid, p) {
 export function onTop(grid, bricks, i) {
   const { c, r } = cellOf(grid, bricks[i]);
   return topAt(grid.g, 0, c, r) === i;
+}
+
+// The build round itself (REUSE-SPEC.md §Forts): piles, fetching and placing blocks, 👍 and the start. Reports what
+// happened on the match's event channels: `s.fullBag` (a shake: can't do that) and `s.donutEvents` ('place', 'fetch').
+
+const event = (f, p) => ({ fighter: f.id, x: p.x, y: p.y, z: p.z });
+
+/** Each hero's pile beside where it starts, `pieces` blocks in its icing. */
+export const pilesFor = (fighters, pieces) => fighters.filter((f) => f.team === 'heroes' && !f.dummy)
+  .map((f) => ({ owner: f.id, x: f.x + PILE_DX, y: f.y, z: f.z, count: pieces, icing: f.icing }));
+
+/** How close to its pile, or past a block's edge, a fighter reaches to pick a block up. */
+const FETCH_REACH = 0.35;
+const BLOCK_HITS = 2;
+
+// --- the build round (REUSE-SPEC.md §Forts) ------------------------------------------------
+
+function shake(s, f) { s.fullBag.push(event(f, f)); }
+
+/** ⬇️: the carried block goes on the faced cell of your own third, unless the stack there is at the height limit. */
+function putDown(s, f) {
+  const cell = f.block && f.onGround ? facedCell(fortGrid(s.stage, f.team, s.bricks, s.piles), { ...f, width: f.w }) : null;
+  if (!cell?.ok) { shake(s, f); return; }
+  s.bricks.push({ id: `p${s.nextBrick++}`, team: f.team, owner: f.id, x: cell.x, y: cell.y, z: cell.z, vy: 0,
+    hits: BLOCK_HITS, maxHits: BLOCK_HITS, icing: f.block });
+  f.block = null;
+  f.placeCell = null;
+  // a block tapped while carrying was only to face it: it isn't taken back the moment your hands are empty
+  if (f.target?.thing === 'brick') f.target = null;
+  s.donutEvents.push({ ...event(f, { x: cell.x + BRICK / 2, y: cell.y, z: cell.z + BRICK / 2 }), kind: 'place' });
+}
+
+/** Arriving empty-handed at your pile takes a block from it; at your own block on top of a stack, takes that back. */
+export function fetchStep(s, f) {
+  if (f.block || !f.target) return;
+  if (f.target.thing === 'pile') fromPile(s, f);
+  if (f.target?.thing === 'brick') fromStack(s, f, f.target.id);
+}
+
+function fromPile(s, f) {
+  const pile = s.piles.find((p) => p.owner === f.id);
+  if (!pile?.count || flat(f, pile) > f.r + FETCH_REACH) return;
+  pile.count--;
+  take(s, f, pile.icing, pile);
+}
+
+function fromStack(s, f, id) {
+  const i = s.bricks.findIndex((b) => b.id === id), b = s.bricks[i];
+  if (!b || !f.nav?.done || flat(f, { x: clamp(f.x, b.x, b.x + BRICK), z: clamp(f.z, b.z, b.z + BRICK) }) > f.r + FETCH_REACH) return;
+  f.target = null;
+  if (b.owner !== f.id || !onTop(fortGrid(s.stage, f.team, s.bricks, s.piles), s.bricks, i)) { shake(s, f); return; }
+  s.bricks = s.bricks.filter((o) => o !== b);
+  take(s, f, b.icing, { x: b.x + BRICK / 2, y: b.y, z: b.z + BRICK / 2 });
+}
+
+function take(s, f, icing, from) {
+  f.block = icing;
+  f.target = null;
+  s.donutEvents.push({ ...event(f, from), kind: 'fetch' });
+}
+
+/** 👍 and its take-back, and the 2-second hold that starts the round for everyone. */
+export function readyInput(s, f, input) {
+  if (input.ready === true) s.ready.add(f.id);
+  if (input.ready === false) s.ready.delete(f.id);
+  if (input.go) s.go = true;
+  if (input.drop) putDown(s, f);
+}
+
+/** The round starts when every hero here has 👍 (CPU bad guys are ready at once), or someone held 👍: piles and carried blocks go. */
+export function startWhenReady(s) {
+  const heroes = s.fighters.filter((f) => f.team === 'heroes' && !f.dummy && !f.away);
+  if (!s.go && !(heroes.length && heroes.every((f) => s.ready.has(f.id)))) return;
+  Object.assign(s, { phase: 'play', t0: s.tick, piles: [], go: false });
+  s.ready.clear();
+  for (const f of s.fighters) f.block = null;
 }

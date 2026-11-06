@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { BASE_PARAMS, createCharacter, getSpecies, speciesIds, setGeometryDetail } from './npc.js';
-import { FUR_RAMP, INK_RAMP, PAINT, inkFrays, paintBright, paintRamp } from './paint.js';
+import { FRAY_BAND, FUR_RAMP, INK_RAMP, PAINT, inkFrays, paintBright, paintRamp } from './paint.js';
 import { aimGameCamera } from '../spinoff/stage.js';
 import './owl.js';
 import './llama.js';
@@ -66,8 +66,8 @@ for (const id of speciesIds()) {
 {
   const owl = createCharacter(paramsOf('owl', { painterly: true }), 'owl');
   assert.ok(owl.mat.feather.userData.plume, 'the plumage never frays');
-  // the beak, feet, eyes and any face colour: everything but the plumage stays whole
-  assert.ok(owl.materials.every((m) => m === owl.mat.feather || !m.userData.plume), 'the ink frays more than the plumage');
+  // the beak, feet, eyes and any face colour stay whole; the feathers and the body fray
+  assert.ok(owl.mat.body.userData.plume && owl.materials.every((m) => [owl.mat.feather, owl.mat.body].includes(m) || !m.userData.plume), 'the ink frays the beak, feet or face');
   const merged = createCharacter(paramsOf('owl', { painterly: true, mergeMeshes: true }), 'owl');
   const ink = [];
   merged.root.traverse((o) => { if (o.userData.merged && o.material.userData.paint) ink.push(o); });
@@ -80,7 +80,7 @@ for (const id of speciesIds()) {
 }
 for (let k = 0; k <= 20; k++) {
   const noise = k / 20, fray = PAINT.fray.value;
-  assert.ok(!inkFrays(2 * fray, noise, fray) && !inkFrays(1, noise, fray), 'the ink frays away from the silhouette');
+  assert.ok(!inkFrays(FRAY_BAND, noise, fray) && !inkFrays(1, noise, fray), 'the ink frays away from the silhouette');
 }
 assert.ok(inkFrays(0, 0.05, PAINT.fray.value), 'the ink never frays');
 // worst case (every brush value frays), from the match camera: what the fray opens to the background lies on the outline
@@ -112,8 +112,8 @@ assert.ok(inkFrays(0, 0.05, PAINT.fray.value), 'the ink never frays');
   };
   const deepest = Math.max(0, ...holes.map(toEdge));
   console.log(`owl ink, match camera: ${holes.length} of ${solid.size} px fray open, the deepest ${deepest} px in from the outline`);
-  assert.ok(holes.length > 0, 'the ink never frays the outline');
-  assert.ok(deepest <= 3, `the fray opens a hole ${deepest} px in from the outline`);
+  assert.ok(holes.length > solid.size * 0.1, `the fray is too faint to see (${holes.length} px)`);
+  assert.ok(deepest <= 8, `the fray opens a hole ${deepest} px in from the outline`);
 }
 
 console.log('paint: ok');

@@ -972,10 +972,10 @@ export function createCharacter(P, species) {
   return ctx;
 }
 
-/** BODIES.md §Painterly: every felt material of the character in the species' style; `plume` names its plumage. */
-function paintCharacter({ materials, mat }, { style, plume }) {
+/** BODIES.md §Painterly: every felt material of the character in the species' style; `plume` names what frays. */
+function paintCharacter({ materials, mat }, { style, plume = [] }) {
   for (const material of materials) {
-    if (material.userData.family === 'felt') paintMaterial(material, style, material === mat[plume]);
+    if (material.userData.family === 'felt') paintMaterial(material, style, plume.some((k) => material === mat[k]));
   }
 }
 

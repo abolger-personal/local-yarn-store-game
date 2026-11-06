@@ -171,11 +171,9 @@ Built 2026-11-04, off by default (`painterly`, per character; the species checke
   on top of the scallops reads moth-eaten (the cute rule).
 - **Ink wash** (owl), from Ohara Koson's crow and Bada Shanren's Two Chicks: a ramp in the body colour's
   own family (value x0.55 to 22% paler), darker where the ink pools toward the silhouette (N·V), faint
-  feather rows (a scallop texture, plumage only) and a frayed outline: near the rim (N·V under 2x `fray`)
-  plumage fragments are discarded on a brush-noise pattern. Alpha-test discard, not blending: no sorting,
-  one draw. Only the plumage frays (the owl's `feather` material); the body sphere under it never does, so a
-  fray opens only at the outline (worst case from the match camera: 59 of 2746 px, all within 2 px of the
-  outline). Merged, plumage is marked by its uv lifted by 2 whole tiles.
+  feather rows (a scallop texture, on what frays) and a frayed outline: near the rim (N·V under `FRAY_BAND`)
+  the feathers and body discard fragments on a brush-noise pattern (see the 2026-11-05 note below). Alpha-test
+  discard, not blending: no sorting, one draw. Merged, plumage is marked by its uv lifted by 2 whole tiles.
 - **Brightness** (2026-11-05): the ramp picks only the colour; its brightness is the base's times the light the
   fragment gets, as felt. Fur rounds that light *up* to the top of its band (`paintBright`; bands 2 x `light` /
   `bands` apart, the soft edge set just past the top), so a painted character is never darker than the felt
@@ -183,8 +181,13 @@ Built 2026-11-04, off by default (`painterly`, per character; the species checke
   now sets band spacing and where the ramp reaches its light colour, not brightness. The brush still shakes a
   band edge either way, so a stroke can sit up to half a band under. Before, the ramp colour times `light`
   (0.8) capped every lit surface near the base colour: darker than felt under any light over 1.
-- Ink fray default 0.4 (was 0.22, which opened 59 of 2746 px from the match camera: invisible); 103 px now,
-  still within 3 px of the outline. Slider up to 0.8.
+- Ink fray and feather rows, made visible 2026-11-05. The fray frayed only the feather scallops, over a body
+  sphere of nearly the same colour, so a hole showed more owl, and the body and head (most of the outline)
+  never frayed: 59 of 2746 px from the match camera, invisible. Now the body frays too (`plume: ['feather',
+  'body']`; beak, feet, eyes and face stay whole), in a fixed band (N·V under `FRAY_BAND` 0.5); `fray`
+  (default 0.4, slider to 0.8) sets how broken, not how wide. Worst case (every brush value frays): 506 px, at
+  most 6 px in from the outline (tested: over 10% of the owl, at most 8 px in). Feather rows were a 118/170
+  grey texture at 0.10 (about ±1.5% value): now dark ink crescents (20 on 150) at 0.35, slider to 1.
 - One shader variant per style (`customProgramCacheKey`), every painted felt material one family
   (`paint-fur`, `paint-ink`), so a merged character is still one felt draw and the cast shares a material.
   The knobs are shared uniforms (`PAINT`: bands, soft, size, brush, streak, light, pool, fray, feather), live in the

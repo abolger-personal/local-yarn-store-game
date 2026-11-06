@@ -13,7 +13,7 @@ export const PAINT = {
   light: { value: 0.8 },
   pool: { value: 0.45 },
   fray: { value: 0.4 },
-  feather: { value: 0.10 },
+  feather: { value: 0.35 },
 };
 
 /** The fur ramp: shadows deeper, more saturated and turned along the hue; lights brighter, as saturated as the fur. */
@@ -39,8 +39,11 @@ export function paintRamp(base, ramp) {
   return { shadow, light: base.map((v) => Math.min(1, v * ramp.bright) * (1 - ramp.wash) + ramp.wash) };
 }
 
+/** How far in (N·V) from the outline the ink frays; `fray` sets how broken it is there, not how wide. */
+export const FRAY_BAND = 0.5;
+
 /** Does the ink fray a plume's fragment at N·V `facing` with brush value `noise` (0..1)? As the shader. */
-export const inkFrays = (facing, noise, fray) => noise < fray * (1 - Math.min(1, Math.abs(facing) / fray / 2)) ** 2 * 1.5;
+export const inkFrays = (facing, noise, fray) => noise < fray * (1 - Math.min(1, Math.abs(facing) / FRAY_BAND)) ** 2 * 1.5;
 
 const glslRamp = (r) => `
 vec3 paintTurn(vec3 c, float a) {
@@ -98,7 +101,7 @@ const INK = `{${level('texture2D(paintBrushMap, vPaintUv * vec2(3.0, 2.0)).r', f
   float paintFacing = dot(normalize(normal), normalize(vViewPosition));
   float paintPlumed = max(paintPlume, step(1.5, vPaintUv.y));
   float paintNoise = texture2D(paintBrushMap, vPaintUv * vec2(9.0, 6.0)).g;
-  if (paintPlumed > 0.5 && paintNoise < paintFray * pow(1.0 - min(1.0, abs(paintFacing) / paintFray / 2.0), 2.0) * 1.5) discard;
+  if (paintPlumed > 0.5 && paintNoise < paintFray * pow(1.0 - min(1.0, abs(paintFacing) / ${FRAY_BAND.toFixed(4)}), 2.0) * 1.5) discard;
   float paintRows = (texture2D(paintFeatherMap, vPaintUv * vec2(6.0, 4.0)).r - 0.5) * paintFeather * paintPlumed;
   float paintPooled = 1.0 - paintPool * smoothstep(0.35, 0.0, abs(paintFacing));
   outgoingLight = paintC * paintPooled * (1.0 + paintStroke * paintStreak + paintRows);
@@ -143,9 +146,9 @@ function drawPlanes(g) {
 }
 
 function drawFeathers(g) {
-  g.fillStyle = 'rgb(118,118,118)';
+  g.fillStyle = 'rgb(150,150,150)';
   g.fillRect(0, 0, TILE, TILE);
-  g.strokeStyle = 'rgb(170,170,170)';
+  g.strokeStyle = 'rgb(20,20,20)';
   g.lineWidth = 3;
   const step = TILE / 8;
   for (let row = 0; row <= 8; row++) for (let col = -1; col <= 8; col++) {

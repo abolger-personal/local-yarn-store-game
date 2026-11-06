@@ -136,6 +136,13 @@ for (const id of speciesIds()) for (const corner of corners(id)) {
     }
     const r = Math.min(skull.scale.x, skull.scale.y, skull.scale.z);
     assert.ok(lo > 1 + 0.001 / r && hi < 1 + 0.012 / r, `${id}: the ${patch.name} lies ${lo.toFixed(3)}..${hi.toFixed(3)} of the skull out`);
+    // the middles of its triangles too, or a flat shape's face cuts through the skull and only its rim shows
+    const tri = new THREE.Triangle(), mid = new THREE.Vector3(), index = patch.geometry.index;
+    for (let t = 0; t < (index ? index.count : pos.count) / 3; t++) {
+      const at = (k) => (index ? index.getX(3 * t + k) : 3 * t + k);
+      tri.setFromAttributeAndIndices(pos, at(0), at(1), at(2)).getMidpoint(mid);
+      assert.ok(inSkull(skull, mid) > 1, `${id}: the ${patch.name} sinks into the skull mid-triangle (${inSkull(skull, mid).toFixed(4)})`);
+    }
   }
 }
 
@@ -165,7 +172,7 @@ for (const id of speciesIds()) {
     const seen = named(built, 'facePaint').map((m) => pixelsOf(built, camera, m));
     console.log(`${id}: ${facePaint} ${seen.join(' + ')} px`);
     // side on, the far cheek's paint hides behind the face; the near one must show
-    assert.ok(Math.max(...seen) > 3, `${id}: only ${seen.join(' + ')} px of the ${facePaint} can be seen in a match`);
+    assert.ok(Math.max(...seen) > 6, `${id}: only ${seen.join(' + ')} px of the ${facePaint} can be seen in a match`);
   }
 }
 

@@ -93,8 +93,8 @@ export const BASE_PARAMS = Object.freeze({
   eyeGlint:      false,
   facePaint:     'none',
   facePaintSize: 1.00,
-  facePaintDown: 0.50,
-  facePaintOut:  1.10,
+  facePaintDown: 1.20,
+  facePaintOut:  0.40,
   facePaintColor: '',
   painterly:     false,
 
@@ -651,13 +651,32 @@ const heart = () => new THREE.Shape().moveTo(0, -0.5).bezierCurveTo(-0.15, -0.3,
   .bezierCurveTo(0.5, -0.1, 0.15, -0.3, 0, -0.5);
 const DECALS = { slashes: () => capsule(0.36, 0.2), heart };
 
+/** Triangles `p` (flat xyz, three corners each), each split in four. */
+function split(p) {
+  const out = [], mid = (a, b) => [0, 1, 2].map((k) => (p[a + k] + p[b + k]) / 2);
+  for (let i = 0; i < p.length; i += 9) {
+    const [a, b, c] = [i, i + 3, i + 6].map((j) => [p[j], p[j + 1], p[j + 2]]), ab = mid(i, i + 3), bc = mid(i + 3, i + 6), ca = mid(i + 6, i);
+    out.push(...a, ...ab, ...ca, ...ab, ...b, ...bc, ...ca, ...bc, ...c, ...ab, ...bc, ...ca);
+  }
+  return new Float32Array(out);
+}
+
+/** `g` (non-indexed) with each triangle split in four, `times` over, so a flat shape can bend onto a curve. */
+function subdivide(g, times) {
+  let p = g.attributes.position.array;
+  for (let t = 0; t < times; t++) p = split(p);
+  const uv = new Float32Array((p.length / 3) * 2).map((_, i) => p[Math.floor(i / 2) * 3 + (i % 2)] + 0.5);
+  return new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(p, 3)).setAttribute('uv', new THREE.BufferAttribute(uv, 2))
+    .setIndex([...Array(p.length / 3).keys()]);
+}
+
 /** Unit shape `kind` (DECALS) `size` across, upright, wrapped onto head ellipsoid `head` round the skin over (x, y), `lift` proud. */
 function skinDecal(head, kind, [x, y], size, lift) {
   return cachedGeometry(`decal|${kind}|${head}|${x}|${y}|${size}|${lift}`, () => {
     const at = new THREE.Vector3(x, y, skinZ(x, y, head));
     const n = new THREE.Vector3(x / head[0] ** 2, y / head[1] ** 2, at.z / head[2] ** 2).normalize();
     const across = new THREE.Vector3().crossVectors(UP, n).normalize(), up = new THREE.Vector3().crossVectors(n, across);
-    const g = new THREE.ShapeGeometry(DECALS[kind](), 8), pos = g.attributes.position, q = new THREE.Vector3();
+    const g = subdivide(new THREE.ShapeGeometry(DECALS[kind](), 8).toNonIndexed(), 3), pos = g.attributes.position, q = new THREE.Vector3();
     for (let i = 0; i < pos.count; i++) {
       q.copy(at).addScaledVector(across, pos.getX(i) * size).addScaledVector(up, pos.getY(i) * size);
       q.multiplyScalar(1 / Math.hypot(q.x / head[0], q.y / head[1], q.z / head[2]));
@@ -676,7 +695,7 @@ function facePaintGeometry(P, placement, side) {
   if (P.facePaint !== 'rings') {
     /** @type {[number, number]} */
     const cheek = [eye[0] + side * P.eyeRadius * P.facePaintOut, eye[1] - P.eyeRadius * squash * P.facePaintDown];
-    return skinDecal(head, P.facePaint, cheek, P.eyeRadius * 2.2 * P.facePaintSize, ACCENT_LIFT);
+    return skinDecal(head, P.facePaint, cheek, P.eyeRadius * 1.5 * P.facePaintSize, ACCENT_LIFT);
   }
   const rim = rimAngle(P, placement, side, ACCENT_LIFT);
   return skinPatch(head, eye, [rim, rim + (P.eyeRadius * P.facePaintSize) / meanOf(head)], ACCENT_LIFT);

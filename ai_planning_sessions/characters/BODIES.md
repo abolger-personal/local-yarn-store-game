@@ -152,14 +152,18 @@ Built 2026-11-04 (the same plate: a hot face, a glint in each eye).
     2026-11-05: it had been the first hot hue at least 0.15 from the fur's, which was scarlet for nearly every fur.
   - **Rings**: a patch of a sphere round the skin point under each eye, scaled onto the head ellipsoid, its
     inner edge solved to clear the white, `facePaintSize` eye radii wide (owl 1.0, llama 0.8, lion 1.0).
-  - **Slashes** and **heart**: a flat shape (a capsule; a heart) wrapped onto the head ellipsoid (each vertex
-    projected onto it, then lifted), 2.2 x `facePaintSize` eye radii across, `facePaintDown` below and
-    `facePaintOut` out from the eye (eye radii; 0.5 and 1.1, the llama 0.0 and 1.3: below its eyes is muzzle).
-    Slashes on both cheeks; the heart on the right cheek only.
+  - **Slashes** and **heart**: a flat shape (a capsule; a heart), split into 4^3 times its triangles and each
+    vertex projected onto the head ellipsoid then lifted, 1.5 x `facePaintSize` eye radii across,
+    `facePaintDown` below and `facePaintOut` out from the eye (eye radii; 1.2 and 0.4, under the eye where eye
+    black goes; the llama 0.0 and 1.3, beside the eye: below its eyes is muzzle). Slashes on both cheeks; the
+    heart on the right cheek only.
+  - 2026-11-05 fix: unsplit, a flat shape's triangles have corners only on its outline, so their middles cut
+    through the curved skull and only the rim showed (playtest: a hollow heart, a sliver of slash, both pushed
+    out to the side by a placement sweep that measured the hollow shapes). The face test now checks every
+    triangle's middle lies outside the skull.
   - From the match camera (head turned by look-at): rings about 340/76/280 px (owl/llama/lion), the near slash
-    6/5/8 px, the heart 29/15/34 px; the far cheek's paint hides behind the face side on, so a fighter facing
-    the other way shows its heart less. Under the eye on the cheek is hidden by the muzzle (lion, llama) and the
-    eye itself (0-10 px tried), hence out to the side. Cheek blush was tried before and hid the same way.
+    41/8/22 px, the heart 54/12/35 px; the far cheek's paint hides behind the face side on, so a fighter facing
+    the other way shows its heart less.
   - A hat brim presses it like the skull. The checker has the pick, size, placement and a colour picker in
     "eyes & face".
 

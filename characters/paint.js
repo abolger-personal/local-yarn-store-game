@@ -16,10 +16,10 @@ export const PAINT = {
   feather: { value: 0.10 },
 };
 
-/** The fur ramp: shadows deeper, more saturated and turned along the hue; lights washed toward white. */
-export const FUR_RAMP = Object.freeze({ saturate: 1.6, shade: 0.62, turn: -0.22, wash: 0.55 });
+/** The fur ramp: shadows deeper, more saturated and turned along the hue; lights brighter, as saturated as the fur. */
+export const FUR_RAMP = Object.freeze({ saturate: 1.6, shade: 0.62, turn: -0.22, bright: 1.2, wash: 0 });
 /** The ink wash: one value family, darker as it pools, a little paler where lit. */
-export const INK_RAMP = Object.freeze({ saturate: 1.1, shade: 0.55, turn: 0, wash: 0.22 });
+export const INK_RAMP = Object.freeze({ saturate: 1.1, shade: 0.55, turn: 0, bright: 1, wash: 0.22 });
 
 const LUMA = [0.2126, 0.7152, 0.0722];
 const lumaOf = (c) => c[0] * LUMA[0] + c[1] * LUMA[1] + c[2] * LUMA[2];
@@ -36,7 +36,7 @@ function turnHue(c, a) {
 export function paintRamp(base, ramp) {
   const turned = turnHue(base, ramp.turn), grey = lumaOf(turned);
   const shadow = turned.map((v) => Math.max(0, grey + (v - grey) * ramp.saturate) * ramp.shade);
-  return { shadow, light: base.map((v) => v + (1 - v) * ramp.wash) };
+  return { shadow, light: base.map((v) => Math.min(1, v * ramp.bright) * (1 - ramp.wash) + ramp.wash) };
 }
 
 /** Does the ink fray a plume's fragment at N·V `facing` with brush value `noise` (0..1)? As the shader. */
@@ -53,7 +53,7 @@ vec3 paintShadow(vec3 base) {
   float grey = dot(turned, vec3(${LUMA.join(', ')}));
   return max(vec3(grey) + (turned - grey) * ${r.saturate.toFixed(4)}, 0.0) * ${r.shade.toFixed(4)};
 }
-vec3 paintLight(vec3 base) { return base + (1.0 - base) * ${r.wash.toFixed(4)}; }
+vec3 paintLight(vec3 base) { return mix(min(base * ${r.bright.toFixed(4)}, 1.0), vec3(1.0), ${r.wash.toFixed(4)}); }
 vec3 paintRamp(vec3 base, float t) {
   return t < 0.5 ? mix(paintShadow(base), base, t * 2.0) : mix(base, paintLight(base), t * 2.0 - 1.0);
 }`;

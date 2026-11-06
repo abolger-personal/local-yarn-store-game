@@ -14,12 +14,12 @@ const hsl = (rgb) => new THREE.Color(...rgb).getHSL({ h: 0, s: 0, l: 0 });
 const chroma = (rgb) => Math.max(...rgb) - Math.min(...rgb);
 const saturation = (rgb) => chroma(rgb) / Math.max(...rgb, 1e-9);
 
-// the fur ramp: lit is paler and less coloured, shadow deeper and more saturated, in the same family
+// the fur ramp: lit is brighter and as saturated (no grey wash), shadow deeper and more saturated, in the same family
 for (const hex of ['#3a5fcd', '#c8752e', '#8f8f96', '#4caf50', '#e8d9bd', '#6e4220']) {
   const base = new THREE.Color(hex).toArray();
   const { shadow, light } = paintRamp(base, FUR_RAMP);
-  const [b, s, l] = [base, shadow, light].map(hsl);
-  assert.ok(l.l > b.l && chroma(light) < chroma(base) + 1e-9, `${hex}: the lit colour is not paler and less coloured`);
+  const [b, s] = [base, shadow].map(hsl);
+  assert.ok(Math.max(...light) >= Math.max(...base) && saturation(light) >= saturation(base) - 1e-9, `${hex}: the lit colour is greyer (${saturation(light).toFixed(2)} vs ${saturation(base).toFixed(2)}) or no brighter`);
   assert.ok(s.l < b.l, `${hex}: the shadow is not deeper`);
   const [bs, ss] = [saturation(base), saturation(shadow)];
   if (bs > 0.05) assert.ok(ss > bs || ss === 1, `${hex}: the shadow (${ss.toFixed(2)}) is no more saturated than the base (${bs.toFixed(2)})`);

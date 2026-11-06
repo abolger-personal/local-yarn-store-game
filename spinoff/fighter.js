@@ -95,7 +95,7 @@ export const defaultLook = () => ({
 
 const coatOf = (species, fur) => (species === 'lion' ? deriveManeColor(fur) : deriveCoatColor(fur));
 
-/** @param {Fighter} f @param {string} fur */
+/** @template {Pick<Fighter, "species" | "params">} F @param {F} f @param {string} fur @returns {F} */
 export function setFur(f, fur) {
   f.params.bodyColor = fur;
   f.params[getSpecies(f.species).coatColorKey] = coatOf(f.species, fur);

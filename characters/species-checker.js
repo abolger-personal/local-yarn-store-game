@@ -12,6 +12,7 @@ import {
 import { stepGlitter } from './glitter.js';
 import { randomTraits } from './visit.js';
 import { aimGameCamera } from '../spinoff/stage.js';
+import { FUR, setFur } from '../spinoff/fighter.js';
 import { PAINT } from './paint.js';
 
 console.info('LYS build', BUILD);
@@ -299,10 +300,15 @@ function rebuildActive() {
   save();
 }
 
-function randomiseSlot(id) {
-  const slot = state.slots[id];
+// the game's riot fur (spinoff/fighter.js), not the store's muted one, so the checker shows what a match shows
+function randomise(slot) {
   getSpecies(slot.speciesId).randomise(slot.params);
+  setFur({ species: slot.speciesId, params: slot.params }, FUR[Math.floor(Math.random() * FUR.length)].hex);
   slot.opts = null;
+}
+
+function randomiseSlot(id) {
+  randomise(state.slots[id]);
   buildSlot(id);
   updatePlates();
   refreshGui();
@@ -311,10 +317,7 @@ function randomiseSlot(id) {
 
 function randomiseBoth() {
   const [a, b] = SLOTS.map((id) => state.slots[id]);
-  SLOTS.forEach((id) => {
-    getSpecies(state.slots[id].speciesId).randomise(state.slots[id].params);
-    state.slots[id].opts = null;
-  });
+  SLOTS.forEach((id) => randomise(state.slots[id]));
   if (state.linkShared) {
     shareRandomParams(a.params, b.params, getSpecies(a.speciesId), getSpecies(b.speciesId));
   }

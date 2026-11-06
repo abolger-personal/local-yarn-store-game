@@ -163,7 +163,8 @@ Built 2026-11-04, off by default (`painterly`, per character; the species checke
   clearcoat off, and the lighting replaced); light to shadow is a colour shift: the light falling on a
   fragment (direct plus indirect diffuse, as a share of what the base colour gets) picks a place on a ramp
   from a shadow colour (hue turned -0.22 rad, saturation x1.6, value x0.62) through the base to a light
-  colour (washed 55% toward white), in 3 bands with near-hard edges (`soft` 0.06). A plane texture on the
+  colour (the base x1.2, as saturated: 2026-11-05, it had been washed 55% toward white, which greyed
+  every lit surface, blue 0.87 to 0.51 saturation), in 3 bands with near-hard edges (`soft` 0.06). A plane texture on the
   existing UVs (which run round each sphere and capsule, so strokes follow the form), a dozen broad swaths a
   tile, once a part (`size` 1), shakes the band edges and adds a faint value streak. Changed 2026-11-05: the
   first brush (90 thin dabs, 3x2 a part, soft 0.16) read as hair, too real for Marc's broad planes; the ink

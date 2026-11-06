@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { POSES, applyPose, setGeometryDetail } from '../characters/npc.js';
 import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
-import { BAGS, CAPES, CLOTH, FUR, HANDS, HATS, SPECIES, TEXTURES, badGuySets, buildFighter, disposeFighter, gloveAnchors, handsFor, newHands, isBadGuyCloth, isBadGuyFur, nearestSwatch, IDLE, entrantOf, knotAt, visibleBox, newFighter, paint, randomFighter, readFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
+import { LOOKS, BAGS, CAPES, CLOTH, FUR, HANDS, HATS, SPECIES, TEXTURES, badGuySets, buildFighter, disposeFighter, gloveAnchors, handsFor, newHands, isBadGuyCloth, isBadGuyFur, nearestSwatch, IDLE, entrantOf, knotAt, visibleBox, newFighter, paint, randomFighter, readFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
 import { wingShape } from '../characters/owl.js';
 import { floorGrid } from './roster.js';
 import { walkPhase } from '../characters/motion.js';
@@ -103,6 +103,15 @@ for (const species of SPECIES) for (const cape of CAPES) {
   assert.equal(readFighter(JSON.parse(JSON.stringify(bad))).badGuy, true, 'being a bad guy is saved');
   for (const v of ['yes', 1, false, null]) assert.ok(!('badGuy' in readFighter({ ...hero, badGuy: v })), `badGuy: ${v} is dropped`);
   assert.ok(!isBadGuyCloth(readFighter(sets[1]).look.gloves), 'bad-guy colours from another tablet are snapped to a kid\'s swatch');
+}
+
+// the 0.0.8 art pass is on in a match: glints, a painted coat, the head free to look
+for (const species of SPECIES) {
+  const built = buildFighter(newFighter(species));
+  let painted = 0;
+  built.root.traverse((o) => { if (o.material?.userData?.paint) painted++; });
+  assert.ok(LOOKS.lookAt && built.params.lookAt && built.mat.glint && painted > 0, `${species}: built without the art pass (${painted} painted)`);
+  disposeFighter(built);
 }
 
 {

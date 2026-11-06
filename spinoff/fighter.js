@@ -1381,8 +1381,13 @@ export function stepTricks(built, punch, dt) {
 }
 
 /** Same order as the shop's `dressedCharacter` (store/sim/cast.js): dress unmerged, then merge. @param {Fighter} f */
+// REUSE-SPEC.md §Look, the 0.0.8 art pass: every fighter wears these; ?plain on the page turns them off, to compare
+// readability in a match
+const PLAIN = typeof location !== 'undefined' && new URLSearchParams(location.search).has('plain');
+export const LOOKS = Object.freeze(PLAIN ? {} : { lookAt: true, eyeGlint: true, painterly: true, shapedFaces: true });
+
 export function buildFighter(f) {
-  const built = createCharacter({ ...BASE_PARAMS, ...f.params, mergeMeshes: false }, f.species);
+  const built = createCharacter({ ...BASE_PARAMS, ...f.params, ...LOOKS, mergeMeshes: false }, f.species);
   built.root.updateMatrixWorld(true);
   built.root.userData.across = new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3()).x;
   dress(built, outfitOf(f.look));

@@ -1351,6 +1351,12 @@ species `randomise` only uses `Math.random`).
 have to be a natural colour: a hot-pink lion and a cyan owl are the point. Quiet, natural and
 grey colours belong to the bad guys.
 
+**The 0.0.8 art pass is on in matches** (decided 2026-11-05, playtest pending: does the painted, textured look
+make moves harder to read?). Every fighter is built with look-at, eye glint, painterly shading and shaped faces
+(`LOOKS` in `fighter.js`; specs in characters BODIES.md). `?plain` on any page turns them off, to compare the
+same fight. If the paint's bands and strokes muddy the silhouettes, levers: fewer `bands`, lower brush strength,
+a bigger stroke size, a lower ink fray; or paint only the idle and keep motion flat.
+
 **Hit-stop is our rumble** (decided 2026-10-14 for landing a hit; planned 2026-10-16 for the other moments below; playtest: "that little freeze feels AWESOME"). Tablets
 have no controller rumble, so a short freeze of everyone involved (`HITSTOP_TICKS`, 5 ticks at
 60 Hz, about 80 ms) is how an impact is felt. Use it more, scaled by how big the moment is:

@@ -124,7 +124,18 @@ for (const id of speciesIds()) for (const corner of corners(id)) {
       }
     }
   }
-  for (const patch of [...named(built, 'eyeRing'), ...named(built, 'faceAccent')]) {
+  // the ring rims the eye: every point of it within its tube of the eye's outline, none out on the face
+  for (const [i, ring] of named(built, 'eyeRing').entries()) {
+    const { node, r, ry } = built.joints.eye[i];
+    const pos = ring.geometry.attributes.position, v = new THREE.Vector3(), tube = ring.geometry.parameters.radius;
+    let far = 0;
+    for (let k = 0; k < pos.count; k++) {
+      v.fromBufferAttribute(pos, k).sub(node.position);
+      far = Math.max(far, Math.hypot(v.x / r, v.y / ry) - 1);
+    }
+    assert.ok(far * r <= tube * 1.05, `${id}: ring ${i} strays ${(far * r * 1000).toFixed(1)} mm off its eye (tube ${(tube * 1000).toFixed(1)} mm)`);
+  }
+  for (const patch of named(built, 'faceAccent')) {
     const pos = patch.geometry.attributes.position, v = new THREE.Vector3();
     let lo = Infinity, hi = 0;
     for (let i = 0; i < pos.count; i++) {

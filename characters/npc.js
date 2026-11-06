@@ -542,12 +542,12 @@ function eyeSeat(P, { spread, lift, front, head }) {
 }
 
 // BODIES.md §Face: a glint up and out on the pupil, to the key light's side
-const GLINT = Object.freeze({ size: 0.30, up: 0.38, out: 0.22 });
+const GLINT = Object.freeze({ size: 0.22, up: 0.42, out: 0.30 });
 
 function buildGlint(P, mat, pupilR, squash) {
   const g = pupilR * GLINT.size, x = pupilR * GLINT.out, y = pupilR * squash * GLINT.up;
   const z = pupilR * 0.72 * Math.sqrt(1 - GLINT.out ** 2 - GLINT.up ** 2);
-  const glint = part(GEO.sphere, mat.glint, { pos: [x, y, z], scale: [g, g * squash, g * 0.5], shadow: false });
+  const glint = part(GEO.sphere, mat.glint, { pos: [x, y, z], scale: [g, g * squash, g * 0.3], shadow: false });
   glint.name = 'glint';
   return glint;
 }
@@ -564,14 +564,14 @@ function buildPupil(side, P, mat, { squash, depth }) {
 const REACH_STEPS = 24;
 
 /** How far (a share of the eye's radius) the white shows above the skin from the eye's middle along `dir`. @param {number[]} dir */
-function whiteReach(P, { squash, head }, at, dir) {
+function whiteReach(P, { squash, head }, at, dir, steps = REACH_STEPS) {
   if (!head) return 1;
   const [ux, uy] = dir;
   const depth = eyeWhiteDepth(P);
-  for (let i = 1; i <= REACH_STEPS; i++) {
-    const t = i / REACH_STEPS;
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
     const x = at.x + t * P.eyeRadius * ux, y = at.y + t * P.eyeRadius * squash * uy, z = at.z + depth * Math.sqrt(1 - t * t);
-    if (Math.hypot(x / head[0], y / head[1], z / head[2]) < 1) return (i - 1) / REACH_STEPS;
+    if (Math.hypot(x / head[0], y / head[1], z / head[2]) < 1) return (i - 1) / steps;
   }
   return 1;
 }
@@ -604,7 +604,7 @@ export function addEyes(ctx, P, opts = {}) {
     head: opts.head,
   };
   placement.front = eyeSeat(P, placement);
-  if (P.eyeGlint) ctx.mat.glint ??= ctx.addMaterial(eyeMaterial(P, '#ffffff'));
+  if (P.eyeGlint) ctx.mat.glint ??= ctx.addMaterial(Object.assign(eyeMaterial(P, '#ffffff'), { emissive: new THREE.Color('#ffffff') }));
   for (const side of [-1, 1]) {
     const { group, ...eye } = buildEye(side, P, ctx.mat, placement);
     ctx.head.add(joint(group, `${sideName(side)}Eye`));
@@ -613,8 +613,8 @@ export function addEyes(ctx, P, opts = {}) {
   if (opts.head) addFace(ctx, P, placement);
 }
 
-// BODIES.md §Face: appliqué patches lie this far proud of the skull, the ring over the accent
-const ACCENT_LIFT = 0.003, RING_LIFT = 0.006;
+// BODIES.md §Face: the accent lies this far proud of the skull
+const ACCENT_LIFT = 0.003;
 const PATCH_SEGMENTS = 24;
 
 /**
@@ -657,6 +657,23 @@ function rimAngle(P, { spread, lift: up, front, squash, head }, side, lift) {
   return a;
 }
 
+// BODIES.md §Face: the ring is a rim round the white where it leaves the skin, half sunk in it like an eyelid
+const RING_AROUND = 40, RING_REACH = 64;
+
+function eyeRing(P, placement, side) {
+  const { spread, lift, front, squash, head } = placement, depth = eyeWhiteDepth(P);
+  const at = new THREE.Vector3(side * P.headRadius * spread, P.headRadius * lift, P.headRadius * front);
+  const tube = P.eyeRadius * P.eyeRingWidth * 0.4;
+  return cachedGeometry(`ring|${at.toArray()}|${head}|${P.eyeRadius}|${squash}|${tube}`, () => {
+    const rim = Array.from({ length: RING_AROUND }, (_, i) => {
+      const a = (i / RING_AROUND) * Math.PI * 2, u = [Math.cos(a), Math.sin(a)];
+      const t = Math.max(whiteReach(P, placement, at, u, RING_REACH), 0.05);
+      return new THREE.Vector3(at.x + t * P.eyeRadius * u[0], at.y + t * P.eyeRadius * squash * u[1], at.z + depth * Math.sqrt(1 - t * t));
+    });
+    return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rim, true), RING_AROUND * 2, tube, 6, true);
+  });
+}
+
 function addFace(ctx, P, placement) {
   const { spread, lift, head } = placement, unit = 1 / meanOf(head);
   if (P.faceAccent) ctx.mat.accent ??= ctx.addMaterial(feltMaterial(P, accentColorOf(P)));
@@ -667,9 +684,7 @@ function addFace(ctx, P, placement) {
       const rim = rimAngle(P, placement, side, ACCENT_LIFT);
       ctx.head.add(named(part(skinPatch(head, eye, [rim, rim + P.eyeRadius * P.faceAccentSize * unit], ACCENT_LIFT), ctx.mat.accent), 'faceAccent'));
     }
-    if (!P.eyeRing) continue;
-    const rim = rimAngle(P, placement, side, RING_LIFT);
-    ctx.head.add(named(part(skinPatch(head, eye, [rim, rim + P.eyeRadius * P.eyeRingWidth * unit], RING_LIFT), ctx.mat.ring), 'eyeRing'));
+    if (P.eyeRing) ctx.head.add(named(part(eyeRing(P, placement, side), ctx.mat.ring), 'eyeRing'));
   }
 }
 
@@ -1441,17 +1456,15 @@ export const BASE_GUI = Object.freeze({
     ['bodyColor', 'color'], ['footColor', 'color'],
     ['sheen', 0, 1], ['sheenRoughness', 0, 1], ['sheenTint', 'color'], ['roughness', 0, 1],
   ],
-  'eyes (glassy)': [
+  // BODIES.md §Face: a ring or accent colour left alone follows the fur
+  'eyes & face': [
     ['eyeRadius', 0.02, 0.14], ['eyeSpread', 0.1, 0.9], ['eyeLift', -0.5, 0.6],
     ['eyeFront', 0.2, 1.4],
     ['pupilScale', 0.1, 0.9], ['pupilDepth', 0.0, 0.06],
     ['eyeColor', 'color'], ['pupilColor', 'color'],
     ['eyeSheen', 0, 1], ['eyeSheenRough', 0, 1], ['eyeRough', 0, 1], ['eyeClearcoat', 0, 1],
-  ],
-  // BODIES.md §Face: a blank colour is derived from the fur
-  face: [
-    ['eyeRingWidth', 0, 0.8], ['eyeRingColor', 'text'],
-    ['faceAccentSize', 0.3, 2.2], ['faceAccentColor', 'text'],
+    ['eyeRingWidth', 0, 0.8], ['eyeRingColor', 'color', ringColorOf],
+    ['faceAccentSize', 0.3, 2.2], ['faceAccentColor', 'color', accentColorOf],
   ],
   tail: [
     ['tailLength', 0.04, 0.50], ['tailThick', 0.006, 0.06],

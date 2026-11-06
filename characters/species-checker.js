@@ -463,10 +463,17 @@ function resetPlacement(id) {
   root.rotation.set(0, slotYaw(id), 0);
 }
 
+/** A picker on a colour that is derived (by `derive`) until picked. */
+const derivedColor = (params, key, derive) => ({
+  get v() { return derive(params); },
+  set v(c) { params[key] = c; },
+});
+
 function addControl(folder, params, entry, onChange) {
   const [key, a, b, step] = entry;
   if (!(key in params)) return;
-  if (a === 'color') folder.addColor(params, key).onChange(onChange);
+  if (a === 'color' && b) folder.addColor(derivedColor(params, key, b), 'v').name(key).onChange(onChange);
+  else if (a === 'color') folder.addColor(params, key).onChange(onChange);
   else if (a === 'bool' || a === 'text') folder.add(params, key).onChange(onChange);
   else if (Array.isArray(a)) folder.add(params, key, a).onChange(onChange);
   else folder.add(params, key, a, b, step ?? 0.001).onChange(onChange);

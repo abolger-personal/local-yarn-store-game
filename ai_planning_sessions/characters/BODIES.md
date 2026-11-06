@@ -136,20 +136,22 @@ the viewer so both eyes show).
 
 Built 2026-11-04 (the same plate: a pale ring round each eye inside a hot face, a glint in each eye).
 
-- **Glint** (`eyeGlint`): a white glassy dot up and out on each pupil, a child of the pupil so it moves with
-  it, in the eye family (no new draw). The head turns to the camera, so the pupil's front is lit.
-- **Eye ring** (`eyeRing`, `eyeRingWidth` in eye radii, `eyeRingColor`): a band of skin round the eye's
-  white, lifted 6 mm off the skull. Blank colour = derived: dark on a face lighter than L* 70, else pale, in
-  the face's hue. Its inner edge is solved at build where it clears the white, so it frames the eye without
-  covering it.
+- **Glint** (`eyeGlint`): a small flat white dot up and out on each pupil, self-lit so it reads white from any
+  light, a child of the pupil so it moves with it, in the eye family (no new draw). Tuned 2026-11-05: smaller
+  (0.22 pupil radii) and nearer the pupil's edge; the lit one shaded grey.
+- **Eye ring** (`eyeRing`, `eyeRingWidth` in eye radii, `eyeRingColor`): a rim round each eye, a tube along the
+  line where the white leaves the skin (solved at build, `whiteReach`), half sunk in the skin like an eyelid;
+  its thickness is 0.4 x the width. Blank colour = derived: dark on a face lighter than L* 70, else pale, in the
+  face's hue. Moved 2026-11-05 off the face: as a skin band it sat out on the forehead (llama) and crossed
+  between the eyes (owl).
 - **Face accent** (`faceAccent`, `faceAccentSize`, `faceAccentColor`): a mask round the eyes, 3 mm off the
   skull, under the ring. Blank colour = derived from the fur: the first hot hue (scarlet, orange, amber,
   pink) at least 0.15 round from the fur's hue, saturated. The owl's reads as a facial disc. Cheek blush was
   tried on the lion and sat hidden under the muzzle and mane from the match camera (0 px), so every species
   wears the mask, sized per species (owl 1.0, llama 0.8 on its big eyes, lion 1.0 eye radii).
-- Ring and accent are patches of a sphere around the skin point under the eye, scaled onto the head
-  ellipsoid: they lie on the skull at any head shape, are felt (merged, no new draw), and a hat brim
-  presses them like the skull.
+- The accent is a patch of a sphere around the skin point under the eye, scaled onto the head
+  ellipsoid: it lies on the skull at any head shape, is felt (merged, no new draw; the ring too), and a hat brim
+  presses it like the skull. Both colours have pickers in "eyes & face"; untouched, they follow the fur.
 
 ## Painterly
 

@@ -2,6 +2,13 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
+## 0.0.9 (in progress)
+
+### Levels
+- **Level 5, the first generated level:** made by the level generator rather than by hand, the same layout every
+  time: a hill, narrow gaps, a shelf too high to jump to without the step beside it, and syrup. Double jumps
+  and chasing bad guys, as on level 4, and five bad guys.
+
 ## 0.0.8 — 2026-11-05: Characters that look alive
 
 The first art pass. Before and after: `ai_planning_sessions/characters/EVOLUTION.md`.

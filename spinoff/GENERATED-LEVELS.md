@@ -196,6 +196,15 @@ future edits, not proving the generator clever.
 layout on cake. `levelFor` in `levels.js` builds the stage from the query string, on breakfast unless
 `stage` says otherwise; without `seed` it's the stage's hand-made layout, or the tutorial.
 
+## Level 5: the first generated level
+
+(decided 2026-11-05, user: "We need level 5 to be our first generated level.") Breakfast's level 5 is
+`generateStage(8, 5)` (`LEVEL_5_SEED` in `levels.js`): a fixed seed, so it is the same stage every time and
+fits the sticker card like a hand-made level (option 1's spirit), with a hill, choke points, step up's debut
+and syrup. Level 4's rules (double jump, the chase) and the bad-guy formula's five bad guys. `checkLevel`
+passes it with the rest of `LEVELS`. Picking seeds by eye from tablet play, and "surprise me" variants, are
+still the next steps below.
+
 ## Recommendation
 
 (brainstorm 2026-10-14)

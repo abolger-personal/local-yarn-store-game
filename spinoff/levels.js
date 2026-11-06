@@ -96,8 +96,15 @@ const CHASE = Object.freeze({ theme: 'breakfast', number: 4, match: Object.freez
   bricks: Object.freeze([]),
 }) });
 
+// GENERATED-LEVELS.md §Recommendation: level 5, the first generated level. A fixed seed, so it is the same stage every
+// time and its card stamp means something; seed 8 at difficulty 5 has a hill, choke points, step up's debut and syrup.
+// Level 4's rules (double jump, the chase).
+export const LEVEL_5_SEED = 8;
+/** @type {Level} */
+const GENERATED_5 = Object.freeze({ theme: 'breakfast', number: 5, match: CHASE.match, stage: generateStage(LEVEL_5_SEED, 5) });
+
 /** Each stage's levels in order, the dial's numbers (REUSE-SPEC.md §After the lobby). @type {Readonly<Partial<Record<StageName, readonly Level[]>>>} */
-export const LEVELS = Object.freeze({ breakfast: Object.freeze([TUTORIAL, BUILDING, JUMPING, CHASE]) });
+export const LEVELS = Object.freeze({ breakfast: Object.freeze([TUTORIAL, BUILDING, JUMPING, CHASE, GENERATED_5]) });
 
 /** Level `n` of a stage, or null if there isn't one. @param {string} name @returns {Level|null} */
 export const levelOf = (name, n) => (Object.hasOwn(LEVELS, name) && LEVELS[name][n - 1]) || null;

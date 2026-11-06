@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { LEVELS, STAGES, TUTORIAL, badGuys, levelBefore, levelFor, levelOf, piecesEach } from './levels.js';
+import { LEVELS, LEVEL_5_SEED, STAGES, TUTORIAL, badGuys, levelBefore, levelFor, levelOf, piecesEach } from './levels.js';
 import { banksHome, checkLevel } from './check-level.mjs';
 import { createMatch, snapshot, tick } from './sim.js';
+import { generateStage } from './generate.js';
 import { MATCH } from './roster.js';
 
 checkLevel(TUTORIAL.stage, 'tutorial', true);
@@ -9,6 +10,8 @@ for (const [name, { stage }] of Object.entries(STAGES)) checkLevel(stage, `${nam
 for (const [name, levels] of Object.entries(LEVELS)) levels.slice(1).forEach((l, i) => checkLevel(l.stage, `${name} level ${i + 2}`, l.breakIn, l.match));
 
 assert.equal(levelOf('breakfast', 1), TUTORIAL, 'level 1 is the tutorial');
+assert.deepEqual(levelOf('breakfast', 5).stage, generateStage(LEVEL_5_SEED, 5), 'level 5 is the first generated level, its seed at difficulty 5');
+assert.ok(levelOf('breakfast', 5).match.doubleJump, 'level 5 keeps the double jump');
 assert.equal(levelFor('?stage=breakfast&level=2'), levelOf('breakfast', 2), '?level= picks a stage\'s numbered level');
 assert.equal(levelFor('?level=2').number, 2, 'on breakfast, the tutorial stage, if no stage is given');
 assert.equal(levelFor('?stage=breakfast&level=99'), STAGES.breakfast, 'a level that isn\'t there is the stage\'s hand-made layout');

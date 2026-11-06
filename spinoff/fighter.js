@@ -5,7 +5,6 @@ import {
   lowestResting, phaseStep, stepMotion, walkGain, walkLayer, walkPhase,
 } from '../characters/npc.js';
 import { deriveManeColor } from '../characters/lion.js';
-import { MOUTHS } from '../characters/faces.js';
 import { CRAFTS, STITCHES_BY_CRAFT, defaultItem, dress, undress, usualTool } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import '../characters/llama.js';
@@ -136,7 +135,6 @@ function readParams(species, raw) {
     else if (typeof d === 'string' && HEX.test(d) && HEX.test(v)) out[k] = v;
   }
   out.name = oneOf(NAMES, raw.name, out.name);
-  out.mouth = oneOf(MOUTHS, raw.mouth, out.mouth);
   return out;
 }
 

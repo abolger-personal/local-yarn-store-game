@@ -4,7 +4,7 @@ import {
   addConeEars, addEyes, addTail, createCharacter, deriveCoatColor,
   feltMaterial, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh, tailBaseHeight,
 } from './npc.js';
-import { MOUTHS, addMouth, mouthFor, named, onFront, softGeometry } from './faces.js';
+import { named, onFront, softGeometry } from './faces.js';
 
 export {
   TONE_MAPPING, POSES, POSE_KEYS, GEO_DETAIL, NAMES,
@@ -30,7 +30,6 @@ export const DEFAULT_PARAMS = {
   beakSize:      0.090,
   beakColor:     '#e0a53c',
   shapedFaces:   false,
-  mouth:         'smile',
   wingLength:    0.349,
   wingWidth:     0.200,
   wingDepth:     0.360,
@@ -92,7 +91,7 @@ export const RANDOM_RANGES = Object.freeze({
   wingDepth:   [0.280, 0.440],
   beakSize:    [0.070, 0.110],
   tailLength:  [0.160, 0.450],
-  eyeRingWidth: [0.200, 0.450],
+  irisSize:     [0.200, 0.450],
   faceAccentSize: [0.70, 1.30],
 });
 
@@ -164,9 +163,6 @@ const curledBeak = () => {
 };
 let beakGeometry = null;
 
-// the mandible drops for an 'o', tilts for a smug one
-const MANDIBLE = Object.freeze({ smile: [0, 0], smug: [0, 0.18], deadpan: [0, 0], o: [0.14, 0] });
-
 function addShapedBeak(ctx, P) {
   const s = P.beakSize, y = -P.headRadius * 0.10, head = { at: [0, 0, 0], size: headScale(P) };
   const skin = onFront(head, 0, y)[2];
@@ -174,16 +170,12 @@ function addShapedBeak(ctx, P) {
   ctx.head.add(named(part(beakGeometry, ctx.mat.beak, {
     pos: [0, y, skin - s * BEAK.buried], scale: [s * BEAK.wide, s * BEAK.length, s * BEAK.tall], rot: [Math.PI * 0.5, 0, 0],
   }), 'beak'));
-  const [drop, tilt] = MANDIBLE[P.mouth] ?? MANDIBLE.smile;
   ctx.head.add(named(part(softGeometry(), ctx.mat.beak, {
-    pos: onFront(head, 0, y - s * (0.40 + drop)), scale: [s * 0.36, s * 0.20, s * 0.42], rot: [0, 0, tilt],
+    pos: onFront(head, 0, y - s * 0.40), scale: [s * 0.36, s * 0.20, s * 0.42],
   }), 'mandible'));
   ctx.head.add(named(part(softGeometry(), ctx.mat.beak, {
     pos: onFront(head, 0, y + s * 0.42, -s * 0.14), scale: [s * 0.55, s * 0.26, s * 0.32],
   }), 'cere'));
-  addMouth(ctx.head, P, {
-    on: head, width: s * 1.6, drop: -y + s * 0.30, material: ctx.addMaterial(feltMaterial(P, P.pupilColor)), dot: [s * 0.2, s * 0.07, s * 0.35],
-  });
 }
 
 function addBeak(ctx, P) {
@@ -251,7 +243,6 @@ export function randomiseInto(P) {
   P.tailLength = Math.min(P.tailLength, 0.9 * tailBaseHeight(P));
   applyFeatherPreset(P, Math.floor(Math.random() * FEATHER_PRESETS.length));
   P.featherColor = deriveCoatColor(P.bodyColor);
-  P.mouth = mouthFor(P);
   return P;
 }
 
@@ -262,7 +253,7 @@ export function randomParams(overrides = {}) {
 export const OWL_GUI = Object.freeze({
   'face & tufts': [
     ['tuftSize', 0.01, 0.14], ['tuftSpread', 0.1, 1.1], ['tuftTilt', -1.5, 1.5],
-    ['beakSize', 0.01, 0.18], ['beakColor', 'color'], ['mouth', MOUTHS],
+    ['beakSize', 0.01, 0.18], ['beakColor', 'color'],
   ],
   feathers: [
     ['feathers', 'bool'], ['featherColor', 'color'],

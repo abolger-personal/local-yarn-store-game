@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { BASE_PARAMS, GEO, createCharacter, getSpecies, speciesIds } from './npc.js';
-import { MOUTHS } from './faces.js';
 import './owl.js';
 import './llama.js';
 import './lion.js';
@@ -54,7 +53,7 @@ const headHost = (built) => [ellipsoid(built.head.children[0])];
 const muzzleParts = (built) => built.head.children.filter((o) => o.isMesh && o.material === built.mat.muzzle);
 
 function checkOwl(built, label) {
-  for (const name of ['beak', 'mandible', 'cere', 'mouth']) {
+  for (const name of ['beak', 'mandible', 'cere']) {
     const [mesh] = named(built, name);
     assert.ok(mesh, `${label}: no ${name}`);
     assertOnSurface(mesh, headHost(built), label);
@@ -63,11 +62,10 @@ function checkOwl(built, label) {
 
 function checkLlama(built, label) {
   const [cyl] = muzzleParts(built);
-  const lips = named(built, 'lip'), [jaw] = named(built, 'jaw'), [mouth] = named(built, 'mouth');
+  const lips = named(built, 'lip'), [jaw] = named(built, 'jaw');
   assert.equal(lips.length, 2, `${label}: two lip lobes`);
   lips.forEach((lip) => assertOnSurface(lip, [tube(cyl)], label));
   assertOnSurface(jaw, lips.map(ellipsoid), label);
-  assertOnSurface(mouth, [ellipsoid(jaw)], label);
   const r = built.params.muzzleThick;
   const lipFront = Math.max(...lips.flatMap(vertices).map((v) => v.z));
   const under = Math.max(...vertices(jaw).map((v) => v.z)) - lipFront;
@@ -78,24 +76,19 @@ function checkLion(built, label) {
   const cap = muzzleParts(built).find((o) => o.geometry === GEO.sphere);
   const pads = named(built, 'pad');
   assert.equal(pads.length, 2, `${label}: two whisker pads`);
-  for (const mesh of [...pads, ...named(built, 'nose'), ...named(built, 'mouth')]) assertOnSurface(mesh, [ellipsoid(cap)], label);
-  const dots = named(built, 'whiskerDot');
-  assert.equal(dots.length, 6, `${label}: three dots a pad`);
-  dots.forEach((dot) => assertOnSurface(dot, pads.map(ellipsoid), label));
+  for (const mesh of [...pads, ...named(built, 'nose')]) assertOnSurface(mesh, [ellipsoid(cap)], label);
 }
 
 const CHECK = { owl: checkOwl, llama: checkLlama, lion: checkLion };
-const FACE = new Set(['beak', 'mandible', 'cere', 'lip', 'jaw', 'pad', 'whiskerDot', 'mouth']);
+const FACE = new Set(['beak', 'mandible', 'cere', 'lip', 'jaw', 'pad']);
 
-// what shows of the new face stays below the eyes' tops, its mouth below their middles (the lips are the old muzzle tip)
+// what shows of the new face stays below the eyes' tops (the lips are the old muzzle tip)
 function checkLow(built, label) {
-  const eyeMid = Math.min(...built.joints.eye.map((e) => e.node.position.y));
-  const eyeTop = eyeMid + built.params.eyeRadius;
+  const eyeTop = Math.min(...built.joints.eye.map((e) => e.node.position.y)) + built.params.eyeRadius;
   const [skull] = headHost(built);
   for (const mesh of built.head.children.filter((o) => FACE.has(o.name) && o.name !== 'lip')) {
     const shown = vertices(mesh).filter((v) => skull(v) > 1);
-    const top = mesh.name === 'mouth' ? eyeMid : eyeTop;
-    assert.ok(Math.max(...shown.map((v) => v.y)) < top, `${label}: ${mesh.name} reaches up past the eyes`);
+    assert.ok(Math.max(...shown.map((v) => v.y)) < eyeTop, `${label}: ${mesh.name} reaches up past the eyes`);
   }
 }
 
@@ -106,15 +99,13 @@ function corners(id) {
   return [['defaults', {}], ['min', at(0)], ['max', at(1)], ...random.map((P, i) => [`random ${i}`, P])];
 }
 
-// every part on the face, low, across range corners and mouths
+// every part on the face, low, across range corners
 for (const id of speciesIds()) {
   for (const [corner, extra] of corners(id)) {
-    for (const mouth of MOUTHS) {
-      const label = `${id} ${corner} ${mouth}`;
-      const built = build(paramsOf(id, { ...extra, mouth, shapedFaces: true, mergeMeshes: false }), id);
-      CHECK[id](built, label);
-      checkLow(built, label);
-    }
+    const label = `${id} ${corner}`;
+    const built = build(paramsOf(id, { ...extra, shapedFaces: true, mergeMeshes: false }), id);
+    CHECK[id](built, label);
+    checkLow(built, label);
   }
 }
 
@@ -139,25 +130,10 @@ for (const id of speciesIds()) {
   assert.ok(out < built.params.beakSize, 'a short beak: no longer than beakSize out of the face');
 }
 
-// the mouths differ
+// no line art: shape only (the black mouths and whisker dots came off 2026-11-05)
 for (const id of speciesIds()) {
-  const boxes = MOUTHS.map((mouth) => {
-    const [mesh] = named(build(paramsOf(id, { mouth, shapedFaces: true, mergeMeshes: false }), id), 'mouth');
-    return new THREE.Box3().setFromPoints(vertices(mesh));
-  });
-  for (let a = 0; a < boxes.length; a++) {
-    for (let b = a + 1; b < boxes.length; b++) {
-      const gap = Math.max(...boxes[a].min.clone().sub(boxes[b].min).toArray().map(Math.abs),
-        ...boxes[a].max.clone().sub(boxes[b].max).toArray().map(Math.abs));
-      assert.ok(gap > 1e-3, `${id}: ${MOUTHS[a]} and ${MOUTHS[b]} make the same mouth`);
-    }
-  }
-}
-
-// a random character gets any of the mouths
-for (const id of speciesIds()) {
-  const seen = new Set(Array.from({ length: 80 }, () => getSpecies(id).randomise(paramsOf(id)).mouth));
-  assert.deepEqual([...seen].sort(), [...MOUTHS].sort(), `${id}: randomise picks every mouth`);
+  const built = build(paramsOf(id, { shapedFaces: true, mergeMeshes: false }), id);
+  assert.equal(named(built, 'mouth').length + named(built, 'whiskerDot').length, 0, `${id}: line art on the face`);
 }
 
 // off is exactly today's face

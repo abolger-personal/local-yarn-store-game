@@ -91,9 +91,9 @@ export const BASE_PARAMS = Object.freeze({
 
   lookAt:        false,
   eyeGlint:      false,
-  eyeRing:       false,
-  eyeRingWidth:  0.30,
-  eyeRingColor:  '',
+  iris:          false,
+  irisSize:      0.30,
+  irisColor:     '',
   faceAccent:    false,
   faceAccentSize:  1.00,
   faceAccentColor: '',
@@ -214,19 +214,15 @@ export function deriveAccentColor(bodyHex) {
   return hsl(h, 0.85, 0.55);
 }
 
-// BODIES.md §Face: pale on a dark face, dark on a pale one, in the face's hue; the switch is L* 70 as luminance
-const RING_SWITCH = 0.4075;
-
-export function ringColorFor(faceHex) {
-  const face = {};
-  new THREE.Color(faceHex).getHSL(face);
-  const c = new THREE.Color(faceHex);
-  return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b > RING_SWITCH ? hsl(face.h, Math.min(face.s, 0.5), 0.14) : hsl(face.h, 0.4, 0.93);
+// BODIES.md §Face: the iris in the fur's hue, rich and mid-dark between the white and the pupil; amber on grey fur
+export function irisColorFor(furHex) {
+  const fur = {};
+  new THREE.Color(furHex).getHSL(fur);
+  return hsl(fur.s < 0.12 ? 0.11 : fur.h, 0.75, 0.38);
 }
 
 export const accentColorOf = (P) => P.faceAccentColor || deriveAccentColor(P.bodyColor);
-const ringUnder = (P) => (P.faceAccent ? accentColorOf(P) : P.bodyColor);
-export const ringColorOf = (P) => P.eyeRingColor || ringColorFor(ringUnder(P));
+export const irisColorOf = (P) => P.irisColor || irisColorFor(P.bodyColor);
 
 export function slugify(text) {
   const slug = (text ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -552,26 +548,37 @@ function buildGlint(P, mat, pupilR, squash) {
   return glint;
 }
 
+// BODIES.md §Face: the white's own shape a hair proud and narrower, so it shows as a coloured cap round the pupil
+// `show` across; its radius solves where it dips back under the white. Never wider than the eye, so never past it.
+const IRIS_PROUD = 1.02;
+
+function buildIris(P, mat, pupilR, { squash, depth }, at) {
+  const show = Math.min(pupilR * (1 + P.irisSize * 1.5), P.eyeRadius * 0.9), k = IRIS_PROUD ** 2;
+  const r = Math.sqrt((k * show ** 2) / (k - 1 + (show / P.eyeRadius) ** 2));
+  return named(part(GEO.sphere, mat.iris, { pos: [0, 0, -at], scale: [r, r * squash, depth * IRIS_PROUD], shadow: false }), 'iris');
+}
+
 function buildPupil(side, P, mat, { squash, depth }) {
   const pupilR = P.eyeRadius * P.pupilScale;
   const pupil = joint(new THREE.Group(), `${sideName(side)}Pupil`);
   pupil.position.z = depth * 0.6 + P.pupilDepth;
   pupil.add(part(GEO.sphere, mat.pupil, { scale: [pupilR, pupilR * squash, pupilR * 0.72] }));
   if (P.eyeGlint) pupil.add(buildGlint(P, mat, pupilR, squash));
+  if (P.iris) pupil.add(buildIris(P, mat, pupilR, { squash, depth }, pupil.position.z));
   return pupil;
 }
 
 const REACH_STEPS = 24;
 
 /** How far (a share of the eye's radius) the white shows above the skin from the eye's middle along `dir`. @param {number[]} dir */
-function whiteReach(P, { squash, head }, at, dir, steps = REACH_STEPS) {
+function whiteReach(P, { squash, head }, at, dir) {
   if (!head) return 1;
   const [ux, uy] = dir;
   const depth = eyeWhiteDepth(P);
-  for (let i = 1; i <= steps; i++) {
-    const t = i / steps;
+  for (let i = 1; i <= REACH_STEPS; i++) {
+    const t = i / REACH_STEPS;
     const x = at.x + t * P.eyeRadius * ux, y = at.y + t * P.eyeRadius * squash * uy, z = at.z + depth * Math.sqrt(1 - t * t);
-    if (Math.hypot(x / head[0], y / head[1], z / head[2]) < 1) return (i - 1) / steps;
+    if (Math.hypot(x / head[0], y / head[1], z / head[2]) < 1) return (i - 1) / REACH_STEPS;
   }
   return 1;
 }
@@ -604,6 +611,7 @@ export function addEyes(ctx, P, opts = {}) {
     head: opts.head,
   };
   placement.front = eyeSeat(P, placement);
+  if (P.iris) ctx.mat.iris ??= ctx.addMaterial(eyeMaterial(P, irisColorOf(P)));
   if (P.eyeGlint) ctx.mat.glint ??= ctx.addMaterial(Object.assign(eyeMaterial(P, '#ffffff'), { emissive: new THREE.Color('#ffffff') }));
   for (const side of [-1, 1]) {
     const { group, ...eye } = buildEye(side, P, ctx.mat, placement);
@@ -657,34 +665,13 @@ function rimAngle(P, { spread, lift: up, front, squash, head }, side, lift) {
   return a;
 }
 
-// BODIES.md §Face: the ring is a rim round the white where it leaves the skin, half sunk in it like an eyelid
-const RING_AROUND = 40, RING_REACH = 64;
-
-function eyeRing(P, placement, side) {
-  const { spread, lift, front, squash, head } = placement, depth = eyeWhiteDepth(P);
-  const at = new THREE.Vector3(side * P.headRadius * spread, P.headRadius * lift, P.headRadius * front);
-  const tube = P.eyeRadius * P.eyeRingWidth * 0.4;
-  return cachedGeometry(`ring|${at.toArray()}|${head}|${P.eyeRadius}|${squash}|${tube}`, () => {
-    const rim = Array.from({ length: RING_AROUND }, (_, i) => {
-      const a = (i / RING_AROUND) * Math.PI * 2, u = [Math.cos(a), Math.sin(a)];
-      const t = Math.max(whiteReach(P, placement, at, u, RING_REACH), 0.05);
-      return new THREE.Vector3(at.x + t * P.eyeRadius * u[0], at.y + t * P.eyeRadius * squash * u[1], at.z + depth * Math.sqrt(1 - t * t));
-    });
-    return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rim, true), RING_AROUND * 2, tube, 6, true);
-  });
-}
-
 function addFace(ctx, P, placement) {
+  if (!P.faceAccent) return;
   const { spread, lift, head } = placement, unit = 1 / meanOf(head);
-  if (P.faceAccent) ctx.mat.accent ??= ctx.addMaterial(feltMaterial(P, accentColorOf(P)));
-  if (P.eyeRing) ctx.mat.ring ??= ctx.addMaterial(feltMaterial(P, ringColorOf(P)));
+  ctx.mat.accent ??= ctx.addMaterial(feltMaterial(P, accentColorOf(P)));
   for (const side of [-1, 1]) {
-    const eye = [side * P.headRadius * spread, P.headRadius * lift];
-    if (P.faceAccent) {
-      const rim = rimAngle(P, placement, side, ACCENT_LIFT);
-      ctx.head.add(named(part(skinPatch(head, eye, [rim, rim + P.eyeRadius * P.faceAccentSize * unit], ACCENT_LIFT), ctx.mat.accent), 'faceAccent'));
-    }
-    if (P.eyeRing) ctx.head.add(named(part(eyeRing(P, placement, side), ctx.mat.ring), 'eyeRing'));
+    const eye = [side * P.headRadius * spread, P.headRadius * lift], rim = rimAngle(P, placement, side, ACCENT_LIFT);
+    ctx.head.add(named(part(skinPatch(head, eye, [rim, rim + P.eyeRadius * P.faceAccentSize * unit], ACCENT_LIFT), ctx.mat.accent), 'faceAccent'));
   }
 }
 
@@ -1463,7 +1450,7 @@ export const BASE_GUI = Object.freeze({
     ['pupilScale', 0.1, 0.9], ['pupilDepth', 0.0, 0.06],
     ['eyeColor', 'color'], ['pupilColor', 'color'],
     ['eyeSheen', 0, 1], ['eyeSheenRough', 0, 1], ['eyeRough', 0, 1], ['eyeClearcoat', 0, 1],
-    ['eyeRingWidth', 0, 0.8], ['eyeRingColor', 'color', ringColorOf],
+    ['irisSize', 0, 0.8], ['irisColor', 'color', irisColorOf],
     ['faceAccentSize', 0.3, 2.2], ['faceAccentColor', 'color', accentColorOf],
   ],
   tail: [

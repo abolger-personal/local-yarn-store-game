@@ -27,7 +27,7 @@ const SLOTS = ['A', 'B'];
 const STYLE_SWITCHES = Object.freeze([
   { key: 'lookAt', name: 'look-at', live: true },
   { key: 'eyeGlint', name: 'eye glint' },
-  { key: 'eyeRing', name: 'eye ring' },
+  { key: 'iris', name: 'iris' },
   { key: 'faceAccent', name: 'face accent' },
   { key: 'painterly', name: 'painterly' },
   { key: 'shapedFaces', name: 'shaped faces' },
@@ -548,6 +548,8 @@ function addSceneFolder() {
 function addPaintKnobs(folder) {
   folder.add(PAINT.bands, 'value', 2, 6, 1).name('paint bands');
   folder.add(PAINT.brush, 'value', 0, 1, 0.01).name('brush strength');
+  folder.add(PAINT.size, 'value', 0.3, 3, 0.01).name('fur stroke size');
+  folder.add(PAINT.soft, 'value', 0, 0.5, 0.01).name('fur band edge');
   folder.add(PAINT.light, 'value', 0.3, 1.6, 0.01).name('paint light');
   folder.add(PAINT.fray, 'value', 0, 0.4, 0.01).name('ink fray');
   folder.add(PAINT.feather, 'value', 0, 0.4, 0.01).name('feather rows');

@@ -3,7 +3,7 @@ import {
   addEars, addEyes, addTail, createCharacter, deriveCoatColor, touchingScallopSize,
   feltMaterial, POSES, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh,
 } from './npc.js';
-import { MOUTHS, addMouth, mouthFor, named, softGeometry } from './faces.js';
+import { named, softGeometry } from './faces.js';
 
 export const DEFAULT_PARAMS = {
   ...BASE_PARAMS,
@@ -32,7 +32,6 @@ export const DEFAULT_PARAMS = {
   noseColor:     '#141013',
   noseSize:      0.60,
   shapedFaces:   false,
-  mouth:         'smile',
   earLength:     0.140,
   earWidth:      0.032,
   earFlatten:    0.45,
@@ -105,7 +104,7 @@ export const RANDOM_RANGES = Object.freeze({
   eyeSpread:    [0.520, 0.660],
   eyeFront:     [0.620, 0.780],
   tailLength:   [0.065, 0.110],
-  eyeRingWidth: [0.200, 0.450],
+  irisSize:     [0.200, 0.450],
   faceAccentSize: [0.60, 1.00],
 });
 
@@ -168,7 +167,7 @@ function addMuzzle(ctx, P) {
   }));
 }
 
-// BODIES.md §Shaped faces: two soft lobes with the llama's cleft between, a jaw a hair further forward, a mouth
+// BODIES.md §Shaped faces: two soft lobes with the llama's cleft between, a jaw a hair further forward
 const LIP = Object.freeze({ out: 0.38, w: 0.64, h: 0.84, d: 0.78 });
 const JAW = Object.freeze({ down: 0.66, w: 0.50, h: 0.32, d: 0.55, underbite: 0.04 });
 
@@ -183,7 +182,6 @@ function addLips(ctx, P, { y, end, r }) {
     size: [r * JAW.w, r * JAW.h, r * JAW.d],
   };
   ctx.head.add(named(part(softGeometry(), ctx.mat.muzzle, { pos: jaw.at, scale: jaw.size }), 'jaw'));
-  addMouth(ctx.head, P, { on: jaw, width: r * 0.6, drop: -r * 0.10, material: ctx.mat.nose });
 }
 
 function addNose(ctx, P) {
@@ -257,7 +255,6 @@ export function randomiseInto(P) {
   randomiseBase(P, RANDOM_RANGES);
   applyFleecePreset(P, Math.floor(Math.random() * FLEECE_PRESETS.length));
   P.fleeceColor = deriveCoatColor(P.bodyColor);
-  P.mouth = mouthFor(P);
   return P;
 }
 
@@ -268,7 +265,7 @@ export function randomParams(overrides = {}) {
 export const LLAMA_GUI = Object.freeze({
   'muzzle & ears': [
     ['muzzleLength', 0.05, 0.40], ['muzzleThick', 0.02, 0.14], ['muzzleDrop', 0, 0.8],
-    ['muzzleColor', 'color'], ['noseColor', 'color'], ['noseSize', 0.2, 1.4], ['mouth', MOUTHS],
+    ['muzzleColor', 'color'], ['noseColor', 'color'], ['noseSize', 0.2, 1.4],
     ['earLength', 0.03, 0.30], ['earWidth', 0.008, 0.07], ['earFlatten', 0.15, 1.0],
     ['earSpread', 0.1, 0.9], ['earTilt', -0.6, 0.9],
   ],

@@ -5,7 +5,7 @@ import {
   feltMaterial, LIMB_TAPER, POSES, part, randomiseBase, registerSpecies, scallopAngles,
   scallopBases, scallopGeometry, scallopMesh,
 } from './npc.js';
-import { MOUTHS, addMouth, mouthFor, dotGeometry, named, onFront, softGeometry, softTriangle } from './faces.js';
+import { named, softGeometry, softTriangle } from './faces.js';
 
 const TIP = LIMB_TAPER;
 
@@ -60,7 +60,6 @@ export const DEFAULT_PARAMS = {
   noseColor:     '#241a1c',
   noseSize:      0.52,
   shapedFaces:   false,
-  mouth:         'smile',
   earLength:     0.088,
   earWidth:      0.040,
   earFlatten:    0.40,
@@ -140,7 +139,7 @@ export const RANDOM_RANGES = Object.freeze({
   eyeRadius:    [0.058, 0.082],
   eyeSpread:    [0.360, 0.480],
   eyeFront:     [0.620, 0.740],
-  eyeRingWidth: [0.200, 0.450],
+  irisSize:     [0.200, 0.450],
   faceAccentSize: [0.80, 1.30],
 });
 
@@ -243,9 +242,8 @@ function addNose(ctx, P) {
   if (P.shapedFaces) addWhiskerPads(ctx, P);
 }
 
-// BODIES.md §Shaped faces: two puffy whisker pads with a few dots, a tiny mouth below
+// BODIES.md §Shaped faces: two puffy whisker pads
 const PAD = Object.freeze({ out: 0.46, down: 0.34, w: 0.52, h: 0.42, d: 0.5, push: 0.52 });
-const DOTS = Object.freeze([[-0.35, 0.25], [0.05, 0.32], [0.4, 0.12]]);
 
 function addWhiskerPads(ctx, P) {
   const y = -P.headRadius * P.muzzleDrop, front = P.headRadius * P.muzzleStart + P.muzzleLength;
@@ -253,12 +251,7 @@ function addWhiskerPads(ctx, P) {
   for (const side of [-1, 1]) {
     const pad = { at: [side * w * PAD.out, y - h * PAD.down, front + d * PAD.push], size: [w * PAD.w, h * PAD.h, d * PAD.d] };
     ctx.head.add(named(part(softGeometry(), ctx.mat.muzzle, { pos: pad.at, scale: pad.size }), 'pad'));
-    for (const [u, v] of DOTS) {
-      const pos = onFront(pad, side * u * pad.size[0], v * pad.size[1]);
-      ctx.head.add(named(part(dotGeometry(), ctx.mat.nose, { pos, scale: [w * 0.035, w * 0.035, w * 0.03] }), 'whiskerDot'));
-    }
   }
-  addMouth(ctx.head, P, { on: { at: [0, y, front], size: [w, h, d] }, width: w * 0.42, drop: h * 0.8, material: ctx.mat.nose });
 }
 
 function addMane(ctx, P) {
@@ -390,7 +383,6 @@ export function randomiseInto(P) {
   applyManePreset(P, Math.floor(Math.random() * MANE_PRESETS.length));
   P.maneSides = pick([4, 5, 6]);
   P.maneColor = deriveManeColor(P.bodyColor);
-  P.mouth = mouthFor(P);
   return P;
 }
 
@@ -404,7 +396,7 @@ export const LION_GUI = Object.freeze({
     ['muzzleWidth', 0.04, 0.18], ['muzzleDepth', 0.03, 0.14],
     ['muzzleRound', 0, 1.8],
     ['muzzleDrop', 0, 0.8], ['muzzleColor', 'color'], ['noseColor', 'color'],
-    ['noseSize', 0.2, 1.0], ['mouth', MOUTHS],
+    ['noseSize', 0.2, 1.0],
     ['earLength', 0.03, 0.20], ['earWidth', 0.010, 0.08], ['earFlatten', 0.15, 1.0],
     ['earSpread', 0.1, 0.9], ['earTilt', -0.6, 0.9], ['earPoint', 0, 0.9],
   ],

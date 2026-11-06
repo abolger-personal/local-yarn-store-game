@@ -6,7 +6,8 @@ import * as THREE from 'three';
 /** The knobs, shared by every painted material (species checker "style" folder). */
 export const PAINT = {
   bands: { value: 3 },
-  soft: { value: 0.16 },
+  soft: { value: 0.06 },
+  size: { value: 1 },
   brush: { value: 0.35 },
   streak: { value: 0.08 },
   light: { value: 0.8 },
@@ -60,24 +61,26 @@ vec3 paintRamp(vec3 base, float t) {
 const PARS = `
 uniform sampler2D paintBrushMap;
 uniform sampler2D paintFeatherMap;
-uniform float paintBands, paintSoft, paintBrush, paintStreak, paintLevel, paintPool, paintFray, paintFeather, paintPlume;
+uniform sampler2D paintPlaneMap;
+uniform float paintSize, paintBands, paintSoft, paintBrush, paintStreak, paintLevel, paintPool, paintFray, paintFeather, paintPlume;
 varying vec2 vPaintUv;`;
 
 // light falling on the fragment, as a share of what a lit base colour would get
-const LEVEL = `
+const level = (stroke) => `
   vec3 paintLit = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse;
   float paintBase = max(dot(diffuseColor.rgb, vec3(${LUMA.join(', ')})), 1e-3);
   float paintT = dot(paintLit, vec3(${LUMA.join(', ')})) / paintBase / (2.0 * paintLevel);
-  float paintStroke = texture2D(paintBrushMap, vPaintUv * vec2(3.0, 2.0)).r - 0.5;
+  float paintStroke = ${stroke} - 0.5;
   paintT = clamp(paintT + paintStroke * paintBrush, 0.0, 1.0);`;
 
-const FUR = `{${LEVEL}
+// fur: a few broad planes a part (Marc), not hair; ink: the fine brush
+const FUR = `{${level('texture2D(paintPlaneMap, vPaintUv / paintSize).r')}
   float paintB = paintT * paintBands;
   paintT = (floor(paintB) + smoothstep(0.5 - paintSoft, 0.5 + paintSoft, fract(paintB))) / paintBands;
   outgoingLight = paintRamp(diffuseColor.rgb, paintT) * (1.0 + paintStroke * paintStreak) * paintLevel;
 }`;
 
-const INK = `{${LEVEL}
+const INK = `{${level('texture2D(paintBrushMap, vPaintUv * vec2(3.0, 2.0)).r')}
   float paintFacing = dot(normalize(normal), normalize(vViewPosition));
   float paintPlumed = max(paintPlume, step(1.5, vPaintUv.y));
   float paintNoise = texture2D(paintBrushMap, vPaintUv * vec2(9.0, 6.0)).g;
@@ -101,6 +104,22 @@ function drawBrush(g) {
     const x = Math.random() * TILE, y = Math.random() * TILE, v = Math.floor(60 + Math.random() * 136);
     const len = 14 + Math.random() * 30, w = 2 + Math.random() * 5, tilt = (Math.random() - 0.5) * 0.5;
     g.fillStyle = `rgba(${v},${Math.floor(Math.random() * 255)},${v},0.35)`;
+    for (const [dx, dy] of [[0, 0], [-TILE, 0], [TILE, 0], [0, -TILE], [0, TILE]]) {
+      g.beginPath();
+      g.ellipse(x + dx, y + dy, len, w, tilt, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+}
+
+/** Marc's planes: a dozen broad swaths a tile, each one flat value, edges kept. */
+function drawPlanes(g) {
+  g.fillStyle = 'rgb(128,128,128)';
+  g.fillRect(0, 0, TILE, TILE);
+  for (let i = 0; i < 12; i++) {
+    const x = Math.random() * TILE, y = Math.random() * TILE, v = Math.floor(40 + Math.random() * 176);
+    const len = 36 + Math.random() * 40, w = 12 + Math.random() * 14, tilt = (Math.random() - 0.5) * 1.2;
+    g.fillStyle = `rgba(${v},${v},${v},0.8)`;
     for (const [dx, dy] of [[0, 0], [-TILE, 0], [TILE, 0], [0, -TILE], [0, TILE]]) {
       g.beginPath();
       g.ellipse(x + dx, y + dy, len, w, tilt, 0, Math.PI * 2);
@@ -137,12 +156,14 @@ function canvasTexture(draw) {
 }
 
 let maps = null;
-const paintMaps = () => (maps ??= { brush: { value: canvasTexture(drawBrush) }, feather: { value: canvasTexture(drawFeathers) } });
+const paintMaps = () => (maps ??= {
+  brush: { value: canvasTexture(drawBrush) }, feather: { value: canvasTexture(drawFeathers) }, plane: { value: canvasTexture(drawPlanes) },
+});
 
 function uniformsFor(material) {
-  const { brush, feather } = paintMaps();
+  const { brush, feather, plane } = paintMaps();
   return {
-    paintBrushMap: brush, paintFeatherMap: feather, paintBands: PAINT.bands, paintSoft: PAINT.soft,
+    paintBrushMap: brush, paintFeatherMap: feather, paintPlaneMap: plane, paintSize: PAINT.size, paintBands: PAINT.bands, paintSoft: PAINT.soft,
     paintBrush: PAINT.brush, paintStreak: PAINT.streak, paintLevel: PAINT.light, paintPool: PAINT.pool,
     paintFray: PAINT.fray, paintFeather: PAINT.feather, paintPlume: { value: material.userData.plume ? 1 : 0 },
   };

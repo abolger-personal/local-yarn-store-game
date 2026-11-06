@@ -182,8 +182,8 @@ for (const id of speciesIds()) {
   }
   undress(built);
   const face = [];
-  // the eye ring and face accent are skin (BODIES.md §Face): a brim presses them as it does the skull
-  const skin = new Set(['eyeRing', 'faceAccent']);
+  // the face accent is skin (BODIES.md §Face): a brim presses it as it does the skull
+  const skin = new Set(['faceAccent']);
   head.traverse((o) => {
     if (o.isMesh && o !== mane && !skin.has(o.name) && head.worldToLocal(new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3())).z > 0.05) face.push([o, o.geometry]);
   });

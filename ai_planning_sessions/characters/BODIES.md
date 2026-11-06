@@ -134,18 +134,19 @@ the viewer so both eyes show).
 
 ## Face
 
-Built 2026-11-04 (the same plate: a pale ring round each eye inside a hot face, a glint in each eye).
+Built 2026-11-04 (the same plate: a hot face, a glint in each eye); the iris 2026-11-05.
 
 - **Glint** (`eyeGlint`): a small flat white dot up and out on each pupil, self-lit so it reads white from any
   light, a child of the pupil so it moves with it, in the eye family (no new draw). Tuned 2026-11-05: smaller
   (0.22 pupil radii) and nearer the pupil's edge; the lit one shaded grey.
-- **Eye ring** (`eyeRing`, `eyeRingWidth` in eye radii, `eyeRingColor`): a rim round each eye, a tube along the
-  line where the white leaves the skin (solved at build, `whiteReach`), half sunk in the skin like an eyelid;
-  its thickness is 0.4 x the width. Blank colour = derived: dark on a face lighter than L* 70, else pale, in the
-  face's hue. Moved 2026-11-05 off the face: as a skin band it sat out on the forehead (llama) and crossed
-  between the eyes (owl).
+- **Iris** (`iris`, `irisSize`, `irisColor`): a coloured cap round each pupil, a child of it: the white's own
+  ellipsoid 2% proud and narrower, so it shows `1 + 1.5 x irisSize` pupil radii across (at most 0.9 of the
+  eye) and dips back under the white at its edge; never wider than the eye, so never past its outline. Eye
+  family (no new draw). Blank colour = derived: the fur's hue, saturation 0.75, lightness 0.38 (amber on grey
+  fur). 2026-11-05: replaced the eye ring (a skin band round the eye, then an eyelid-like rim); the intent was
+  an iris.
 - **Face accent** (`faceAccent`, `faceAccentSize`, `faceAccentColor`): a mask round the eyes, 3 mm off the
-  skull, under the ring. Blank colour = derived from the fur: the first hot hue (scarlet, orange, amber,
+  skull. Blank colour = derived from the fur: the first hot hue (scarlet, orange, amber,
   pink) at least 0.15 round from the fur's hue, saturated. The owl's reads as a facial disc. Cheek blush was
   tried on the lion and sat hidden under the muzzle and mane from the match camera (0 px), so every species
   wears the mask, sized per species (owl 1.0, llama 0.8 on its big eyes, lion 1.0 eye radii).
@@ -162,9 +163,11 @@ Built 2026-11-04, off by default (`painterly`, per character; the species checke
   clearcoat off, and the lighting replaced); light to shadow is a colour shift: the light falling on a
   fragment (direct plus indirect diffuse, as a share of what the base colour gets) picks a place on a ramp
   from a shadow colour (hue turned -0.22 rad, saturation x1.6, value x0.62) through the base to a light
-  colour (washed 55% toward white), in 3 soft bands. A brushstroke texture on the existing UVs (which run
-  round each sphere and capsule, so strokes follow the form) shakes the band edges and adds a faint value
-  streak. The llama gets fur too: its fleece is a broad pale mass, like the horse, and its scalloped fleece
+  colour (washed 55% toward white), in 3 bands with near-hard edges (`soft` 0.06). A plane texture on the
+  existing UVs (which run round each sphere and capsule, so strokes follow the form), a dozen broad swaths a
+  tile, once a part (`size` 1), shakes the band edges and adds a faint value streak. Changed 2026-11-05: the
+  first brush (90 thin dabs, 3x2 a part, soft 0.16) read as hair, too real for Marc's broad planes; the ink
+  keeps it. The llama gets fur too: its fleece is a broad pale mass, like the horse, and its scalloped fleece
   geometry already gives the wool its edge; ink pooling would grey a cream fleece toward dirty, and a fray
   on top of the scallops reads moth-eaten (the cute rule).
 - **Ink wash** (owl), from Ohara Koson's crow and Bada Shanren's Two Chicks: a ramp in the body colour's
@@ -176,8 +179,8 @@ Built 2026-11-04, off by default (`painterly`, per character; the species checke
   outline). Merged, plumage is marked by its uv lifted by 2 whole tiles.
 - One shader variant per style (`customProgramCacheKey`), every painted felt material one family
   (`paint-fur`, `paint-ink`), so a merged character is still one felt draw and the cast shares a material.
-  The knobs are shared uniforms (`PAINT`: bands, soft, brush, streak, light, pool, fray, feather), live in the
-  species checker's style folder. Cost: two 128x128 canvas textures for the whole cast (a grey pixel in
+  The knobs are shared uniforms (`PAINT`: bands, soft, size, brush, streak, light, pool, fray, feather), live in the
+  species checker's style folder. Cost: three 128x128 canvas textures for the whole cast (a grey pixel in
   node), two or three texture reads a fragment, no extra meshes, draws or passes.
 - Off, the felt is exactly as before (same material, no shader hook).
 
@@ -323,22 +326,20 @@ plus each species' face builders; checks in `characters/faces.test.mjs`.
   teeth, gums, fangs, big jaws, wide-open mouths, sneers or raptor hooks; nothing that sharpens or ages
   a face. When unsure, smaller and rounder. Everything is sized from existing params (beak size, muzzle
   thickness, muzzle width/depth), so every random-range corner works; the test walks min, max and
-  random corners with every mouth.
+  random corners.
 - **Owl:** a short beak (protrudes under `beakSize`) whose blunt tip curls gently down — a tapered
   cylinder bent by t³, 0.36 beakSize of drop at the tip; a small lower mandible; a soft cere bump where
-  the beak meets the face; gape corners either side of the beak, felt in the pupil colour.
+  the beak meets the face.
 - **Llama:** the muzzle's round tip becomes two soft lobes with the llama cleft between (the nose's stem
   runs down into it); a small jaw below, its front only a hint past the lips (0.04 muzzle thickness,
-  tested under 0.08); the mouth line along the jaw's top, in nose colour.
+  tested under 0.08).
 - **Lion:** a small rounded inverted-triangle nose (same place and size as the old one), two puffy
-  whisker pads in muzzle colour with three dots each, a tiny mouth line under them.
-- **Mouth** (`mouth`, in each species' face GUI folder): `smile` (default, corners up), `smug` (one
-  corner curls up), `deadpan` (short and straight), `o` (a tiny surprised dot; the owl's mandible drops a
-  touch to show it). A random character's mouth is read off its drawn head size, not a fresh draw, so
-  seeded random streams (craft-anim, generate) stay as they were. Saved spinoff fighters keep it.
+  whisker pads in muzzle colour.
+- **No line art** (2026-11-05): the black mouths (smile, smug, deadpan, o), the owl's gape corners and
+  the lion's whisker dots came off: shape only.
 - **Triangles** (default params, high detail, merged): owl +952; llama −1792 and lion −1312, because the
-  shaped parts use small fixed low-poly spheres (16×12, dots 8×6) where the old tip and nose used the
-  48×32 `GEO.sphere`. The mouth line is a 16×4 tube.
+  shaped parts use small fixed low-poly spheres (16×12) where the old tip and nose used the 48×32
+  `GEO.sphere` (counted with the line art; a little lower without it).
 
 ## Open questions
 

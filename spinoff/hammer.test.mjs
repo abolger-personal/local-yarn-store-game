@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { TICK_HZ, groundOf } from './match.js';
 import { TUTORIAL } from './levels.js';
 import { HAMMER, aimOf, hammerPath, handOf } from './hammer.js';
-import { MOVES, createMatch, snapshot, tick } from './sim.js';
+import { createMatch, snapshot, tick } from './sim.js';
+import { MOVES } from './combat.js';
 import { readInput } from './multiplayer.js';
 
 const STAGE = { ...TUTORIAL.stage, bricks: [] };

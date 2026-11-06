@@ -3,7 +3,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { DANCES, POSES, holdMiddle, makeDance, placeDancer, setGeometryDetail, stepDance } from '../characters/npc.js';
 import { stepGlitter } from '../characters/glitter.js';
 import { KEYS, attachControls, createControls } from './controls.js';
-import * as match from './sim.js';
+import { RESPAWN_Y, SIM } from './sim.js';
+import { MOVES, SHOTS, SHOT_TAP, shotCharge } from './combat.js';
 import { countStrike, landHit, newCombo } from './punches.js';
 import { KICK_COMBO, shownStrike, strikeOf } from './kicks.js';
 import { BAD_DONUT, HAND_ICON, MOVE_POSES, poseShotTrick, shotTrick, badGuySets, buildFighter, entrantOf, greathammerMeshes, loadFighter, newFighter, newHands, paint, seatDrop, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
@@ -25,7 +26,7 @@ import { aimOf, hammerPath, handOf } from './hammer.js';
 /** @typedef {import('./match.js').HitEvent} HitEvent @typedef {import('./match.js').DonutEvent} DonutEvent */
 
 /** @type {import('./match.js').MatchApi} */
-const api = match;
+const api = SIM;
 
 setGeometryDetail('med');
 
@@ -130,14 +131,14 @@ function poseOf(m, f) {
   return { ...base, headYaw: Math.sin(m.t.no * 28) * 0.8 };
 }
 
-const HANG = match.MOVES.stomp.hang / match.MOVES.stomp.steps;
+const HANG = MOVES.stomp.hang / MOVES.stomp.steps;
 /** How far round a stomp has turned while it hangs in the air (a spin or a backflip, `f.turn`), fast then settling. @param {FighterState} f */
 const stompTurn = (f) => (!f.onGround && f.move === 'kick' && f.turn ? 2 * Math.PI * (1 - (1 - Math.min(1, f.step / HANG)) ** 2) : 0);
 
 
 /** How far into its swing a fighter winding up for a shot holds it (REUSE-SPEC.md §Trick shots). */
 const WINDUP = 0.1;
-const SWEEP = DANCES['wuxia-turn'], SWEEP_SECONDS = match.MOVES.sweep.steps / TICK_HZ;
+const SWEEP = DANCES['wuxia-turn'], SWEEP_SECONDS = MOVES.sweep.steps / TICK_HZ;
 /** The wuxia sweep is its dance, posed from how far through the move the fighter is. @param {FighterState} f */
 function sweepFrame(f) {
   if (f.move !== 'sweep') return null;
@@ -261,7 +262,7 @@ function waiting(m, f) {
   if (!badges.has(n)) badges.set(n, countBadge(n));
   if (m.count.material.map !== badges.get(n)) Object.assign(m.count.material, { map: badges.get(n), needsUpdate: true });
   m.count.scale.setScalar(0.6);
-  m.count.position.set(f.x, f.y - match.RESPAWN_Y + COUNT_UP, f.z);
+  m.count.position.set(f.x, f.y - RESPAWN_Y + COUNT_UP, f.z);
   return true;
 }
 
@@ -453,8 +454,8 @@ const aimNow = () => (aimSince ? aimOf((performance.now() - aimSince) / 1000) : 
 // REUSE-SPEC.md §Trick shots: 🥊 held with a trick on gloves, sword or scythe charges its shot, filling 🥊; past full it
 // fizzles (the fill goes), and 🦶 meanwhile drops it
 let shotSince = 0;
-const myShot = () => mine.look.hands !== 'hammer' && Boolean(match.SHOTS[mine.look.trick]);
-const shotNow = () => (shotSince ? match.shotCharge(mine.look.trick, (performance.now() - shotSince) / 1000) : null);
+const myShot = () => mine.look.hands !== 'hammer' && Boolean(SHOTS[mine.look.trick]);
+const shotNow = () => (shotSince ? shotCharge(mine.look.trick, (performance.now() - shotSince) / 1000) : null);
 
 // REUSE-SPEC.md §Discoverable moves: 🦶 held this long and let go sweeps; its button fills meanwhile. The press's kick
 // went on press, as 🥊's punch does under the Greathammer's aim
@@ -492,7 +493,7 @@ function drawPreview(me) {
 /** Let go of 🥊 held for a shot: a tap swings (the punch kept back on the press), a charge swings and throws, a fizzle neither. */
 function letGoShot(controls) {
   const held = (performance.now() - shotSince) / 1000, k = shotNow();
-  if (held < match.SHOT_TAP) controls.down('key', 'punch', null);
+  if (held < SHOT_TAP) controls.down('key', 'punch', null);
   else if (k !== null) controls.shot(k);
   controls.charge(false);
   shotSince = 0;

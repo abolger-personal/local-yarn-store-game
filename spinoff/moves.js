@@ -4,7 +4,7 @@ import { SPECIES, buildFighter, newFighter, stepFighter } from './fighter.js';
 import { COMBO, countStrike, landHit, newCombo } from './punches.js';
 import { KICK_COMBO, strikeOf } from './kicks.js';
 import { HITSTOP_TICKS, TICK_HZ } from './match.js';
-import { MOVES } from './sim.js';
+import { MOVES } from './combat.js';
 import { makeStage } from './stage.js';
 
 // A look at the punches (punches.js) and kicks (kicks.js) on every species, from play.js's camera pitch, each landing and looping.

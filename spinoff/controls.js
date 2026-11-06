@@ -1,7 +1,7 @@
 // Taps to Inputs (REUSE-SPEC.md §Navigation: tap to move). Classification is pure; the DOM glue is thin.
 import * as THREE from 'three';
 import { BRICK, outside } from './match.js';
-import { POWERS } from './sim.js';
+import { POWERS } from './combat.js';
 
 /** @typedef {import('./match.js').Snapshot} Snapshot @typedef {import('./match.js').Target} Target */
 /** @typedef {import('./match.js').Input} Input @typedef {import('./match.js').FighterState} FighterState */

@@ -3,7 +3,7 @@
 // together.js gives it the Trystero one from net.js.
 import { readFighter } from './fighter.js';
 import { ROUND_SECONDS, TICK_HZ } from './match.js';
-import { POWERS } from './sim.js';
+import { POWERS } from './combat.js';
 import { MAX_FIGHTERS } from './roster.js';
 import { badGuys } from './levels.js';
 

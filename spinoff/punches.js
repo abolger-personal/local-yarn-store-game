@@ -1,5 +1,5 @@
 import { POSES } from '../characters/npc.js';
-import { MOVES } from './sim.js';
+import { MOVES } from './combat.js';
 
 // Look only: the sim's punch is one move; each tablet draws it as the next of these for every punch that has landed.
 // No hook (2026-10-15): from the side-on camera its sweep across the body read the same as a cross.

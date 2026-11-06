@@ -6,7 +6,8 @@ import { SPECIES, buildFighter, disposeFighter, newFighter, stepFighter } from '
 import { COMBO, COMBO_TICKS, PUNCHES, countStrike, landHit, newCombo, punchArm } from './punches.js';
 import { KICKS, KICK_COMBO } from './kicks.js';
 import { HITSTOP_TICKS } from './match.js';
-import { MOVES, createMatch, snapshot, tick } from './sim.js';
+import { createMatch, snapshot, tick } from './sim.js';
+import { MOVES } from './combat.js';
 import { TUTORIAL } from './levels.js';
 
 LOOK.viewPx = 0;

@@ -4,7 +4,7 @@ import { POSES, setGeometryDetail } from '../characters/npc.js';
 import { LOOK } from '../characters/garments.js';
 import { SPECIES, buildFighter, disposeFighter, newFighter, stepFighter } from './fighter.js';
 import { SHOWN_FRAMES, kickLeg, shownStrike } from './kicks.js';
-import { MOVES } from './sim.js';
+import { MOVES } from './combat.js';
 
 LOOK.viewPx = 0;
 setGeometryDetail('low');

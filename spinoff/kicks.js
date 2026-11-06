@@ -1,6 +1,6 @@
 import { POSES } from '../characters/npc.js';
 import { COMBO, punchArm, sample } from './punches.js';
-import { MOVES } from './sim.js';
+import { MOVES } from './combat.js';
 
 // Look only, like the punch string (punches.js): the sim's kick is one move, drawn as the next of these per landed kick.
 export const KICK_COMBO = Object.freeze(['kick', 'thrust']);

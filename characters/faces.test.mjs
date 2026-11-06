@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { BASE_PARAMS, GEO, createCharacter, getSpecies, speciesIds } from './npc.js';
-import './owl.js';
-import './llama.js';
-import './lion.js';
+import './species.js';
 
-// today's faces with shaped faces off (default params, unmerged): mesh count and head bounds, taken before the change
+// today's faces with shaped faces off (default params, unmerged): mesh count and head bounds, taken before the change;
+// a species not listed in OFF or CHECK gets only the generic checks
 const OFF = {
   owl:   [41, [-0.22452, 0.52702, -0.16758, 0.22452, 0.89686, 0.24156]],
   llama: [38, [-0.12757, 0.91516, -0.12992, 0.12757, 1.22366, 0.31092]],
@@ -102,7 +101,7 @@ for (const id of speciesIds()) {
   for (const [corner, extra] of corners(id)) {
     const label = `${id} ${corner}`;
     const built = build(paramsOf(id, { ...extra, shapedFaces: true, mergeMeshes: false }), id);
-    CHECK[id](built, label);
+    CHECK[id]?.(built, label);
     checkLow(built, label);
   }
 }
@@ -135,7 +134,7 @@ for (const id of speciesIds()) {
 }
 
 // off is exactly today's face
-for (const id of speciesIds()) {
+for (const id of speciesIds().filter((s) => OFF[s])) {
   const built = build(paramsOf(id, { mergeMeshes: false }), id);
   const [count, bounds] = OFF[id];
   assert.equal(meshes(built.root).length, count, `${id}: off keeps today's meshes`);

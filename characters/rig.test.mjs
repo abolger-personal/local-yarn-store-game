@@ -2,13 +2,12 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
   POSES, POSE_KEYS, MOTION_DEFAULTS, BASE_PARAMS, createCharacter, stepMotion, applyPose,
-  valueOf, walkPhase, walkLayer, speciesIds, getSpecies, resetMotion,
+  valueOf, walkPhase, walkLayer, speciesIds, getSpecies, resetMotion, applyPreset,
   DANCES, DANCE_NAMES, makeDance, stepDance, LIMB_TAPER, placeDancer,
   motionOf, walkGain, tailBaseHeight, seatedHipsAlong, lowestResting, GEO,
 } from './npc.js';
 import { CHAIR_BACK_Z, CHAIR_W } from './store/core/config.js';
-import './owl.js';
-import './llama.js';
+import './species.js';
 import { MANE_PRESETS, lightness as maneLightness, maneBases, maneCrownGap, snoutGap } from './lion.js';
 
 const build = (id) => createCharacter(
@@ -627,9 +626,9 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
 {
   for (const id of speciesIds()) {
     const kit = getSpecies(id);
-    if (!kit.presetKey && !kit.onPresetChange) continue;
-    assert.ok(kit.presetKey && kit.onPresetChange,
-      `${id}: presetKey and onPresetChange are one contract -- declaring half of it gives a `
+    if (!kit.presetKey && !kit.presets) continue;
+    assert.ok(kit.presetKey && kit.presets?.length,
+      `${id}: presetKey and presets are one contract -- declaring half of it gives a `
       + 'slider that silently does nothing');
     assert.ok(kit.presetKey in kit.defaults,
       `${id}: presetKey "${kit.presetKey}" must be a real param, or the slider never appears`);
@@ -637,8 +636,8 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     const P = structuredClone(kit.defaults);
     const seen = new Set();
     for (let i = 0; i < 12; i++) {
-      kit.onPresetChange(P, i);
-      assert.equal(P[kit.presetKey], i, `${id}: onPresetChange must record which preset is live`);
+      applyPreset(P, kit, i);
+      assert.equal(P[kit.presetKey], i, `${id}: applyPreset must record which preset is live`);
       const others = Object.entries(P)
         .filter(([k, v]) => k !== kit.presetKey && v !== kit.defaults[k])
         .map(([k]) => k);
@@ -648,7 +647,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       `${id}: the presets must differ from each other -- every one of them wrote the same params`);
 
     for (const i of [-3, 999]) {
-      kit.onPresetChange(P, i);
+      applyPreset(P, kit, i);
       for (const [k, v] of Object.entries(P)) {
         assert.ok(!Number.isNaN(v), `${id}: preset index ${i} left ${k} NaN`);
       }
@@ -657,14 +656,14 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
 }
 
 {
-  const HEAD = { owl: [1.06, 1.00, 0.98], llama: [0.80, 0.94, 1.16], lion: [1.04, 0.94, 1.00] };
+  // a species not listed here gets no ear-depth check
   const SPREAD = { owl: 'tuftSpread', llama: 'earSpread', lion: 'earSpread' };
 
   const deepest = (id, over) => {
     const P = { ...BASE_PARAMS, ...getSpecies(id).defaults, ...over, mergeMeshes: false };
     const built = createCharacter(P, id);
     built.root.updateMatrixWorld(true);
-    const [ax, ay, az] = HEAD[id].map((f) => f * P.headRadius);
+    const [ax, ay, az] = getSpecies(id).headShape.map((f) => f * P.headRadius);
     const v = new THREE.Vector3();
     let best = Infinity;
     for (const ear of built.joints.ear) {
@@ -681,7 +680,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     return best;
   };
 
-  for (const id of Object.keys(HEAD)) {
+  for (const id of Object.keys(SPREAD)) {
     if (!getSpecies(id)) continue;
     for (const spread of [0.10, 0.44, 0.60, 0.75, 0.90]) {
       for (const tilt of [-0.6, 0, 0.3, 0.9]) {
@@ -709,7 +708,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       + 'what randomise draws from, so a short one ships on rerolls');
   });
 
-  const rowsEntry = kit.gui.mane.find((e) => e[0] === 'maneRows');
+  const rowsEntry = kit.gui.coat.find((e) => e[0] === 'maneRows');
   assert.ok(rowsEntry, 'lion: maneRows must still be on the mane folder');
   assert.ok(rowsEntry[1] >= MIN,
     `lion: the maneRows slider starts at ${rowsEntry[1]}, below the ${MIN} floor`);
@@ -820,12 +819,12 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     assert.ok(preset.maneBottom >= MIN,
       `lion: mane preset ${i} stops at ${preset.maneBottom}, above the ${MIN} equator floor`);
   });
-  const bottomEntry = kit.gui.mane.find((e) => e[0] === 'maneBottom');
+  const bottomEntry = kit.gui.coat.find((e) => e[0] === 'maneBottom');
   assert.ok(bottomEntry, 'lion: maneBottom must still be on the mane folder');
   assert.ok(bottomEntry[1] >= MIN,
     `lion: the maneBottom slider starts at ${bottomEntry[1]}, above the ${MIN} equator floor`);
 
-  const dropEntry = kit.gui.mane.find((e) => e[0] === 'maneDrop');
+  const dropEntry = kit.gui.coat.find((e) => e[0] === 'maneDrop');
   assert.ok(dropEntry && dropEntry[1] >= 0,
     `lion: the maneDrop slider starts at ${dropEntry?.[1]} -- a mane never sits ABOVE the skull `
     + 'it grows from, and the skull pull-in can only crush those rows flat onto the crown');
@@ -1013,7 +1012,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     assert.ok(preset.maneProud >= MIN,
       `lion: mane preset ${i} has maneProud ${preset.maneProud}, under the ${MIN} floor`);
   });
-  const entry = kit.gui.mane.find((e) => e[0] === 'maneProud');
+  const entry = kit.gui.coat.find((e) => e[0] === 'maneProud');
   assert.ok(entry, 'lion: maneProud must still be on the mane folder');
   assert.ok(entry[1] >= MIN && entry[2] === 3,
     `lion: the maneProud slider must run ${MIN} to 3 -- it runs ${entry[1]} to ${entry[2]}`);
@@ -1111,9 +1110,10 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     assert.ok(seat > 0.8 && seat < 1, `${id}: the tail root must sit just inside the torso, at ${seat.toFixed(3)}`);
 
     const R = kit.randomRanges;
-    const torsoH = id === 'lion' ? D.torsoH * 0.72 * 0.92 : R.torsoH[0];
-    const worst = { ...D, legHeight: R.legHeight[0], torsoH };
-    worst.tailLength = id === 'lion' ? 1.0 * tailBaseHeight(worst) : R.tailLength[1];
+    // the lion draws its body and tail itself (lion.js varyBody); a species without a range keeps its default
+    const torsoH = id === 'lion' ? D.torsoH * 0.72 * 0.92 : R.torsoH?.[0] ?? D.torsoH;
+    const worst = { ...D, legHeight: R.legHeight?.[0] ?? D.legHeight, torsoH };
+    worst.tailLength = id === 'lion' ? 1.0 * tailBaseHeight(worst) : R.tailLength?.[1] ?? D.tailLength;
     if (id === 'owl') worst.tailLength = Math.min(worst.tailLength, 0.9 * tailBaseHeight(worst));
     for (const [name, P] of [['default', D], ['worst corner', worst]]) {
       const lo = lowestWalking(P, id);

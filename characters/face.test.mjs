@@ -5,9 +5,7 @@ import {
   placePupils, facePaintColorFor, FACE_PAINTS,
 } from './npc.js';
 import { aimGameCamera } from '../spinoff/stage.js';
-import './owl.js';
-import './llama.js';
-import './lion.js';
+import './species.js';
 
 // BODIES.md §Look-at, §Face, seen as the match sees them (spinoff/stage.js aimGameCamera)
 setGeometryDetail('med');

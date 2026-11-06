@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { POSES, applyPose, setGeometryDetail } from '../characters/npc.js';
+import { POSES, applyPose, getSpecies, setGeometryDetail } from '../characters/npc.js';
 import { LOOK } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import { LOOKS, BAGS, CAPES, CLOTH, FUR, HANDS, HATS, SPECIES, TEXTURES, badGuySets, buildFighter, disposeFighter, gloveAnchors, handsFor, newHands, isBadGuyCloth, isBadGuyFur, nearestSwatch, IDLE, entrantOf, knotAt, visibleBox, newFighter, paint, randomFighter, readFighter, seatDrop, setFur, stepFighter, wobbleAt, wobbleHz } from './fighter.js';
-import { wingShape } from '../characters/owl.js';
 import { floorGrid } from './roster.js';
 import { walkPhase } from '../characters/motion.js';
 import { SYRUP_SLOW, WALK_SPEED } from './walk.js';
@@ -37,7 +36,7 @@ for (const species of SPECIES) {
 
 for (const f of [newFighter('owl'), ...Array.from({ length: OWLS }, () => randomFighter(Math.random, 'owl'))]) {
   const built = buildFighter(f);
-  const { pos, scale } = wingShape(built.params);
+  const { pos, scale } = getSpecies('owl').wingShape(built.params);
   applyPose(built, POSES.rest);
   built.root.updateMatrixWorld(true);
   built.gloves.forEach((glove, i) => {
@@ -267,7 +266,7 @@ for (const species of SPECIES) {
     assert.equal(gloved.tricks.length, 0, `${species}: plain gloves have no trick`);
     for (const held of ['sword', 'scythe', 'hammer']) {
       const built = buildFighter({ ...f, look: { ...f.look, hands: held, trick: 'sparkle' } });
-      const hand = species === 'owl' ? built.joints.upperArm[0].node : built.holds[0].parent;
+      const hand = built.species.gloveAnchors ? built.joints.upperArm[0].node : built.holds[0].parent;
       assert.ok(built.sword?.parent === hand && built.gloves.length === 0, `${species}: a ${held} in the right hand and no gloves`);
       const entrant = (b) => entrantOf(f, b, { id: 'a', team: 'heroes' });
       const size = (b) => { const e = entrant(b); return [e.reach, e.width, e.height]; };
@@ -304,7 +303,7 @@ for (const species of SPECIES) {
         assert.ok(built.tricks[0].userData.spin.children.length > 4, `${species}: sparkles, stars, hearts and notes, whatever trick was saved`);
       }
       blade('jab', 0.25);
-      if (species !== 'owl') {
+      if (!built.species.gloveAnchors) {
         const fore = built.holds[0].parent.parent, along = at(built.sword).sub(at(fore)).normalize();
         const d = built.sword.localToWorld(new THREE.Vector3(0, 0, 0.4)).sub(at(built.sword)).normalize();
         assert.ok(d.angleTo(along) < 0.35, `${species} ${held}: the stabbing arm reaches along the blade (${d.angleTo(along).toFixed(2)} rad off)`);

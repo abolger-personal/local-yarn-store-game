@@ -1,9 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { BASE_PARAMS, createCharacter, getSpecies, speciesIds, mergeCharacter, applyPose, POSES, DANCE_POSES } from './npc.js';
-import './owl.js';
-import './llama.js';
-import './lion.js';
+import './species.js';
 import {
   GARMENTS, STITCHES, STITCHES_BY_CRAFT, EDGES, ACCESSORIES, COLOURWORKS, FORMS, SLEEVES, FIT_RANGE, MAX_COLOURS, fabric,
   LOOK, WEIGHTS, madeItem, usualTool, bodyFit, defaultItem, dress, undress, resolveColourwork, hasForm, garmentMaterial, randomItem, outfitPieces,

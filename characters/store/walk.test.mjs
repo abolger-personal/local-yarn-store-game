@@ -34,7 +34,7 @@ Object.assign(globalThis, { document: el(), window: globalThis, innerWidth: 1280
 
 const { S, gameSpeed } = await import('./core/config.js');
 const { shop, cast, clocks, simRng } = await import('./core/state.js');
-await import('../owl.js'); await import('../llama.js'); await import('../lion.js');
+await import('../species.js');
 const { STATE, ACTION } = await import('../visit.js');
 const { topSpeed } = await import('../motion.js');
 const { buildRoomShell } = await import('./scene/room.js');

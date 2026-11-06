@@ -3,13 +3,12 @@ import {
   BAGS, CAPES, CLOTH, FUR, HAND_ICON, HATS, SPECIES, TEXTURES, TRICKS, animateFighter, buildFighter, disposeFighter, handsFor, loadFighter, newFighter,
   addTricks, paint, randomFighter, rollEffect, saveFighter, setFur, stepFighter, stepTricks,
 } from './fighter.js';
-import { FACE_PAINTS, POSES, facePaintColorOf } from '../characters/npc.js';
+import { FACE_PAINTS, POSES, facePaintColorOf, getSpecies } from '../characters/npc.js';
 import { debugMenu, debugging, inRoom, openRoom } from './net.js';
 import { levelsBeaten } from './progress.js';
 import { STRIKE } from './punches.js';
 import { aimGameCamera, makeStage } from './stage.js';
 
-const ANIMAL = { lion: '🦁', llama: '🦙', owl: '🦉' };
 const NONE = '<circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" stroke-width="4"/><path d="M13 35 35 13" stroke="currentColor" stroke-width="4"/>';
 const ICON = {
   ...HAND_ICON,
@@ -111,7 +110,7 @@ function render() {
   const { species, params, badGuy = false } = fighter, { look } = paint(fighter);
   document.getElementById('bad').setAttribute('aria-pressed', String(badGuy));
   panel.innerHTML = [
-    row('🐾', 'animal', pictures(SPECIES.map((s) => button('species', s, s, `<span class="emoji">${ANIMAL[s]}</span>`, s === species)).join(''))),
+    row('🐾', 'animal', pictures(SPECIES.map((s) => button('species', s, s, `<span class="emoji">${getSpecies(s).emoji}</span>`, s === species)).join(''))),
     ...(badGuy ? [] : [row('🎨', 'fur', colours(swatchRow('fur', FUR, params.bodyColor)))]),
     garment('🎩', 'hat', HATS, true),
     garment('🦸', 'cape', CAPES, true),

@@ -7,9 +7,12 @@ export const BUILD = '2026-09-26.8-tails';
 
 const SPECIES = new Map();
 
+/** ai_planning_sessions/characters/ADDING-A-SPECIES.md: a kit, filled with the defaults it may leave out */
 export function registerSpecies(species) {
-  SPECIES.set(species.id, species);
-  return species;
+  const kit = { coatOf: deriveCoatColor, ...species };
+  kit.randomise ??= (P) => randomiseKit(P, kit);
+  SPECIES.set(kit.id, kit);
+  return kit;
 }
 
 export const getSpecies = (id) => SPECIES.get(id);
@@ -498,6 +501,34 @@ export function touchingScallopSize({ rows, perRow, top, bottom, maxSize = 0.45 
   const across = ((Math.PI * 2) / columns) * widestRowSin(rowCount, top, bottom);
   const down = rowCount > 1 ? ((bottom - top) * Math.PI) / (rowCount - 1) : across;
   return Math.min(Math.max(across, down) * 0.5, maxSize);
+}
+
+/** BODIES.md §Coats: a coat's curl size, sized to touch its neighbours when `${coat}AutoSize` */
+export const coatSize = (P, coat, shape) => (P[`${coat}AutoSize`] ? touchingScallopSize(shape) * P[`${coat}Touch`] : P[`${coat}Size`]);
+
+/** The torso's scallop shell from a coat's params: `${coat}Rows`, `${coat}PerRow`, `${coat}Top`, … */
+function torsoShell(P, coat) {
+  const shape = { rows: P[`${coat}Rows`], perRow: P[`${coat}PerRow`], top: P[`${coat}Top`], bottom: P[`${coat}Bottom`] };
+  return { ...shape, size: coatSize(P, coat, shape), flat: P[`${coat}Flat`], proud: P[`${coat}Proud`], stagger: P[`${coat}Stagger`] };
+}
+
+/** How far a torso coat, worn while `P[on]`, stands proud of the torso: a kit's coatBulge. */
+export function coatBulge(P, on, coat) {
+  if (!P[on]) return 0;
+  const { size, proud, flat } = torsoShell(P, coat);
+  return Math.max(0, size * (proud - flat));
+}
+
+/** The kit's head: an ellipsoid of `headShape` × headRadius in the body felt; its radii go in ctx.headScale. */
+export function addHead(ctx, P) {
+  ctx.headScale = ctx.species.headShape.map((k) => P.headRadius * k);
+  ctx.head.add(part(GEO.sphere, ctx.mat.body, { scale: ctx.headScale }));
+}
+
+export function addTorsoCoat(ctx, P, { on, coat, material }) {
+  if (!P[on]) return;
+  const shell = scallopMesh(scallopGeometry(torsoShell(P, coat)), material, [P.torsoW, P.torsoH, P.torsoD]);
+  if (shell) ctx.chest.add(shell);
 }
 
 export function scallopMesh(geometry, material, scale) {
@@ -1427,6 +1458,24 @@ export function randomiseBase(P, ranges = BASE_RANDOM_RANGES) {
   return P;
 }
 
+/** A kit's presets: preset `index` (wrapped) into P, the index into P[presetKey]. */
+export function applyPreset(P, { presets, presetKey }, index) {
+  const count = presets.length;
+  P[presetKey] = index;
+  return Object.assign(P, presets[((index % count) + count) % count]);
+}
+
+export const randomPreset = (P, kit) => applyPreset(P, kit, Math.floor(Math.random() * kit.presets.length));
+
+/** BODIES.md §Randomisation: the base draw, the kit's own (`vary`), a coat preset, the coat colour from the fur. */
+export function randomiseKit(P, kit) {
+  randomiseBase(P, kit.randomRanges);
+  kit.vary?.(P);
+  if (kit.presets) randomPreset(P, kit);
+  if (kit.coatColorKey) P[kit.coatColorKey] = kit.coatOf(P.bodyColor);
+  return P;
+}
+
 export const SHARED_RANDOM_KEYS = ['bodyColor', 'heldColor'];
 
 const sameRange = (a, b) => Boolean(a) && Boolean(b) && a[0] === b[0] && a[1] === b[1];
@@ -1446,39 +1495,20 @@ export function shareRandomParams(from, to, fromKit, toKit) {
   return to;
 }
 
+// ADDING-A-SPECIES.md §Menus: the species checker's sections a kit's gui rows may fill, merged after BASE_GUI's
+export const GUI_SECTIONS = Object.freeze(['body', 'head & face', 'coat', 'tail', 'rig', 'debug pose']);
+
 export const BASE_GUI = Object.freeze({
-  proportions: [
+  body: [
     ['headRadius', 0.06, 0.32], ['headOverlap', 0.0, 0.16], ['neckLength', 0.01, 0.70],
     ['neckThick', 0.02, 0.14],
     ['torsoW', 0.12, 0.36], ['torsoH', 0.14, 0.42], ['torsoD', 0.10, 0.34],
     ['legHeight', 0.02, 0.40],
-  ],
-  pose: [
-    ['armSwing', -1.6, 1.6], ['armOut', -1.0, 3.0], ['elbowBend', -0.2, 2.4],
-    ['legSwing', -1.0, 1.0], ['kneeBend', -0.4, 2.4], ['hipFlex', -0.6, 1.9],
-    ['legOut', -0.2, 1.6], ['legOutAlt', -0.8, 0.8],
-    ['spineBend', -0.7, 1.2], ['spineRoll', -0.8, 0.8],
-    ['earPerk', -1.2, 1.2], ['earSplay', -0.8, 1.2],
-    ['armSwingAlt', -1.0, 1.0], ['armOutAlt', -1.5, 1.5], ['spineTwist', -1.2, 1.2],
-    ['headYaw', -5.0, 5.0], ['headPitch', -0.9, 0.9], ['headTilt', -0.8, 0.8],
-    ['tailLift', -1.2, 1.2], ['tailWag', 0, 1.5], ['earFlap', 0, 1.5],
-    ['blink', 0, 1],
-    ['holdItem', 'bool'],
-  ],
-  rig: [
-    ['hipInset', 0.0, 0.14], ['legSpread', 0.02, 0.20], ['limbThick', 0.012, 0.070],
-    ['upperArmLen', 0.03, 0.20], ['forearmLen', 0.03, 0.20],
-    ['shoulderOut', 0.4, 1.6], ['shoulderLift', -0.2, 0.9],
-    ['clampArmOut', 'bool'], ['armClearance', 0, 0.03],
-    ['headYawMax', 0.4, 5.0],
-    ['heldColor', 'color'],
-  ],
-  'body material': [
     ['bodyColor', 'color'], ['footColor', 'color'],
     ['sheen', 0, 1], ['sheenRoughness', 0, 1], ['sheenTint', 'color'], ['roughness', 0, 1],
   ],
   // BODIES.md §Face paint: a colour left alone follows the fur
-  'eyes & face': [
+  'head & face': [
     ['eyeRadius', 0.02, 0.14], ['eyeSpread', 0.1, 0.9], ['eyeLift', -0.5, 0.6],
     ['eyeFront', 0.2, 1.4],
     ['pupilScale', 0.1, 0.9], ['pupilDepth', 0.0, 0.06],
@@ -1490,5 +1520,24 @@ export const BASE_GUI = Object.freeze({
     ['tailLength', 0.04, 0.50], ['tailThick', 0.006, 0.06],
     ['tailDroop', -1.6, 1.2], ['tailCurl', -0.8, 0.8],
     ['tailStiff', 60, 800], ['tailZeta', 0.1, 1.2],
+  ],
+  rig: [
+    ['hipInset', 0.0, 0.14], ['legSpread', 0.02, 0.20], ['limbThick', 0.012, 0.070],
+    ['upperArmLen', 0.03, 0.20], ['forearmLen', 0.03, 0.20],
+    ['shoulderOut', 0.4, 1.6], ['shoulderLift', -0.2, 0.9],
+    ['clampArmOut', 'bool'], ['armClearance', 0, 0.03],
+    ['headYawMax', 0.4, 5.0],
+    ['heldColor', 'color'], ['holdItem', 'bool'],
+  ],
+  'debug pose': [
+    ['armSwing', -1.6, 1.6], ['armOut', -1.0, 3.0], ['elbowBend', -0.2, 2.4],
+    ['legSwing', -1.0, 1.0], ['kneeBend', -0.4, 2.4], ['hipFlex', -0.6, 1.9],
+    ['legOut', -0.2, 1.6], ['legOutAlt', -0.8, 0.8],
+    ['spineBend', -0.7, 1.2], ['spineRoll', -0.8, 0.8],
+    ['earPerk', -1.2, 1.2], ['earSplay', -0.8, 1.2],
+    ['armSwingAlt', -1.0, 1.0], ['armOutAlt', -1.5, 1.5], ['spineTwist', -1.2, 1.2],
+    ['headYaw', -5.0, 5.0], ['headPitch', -0.9, 0.9], ['headTilt', -0.8, 0.8],
+    ['tailLift', -1.2, 1.2], ['tailWag', 0, 1.5], ['earFlap', 0, 1.5],
+    ['blink', 0, 1],
   ],
 });

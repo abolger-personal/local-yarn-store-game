@@ -5,7 +5,7 @@ import {
   DANCES, makeDance, stepDance, placeDancer,
 } from './npc.js';
 import { stepGlitter } from './glitter.js';
-import './llama.js';
+import './species.js';
 
 const scene = new THREE.Scene();
 const b = createCharacter({ ...BASE_PARAMS, ...getSpecies('llama').defaults, mergeMeshes: false }, 'llama');

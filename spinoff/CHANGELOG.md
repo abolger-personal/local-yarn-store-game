@@ -2,25 +2,37 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
-## 0.0.8
+## 0.0.8 — 2026-11-05: Characters that look alive
+
+The first art pass. Before and after: `ai_planning_sessions/characters/EVOLUTION.md`.
+
+### Characters that look alive (every fighter, in every match)
+- **They square up.** A fighter looks at the nearest bad guy whenever one is close enough to hit, so two
+  fighters face off before they swing. Otherwise it looks at the spot you tapped until it gets there. The eyes
+  move a moment before the head does.
+- **Painted.** Lions and llamas have broad flat colour planes for fur, like Franz Marc's blue horse; owls are
+  an ink wash with dark feather rows and a ragged outline. Painted fighters are never darker than plain ones.
+- **Cuter faces.** A curled owl beak, a split llama lip, a lion's triangle nose and whisker pads. Shapes only,
+  no drawn-on lines.
+- **A glint in every eye.**
+- To compare with the old look, add `?plain` to the page's address.
+
+### Game face paint
+- **Pick your face paint** in the fighter chooser (🎭): rings round the eyes, slashes under the eyes, or a
+  heart on one cheek, in the colour opposite your fur on the colour wheel. Computer fighters wear it too.
+  More to unlock later.
 
 ### Fighting
 - **A knocked-loose donut flies with whoever was carrying it**, landing just past them, so a big hit doesn't
   leave you metres from your donut while a bad guy lands right on top of its own.
 
-### Game face paint
-- **Pick your face paint** in the fighter chooser (🎭): rings round the eyes, slashes on the cheekbones, or a
-  heart on one cheek, in the colour opposite your fur on the colour wheel. Computer fighters wear it too.
-  More to unlock later.
-
-### Characters that look alive (every fighter, in every match)
-- **Painted.** Lions and llamas have broad flat colour planes for fur, like Franz Marc's blue horse; owls are
-  an ink wash with dark feather rows and a ragged outline.
-- **Cuter faces.** A curled owl beak, a split llama lip, a lion's triangle nose and whisker pads.
-- **They look where they're going.** A fighter looks at the spot you tapped until it gets there, and at the
-  nearest bad guy whenever one is close enough to hit. The eyes move a moment before the head does.
-- **A glint in every eye.**
-- To compare with the old look, add `?plain` to the page's address.
+### For the designer (species checker)
+- A **style** menu to switch each look on and off and compare, with live sliders for the paint (bands, band
+  spacing, brush, fur stroke size, ink fray, feather rows) and a **match camera** that shows a character as a
+  match does.
+- **Eyes & face** settings: face paint, its size, placement and colour (a picker that shows the colour worked out
+  from the fur until you pick one).
+- **Randomise** uses the game's bright fur colours, so a checker character looks like one in a match.
 
 ## 0.0.7 — 2026-11-04: Tricks, trick shots and the sweep
 

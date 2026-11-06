@@ -1,11 +1,11 @@
 import {
-  BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
-  addEars, addEyes, addTail, createCharacter, deriveCoatColor, touchingScallopSize,
-  feltMaterial, POSES, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh,
+  BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, GEO,
+  addEars, addEyes, addHead, addTail, addTorsoCoat, coatBulge, coatSize,
+  feltMaterial, POSES, part, registerSpecies, scallopGeometry, scallopMesh,
 } from './npc.js';
 import { named, softGeometry } from './faces.js';
 
-export const DEFAULT_PARAMS = {
+const DEFAULT_PARAMS = {
   ...BASE_PARAMS,
   name:          'Perpetua',
   footColor:     '#5d4a3c',
@@ -66,7 +66,7 @@ export const DEFAULT_PARAMS = {
   tailZeta:      0.45,
 };
 
-export const FLEECE_PRESETS = Object.freeze([
+const FLEECE_PRESETS = Object.freeze([
   { fleeceRows: 4, fleecePerRow: 7,  fleeceProud: 0.80, fleeceFlat: 0.42, fleeceStagger: true,  fleeceTop: 0.32, fleeceBottom: 0.95 },
   { fleeceRows: 4, fleecePerRow: 9,  fleeceProud: 0.72, fleeceFlat: 0.44, fleeceStagger: true,  fleeceTop: 0.30, fleeceBottom: 0.96 },
   { fleeceRows: 5, fleecePerRow: 9,  fleeceProud: 0.76, fleeceFlat: 0.44, fleeceStagger: true,  fleeceTop: 0.28, fleeceBottom: 0.96 },
@@ -77,14 +77,7 @@ export const FLEECE_PRESETS = Object.freeze([
   { fleeceRows: 8, fleecePerRow: 15, fleeceProud: 0.62, fleeceFlat: 0.50, fleeceStagger: true,  fleeceTop: 0.20, fleeceBottom: 0.99 },
 ]);
 
-export function applyFleecePreset(P, index) {
-  const count = FLEECE_PRESETS.length;
-  P.fleecePreset = index;
-  Object.assign(P, FLEECE_PRESETS[((index % count) + count) % count]);
-  return P;
-}
-
-export const RANDOM_RANGES = Object.freeze({
+const RANDOM_RANGES = Object.freeze({
   ...BASE_RANDOM_RANGES,
   neckLength:   [0.260, 0.520],
   neckThick:    [0.042, 0.066],
@@ -109,23 +102,6 @@ export const RANDOM_RANGES = Object.freeze({
   facePaintSize:  [0.60, 1.00],
 });
 
-const headScale = (P) => [P.headRadius * 0.80, P.headRadius * 0.94, P.headRadius * 1.16];
-
-const curlSize = (P, shape, scale = 1) => (P.fleeceAutoSize
-  ? touchingScallopSize(shape) * P.fleeceTouch * scale
-  : P.fleeceSize * scale);
-
-const torsoShell = (P) => {
-  const shape = {
-    rows: P.fleeceRows, perRow: P.fleecePerRow,
-    top: P.fleeceTop, bottom: P.fleeceBottom,
-  };
-  return {
-    ...shape, size: curlSize(P, shape),
-    flat: P.fleeceFlat, proud: P.fleeceProud, stagger: P.fleeceStagger,
-  };
-};
-
 const neckShell = (P) => {
   const shape = {
     rows: Math.max(2, Math.round(P.fleeceRows * 0.8)),
@@ -133,20 +109,10 @@ const neckShell = (P) => {
     top: 0.30, bottom: 0.92,
   };
   return {
-    ...shape, size: curlSize(P, shape, P.fleeceNeckScale),
+    ...shape, size: coatSize(P, 'fleece', shape) * P.fleeceNeckScale,
     flat: P.fleeceFlat, proud: P.fleeceProud, stagger: P.fleeceStagger,
   };
 };
-
-export const coatBulge = (P) => {
-  if (!P.fleece) return 0;
-  const { size, proud, flat } = torsoShell(P);
-  return Math.max(0, size * (proud - flat));
-};
-
-function addHead(ctx, P) {
-  ctx.head.add(part(GEO.sphere, ctx.mat.body, { scale: headScale(P) }));
-}
 
 function addMuzzle(ctx, P) {
   const y = -P.headRadius * P.muzzleDrop;
@@ -205,13 +171,6 @@ function addNose(ctx, P) {
   }));
 }
 
-function addTorsoFleece(ctx, P) {
-  if (!P.fleece) return;
-  const scale = [P.torsoW, P.torsoH, P.torsoD];
-  const shell = scallopMesh(scallopGeometry(torsoShell(P)), ctx.mat.fleece, scale);
-  if (shell) ctx.chest.add(shell);
-}
-
 function addNeckFleece(ctx, P) {
   if (!P.fleece || !P.fleeceNeck) return;
   const half = (P.neckLength * P.fleeceNeckCoverage) / 2;
@@ -229,15 +188,15 @@ function buildKit(ctx, P) {
   ctx.mat.nose = ctx.addMaterial(feltMaterial(P, P.noseColor));
 
   addHead(ctx, P);
-  addEyes(ctx, P, { squash: 1.1, head: headScale(P) });
+  addEyes(ctx, P, { squash: 1.1, head: ctx.headScale });
   addMuzzle(ctx, P);
   addNose(ctx, P);
   addEars(ctx, P, {
     size: P.earWidth, length: P.earLength, shape: 'leaf',
     spread: P.earSpread, tilt: P.earTilt, lift: 0.72, back: -0.10,
-    flatten: P.earFlatten, head: headScale(P),
+    flatten: P.earFlatten, head: ctx.headScale,
   });
-  addTorsoFleece(ctx, P);
+  addTorsoCoat(ctx, P, { on: 'fleece', coat: 'fleece', material: ctx.mat.fleece });
   addNeckFleece(ctx, P);
   addLlamaTail(ctx, P);
 }
@@ -252,25 +211,14 @@ function addLlamaTail(ctx, P) {
   });
 }
 
-export function randomiseInto(P) {
-  randomiseBase(P, RANDOM_RANGES);
-  applyFleecePreset(P, Math.floor(Math.random() * FLEECE_PRESETS.length));
-  P.fleeceColor = deriveCoatColor(P.bodyColor);
-  return P;
-}
-
-export function randomParams(overrides = {}) {
-  return Object.assign(randomiseInto(structuredClone(DEFAULT_PARAMS)), overrides);
-}
-
-export const LLAMA_GUI = Object.freeze({
-  'muzzle & ears': [
+const LLAMA_GUI = Object.freeze({
+  'head & face': [
     ['muzzleLength', 0.05, 0.40], ['muzzleThick', 0.02, 0.14], ['muzzleDrop', 0, 0.8],
     ['muzzleColor', 'color'], ['noseColor', 'color'], ['noseSize', 0.2, 1.4],
     ['earLength', 0.03, 0.30], ['earWidth', 0.008, 0.07], ['earFlatten', 0.15, 1.0],
     ['earSpread', 0.1, 0.9], ['earTilt', -0.6, 0.9],
   ],
-  fleece: [
+  coat: [
     ['fleece', 'bool'], ['fleeceColor', 'color'], ['fleeceNeck', 'bool'],
     ['fleecePreset', 0, FLEECE_PRESETS.length - 1, 1],
     ['fleeceRows', 1, 8, 1], ['fleecePerRow', 3, 20, 1],
@@ -285,7 +233,7 @@ export const LLAMA_GUI = Object.freeze({
 });
 
 // BODIES.md §Llama
-export const MOTION_RANGES = Object.freeze({
+const MOTION_RANGES = Object.freeze({
   ...BASE_MOTION_RANGES,
   stiff:    [55, 190],
   idleRate: [0.60, 1.60],
@@ -296,23 +244,24 @@ export const MOTION_RANGES = Object.freeze({
   kneeLift: [0.70, 1.70],
 });
 
-export const llama = registerSpecies({
+registerSpecies({
   id: 'llama',
   label: 'Llama',
+  emoji: '🦙',
+  firstFur: '#fd9bd9',
   defaults: DEFAULT_PARAMS,
   randomRanges: RANDOM_RANGES,
   motionRanges: MOTION_RANGES,
-  gui: { ...BASE_GUI, ...LLAMA_GUI },
+  gui: LLAMA_GUI,
+  headShape: [0.80, 0.94, 1.16],
   buildKit,
-  coatBulge,
+  coatBulge: (P) => coatBulge(P, 'fleece', 'fleece'),
   coatColorKey: 'fleeceColor',
-  randomise: randomiseInto,
   // BODIES.md §Painterly
   paint: { style: 'fur' },
-  onPresetChange: applyFleecePreset,
+  presets: FLEECE_PRESETS,
   presetKey: 'fleecePreset',
   // The arms vanish against the fleece, so the ears carry the cheer.
   delighted: Object.freeze({ ...POSES.delighted, earFlap: 1 }),
 });
 
-export const createLlama = (P) => createCharacter(P, llama);

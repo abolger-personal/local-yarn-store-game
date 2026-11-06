@@ -3,9 +3,7 @@ import { installInput } from './interact/input.js';
 import * as THREE from 'three';
 import { BUILD, setGeometryDetail } from '../npc.js';
 import { loadAtlas } from '../../inventory/notions.js';
-import '../owl.js';
-import '../llama.js';
-import '../lion.js';
+import '../species.js';
 import { STATE } from '../visit.js';
 
 import { S } from './core/config.js';

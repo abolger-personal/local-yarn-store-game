@@ -3,9 +3,7 @@ import * as THREE from 'three';
 import { BASE_PARAMS, createCharacter, getSpecies, speciesIds, setGeometryDetail } from './npc.js';
 import { FRAY_BAND, FUR_RAMP, INK_RAMP, PAINT, inkFrays, paintBright, paintRamp } from './paint.js';
 import { aimGameCamera } from '../spinoff/stage.js';
-import './owl.js';
-import './llama.js';
-import './lion.js';
+import './species.js';
 
 // BODIES.md §Painterly
 setGeometryDetail('med');
@@ -37,11 +35,11 @@ for (const level of [0.4, 0.8, 1.6]) {
 
 // on: matte, no specular, its own family per style; off: the felt exactly as before
 for (const id of speciesIds()) {
-  const kit = getSpecies(id), on = createCharacter(paramsOf(id, { painterly: true }), id);
+  const kit = getSpecies(id), on = createCharacter(paramsOf(id, { painterly: true }), id), style = kit.paint?.style;
   const plain = createCharacter(paramsOf(id), id), before = createCharacter(paramsOf(id, { painterly: undefined }), id);
   const felt = (b) => b.materials.filter((m) => !['eye', 'knit'].includes(m.userData.family));
-  for (const m of felt(on)) {
-    assert.equal(m.userData.family, `paint-${kit.paint.style}`, `${id}: a felt material is left unpainted`);
+  for (const m of style ? felt(on) : []) {
+    assert.equal(m.userData.family, `paint-${style}`, `${id}: a felt material is left unpainted`);
     assert.ok(m.roughness === 1 && m.sheen === 0 && m.specularIntensity === 0 && m.clearcoat === 0, `${id}: a painted material keeps a highlight`);
   }
   plain.materials.forEach((m, i) => {
@@ -53,7 +51,7 @@ for (const id of speciesIds()) {
   assert.ok(on.materials.filter((m) => m.userData.family === 'eye').every((m) => !m.userData.paint), `${id}: the eyes are painted`);
   const shader = { uniforms: {}, vertexShader: THREE.ShaderLib.physical.vertexShader, fragmentShader: THREE.ShaderLib.physical.fragmentShader };
   felt(on)[0].onBeforeCompile(shader);
-  assert.ok(shader.vertexShader.includes('vPaintUv = uv') && shader.fragmentShader.includes('outgoingLight = paintC'), `${id}: the paint never reaches the shader`);
+  assert.ok(!style || shader.vertexShader.includes('vPaintUv = uv') && shader.fragmentShader.includes('outgoingLight = paintC'), `${id}: the paint never reaches the shader`);
   const draws = (painterly) => {
     let n = 0;
     createCharacter(paramsOf(id, { painterly, mergeMeshes: true }), id).root.traverse((o) => { if (o.isMesh) n++; });

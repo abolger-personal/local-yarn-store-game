@@ -1,20 +1,12 @@
 import * as THREE from 'three';
 import {
-  BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
-  addConeEars, addEyes, addTail, createCharacter, deriveCoatColor,
-  feltMaterial, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh, tailBaseHeight,
+  BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, GEO,
+  addConeEars, addEyes, addHead, addTail, addTorsoCoat, coatBulge,
+  feltMaterial, part, registerSpecies, scallopGeometry, scallopMesh, tailBaseHeight,
 } from './npc.js';
 import { named, onFront } from './faces.js';
 
-export {
-  TONE_MAPPING, POSES, POSE_KEYS, GEO_DETAIL, NAMES,
-  rand, pick, randHex, randomFur, slugify,
-  feltMaterial, eyeMaterial, knitMaterial, greyMat, blackMat,
-  setGeometryDetail, getGeometryDetail, setViewMode, applyPose,
-  disposeCharacter as disposeOwl,
-} from './npc.js';
-
-export const DEFAULT_PARAMS = {
+const DEFAULT_PARAMS = {
   ...BASE_PARAMS,
   name:          'Hoot',
   footColor:     '#e0a53c',
@@ -60,7 +52,7 @@ export const DEFAULT_PARAMS = {
 };
 
 // BODIES.md §Owl
-export const FEATHER_PRESETS = Object.freeze([
+const FEATHER_PRESETS = Object.freeze([
   { featherRows: 2, featherPerRow: 7,  featherSize: 0.330, featherProud: 0.40, featherFlat: 0.34, featherStagger: true,  featherTop: 0.44, featherBottom: 0.94 },
   { featherRows: 2, featherPerRow: 11, featherSize: 0.245, featherProud: 0.34, featherFlat: 0.42, featherStagger: false, featherTop: 0.40, featherBottom: 0.92 },
   { featherRows: 3, featherPerRow: 9,  featherSize: 0.276, featherProud: 0.32, featherFlat: 0.40, featherStagger: true,  featherTop: 0.40, featherBottom: 0.95 },
@@ -71,14 +63,7 @@ export const FEATHER_PRESETS = Object.freeze([
   { featherRows: 3, featherPerRow: 6,  featherSize: 0.330, featherProud: 0.30, featherFlat: 0.28, featherStagger: true,  featherTop: 0.48, featherBottom: 0.93 },
 ]);
 
-export function applyFeatherPreset(P, index) {
-  const count = FEATHER_PRESETS.length;
-  P.featherPreset = index;
-  Object.assign(P, FEATHER_PRESETS[((index % count) + count) % count]);
-  return P;
-}
-
-export const RANDOM_RANGES = Object.freeze({
+const RANDOM_RANGES = Object.freeze({
   ...BASE_RANDOM_RANGES,
   neckLength:  [0.050, 0.160],
   headOverlap: [0.050, 0.150],
@@ -94,8 +79,6 @@ export const RANDOM_RANGES = Object.freeze({
   facePaintSize:  [0.70, 1.30],
 });
 
-const headScale = (P) => [P.headRadius * 1.06, P.headRadius, P.headRadius * 0.98];
-
 const WING_OFFSET = 0.012;
 
 const wingScale = (P) => {
@@ -106,12 +89,6 @@ const wingScale = (P) => {
     Math.max(P.wingLength * P.wingDepth, cover),
   ];
 };
-
-const torsoShell = (P) => ({
-  rows: P.featherRows, perRow: P.featherPerRow, size: P.featherSize,
-  flat: P.featherFlat, proud: P.featherProud,
-  top: P.featherTop, bottom: P.featherBottom, stagger: P.featherStagger,
-});
 
 const headShell = (P) => ({
   rows: Math.max(1, Math.round(P.featherRows * 0.7)),
@@ -130,25 +107,10 @@ const wingShell = (P) => ({
   top: 0.42, bottom: 0.96, stagger: P.featherStagger,
 });
 
-export const coatBulge = (P) => {
-  if (!P.feathers) return 0;
-  const { size, proud, flat } = torsoShell(P);
-  return Math.max(0, size * (proud - flat));
-};
-
-function addHead(ctx, P) {
-  const scale = headScale(P);
-  ctx.head.add(part(GEO.sphere, ctx.mat.body, { scale }));
+function addHeadPlumage(ctx, P) {
   if (!P.feathers || !P.featherHead) return;
-  const shell = scallopMesh(scallopGeometry(headShell(P)), ctx.mat.feather, scale);
+  const shell = scallopMesh(scallopGeometry(headShell(P)), ctx.mat.feather, ctx.headScale);
   if (shell) ctx.head.add(shell);
-}
-
-function addTorsoPlumage(ctx, P) {
-  if (!P.feathers) return;
-  const scale = [P.torsoW, P.torsoH, P.torsoD];
-  const shell = scallopMesh(scallopGeometry(torsoShell(P)), ctx.mat.feather, scale);
-  if (shell) ctx.chest.add(shell);
 }
 
 // BODIES.md §Shaped faces: one short beak whose blunt tip curls gently down
@@ -163,7 +125,7 @@ const curledBeak = () => {
 let beakGeometry = null;
 
 function addShapedBeak(ctx, P) {
-  const s = P.beakSize, y = -P.headRadius * 0.10, head = { at: [0, 0, 0], size: headScale(P) };
+  const s = P.beakSize, y = -P.headRadius * 0.10, head = { at: [0, 0, 0], size: ctx.headScale };
   const skin = onFront(head, 0, y)[2];
   beakGeometry ??= curledBeak();
   ctx.head.add(named(part(beakGeometry, ctx.mat.beak, {
@@ -206,12 +168,13 @@ function buildKit(ctx, P) {
   ctx.mat.beak = ctx.addMaterial(feltMaterial(P, P.beakColor));
 
   addHead(ctx, P);
-  addEyes(ctx, P, { head: headScale(P) });
+  addHeadPlumage(ctx, P);
+  addEyes(ctx, P, { head: ctx.headScale });
   addBeak(ctx, P);
-  addTorsoPlumage(ctx, P);
+  addTorsoCoat(ctx, P, { on: 'feathers', coat: 'feather', material: ctx.mat.feather });
   addConeEars(ctx, P, {
     size: P.tuftSize, length: P.tuftSize * 2.4,
-    spread: P.tuftSpread, tilt: P.tuftTilt, lift: 0.55, head: headScale(P),
+    spread: P.tuftSpread, tilt: P.tuftTilt, lift: 0.55, head: ctx.headScale,
   });
   for (const { node, side } of ctx.joints.upperArm) addWing(node, side, ctx, P);
   addTail(ctx, P, { dress: (node, i, len) => addTailFan(node, len, ctx, P) });
@@ -230,25 +193,26 @@ function addTailFan(node, len, ctx, P) {
   }
 }
 
-export function randomiseInto(P) {
-  randomiseBase(P, RANDOM_RANGES);
-  // a long tail only on an owl high enough off the floor for it, as the lion's
-  P.tailLength = Math.min(P.tailLength, 0.9 * tailBaseHeight(P));
-  applyFeatherPreset(P, Math.floor(Math.random() * FEATHER_PRESETS.length));
-  P.featherColor = deriveCoatColor(P.bodyColor);
-  return P;
+// a long tail only on an owl high enough off the floor for it, as the lion's
+const shortenTail = (P) => { P.tailLength = Math.min(P.tailLength, 0.9 * tailBaseHeight(P)); };
+
+// spinoff/REUSE-SPEC.md §Costumes: the owl's hand is buried mid-wing, so its wing tips go into the gloves,
+// each big enough to swallow its tip whatever the owl's wing size, and never smaller than a glove on a hand (`hand`)
+const WING_TIP = 0.8;
+
+function wingTipGloves(built, hand) {
+  const { pos, scale } = wingShape(built.params);
+  const across = Math.sqrt(1 - WING_TIP ** 2);
+  const r = 1.05 * Math.max(hand, scale[0] * across, (scale[2] * across) / 1.1, (scale[1] * (1 - WING_TIP)) / 0.95);
+  return built.joints.upperArm.map(({ node, side }) => ({ parent: node, at: [side * pos[0], pos[1] - scale[1] * WING_TIP, 0], r }));
 }
 
-export function randomParams(overrides = {}) {
-  return Object.assign(randomiseInto(structuredClone(DEFAULT_PARAMS)), overrides);
-}
-
-export const OWL_GUI = Object.freeze({
-  'face & tufts': [
+const OWL_GUI = Object.freeze({
+  'head & face': [
     ['tuftSize', 0.01, 0.14], ['tuftSpread', 0.1, 1.1], ['tuftTilt', -1.5, 1.5],
     ['beakSize', 0.01, 0.18], ['beakColor', 'color'],
   ],
-  feathers: [
+  coat: [
     ['feathers', 'bool'], ['featherColor', 'color'],
     ['featherHead', 'bool'], ['featherWings', 'bool'],
     ['featherPreset', 0, FEATHER_PRESETS.length - 1, 1],
@@ -257,14 +221,12 @@ export const OWL_GUI = Object.freeze({
     ['featherTop', 0, 1], ['featherBottom', 0, 1],
     ['featherHeadScale', 0.2, 1.4], ['featherWingScale', 0.2, 1.4],
     ['featherFaceGap', 0, 3.2], ['featherStagger', 'bool'],
-  ],
-  wings: [
     ['wingLength', 0.08, 0.40], ['wingWidth', 0.06, 0.45], ['wingDepth', 0.10, 0.70],
   ],
 });
 
 // BODIES.md §Owl
-export const MOTION_RANGES = Object.freeze({
+const MOTION_RANGES = Object.freeze({
   ...BASE_MOTION_RANGES,
   stiff:    [140, 300],
   idleRate: [1.20, 3.00],
@@ -273,22 +235,24 @@ export const MOTION_RANGES = Object.freeze({
   stride:   [1.30, 1.90],
 });
 
-export const owl = registerSpecies({
+registerSpecies({
   id: 'owl',
   label: 'Owl',
+  emoji: '🦉',
+  firstFur: '#0fc8c5',
   defaults: DEFAULT_PARAMS,
   randomRanges: RANDOM_RANGES,
   motionRanges: MOTION_RANGES,
-  gui: { ...BASE_GUI, ...OWL_GUI },
+  gui: OWL_GUI,
+  headShape: [1.06, 1.00, 0.98],
   buildKit,
-  coatBulge,
+  coatBulge: (P) => coatBulge(P, 'feathers', 'feather'),
   wingShape,
+  gloveAnchors: wingTipGloves,
   coatColorKey: 'featherColor',
-  randomise: randomiseInto,
+  vary: shortenTail,
   // BODIES.md §Painterly
   paint: { style: 'ink', plume: ['feather', 'body'] },
-  onPresetChange: applyFeatherPreset,
+  presets: FEATHER_PRESETS,
   presetKey: 'featherPreset',
 });
-
-export const createOwl = (P) => createCharacter(P, owl);

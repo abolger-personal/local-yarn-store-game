@@ -10,9 +10,7 @@ import {
   spanBounds,
 } from './npc.js';
 import { randomTraits } from './visit.js';
-import './owl.js';
-import './llama.js';
-import './lion.js';
+import './species.js';
 
 console.info('LYS build', BUILD);
 

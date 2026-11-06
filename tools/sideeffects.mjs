@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { storeFiles } from './modules.mjs';
 
-const REQUIRED = ['owl.js', 'llama.js', 'lion.js'];   // register a species with npc.js
+const REQUIRED = ['species.js'];   // registers every species with npc.js
 const src = storeFiles().map((f) => readFileSync(f, 'utf8')).join('\n');
 
 const bare = new Set([...src.matchAll(/^import\s+'([^']+)';/gm)].map((m) => m[1].split('/').pop()));

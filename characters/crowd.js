@@ -15,9 +15,7 @@ import { PATTERN_DESIGNS } from '../inventory/catalog.js';
 
 console.info('LYS build', BUILD);
 
-import './owl.js';
-import './llama.js';
-import './lion.js';
+import './species.js';
 
 const SPECIES_MIX = ['mixed', ...speciesIds()];
 

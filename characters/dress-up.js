@@ -15,13 +15,12 @@ import {
   FIT_RANGE, TOOL_RANGE, LOOK, MAX_COLOURS, defaultItem, dress, undress, garmentMaterial, resolveColourwork, hasForm, randomItem,
   madeItem, usualTool,
 } from './garments.js';
-import './owl.js';
-import './llama.js';
-import './lion.js';
+import { SPECIES_IDS } from './species.js';
 
 console.info('LYS build', BUILD);
 
-const SLOTS = ['owl', 'llama', 'lion'];
+const SLOTS = SPECIES_IDS;
+const perSlot = (make) => Object.fromEntries(SLOTS.map((id) => [id, make()]));
 const STORE_KEY = 'lys.dressUp.v1';
 
 function freshPattern(type) {
@@ -46,7 +45,7 @@ const state = {
   look: { ...LOOK, viewPx: 0 },
   patterns: freshPatterns(),
   used: freshUsed(),
-  params: { owl: null, llama: null, lion: null },
+  params: perSlot(() => null),
 };
 
 function usedOf(type) {
@@ -104,9 +103,9 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-const built = { owl: null, llama: null, lion: null };
-const slotState = { owl: {}, llama: {}, lion: {} };
-const slotX = (id) => (SLOTS.indexOf(id) - 1) * state.spacing;
+const built = perSlot(() => null);
+const slotState = perSlot(() => ({}));
+const slotX = (id) => (SLOTS.indexOf(id) - (SLOTS.length - 1) / 2) * state.spacing;
 
 function buildSlot(id) {
   if (built[id]) {
@@ -186,11 +185,11 @@ function orbitBy(dTheta, dPhi) {
   setOrbit(spherical.theta + dTheta, spherical.phi + dPhi);
 }
 
-const plates = {
-  owl: document.getElementById('plateOwl'),
-  llama: document.getElementById('plateLlama'),
-  lion: document.getElementById('plateLion'),
-};
+const plates = perSlot(() => {
+  const plate = Object.assign(document.createElement('div'), { className: 'plate' });
+  document.getElementById('hud').before(plate);
+  return plate;
+});
 const projected = new THREE.Vector3();
 
 function updatePlates() {
@@ -200,8 +199,8 @@ function updatePlates() {
 }
 
 function positionPlates() {
-  const gap = Math.abs(projected.set(slotX('owl'), 0, 0).project(camera).x
-    - projected.set(slotX('llama'), 0, 0).project(camera).x) * 0.5 * innerWidth;
+  const gap = Math.abs(projected.set(slotX(SLOTS[0]), 0, 0).project(camera).x
+    - projected.set(slotX(SLOTS[1]), 0, 0).project(camera).x) * 0.5 * innerWidth;
   for (const id of SLOTS) {
     projected.set(slotX(id), 0, 0).project(camera);
     plates[id].classList.toggle('compact', gap < 170);

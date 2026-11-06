@@ -7,9 +7,7 @@ import {
 import { stitchBeat, advanceStitch, makeCraft, stepCraft, poseCraft, glance, hesitation, pieceScale } from './craft-anim.js';
 import { SPARKLE_BITS, makeSparkle, playSparkle, stepSparkle, sparkleScale, SPARKLE_TIME } from './sparkle.js';
 import { CHAIR_W, SEAT_H } from './store/core/config.js';
-import './owl.js';
-import './llama.js';
-import './lion.js';
+import './species.js';
 import { mulberry32 } from './store/core/util.js';
 
 Math.random = mulberry32(7);

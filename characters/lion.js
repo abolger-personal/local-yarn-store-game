@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
-  BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, BASE_GUI, GEO,
-  addEars, addEyes, addTail, createCharacter, hsl, pick, rand, tailBaseHeight, touchingScallopSize,
+  BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, GEO,
+  addEars, addEyes, addHead, addTail, coatSize, hsl, pick, rand, randomPreset, tailBaseHeight,
   feltMaterial, LIMB_TAPER, POSES, part, randomiseBase, registerSpecies, scallopAngles,
   scallopBases, scallopGeometry, scallopMesh,
 } from './npc.js';
@@ -28,7 +28,7 @@ const MANE_SEAT = 0.95;
 
 const UNDERFUR = 1.02;
 
-export const DEFAULT_PARAMS = {
+const DEFAULT_PARAMS = {
   ...BASE_PARAMS,
   name:          'Bramble',
   footColor:     '#6b5336',
@@ -102,17 +102,12 @@ export const MANE_PRESETS = Object.freeze([
   { maneRows: 5, manePerRow: 15, maneProud: 1.140, maneStagger: true,  maneTop: 0.12, maneBottom: 0.97 },
 ]);
 
-export function applyManePreset(P, index) {
-  const count = MANE_PRESETS.length;
-  P.manePreset = index;
-  Object.assign(P, MANE_PRESETS[((index % count) + count) % count]);
-  return P;
-}
+const MANE = Object.freeze({ presets: MANE_PRESETS, presetKey: 'manePreset' });
 
 const DRAWN_AS_ONE = new Set(['torsoW', 'torsoH', 'torsoD', 'upperArmLen', 'forearmLen']);
 
 // BODIES.md §Lion: mane ranges, size variety
-export const RANDOM_RANGES = Object.freeze({
+const RANDOM_RANGES = Object.freeze({
   ...Object.fromEntries(Object.entries(BASE_RANDOM_RANGES).filter(([k]) => !DRAWN_AS_ONE.has(k))),
   headRadius:   [0.158, 0.198],
   headOverlap:  [0.050, 0.098],
@@ -143,11 +138,6 @@ export const RANDOM_RANGES = Object.freeze({
 });
 
 const HEAD_SHAPE = Object.freeze([1.04, 0.94, 1.00]);
-const headScale = (P) => HEAD_SHAPE.map((k) => P.headRadius * k);
-
-const curlSize = (P, shape) => (P.maneAutoSize
-  ? touchingScallopSize(shape) * P.maneTouch
-  : P.maneSize);
 
 // ponytail: one mane geometry per lion (~1k tris, 1 draw); quantise drawn values to share it if crowds grow
 const skullInShell = (P) => ({
@@ -165,7 +155,7 @@ const maneShell = (P) => {
     sides: P.maneSides,
   };
   return {
-    ...shape, size: curlSize(P, shape),
+    ...shape, size: coatSize(P, 'mane', shape),
     flat: 0, proud: P.maneProud, stagger: P.maneStagger,
     inside: skullInShell(P),
     underfur: UNDERFUR / MANE_SEAT,
@@ -187,12 +177,6 @@ export function maneCrownGap(P) {
 }
 
 export const maneBases = (P) => scallopBases(maneShell(P));
-
-export const coatBulge = () => 0;
-
-function addHead(ctx, P) {
-  ctx.head.add(part(GEO.sphere, ctx.mat.body, { scale: headScale(P) }));
-}
 
 function addMuzzle(ctx, P) {
   const y = -P.headRadius * P.muzzleDrop;
@@ -287,13 +271,13 @@ function buildKit(ctx, P) {
   ctx.mat.nose = ctx.addMaterial(feltMaterial(P, P.noseColor));
 
   addHead(ctx, P);
-  addEyes(ctx, P, { squash: 1.0, head: headScale(P) });
+  addEyes(ctx, P, { squash: 1.0, head: ctx.headScale });
   addMuzzle(ctx, P);
   addNose(ctx, P);
   addEars(ctx, P, {
     size: P.earWidth, length: P.earLength, shape: 'leaf',
     spread: P.earSpread, tilt: P.earTilt, lift: 0.70, back: -0.14,
-    flatten: P.earFlatten, head: headScale(P),
+    flatten: P.earFlatten, head: ctx.headScale,
   });
   addEarTips(ctx, P);
   addMane(ctx, P);
@@ -335,7 +319,7 @@ export function lightness(hex) {
 // BODIES.md §Lion: mane colour
 const MIN_MANE_CONTRAST = 28;
 
-export function deriveManeColor(bodyHex) {
+function deriveManeColor(bodyHex) {
   const body = {};
   new THREE.Color(bodyHex).getHSL(body);
   const target = rand(MIN_MANE_CONTRAST, 44);
@@ -374,23 +358,19 @@ function varyBody(P) {
   for (const k of ['upperArmLen', 'forearmLen']) P[k] = round3(P[k] / Math.max(1, over));
 }
 
-export function randomiseInto(P) {
+function randomiseLion(P) {
   randomiseBase(P, RANDOM_RANGES);
   varyBody(P);
   P.tailLength = rand(...TAIL_RATIO) * tailBaseHeight(P);
   solveSnout(P);
-  applyManePreset(P, Math.floor(Math.random() * MANE_PRESETS.length));
+  randomPreset(P, MANE);
   P.maneSides = pick([4, 5, 6]);
   P.maneColor = deriveManeColor(P.bodyColor);
   return P;
 }
 
-export function randomParams(overrides = {}) {
-  return Object.assign(randomiseInto(structuredClone(DEFAULT_PARAMS)), overrides);
-}
-
-export const LION_GUI = Object.freeze({
-  'snout & ears': [
+const LION_GUI = Object.freeze({
+  'head & face': [
     ['muzzleStart', 0.2, 1.0], ['muzzleLength', 0.04, 0.24],
     ['muzzleWidth', 0.04, 0.18], ['muzzleDepth', 0.03, 0.14],
     ['muzzleRound', 0, 1.8],
@@ -399,7 +379,7 @@ export const LION_GUI = Object.freeze({
     ['earLength', 0.03, 0.20], ['earWidth', 0.010, 0.08], ['earFlatten', 0.15, 1.0],
     ['earSpread', 0.1, 0.9], ['earTilt', -0.6, 0.9], ['earPoint', 0, 0.9],
   ],
-  mane: [
+  coat: [
     ['mane', 'bool'], ['maneColor', 'color'],
     ['manePreset', 0, MANE_PRESETS.length - 1, 1],
     ['maneFaceGap', 0, 4.2], ['maneTall', 0.7, 1.4], ['maneHug', 0, 1],
@@ -413,7 +393,7 @@ export const LION_GUI = Object.freeze({
 });
 
 // BODIES.md §Lion
-export const MOTION_RANGES = Object.freeze({
+const MOTION_RANGES = Object.freeze({
   ...BASE_MOTION_RANGES,
   stiff:    [70, 210],
   idleRate: [0.55, 1.35],
@@ -424,23 +404,24 @@ export const MOTION_RANGES = Object.freeze({
   kneeLift: [0.45, 1.05],
 });
 
-export const lion = registerSpecies({
+registerSpecies({
   id: 'lion',
   label: 'Lion',
+  emoji: '🦁',
+  firstFur: '#ef8907',
   defaults: DEFAULT_PARAMS,
   randomRanges: RANDOM_RANGES,
   motionRanges: MOTION_RANGES,
-  gui: { ...BASE_GUI, ...LION_GUI },
+  gui: LION_GUI,
+  headShape: HEAD_SHAPE,
   buildKit,
-  coatBulge,
   coatColorKey: 'maneColor',
-  randomise: randomiseInto,
+  coatOf: deriveManeColor,
+  randomise: randomiseLion,
   // BODIES.md §Painterly
   paint: { style: 'fur' },
-  onPresetChange: applyManePreset,
-  presetKey: 'manePreset',
+  ...MANE,
   // The arms vanish against the mane, so the tail carries the cheer: lifted clear of the body.
   delighted: Object.freeze({ ...POSES.delighted, tailLift: 0.9, tailWag: 1.6 }),
 });
 
-export const createLion = (P) => createCharacter(P, lion);

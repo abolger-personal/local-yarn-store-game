@@ -11,9 +11,7 @@ import { CRAFT_MODES, TELLS, makeCraft, stepCraft, poseCraft, disposeCraft } fro
 import { makeSparkle, playSparkle, stepSparkle } from './sparkle.js';
 import { PATTERN_NAMES } from '../inventory/catalog.js';
 import { CHAIR_BACK_Z, CHAIR_W, SEAT_H } from './store/core/config.js';
-import './owl.js';
-import './llama.js';
-import './lion.js';
+import { SPECIES_IDS } from './species.js';
 
 console.info('LYS build', BUILD);
 
@@ -110,7 +108,7 @@ const live = (k) => (v) => { if (craft) craft[k] = v; };
 
 function buildGui() {
   const gui = new GUI({ title: 'sit and knit' });
-  gui.add(state, 'species', ['owl', 'llama', 'lion']).onChange(() => buildSitter());
+  gui.add(state, 'species', SPECIES_IDS).onChange(() => buildSitter());
   gui.add({ roll: () => buildSitter(true) }, 'roll').name('new individual');
   gui.add(state, 'mode', CRAFT_MODES).onChange(live('mode'));
   gui.add(state, 'tell', TELLS).name('tell (out = out of yarn)').onChange(live('tell'));

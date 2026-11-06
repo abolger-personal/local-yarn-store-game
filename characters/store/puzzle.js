@@ -2,9 +2,7 @@ import * as THREE from 'three';
 
 import { BUILD, NAMES, POSES, applyPose, createCharacter, disposeCharacter, getSpecies, pick,
          setGeometryDetail, setViewMode, speciesIds } from '../npc.js';
-import '../owl.js';
-import '../llama.js';
-import '../lion.js';
+import '../species.js';
 import { STATE, TRAITS, consideredHere, interact, labelOf, makeNpc, makeWorld, noticeable,
          signGuestbook } from '../visit.js';
 import { describeWip, labelWant, wantFor, wantsOf, stow, WIP_STATE } from '../wip.js';

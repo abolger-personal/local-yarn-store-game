@@ -11,6 +11,7 @@ const SLOW = [
   'characters/craft-anim.test.mjs',
   'characters/garments.test.mjs',
   'characters/store/walk.test.mjs',
+  'characters/species.test.mjs',
 ];
 
 const FAST = [

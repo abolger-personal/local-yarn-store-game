@@ -5,7 +5,7 @@ import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
   TONE_MAPPING, POSES, GEO_DETAIL, BUILD, MOTION_DEFAULTS, BASE_PARAMS,
   createCharacter, applyPose, setViewMode, disposeCharacter,
-  setGeometryDetail, getSpecies, speciesList, slugify, shareRandomParams,
+  setGeometryDetail, getSpecies, speciesList, slugify, shareRandomParams, applyPreset, BASE_GUI, GUI_SECTIONS,
   stepMotion, resetMotion, motionOf, walkPhase, walkLayer, walkGain, phaseStep,
   DANCES, DANCE_NAMES, makeDance, stepDance, placeDancer,
 } from './npc.js';
@@ -17,9 +17,7 @@ import { PAINT } from './paint.js';
 
 console.info('LYS build', BUILD);
 
-import './owl.js';
-import './llama.js';
-import './lion.js';
+import './species.js';
 
 const SLOTS = ['A', 'B'];
 
@@ -482,43 +480,51 @@ function addControl(folder, params, entry, onChange) {
 
 function presetHandler(species, params, onChange) {
   return () => {
-    species.onPresetChange(params, params[species.presetKey]);
+    applyPreset(params, species, params[species.presetKey]);
     onChange();
     gui.controllersRecursive().forEach((c) => c.updateDisplay());
   };
 }
 
-function addSlotFolders(species, params, onChange) {
-  const isPreset = (key) => key === species.presetKey && species.onPresetChange;
-  for (const [title, entries] of Object.entries(species.gui)) {
-    const folder = gui.addFolder(title);
-    entries.forEach((entry) => addControl(folder, params, entry,
-      isPreset(entry[0]) ? presetHandler(species, params, onChange) : onChange));
-    if (state.play && title === 'pose') folder.controllers.forEach((c) => c.disable());
-    folder.close();
-  }
+/** ADDING-A-SPECIES.md §Menus: BASE_GUI's rows for `title`, then the kit's, in a closed folder; null when there are none. */
+function addRows(parent, title, species, params) {
+  const rows = [...(BASE_GUI[title] ?? []), ...(species.gui?.[title] ?? [])];
+  if (!rows.length) return null;
+  const folder = parent.addFolder(title);
+  const isPreset = (key) => key === species.presetKey && species.presets;
+  rows.forEach((row) => addControl(folder, params, row,
+    isPreset(row[0]) ? presetHandler(species, params, rebuildActive) : rebuildActive));
+  folder.close();
+  return folder;
 }
 
-function addTopControls(species) {
-  gui.add(state, 'active', SLOTS).name('editing slot  (Tab)').onChange(() => { buildGui(); updatePlates(); });
-  gui.add({ id: species.id }, 'id', speciesList().map((s) => s.id))
+function addCharacterFolder(species) {
+  const folder = gui.addFolder('character');
+  folder.add(state, 'active', SLOTS).name('editing slot  (Tab)').onChange(() => { buildGui(); updatePlates(); });
+  folder.add({ id: species.id }, 'id', speciesList().map((s) => s.id))
     .name('species').onChange((v) => setSpecies(state.active, v));
-  gui.add(activeSlot().params, 'name').onChange(() => { updatePlates(); save(); });
-  gui.add({ f: () => randomiseSlot(state.active) }, 'f').name('randomise slot  (R)');
-  gui.add({ f: randomiseBoth }, 'f').name('randomise both  (Shift R)');
-  gui.add(state, 'linkShared').name('link shared params').onChange(save);
-  gui.add({ f: () => setSpecies(state.active, activeSlot().speciesId) }, 'f').name('reset slot');
-  gui.add({ f: exportActive }, 'f').name('export slot  (E)');
+  folder.add(activeSlot().params, 'name').onChange(() => { updatePlates(); save(); });
+  folder.add({ f: () => randomiseSlot(state.active) }, 'f').name('randomise slot  (R)');
+  folder.add({ f: randomiseBoth }, 'f').name('randomise both  (Shift R)');
+  folder.add(state, 'linkShared').name('link shared params').onChange(save);
+  folder.add({ f: () => setSpecies(state.active, activeSlot().speciesId) }, 'f').name('reset slot');
+  folder.add({ f: exportActive }, 'f').name('export slot  (E)');
 }
 
-function addMotionFolder() {
-  const folder = gui.addFolder('motion');
+function addAnimationFolder(species, params) {
+  const folder = gui.addFolder('animation');
   folder.add(state, 'play').name('animate  (M)').onChange(setPlay);
   folder.add(state, 'idle').name('+ idle layer  (I)').onChange(save);
   folder.add(state, 'walk').name('+ walk layer  (W)').onChange(save);
   folder.add(state, 'speed', 0, 1.5, 0.01).name('walk speed').onChange(save);
+  const poseRow = folder.add(state, 'pose', POSE_NAMES).onChange(setPose);
+  if (state.dance !== 'none') poseRow.disable();
+  addDances(folder.addFolder('victory dances'));
+  const raw = addRows(folder, 'debug pose', species, params);
+  if (state.play) raw?.controllers.forEach((c) => c.disable());
+}
 
-  const dances = gui.addFolder('victory dances');
+function addDances(dances) {
   dances.add(state, 'dance', ['none', ...DANCE_NAMES]).name('dance').onChange(setDance);
   dances.add(state, 'repeat').name('repeat one-shots').onChange(save);
   // a flip seen from the front is a nod (DANCES.md §Gymnastics, Reading them)
@@ -529,11 +535,11 @@ function addMotionFolder() {
   }
 }
 
-function addSceneFolder() {
-  const folder = gui.addFolder('scene');
-  const poseRow = folder.add(state, 'pose', POSE_NAMES).onChange(setPose);
-  if (state.dance !== 'none') poseRow.disable();
+function addViewFolder() {
+  const folder = gui.addFolder('view');
   folder.add(state, 'view', ['felted', 'grey', 'silhouette']).onChange(setView);
+  folder.add(state, 'matchCamera').name('match camera').onChange(setMatchCamera);
+  folder.add(state, 'lookAtOther').name('look at the other slot').onChange(save);
   folder.add(state, 'detail', Object.keys(GEO_DETAIL)).name('geometry detail')
     .onChange((v) => { setGeometryDetail(v); buildAll(); save(); });
   folder.add(state, 'spacing', 0.2, 1.6, 0.01).onChange(() => { buildAll(); save(); });
@@ -545,15 +551,16 @@ function addSceneFolder() {
     .onChange((v) => (renderer.toneMapping = TONE_MAPPING[v]));
 }
 
-// BODIES.md §Painterly: the knobs are shared uniforms, live
+// BODIES.md §Painterly: the knobs are shared uniforms, live; named by the paint style they touch
 function addPaintKnobs(folder) {
   folder.add(PAINT.bands, 'value', 2, 6, 1).name('paint bands');
   folder.add(PAINT.brush, 'value', 0, 1, 0.01).name('brush strength');
-  folder.add(PAINT.size, 'value', 0.3, 3, 0.01).name('fur stroke size (lion, llama)');
-  folder.add(PAINT.soft, 'value', 0, 0.5, 0.01).name('fur band edge (lion, llama)');
   folder.add(PAINT.light, 'value', 0.3, 1.6, 0.01).name('paint band spacing');
-  folder.add(PAINT.fray, 'value', 0, 0.8, 0.01).name('ink fray (owl outline)');
-  folder.add(PAINT.feather, 'value', 0, 1, 0.01).name('feather rows (owl)');
+  folder.add(PAINT.size, 'value', 0.3, 3, 0.01).name('fur stroke size');
+  folder.add(PAINT.soft, 'value', 0, 0.5, 0.01).name('fur band edge');
+  folder.add(PAINT.fray, 'value', 0, 0.8, 0.01).name('ink fray (outline)');
+  folder.add(PAINT.feather, 'value', 0, 1, 0.01).name('ink feather rows');
+  folder.close();
 }
 
 /** @param {{ key: string, live?: boolean }} row */
@@ -580,24 +587,23 @@ function setMatchCamera(on) {
   save();
 }
 
-function addStyleFolder() {
-  const folder = gui.addFolder('style');
+function addLookFolder() {
+  const folder = gui.addFolder('look');
   for (const row of STYLE_SWITCHES) folder.add(state.style, row.key).name(row.name).onChange(() => setStyle(row));
-  folder.add(state, 'lookAtOther').name('look at the other slot').onChange(save);
-  folder.add(state, 'matchCamera').name('match camera').onChange(setMatchCamera);
-  addPaintKnobs(folder);
+  addPaintKnobs(folder.addFolder('paint'));
 }
 
+// ADDING-A-SPECIES.md §Menus: top to bottom; a kit's rows land in the GUI_SECTIONS folder of the same name
 function buildGui() {
   gui?.destroy();
   gui = new GUI({ title: 'species checker' });
   const slot = activeSlot();
   const species = getSpecies(slot.speciesId);
-  addTopControls(species);
-  addStyleFolder();
-  addMotionFolder();
-  addSceneFolder();
-  addSlotFolders(species, slot.params, rebuildActive);
+  addCharacterFolder(species);
+  addLookFolder();
+  for (const title of GUI_SECTIONS.filter((t) => t !== 'debug pose')) addRows(gui, title, species, slot.params);
+  addAnimationFolder(species, slot.params);
+  addViewFolder();
   gui.onFinishChange(save);
 }
 

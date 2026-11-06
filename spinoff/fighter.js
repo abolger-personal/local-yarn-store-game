@@ -1,21 +1,20 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-  BASE_PARAMS, FACE_PAINTS, MOTION_DEFAULTS, NAMES, POSES, applyPose, createCharacter, deriveCoatColor, disposeCharacter, getSpecies, knitMaterial, mergeCharacter,
+  BASE_PARAMS, FACE_PAINTS, MOTION_DEFAULTS, NAMES, POSES, applyPose, createCharacter, disposeCharacter, getSpecies, knitMaterial, mergeCharacter,
   lowestResting, phaseStep, stepMotion, walkGain, walkLayer, walkPhase,
 } from '../characters/npc.js';
-import { deriveManeColor } from '../characters/lion.js';
+import { SPECIES_IDS } from '../characters/species.js';
 import { CRAFTS, STITCHES_BY_CRAFT, defaultItem, dress, undress, usualTool } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
-import '../characters/llama.js';
-import { wingShape } from '../characters/owl.js';
 import { makeSparkle } from '../characters/sparkle.js';
 import { GLOVE, STRIKE, SWORD_MOVES, SWORD_UP, punchLayer, punchWeight, sample } from './punches.js';
 import { HAMMER } from './hammer.js';
 import { kickLayer, kickLunge } from './kicks.js';
 
 export const FIGHTER_KEY = 'lys.fighter.v1';
-export const SPECIES = Object.freeze(['lion', 'llama', 'owl']);
+// the chooser's order, lion first: the registry's reversed, so seeded rosters draw as they always have
+export const SPECIES = Object.freeze([...SPECIES_IDS].reverse());
 
 const swatches = (pairs) => Object.freeze(pairs.map(([hex, name]) => Object.freeze({ hex, name })));
 
@@ -29,7 +28,6 @@ const RIOT = [
 
 export const FUR = swatches(RIOT);
 export const CLOTH = swatches([...RIOT, ['#ffffff', 'white']]);
-const FIRST_FUR = Object.freeze({ lion: '#ef8907', llama: '#fd9bd9', owl: '#0fc8c5' });
 
 export const HATS = Object.freeze(['beanie', 'pixie', 'beret', 'bucket', 'earflap']);
 export const CAPES = Object.freeze(['cape', 'capelet']);
@@ -93,19 +91,18 @@ export const defaultLook = () => ({
   bag: 'backpack', bagColor: '#ffd21a', gloves: '#ff3b7f', hands: 'gloves', trick: 'plain',
 });
 
-const coatOf = (species, fur) => (species === 'lion' ? deriveManeColor(fur) : deriveCoatColor(fur));
-
 /** @template {Pick<Fighter, "species" | "params">} F @param {F} f @param {string} fur @returns {F} */
 export function setFur(f, fur) {
+  const kit = getSpecies(f.species);
   f.params.bodyColor = fur;
-  f.params[getSpecies(f.species).coatColorKey] = coatOf(f.species, fur);
+  f.params[kit.coatColorKey] = kit.coatOf(fur);
   return f;
 }
 
 /** @returns {Fighter} */
 export function newFighter(species) {
   const f = { species, params: structuredClone(getSpecies(species).defaults), look: defaultLook() };
-  return setFur(f, FIRST_FUR[species]);
+  return setFur(f, getSpecies(species).firstFur);
 }
 
 const pickOf = (list, rng) => list[Math.floor(rng() * list.length)];
@@ -200,22 +197,12 @@ function gloveGeometry() {
   return gloveGeo;
 }
 
-export const WING_TIP = 0.8;
-
 const handGlove = (P) => P.limbThick * GLOVE_SIZE;
 
 const onHands = (built) => built.holds.map((hold) => ({ parent: hold.parent, at: [0, 0, 0], r: handGlove(built.params) }));
 
-// REUSE-SPEC.md §Costumes: the owl's hand is buried mid-wing, so its wing tips go into the gloves,
-// each big enough to swallow its tip whatever the owl's wing size
-function onWingTips(built) {
-  const { pos, scale } = wingShape(built.params);
-  const across = Math.sqrt(1 - WING_TIP ** 2);
-  const r = 1.05 * Math.max(handGlove(built.params), scale[0] * across, (scale[2] * across) / 1.1, (scale[1] * (1 - WING_TIP)) / 0.95);
-  return built.joints.upperArm.map(({ node, side }) => ({ parent: node, at: [side * pos[0], pos[1] - scale[1] * WING_TIP, 0], r }));
-}
-
-export const gloveAnchors = (built) => (built.species.id === 'owl' ? onWingTips(built) : onHands(built));
+// REUSE-SPEC.md §Costumes: a species whose hands are buried (the owl's, mid-wing) says where its gloves go instead
+export const gloveAnchors = (built) => built.species.gloveAnchors?.(built, handGlove(built.params)) ?? onHands(built);
 
 /** Boxing gloves on both hands, or both wing tips (REUSE-SPEC.md §Costumes). */
 export function addGloves(built, color) {

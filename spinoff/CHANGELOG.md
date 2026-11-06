@@ -8,6 +8,15 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **The match code is in reusable pieces:** the stage, getting round it, fighting, the build round and the donut game
   each in their own file, so a different game could take the levels without the fighting, or the fighting without the
   levels. A recorded set of matches checks that nothing plays any differently.
+- **New animals are easy to add:** one list of species, each animal describing itself (its emoji, first fur colour,
+  coat colour, where its gloves go), shared building blocks, and a step-by-step recipe
+  (`ai_planning_sessions/characters/ADDING-A-SPECIES.md`). Next: a turtle.
+
+### For the designer (species checker)
+- **Menus by part of the body:** Character, Look (with the paint sliders named by style), Body, Head & face (eyes, face
+  paint and each animal's own face parts together), Coat, Tail, Rig, Animation (raw pose sliders tucked into a debug
+  folder), View. Saved settings still load.
+- **Dress-up** shows however many animals there are.
 
 ### Levels
 - **Level 5, the first generated level:** made by the level generator rather than by hand, the same layout every

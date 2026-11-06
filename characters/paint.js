@@ -12,7 +12,7 @@ export const PAINT = {
   streak: { value: 0.08 },
   light: { value: 0.8 },
   pool: { value: 0.45 },
-  fray: { value: 0.22 },
+  fray: { value: 0.4 },
   feather: { value: 0.10 },
 };
 
@@ -66,28 +66,42 @@ uniform float paintSize, paintBands, paintSoft, paintBrush, paintStreak, paintLe
 varying vec2 vPaintUv;`;
 
 // light falling on the fragment, as a share of what a lit base colour would get
-const level = (stroke) => `
+/**
+ * BODIES.md §Painterly, brightness: the light a fragment gets (`e`, a share of what its colour would show under
+ * a light of 1), rounded up to the top of its band, so a painted character is never darker than the felt one;
+ * bands are 2 x `level` / `bands` apart. As the shader, without the soft edge.
+ */
+export function paintBright(e, bands, level) {
+  const step = (2 * level) / bands;
+  return (Math.floor(e / step) + 1) * step;
+}
+
+// the ramp picks the colour only; its brightness is the base's, times the light (`paintE`, banded for fur)
+const level = (stroke, banded) => `
   vec3 paintLit = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse;
   float paintBase = max(dot(diffuseColor.rgb, vec3(${LUMA.join(', ')})), 1e-3);
-  float paintT = dot(paintLit, vec3(${LUMA.join(', ')})) / paintBase / (2.0 * paintLevel);
+  float paintE = dot(paintLit, vec3(${LUMA.join(', ')})) / paintBase;
   float paintStroke = ${stroke} - 0.5;
-  paintT = clamp(paintT + paintStroke * paintBrush, 0.0, 1.0);`;
+  float paintStep = 2.0 * paintLevel / paintBands;
+  ${banded ? `float paintB = max(paintE / paintStep + paintStroke * paintBrush * paintBands - 0.5 + paintSoft, -0.5);
+  paintE = (floor(paintB) + smoothstep(0.5 - paintSoft, 0.5 + paintSoft, fract(paintB)) + 1.0) * paintStep;
+  float paintT = clamp(paintE / (2.0 * paintLevel), 0.0, 1.0);` : `float paintT = clamp(paintE / (2.0 * paintLevel) + paintStroke * paintBrush, 0.0, 1.0);`}
+  vec3 paintC = paintRamp(diffuseColor.rgb, paintT);
+  paintC *= paintBase / max(dot(paintC, vec3(${LUMA.join(', ')})), 1e-3) * paintE;`;
 
 // fur: a few broad planes a part (Marc), not hair; ink: the fine brush
-const FUR = `{${level('texture2D(paintPlaneMap, vPaintUv / paintSize).r')}
-  float paintB = paintT * paintBands;
-  paintT = (floor(paintB) + smoothstep(0.5 - paintSoft, 0.5 + paintSoft, fract(paintB))) / paintBands;
-  outgoingLight = paintRamp(diffuseColor.rgb, paintT) * (1.0 + paintStroke * paintStreak) * paintLevel;
+const FUR = `{${level('texture2D(paintPlaneMap, vPaintUv / paintSize).r', true)}
+  outgoingLight = paintC * (1.0 + paintStroke * paintStreak);
 }`;
 
-const INK = `{${level('texture2D(paintBrushMap, vPaintUv * vec2(3.0, 2.0)).r')}
+const INK = `{${level('texture2D(paintBrushMap, vPaintUv * vec2(3.0, 2.0)).r', false)}
   float paintFacing = dot(normalize(normal), normalize(vViewPosition));
   float paintPlumed = max(paintPlume, step(1.5, vPaintUv.y));
   float paintNoise = texture2D(paintBrushMap, vPaintUv * vec2(9.0, 6.0)).g;
   if (paintPlumed > 0.5 && paintNoise < paintFray * pow(1.0 - min(1.0, abs(paintFacing) / paintFray / 2.0), 2.0) * 1.5) discard;
   float paintRows = (texture2D(paintFeatherMap, vPaintUv * vec2(6.0, 4.0)).r - 0.5) * paintFeather * paintPlumed;
   float paintPooled = 1.0 - paintPool * smoothstep(0.35, 0.0, abs(paintFacing));
-  outgoingLight = paintRamp(diffuseColor.rgb, paintT) * paintPooled * (1.0 + paintStroke * paintStreak + paintRows) * paintLevel;
+  outgoingLight = paintC * paintPooled * (1.0 + paintStroke * paintStreak + paintRows);
 }`;
 
 export const PAINT_STYLES = Object.freeze({

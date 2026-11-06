@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { BASE_PARAMS, createCharacter, getSpecies, speciesIds, setGeometryDetail } from './npc.js';
-import { FUR_RAMP, INK_RAMP, PAINT, inkFrays, paintRamp } from './paint.js';
+import { FUR_RAMP, INK_RAMP, PAINT, inkFrays, paintBright, paintRamp } from './paint.js';
 import { aimGameCamera } from '../spinoff/stage.js';
 import './owl.js';
 import './llama.js';
@@ -27,6 +27,14 @@ for (const hex of ['#3a5fcd', '#c8752e', '#8f8f96', '#4caf50', '#e8d9bd', '#6e42
   assert.ok(hsl(ink.shadow).l < b.l && hsl(ink.light).l > b.l, `${hex}: the ink wash does not run dark to pale`);
 }
 
+// never darker than the felt: the banded light is at least the light, and at most a band more
+for (const level of [0.4, 0.8, 1.6]) {
+  for (let e = 0; e < 4; e += 0.01) {
+    const b = paintBright(e, PAINT.bands.value, level), step = (2 * level) / PAINT.bands.value;
+    assert.ok(b >= e && b <= e + step + 1e-9, `light ${e.toFixed(2)} paints as ${b.toFixed(2)} (level ${level})`);
+  }
+}
+
 // on: matte, no specular, its own family per style; off: the felt exactly as before
 for (const id of speciesIds()) {
   const kit = getSpecies(id), on = createCharacter(paramsOf(id, { painterly: true }), id);
@@ -45,7 +53,7 @@ for (const id of speciesIds()) {
   assert.ok(on.materials.filter((m) => m.userData.family === 'eye').every((m) => !m.userData.paint), `${id}: the eyes are painted`);
   const shader = { uniforms: {}, vertexShader: THREE.ShaderLib.physical.vertexShader, fragmentShader: THREE.ShaderLib.physical.fragmentShader };
   felt(on)[0].onBeforeCompile(shader);
-  assert.ok(shader.vertexShader.includes('vPaintUv = uv') && shader.fragmentShader.includes('outgoingLight = paintRamp('), `${id}: the paint never reaches the shader`);
+  assert.ok(shader.vertexShader.includes('vPaintUv = uv') && shader.fragmentShader.includes('outgoingLight = paintC'), `${id}: the paint never reaches the shader`);
   const draws = (painterly) => {
     let n = 0;
     createCharacter(paramsOf(id, { painterly, mergeMeshes: true }), id).root.traverse((o) => { if (o.isMesh) n++; });

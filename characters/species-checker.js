@@ -552,8 +552,8 @@ function addPaintKnobs(folder) {
   folder.add(PAINT.brush, 'value', 0, 1, 0.01).name('brush strength');
   folder.add(PAINT.size, 'value', 0.3, 3, 0.01).name('fur stroke size (lion, llama)');
   folder.add(PAINT.soft, 'value', 0, 0.5, 0.01).name('fur band edge (lion, llama)');
-  folder.add(PAINT.light, 'value', 0.3, 1.6, 0.01).name('paint light');
-  folder.add(PAINT.fray, 'value', 0, 0.4, 0.01).name('ink fray (owl outline)');
+  folder.add(PAINT.light, 'value', 0.3, 1.6, 0.01).name('paint band spacing');
+  folder.add(PAINT.fray, 'value', 0, 0.8, 0.01).name('ink fray (owl outline)');
   folder.add(PAINT.feather, 'value', 0, 0.4, 0.01).name('feather rows (owl)');
 }
 

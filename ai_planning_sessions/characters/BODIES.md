@@ -176,6 +176,15 @@ Built 2026-11-04, off by default (`painterly`, per character; the species checke
   one draw. Only the plumage frays (the owl's `feather` material); the body sphere under it never does, so a
   fray opens only at the outline (worst case from the match camera: 59 of 2746 px, all within 2 px of the
   outline). Merged, plumage is marked by its uv lifted by 2 whole tiles.
+- **Brightness** (2026-11-05): the ramp picks only the colour; its brightness is the base's times the light the
+  fragment gets, as felt. Fur rounds that light *up* to the top of its band (`paintBright`; bands 2 x `light` /
+  `bands` apart, the soft edge set just past the top), so a painted character is never darker than the felt
+  one, only up to a band brighter; ink keeps the light as it is. `light` (the checker's "paint band spacing")
+  now sets band spacing and where the ramp reaches its light colour, not brightness. The brush still shakes a
+  band edge either way, so a stroke can sit up to half a band under. Before, the ramp colour times `light`
+  (0.8) capped every lit surface near the base colour: darker than felt under any light over 1.
+- Ink fray default 0.4 (was 0.22, which opened 59 of 2746 px from the match camera: invisible); 103 px now,
+  still within 3 px of the outline. Slider up to 0.8.
 - One shader variant per style (`customProgramCacheKey`), every painted felt material one family
   (`paint-fur`, `paint-ink`), so a merged character is still one felt draw and the cast shares a material.
   The knobs are shared uniforms (`PAINT`: bands, soft, size, brush, streak, light, pool, fray, feather), live in the

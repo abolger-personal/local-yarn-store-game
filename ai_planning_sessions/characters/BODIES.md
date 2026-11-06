@@ -125,9 +125,12 @@ the viewer so both eyes show).
 - A pupil slides over its white, held on the white's surface, only as far as the white shows above the
   skin in that direction (sampled at build), so it never goes under the skull. Each pupil is a joint (a
   bone when merged), so it moves and blinks with its eye after the merge.
-- The spinoff's tablet picks the target from the snapshot (`play.js lookTarget`): the fighter it traded a
-  hit with for 1.5 s (HitEvent `by`/`target`), the nearest foe while it punches, kicks, sweeps or winds up,
-  else the camera. No sim or network change.
+- The spinoff's tablet picks the target from the snapshot (`play.js lookTarget`), decided 2026-11-05: the
+  nearest foe in play within striking distance (1.5 m flat), else where it is heading (the snapshot's
+  `target`, a tapped point or a thing's spot), at its own head height so the head turns level, till it is
+  within 0.3 m (the snapshot keeps the target after arrival, for footprints), else straight ahead (null).
+  Playtest: looking at the camera was weird; before this it was the fighter it traded a hit with for 1.5 s,
+  the nearest foe while attacking, else the camera. No sim or network change.
 - Measured from the match camera (species checker "match camera", 800x500 px): head 90° from the camera
   turns to 41°; eye pixels owl 104+31 → 168+106, llama 159+41 → 175+87, lion 74+18 → 113+65
   (`face.test.mjs`).

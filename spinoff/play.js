@@ -49,8 +49,8 @@ const [net] = await Promise.all([joining, warmUp(...(prebuilt.me ? [prebuilt.me.
 const level = net?.start ?? asked, ground = groundOf(level.stage);
 const ME = net?.me ?? 'me';
 const CAMERA = { xMin: ground.x0 + 3, xMax: ground.x1 - 3 };
-const TIMERS = { foe: 1.5, squash: 0.22, no: 0.6, joy: 0.9, pop: 0.35, pulse: 0.45, wobble: 0.35, hop: 0.4, land: 0.5, pad: 0.45 };
-const FIGHTER_TIMERS = ['foe', 'squash', 'no', 'joy', 'pop', 'pulse', 'land'];
+const TIMERS = { squash: 0.22, no: 0.6, joy: 0.9, pop: 0.35, pulse: 0.45, wobble: 0.35, hop: 0.4, land: 0.5, pad: 0.45 };
+const FIGHTER_TIMERS = ['squash', 'no', 'joy', 'pop', 'pulse', 'land'];
 // REUSE-SPEC.md §Stages and difficulty are separate: on a spongy stage every landing springs
 const SPONGY = (level.stage.bounce ?? 1) > 1;
 const NONE = Object.freeze([]);
@@ -265,23 +265,27 @@ function waiting(m, f) {
   return true;
 }
 
-const ATTACKS = new Set(['punch', 'kick', 'sweep', 'charge']);
-/** The fighter `id`, else the nearest foe of `f` in play when `attacking`, else null; a plain loop, as it runs every frame. @param {FighterState} f */
-function foeOf(f, all, id, attacking) {
+// BODIES.md §Look-at: a foe this close (m, flat) is one you could hit; a destination this close is reached (the
+// snapshot keeps it after arrival, for footprints)
+const LOOK_STRIKE = 1.5, LOOK_ARRIVED = 0.3;
+
+/** The nearest foe in play, or null. @param {FighterState} f @param {FighterState[]} all */
+function nearestFoe(f, all) {
   let best = null, far = Infinity;
   for (const o of all) {
-    if (o.id === id) return o;
-    const d = attacking && o.team !== f.team && !o.respawn ? Math.hypot(o.x - f.x, o.z - f.z) : Infinity;
+    const d = o.team !== f.team && !o.respawn ? Math.hypot(o.x - f.x, o.z - f.z) : Infinity;
     if (d < far) { best = o; far = d; }
   }
-  return best;
+  return far <= LOOK_STRIKE ? best : null;
 }
 
-/** BODIES.md §Look-at: at whoever a fighter just traded a hit with, at the nearest foe while it attacks, else at us.
- * @param {FighterState} f @param {Snapshot} snap */
+/** BODIES.md §Look-at: at the nearest foe within striking distance, else level toward where it's heading till it
+ * arrives, else ahead. @param {FighterState} f @param {Snapshot} snap */
 function lookTarget(m, f, snap) {
-  const foe = foeOf(f, snap.fighters, m.t.foe > 0 ? m.foe : null, ATTACKS.has(f.move));
-  return foe ? (m.lookAt ??= new THREE.Vector3()).set(foe.x, foe.y + foe.height * 0.8, foe.z) : camera.position;
+  const foe = nearestFoe(f, snap.fighters), at = (m.lookAt ??= new THREE.Vector3());
+  if (foe) return at.set(foe.x, foe.y + foe.height * 0.8, foe.z);
+  const t = f.target, going = t && Math.hypot(t.x - f.x, t.z - f.z) > LOOK_ARRIVED;
+  return going ? at.set(t.x, f.y + f.height * 0.8, t.z) : null;
 }
 
 /** @param {FighterState} f @param {Snapshot} snap */
@@ -584,9 +588,6 @@ function onHit(h, snap) {
   if (h.on === 'brick') { brickHit(h); return; }
   const f = snap.fighters.find((o) => o.id === h.target), m = fighters.get(h.target);
   if (!f || !m) return;
-  const by = fighters.get(h.by);
-  if (by) Object.assign(by, { foe: h.target }).t.foe = 1;
-  Object.assign(m, { foe: h.by }).t.foe = 1;
   m.t.squash = 1;
   m.recoil.set(f.x - h.x, 0, f.z - h.z).normalize().multiplyScalar(0.18);
 }

@@ -13,9 +13,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **Painted.** Lions and llamas have broad flat colour planes for fur, like Franz Marc's blue horse; owls are
   an ink wash with dark feather rows and a ragged outline.
 - **Cuter faces.** A curled owl beak, a split llama lip, a lion's triangle nose and whisker pads.
-- **They look at you.** Standing about, a fighter turns its head toward you, so both eyes show; while it
-  punches or kicks it looks at the bad guy it is going for, and after a hit it looks at whoever it traded
-  the hit with. The eyes move a moment before the head does.
+- **They look where they're going.** A fighter looks at the spot you tapped until it gets there, and at the
+  nearest bad guy whenever one is close enough to hit. The eyes move a moment before the head does.
 - **A glint in every eye.**
 - To compare with the old look, add `?plain` to the page's address.
 

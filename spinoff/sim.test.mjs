@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, ROUND_SECONDS, TICK_HZ, outside } from './match.js';
 import { STAGES, TUTORIAL } from './levels.js';
 import { MATCH } from './roster.js';
-import { CALM_DRAIN, CALM_TICKS, DUMMY, GRAVITY, MOVES, POWER, SHOTS, shotCharge, TOY, RESPAWN_WAIT, SPRING_LIFT, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
+import { CALM_DRAIN, CALM_TICKS, DUMMY, MOVES, POWER, SHOTS, shotCharge, TOY, RESPAWN_WAIT, SPRING_LIFT, SYRUP_SLOW, WALK_SPEED, createMatch, snapshot, tick } from './sim.js';
 import { BOUNCE } from './generate.js';
+import { GRAVITY } from './world.js';
 import { BAM_SIZE, SHAKE } from './fx.js';
 
 // The tutorial's layout and syrup with the gapped wall (the hand-made stages' fort), so routing has gaps to find; heroes start beside their shelf

@@ -1,16 +1,16 @@
 // The match host: one fixed tick of pure logic, no three.js, no Math.random. REUSE-SPEC.md §Milestones 1.
 // The stage is a depth band (§Navigation): fighters walk in x/z on floor tops and jump in y.
-import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, HIT_DEPTH, PILE_DX, ROUND_SECONDS, SHELF_WIDTH, TICK_HZ, coreOf, groundOf, outside } from './match.js';
+import { BRICK, DONUTS_PER_SHELF, HITSTOP_TICKS, HIT_DEPTH, PILE_DX, ROUND_SECONDS, SHELF_WIDTH, TICK_HZ, outside } from './match.js';
 import { EMPTY, anySlot, footprint, lift, makeDisplay, place, topAt } from '../inventory/grid.js';
 import { MATCH, canHit } from './roster.js';
 import { cellUnder, facedCell, fortGrid, onTop } from './build.js';
 import { HAMMER, hammerPath, handOf } from './hammer.js';
+import {
+  CELL, DT, EPS, GRAVITY, STEP, bandOf, brickBox, clamp, flat, floorBox, floorFor, inStage, inXZ, patchAt, pushOut, supportAt,
+} from './world.js';
 
-const DT = 1 / TICK_HZ;
-const EPS = 1e-6;
-const STEP = 0.01;
-const PUSH_PASSES = 4;
-export const GRAVITY = 30;
+const toBox = outside;
+
 export const WALK_SPEED = 3.5;
 export const AIR_SPEED = 4;
 /** Walking speed is multiplied by this while standing in syrup (REUSE-SPEC.md §Forts, Level 1). */
@@ -25,8 +25,6 @@ export const BUTTER_GRIP = 0.05;
 /** ...and the wanted speed toward the target is at most distance × this a second, so you overshoot a little and come back. */
 export const BUTTER_BRAKE = 2.5;
 const SETTLE = 0.1;
-export const LEDGE_MARGIN = 0.05;
-export const CELL = 0.2;
 const JUMP_REACH = 1.2;
 const JUMP_COST = 2;
 const DROP_COST = 0.5;
@@ -132,18 +130,9 @@ export const MOVES = Object.freeze({
 const OPEN = 0, SOFT = 1, HOP = 2, BLOCKED = 3;
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 /** The highest rise a route jumps for at this take-off speed. */
 export const reachUp = (speed) => (JUMP_MARGIN * speed * speed) / (2 * GRAVITY);
-const flat = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
-const inXZ = (b, x, z) => outside(b, x, z) === 0;
-const toBox = outside;
-const floorBox = (f) => ({ x0: f.x0, x1: f.x1, z0: f.z0, z1: f.z1, y0: -Infinity, y1: f.y, round: f.round, kind: 'floor' });
-const brickBox = (b) => ({ x0: b.x, x1: b.x + BRICK, z0: b.z, z1: b.z + BRICK, y0: b.y, y1: b.y + BRICK, kind: 'brick' });
 const shelfBox = (z0) => (sh) => ({ x0: sh.x - sh.half, x1: sh.x + sh.half, z0, z1: sh.z, y0: sh.y, y1: sh.y + SHELF_H, kind: 'shelf' });
-/** The index of the patch in `list` that (x, z) on the top at y stands in, or within `grow` of; -1 if none. */
-const patchAt = (s, list, p, grow = 0) => (list ?? []).findIndex((q) => Math.abs(p.y - (q.y ?? s.band.y)) <= STEP
-  && Math.hypot(p.x - q.x, p.z - q.z) < q.r + grow);
 const shelfOf = (s, team) => s.shelves.find((sh) => sh.team === team);
 /** In front of the shelf: touching it anywhere along its front, or with `side` 0, your middle in front of it (REUSE-SPEC.md §Mode). */
 const standingAt = (f, sh, reach = SHELF_REACH, side = f.r) => f.onGround && Math.abs(f.y - sh.y) <= STEP
@@ -151,58 +140,7 @@ const standingAt = (f, sh, reach = SHELF_REACH, side = f.r) => f.onGround && Mat
 /** REUSE-SPEC.md §Mode: a guard standing in front of its shelf blocks the grab; one knocked to its end doesn't. */
 const guarding = (s, f) => standingAt(f, shelfOf(s, f.team), GUARD_REACH, 0);
 const guardOf = (s, team) => s.fighters.find((o) => o.team === team && guarding(s, o));
-const inStage = ({ band }, p) => {
-  p.x = clamp(p.x, band.x0 + LEDGE_MARGIN, band.x1 - LEDGE_MARGIN);
-  p.z = Math.min(p.z, band.z1 - LEDGE_MARGIN);
-};
 
-/** The ground's x/z extent from the back wall, its height, and its floor grid's size. @param {import('./match.js').Stage} stage */
-function bandOf(stage) {
-  const g = groundOf(stage), z0 = stage.backWall;
-  return { x0: g.x0, x1: g.x1, z0, z1: g.z1, y: g.y, nx: Math.round((g.x1 - g.x0) / CELL), nz: Math.round((g.z1 - z0) / CELL) };
-}
-
-/** The highest top under (x, z) no higher than maxY. */
-function supportAt(list, x, z, maxY) {
-  let top = -Infinity;
-  for (const b of list) if (inXZ(b, x, z) && b.y1 <= maxY + STEP && b.y1 > top) top = b.y1;
-  return top;
-}
-
-function escapeBox(p, b, r) {
-  const ways = [[p.x - b.x0, 'x', b.x0 - r], [b.x1 - p.x, 'x', b.x1 + r], [p.z - b.z0, 'z', b.z0 - r], [b.z1 - p.z, 'z', b.z1 + r]];
-  const [, axis, v] = ways.reduce((a, w) => (w[0] < a[0] ? w : a));
-  p[axis] = v;
-}
-
-function pushOnce(s, p, r, h) {
-  let moved = false;
-  for (const b of s.solids) {
-    if (p.y >= b.y1 - STEP || p.y + h <= b.y0) continue;
-    const q = coreOf(b, p.x, p.z), d = Math.hypot(p.x - q.x, p.z - q.z);
-    if (d >= r + q.r) continue;
-    moved = true;
-    if (d > EPS) {
-      p.x = q.x + ((p.x - q.x) / d) * (r + q.r);
-      p.z = q.z + ((p.z - q.z) / d) * (r + q.r);
-    } else escapeBox(p, b, r);
-  }
-  p.z = Math.max(p.z, s.band.z0 + r);
-  return moved;
-}
-
-// ponytail: a few passes, so a body wedged between many boxes could still end inside one; a proper depenetration solve if forts get dense
-/** Pushes a body (circle r in x/z, h tall, feet at p.y) out of every solid it overlaps, and off the back wall. */
-function pushOut(s, p, r, h) {
-  for (let pass = 0; pass < PUSH_PASSES; pass++) if (!pushOnce(s, p, r, h)) return;
-}
-
-function floorFor(s, x, z, y) {
-  let best = null;
-  for (const fl of s.stage.floors)
-    if (inXZ(fl, x, z) && (!best || Math.abs(fl.y - y) < Math.abs(best.y - y))) best = fl;
-  return best ? best.y : s.band.y;
-}
 
 // --- the floor grid -------------------------------------------------------------------------
 

@@ -4,6 +4,11 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 
 ## 0.0.9 (in progress)
 
+### Under the hood
+- **The match code is in reusable pieces:** the stage, getting round it, fighting, the build round and the donut game
+  each in their own file, so a different game could take the levels without the fighting, or the fighting without the
+  levels. A recorded set of matches checks that nothing plays any differently.
+
 ### Levels
 - **Level 5, the first generated level:** made by the level generator rather than by hand, the same layout every
   time: a hill, narrow gaps, a shelf too high to jump to without the step beside it, and syrup. Double jumps

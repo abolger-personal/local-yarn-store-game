@@ -45,6 +45,23 @@ saved on their tablet, so each kid brings the fighter they made. The yarn store'
 `dress-up.html` is a grown-up tuning tool (lil-gui panels, text everywhere) and stays one; the
 chooser is its own code in `spinoff/fighter.js`, with its own save.
 
+**The sim in reusable pieces** (decided 2026-11-05, built 0.0.9: "level building separate from combat, either could be
+reused on a different game"). One-way imports, each piece knowing only the ones above it:
+
+| Module | What it is | Reusable for |
+| --- | --- | --- |
+| `world.js` | the stage as terrain: solids, support, push-out, syrup/butter/trampoline patches, the band, falling bricks | any game on these stages |
+| `walk.js` | getting round it: floor grid, A*, routes, walking, jumping (and double), trampolines, butter, syrup, bodies pushing apart | any tap-to-move game on them |
+| `combat.js` | fighting: moves, hits, knockback, percent, stun, trips, skids, chains, Greathammer, shots, the toy, who can hit whom | any arena walk.js can move bodies over |
+| `build.js` | the fort grid and the build round (piles, fetch, place, ready) | any build-then-play game |
+| `donut-game.js` | capture the flag with donuts: shelves, guards, loose donuts, goals by thing, ring-outs, respawn, power bar, who leads | this game |
+| `sim.js` | the wiring: the fighter record, input, `createMatch` / `tick` / `snapshot` | this game |
+
+The game answers walking's questions through a `Mind` (sim.js `MIND`: where a target is, whether an attack roots or busies a
+fighter, a stomp's pop, who holds its ground) and gives combat its loot through `s.drop`. Walking and jumping go with the
+level; the rig's walk and jump animation stays with the character (`characters/motion.js`). `replay.test.mjs` hashes
+four seeded matches tick by tick, so moving code can't quietly change play.
+
 **Tests never wait on real time** (decided 2026-10-17): timers and the clock are `node:test`'s
 `mock.timers`, ticked by the test, and tablets on the network share that one fake clock in one thread
 (`together.test.mjs`). Each test file in `npm run check` runs under 2 s; heavy CPU work goes in

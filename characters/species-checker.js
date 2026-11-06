@@ -550,11 +550,11 @@ function addSceneFolder() {
 function addPaintKnobs(folder) {
   folder.add(PAINT.bands, 'value', 2, 6, 1).name('paint bands');
   folder.add(PAINT.brush, 'value', 0, 1, 0.01).name('brush strength');
-  folder.add(PAINT.size, 'value', 0.3, 3, 0.01).name('fur stroke size');
-  folder.add(PAINT.soft, 'value', 0, 0.5, 0.01).name('fur band edge');
+  folder.add(PAINT.size, 'value', 0.3, 3, 0.01).name('fur stroke size (lion, llama)');
+  folder.add(PAINT.soft, 'value', 0, 0.5, 0.01).name('fur band edge (lion, llama)');
   folder.add(PAINT.light, 'value', 0.3, 1.6, 0.01).name('paint light');
-  folder.add(PAINT.fray, 'value', 0, 0.4, 0.01).name('ink fray');
-  folder.add(PAINT.feather, 'value', 0, 0.4, 0.01).name('feather rows');
+  folder.add(PAINT.fray, 'value', 0, 0.4, 0.01).name('ink fray (owl outline)');
+  folder.add(PAINT.feather, 'value', 0, 0.4, 0.01).name('feather rows (owl)');
 }
 
 /** @param {{ key: string, live?: boolean }} row */

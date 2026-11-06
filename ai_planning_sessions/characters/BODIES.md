@@ -327,8 +327,8 @@ plus each species' face builders; checks in `characters/faces.test.mjs`.
   thickness, muzzle width/depth), so every random-range corner works; the test walks min, max and
   random corners.
 - **Owl:** a short beak (protrudes under `beakSize`) whose blunt tip curls gently down — a tapered
-  cylinder bent by t³, 0.36 beakSize of drop at the tip; a small lower mandible; a soft cere bump where
-  the beak meets the face.
+  cylinder bent by t³, 0.36 beakSize of drop at the tip, and nothing else: a lower mandible and a cere bump
+  were tried (2026-11-04) and read as three beaks at fighter size, so came off 2026-11-05.
 - **Llama:** the muzzle's round tip becomes two soft lobes with the llama cleft between (the nose's stem
   runs down into it); a small jaw below, its front only a hint past the lips (0.04 muzzle thickness,
   tested under 0.08).
@@ -345,7 +345,7 @@ plus each species' face builders; checks in `characters/faces.test.mjs`.
 - Lion: a second mane shell on the chest if the head-anchored mane reads too light.
 - Lion: quantise the drawn mane values if a big crowd shows the per-lion geometry memory.
 - Shaped faces (brainstorm 2026-11-04): the low-poly face spheres ignore geometry detail; tie them to
-  `GEO_DETAIL` if faces get close-ups. The owl's cere and beak root sit near eye height (tested only
+  `GEO_DETAIL` if faces get close-ups. The owl's beak root sits near eye height (tested only
   below the eyes' tops), as the old beak did.
 - Blink: see MOTION-TODO.md §Known ceilings (`characters/MOTION-TODO.md`).
 - Lion motion ranges still to be tuned in the motion lab, as the llama's were.

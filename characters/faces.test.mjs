@@ -53,11 +53,9 @@ const headHost = (built) => [ellipsoid(built.head.children[0])];
 const muzzleParts = (built) => built.head.children.filter((o) => o.isMesh && o.material === built.mat.muzzle);
 
 function checkOwl(built, label) {
-  for (const name of ['beak', 'mandible', 'cere']) {
-    const [mesh] = named(built, name);
-    assert.ok(mesh, `${label}: no ${name}`);
-    assertOnSurface(mesh, headHost(built), label);
-  }
+  assert.equal(named(built, 'beak').length, 1, `${label}: one beak`);
+  assertOnSurface(named(built, 'beak')[0], headHost(built), label);
+  assert.equal(named(built, 'mandible').length + named(built, 'cere').length, 0, `${label}: a second beak-coloured lump`);
 }
 
 function checkLlama(built, label) {
@@ -80,7 +78,7 @@ function checkLion(built, label) {
 }
 
 const CHECK = { owl: checkOwl, llama: checkLlama, lion: checkLion };
-const FACE = new Set(['beak', 'mandible', 'cere', 'lip', 'jaw', 'pad']);
+const FACE = new Set(['beak', 'lip', 'jaw', 'pad']);
 
 // what shows of the new face stays below the eyes' tops (the lips are the old muzzle tip)
 function checkLow(built, label) {

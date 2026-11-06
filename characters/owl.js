@@ -4,7 +4,7 @@ import {
   addConeEars, addEyes, addTail, createCharacter, deriveCoatColor,
   feltMaterial, part, randomiseBase, registerSpecies, scallopGeometry, scallopMesh, tailBaseHeight,
 } from './npc.js';
-import { named, onFront, softGeometry } from './faces.js';
+import { named, onFront } from './faces.js';
 
 export {
   TONE_MAPPING, POSES, POSE_KEYS, GEO_DETAIL, NAMES,
@@ -151,7 +151,7 @@ function addTorsoPlumage(ctx, P) {
   if (shell) ctx.chest.add(shell);
 }
 
-// BODIES.md §Shaped faces: a short beak whose blunt tip curls gently down, a small lower mandible, a soft cere
+// BODIES.md §Shaped faces: one short beak whose blunt tip curls gently down
 const BEAK = Object.freeze({ wide: 0.50, tall: 0.42, length: 1.45, buried: 0.60, curl: 0.85, rings: 6 });
 
 const curledBeak = () => {
@@ -169,12 +169,6 @@ function addShapedBeak(ctx, P) {
   ctx.head.add(named(part(beakGeometry, ctx.mat.beak, {
     pos: [0, y, skin - s * BEAK.buried], scale: [s * BEAK.wide, s * BEAK.length, s * BEAK.tall], rot: [Math.PI * 0.5, 0, 0],
   }), 'beak'));
-  ctx.head.add(named(part(softGeometry(), ctx.mat.beak, {
-    pos: onFront(head, 0, y - s * 0.40), scale: [s * 0.36, s * 0.20, s * 0.42],
-  }), 'mandible'));
-  ctx.head.add(named(part(softGeometry(), ctx.mat.beak, {
-    pos: onFront(head, 0, y + s * 0.42, -s * 0.14), scale: [s * 0.55, s * 0.26, s * 0.32],
-  }), 'cere'));
 }
 
 function addBeak(ctx, P) {

@@ -108,6 +108,8 @@ for (const species of SPECIES) for (const cape of CAPES) {
 {
   const f = randomFighter(() => 0.5);
   assert.deepEqual(readFighter(JSON.parse(JSON.stringify(f))), f, 'a saved fighter reads back unchanged');
+  for (const facePaint of ['heart', 'slashes']) assert.equal(readFighter({ ...f, params: { ...f.params, facePaint } }).params.facePaint, facePaint, `${facePaint} face paint is kept`);
+  assert.equal(readFighter({ ...f, params: { ...f.params, facePaint: '<img>' } }).params.facePaint, 'none', 'unknown face paint is dropped');
   assert.equal(readFighter(null), null);
   assert.equal(readFighter({ species: 'dragon' }), null, 'only the three animals');
   const junk = readFighter({ species: 'llama', params: { headRadius: 'big', bodyColor: 'red;}', legHeight: Number.NaN, view: '<script>' },

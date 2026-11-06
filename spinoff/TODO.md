@@ -40,5 +40,7 @@
   - **The dive and landing:** speed lines while diving, a ring across the floor where it lands.
   - **Whose effect:** the fighter's chosen trick, so a glove or sword trick has a stomp version, or
     one effect for everyone.
+- [ ] **More face paints to unlock** (added 2026-11-05). Rings, slashes and a heart are in the chooser; add more
+  (stars, stripes, a lightning bolt...) unlocked by levels beaten, like the hands (REUSE-SPEC.md §Fighter chooser).
 - [ ] **A tutorial for each discoverable move** (added 2026-11-04). Moves are never unlocked; every fighter has them,
   and a tutorial shows how to do each (first: hold 🦶 and let go, the sweep). REUSE-SPEC.md §Discoverable moves.

@@ -4,13 +4,16 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 
 ## 0.0.8
 
+### Game face paint
+- **Pick your face paint** in the fighter chooser (🎭): rings round the eyes, slashes on the cheekbones, or a
+  heart on one cheek, in the colour opposite your fur on the colour wheel. Computer fighters wear it too.
+  More to unlock later.
+
 ### Characters that look alive (in the species checker's style menu to try; not in the game yet)
 - **They look at you.** Standing about, a fighter turns its head toward you, so both eyes show; while it
   punches or kicks it looks at the bad guy it is going for, and after a hit it looks at whoever it traded
   the hit with. The eyes move a moment before the head does.
 - **A glint in every eye.**
-- **A bright face**: a patch round the eyes in the colour opposite the fur's on the colour wheel (orange on
-  a blue lion, violet on a lemon one).
 
 ## 0.0.7 — 2026-11-04: Tricks, trick shots and the sweep
 

@@ -91,9 +91,11 @@ export const BASE_PARAMS = Object.freeze({
 
   lookAt:        false,
   eyeGlint:      false,
-  faceAccent:    false,
-  faceAccentSize:  1.00,
-  faceAccentColor: '',
+  facePaint:     'none',
+  facePaintSize: 1.00,
+  facePaintDown: 0.50,
+  facePaintOut:  1.10,
+  facePaintColor: '',
   painterly:     false,
 
   bodyColor:     '#a0a6ba',
@@ -202,13 +204,13 @@ export function deriveCoatColor(bodyHex) {
 // BODIES.md §Face: the fur's complement, straight across the hue circle; scarlet on grey fur, which has no hue
 const GREY_FUR = 0.12, GREY_ACCENT = 0.03;
 
-export function deriveAccentColor(bodyHex) {
+export function facePaintColorFor(bodyHex) {
   const body = {};
   new THREE.Color(bodyHex).getHSL(body);
   return hsl(body.s < GREY_FUR ? GREY_ACCENT : (body.h + 0.5) % 1, 0.85, 0.55);
 }
 
-export const accentColorOf = (P) => P.faceAccentColor || deriveAccentColor(P.bodyColor);
+export const facePaintColorOf = (P) => P.facePaintColor || facePaintColorFor(P.bodyColor);
 
 export function slugify(text) {
   const slug = (text ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -595,7 +597,7 @@ export function addEyes(ctx, P, opts = {}) {
   if (opts.head) addFace(ctx, P, placement);
 }
 
-// BODIES.md §Face: the accent lies this far proud of the skull
+// BODIES.md §Face paint: it lies this far proud of the skull
 const ACCENT_LIFT = 0.003;
 const PATCH_SEGMENTS = 24;
 
@@ -639,13 +641,52 @@ function rimAngle(P, { spread, lift: up, front, squash, head }, side, lift) {
   return a;
 }
 
+// BODIES.md §Face paint: what a player paints on (spinoff chooser); more unlock later
+export const FACE_PAINTS = Object.freeze(['none', 'rings', 'slashes', 'heart']);
+
+const capsule = (w, h) => new THREE.Shape().moveTo(-w, -h).lineTo(w, -h).absarc(w, 0, h, -Math.PI / 2, Math.PI / 2)
+  .lineTo(-w, h).absarc(-w, 0, h, Math.PI / 2, Math.PI * 1.5);
+const heart = () => new THREE.Shape().moveTo(0, -0.5).bezierCurveTo(-0.15, -0.3, -0.5, -0.1, -0.5, 0.15)
+  .bezierCurveTo(-0.5, 0.42, -0.15, 0.5, 0, 0.28).bezierCurveTo(0.15, 0.5, 0.5, 0.42, 0.5, 0.15)
+  .bezierCurveTo(0.5, -0.1, 0.15, -0.3, 0, -0.5);
+const DECALS = { slashes: () => capsule(0.36, 0.2), heart };
+
+/** Unit shape `kind` (DECALS) `size` across, upright, wrapped onto head ellipsoid `head` round the skin over (x, y), `lift` proud. */
+function skinDecal(head, kind, [x, y], size, lift) {
+  return cachedGeometry(`decal|${kind}|${head}|${x}|${y}|${size}|${lift}`, () => {
+    const at = new THREE.Vector3(x, y, skinZ(x, y, head));
+    const n = new THREE.Vector3(x / head[0] ** 2, y / head[1] ** 2, at.z / head[2] ** 2).normalize();
+    const across = new THREE.Vector3().crossVectors(UP, n).normalize(), up = new THREE.Vector3().crossVectors(n, across);
+    const g = new THREE.ShapeGeometry(DECALS[kind](), 8), pos = g.attributes.position, q = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      q.copy(at).addScaledVector(across, pos.getX(i) * size).addScaledVector(up, pos.getY(i) * size);
+      q.multiplyScalar(1 / Math.hypot(q.x / head[0], q.y / head[1], q.z / head[2]));
+      q.addScaledVector(q.clone().normalize(), lift);
+      pos.setXYZ(i, q.x, q.y, q.z);
+    }
+    g.computeVertexNormals();
+    return g;
+  });
+}
+
+// BODIES.md §Face paint: on the cheekbone (facePaintDown, facePaintOut in eye radii from the eye), or one heart on the right cheek
+
+function facePaintGeometry(P, placement, side) {
+  const { spread, lift, squash, head } = placement, eye = [side * P.headRadius * spread, P.headRadius * lift];
+  if (P.facePaint !== 'rings') {
+    /** @type {[number, number]} */
+    const cheek = [eye[0] + side * P.eyeRadius * P.facePaintOut, eye[1] - P.eyeRadius * squash * P.facePaintDown];
+    return skinDecal(head, P.facePaint, cheek, P.eyeRadius * 2.2 * P.facePaintSize, ACCENT_LIFT);
+  }
+  const rim = rimAngle(P, placement, side, ACCENT_LIFT);
+  return skinPatch(head, eye, [rim, rim + (P.eyeRadius * P.facePaintSize) / meanOf(head)], ACCENT_LIFT);
+}
+
 function addFace(ctx, P, placement) {
-  if (!P.faceAccent) return;
-  const { spread, lift, head } = placement, unit = 1 / meanOf(head);
-  ctx.mat.accent ??= ctx.addMaterial(feltMaterial(P, accentColorOf(P)));
-  for (const side of [-1, 1]) {
-    const eye = [side * P.headRadius * spread, P.headRadius * lift], rim = rimAngle(P, placement, side, ACCENT_LIFT);
-    ctx.head.add(named(part(skinPatch(head, eye, [rim, rim + P.eyeRadius * P.faceAccentSize * unit], ACCENT_LIFT), ctx.mat.accent), 'faceAccent'));
+  if (!FACE_PAINTS.includes(P.facePaint) || P.facePaint === 'none') return;
+  ctx.mat.facePaint ??= ctx.addMaterial(feltMaterial(P, facePaintColorOf(P)));
+  for (const side of P.facePaint === 'heart' ? [-1] : [-1, 1]) {
+    ctx.head.add(named(part(facePaintGeometry(P, placement, side), ctx.mat.facePaint), 'facePaint'));
   }
 }
 
@@ -1417,14 +1458,14 @@ export const BASE_GUI = Object.freeze({
     ['bodyColor', 'color'], ['footColor', 'color'],
     ['sheen', 0, 1], ['sheenRoughness', 0, 1], ['sheenTint', 'color'], ['roughness', 0, 1],
   ],
-  // BODIES.md §Face: an accent colour left alone follows the fur
+  // BODIES.md §Face paint: a colour left alone follows the fur
   'eyes & face': [
     ['eyeRadius', 0.02, 0.14], ['eyeSpread', 0.1, 0.9], ['eyeLift', -0.5, 0.6],
     ['eyeFront', 0.2, 1.4],
     ['pupilScale', 0.1, 0.9], ['pupilDepth', 0.0, 0.06],
     ['eyeColor', 'color'], ['pupilColor', 'color'],
     ['eyeSheen', 0, 1], ['eyeSheenRough', 0, 1], ['eyeRough', 0, 1], ['eyeClearcoat', 0, 1],
-    ['faceAccentSize', 0.3, 2.2], ['faceAccentColor', 'color', accentColorOf],
+    ['facePaint', FACE_PAINTS], ['facePaintSize', 0.3, 2.2], ['facePaintDown', -1.5, 2], ['facePaintOut', 0, 2], ['facePaintColor', 'color', facePaintColorOf],
   ],
   tail: [
     ['tailLength', 0.04, 0.50], ['tailThick', 0.006, 0.06],

@@ -141,16 +141,25 @@ Built 2026-11-04 (the same plate: a hot face, a glint in each eye).
   (0.22 pupil radii) and nearer the pupil's edge; the lit one shaded grey.
 - **No eye ring or iris** (2026-11-05): a skin band round the eye, then a rim like an eyelid, then a coloured
   iris cap on the white were all tried and taken out.
-- **Face accent** (`faceAccent`, `faceAccentSize`, `faceAccentColor`): a mask round the eyes, 3 mm off the
-  skull. Blank colour = derived from the fur: its complement, straight across the HSL hue
-  circle (hue + 0.5), saturation 0.85, lightness 0.55; scarlet on grey fur (saturation under 0.12), which has no
-  hue. 2026-11-05: it had been the first hot hue (scarlet, orange, amber, pink) at least 0.15 from the fur's,
-  which was scarlet for nearly every fur. The owl's reads as a facial disc. Cheek blush was
-  tried on the lion and sat hidden under the muzzle and mane from the match camera (0 px), so every species
-  wears the mask, sized per species (owl 1.0, llama 0.8 on its big eyes, lion 1.0 eye radii).
-- The accent is a patch of a sphere around the skin point under the eye, scaled onto the head
-  ellipsoid: it lies on the skull at any head shape, is felt (merged, no new draw; the ring too), and a hat brim
-  presses it like the skull. Both colours have pickers in "eyes & face"; untouched, they follow the fur.
+- **Face paint** (`facePaint`: `none` (default), `rings`, `slashes`, `heart`; `FACE_PAINTS`), 2026-11-05: a
+  player's pick in the spinoff chooser (REUSE-SPEC.md §Fighter chooser), not a style switch; it replaced the
+  face accent (always rings). Felt, 3 mm off the skull, merged (no new draw).
+  - Colour (`facePaintColor`, blank = derived): the fur's complement, straight across the HSL hue circle (hue +
+    0.5), saturation 0.85, lightness 0.55; scarlet on grey fur (saturation under 0.12), which has no hue.
+    2026-11-05: it had been the first hot hue at least 0.15 from the fur's, which was scarlet for nearly every fur.
+  - **Rings**: a patch of a sphere round the skin point under each eye, scaled onto the head ellipsoid, its
+    inner edge solved to clear the white, `facePaintSize` eye radii wide (owl 1.0, llama 0.8, lion 1.0).
+  - **Slashes** and **heart**: a flat shape (a capsule; a heart) wrapped onto the head ellipsoid (each vertex
+    projected onto it, then lifted), 2.2 x `facePaintSize` eye radii across, `facePaintDown` below and
+    `facePaintOut` out from the eye (eye radii; 0.5 and 1.1, the llama 0.0 and 1.3: below its eyes is muzzle).
+    Slashes on both cheeks; the heart on the right cheek only.
+  - From the match camera (head turned by look-at): rings about 340/76/280 px (owl/llama/lion), the near slash
+    6/5/8 px, the heart 29/15/34 px; the far cheek's paint hides behind the face side on, so a fighter facing
+    the other way shows its heart less. Under the eye on the cheek is hidden by the muzzle (lion, llama) and the
+    eye itself (0-10 px tried), hence out to the side. Cheek blush was tried before and hid the same way.
+  - A hat brim presses it like the skull. The checker has the pick, size, placement and a colour picker in
+    "eyes & face".
+
 
 ## Painterly
 

@@ -3,7 +3,7 @@ import {
   BAGS, CAPES, CLOTH, FUR, HAND_ICON, HATS, SPECIES, TEXTURES, TRICKS, animateFighter, buildFighter, disposeFighter, handsFor, loadFighter, newFighter,
   addTricks, paint, randomFighter, rollEffect, saveFighter, setFur, stepFighter, stepTricks,
 } from './fighter.js';
-import { POSES } from '../characters/npc.js';
+import { FACE_PAINTS, POSES, facePaintColorOf } from '../characters/npc.js';
 import { debugMenu, debugging, inRoom, openRoom } from './net.js';
 import { levelsBeaten } from './progress.js';
 import { STRIKE } from './punches.js';
@@ -37,6 +37,16 @@ const patternId = (stitch) => `t-${stitch.replace(' ', '-')}`;
 document.body.insertAdjacentHTML('beforeend', `<svg width="0" height="0" aria-hidden="true"><defs>${Object.entries(PATTERN).map(([stitch, ink]) =>
   `<pattern id="${patternId(stitch)}" width="6" height="6" patternUnits="userSpaceOnUse">${ink}</pattern>`).join('')}</defs></svg>`);
 const textured = (body, stitch) => (PATTERN[stitch] ? `${body}<g fill="url(#${patternId(stitch)})">${body}</g>` : body);
+
+// REUSE-SPEC.md §Fighter chooser, Face paint: a face with the paint on it, in the paint's colour
+const FACE = '<circle cx="24" cy="24" r="19" fill="#f3ead8" stroke="#9a8f84" stroke-width="2"/>';
+const EYES = '<circle cx="17" cy="21" r="3" fill="#222"/><circle cx="31" cy="21" r="3" fill="#222"/>';
+const FACE_ICON = {
+  none: FACE + EYES,
+  rings: `${FACE}<circle cx="17" cy="21" r="6.5" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="31" cy="21" r="6.5" fill="none" stroke="currentColor" stroke-width="3"/>${EYES}`,
+  slashes: `${FACE}<rect x="10" y="28" width="11" height="4" rx="2"/><rect x="27" y="28" width="11" height="4" rx="2"/>${EYES}`,
+  heart: `${FACE}<path d="M33 35c-4-3-7-5-7-8 0-2 2-3 3.5-3 1.5 0 2.5 1 3.5 2 1-1 2-2 3.5-2 1.5 0 3.5 1 3.5 3 0 3-3 5-7 8Z"/>${EYES}`,
+};
 
 const svg = (body, colour) => `<svg viewBox="0 0 48 48" fill="currentColor" style="color:${colour}" aria-hidden="true">${body}</svg>`;
 
@@ -106,6 +116,8 @@ function render() {
     garment('🎩', 'hat', HATS, true),
     garment('🦸', 'cape', CAPES, true),
     garment('🎒', 'bag', BAGS, false),
+    row('🎭', 'face paint', pictures(FACE_PAINTS.map((v) =>
+      button('facePaint', v, `${v} face paint`, svg(FACE_ICON[v], facePaintColorOf(paint(fighter).params)), v === params.facePaint)).join(''))),
     row('✊', 'hands', pictures(handsFor(beaten, badGuy).map((v) => {
       const on = v === look.hands, icon = on && rolled !== null ? '🎲' : on && TRICKS[v].length > 1 && TRICK_ICON[look.trick];
       const badge = icon ? `<text x="38" y="14" font-size="18" text-anchor="middle">${icon}</text>` : '';
@@ -132,6 +144,7 @@ const ACTIONS = {
   hat: (v) => pickOrRestitch('hat', v),
   cape: (v) => pickOrRestitch('cape', v),
   bag: (v) => { fighter.look.bag = v; },
+  facePaint: (v) => { fighter.params.facePaint = v; },
   hands: (v) => {
     const { look } = fighter, tricks = TRICKS[v];
     // ponytail: the effects randomizer's try-out (fighter.js ROLL), in dev mode on gloves or the sword only

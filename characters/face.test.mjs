@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
   BASE_PARAMS, GEO, POSES, MOTION_DEFAULTS, createCharacter, getSpecies, speciesIds, stepMotion, setGeometryDetail,
-  placePupils, deriveAccentColor,
+  placePupils, facePaintColorFor, FACE_PAINTS,
 } from './npc.js';
 import { aimGameCamera } from '../spinoff/stage.js';
 import './owl.js';
@@ -13,8 +13,10 @@ import './lion.js';
 setGeometryDetail('med');
 const STILL = { ...MOTION_DEFAULTS, idleAmount: 0 };
 // off by default, so the game looks as it did till the designer picks them (the species checker's style folder)
-const STYLE = { lookAt: true, eyeGlint: true, faceAccent: true };
+const STYLE = { lookAt: true, eyeGlint: true };
 for (const k of Object.keys(STYLE)) assert.equal(BASE_PARAMS[k], false, `${k} is off by default`);
+assert.equal(BASE_PARAMS.facePaint, 'none', 'face paint on by default');
+const PAINTED = FACE_PAINTS.filter((p) => p !== 'none'), SIDES = { rings: 2, slashes: 2, heart: 1 };
 const paramsOf = (id, extra = {}) => ({ ...BASE_PARAMS, ...getSpecies(id).defaults, ...STYLE, mergeMeshes: false, ...extra });
 
 /** A fighter side on at the origin, facing +x, as placeFighter turns one; the match camera on it. */
@@ -42,8 +44,8 @@ const _c = new THREE.Vector3(), _ndc = new THREE.Vector2();
 
 /** Screen pixels (on an 800 by 500 screen) where `group` is the nearest thing of the head's: a z-buffer count, by ray. */
 function pixelsOf(built, camera, group) {
-  group.getWorldPosition(_c);
-  const r = new THREE.Box3().setFromObject(group).getSize(_p).length() / 2;
+  const box = new THREE.Box3().setFromObject(group), r = box.getSize(_p).length() / 2;
+  box.getCenter(_c);
   const centre = _c.clone().project(camera), edge = _c.clone().add(_d.set(0, 0, 0).setFromMatrixColumn(camera.matrixWorld, 0).multiplyScalar(r)).project(camera);
   const half = Math.ceil(Math.hypot(edge.x - centre.x, edge.y - centre.y) * SCREEN[0] / 2) + 1;
   let n = 0;
@@ -124,7 +126,7 @@ for (const id of speciesIds()) for (const corner of corners(id)) {
       }
     }
   }
-  for (const patch of named(built, 'faceAccent')) {
+  for (const patch of PAINTED.flatMap((facePaint) => named(createCharacter(paramsOf(id, { ...corner, facePaint }), id), 'facePaint'))) {
     const pos = patch.geometry.attributes.position, v = new THREE.Vector3();
     let lo = Infinity, hi = 0;
     for (let i = 0; i < pos.count; i++) {
@@ -139,10 +141,11 @@ for (const id of speciesIds()) for (const corner of corners(id)) {
 
 // each switch really takes its part off; the parts merge into the families already drawn
 for (const id of speciesIds()) {
-  const parts = { eyeGlint: 'glint', faceAccent: 'faceAccent' };
-  for (const [key, name] of Object.entries(parts)) {
-    assert.equal(named(createCharacter(paramsOf(id), id), name).length, 2, `${id}: no ${name} with ${key} on`);
-    assert.equal(named(createCharacter(paramsOf(id, { [key]: false }), id), name).length, 0, `${id}: a ${name} with ${key} off`);
+  assert.equal(named(createCharacter(paramsOf(id), id), 'glint').length, 2, `${id}: no glint with eyeGlint on`);
+  assert.equal(named(createCharacter(paramsOf(id, { eyeGlint: false }), id), 'glint').length, 0, `${id}: a glint with eyeGlint off`);
+  for (const facePaint of FACE_PAINTS) {
+    const n = named(createCharacter(paramsOf(id, { facePaint }), id), 'facePaint').length;
+    assert.equal(n, SIDES[facePaint] ?? 0, `${id}: ${n} pieces of ${facePaint} face paint`);
   }
   const [glint] = named(createCharacter(paramsOf(id), id), 'glint');
   assert.ok(glint.material.userData.family === 'eye' && glint.material.color.getHex() === 0xffffff, `${id}: the glint is not a white glassy eye part`);
@@ -151,26 +154,27 @@ for (const id of speciesIds()) {
     createCharacter(paramsOf(id, { mergeMeshes: true, ...extra }), id).root.traverse((o) => { if (o.isMesh) n++; });
     return n;
   };
-  assert.equal(draws({}), draws({ eyeGlint: false, faceAccent: false }), `${id}: the face parts add draws`);
+  for (const facePaint of PAINTED) assert.equal(draws({ facePaint }), draws({ eyeGlint: false }), `${id}: ${facePaint} face paint adds draws`);
 }
 
-// the accent can be seen from the match camera, looking at it
+// every face paint can be seen from the match camera, looking at it (the heart is on the near cheek)
 for (const id of speciesIds()) {
-  const { built, camera } = matchView(id);
-  settle(built);
-  for (const name of ['faceAccent']) {
-    const seen = named(built, name).map((m) => pixelsOf(built, camera, m));
-    console.log(`${id}: ${name} ${seen.join(' + ')} px`);
-    assert.ok(Math.min(...seen) > 6, `${id}: only ${seen.join(' + ')} px of the ${name}s can be seen in a match`);
+  for (const facePaint of PAINTED) {
+    const { built, camera } = matchView(id, { facePaint });
+    settle(built);
+    const seen = named(built, 'facePaint').map((m) => pixelsOf(built, camera, m));
+    console.log(`${id}: ${facePaint} ${seen.join(' + ')} px`);
+    // side on, the far cheek's paint hides behind the face; the near one must show
+    assert.ok(Math.max(...seen) > 3, `${id}: only ${seen.join(' + ')} px of the ${facePaint} can be seen in a match`);
   }
 }
 
-// the accent is the fur's complement
+// face paint is the fur's complement
 for (const fur of ['#3d7bd9', '#4caf50', '#e0a53c', '#8f8f96', '#d94c8a']) {
   const a = {}, b = {};
-  new THREE.Color(deriveAccentColor(fur)).getHSL(a);
+  new THREE.Color(facePaintColorFor(fur)).getHSL(a);
   new THREE.Color(fur).getHSL(b);
-  assert.ok(a.s > 0.7 && (b.s < 0.12 || Math.abs(Math.abs(a.h - b.h) - 0.5) < 0.01), `the accent for ${fur} is not across the hue circle from it`);
+  assert.ok(a.s > 0.7 && (b.s < 0.12 || Math.abs(Math.abs(a.h - b.h) - 0.5) < 0.01), `the face paint for ${fur} is not across the hue circle from it`);
 }
 
 console.log('face: ok');

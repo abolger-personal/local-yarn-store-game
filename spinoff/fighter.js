@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-  BASE_PARAMS, MOTION_DEFAULTS, NAMES, POSES, applyPose, createCharacter, deriveCoatColor, disposeCharacter, getSpecies, knitMaterial, mergeCharacter,
+  BASE_PARAMS, FACE_PAINTS, MOTION_DEFAULTS, NAMES, POSES, applyPose, createCharacter, deriveCoatColor, disposeCharacter, getSpecies, knitMaterial, mergeCharacter,
   lowestResting, phaseStep, stepMotion, walkGain, walkLayer, walkPhase,
 } from '../characters/npc.js';
 import { deriveManeColor } from '../characters/lion.js';
@@ -120,7 +120,9 @@ export function randomFighter(rng = Math.random, species = pickOf(SPECIES, rng))
     cape: pickOf([...CAPES, null], rng), capeColor: colour(), capeStitch: pickOf(TEXTURES, rng),
     bag: pickOf(BAGS, rng), bagColor: colour(), gloves: colour(), hands, trick: pickOf(TRICKS[hands], rng),
   };
-  return setFur(f, pickOf(FUR, rng).hex);
+  setFur(f, pickOf(FUR, rng).hex);
+  f.params.facePaint = pickOf(FACE_PAINTS, rng);
+  return f;
 }
 
 const oneOf = (list, v, fallback) => (list.includes(v) ? v : fallback);
@@ -135,6 +137,7 @@ function readParams(species, raw) {
     else if (typeof d === 'string' && HEX.test(d) && HEX.test(v)) out[k] = v;
   }
   out.name = oneOf(NAMES, raw.name, out.name);
+  out.facePaint = oneOf(FACE_PAINTS, raw.facePaint, out.facePaint);
   return out;
 }
 

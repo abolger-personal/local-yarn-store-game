@@ -1629,6 +1629,11 @@ only, pictures and colour, no words needed; every button has an `aria-label` for
    trick floats up off the glove or sword tip, big, for 1.2 s (`showOffTrick`), so a kid sees what it does. Icons are drawn in the colour currently picked. Tapping the hat or cape you
    already wear knits it in the next stitch; the icon shows the stitch as a pattern. Each tap rebuilds the fighter
    (about 17 ms) on a gently turning preview.
+   **Face paint** (decided 2026-11-05), a 🎭 row before the hands: none, rings round the eyes, cheekbone
+   slashes (NFL eye black) or one heart on a cheek, each icon a little face with the paint on. No colour
+   swatches: the paint is the fur's complement across the hue circle (characters BODIES.md §Face paint). It is
+   a character param (`facePaint`), so it saves and travels to other tablets with the fighter; a random fighter
+   (CPU, Surprise me) gets any of the four. Planned: more face paints, unlocked like the hands.
 4. **Surprise me.** 🎲 runs the species' `randomise` plus a random outfit.
 5. **Done.** 👍 saves `{ species, params, look }` to `localStorage` under `lys.fighter.v1` and
    goes to the lobby. That same object is what the join handshake sends.

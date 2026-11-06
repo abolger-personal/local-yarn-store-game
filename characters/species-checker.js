@@ -28,7 +28,6 @@ const SLOTS = ['A', 'B'];
 const STYLE_SWITCHES = Object.freeze([
   { key: 'lookAt', name: 'look-at', live: true },
   { key: 'eyeGlint', name: 'eye glint' },
-  { key: 'faceAccent', name: 'face accent' },
   { key: 'painterly', name: 'painterly' },
   { key: 'shapedFaces', name: 'shaped faces' },
 ]);

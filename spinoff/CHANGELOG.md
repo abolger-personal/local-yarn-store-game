@@ -8,9 +8,9 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **They look at you.** Standing about, a fighter turns its head toward you, so both eyes show; while it
   punches or kicks it looks at the bad guy it is going for, and after a hit it looks at whoever it traded
   the hit with. The eyes move a moment before the head does.
-- **A glint in every eye**, and **a coloured iris** round each pupil, in the fur's colour.
-- **A bright face**: a hot-coloured patch round the eyes (red, orange, amber or pink, picked to stand out
-  from the fur).
+- **A glint in every eye.**
+- **A bright face**: a patch round the eyes in the colour opposite the fur's on the colour wheel (orange on
+  a blue lion, violet on a lemon one).
 
 ## 0.0.7 — 2026-11-04: Tricks, trick shots and the sweep
 

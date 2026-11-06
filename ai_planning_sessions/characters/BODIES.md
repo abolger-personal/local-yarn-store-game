@@ -134,20 +134,18 @@ the viewer so both eyes show).
 
 ## Face
 
-Built 2026-11-04 (the same plate: a hot face, a glint in each eye); the iris 2026-11-05.
+Built 2026-11-04 (the same plate: a hot face, a glint in each eye).
 
 - **Glint** (`eyeGlint`): a small flat white dot up and out on each pupil, self-lit so it reads white from any
   light, a child of the pupil so it moves with it, in the eye family (no new draw). Tuned 2026-11-05: smaller
   (0.22 pupil radii) and nearer the pupil's edge; the lit one shaded grey.
-- **Iris** (`iris`, `irisSize`, `irisColor`): a coloured cap round each pupil, a child of it: the white's own
-  ellipsoid 2% proud and narrower, so it shows `1 + 1.5 x irisSize` pupil radii across (at most 0.9 of the
-  eye) and dips back under the white at its edge; never wider than the eye, so never past its outline. Eye
-  family (no new draw). Blank colour = derived: the fur's hue, saturation 0.75, lightness 0.38 (amber on grey
-  fur). 2026-11-05: replaced the eye ring (a skin band round the eye, then an eyelid-like rim); the intent was
-  an iris.
+- **No eye ring or iris** (2026-11-05): a skin band round the eye, then a rim like an eyelid, then a coloured
+  iris cap on the white were all tried and taken out.
 - **Face accent** (`faceAccent`, `faceAccentSize`, `faceAccentColor`): a mask round the eyes, 3 mm off the
-  skull. Blank colour = derived from the fur: the first hot hue (scarlet, orange, amber,
-  pink) at least 0.15 round from the fur's hue, saturated. The owl's reads as a facial disc. Cheek blush was
+  skull. Blank colour = derived from the fur: its complement, straight across the HSL hue
+  circle (hue + 0.5), saturation 0.85, lightness 0.55; scarlet on grey fur (saturation under 0.12), which has no
+  hue. 2026-11-05: it had been the first hot hue (scarlet, orange, amber, pink) at least 0.15 from the fur's,
+  which was scarlet for nearly every fur. The owl's reads as a facial disc. Cheek blush was
   tried on the lion and sat hidden under the muzzle and mane from the match camera (0 px), so every species
   wears the mask, sized per species (owl 1.0, llama 0.8 on its big eyes, lion 1.0 eye radii).
 - The accent is a patch of a sphere around the skin point under the eye, scaled onto the head

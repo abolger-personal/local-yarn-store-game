@@ -91,9 +91,6 @@ export const BASE_PARAMS = Object.freeze({
 
   lookAt:        false,
   eyeGlint:      false,
-  iris:          false,
-  irisSize:      0.30,
-  irisColor:     '',
   faceAccent:    false,
   faceAccentSize:  1.00,
   faceAccentColor: '',
@@ -202,27 +199,16 @@ export function deriveCoatColor(bodyHex) {
   return hsl(h, s, l);
 }
 
-// BODIES.md §Face: the first hot hue far enough round from the fur's, else the farthest
-const HOT_HUES = [0.03, 0.08, 0.12, 0.95];
-const HOT_GAP = 0.15;
+// BODIES.md §Face: the fur's complement, straight across the hue circle; scarlet on grey fur, which has no hue
+const GREY_FUR = 0.12, GREY_ACCENT = 0.03;
 
 export function deriveAccentColor(bodyHex) {
   const body = {};
   new THREE.Color(bodyHex).getHSL(body);
-  const gap = (h) => (body.s < 0.12 ? 1 : Math.min(Math.abs(h - body.h), 1 - Math.abs(h - body.h)));
-  const h = HOT_HUES.find((hue) => gap(hue) >= HOT_GAP) ?? HOT_HUES.reduce((a, b) => (gap(b) > gap(a) ? b : a));
-  return hsl(h, 0.85, 0.55);
-}
-
-// BODIES.md §Face: the iris in the fur's hue, rich and mid-dark between the white and the pupil; amber on grey fur
-export function irisColorFor(furHex) {
-  const fur = {};
-  new THREE.Color(furHex).getHSL(fur);
-  return hsl(fur.s < 0.12 ? 0.11 : fur.h, 0.75, 0.38);
+  return hsl(body.s < GREY_FUR ? GREY_ACCENT : (body.h + 0.5) % 1, 0.85, 0.55);
 }
 
 export const accentColorOf = (P) => P.faceAccentColor || deriveAccentColor(P.bodyColor);
-export const irisColorOf = (P) => P.irisColor || irisColorFor(P.bodyColor);
 
 export function slugify(text) {
   const slug = (text ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -548,23 +534,12 @@ function buildGlint(P, mat, pupilR, squash) {
   return glint;
 }
 
-// BODIES.md §Face: the white's own shape a hair proud and narrower, so it shows as a coloured cap round the pupil
-// `show` across; its radius solves where it dips back under the white. Never wider than the eye, so never past it.
-const IRIS_PROUD = 1.02;
-
-function buildIris(P, mat, pupilR, { squash, depth }, at) {
-  const show = Math.min(pupilR * (1 + P.irisSize * 1.5), P.eyeRadius * 0.9), k = IRIS_PROUD ** 2;
-  const r = Math.sqrt((k * show ** 2) / (k - 1 + (show / P.eyeRadius) ** 2));
-  return named(part(GEO.sphere, mat.iris, { pos: [0, 0, -at], scale: [r, r * squash, depth * IRIS_PROUD], shadow: false }), 'iris');
-}
-
 function buildPupil(side, P, mat, { squash, depth }) {
   const pupilR = P.eyeRadius * P.pupilScale;
   const pupil = joint(new THREE.Group(), `${sideName(side)}Pupil`);
   pupil.position.z = depth * 0.6 + P.pupilDepth;
   pupil.add(part(GEO.sphere, mat.pupil, { scale: [pupilR, pupilR * squash, pupilR * 0.72] }));
   if (P.eyeGlint) pupil.add(buildGlint(P, mat, pupilR, squash));
-  if (P.iris) pupil.add(buildIris(P, mat, pupilR, { squash, depth }, pupil.position.z));
   return pupil;
 }
 
@@ -611,7 +586,6 @@ export function addEyes(ctx, P, opts = {}) {
     head: opts.head,
   };
   placement.front = eyeSeat(P, placement);
-  if (P.iris) ctx.mat.iris ??= ctx.addMaterial(eyeMaterial(P, irisColorOf(P)));
   if (P.eyeGlint) ctx.mat.glint ??= ctx.addMaterial(Object.assign(eyeMaterial(P, '#ffffff'), { emissive: new THREE.Color('#ffffff') }));
   for (const side of [-1, 1]) {
     const { group, ...eye } = buildEye(side, P, ctx.mat, placement);
@@ -1443,14 +1417,13 @@ export const BASE_GUI = Object.freeze({
     ['bodyColor', 'color'], ['footColor', 'color'],
     ['sheen', 0, 1], ['sheenRoughness', 0, 1], ['sheenTint', 'color'], ['roughness', 0, 1],
   ],
-  // BODIES.md §Face: a ring or accent colour left alone follows the fur
+  // BODIES.md §Face: an accent colour left alone follows the fur
   'eyes & face': [
     ['eyeRadius', 0.02, 0.14], ['eyeSpread', 0.1, 0.9], ['eyeLift', -0.5, 0.6],
     ['eyeFront', 0.2, 1.4],
     ['pupilScale', 0.1, 0.9], ['pupilDepth', 0.0, 0.06],
     ['eyeColor', 'color'], ['pupilColor', 'color'],
     ['eyeSheen', 0, 1], ['eyeSheenRough', 0, 1], ['eyeRough', 0, 1], ['eyeClearcoat', 0, 1],
-    ['irisSize', 0, 0.8], ['irisColor', 'color', irisColorOf],
     ['faceAccentSize', 0.3, 2.2], ['faceAccentColor', 'color', accentColorOf],
   ],
   tail: [

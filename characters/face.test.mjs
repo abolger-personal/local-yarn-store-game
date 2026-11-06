@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
   BASE_PARAMS, GEO, POSES, MOTION_DEFAULTS, createCharacter, getSpecies, speciesIds, stepMotion, setGeometryDetail,
-  placePupils, deriveAccentColor, irisColorFor,
+  placePupils, deriveAccentColor,
 } from './npc.js';
 import { aimGameCamera } from '../spinoff/stage.js';
 import './owl.js';
@@ -13,7 +13,7 @@ import './lion.js';
 setGeometryDetail('med');
 const STILL = { ...MOTION_DEFAULTS, idleAmount: 0 };
 // off by default, so the game looks as it did till the designer picks them (the species checker's style folder)
-const STYLE = { lookAt: true, eyeGlint: true, iris: true, faceAccent: true };
+const STYLE = { lookAt: true, eyeGlint: true, faceAccent: true };
 for (const k of Object.keys(STYLE)) assert.equal(BASE_PARAMS[k], false, `${k} is off by default`);
 const paramsOf = (id, extra = {}) => ({ ...BASE_PARAMS, ...getSpecies(id).defaults, ...STYLE, mergeMeshes: false, ...extra });
 
@@ -124,14 +124,6 @@ for (const id of speciesIds()) for (const corner of corners(id)) {
       }
     }
   }
-  // the iris shows round the pupil, the pupil in front of it, and it never reaches past the eye
-  for (const [i, iris] of named(built, 'iris').entries()) {
-    const { r, ry, depth, pupil: { position: at, children: [pupil] } } = built.joints.eye[i];
-    const showing = (rho) => iris.scale.z * Math.sqrt(Math.max(0, 1 - (rho / iris.scale.x) ** 2)) > depth * Math.sqrt(Math.max(0, 1 - (rho / r) ** 2));
-    assert.ok(iris.parent === built.joints.eye[i].pupil && showing(pupil.scale.x * 1.2), `${id}: iris ${i} hides under the white round its pupil`);
-    assert.ok(at.z + pupil.scale.z > iris.scale.z, `${id}: iris ${i} covers its pupil`);
-    assert.ok(iris.scale.x <= r + 1e-9 && iris.scale.y <= ry + 1e-9, `${id}: iris ${i} reaches past its eye`);
-  }
   for (const patch of named(built, 'faceAccent')) {
     const pos = patch.geometry.attributes.position, v = new THREE.Vector3();
     let lo = Infinity, hi = 0;
@@ -147,7 +139,7 @@ for (const id of speciesIds()) for (const corner of corners(id)) {
 
 // each switch really takes its part off; the parts merge into the families already drawn
 for (const id of speciesIds()) {
-  const parts = { eyeGlint: 'glint', iris: 'iris', faceAccent: 'faceAccent' };
+  const parts = { eyeGlint: 'glint', faceAccent: 'faceAccent' };
   for (const [key, name] of Object.entries(parts)) {
     assert.equal(named(createCharacter(paramsOf(id), id), name).length, 2, `${id}: no ${name} with ${key} on`);
     assert.equal(named(createCharacter(paramsOf(id, { [key]: false }), id), name).length, 0, `${id}: a ${name} with ${key} off`);
@@ -159,30 +151,26 @@ for (const id of speciesIds()) {
     createCharacter(paramsOf(id, { mergeMeshes: true, ...extra }), id).root.traverse((o) => { if (o.isMesh) n++; });
     return n;
   };
-  assert.equal(draws({}), draws({ eyeGlint: false, iris: false, faceAccent: false }), `${id}: the face parts add draws`);
+  assert.equal(draws({}), draws({ eyeGlint: false, faceAccent: false }), `${id}: the face parts add draws`);
 }
 
-// the iris and the accent can be seen from the match camera, looking at it
+// the accent can be seen from the match camera, looking at it
 for (const id of speciesIds()) {
   const { built, camera } = matchView(id);
   settle(built);
-  for (const name of ['iris', 'faceAccent']) {
+  for (const name of ['faceAccent']) {
     const seen = named(built, name).map((m) => pixelsOf(built, camera, m));
     console.log(`${id}: ${name} ${seen.join(' + ')} px`);
     assert.ok(Math.min(...seen) > 6, `${id}: only ${seen.join(' + ')} px of the ${name}s can be seen in a match`);
   }
 }
 
-// the iris is rich and mid-dark, between the white and the pupil; the accent is hot and off the fur's hue
+// the accent is the fur's complement
 for (const fur of ['#3d7bd9', '#4caf50', '#e0a53c', '#8f8f96', '#d94c8a']) {
   const a = {}, b = {};
   new THREE.Color(deriveAccentColor(fur)).getHSL(a);
   new THREE.Color(fur).getHSL(b);
-  const iris = {};
-  new THREE.Color(irisColorFor(fur)).getHSL(iris);
-  assert.ok(iris.s > 0.6 && iris.l > 0.3 && iris.l < 0.5, `the iris for ${fur} is ${irisColorFor(fur)}, not rich and mid`);
-  assert.ok(a.s > 0.7 && (a.h < 0.15 || a.h > 0.9), `the accent for ${fur} is not hot`);
-  assert.ok(b.s < 0.12 || Math.min(Math.abs(a.h - b.h), 1 - Math.abs(a.h - b.h)) > 0.1, `the accent for ${fur} is the fur's own hue`);
+  assert.ok(a.s > 0.7 && (b.s < 0.12 || Math.abs(Math.abs(a.h - b.h) - 0.5) < 0.01), `the accent for ${fur} is not across the hue circle from it`);
 }
 
 console.log('face: ok');

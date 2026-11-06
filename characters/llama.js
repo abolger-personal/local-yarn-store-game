@@ -104,7 +104,6 @@ export const RANDOM_RANGES = Object.freeze({
   eyeSpread:    [0.520, 0.660],
   eyeFront:     [0.620, 0.780],
   tailLength:   [0.065, 0.110],
-  irisSize:     [0.200, 0.450],
   faceAccentSize: [0.60, 1.00],
 });
 

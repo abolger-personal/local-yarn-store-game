@@ -37,6 +37,7 @@ const FAST = [
   'spinoff/roster.test.mjs',
   'spinoff/controls.test.mjs',
   'spinoff/sim.test.mjs',
+  'spinoff/replay.test.mjs',
   'spinoff/hammer.test.mjs',
   'spinoff/build.test.mjs',
   'spinoff/cpu.test.mjs',

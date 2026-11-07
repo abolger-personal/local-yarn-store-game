@@ -15,6 +15,8 @@ export const PAINT = {
   pool: { value: 0.45 },
   fray: { value: 0.78 },
   feather: { value: 0.76 },
+  scales: { value: 0.5 },
+  scaleSize: { value: 1 },
 };
 
 /** The fur ramp: shadows deeper, more saturated and turned along the hue; lights brighter, as saturated as the fur. */
@@ -66,7 +68,8 @@ const PARS = `
 uniform sampler2D paintBrushMap;
 uniform sampler2D paintFeatherMap;
 uniform sampler2D paintPlaneMap;
-uniform float paintSize, paintBands, paintSoft, paintBrush, paintStreak, paintLevel, paintPool, paintFray, paintFeather, paintAccent, paintAccentSize;
+uniform sampler2D paintScaleMap;
+uniform float paintSize, paintBands, paintSoft, paintBrush, paintStreak, paintLevel, paintPool, paintFray, paintFeather, paintAccent, paintAccentSize, paintScales, paintScaleSize;
 varying vec2 vPaintUv;
 // BODIES.md §Painterly, accent pieces: by material, or merged, by uv lifted 2 whole tiles
 #define paintAccented max(paintAccent, step(1.5, vPaintUv.y))`;
@@ -96,8 +99,15 @@ const level = (stroke, banded) => `
   paintC *= paintBase / max(dot(paintC, vec3(${LUMA.join(', ')})), 1e-3) * paintE;`;
 
 // fur: a few broad planes a part (Marc), not hair; ink: the fine brush
-const FUR = `{${level('texture2D(paintPlaneMap, vPaintUv / mix(paintSize, paintAccentSize, paintAccented)).r', true)}
+const PLANES = level('texture2D(paintPlaneMap, vPaintUv / mix(paintSize, paintAccentSize, paintAccented)).r', true);
+const FUR = `{${PLANES}
   outgoingLight = paintC * (1.0 + paintStroke * paintStreak);
+}`;
+
+// BODIES.md §Dragon, scales: the fur's planes, and overlapping scales painted over all but the accent pieces
+const SCALE = `{${PLANES}
+  float paintScaled = (texture2D(paintScaleMap, vPaintUv * vec2(6.0, 3.0) / paintScaleSize).r - 0.5) * paintScales * (1.0 - paintAccented);
+  outgoingLight = paintC * (1.0 + paintStroke * paintStreak + paintScaled);
 }`;
 
 const INK = `{${level('texture2D(paintBrushMap, vPaintUv * vec2(3.0, 2.0)).r', false)}
@@ -112,6 +122,7 @@ const INK = `{${level('texture2D(paintBrushMap, vPaintUv * vec2(3.0, 2.0)).r', f
 export const PAINT_STYLES = Object.freeze({
   fur: { ramp: FUR_RAMP, body: FUR },
   ink: { ramp: INK_RAMP, body: INK },
+  scale: { ramp: FUR_RAMP, body: SCALE },
 });
 
 const TILE = 128;
@@ -160,6 +171,27 @@ function drawFeathers(g) {
   }
 }
 
+// overlapping round scales, rows drawn bottom up so each covers the tops of the row below: a light middle (the
+// shine) to a dark lower edge
+function drawScales(g) {
+  g.fillStyle = 'rgb(128,128,128)';
+  g.fillRect(0, 0, TILE, TILE);
+  const step = TILE / 4, r = step * 0.62;
+  for (let row = 4; row >= -1; row--) for (let col = -1; col <= 4; col++) {
+    const x = (col + (row % 2 ? 0.5 : 0)) * step, y = row * step * 0.75;
+    for (const dy of [0, TILE]) {
+      const shade = g.createRadialGradient(x, y + dy - r * 0.2, r * 0.1, x, y + dy, r);
+      shade.addColorStop(0, 'rgb(215,215,215)');
+      shade.addColorStop(0.75, 'rgb(130,130,130)');
+      shade.addColorStop(1, 'rgb(40,40,40)');
+      g.fillStyle = shade;
+      g.beginPath();
+      g.arc(x, y + dy, r, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+}
+
 /** A tiling grey texture drawn on a canvas once; a flat grey pixel where there is no canvas (node tests). */
 function canvasTexture(draw) {
   if (typeof document === 'undefined') {
@@ -177,12 +209,14 @@ function canvasTexture(draw) {
 let maps = null;
 const paintMaps = () => (maps ??= {
   brush: { value: canvasTexture(drawBrush) }, feather: { value: canvasTexture(drawFeathers) }, plane: { value: canvasTexture(drawPlanes) },
+  scale: { value: canvasTexture(drawScales) },
 });
 
 function uniformsFor(material) {
-  const { brush, feather, plane } = paintMaps();
+  const { brush, feather, plane, scale } = paintMaps();
   return {
-    paintBrushMap: brush, paintFeatherMap: feather, paintPlaneMap: plane, paintSize: PAINT.size, paintBands: PAINT.bands, paintSoft: PAINT.soft,
+    paintBrushMap: brush, paintFeatherMap: feather, paintPlaneMap: plane, paintScaleMap: scale,
+    paintScales: PAINT.scales, paintScaleSize: PAINT.scaleSize, paintSize: PAINT.size, paintBands: PAINT.bands, paintSoft: PAINT.soft,
     paintBrush: PAINT.brush, paintStreak: PAINT.streak, paintLevel: PAINT.light, paintPool: PAINT.pool,
     paintFray: PAINT.fray, paintFeather: PAINT.feather, paintAccent: { value: material.userData.accent ? 1 : 0 }, paintAccentSize: PAINT.accentSize,
   };

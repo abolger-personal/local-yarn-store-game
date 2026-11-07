@@ -354,10 +354,10 @@ Decided 2026-11-06 (the designer: "cute, not scary, NO WINGS, but still dragon, 
 scales"). A striker and projectile shooter in the brawler, on the base two-legged rig.
 
 - **Croc tells vs dragon fixes.** A long, flat, wide snout -> a round head (`headShape` 1.00 x 0.95 x 1.05,
-  `headRadius` 0.195, about 0.45 of the height with the horns) and a short soft cream muzzle bump
-  (`muzzleSize`, `muzzleDrop`), nostrils and a soft brow over each eye under shaped faces (shape only). Low sprawl
+  `headRadius` 0.195, about 0.45 of the height with the horns) and a short soft muzzle bump in the head's colour
+  (`muzzleSize`, `muzzleDrop`; cream didn't read as a dragon, 2026-11-06), nostrils and a soft brow over each eye under shaped faces (shape only). Low sprawl
   -> upright, chunky, short thick limbs (`legHeight` 0.150, `limbThick` 0.044, torso 0.230 x 0.215 x 0.235).
-  Uniform flat armour plates -> rounded overlapping scales standing proud, a cream belly plate over them. A long
+  Uniform flat armour plates -> painted overlapping scales everywhere, and the belly an alligator's (below). A long
   thick tapering tail -> a short (0.200), curled (`tailCurl` 0.55) tail with a small ivory spade tip.
 - **Identity on the head** (no wings): two small curled-back ivory horns on top (cone ears, `hornSize`,
   `hornLength`, `hornSpread`, `hornTilt`, `hornCurl`; hidden under a hat like ears), and a leafy crest of soft
@@ -366,16 +366,24 @@ scales"). A striker and projectile shooter in the brawler, on the base two-legge
 - **Back ridge** (`spikes`, `spikeCount`, `spikeSize`): soft spikes down the spine standing on the scales, and one
   on each tail segment. The body ridge rides a joint of its own on the chest, so garments fit the torso, not the
   spikes (a cape or sweater lets them poke through, as a costume with a ridge would).
-- **Scales**: a torso coat named `scale` (`addTorsoCoat`, 4 rows of 9, touching, staggered, `scaleFlat` 0.46 under
-  `scaleProud` 0.62 so each overlaps the next like shingles). Shine: the scale material is in the eye family
-  (clearcoat, low roughness), so painterly, which paints only felt, leaves it glossy, and merged it shares the
-  eyes' draw (no new draw). Candy gloss, not metal (metalness 0). None on the face or limbs.
-- **Palette as roles** from the fur the player picks: scales and body the fur (`coatOf` is the fur itself); belly
-  and muzzle a fixed cream `#fff1cc`; horns, feet and tail tip a fixed ivory `#fbf6e9`; crest and spikes the
+- **Scales** (changed 2026-11-06, the designer: scales on the arms and head too, as paint, like the owl's feather
+  rows, not add-on shells): the `scale` paint style, the fur's planes plus a tiling texture of overlapping round scales
+  (light middles for the shine, dark lower edges) on every felt part but the accent pieces (`paint.scales`, the
+  checker's "scales (dragon)", and `paint.scaleSize`). They follow each part's uvs, so they come smaller on small parts.
+  The add-on torso scale coat (glossy, in the eye family) is gone.
+- **Belly** (2026-11-06, the designer: alligator, snake or crocodile there): chevron plates pointing down (`bellyPlates`
+  7, `bellyWidth` 0.6 of the torso), from the neck (0.75 of the torso up) to under the tail root (0.92 down), each a
+  little prouder than the one below so its point lies over the next, narrowing 30% toward the bottom; one mesh.
+- **Add-ons way bigger** (2026-11-06, the designer had every slider at its top): horns 0.065 x 0.160, spread 0.5,
+  curl 2.0; crest 0.110; spikes 0.090; tail tip 0.110; muzzle 1.5. The sliders go to about twice that.
+- **Tail**: untouched (the designer: "adorable, change nothing about its shape or motion"); its spikes now have their
+  own size (`tailSpikeSize`, 0.028, as before), so the bigger back spikes leave the tail as it was.
+- **Palette as roles** from the fur the player picks: scales, body and muzzle the fur; belly plates a fixed cream
+  `#fff1cc`; horns, feet and tail tip a fixed ivory `#fbf6e9`; crest and spikes the
   fur's complement (`facePaintColorFor`) until picked (`spikeColor` blank, a derived gui row). Cream against the
   riot furs: Lab dE 54 (turquoise) to 123 (violet); the least lightness gap is yellow (dL 10) and lime (14), where
-  the chroma carries it (dE 65, 75) and the belly plate stands proud of the scales so its edge shades.
-- Paint accent: the crest and spikes (`paint.accent: ['spike']`).
+  the chroma carries it (dE 65, 75) and the plates stand proud so their edges shade.
+- Paint accent: the crest, spikes, horns and belly plates (`paint.accent: ['spike', 'horn', 'belly']`): no scales painted on them.
 - Motion: bouncy and lively. Stiff 120-260, idle rate 1.00-2.40, idle amp 0.60-1.40, head arc 0.80-1.60, bounce
   0.04-0.10, stride 1.40-1.90, knee lift 0.50-0.85. Starting values.
 - Future (brainstorm, REUSE-SPEC.md): a throat/chest glow for the projectile, armoured forearms, weapon grafts;

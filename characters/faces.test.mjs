@@ -83,6 +83,18 @@ function checkDragon(built, label) {
   assert.equal(brows.length, 2, `${label}: two brows`);
   nostrils.forEach((n) => assertOnSurface(n, named(built, 'muzzle').map(ellipsoid), label));
   brows.forEach((b) => assertOnSurface(b, headHost(built), label));
+  assert.ok(named(built, 'muzzle').every((m) => m.material === built.mat.body), `${label}: the muzzle is not the head's colour`);
+  checkBelly(built, label);
+}
+
+// BODIES.md §Dragon: the chevron belly hugs the front of the torso, just proud, from the neck to under the tail root
+function checkBelly(built, label) {
+  const P = built.params, [belly] = built.chest.children.filter((o) => o.name === 'belly');
+  assert.ok(belly, `${label}: no belly plates`);
+  const k = vertices(belly).map((v) => Math.hypot(v.x / P.torsoW, v.y / P.torsoH, v.z / P.torsoD));
+  assert.ok(Math.min(...k) > 1 && Math.max(...k) < 1.12, `${label}: the belly plates sink in or float off (${Math.min(...k).toFixed(3)} to ${Math.max(...k).toFixed(3)})`);
+  const ys = vertices(belly).map((v) => v.y / P.torsoH);
+  assert.ok(Math.max(...ys) > 0.7 && Math.min(...ys) < -0.85, `${label}: the belly does not run neck to tail root`);
 }
 
 const CHECK = { owl: checkBeak, llama: checkLlama, lion: checkLion, dragon: checkDragon, turtle: checkBeak };

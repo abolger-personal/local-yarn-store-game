@@ -684,7 +684,10 @@ const capsule = (w, h) => new THREE.Shape().moveTo(-w, -h).lineTo(w, -h).absarc(
 const heart = () => new THREE.Shape().moveTo(0, -0.5).bezierCurveTo(-0.15, -0.3, -0.5, -0.1, -0.5, 0.15)
   .bezierCurveTo(-0.5, 0.42, -0.15, 0.5, 0, 0.28).bezierCurveTo(0.15, 0.5, 0.5, 0.42, 0.5, 0.15)
   .bezierCurveTo(0.5, -0.1, 0.15, -0.3, 0, -0.5);
-const DECALS = { slashes: () => capsule(0.36, 0.2), heart };
+// BODIES.md §Dragon: a belly plate, flat across the top and pointed down
+const chevron = () => new THREE.Shape([[-0.5, 0.18], [0.5, 0.18], [0.5, -0.02], [0, -0.22], [-0.5, -0.02]].map(([x, y]) => new THREE.Vector2(x, y)));
+
+const DECALS = { slashes: () => capsule(0.36, 0.2), heart, chevron };
 
 /** Triangles `p` (flat xyz, three corners each), each split in four. */
 function split(p) {
@@ -706,7 +709,7 @@ function subdivide(g, times) {
 }
 
 /** Unit shape `kind` (DECALS) `size` across, upright, wrapped onto head ellipsoid `head` round the skin over (x, y), `lift` proud. */
-function skinDecal(head, kind, [x, y], size, lift) {
+export function skinDecal(head, kind, [x, y], size, lift) {
   return cachedGeometry(`decal|${kind}|${head}|${x}|${y}|${size}|${lift}`, () => {
     const at = new THREE.Vector3(x, y, skinZ(x, y, head));
     const n = new THREE.Vector3(x / head[0] ** 2, y / head[1] ** 2, at.z / head[2] ** 2).normalize();

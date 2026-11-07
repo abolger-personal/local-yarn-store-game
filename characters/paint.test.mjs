@@ -96,6 +96,10 @@ for (const [id, key] of [['lion', 'mane'], ['llama', 'fleece']]) {
   });
   assert.ok(accentVerts > 0, `${id}: merged, the ${key} is not marked as an accent piece`);
 }
+{
+  const dragon = createCharacter(paramsOf('dragon', { painterly: true }), 'dragon'), plain = [dragon.mat.spike, dragon.mat.horn, dragon.mat.belly];
+  assert.ok(dragon.materials.every((m) => Boolean(m.userData.accent) === plain.includes(m)), 'dragon: scales painted on the spikes, horns or belly plates, or missing off the body');
+}
 for (let k = 0; k <= 20; k++) {
   const noise = k / 20, fray = PAINT.fray.value;
   assert.ok(!inkFrays(FRAY_BAND, noise, fray) && !inkFrays(1, noise, fray), 'the ink frays away from the silhouette');

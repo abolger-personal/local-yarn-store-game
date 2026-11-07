@@ -581,6 +581,8 @@ function addPaintKnobs(folder) {
   folder.add(PAINT.soft, 'value', 0, 0.5, 0.01).name('fur band edge');
   folder.add(PAINT.fray, 'value', 0, 0.8, 0.01).name('ink fray (outline)');
   folder.add(PAINT.feather, 'value', 0, 1, 0.01).name('ink feather rows');
+  folder.add(PAINT.scales, 'value', 0, 1, 0.01).name('scales (dragon)');
+  folder.add(PAINT.scaleSize, 'value', 0.3, 3, 0.01).name('scale size');
   folder.close();
 }
 

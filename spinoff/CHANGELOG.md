@@ -11,8 +11,9 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **Two new animals: a turtle and a dragon.** The turtle, Shelly 🐢, is a snapping turtle made round and burly: a big
   soft neck with folds, big eyes, a blunt round head, stubby legs, and a painted turtle's colours (a dark shell with
   a bright rim and underside, bright stripes on the head and neck, all worked out from the fur). The dragon, Ember
-  🐉, is cute, not scary, and has no wings: a big round head, short muzzle, curled ivory horns, a soft crest, glossy
-  overlapping scales, a cream belly and a short curled tail with a spade tip.
+  🐉, is cute, not scary, and has no wings: a big round head, short muzzle in the head's colour, curled ivory horns, a soft crest,
+  overlapping scales painted all over (head, arms and legs too), big horns, crest and spikes, an alligator's
+  belly of chevron plates from the neck to under the tail, and a short curled tail with a spade tip.
 - **New animals are easy to add:** one list of species, each animal describing itself (its emoji, first fur colour,
   coat colour, where its gloves go), shared building blocks, and a step-by-step recipe
   (`ai_planning_sessions/characters/ADDING-A-SPECIES.md`). Next: a turtle.

@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, GEO,
-  addEyes, addHead, addTail, addTorsoCoat, coatBulge, facePaintColorFor,
-  feltMaterial, hsl, part, rand, registerSpecies, skinDecal, skinPatch,
+  addEyes, addHead, addTail, addTorsoCoat, coatBulge,
+  feltMaterial, hsl, part, rand, registerSpecies, skinDecal,
 } from './npc.js';
 import { named, onFront, softGeometry, softTriangle } from './faces.js';
 
@@ -91,19 +91,33 @@ const RANDOM_RANGES = Object.freeze({
 
 const hslOf = (hex) => new THREE.Color(hex).getHSL({ h: 0, s: 0, l: 0 });
 
-// BODIES.md §Turtle: the painted turtle's dark shell, a deep shade of the skin
+// BODIES.md §Turtle, colour: the painted turtle's. A dark shell, a deep shade of the skin. (Lightnesses here are
+// three.js's working, linear ones: 0.05 shows about as dark as 0.25.)
 function deepShellColor(bodyHex) {
-  const { h, s, l } = hslOf(bodyHex);
-  return hsl(h, Math.min(0.9, s * rand(0.9, 1.2)), THREE.MathUtils.clamp(l * rand(0.38, 0.52), 0.06, 0.30));
+  const { h, s } = hslOf(bodyHex);
+  return hsl(h, Math.min(0.85, s * rand(0.8, 1.0)), rand(0.05, 0.08));
 }
 
-// BODIES.md §Turtle: the rim and plastron take the face-paint complement; the stripes, that complement lightened
-const rimColorOf = (P) => P.rimColor || facePaintColorFor(P.bodyColor);
-const stripeColorOf = (P) => {
-  if (P.stripeColor) return P.stripeColor;
-  const { h, s } = hslOf(facePaintColorFor(P.bodyColor));
-  return hsl(h, s, 0.80);
+// warm accents, never the skin's opposite: the rim the first of scarlet, orange or yellow far enough round the hue circle
+// from the skin; on a skin too warm for any, a pale cream
+const WARM = Object.freeze([0.0, 0.07, 0.14]), WARM_LIGHT = Object.freeze([0.25, 0.30, 0.45]);
+const hueGap = (a, b) => Math.min(Math.abs(a - b), 1 - Math.abs(a - b));
+
+function rimHue(bodyHex) {
+  const { h } = hslOf(bodyHex);
+  return WARM.findIndex((w) => hueGap(w, h) >= 0.10);
+}
+
+const rimColorOf = (P) => {
+  if (P.rimColor) return P.rimColor;
+  const i = rimHue(P.bodyColor);
+  return i < 0 ? '#fff1cc' : hsl(WARM[i], 0.95, WARM_LIGHT[i]);
 };
+// the plastron a real one's yellow-orange; on a yellow or orange skin, cream
+const PLASTRON_HUE = 0.11;
+const plastronColorOf = (P) => (hueGap(hslOf(P.bodyColor).h, PLASTRON_HUE) < 0.08 ? '#fff1cc' : hsl(PLASTRON_HUE, 0.95, 0.42));
+// the stripes a light yellow; on a yellow skin, cream
+const stripeColorOf = (P) => P.stripeColor || (hueGap(hslOf(P.bodyColor).h, WARM[2]) < 0.1 ? '#fff6dc' : hsl(WARM[2], 0.95, 0.42));
 
 // BODIES.md §Shaped faces: a small blunt upper beak, wide on top, low on the snout
 const BEAK = Object.freeze({ drop: 0.34, wide: 1.10, tall: 0.70, deep: 0.80, buried: 0.45 });
@@ -135,28 +149,29 @@ function addNeckFolds(ctx, P) {
   }
 }
 
-// BODIES.md §Turtle: raised felt strips, two along each side of the head behind the eye, one down each side of the neck
-const STRIPE_ROWS = Object.freeze([0.0, -0.42]);
-const STRIPE = Object.freeze({ back: -0.30, half: 0.52, proud: 0.35 });
+// BODIES.md §Turtle: painted stripes, as face paint is (lying on the skin, tapered, bowed): two along each side of
+// the head behind the eye, one down each side of the neck
+const STRIPE = Object.freeze({ rows: [0.05, -0.40], front: 0.10, long: 1.10, lift: 0.003 });
 
-function addHeadStripe(ctx, P, side, row) {
-  const [hx, hy, hz] = ctx.headScale, w = P.stripeWidth * P.headRadius;
-  const y = row * hy, z = STRIPE.back * hz, k = Math.sqrt(1 - row * row - STRIPE.back ** 2);
-  const slope = (hx * -STRIPE.back) / (hz * k);
-  ctx.head.add(part(softGeometry(), ctx.mat.stripe, {
-    pos: [side * (hx * k - w * (1 - STRIPE.proud)), y, z], scale: [w, w * 0.5, hz * STRIPE.half], rot: [0, side * Math.atan(slope), 0],
-  }));
+function stripeGeometries(ctx, P, side) {
+  const [hx, hy, hz] = ctx.headScale, len = hz * STRIPE.long, w = (P.stripeWidth * P.headRadius) / len;
+  return STRIPE.rows.map((row) => {
+    const x = side * hx * Math.sqrt(Math.max(0, 1 - row * row - STRIPE.front ** 2));
+    return skinDecal(ctx.headScale, ['stripe', w], [x, row * hy], len, STRIPE.lift);
+  });
+}
+
+function neckStripe(P, side) {
+  const r = P.neckFolds ? foldRadius(P, 0) : P.neckThick, half = P.neckLength / 2 + P.headOverlap, len = 2 * half;
+  return skinDecal([r, half, r], ['stripe', (P.stripeWidth * P.headRadius) / len, true], [side * r * 0.97, 0], len, STRIPE.lift);
 }
 
 function addStripes(ctx, P) {
   if (!P.stripes) return;
-  const w = P.stripeWidth * P.headRadius, r = P.neckFolds ? foldRadius(P, 0) : P.neckThick;
-  for (const side of [-1, 1]) {
-    for (const row of STRIPE_ROWS) addHeadStripe(ctx, P, side, row);
-    ctx.neck.add(part(softGeometry(), ctx.mat.stripe, {
-      pos: [side * (r - w * (1 - STRIPE.proud)), P.headOverlap + P.neckLength / 2, 0], scale: [w, P.neckLength / 2 + P.headOverlap, w * 0.5],
-    }));
-  }
+  const head = [-1, 1].flatMap((side) => stripeGeometries(ctx, P, side));
+  ctx.head.add(named(part(mergeGeometries(head, false), ctx.mat.stripe), 'stripe'));
+  const neck = mergeGeometries([-1, 1].map((side) => neckStripe(P, side)), false);
+  ctx.neck.add(named(part(neck, ctx.mat.stripe, { pos: [0, P.headOverlap + P.neckLength / 2, 0] }), 'stripe'));
 }
 
 const shells = new Map();
@@ -191,8 +206,8 @@ function addCarapace(ctx, P) {
   if (P.shellRim) back.add(named(part(shellBand(P, proud, edge - Math.PI * SHELL.rim, edge), ctx.mat.rim), 'rim'));
 }
 
-// BODIES.md §Turtle: the plastron in panels, two columns of four, its seams the dark shell showing between them
-const PLASTRON = Object.freeze({ rows: [0.42, 0.08, -0.26, -0.60], col: 0.27, size: 0.50, cap: 1.05, lift: 0.004 });
+// BODIES.md §Turtle: the plastron in panels, two columns of four, on the skin, the seams between them its "abs"
+const PLASTRON = Object.freeze({ rows: [0.42, 0.08, -0.26, -0.60], col: 0.27, size: 0.50, lift: 0.004 });
 
 function plastronPanels(P) {
   const torso = [P.torsoW, P.torsoH, P.torsoD], size = P.torsoW * PLASTRON.size, key = `plastron|${torso}`;
@@ -204,10 +219,7 @@ function plastronPanels(P) {
 }
 
 function addPlastron(ctx, P) {
-  if (!P.plastron) return;
-  const torso = [P.torsoW, P.torsoH, P.torsoD];
-  ctx.chest.add(part(skinPatch(torso, [0, -P.torsoH * 0.1], [0, PLASTRON.cap], PLASTRON.lift), ctx.mat.scute));
-  ctx.chest.add(named(part(plastronPanels(P), ctx.mat.rim), 'plastron'));
+  if (P.plastron) ctx.chest.add(named(part(plastronPanels(P), ctx.mat.plastron), 'plastron'));
 }
 
 function addTurtleTail(ctx, P) {
@@ -222,6 +234,7 @@ function addTurtleTail(ctx, P) {
 function buildKit(ctx, P) {
   ctx.mat.scute = ctx.addMaterial(feltMaterial(P, P.scuteColor));
   ctx.mat.rim = ctx.addMaterial(feltMaterial(P, rimColorOf(P)));
+  ctx.mat.plastron = ctx.addMaterial(feltMaterial(P, plastronColorOf(P)));
   ctx.mat.stripe = ctx.addMaterial(feltMaterial(P, stripeColorOf(P)));
   ctx.mat.beak = ctx.addMaterial(feltMaterial(P, P.beakColor));
 

@@ -426,11 +426,19 @@ Status: decided 2026-11-06 (designer's references: a snapping turtle for shape, 
 - Not built: the hood. A shell overhanging the neck would clip the head as it turns (the neck pose is the
   shared rig's, a kit can't lean it forward), so the scutes start high (`scuteTop` 0.06) round the neck
   instead.
-- Colour (painted turtle): skin is the fur; the shell (`scuteColor`) a deep shade of it (lightness x0.38–0.52,
-  capped 0.30); rim and plastron (`rimColor`) the face-paint complement (`facePaintColorFor`); stripes
-  (`stripeColor`) that complement at lightness 0.80. Rim and stripe colours stay derived (`''`) until picked.
-- Stripes (`stripes`, `stripeWidth`): raised felt strips, two along each side of the head behind the eye and
-  one down each side of the neck. No line art.
+- Colour (painted turtle; changed 2026-11-06, the designer: "something still looks weird with how colours are
+  picked"; the complement gave a pink turtle teal accents, a mid raspberry shell): skin is the fur; the shell
+  (`scuteColor`) a DARK shade of it (linear lightness 0.05–0.08); the rim (`rimColor`) WARM, never the skin's opposite:
+  the first of scarlet, orange, yellow at least 0.10 round the hue circle from the skin (scarlet on every cool fur,
+  yellow on pinks, red on lemon), cream on a skin too warm for all three; the plastron a real one's yellow-orange,
+  cream on a yellow or orange skin; the stripes (`stripeColor`) a light yellow, cream on a yellow skin. Rim and
+  stripe stay derived (`''`) until picked. Tested on every riot fur: the shell darker than the skin by 0.1 luma, the
+  rim warm.
+- Stripes (`stripes`, `stripeWidth`): painted on as face paint is (2026-11-06, the designer: they looked
+  geometric): tapered, slightly bowed bands lying on the skin (`skinDecal`'s `stripe`), two along each side of the
+  head behind the eye, one up each side of the neck. No line art.
+- The plastron's panels sit straight on the skin; the dark backing under them showed past their edge like a little
+  shield (2026-11-06) and is gone.
 - Tail: a short cone (0.055–0.110), clears the floor at the shortest legs.
 - Paint: fur, with the scutes and the rim as accent pieces.
 - Motion: slow and springy. Stiff 50–140, idle rate 0.40–0.95, head arc 0.60–1.20, bounce 0–0.03, short

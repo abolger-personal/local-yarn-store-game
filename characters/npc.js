@@ -692,7 +692,18 @@ const panel = (w = 0.5, h = 0.42, c = 0.14) => new THREE.Shape().moveTo(-w + c, 
   .lineTo(w, h - c).absarc(w - c, h - c, c, 0, Math.PI / 2).lineTo(-w + c, h).absarc(-w + c, h - c, c, Math.PI / 2, Math.PI)
   .lineTo(-w, -h + c).absarc(-w + c, -h + c, c, Math.PI, Math.PI * 1.5);
 
-const DECALS = { slashes: () => capsule(0.36, 0.2), heart, chevron, panel };
+// BODIES.md §Turtle: a painted head stripe, 1 long, `w` thick, tapered to points, bowed a little; `upright` runs it up
+// and down instead of along
+function stripe(w, upright = false) {
+  const N = 16, at = (t, side) => {
+    const x = t - 0.5, y = 0.06 * Math.sin(Math.PI * t) + side * (w / 2) * Math.sqrt(Math.sin(Math.PI * t));
+    return upright ? new THREE.Vector2(y, x) : new THREE.Vector2(x, y);
+  };
+  const edge = Array.from({ length: N + 1 }, (_, i) => i / N);
+  return new THREE.Shape([...edge.map((t) => at(t, 1)), ...edge.reverse().map((t) => at(t, -1))]);
+}
+
+const DECALS = { slashes: () => capsule(0.36, 0.2), heart, chevron, panel, stripe };
 
 /** Triangles `p` (flat xyz, three corners each), each split in four. */
 function split(p) {
@@ -713,13 +724,17 @@ function subdivide(g, times) {
     .setIndex([...Array(p.length / 3).keys()]);
 }
 
-/** Unit shape `kind` (DECALS) `size` across, upright, wrapped onto head ellipsoid `head` round the skin over (x, y), `lift` proud. */
+/**
+ * Unit shape `kind` (DECALS; or [kind, ...its args]) `size` across, upright, wrapped onto head ellipsoid `head` round
+ * the skin over (x, y), `lift` proud.
+ */
 export function skinDecal(head, kind, [x, y], size, lift) {
   return cachedGeometry(`decal|${kind}|${head}|${x}|${y}|${size}|${lift}`, () => {
     const at = new THREE.Vector3(x, y, skinZ(x, y, head));
     const n = new THREE.Vector3(x / head[0] ** 2, y / head[1] ** 2, at.z / head[2] ** 2).normalize();
     const across = new THREE.Vector3().crossVectors(UP, n).normalize(), up = new THREE.Vector3().crossVectors(n, across);
-    const g = subdivide(new THREE.ShapeGeometry(DECALS[kind](), 8).toNonIndexed(), 3), pos = g.attributes.position, q = new THREE.Vector3();
+    const [name, ...args] = [kind].flat();
+    const g = subdivide(new THREE.ShapeGeometry(DECALS[name](...args), 8).toNonIndexed(), 3), pos = g.attributes.position, q = new THREE.Vector3();
     for (let i = 0; i < pos.count; i++) {
       q.copy(at).addScaledVector(across, pos.getX(i) * size).addScaledVector(up, pos.getY(i) * size);
       q.multiplyScalar(1 / Math.hypot(q.x / head[0], q.y / head[1], q.z / head[2]));

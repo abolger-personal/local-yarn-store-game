@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { BASE_PARAMS, GEO, createCharacter, getSpecies, speciesIds } from './npc.js';
 import './species.js';
+import { FUR } from '../spinoff/fighter.js';
 
 // today's faces with shaped faces off (default params, unmerged): mesh count and head bounds, taken before the change;
 // a species not listed in OFF or CHECK gets only the generic checks
@@ -9,7 +10,7 @@ const OFF = {
   owl:   [41, [-0.22452, 0.52702, -0.16758, 0.22452, 0.89686, 0.24156]],
   llama: [38, [-0.12757, 0.91516, -0.12992, 0.12757, 1.22366, 0.31092]],
   lion:  [42, [-0.25192, 0.56904, -0.26689, 0.25192, 0.98695, 0.26343]],
-  turtle: [42, [-0.22500, 0.53160, -0.18000, 0.22500, 0.85560, 0.21301]],
+  turtle: [37, [-0.22500, 0.53160, -0.18000, 0.22500, 0.85560, 0.21301]],
 };
 
 const paramsOf = (id, extra) => ({ ...BASE_PARAMS, ...getSpecies(id).defaults, ...extra });
@@ -105,6 +106,23 @@ function checkDragon(built, label) {
   const rim = built.chest.getObjectByName('rim'), vs = vertices(rim);
   const span = (k) => Math.max(...vs.map((v) => v[k])) - Math.min(...vs.map((v) => v[k]));
   assert.ok(span('y') > 1.6 * P.torsoH && span('z') < 0.45 * P.torsoD, `turtle: the shell rim lies flat (tall ${(span('y') / P.torsoH).toFixed(2)}, deep ${(span('z') / P.torsoD).toFixed(2)})`);
+}
+
+// BODIES.md §Turtle: the head stripes are painted on, as face paint: lying on the skin, never standing off it
+{
+  const built = build(paramsOf('turtle', { mergeMeshes: false }), 'turtle'), skull = ellipsoid(built.head.children[0]);
+  const k = named(built, 'stripe').flatMap(vertices).map(skull);
+  assert.ok(k.length && Math.min(...k) > 0.99 && Math.max(...k) < 1.05, `turtle: the head stripes stand off the skin (${Math.min(...k).toFixed(3)} to ${Math.max(...k).toFixed(3)})`);
+}
+
+// BODIES.md §Turtle, colour: on every riot fur, a shell darker than the skin and a warm rim (or cream), never the
+// skin's opposite
+for (const { hex, name } of FUR) {
+  const kit = getSpecies('turtle'), m = build({ ...paramsOf('turtle', { mergeMeshes: false }), bodyColor: hex, scuteColor: kit.coatOf(hex) }, 'turtle').mat;
+  const luma = (c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b, hue = (c) => c.getHSL({ h: 0, s: 0, l: 0 }).h;
+  assert.ok(luma(m.scute.color) < luma(new THREE.Color(hex)) - 0.1, `turtle on ${name}: the shell is not dark against the skin`);
+  const h = hue(m.rim.color);
+  assert.ok(m.rim.color.getHexString() === 'fff1cc' || h < 0.16 || h > 0.97, `turtle on ${name}: the rim is not warm (${m.rim.color.getHexString()})`);
 }
 
 // BODIES.md §Dragon: the chevron belly hugs the front of the torso, just proud, from the neck to under the tail root

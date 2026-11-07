@@ -348,6 +348,41 @@ Built 2026-11-04; on by default in both games since 2026-11-06 (`painterly`, per
 - Motion: heavy and deliberate — unhurried but committed. Stiff 70–210, idle rate 0.55–1.35, head arc
   0.70–1.30, some bounce 0.01–0.05, stride 1.30–1.75, knee lift 0.45–1.05 (a cat pads). Starting values.
 
+## Turtle
+
+Status: decided 2026-11-06 (designer's references: a snapping turtle for shape, a painted turtle for colour).
+`characters/turtle.js`.
+
+- Burrowy and burly: a sturdy little tank, round and never mean. Broad torso (0.245 × 0.220 × 0.235), broad
+  high shoulders (`shoulderLift` 0.40: at the base 0.30 a shawl sinks into the body in the attitude; wider
+  `shoulderOut` or `clampArmOut` failed the fighter's two-handed scythe and sword checks), thick limbs (`limbThick` 0.046), stubby legs
+  (`legHeight` 0.140, drawn 0.100–0.160) on a deep hidden femur (`hipInset` 0.070), so it still sits and drops
+  low (shorter than this failed the fighter's seat drop and the wuxia freeze).
+- Head: big, round and blunt (`headShape` 1.05 × 0.90 × 1.00, `headRadius` 0.180), low on a short (0.060) thick
+  (0.125, nearly the head's width) neck. The neck never tucks: it would hide the face in a fight. Big eyes
+  (`eyeRadius` 0.108, drawn 0.096–0.118), set high (`eyeLift` 0.20).
+- Neck folds (`neckFolds`, 0–3, default 2): soft rolls of skin where the neck meets the shell, each a little
+  narrower going up. The main cute feature.
+- Beak: small, blunt, low on the snout (0.34 head radius down), in `beakColor`. Shaped faces: a soft rounded
+  inverted triangle, wide on top; off: a short squat cone. Shape only.
+- Shell: a torso coat of flat plate scutes (`shell`, coat `scute`): faceted plates (`scuteSides` 6, 0 for
+  domes), proud 0.30 over flat 0.12 so they read as plates, not bumps; a bare belly (`scuteGap` 2.2 rad) for
+  the plastron. Five layouts (`scutePreset`). The marginal scutes are one band (`shellRim`) at the shell's
+  lower edge, flush with the scute tops (so inside the coat bulge the arms already clear); the plastron
+  (`plastron`) is a flattened ellipsoid on the belly.
+- Not built: the hood. A shell overhanging the neck would clip the head as it turns (the neck pose is the
+  shared rig's, a kit can't lean it forward), so the scutes start high (`scuteTop` 0.06) round the neck
+  instead.
+- Colour (painted turtle): skin is the fur; the shell (`scuteColor`) a deep shade of it (lightness x0.38–0.52,
+  capped 0.30); rim and plastron (`rimColor`) the face-paint complement (`facePaintColorFor`); stripes
+  (`stripeColor`) that complement at lightness 0.80. Rim and stripe colours stay derived (`''`) until picked.
+- Stripes (`stripes`, `stripeWidth`): raised felt strips, two along each side of the head behind the eye and
+  one down each side of the neck. No line art.
+- Tail: a short cone (0.055–0.110), clears the floor at the shortest legs.
+- Paint: fur, with the scutes and the rim as accent pieces.
+- Motion: slow and springy. Stiff 50–140, idle rate 0.40–0.95, head arc 0.60–1.20, bounce 0–0.03, short
+  stride 1.25–1.60. Starting values.
+
 ## Shaped faces
 
 *Built 2026-11-04.* Cartoon animals are expressive in the face, but there's no budget for animating

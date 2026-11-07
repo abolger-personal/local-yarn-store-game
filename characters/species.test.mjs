@@ -24,7 +24,7 @@ registerSpecies({
   },
 });
 
-assert.deepEqual(SPECIES_IDS, ['owl', 'llama', 'lion'], 'species.js registers every species, in its import order');
+assert.deepEqual(SPECIES_IDS, ['owl', 'llama', 'lion', 'turtle'], 'species.js registers every species, in its import order');
 for (const id of speciesIds()) {
   const kit = getSpecies(id);
   assert.ok(kit.emoji && /^#[0-9a-f]{6}$/i.test(kit.firstFur), `${id}: the chooser needs an emoji and a first fur`);

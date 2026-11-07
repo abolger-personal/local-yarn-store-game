@@ -1,7 +1,8 @@
 # Adding a species
 
 Status: decided, 2026-11-06. The recipe for a new species kit, with a turtle as the worked example of what its
-file would declare. No turtle exists yet; nothing here is turtle code. What a body is and how a kit may change it
+file would declare. The turtle now exists (`characters/turtle.js`, 2026-11-06); the tables below are the plan it
+started from, and the built kit departs from them where the designer's references did (BODIES.md §Turtle). What a body is and how a kit may change it
 (add or scale, never replace) is BODIES.md; this file is the checklist.
 
 ## 1. The recipe
@@ -63,7 +64,7 @@ All in `npc.js`. Reuse them before writing geometry.
   segment (BODIES.md §Tail). Every species has one; `rig.test.mjs` checks it clears the floor and the seat.
 - Coats (BODIES.md §Coats): name the params `${coat}Rows`, `${coat}PerRow`, `${coat}Top`, `${coat}Bottom`,
   `${coat}Size`, `${coat}Flat`, `${coat}Proud`, `${coat}Stagger` (and `${coat}AutoSize`, `${coat}Touch` for a coat
-  sized to touch), and `addTorsoCoat(ctx, P, { on, coat, material })` lays the torso shell while `P[on]`,
+  sized to touch; optional `${coat}Sides` for faceted plates, `${coat}Gap` for a bare front), and `addTorsoCoat(ctx, P, { on, coat, material })` lays the torso shell while `P[on]`,
   `coatBulge(P, on, coat)` is the kit's bulge, `coatSize(P, coat, shape)` sizes a shell on another part (the
   llama's neck ruff). For anything else, `scallopGeometry` + `scallopMesh`.
 - `feltMaterial(P, colour)` through `ctx.addMaterial`, and `ctx.mat.<name>` so tests and paint can find it.

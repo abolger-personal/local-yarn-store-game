@@ -23,126 +23,151 @@ export const SHOTS = {
     owl: { headYaw: 0.07, headPitch: -0.16, fov: 37.25, up: 0.93, k: 0.71, drop: -0.27, off: -0.07 },   // 0.410, worst 0.399
     llama: { headYaw: -0.09, headPitch: -0.09, fov: 28.83, up: 1.09, k: 1.01, drop: 0.1, off: 0.04 },   // 0.379, worst 0.374, flagged, its #3: the higher fail the test body
     lion: { headYaw: -0.04, headPitch: 0.09, fov: 35.84, up: 0.61, k: 0.75, drop: -0.18, off: -0.01 },   // 0.393, worst 0.371, flagged
+    turtle: { headYaw: -0.27, headPitch: 0.11, fov: 26.71, up: 0.7, k: 0.74, drop: -0.24, off: 0.05 },   // 0.394, its defaults only (one-body search, not the tuner)
   },
   'hat:slouch': {
     owl: { headYaw: -0.43, headPitch: 0.23, fov: 45.71, up: 0.51, k: 0.72, drop: -0.27, off: 0.08 },   // 0.442, worst 0.429
     llama: { headYaw: -0.14, headPitch: 0.07, fov: 25, up: 0.63, k: 0.93, drop: -0.49, off: -0.09 },   // 0.430, worst 0.416
     lion: { headYaw: -0.03, headPitch: 0.12, fov: 25.38, up: 0.52, k: 0.72, drop: -0.5, off: -0.22 },   // 0.420, worst 0.301
+    turtle: { headYaw: -0.32, headPitch: 0.17, fov: 26.89, up: 0.67, k: 0.75, drop: -0.23, off: 0.1 },   // 0.434, its defaults only (one-body search, not the tuner)
   },
   'hat:fisherman': {
     owl: { headYaw: -0.14, headPitch: 0.11, fov: 49.84, up: 0.6, k: 0.74, drop: -0.12, off: 0.08 },   // 0.420, worst 0.393, its #4: the higher fail the test body
     llama: { headYaw: 0.04, headPitch: 0.12, fov: 26.87, up: 0.58, k: 0.97, drop: -0.16, off: 0.03 },   // 0.346, worst 0.278, flagged
     lion: { headYaw: 0.1, headPitch: -0.05, fov: 29.95, up: 0.79, k: 0.74, drop: -0.19, off: -0.05 },   // 0.392, worst 0.361, its #6: the higher fail the test body
+    turtle: { headYaw: -0.33, headPitch: 0.2, fov: 26.93, up: 0.65, k: 0.75, drop: -0.19, off: 0.09 },   // 0.325, its defaults only (one-body search, not the tuner)
   },
   'hat:beret': {
     owl: { headYaw: -0.39, headPitch: 0.2, fov: 40.28, up: 0.54, k: 0.74, drop: -0.27, off: 0.15 },   // 0.458, worst 0.446
     llama: { headYaw: -0.18, headPitch: -0.02, fov: 25.47, up: 0.96, k: 0.9, drop: -0.29, off: 0.06 },   // 0.422, worst 0.410
     lion: { headYaw: -0.29, headPitch: 0.12, fov: 27.36, up: 0.72, k: 0.73, drop: -0.2, off: 0.07 },   // 0.455, worst 0.390
+    turtle: { headYaw: -0.39, headPitch: 0.21, fov: 40.63, up: 0.55, k: 0.74, drop: -0.25, off: 0.15 },   // 0.449, its defaults only (one-body search, not the tuner)
   },
   'hat:earflap': {
     owl: { headYaw: -0.18, headPitch: -0.02, fov: 27.09, up: 0.82, k: 0.69, drop: -0.19, off: 0.08 },   // 0.446, worst 0.409
     llama: { headYaw: 0, headPitch: -0.01, fov: 26.57, up: 0.97, k: 0.96, drop: 0.09, off: -0.02 },   // 0.373, worst 0.310, flagged
     lion: { headYaw: -0.15, headPitch: -0.09, fov: 29.01, up: 0.77, k: 0.7, drop: -0.2, off: 0.01 },   // 0.426, worst 0.398
+    turtle: { headYaw: -0.28, headPitch: 0.11, fov: 26.31, up: 0.72, k: 0.75, drop: -0.19, off: 0.08 },   // 0.375, its defaults only (one-body search, not the tuner)
   },
   'hat:hood': {
     owl: { headYaw: 0.72, headPitch: -0.91, fov: 37.98, up: 1.16, k: 0.72, drop: -0.05, off: 0.02 },   // 0.403, worst 0.337
     llama: { headYaw: 0.53, headPitch: -0.7, fov: 34.18, up: 0.67, k: 1.04, drop: 0.24, off: 0.2 },   // 0.340, worst 0.296, flagged
     lion: { headYaw: -0.32, headPitch: -0.14, fov: 27.24, up: 1.16, k: 0.6, drop: -0.07, off: 0.04 },   // 0.382, worst 0.280, flagged
+    turtle: { headYaw: 0.59, headPitch: -1, fov: 45.12, up: 0.8, k: 0.77, drop: -0.08, off: 0.04 },   // 0.402, its defaults only (one-body search, not the tuner)
   },
   'hat:headband': {
     owl: { headYaw: -0.04, headPitch: 0.09, fov: 39.02, up: 0.69, k: 0.73, drop: -0.15, off: 0.09 },   // 0.402, worst 0.375
     llama: { headYaw: 0.16, headPitch: -0.02, fov: 34.56, up: 0.55, k: 0.97, drop: -0.05, off: -0.06 },   // 0.361, worst 0.323, flagged
     lion: { headYaw: -0.01, headPitch: -0.32, fov: 61.46, up: 1.19, k: 0.67, drop: -0.3, off: -0.08 },   // 0.393, worst 0.381, its #6: the higher fail the test body
+    turtle: { headYaw: -0.17, headPitch: 0.18, fov: 40.27, up: 0.66, k: 0.75, drop: -0.1, off: 0.19 },   // 0.320, its defaults only (one-body search, not the tuner)
   },
   'hat:bucket': {
     owl: { headYaw: 0.09, headPitch: -0.05, fov: 31.35, up: 0.85, k: 0.73, drop: -0.08, off: 0.02 },   // 0.450, worst 0.446
     llama: { headYaw: -0.1, headPitch: -0.11, fov: 31.13, up: 0.87, k: 1.01, drop: 0.18, off: -0.04 },   // 0.394, worst 0.375, flagged, its #2: the higher fail the test body
     lion: { headYaw: 0.01, headPitch: -0.17, fov: 36.88, up: 1.12, k: 0.68, drop: -0.08, off: 0.02 },   // 0.455, worst 0.435, its #2: the higher fail the test body
+    turtle: { headYaw: -0.08, headPitch: 0.08, fov: 37.66, up: 0.77, k: 0.75, drop: -0.15, off: 0.08 },   // 0.444, its defaults only (one-body search, not the tuner)
   },
   'hat:cloche': {
     owl: { headYaw: -0.16, headPitch: 0.16, fov: 37.09, up: 0.57, k: 0.74, drop: -0.07, off: 0.01 },   // 0.431, worst 0.379
     llama: { headYaw: 0.06, headPitch: 0.19, fov: 36.71, up: 0.35, k: 0.97, drop: 0.14, off: 0 },   // 0.362, worst 0.283, flagged, its #2: the higher fail the test body
     lion: { headYaw: -0.12, headPitch: -0.03, fov: 31.3, up: 0.71, k: 0.73, drop: -0.1, off: 0.01 },   // 0.427, worst 0.419
+    turtle: { headYaw: -0.36, headPitch: 0, fov: 36.37, up: 0.56, k: 0.7, drop: -0.08, off: 0.03 },   // 0.391, its defaults only (one-body search, not the tuner)
   },
   'hat:pixie': {
     owl: { headYaw: -0.16, headPitch: 0, fov: 25, up: 0.88, k: 0.71, drop: -0.39, off: 0.03 },   // 0.441, worst 0.431
     llama: { headYaw: -0.18, headPitch: 0.02, fov: 25.43, up: 0.91, k: 0.95, drop: -0.26, off: 0.07 },   // 0.405, worst 0.390
     lion: { headYaw: 0.02, headPitch: 0.06, fov: 25.36, up: 0.6, k: 0.74, drop: -0.33, off: -0.06 },   // 0.436, worst 0.428
+    turtle: { headYaw: -0.25, headPitch: 0.15, fov: 26.32, up: 0.71, k: 0.75, drop: -0.2, off: 0.08 },   // 0.352, its defaults only (one-body search, not the tuner)
   },
   'scarf:cowl': {
     owl: { headYaw: -0.22, headPitch: -0.93, fov: 33.65, up: 0.38, k: 0.82, drop: 0.54, off: 0.28 },   // 0.317, worst 0.280, flagged
     llama: { headYaw: 0.2, headPitch: -0.84, fov: 32.06, up: 0.65, k: 1.11, drop: 0.68, off: 0.25 },   // 0.411, worst 0.360
     lion: { headYaw: 0.04, headPitch: -0.23, fov: 66.46, up: -0.02, k: 0.81, drop: 0.32, off: 0.19 },   // 0.392, worst 0.325, flagged
+    turtle: { headYaw: -0.77, headPitch: -0.22, fov: 64.45, up: 0.18, k: 0.83, drop: 0.45, off: 0.1 },   // 0.378, its defaults only (one-body search, not the tuner)
   },
   'scarf:infinity': {
     owl: { headYaw: -0.66, headPitch: -0.39, fov: 64.75, up: 0.29, k: 0.89, drop: 0.55, off: 0.26 },   // 0.373, worst 0.309, flagged
     llama: { headYaw: -1, headPitch: 0.47, fov: 41.81, up: -0.36, k: 0.95, drop: 0.51, off: 0.33 },   // 0.395, worst 0.375, flagged
     lion: { headYaw: 0, headPitch: -0.15, fov: 39.76, up: 0.07, k: 0.78, drop: 0.51, off: 0.15 },   // 0.404, worst 0.343
+    turtle: { headYaw: -0.75, headPitch: -0.14, fov: 68.27, up: -0.01, k: 0.75, drop: 0.32, off: 0.09 },   // 0.374, its defaults only (one-body search, not the tuner)
   },
   'scarf:ascot': {
     owl: { headYaw: 0.39, headPitch: 0.11, fov: 67.54, up: 0.01, k: 0.84, drop: 0.44, off: 0.36 },   // 0.377, worst 0.302, flagged
     llama: { headYaw: 0.37, headPitch: -0.08, fov: 36.17, up: 0.05, k: 1.04, drop: 0.71, off: 0.32 },   // 0.445, worst 0.416
     lion: { headYaw: -0.81, headPitch: -0.18, fov: 64.88, up: 0.13, k: 0.82, drop: 0.44, off: 0.17 },   // 0.408, worst 0.382
+    turtle: { headYaw: -0.91, headPitch: -0.15, fov: 63.31, up: 0.08, k: 0.79, drop: 0.32, off: 0.19 },   // 0.380, its defaults only (one-body search, not the tuner)
   },
   'scarf:long': {
     owl: { headYaw: -0.79, headPitch: -0.08, fov: 49.88, up: -0.38, k: 0.71, drop: 0.52, off: 0.2 },   // 0.406, worst 0.369
     llama: { headYaw: 0.2, headPitch: 0.34, fov: 25.62, up: -0.31, k: 0.96, drop: 0.82, off: 0.3 },   // 0.415, worst 0.318
     lion: { headYaw: 0.2, headPitch: 0.34, fov: 65.34, up: -0.05, k: 0.79, drop: 0.72, off: 0.16 },   // 0.461, worst 0.296
+    turtle: { headYaw: -0.83, headPitch: -0.14, fov: 65.1, up: 0.09, k: 0.81, drop: 0.42, off: 0.18 },   // 0.456, its defaults only (one-body search, not the tuner)
   },
   'scarf:trailing': {
     owl: { headYaw: -0.03, headPitch: -0.93, fov: 31.21, up: 0.89, k: 0.71, drop: -0.24, off: -0.23 },   // 0.345, worst 0.277, flagged, its #3: the higher fail the test body
     llama: { headYaw: 0, headPitch: -0.68, fov: 43.68, up: 1.19, k: 1.03, drop: 0.16, off: -0.18 },   // 0.350, worst 0.235, its #6: the higher fail the test body
     lion: { headYaw: -0.08, headPitch: 0.59, fov: 33.46, up: -0.02, k: 0.77, drop: 1.04, off: 0.18 },   // 0.370, worst 0.330, flagged
+    turtle: { headYaw: 0.56, headPitch: -1, fov: 44.33, up: 0.76, k: 0.76, drop: -0.06, off: 0.03 },   // 0.314, its defaults only (one-body search, not the tuner)
   },
   'scarf:skinny': {
     owl: { headYaw: -0.23, headPitch: -0.53, fov: 40.16, up: 0.41, k: 0.89, drop: 0.78, off: 0.3 },   // 0.379, worst 0.318, flagged, its #2: the higher fail the test body
     llama: { headYaw: 0.35, headPitch: 0.95, fov: 25.36, up: -0.77, k: 0.85, drop: 1.32, off: -0.07 },   // 0.353, worst 0.308, flagged
     lion: { headYaw: 0.11, headPitch: 0.19, fov: 67.51, up: 0.21, k: 0.87, drop: 0.72, off: 0.14 },   // 0.411, worst 0.354
+    turtle: { headYaw: -0.27, headPitch: -0.92, fov: 33.68, up: 0.31, k: 0.82, drop: 0.46, off: 0.28 },   // 0.367, its defaults only (one-body search, not the tuner)
   },
   'scarf:kerchief': {
     owl: { headYaw: -0.21, headPitch: -0.79, fov: 41.79, up: 0.28, k: 0.83, drop: 0.54, off: 0.31 },   // 0.396, worst 0.358, flagged
     llama: { headYaw: 0.38, headPitch: 0.13, fov: 26.98, up: 0.52, k: 1.12, drop: 1, off: 0.26 },   // 0.385, worst 0.360, flagged
     lion: { headYaw: 0.09, headPitch: 0.31, fov: 65.77, up: -0.12, k: 0.71, drop: 0.56, off: 0.02 },   // 0.408, worst 0.361
+    turtle: { headYaw: -0.86, headPitch: -0.25, fov: 63.1, up: 0, k: 0.75, drop: 0.39, off: 0.09 },   // 0.413, its defaults only (one-body search, not the tuner)
   },
   'scarf:chunky wrap': {
     owl: { headYaw: -0.27, headPitch: -0.52, fov: 51.31, up: 0.37, k: 0.86, drop: 0.67, off: 0.18 },   // 0.407, worst 0.344
     llama: { headYaw: 0.3, headPitch: 0.6, fov: 28.75, up: -0.39, k: 0.95, drop: 0.88, off: 0.05 },   // 0.459, worst 0.340
     lion: { headYaw: 0.06, headPitch: 0.29, fov: 65.8, up: -0.13, k: 0.77, drop: 0.71, off: 0.22 },   // 0.419, worst 0.362
+    turtle: { headYaw: -0.06, headPitch: -0.16, fov: 64.58, up: -0.12, k: 0.76, drop: 0.44, off: 0.08 },   // 0.469, its defaults only (one-body search, not the tuner)
   },
   'sweater:pullover': {
     owl: { headYaw: -0.05, headPitch: 0.39, fov: 65.65, up: -0.23, k: 0.7, drop: 0.79, off: 0.06 },   // 0.410, worst 0.378
     llama: { headYaw: 0.41, headPitch: 0.29, fov: 33.46, up: -0.08, k: 1.24, drop: 0.87, off: 0.23 },   // 0.356, worst 0.331, flagged
     lion: { headYaw: 0.07, headPitch: 0.49, fov: 69.48, up: -0.21, k: 0.71, drop: 0.83, off: 0.08 },   // 0.444, worst 0.385
+    turtle: { headYaw: -0.93, headPitch: -0.12, fov: 61.89, up: 0.01, k: 0.78, drop: 0.6, off: 0.05 },   // 0.468, its defaults only (one-body search, not the tuner)
   },
   'sweater:cardigan': {
     owl: { headYaw: 0.29, headPitch: 0.36, fov: 48.96, up: -0.36, k: 0.67, drop: 0.71, off: 0.17 },   // 0.424, worst 0.336
     llama: { headYaw: -0.26, headPitch: 0.9, fov: 39.27, up: 0.15, k: 1.06, drop: 1.06, off: 0.2 },   // 0.380, worst 0.309, flagged
     lion: { headYaw: -0.08, headPitch: 0.46, fov: 66.67, up: -0.22, k: 0.69, drop: 0.87, off: -0.01 },   // 0.456, worst 0.417
+    turtle: { headYaw: -0.93, headPitch: -0.12, fov: 61.89, up: 0.01, k: 0.78, drop: 0.6, off: 0.05 },   // 0.469, its defaults only (one-body search, not the tuner)
   },
   'sweater:vest': {
     owl: { headYaw: 0.07, headPitch: 0.54, fov: 44.81, up: -0.81, k: 0.63, drop: 0.85, off: 0.03 },   // 0.407, worst 0.368
     llama: { headYaw: -0.09, headPitch: 0.9, fov: 40.74, up: 0.01, k: 1.13, drop: 1.04, off: 0.22 },   // 0.374, worst 0.312, flagged, its #5: the higher fail the test body
     lion: { headYaw: 0.02, headPitch: 0.57, fov: 68.33, up: -0.32, k: 0.65, drop: 0.89, off: 0.02 },   // 0.478, worst 0.404
+    turtle: { headYaw: -0.8, headPitch: -0.21, fov: 63.68, up: -0.04, k: 0.87, drop: 0.47, off: 0.15 },   // 0.429, its defaults only (one-body search, not the tuner)
   },
   'sweater:turtleneck': {
     owl: { headYaw: -0.29, headPitch: 0.36, fov: 53.04, up: -0.48, k: 0.7, drop: 0.63, off: 0.25 },   // 0.407, worst 0.296
     llama: { headYaw: 0.32, headPitch: -0.13, fov: 43.37, up: 0.52, k: 1.21, drop: 0.81, off: 0.35 },   // 0.398, worst 0.349, its #3: the higher fail the test body
     lion: { headYaw: 0.04, headPitch: 0.55, fov: 70, up: -0.21, k: 0.71, drop: 0.81, off: 0.07 },   // 0.445, worst 0.370
+    turtle: { headYaw: -0.2, headPitch: -0.9, fov: 34.48, up: 0.42, k: 0.84, drop: 0.51, off: 0.29 },   // 0.404, its defaults only (one-body search, not the tuner)
   },
   'sweater:cropped': {
     owl: { headYaw: -0.02, headPitch: 0.28, fov: 65.21, up: -0.51, k: 0.65, drop: 0.66, off: 0.07 },   // 0.435, worst 0.418
     llama: { headYaw: 0.28, headPitch: 0.5, fov: 40.43, up: 0.01, k: 1.38, drop: 0.88, off: 0.16 },   // 0.351, worst 0.331, its #4: the higher fail the test body
     lion: { headYaw: 0.19, headPitch: 0.26, fov: 67.88, up: -0.25, k: 0.72, drop: 0.66, off: 0.09 },   // 0.419, worst 0.339
+    turtle: { headYaw: -0.93, headPitch: -0.12, fov: 61.89, up: 0.01, k: 0.78, drop: 0.6, off: 0.05 },   // 0.458, its defaults only (one-body search, not the tuner)
   },
   'sweater:tunic': {
     owl: { headYaw: 0.26, headPitch: 0.43, fov: 67.74, up: -0.35, k: 0.67, drop: 0.82, off: 0.16 },   // 0.414, worst 0.328
     llama: { headYaw: 0.08, headPitch: -0.06, fov: 44.01, up: 0.87, k: 1.37, drop: 0.92, off: 0.36 },   // 0.372, worst 0.342, its #5: the higher fail the test body
     lion: { headYaw: 0.28, headPitch: 0.41, fov: 51.54, up: -0.24, k: 0.73, drop: 0.87, off: 0.17 },   // 0.438, worst 0.374
+    turtle: { headYaw: -0.93, headPitch: -0.12, fov: 61.89, up: 0.01, k: 0.78, drop: 0.6, off: 0.05 },   // 0.451, its defaults only (one-body search, not the tuner)
   },
   'sweater:raglan': {
     owl: { headYaw: -0.06, headPitch: 0.41, fov: 65.79, up: -0.23, k: 0.7, drop: 0.81, off: 0.05 },   // 0.424, worst 0.352
     llama: { headYaw: 0.08, headPitch: 0.32, fov: 43.28, up: 0.75, k: 1.35, drop: 1.03, off: 0.3 },   // 0.361, worst 0.289, flagged, its #2: the higher fail the test body
     lion: { headYaw: 0.18, headPitch: 0.29, fov: 69.96, up: -0.35, k: 0.69, drop: 0.63, off: 0.11 },   // 0.422, worst 0.333
+    turtle: { headYaw: -0.93, headPitch: -0.12, fov: 61.89, up: 0.01, k: 0.78, drop: 0.6, off: 0.05 },   // 0.468, its defaults only (one-body search, not the tuner)
   },
   'bag:shoulder bag': {
     owl: { headYaw: 0.5, headPitch: -0.07, fov: 43.2, up: 1.25, k: 1.04, drop: 0.67, off: 0.71 },   // 0.358, worst 0.319, flagged
@@ -183,31 +208,37 @@ export const SHOTS = {
     owl: { headYaw: -0.26, headPitch: 0.09, fov: 36.56, up: 0.54, k: 0.94, drop: 1.01, off: 0.38 },   // 0.352, worst 0.316, flagged
     llama: { headYaw: -0.03, headPitch: 0.85, fov: 59.05, up: 0.55, k: 1.43, drop: 0.99, off: 0.29 },   // 0.312, worst 0.267, flagged
     lion: { headYaw: -0.42, headPitch: 0.66, fov: 25.45, up: 0.22, k: 0.83, drop: 1.18, off: 0.21 },   // 0.360, worst 0.338, flagged
+    turtle: { headYaw: 0.27, headPitch: 0.21, fov: 25.18, up: -0.77, k: 0.73, drop: 0.77, off: 0.27 },   // 0.353, its defaults only (one-body search, not the tuner)
   },
   'socks:knee-high': {
     owl: { headYaw: -0.38, headPitch: 0.75, fov: 40.23, up: 0.34, k: 0.9, drop: 1.1, off: 0.27 },   // 0.365, worst 0.342, flagged
     llama: { headYaw: -0.01, headPitch: 0.89, fov: 69.41, up: 0.43, k: 1.39, drop: 0.9, off: 0.27 },   // 0.341, worst 0.329, flagged
     lion: { headYaw: -0.06, headPitch: 0.67, fov: 32.21, up: 0.27, k: 0.85, drop: 1.07, off: 0.16 },   // 0.370, worst 0.348, flagged
+    turtle: { headYaw: -0.08, headPitch: 0.68, fov: 31.79, up: 0.27, k: 0.85, drop: 1.09, off: 0.16 },   // 0.321, its defaults only (one-body search, not the tuner)
   },
   'socks:over-knee': {
     owl: { headYaw: 0.11, headPitch: 0.34, fov: 52.22, up: 0.24, k: 0.9, drop: 0.9, off: 0.32 },   // 0.366, worst 0.339, flagged
     llama: { headYaw: 0.01, headPitch: 0.94, fov: 58.84, up: 0.37, k: 1.3, drop: 0.93, off: 0.26 },   // 0.304, worst 0.249, flagged
     lion: { headYaw: -0.48, headPitch: 0.86, fov: 38.02, up: 0.04, k: 0.8, drop: 1.12, off: 0.24 },   // 0.382, worst 0.365, flagged
+    turtle: { headYaw: 0.14, headPitch: 0.45, fov: 25.18, up: -0.79, k: 0.7, drop: 0.86, off: 0.28 },   // 0.347, its defaults only (one-body search, not the tuner)
   },
   'socks:slouch': {
     owl: { headYaw: -0.04, headPitch: 0.81, fov: 60.19, up: 0.43, k: 0.99, drop: 0.98, off: 0.16 },   // 0.357, worst 0.337, flagged
     llama: { headYaw: -0.02, headPitch: 0.85, fov: 62, up: 0.5, k: 1.39, drop: 0.95, off: 0.27 },   // 0.334, worst 0.299, flagged
     lion: { headYaw: -0.32, headPitch: 0.47, fov: 37.4, up: 0.32, k: 0.87, drop: 0.93, off: 0.23 },   // 0.363, worst 0.343, flagged
+    turtle: { headYaw: 0.2, headPitch: 0.3, fov: 25, up: -0.74, k: 0.74, drop: 0.79, off: 0.27 },   // 0.355, its defaults only (one-body search, not the tuner)
   },
   'socks:leg warmers': {
     owl: { headYaw: -0.05, headPitch: 0.12, fov: 26.06, up: 0.24, k: 0.84, drop: 1.02, off: 0.36 },   // 0.333, worst 0.317, flagged
     llama: { headYaw: -0.09, headPitch: 0.98, fov: 62.83, up: 0.42, k: 1.37, drop: 0.96, off: 0.31 },   // 0.298, worst 0.271, flagged
     lion: { headYaw: -0.47, headPitch: 0.74, fov: 33.85, up: 0.02, k: 0.78, drop: 1.11, off: 0.13 },   // 0.341, worst 0.312, flagged
+    turtle: { headYaw: -0.06, headPitch: 0.67, fov: 31.26, up: 0.28, k: 0.85, drop: 1.09, off: 0.17 },   // 0.294, its defaults only (one-body search, not the tuner)
   },
   'socks:slipper socks': {
     owl: { headYaw: -0.25, headPitch: 0.7, fov: 30.87, up: 0.37, k: 0.87, drop: 1.15, off: 0.27 },   // 0.359, worst 0.328, flagged
     llama: { headYaw: 0.04, headPitch: 0.76, fov: 60.31, up: 0.57, k: 1.45, drop: 0.93, off: 0.29 },   // 0.315, worst 0.297, flagged
     lion: { headYaw: -0.31, headPitch: 0.98, fov: 60.01, up: 0.24, k: 0.9, drop: 1.07, off: 0.05 },   // 0.360, worst 0.350, flagged
+    turtle: { headYaw: -0.08, headPitch: 0.68, fov: 31.79, up: 0.27, k: 0.85, drop: 1.09, off: 0.16 },   // 0.348, its defaults only (one-body search, not the tuner)
   },
   'potholder': {
     owl: { headYaw: 0.28, headPitch: 0.39, fov: 57.57, up: -0.92, k: 0.95, drop: -0.19, off: 0.84 },   // 0.380, worst 0.360, flagged

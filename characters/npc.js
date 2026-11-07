@@ -507,10 +507,13 @@ export function touchingScallopSize({ rows, perRow, top, bottom, maxSize = 0.45 
 /** BODIES.md §Coats: a coat's curl size, sized to touch its neighbours when `${coat}AutoSize` */
 export const coatSize = (P, coat, shape) => (P[`${coat}AutoSize`] ? touchingScallopSize(shape) * P[`${coat}Touch`] : P[`${coat}Size`]);
 
-/** The torso's scallop shell from a coat's params: `${coat}Rows`, `${coat}PerRow`, `${coat}Top`, … */
+/** The torso's scallop shell from a coat's params: `${coat}Rows`, `${coat}PerRow`, `${coat}Top`, …, and optional `${coat}Sides`, `${coat}Gap` (the face gap, here the belly) */
 function torsoShell(P, coat) {
   const shape = { rows: P[`${coat}Rows`], perRow: P[`${coat}PerRow`], top: P[`${coat}Top`], bottom: P[`${coat}Bottom`] };
-  return { ...shape, size: coatSize(P, coat, shape), flat: P[`${coat}Flat`], proud: P[`${coat}Proud`], stagger: P[`${coat}Stagger`] };
+  return {
+    ...shape, size: coatSize(P, coat, shape), flat: P[`${coat}Flat`], proud: P[`${coat}Proud`], stagger: P[`${coat}Stagger`],
+    sides: P[`${coat}Sides`], skipFront: P[`${coat}Gap`],
+  };
 }
 
 /** How far a torso coat, worn while `P[on]`, stands proud of the torso: a kit's coatBulge. */

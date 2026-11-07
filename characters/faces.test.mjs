@@ -9,6 +9,7 @@ const OFF = {
   owl:   [41, [-0.22452, 0.52702, -0.16758, 0.22452, 0.89686, 0.24156]],
   llama: [38, [-0.12757, 0.91516, -0.12992, 0.12757, 1.22366, 0.31092]],
   lion:  [42, [-0.25192, 0.56904, -0.26689, 0.25192, 0.98695, 0.26343]],
+  turtle: [40, [-0.21342, 0.53160, -0.18000, 0.21342, 0.85560, 0.21301]],
 };
 
 const paramsOf = (id, extra) => ({ ...BASE_PARAMS, ...getSpecies(id).defaults, ...extra });
@@ -51,7 +52,7 @@ function assertOnSurface(mesh, hosts, label) {
 const headHost = (built) => [ellipsoid(built.head.children[0])];
 const muzzleParts = (built) => built.head.children.filter((o) => o.isMesh && o.material === built.mat.muzzle);
 
-function checkOwl(built, label) {
+function checkBeak(built, label) {
   assert.equal(named(built, 'beak').length, 1, `${label}: one beak`);
   assertOnSurface(named(built, 'beak')[0], headHost(built), label);
   assert.equal(named(built, 'mandible').length + named(built, 'cere').length, 0, `${label}: a second beak-coloured lump`);
@@ -76,7 +77,7 @@ function checkLion(built, label) {
   for (const mesh of [...pads, ...named(built, 'nose')]) assertOnSurface(mesh, [ellipsoid(cap)], label);
 }
 
-const CHECK = { owl: checkOwl, llama: checkLlama, lion: checkLion };
+const CHECK = { owl: checkBeak, llama: checkLlama, lion: checkLion, turtle: checkBeak };
 const FACE = new Set(['beak', 'lip', 'jaw', 'pad']);
 
 // what shows of the new face stays below the eyes' tops (the lips are the old muzzle tip)

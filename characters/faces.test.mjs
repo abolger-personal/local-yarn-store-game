@@ -76,7 +76,15 @@ function checkLion(built, label) {
   for (const mesh of [...pads, ...named(built, 'nose')]) assertOnSurface(mesh, [ellipsoid(cap)], label);
 }
 
-const CHECK = { owl: checkOwl, llama: checkLlama, lion: checkLion };
+function checkDragon(built, label) {
+  const nostrils = named(built, 'nostril'), brows = named(built, 'brow');
+  assert.equal(nostrils.length, 2, `${label}: two nostrils`);
+  assert.equal(brows.length, 2, `${label}: two brows`);
+  nostrils.forEach((n) => assertOnSurface(n, named(built, 'muzzle').map(ellipsoid), label));
+  brows.forEach((b) => assertOnSurface(b, headHost(built), label));
+}
+
+const CHECK = { owl: checkOwl, llama: checkLlama, lion: checkLion, dragon: checkDragon };
 const FACE = new Set(['beak', 'lip', 'jaw', 'pad']);
 
 // what shows of the new face stays below the eyes' tops (the lips are the old muzzle tip)

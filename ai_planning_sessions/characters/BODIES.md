@@ -1,7 +1,7 @@
 # Bodies: the shared rig and the species kits
 
 How a character's body is built and posed (`characters/npc.js`) and what each species kit adds
-(`owl.js`, `llama.js`, `lion.js`). The governing rule is P1-SPIKE-PLAN.md's **species kits may ADD or
+(`owl.js`, `llama.js`, `lion.js`, `dragon.js`). The governing rule is P1-SPIKE-PLAN.md's **species kits may ADD or
 SCALE, never REPLACE**: npc.js owns torso, arms, hands, legs, feet, neck and the shared machinery; a
 kit owns everything above the neck plus whatever it bolts on (wings, fleece, mane, tail dressing). The
 base never builds head geometry, wings or a coat — baking one in is how a shared rig becomes a
@@ -347,6 +347,39 @@ Built 2026-11-04; on by default in both games since 2026-11-06 (`painterly`, per
 - `coatBulge` is 0: nothing on the torso reaches the elbows.
 - Motion: heavy and deliberate — unhurried but committed. Stiff 70–210, idle rate 0.55–1.35, head arc
   0.70–1.30, some bounce 0.01–0.05, stride 1.30–1.75, knee lift 0.45–1.05 (a cat pads). Starting values.
+
+## Dragon
+
+Decided 2026-11-06 (the designer: "cute, not scary, NO WINGS, but still dragon, not crocodile", "shiny overlapping
+scales"). A striker and projectile shooter in the brawler, on the base two-legged rig.
+
+- **Croc tells vs dragon fixes.** A long, flat, wide snout -> a round head (`headShape` 1.00 x 0.95 x 1.05,
+  `headRadius` 0.195, about 0.45 of the height with the horns) and a short soft cream muzzle bump
+  (`muzzleSize`, `muzzleDrop`), nostrils and a soft brow over each eye under shaped faces (shape only). Low sprawl
+  -> upright, chunky, short thick limbs (`legHeight` 0.150, `limbThick` 0.044, torso 0.230 x 0.215 x 0.235).
+  Uniform flat armour plates -> rounded overlapping scales standing proud, a cream belly plate over them. A long
+  thick tapering tail -> a short (0.200), curled (`tailCurl` 0.55) tail with a small ivory spade tip.
+- **Identity on the head** (no wings): two small curled-back ivory horns on top (cone ears, `hornSize`,
+  `hornLength`, `hornSpread`, `hornTilt`, `hornCurl`; hidden under a hat like ears), and a leafy crest of soft
+  spikes down the back of the head (`crestCount`, `crestSize`). Spikes are eggs narrowing to a rounded point
+  (the cute rule), never cones.
+- **Back ridge** (`spikes`, `spikeCount`, `spikeSize`): soft spikes down the spine standing on the scales, and one
+  on each tail segment. The body ridge rides a joint of its own on the chest, so garments fit the torso, not the
+  spikes (a cape or sweater lets them poke through, as a costume with a ridge would).
+- **Scales**: a torso coat named `scale` (`addTorsoCoat`, 4 rows of 9, touching, staggered, `scaleFlat` 0.46 under
+  `scaleProud` 0.62 so each overlaps the next like shingles). Shine: the scale material is in the eye family
+  (clearcoat, low roughness), so painterly, which paints only felt, leaves it glossy, and merged it shares the
+  eyes' draw (no new draw). Candy gloss, not metal (metalness 0). None on the face or limbs.
+- **Palette as roles** from the fur the player picks: scales and body the fur (`coatOf` is the fur itself); belly
+  and muzzle a fixed cream `#fff1cc`; horns, feet and tail tip a fixed ivory `#fbf6e9`; crest and spikes the
+  fur's complement (`facePaintColorFor`) until picked (`spikeColor` blank, a derived gui row). Cream against the
+  riot furs: Lab dE 54 (turquoise) to 123 (violet); the least lightness gap is yellow (dL 10) and lime (14), where
+  the chroma carries it (dE 65, 75) and the belly plate stands proud of the scales so its edge shades.
+- Paint accent: the crest and spikes (`paint.accent: ['spike']`).
+- Motion: bouncy and lively. Stiff 120-260, idle rate 1.00-2.40, idle amp 0.60-1.40, head arc 0.80-1.60, bounce
+  0.04-0.10, stride 1.40-1.90, knee lift 0.50-0.85. Starting values.
+- Future (brainstorm, REUSE-SPEC.md): a throat/chest glow for the projectile, armoured forearms, weapon grafts;
+  nothing here blocks them. Cheek fins and cream cheek patches were left out (optional); add if the head needs more.
 
 ## Shaped faces
 

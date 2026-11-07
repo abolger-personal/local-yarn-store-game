@@ -657,7 +657,8 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
 
 {
   // a species not listed here gets no ear-depth check
-  const SPREAD = { owl: 'tuftSpread', llama: 'earSpread', lion: 'earSpread' };
+  const SPREAD = { owl: 'tuftSpread', llama: 'earSpread', lion: 'earSpread', dragon: 'hornSpread' };
+  const TILT = { owl: 'tuftTilt', dragon: 'hornTilt' };
 
   const deepest = (id, over) => {
     const P = { ...BASE_PARAMS, ...getSpecies(id).defaults, ...over, mergeMeshes: false };
@@ -685,7 +686,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     for (const spread of [0.10, 0.44, 0.60, 0.75, 0.90]) {
       for (const tilt of [-0.6, 0, 0.3, 0.9]) {
         const over = { [SPREAD[id]]: spread };
-        if (id === 'owl') over.tuftTilt = tilt; else over.earTilt = tilt;
+        over[TILT[id] ?? 'earTilt'] = tilt;
         const d = deepest(id, over);
         assert.ok(d < 0.98,
           `${id}: the ear must stay in the head -- deepest point is ${d.toFixed(3)} of the way `

@@ -402,16 +402,21 @@ Status: decided 2026-11-06 (designer's references: a snapping turtle for shape, 
   deeper, with short arms, the knitting needles graze the belly (craft-anim test; 6 of 60 random turtles at 0.265).
 - Head: big, round and blunt (`headShape` 1.05 × 0.90 × 1.00, `headRadius` 0.180), low on a short (0.060) thick
   (0.125, nearly the head's width) neck. The neck never tucks: it would hide the face in a fight. Big eyes
-  (`eyeRadius` 0.108, drawn 0.096–0.118), set high (`eyeLift` 0.20).
+  (`eyeRadius` 0.108, drawn 0.096–0.118), set high (`eyeLift` 0.20), far apart (`eyeSpread` 0.65, drawn 0.60–0.70:
+  the designer, 2026-11-06, closer doesn't read reptile).
 - Neck folds (`neckFolds`, 0–3, default 2): soft rolls of skin where the neck meets the shell, each a little
   narrower going up. The main cute feature.
 - Beak: small, blunt, low on the snout (0.34 head radius down), in `beakColor`. Shaped faces: a soft rounded
   inverted triangle, wide on top; off: a short squat cone. Shape only.
 - Shell: a torso coat of flat plate scutes (`shell`, coat `scute`): faceted plates (`scuteSides` 6, 0 for
   domes), proud 0.30 over flat 0.12 so they read as plates, not bumps; a bare belly (`scuteGap` 2.2 rad) for
-  the plastron. Five layouts (`scutePreset`). The marginal scutes are one band (`shellRim`) at the shell's
-  lower edge, flush with the scute tops (so inside the coat bulge the arms already clear); the plastron
-  (`plastron`) is a flattened ellipsoid on the belly.
+  the plastron. Five layouts (`scutePreset`). Changed 2026-11-06 (the designer: "reading as tiles, not a shell; they
+  always need to stay attached, they form a surface"): one carapace, the torso ellipsoid round all but the belly gap,
+  over 0.55 of the coat bulge, under the scutes, so they are plates on one shell and a gap shows shell, not skin. The
+  marginal scutes (`shellRim`) a band on that same surface along its lower edge, flush with the scute tops (it was a
+  flat ring standing out like a hat brim, perpendicular to the shell). The plastron (`plastron`) in panels, the
+  turtle's "abs": two columns of four rounded squares in the rim colour on a dark shell-coloured backing, the seams
+  between them.
 - Not built: the hood. A shell overhanging the neck would clip the head as it turns (the neck pose is the
   shared rig's, a kit can't lean it forward), so the scutes start high (`scuteTop` 0.06) round the neck
   instead.

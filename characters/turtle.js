@@ -1,8 +1,9 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, GEO,
   addEyes, addHead, addTail, addTorsoCoat, coatBulge, facePaintColorFor,
-  feltMaterial, hsl, part, rand, registerSpecies,
+  feltMaterial, hsl, part, rand, registerSpecies, skinDecal, skinPatch,
 } from './npc.js';
 import { named, onFront, softGeometry, softTriangle } from './faces.js';
 
@@ -25,7 +26,8 @@ const DEFAULT_PARAMS = {
   headOverlap:   0.070,
 
   eyeRadius:     0.108,
-  eyeSpread:     0.400,
+  // BODIES.md §Turtle: eyes far apart, out on the sides, or it doesn't read reptile
+  eyeSpread:     0.650,
   eyeLift:       0.200,
 
   beakSize:      0.055,
@@ -80,6 +82,7 @@ const RANDOM_RANGES = Object.freeze({
   limbThick:   [0.040, 0.052],
   neckThick:   [0.110, 0.135],
   eyeRadius:   [0.096, 0.118],
+  eyeSpread:   [0.600, 0.700],
   beakSize:    [0.042, 0.068],
   stripeWidth: [0.050, 0.090],
   tailLength:  [0.055, 0.110],
@@ -155,23 +158,49 @@ function addStripes(ctx, P) {
   }
 }
 
-// BODIES.md §Turtle: the marginal scutes as one band at the shell's lower edge, flush with the scute tops
-function addRim(ctx, P) {
-  if (!P.shell || !P.shellRim) return;
-  const phi = Math.PI * P.scuteBottom, out = (1 + ctx.bulge) * Math.sin(phi) / 1.34, tall = P.torsoH * 0.09;
-  ctx.chest.add(part(GEO.torus, ctx.mat.rim, {
-    pos: [0, P.torsoH * Math.cos(phi), 0], scale: [P.torsoW * out, P.torsoD * out, tall / 0.34], rot: [Math.PI * 0.5, 0, 0],
-  }));
+const shells = new Map();
+
+/**
+ * Part of the torso ellipsoid, `lift` proud, from `from` to `to` (radians down from the top), all the way round but
+ * the belly gap: the carapace and its rim follow the shell's own surface.
+ */
+function shellBand(P, lift, from, to) {
+  const key = `${P.torsoW}|${P.torsoH}|${P.torsoD}|${lift}|${from}|${to}|${P.scuteGap}`;
+  if (!shells.has(key)) {
+    const gap = P.scuteGap, g = new THREE.SphereGeometry(1, 40, 12, Math.PI / 2 + gap / 2, Math.PI * 2 - gap, from, to - from);
+    shells.set(key, g.scale(P.torsoW + lift, P.torsoH + lift, P.torsoD + lift));
+  }
+  return shells.get(key);
 }
 
-const PLASTRON = Object.freeze({ wide: 0.60, tall: 0.72, deep: 0.30, seat: 0.76, drop: -0.12 });
+// BODIES.md §Turtle: one carapace under the scutes, so they are plates on a shell and never loose tiles; the marginal
+// scutes a band along its lower edge, on the shell's surface, flush with the scute tops
+const SHELL = Object.freeze({ under: 0.55, rim: 0.07 });
+
+function addCarapace(ctx, P) {
+  if (!P.shell) return;
+  const top = Math.PI * P.scuteTop, bottom = Math.PI * P.scuteBottom, proud = ctx.bulge * P.torsoD;
+  ctx.chest.add(named(part(shellBand(P, proud * SHELL.under, top, bottom), ctx.mat.scute), 'carapace'));
+  if (P.shellRim) ctx.chest.add(named(part(shellBand(P, proud, bottom - Math.PI * SHELL.rim, bottom), ctx.mat.rim), 'rim'));
+}
+
+// BODIES.md §Turtle: the plastron in panels, two columns of four, its seams the dark shell showing between them
+const PLASTRON = Object.freeze({ rows: [0.42, 0.08, -0.26, -0.60], col: 0.27, size: 0.50, cap: 1.05, lift: 0.004 });
+
+function plastronPanels(P) {
+  const torso = [P.torsoW, P.torsoH, P.torsoD], size = P.torsoW * PLASTRON.size, key = `plastron|${torso}`;
+  if (!shells.has(key)) {
+    shells.set(key, mergeGeometries(PLASTRON.rows.flatMap((y) => [-1, 1].map((side) =>
+      skinDecal(torso, 'panel', [side * P.torsoW * PLASTRON.col, y * P.torsoH], size, PLASTRON.lift * 2))), false));
+  }
+  return shells.get(key);
+}
 
 function addPlastron(ctx, P) {
   if (!P.plastron) return;
-  ctx.chest.add(part(GEO.sphere, ctx.mat.rim, {
-    pos: [0, P.torsoH * PLASTRON.drop, P.torsoD * PLASTRON.seat],
-    scale: [P.torsoW * PLASTRON.wide, P.torsoH * PLASTRON.tall, P.torsoD * PLASTRON.deep],
-  }));
+  const torso = [P.torsoW, P.torsoH, P.torsoD];
+  ctx.chest.add(part(skinPatch(torso, [0, -P.torsoH * 0.1], [0, PLASTRON.cap], PLASTRON.lift), ctx.mat.scute));
+  ctx.chest.add(named(part(plastronPanels(P), ctx.mat.rim), 'plastron'));
 }
 
 function addTurtleTail(ctx, P) {
@@ -195,7 +224,7 @@ function buildKit(ctx, P) {
   addNeckFolds(ctx, P);
   addStripes(ctx, P);
   addTorsoCoat(ctx, P, { on: 'shell', coat: 'scute', material: ctx.mat.scute });
-  addRim(ctx, P);
+  addCarapace(ctx, P);
   addPlastron(ctx, P);
   addTurtleTail(ctx, P);
 }

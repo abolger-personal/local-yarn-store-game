@@ -687,7 +687,12 @@ const heart = () => new THREE.Shape().moveTo(0, -0.5).bezierCurveTo(-0.15, -0.3,
 // BODIES.md §Dragon: a belly plate, flat across the top and pointed down
 const chevron = () => new THREE.Shape([[-0.5, 0.18], [0.5, 0.18], [0.5, -0.02], [0, -0.22], [-0.5, -0.02]].map(([x, y]) => new THREE.Vector2(x, y)));
 
-const DECALS = { slashes: () => capsule(0.36, 0.2), heart, chevron };
+// BODIES.md §Turtle: a plastron panel, a rounded square
+const panel = (w = 0.5, h = 0.42, c = 0.14) => new THREE.Shape().moveTo(-w + c, -h).lineTo(w - c, -h).absarc(w - c, -h + c, c, -Math.PI / 2, 0)
+  .lineTo(w, h - c).absarc(w - c, h - c, c, 0, Math.PI / 2).lineTo(-w + c, h).absarc(-w + c, h - c, c, Math.PI / 2, Math.PI)
+  .lineTo(-w, -h + c).absarc(-w + c, -h + c, c, Math.PI, Math.PI * 1.5);
+
+const DECALS = { slashes: () => capsule(0.36, 0.2), heart, chevron, panel };
 
 /** Triangles `p` (flat xyz, three corners each), each split in four. */
 function split(p) {

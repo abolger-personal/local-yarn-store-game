@@ -414,10 +414,13 @@ Status: decided 2026-11-06 (designer's references: a snapping turtle for shape, 
 - Shell: a torso coat of flat plate scutes (`shell`, coat `scute`): faceted plates (`scuteSides` 6, 0 for
   domes), proud 0.30 over flat 0.12 so they read as plates, not bumps; a bare belly (`scuteGap` 2.2 rad) for
   the plastron. Five layouts (`scutePreset`). Changed 2026-11-06 (the designer: "reading as tiles, not a shell; they
-  always need to stay attached, they form a surface"): one carapace, the torso ellipsoid round all but the belly gap,
-  over 0.55 of the coat bulge, under the scutes, so they are plates on one shell and a gap shows shell, not skin. The
-  marginal scutes (`shellRim`) a band on that same surface along its lower edge, flush with the scute tops (it was a
-  flat ring standing out like a hat brim, perpendicular to the shell). The plastron (`plastron`) in panels, the
+  always need to stay attached, they form a surface"): one carapace under the scutes, so they are plates on one shell
+  and a gap shows shell, not skin. The turtle stands on two legs, so the carapace is a cap on its BACK (the torso
+  ellipsoid out from straight back to `π - scuteGap / 2`, 0.55 of the coat bulge proud), and its edge, with the
+  marginal scutes (`shellRim`) as a band along it flush with the scute tops, is a loop standing upright round the
+  body: perpendicular to the floor, never parallel (the designer, twice: first a flat ring like a hat brim, then a band
+  round the bottom edge). `scuteGap` 3.0 puts the edge down the sides, behind the arms. The shell rides a joint of its
+  own (as the dragon's ridge), so garments fit the torso and scutes, not the shell over the shoulders. The plastron (`plastron`) in panels, the
   turtle's "abs": two columns of four rounded squares in the rim colour on a dark shell-coloured backing, the seams
   between them.
 - Not built: the hood. A shell overhanging the neck would clip the head as it turns (the neck pose is the

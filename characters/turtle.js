@@ -54,7 +54,8 @@ const DEFAULT_PARAMS = {
   scuteProud:    0.30,
   scuteTop:      0.06,
   scuteBottom:   0.70,
-  scuteGap:      2.20,
+  // BODIES.md §Turtle: the shell's edge down the sides, behind the arms
+  scuteGap:      3.00,
   scuteStagger:  true,
 
   tailLength:    0.080,
@@ -66,11 +67,11 @@ const DEFAULT_PARAMS = {
 
 // BODIES.md §Turtle: plates, not bumps (low proud, flat just under it), a bare belly for the plastron
 const SCUTE_PRESETS = Object.freeze([
-  { scuteRows: 2, scutePerRow: 7,  scuteSides: 6, scuteTouch: 1.10, scuteFlat: 0.12, scuteProud: 0.30, scuteTop: 0.08, scuteBottom: 0.68, scuteGap: 2.20, scuteStagger: true },
-  { scuteRows: 3, scutePerRow: 8,  scuteSides: 6, scuteTouch: 1.10, scuteFlat: 0.12, scuteProud: 0.30, scuteTop: 0.06, scuteBottom: 0.70, scuteGap: 2.20, scuteStagger: true },
-  { scuteRows: 3, scutePerRow: 10, scuteSides: 5, scuteTouch: 1.15, scuteFlat: 0.14, scuteProud: 0.30, scuteTop: 0.06, scuteBottom: 0.72, scuteGap: 2.00, scuteStagger: true },
-  { scuteRows: 4, scutePerRow: 9,  scuteSides: 6, scuteTouch: 1.10, scuteFlat: 0.12, scuteProud: 0.26, scuteTop: 0.05, scuteBottom: 0.74, scuteGap: 2.40, scuteStagger: false },
-  { scuteRows: 3, scutePerRow: 7,  scuteSides: 0, scuteTouch: 1.05, scuteFlat: 0.16, scuteProud: 0.30, scuteTop: 0.08, scuteBottom: 0.70, scuteGap: 2.20, scuteStagger: true },
+  { scuteRows: 2, scutePerRow: 7,  scuteSides: 6, scuteTouch: 1.10, scuteFlat: 0.12, scuteProud: 0.30, scuteTop: 0.08, scuteBottom: 0.68, scuteGap: 2.90, scuteStagger: true },
+  { scuteRows: 3, scutePerRow: 8,  scuteSides: 6, scuteTouch: 1.10, scuteFlat: 0.12, scuteProud: 0.30, scuteTop: 0.06, scuteBottom: 0.70, scuteGap: 3.00, scuteStagger: true },
+  { scuteRows: 3, scutePerRow: 10, scuteSides: 5, scuteTouch: 1.15, scuteFlat: 0.14, scuteProud: 0.30, scuteTop: 0.06, scuteBottom: 0.72, scuteGap: 2.90, scuteStagger: true },
+  { scuteRows: 4, scutePerRow: 9,  scuteSides: 6, scuteTouch: 1.10, scuteFlat: 0.12, scuteProud: 0.26, scuteTop: 0.05, scuteBottom: 0.74, scuteGap: 3.10, scuteStagger: false },
+  { scuteRows: 3, scutePerRow: 7,  scuteSides: 0, scuteTouch: 1.05, scuteFlat: 0.16, scuteProud: 0.30, scuteTop: 0.08, scuteBottom: 0.70, scuteGap: 3.00, scuteStagger: true },
 ]);
 
 const RANDOM_RANGES = Object.freeze({
@@ -161,27 +162,33 @@ function addStripes(ctx, P) {
 const shells = new Map();
 
 /**
- * Part of the torso ellipsoid, `lift` proud, from `from` to `to` (radians down from the top), all the way round but
- * the belly gap: the carapace and its rim follow the shell's own surface.
+ * The torso ellipsoid, `lift` proud, from `from` to `to` radians out from straight back: the turtle stands, so its
+ * shell is a cap on its back and the shell's edge a loop standing upright round it, never a ring parallel to the floor.
  */
 function shellBand(P, lift, from, to) {
-  const key = `${P.torsoW}|${P.torsoH}|${P.torsoD}|${lift}|${from}|${to}|${P.scuteGap}`;
+  const key = `${P.torsoW}|${P.torsoH}|${P.torsoD}|${lift}|${from}|${to}`;
   if (!shells.has(key)) {
-    const gap = P.scuteGap, g = new THREE.SphereGeometry(1, 40, 12, Math.PI / 2 + gap / 2, Math.PI * 2 - gap, from, to - from);
+    const g = new THREE.SphereGeometry(1, 40, 16, 0, Math.PI * 2, from, to - from).rotateX(-Math.PI / 2);
     shells.set(key, g.scale(P.torsoW + lift, P.torsoH + lift, P.torsoD + lift));
   }
   return shells.get(key);
 }
 
-// BODIES.md §Turtle: one carapace under the scutes, so they are plates on a shell and never loose tiles; the marginal
-// scutes a band along its lower edge, on the shell's surface, flush with the scute tops
+// BODIES.md §Turtle: one carapace on the back under the scutes, so they are plates on a shell and never loose tiles,
+// reaching as far round as the scutes do (the scutes' front gap); the marginal scutes a band along its upright edge,
+// flush with the scute tops
 const SHELL = Object.freeze({ under: 0.55, rim: 0.07 });
 
+// on a joint of its own, as the dragon's ridge: garments fit the torso and its scutes (garments.js carried), so the
+// shell over the shoulders doesn't swell a shawl
 function addCarapace(ctx, P) {
   if (!P.shell) return;
-  const top = Math.PI * P.scuteTop, bottom = Math.PI * P.scuteBottom, proud = ctx.bulge * P.torsoD;
-  ctx.chest.add(named(part(shellBand(P, proud * SHELL.under, top, bottom), ctx.mat.scute), 'carapace'));
-  if (P.shellRim) ctx.chest.add(named(part(shellBand(P, proud, bottom - Math.PI * SHELL.rim, bottom), ctx.mat.rim), 'rim'));
+  const edge = Math.PI - P.scuteGap / 2, proud = ctx.bulge * P.torsoD;
+  const back = Object.assign(new THREE.Group(), { name: 'shell' });
+  back.userData.joint = true;
+  ctx.chest.add(back);
+  back.add(named(part(shellBand(P, proud * SHELL.under, 0, edge), ctx.mat.scute), 'carapace'));
+  if (P.shellRim) back.add(named(part(shellBand(P, proud, edge - Math.PI * SHELL.rim, edge), ctx.mat.rim), 'rim'));
 }
 
 // BODIES.md §Turtle: the plastron in panels, two columns of four, its seams the dark shell showing between them

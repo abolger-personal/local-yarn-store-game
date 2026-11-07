@@ -98,6 +98,15 @@ function checkDragon(built, label) {
   assert.ok(long.tip - short.tip > 0.35 * def.hr && long.w === short.w, 'dragon: muzzleLength does not push the snout out');
 }
 
+// BODIES.md §Turtle: the turtle stands, so the shell's rim is a loop standing upright round its back (tall, shallow
+// front to back), never a ring parallel to the floor
+{
+  const built = build(paramsOf('turtle', { mergeMeshes: false }), 'turtle'), P = built.params;
+  const rim = built.chest.getObjectByName('rim'), vs = vertices(rim);
+  const span = (k) => Math.max(...vs.map((v) => v[k])) - Math.min(...vs.map((v) => v[k]));
+  assert.ok(span('y') > 1.6 * P.torsoH && span('z') < 0.45 * P.torsoD, `turtle: the shell rim lies flat (tall ${(span('y') / P.torsoH).toFixed(2)}, deep ${(span('z') / P.torsoD).toFixed(2)})`);
+}
+
 // BODIES.md §Dragon: the chevron belly hugs the front of the torso, just proud, from the neck to under the tail root
 function checkBelly(built, label) {
   const P = built.params, [belly] = built.chest.children.filter((o) => o.name === 'belly');

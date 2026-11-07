@@ -119,7 +119,7 @@ for (const species of SPECIES) {
   for (const facePaint of ['heart', 'slashes']) assert.equal(readFighter({ ...f, params: { ...f.params, facePaint } }).params.facePaint, facePaint, `${facePaint} face paint is kept`);
   assert.equal(readFighter({ ...f, params: { ...f.params, facePaint: '<img>' } }).params.facePaint, 'none', 'unknown face paint is dropped');
   assert.equal(readFighter(null), null);
-  assert.equal(readFighter({ species: 'dragon' }), null, 'only the three animals');
+  assert.equal(readFighter({ species: 'griffin' }), null, 'only the registered animals');
   const junk = readFighter({ species: 'llama', params: { headRadius: 'big', bodyColor: 'red;}', legHeight: Number.NaN, view: '<script>' },
     look: { hat: 'crown', hatColor: '#000000', hatStitch: 'linen stitch', cape: null, bag: 'suitcase', gloves: 12 } });
   const fresh = newFighter('llama');

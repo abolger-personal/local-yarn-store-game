@@ -78,7 +78,7 @@ function guestOf(net, id) {
   const twoGrounds = { ...sent.stage, floors: [...sent.stage.floors, sent.stage.floors[0]] };
   assert.equal(readStart({ ...sent, stage: twoGrounds }, 'G1', THEMES), null, 'a stage needs exactly one ground');
   assert.equal(readStart({ ...sent, stage: { ...sent.stage, floors: sent.stage.floors.slice(1) } }, 'G1', THEMES), null, 'a stage without a ground is refused');
-  assert.equal(readStart({ ...sent, roster: [...sent.roster, { id: 'G2', team: 'heroes', fighter: { species: 'dragon' } }] }, 'G1', THEMES), null, 'a bad fighter is refused');
+  assert.equal(readStart({ ...sent, roster: [...sent.roster, { id: 'G2', team: 'heroes', fighter: { species: 'griffin' } }] }, 'G1', THEMES), null, 'a bad fighter is refused');
   assert.equal(readSnap({ seq: 1, tick: 1, paused: false, fighters: [{ id: 'X' }], donuts: [], bricks: [], shelves: [], events: [] }, new Set(['H'])), null,
     'a snapshot with a fighter outside the roster is refused');
 }

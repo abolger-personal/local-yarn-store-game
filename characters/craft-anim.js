@@ -17,6 +17,7 @@ const HOLD_KEYS = Object.keys(HOLD);
 const PIECE = Object.freeze({ w: 0.10, h0: 0.02, h1: 0.13 });
 const WING_CLEAR = 1.2;
 const ABOVE_LAP = 0.03;
+const TIP_REACH = [0.05, -0.035], TIP_BACK = -0.03, CHORD_CLEAR = 0.97;
 const BALL_R = 0.04;
 const STRAND_N = 12, STRAND_R = 0.005;
 const ROWS = 18;
@@ -179,6 +180,29 @@ function measureLap(c) {
   c.kneeFront = knee.z + P.limbThick + 0.01;
   const y = c.lapY + ABOVE_LAP;
   c.work.set(0, y, bellyFront(built, chest, y) + 0.08);
+  clearChords(c, chest);
+}
+
+function torsoGap(built, chest, a, b) {
+  const P = built.params, s = 1 + (built.bulge ?? 0);
+  const r = _e.set(P.torsoW, P.torsoH, P.torsoD).multiplyScalar(s);
+  const p = _v.copy(a).sub(chest).divide(r), d = _w.copy(b).sub(chest).divide(r).sub(p);
+  return p.addScaledVector(d, clamp01(-p.dot(d) / d.lengthSq())).length();
+}
+
+// CRAFT-ANIM.md: a paw sits beside the torso, so the needle crossing to the far side of the work, pulled
+// back by the reach, chords across the belly; walk the work out until every such chord clears it.
+function clearChords(c, chest) {
+  const paws = c.built.holds.map((h) => rootLocal(c, h, new THREE.Vector3()));
+  const tip = new THREE.Vector3(), from = new THREE.Vector3();
+  for (let i = 0; i < 40; i++) {
+    const gap = Math.min(...paws.map((paw, hold) => {
+      tip.set(c.work.x + TIP_REACH[hold], c.work.y, c.work.z + TIP_BACK);
+      return torsoGap(c.built, chest, from.lerpVectors(paw, tip, 0.3), tip);
+    }));
+    if (gap >= CHORD_CLEAR) return;
+    c.work.z += 0.005;
+  }
 }
 
 function makeTool(c, hold, hook = false) {
@@ -272,6 +296,8 @@ function aim(c, tool, off, spin = 0) {
   tool.tip.set(c.work.x + off.x, c.work.y + off.y, c.work.z + off.z);
   c.root.localToWorld(_v.copy(tool.tip));
   gripAt(tool, _v, _g);
+  // a pencil grip: the hook lies over the paw, or its butt runs back down the forearm it points along
+  if (tool.hook) _g.y += c.built.params.limbThick;
   tool.hold.worldToLocal(_v);
   tool.wrist.position.copy(tool.hold.worldToLocal(_g));
   const len = _v.sub(_g).length();

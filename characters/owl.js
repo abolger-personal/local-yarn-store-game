@@ -21,7 +21,6 @@ const DEFAULT_PARAMS = {
   tuftTilt:      0.800,
   beakSize:      0.090,
   beakColor:     '#e0a53c',
-  shapedFaces:   false,
   wingLength:    0.349,
   wingWidth:     0.200,
   wingDepth:     0.360,

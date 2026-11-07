@@ -92,14 +92,15 @@ export const BASE_PARAMS = Object.freeze({
   eyeRough:      0.22,
   eyeClearcoat:  0.70,
 
-  lookAt:        false,
-  eyeGlint:      false,
+  lookAt:        true,
+  eyeGlint:      true,
+  shapedFaces:   true,
   facePaint:     'none',
   facePaintSize: 1.00,
   facePaintDown: 1.20,
   facePaintOut:  0.40,
   facePaintColor: '',
-  painterly:     false,
+  painterly:     true,
 
   bodyColor:     '#a0a6ba',
   footColor:     '#e0a53c',

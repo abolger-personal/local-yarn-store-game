@@ -135,7 +135,7 @@ for (const id of speciesIds()) {
 
 // off is exactly today's face
 for (const id of speciesIds().filter((s) => OFF[s])) {
-  const built = build(paramsOf(id, { mergeMeshes: false }), id);
+  const built = build(paramsOf(id, { shapedFaces: false, eyeGlint: false, mergeMeshes: false }), id);
   const [count, bounds] = OFF[id];
   assert.equal(meshes(built.root).length, count, `${id}: off keeps today's meshes`);
   const box = new THREE.Box3().setFromObject(built.head);

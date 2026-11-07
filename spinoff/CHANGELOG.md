@@ -23,6 +23,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   size"), apart from the rest of the fur.
 - **New paint defaults**, picked in the checker: broad fur planes on the body, small busy ones on the mane and wool,
   softer band edges, a stronger ink fray and feather rows. The checker opens with the game's look switched on.
+- **The look is the default everywhere:** painterly, shaped faces, eye glint and look-at are on for every character, in
+  this game and in the yarn shop (which keeps its own yarn-shop colours). `?plain` still turns it off here.
 
 ### Levels
 - **Level 5, the first generated level:** made by the level generator rather than by hand, the same layout every

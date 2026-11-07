@@ -36,7 +36,7 @@ for (const level of [0.4, 0.8, 1.6]) {
 // on: matte, no specular, its own family per style; off: the felt exactly as before
 for (const id of speciesIds()) {
   const kit = getSpecies(id), on = createCharacter(paramsOf(id, { painterly: true }), id), style = kit.paint?.style;
-  const plain = createCharacter(paramsOf(id), id), before = createCharacter(paramsOf(id, { painterly: undefined }), id);
+  const plain = createCharacter(paramsOf(id, { painterly: false }), id), before = createCharacter(paramsOf(id, { painterly: undefined }), id);
   const felt = (b) => b.materials.filter((m) => !['eye', 'knit'].includes(m.userData.family));
   for (const m of style ? felt(on) : []) {
     assert.equal(m.userData.family, `paint-${style}`, `${id}: a felt material is left unpainted`);

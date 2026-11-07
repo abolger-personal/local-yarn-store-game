@@ -1371,7 +1371,7 @@ export function stepTricks(built, punch, dt) {
 // REUSE-SPEC.md §Look, the 0.0.8 art pass: every fighter wears these; ?plain on the page turns them off, to compare
 // readability in a match
 const PLAIN = typeof location !== 'undefined' && new URLSearchParams(location.search).has('plain');
-export const LOOKS = Object.freeze(PLAIN ? {} : { lookAt: true, eyeGlint: true, painterly: true, shapedFaces: true });
+export const LOOKS = Object.freeze(Object.fromEntries(['lookAt', 'eyeGlint', 'painterly', 'shapedFaces'].map((k) => [k, !PLAIN])));
 
 export function buildFighter(f) {
   const built = createCharacter({ ...BASE_PARAMS, ...f.params, ...LOOKS, mergeMeshes: false }, f.species);

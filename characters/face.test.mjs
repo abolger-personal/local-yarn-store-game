@@ -10,9 +10,9 @@ import './species.js';
 // BODIES.md §Look-at, §Face, seen as the match sees them (spinoff/stage.js aimGameCamera)
 setGeometryDetail('med');
 const STILL = { ...MOTION_DEFAULTS, idleAmount: 0 };
-// off by default, so the game looks as it did till the designer picks them (the species checker's style folder)
+// on by default in both games since the designer picked them (2026-11-06; the species checker's look folder)
 const STYLE = { lookAt: true, eyeGlint: true };
-for (const k of Object.keys(STYLE)) assert.equal(BASE_PARAMS[k], false, `${k} is off by default`);
+for (const k of ['lookAt', 'eyeGlint', 'painterly', 'shapedFaces']) assert.equal(BASE_PARAMS[k], true, `${k} is off by default`);
 assert.equal(BASE_PARAMS.facePaint, 'none', 'face paint on by default');
 const PAINTED = FACE_PAINTS.filter((p) => p !== 'none'), SIDES = { rings: 2, slashes: 2, heart: 1 };
 const paramsOf = (id, extra = {}) => ({ ...BASE_PARAMS, ...getSpecies(id).defaults, ...STYLE, mergeMeshes: false, ...extra });

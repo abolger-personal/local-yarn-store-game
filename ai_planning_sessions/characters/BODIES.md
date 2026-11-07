@@ -113,7 +113,7 @@ Everything is judged at play distance: characters are ~150px tall.
 Built 2026-11-04 (the art pass: "less drugged"; Audubon's Carolina Parrot plate: body side on, head 3/4 to
 the viewer so both eyes show).
 
-- **Decided.** `built.lookTarget` (a world point, or null) and `lookAt` (a param, off by default till the designer picks it, like every style switch). Inside
+- **Decided.** `built.lookTarget` (a world point, or null) and `lookAt` (a param; like every style switch, on by default in both games since 2026-11-06, when the designer picked them). Inside
   `stepMotion`, after the pose and its layers, the head turns toward the target: yaw clamped to 0.8 rad
   (3/4 on to a side-on body), pitch to 0.35, eased at 5/s. The pupils take whatever the head does not
   (clamped to 1 rad, eased at 18/s), so they glance ahead of a turn and finish it when the head is clamped.
@@ -170,7 +170,7 @@ Built 2026-11-04 (the same plate: a hot face, a glint in each eye).
 
 ## Painterly
 
-Built 2026-11-04, off by default (`painterly`, per character; the species checker's style folder, "painterly", set on every slot).
+Built 2026-11-04; on by default in both games since 2026-11-06 (`painterly`, per character; the species checker's style folder, "painterly", set on every slot).
 `characters/paint.js`.
 
 - **Fur** (lion, llama), from Franz Marc's Blue Horse I: no highlights (roughness 1, sheen, specular and

@@ -59,7 +59,6 @@ const DEFAULT_PARAMS = {
   muzzleColor:   '#e8d9bd',
   noseColor:     '#241a1c',
   noseSize:      0.52,
-  shapedFaces:   false,
   earLength:     0.088,
   earWidth:      0.040,
   earFlatten:    0.40,

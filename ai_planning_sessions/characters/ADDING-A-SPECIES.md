@@ -46,7 +46,7 @@ file would declare. No turtle exists yet; nothing here is turtle code. What a bo
 | `presets` + `presetKey` | none; both or neither (`rig.test.mjs` checks the pair), the preset slider applies `presets[i]` | 6 scute layouts, `'scutePreset'` |
 | `vary(P)` | none; the kit's own draws after the base draw, before the preset (the owl's tail clamp) | keep a long tail off the floor, as the owl's `shortenTail` |
 | `randomise(P)` | `randomiseKit`: base draw, `vary`, a random preset, the coat colour. Write your own only when a draw must come in a different order (the lion: body, tail and snout before the preset, mane sides after) | the default |
-| `paint` | no painterly look: `{ style: 'fur' }` or `{ style: 'ink', plume: [materials that fray] }` (BODIES.md §Painterly) | `{ style: 'ink', plume: ['scute'] }` |
+| `paint` | no painterly look: `{ style: 'fur', accent: [materials with their own stroke size] }` or `{ style: 'ink', accent: [materials that fray] }` (BODIES.md §Painterly) | `{ style: 'ink', accent: ['scute'] }` |
 | `delighted` | `POSES.delighted`; a cheer for a body whose arms don't read (the llama's ears, the lion's tail) | a head bob: `{ ...POSES.delighted, headPitch: -0.4 }` |
 | `wingShape(P)` | none; the owl's wing ellipsoid, for craft-anim's hands | none |
 | `gloveAnchors(built, hand)` | gloves on the hands; where the fight gloves go when the hands are buried, each glove at least `hand` across (the owl's wing tips) | none, unless the flippers swallow the hands |

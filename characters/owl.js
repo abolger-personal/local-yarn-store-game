@@ -252,7 +252,7 @@ registerSpecies({
   coatColorKey: 'featherColor',
   vary: shortenTail,
   // BODIES.md §Painterly
-  paint: { style: 'ink', plume: ['feather', 'body'] },
+  paint: { style: 'ink', accent: ['feather', 'body'] },
   presets: FEATHER_PRESETS,
   presetKey: 'featherPreset',
 });

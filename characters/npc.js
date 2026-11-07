@@ -1063,10 +1063,10 @@ export function createCharacter(P, species) {
   return ctx;
 }
 
-/** BODIES.md §Painterly: every felt material of the character in the species' style; `plume` names what frays. */
-function paintCharacter({ materials, mat }, { style, plume = [] }) {
+/** BODIES.md §Painterly: every felt material of the character in the species' style; `accent` names the accent pieces. */
+function paintCharacter({ materials, mat }, { style, accent = [] }) {
   for (const material of materials) {
-    if (material.userData.family === 'felt') paintMaterial(material, style, plume.some((k) => material === mat[k]));
+    if (material.userData.family === 'felt') paintMaterial(material, style, accent.some((k) => material === mat[k]));
   }
 }
 
@@ -1083,8 +1083,8 @@ function bakedGeometry(mesh, toJointSpace) {
   const local = new THREE.Matrix4().multiplyMatrices(toJointSpace, mesh.matrixWorld);
   const geometry = mesh.geometry.clone().applyMatrix4(local);
   for (const name of mesh.userData.dropOnMerge ?? []) geometry.deleteAttribute(name);
-  // BODIES.md §Painterly: merged, plumage is marked by uv lifted 2 (whole tiles, so the textures don't move)
-  if (mesh.material.userData.plume) {
+  // BODIES.md §Painterly: merged, accent pieces are marked by uv lifted 2 (whole tiles, so the textures don't move)
+  if (mesh.material.userData.accent) {
     const { uv } = geometry.attributes;
     for (let i = 0; i < uv.count; i++) uv.setY(i, uv.getY(i) + 2);
   }

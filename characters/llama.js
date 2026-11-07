@@ -258,7 +258,7 @@ registerSpecies({
   coatBulge: (P) => coatBulge(P, 'fleece', 'fleece'),
   coatColorKey: 'fleeceColor',
   // BODIES.md §Painterly
-  paint: { style: 'fur' },
+  paint: { style: 'fur', accent: ['fleece'] },
   presets: FLEECE_PRESETS,
   presetKey: 'fleecePreset',
   // The arms vanish against the fleece, so the ears carry the cheer.

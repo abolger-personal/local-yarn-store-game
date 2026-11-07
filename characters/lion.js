@@ -419,7 +419,7 @@ registerSpecies({
   coatOf: deriveManeColor,
   randomise: randomiseLion,
   // BODIES.md §Painterly
-  paint: { style: 'fur' },
+  paint: { style: 'fur', accent: ['mane'] },
   ...MANE,
   // The arms vanish against the mane, so the tail carries the cheer: lifted clear of the body.
   delighted: Object.freeze({ ...POSES.delighted, tailLift: 0.9, tailWag: 1.6 }),

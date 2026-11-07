@@ -8,6 +8,7 @@ export const PAINT = {
   bands: { value: 3 },
   soft: { value: 0.06 },
   size: { value: 1 },
+  accentSize: { value: 1 },
   brush: { value: 0.35 },
   streak: { value: 0.08 },
   light: { value: 0.8 },
@@ -42,7 +43,7 @@ export function paintRamp(base, ramp) {
 /** How far in (N·V) from the outline the ink frays; `fray` sets how broken it is there, not how wide. */
 export const FRAY_BAND = 0.5;
 
-/** Does the ink fray a plume's fragment at N·V `facing` with brush value `noise` (0..1)? As the shader. */
+/** Does the ink fray an accent piece's fragment at N·V `facing` with brush value `noise` (0..1)? As the shader. */
 export const inkFrays = (facing, noise, fray) => noise < fray * (1 - Math.min(1, Math.abs(facing) / FRAY_BAND)) ** 2 * 1.5;
 
 const glslRamp = (r) => `
@@ -65,8 +66,10 @@ const PARS = `
 uniform sampler2D paintBrushMap;
 uniform sampler2D paintFeatherMap;
 uniform sampler2D paintPlaneMap;
-uniform float paintSize, paintBands, paintSoft, paintBrush, paintStreak, paintLevel, paintPool, paintFray, paintFeather, paintPlume;
-varying vec2 vPaintUv;`;
+uniform float paintSize, paintBands, paintSoft, paintBrush, paintStreak, paintLevel, paintPool, paintFray, paintFeather, paintAccent, paintAccentSize;
+varying vec2 vPaintUv;
+// BODIES.md §Painterly, accent pieces: by material, or merged, by uv lifted 2 whole tiles
+#define paintAccented max(paintAccent, step(1.5, vPaintUv.y))`;
 
 // light falling on the fragment, as a share of what a lit base colour would get
 /**
@@ -93,16 +96,15 @@ const level = (stroke, banded) => `
   paintC *= paintBase / max(dot(paintC, vec3(${LUMA.join(', ')})), 1e-3) * paintE;`;
 
 // fur: a few broad planes a part (Marc), not hair; ink: the fine brush
-const FUR = `{${level('texture2D(paintPlaneMap, vPaintUv / paintSize).r', true)}
+const FUR = `{${level('texture2D(paintPlaneMap, vPaintUv / mix(paintSize, paintAccentSize, paintAccented)).r', true)}
   outgoingLight = paintC * (1.0 + paintStroke * paintStreak);
 }`;
 
 const INK = `{${level('texture2D(paintBrushMap, vPaintUv * vec2(3.0, 2.0)).r', false)}
   float paintFacing = dot(normalize(normal), normalize(vViewPosition));
-  float paintPlumed = max(paintPlume, step(1.5, vPaintUv.y));
   float paintNoise = texture2D(paintBrushMap, vPaintUv * vec2(9.0, 6.0)).g;
-  if (paintPlumed > 0.5 && paintNoise < paintFray * pow(1.0 - min(1.0, abs(paintFacing) / ${FRAY_BAND.toFixed(4)}), 2.0) * 1.5) discard;
-  float paintRows = (texture2D(paintFeatherMap, vPaintUv * vec2(6.0, 4.0)).r - 0.5) * paintFeather * paintPlumed;
+  if (paintAccented > 0.5 && paintNoise < paintFray * pow(1.0 - min(1.0, abs(paintFacing) / ${FRAY_BAND.toFixed(4)}), 2.0) * 1.5) discard;
+  float paintRows = (texture2D(paintFeatherMap, vPaintUv * vec2(6.0, 4.0)).r - 0.5) * paintFeather * paintAccented;
   float paintPooled = 1.0 - paintPool * smoothstep(0.35, 0.0, abs(paintFacing));
   outgoingLight = paintC * paintPooled * (1.0 + paintStroke * paintStreak + paintRows);
 }`;
@@ -182,7 +184,7 @@ function uniformsFor(material) {
   return {
     paintBrushMap: brush, paintFeatherMap: feather, paintPlaneMap: plane, paintSize: PAINT.size, paintBands: PAINT.bands, paintSoft: PAINT.soft,
     paintBrush: PAINT.brush, paintStreak: PAINT.streak, paintLevel: PAINT.light, paintPool: PAINT.pool,
-    paintFray: PAINT.fray, paintFeather: PAINT.feather, paintPlume: { value: material.userData.plume ? 1 : 0 },
+    paintFray: PAINT.fray, paintFeather: PAINT.feather, paintAccent: { value: material.userData.accent ? 1 : 0 }, paintAccentSize: PAINT.accentSize,
   };
 }
 
@@ -198,12 +200,13 @@ function inject(shader, style, material) {
 
 /**
  * Paints felt `material` in `style` (a PAINT_STYLES key), in place: matte, no specular, its own material family
- * so a merged cast shares one material and one program per style. `plume` marks the plumage the ink frays.
- * @param {THREE.MeshPhysicalMaterial} material @param {string} style @param {boolean} [plume]
+ * so a merged cast shares one material and one program per style. `accent` marks the accent pieces:
+ * the ink frays them, fur paints them at their own stroke size.
+ * @param {THREE.MeshPhysicalMaterial} material @param {string} style @param {boolean} [accent]
  */
-export function paintMaterial(material, style, plume = material.userData.plume) {
+export function paintMaterial(material, style, accent = material.userData.accent) {
   Object.assign(material, { roughness: 1, sheen: 0, specularIntensity: 0, clearcoat: 0 });
-  Object.assign(material.userData, { family: `paint-${style}`, paint: style, plume: Boolean(plume) });
+  Object.assign(material.userData, { family: `paint-${style}`, paint: style, accent: Boolean(accent) });
   material.onBeforeCompile = (shader) => inject(shader, style, material);
   material.customProgramCacheKey = () => `paint-${style}`;
   return material;

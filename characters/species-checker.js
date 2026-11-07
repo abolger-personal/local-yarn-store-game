@@ -577,6 +577,7 @@ function addPaintKnobs(folder) {
   folder.add(PAINT.brush, 'value', 0, 1, 0.01).name('brush strength');
   folder.add(PAINT.light, 'value', 0.3, 1.6, 0.01).name('paint band spacing');
   folder.add(PAINT.size, 'value', 0.3, 3, 0.01).name('fur stroke size');
+  folder.add(PAINT.accentSize, 'value', 0.3, 3, 0.01).name('fur accent stroke size (mane, wool)');
   folder.add(PAINT.soft, 'value', 0, 0.5, 0.01).name('fur band edge');
   folder.add(PAINT.fray, 'value', 0, 0.8, 0.01).name('ink fray (outline)');
   folder.add(PAINT.feather, 'value', 0, 1, 0.01).name('ink feather rows');

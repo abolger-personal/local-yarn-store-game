@@ -19,6 +19,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **Dress-up** shows however many animals there are.
 - **Four slots** (A to D, partners A↔B and C↔D square up), and **edit all slots at once**: a trait changed on one
   goes to every slot whose animal has it.
+- **Accent stroke size:** the lion's mane and the llama's wool get their own fur stroke size slider ("fur accent stroke
+  size"), apart from the rest of the fur.
 
 ### Levels
 - **Level 5, the first generated level:** made by the level generator rather than by hand, the same layout every

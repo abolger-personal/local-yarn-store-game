@@ -199,7 +199,7 @@ Built 2026-11-04, off by default (`painterly`, per character; the species checke
   (0.8) capped every lit surface near the base colour: darker than felt under any light over 1.
 - Ink fray and feather rows, made visible 2026-11-05. The fray frayed only the feather scallops, over a body
   sphere of nearly the same colour, so a hole showed more owl, and the body and head (most of the outline)
-  never frayed: 59 of 2746 px from the match camera, invisible. Now the body frays too (`plume: ['feather',
+  never frayed: 59 of 2746 px from the match camera, invisible. Now the body frays too (`accent: ['feather',
   'body']`; beak, feet, eyes and face stay whole), in a fixed band (N·V under `FRAY_BAND` 0.5); `fray`
   (default 0.4, slider to 0.8) sets how broken, not how wide. Worst case (every brush value frays): 506 px, at
   most 6 px in from the outline (tested: over 10% of the owl, at most 8 px in). Feather rows were a 118/170

@@ -63,18 +63,38 @@ for (const id of speciesIds()) {
 // ink frays only the plumage, only near the silhouette; the beak and the face are left whole
 {
   const owl = createCharacter(paramsOf('owl', { painterly: true }), 'owl');
-  assert.ok(owl.mat.feather.userData.plume, 'the plumage never frays');
+  assert.ok(owl.mat.feather.userData.accent, 'the plumage never frays');
   // the beak, feet, eyes and any face colour stay whole; the feathers and the body fray
-  assert.ok(owl.mat.body.userData.plume && owl.materials.every((m) => [owl.mat.feather, owl.mat.body].includes(m) || !m.userData.plume), 'the ink frays the beak, feet or face');
+  assert.ok(owl.mat.body.userData.accent && owl.materials.every((m) => [owl.mat.feather, owl.mat.body].includes(m) || !m.userData.accent), 'the ink frays the beak, feet or face');
   const merged = createCharacter(paramsOf('owl', { painterly: true, mergeMeshes: true }), 'owl');
   const ink = [];
   merged.root.traverse((o) => { if (o.userData.merged && o.material.userData.paint) ink.push(o); });
   assert.equal(ink.length, 1, 'the merged owl is not one ink draw');
   assert.notEqual(ink[0].material.onBeforeCompile, THREE.Material.prototype.onBeforeCompile, 'merged, the owl loses its ink shader');
   const uv = ink[0].geometry.attributes.uv;
-  let plumed = 0;
-  for (let i = 0; i < uv.count; i++) plumed += uv.getY(i) > 1.5 ? 1 : 0;
-  assert.ok(plumed > 0 && plumed < uv.count, `merged, ${plumed} of ${uv.count} owl vertices are marked as plumage`);
+  let accented = 0;
+  for (let i = 0; i < uv.count; i++) accented += uv.getY(i) > 1.5 ? 1 : 0;
+  assert.ok(accented > 0 && accented < uv.count, `merged, ${accented} of ${uv.count} owl vertices are marked as plumage`);
+}
+// BODIES.md §Painterly, accent pieces: the mane and the wool take their own fur stroke size; merged, they are the only
+// vertices lifted 2 tiles (so no other part may already sit there)
+for (const [id, key] of [['lion', 'mane'], ['llama', 'fleece']]) {
+  const kit = createCharacter(paramsOf(id, { painterly: true }), id);
+  assert.ok(kit.mat[key].userData.accent && kit.materials.every((m) => m === kit.mat[key] || !m.userData.accent), `${id}: the ${key} is not its only accent piece`);
+  let lifted = 0, accentVerts = 0;
+  kit.root.traverse((o) => {
+    if (!o.isMesh || !o.geometry.attributes.uv) return;
+    const { uv } = o.geometry.attributes;
+    for (let i = 0; i < uv.count; i++) lifted += uv.getY(i) > 1.5 ? 1 : 0;
+  });
+  assert.equal(lifted, 0, `${id}: unmerged, a part's uv already reads as an accent piece`);
+  const merged = createCharacter(paramsOf(id, { painterly: true, mergeMeshes: true }), id);
+  merged.root.traverse((o) => {
+    if (!o.userData.merged || !o.material.userData.paint) return;
+    const { uv } = o.geometry.attributes;
+    for (let i = 0; i < uv.count; i++) accentVerts += uv.getY(i) > 1.5 ? 1 : 0;
+  });
+  assert.ok(accentVerts > 0, `${id}: merged, the ${key} is not marked as an accent piece`);
 }
 for (let k = 0; k <= 20; k++) {
   const noise = k / 20, fray = PAINT.fray.value;
@@ -93,7 +113,7 @@ assert.ok(inkFrays(0, 0.05, PAINT.fray.value), 'the ink never frays');
   const corners = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => new THREE.Vector3(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).project(camera));
   const [x0, x1, y0, y1] = [Math.min(...corners.map((c) => c.x)), Math.max(...corners.map((c) => c.x)), Math.min(...corners.map((c) => c.y)), Math.max(...corners.map((c) => c.y))]
     .map((v, i) => Math.round(((i < 2 ? v * W : v * H) / 2)));
-  const frays = (hit) => hit.object.material.userData.plume
+  const frays = (hit) => hit.object.material.userData.accent
     && inkFrays(n.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).dot(ray.ray.direction) * -1, 0, PAINT.fray.value);
   const solid = new Set(), whole = new Set();
   for (let i = x0 - 1; i <= x1 + 1; i++) for (let j = y0 - 1; j <= y1 + 1; j++) {

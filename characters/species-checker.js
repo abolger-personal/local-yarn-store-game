@@ -19,9 +19,12 @@ console.info('LYS build', BUILD);
 
 import './species.js';
 
-const SLOTS = ['A', 'B'];
+const SLOTS = ['A', 'B', 'C', 'D'];
+const slotIndex = (id) => SLOTS.indexOf(id);
+// partners square up: A and B, C and D
+const partnerOf = (id) => SLOTS[slotIndex(id) ^ 1];
 
-// BODIES.md §Face, §Look-at: one row per style switch, a boolean rig param set on both slots (default from
+// BODIES.md §Face, §Look-at: one row per style switch, a boolean rig param set on every slot (default from
 // BASE_PARAMS); `live` switches take effect on the next frame, the rest rebuild the slots
 const STYLE_SWITCHES = Object.freeze([
   { key: 'lookAt', name: 'look-at', live: true },
@@ -41,6 +44,7 @@ const state = {
   toneMapping: 'ACES',
   spacing: 0.62,
   linkShared: true,
+  editAll: false,
   play: false,
   idle: true,
   walk: false,
@@ -52,10 +56,8 @@ const state = {
   style: { ...STYLE },
   lookAtOther: false,
   matchCamera: false,
-  slots: {
-    A: { speciesId: 'owl', params: null },
-    B: { speciesId: 'llama', params: null },
-  },
+  slots: /** @type {Record<string, any>} */ (
+    Object.fromEntries(SLOTS.map((id, i) => [id, { speciesId: speciesList()[i % speciesList().length].id, params: null }]))),
 };
 
 const freshParams = (speciesId) => Object.assign(
@@ -106,14 +108,14 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-const built = { A: null, B: null };
+const built = Object.fromEntries(SLOTS.map((id) => [id, null]));
 
 function slotX(id) {
-  return (id === 'A' ? -1 : 1) * state.spacing;
+  return (2 * slotIndex(id) - (SLOTS.length - 1)) * state.spacing;
 }
 
 // the match camera sees fighters side on, facing each other (spinoff/play.js placeFighter)
-const slotYaw = (id) => (state.matchCamera ? (id === 'A' ? 1 : -1) * Math.PI / 2 : 0);
+const slotYaw = (id) => (state.matchCamera ? (slotIndex(id) % 2 ? -1 : 1) * Math.PI / 2 : 0);
 
 function measureHeight(root) {
   const box = new THREE.Box3().setFromObject(root);
@@ -212,9 +214,14 @@ function nextSnapView() {
   setOrbit(SNAP_VIEWS[snapIndex]);
 }
 
-const plates = { A: document.getElementById('plateA'), B: document.getElementById('plateB') };
+const plates = Object.fromEntries(SLOTS.map((id) => {
+  const el = document.createElement('div');
+  el.className = 'plate';
+  document.body.append(el);
+  return [id, el];
+}));
 const projected = new THREE.Vector3();
-const fullPlateWidth = { A: 0, B: 0 };
+const fullPlateWidth = Object.fromEntries(SLOTS.map((id) => [id, 0]));
 
 function plateRoom() {
   const a = projected.set(slotX('A'), 0, 0).project(camera).x;
@@ -249,7 +256,7 @@ function save() {
   const payload = {
     active: state.active, view: state.view, pose: state.pose, detail: state.detail,
     exposure: state.exposure, toneMapping: state.toneMapping, spacing: state.spacing,
-    linkShared: state.linkShared,
+    linkShared: state.linkShared, editAll: state.editAll,
     play: state.play, speed: state.speed, idle: state.idle, walk: state.walk,
     repeat: state.repeat, side: state.side, slow: state.slow,
     style: state.style, lookAtOther: state.lookAtOther, matchCamera: state.matchCamera,
@@ -290,10 +297,19 @@ let gui = null;
 const activeSlot = () => state.slots[state.active];
 const refreshGui = () => gui?.controllersRecursive().forEach((c) => c.updateDisplay());
 
-function rebuildActive() {
-  buildSlot(state.active);
+const editedIds = () => (state.editAll ? SLOTS : [state.active]);
+
+function rebuildEdited() {
+  editedIds().forEach(buildSlot);
   updatePlates();
   save();
+}
+
+/** A trait row changed on the active slot; with edit all, every slot whose species has that trait follows. */
+function traitChanged(key) {
+  const value = activeSlot().params[key];
+  for (const id of editedIds()) if (key in state.slots[id].params) state.slots[id].params[key] = value;
+  rebuildEdited();
 }
 
 // the game's riot fur (spinoff/fighter.js), not the store's muted one, so the checker shows what a match shows
@@ -311,11 +327,11 @@ function randomiseSlot(id) {
   save();
 }
 
-function randomiseBoth() {
-  const [a, b] = SLOTS.map((id) => state.slots[id]);
+function randomiseAll() {
+  const [first, ...rest] = SLOTS.map((id) => state.slots[id]);
   SLOTS.forEach((id) => randomise(state.slots[id]));
   if (state.linkShared) {
-    shareRandomParams(a.params, b.params, getSpecies(a.speciesId), getSpecies(b.speciesId));
+    for (const s of rest) shareRandomParams(first.params, s.params, getSpecies(first.speciesId), getSpecies(s.speciesId));
   }
   buildAll();
   refreshGui();
@@ -421,7 +437,7 @@ function stepSlot(id, dt) {
 }
 
 function lookTargetFor(id, slot) {
-  const other = built[id === 'A' ? 'B' : 'A'];
+  const other = built[partnerOf(id)];
   if (!state.lookAtOther || !other) return camera.position;
   return other.joints.head.getWorldPosition(slot.lookAt ??= new THREE.Vector3());
 }
@@ -478,11 +494,14 @@ function addControl(folder, params, entry, onChange) {
   else folder.add(params, key, a, b, step ?? 0.001).onChange(onChange);
 }
 
-function presetHandler(species, params, onChange) {
+function presetHandler(species, params) {
   return () => {
-    applyPreset(params, species, params[species.presetKey]);
-    onChange();
-    gui.controllersRecursive().forEach((c) => c.updateDisplay());
+    for (const id of editedIds()) {
+      const slot = state.slots[id], kit = getSpecies(slot.speciesId);
+      if (kit.presets && kit.presetKey === species.presetKey) applyPreset(slot.params, kit, params[species.presetKey]);
+    }
+    rebuildEdited();
+    refreshGui();
   };
 }
 
@@ -493,7 +512,7 @@ function addRows(parent, title, species, params) {
   const folder = parent.addFolder(title);
   const isPreset = (key) => key === species.presetKey && species.presets;
   rows.forEach((row) => addControl(folder, params, row,
-    isPreset(row[0]) ? presetHandler(species, params, rebuildActive) : rebuildActive));
+    isPreset(row[0]) ? presetHandler(species, params) : () => traitChanged(row[0])));
   folder.close();
   return folder;
 }
@@ -505,8 +524,9 @@ function addCharacterFolder(species) {
     .name('species').onChange((v) => setSpecies(state.active, v));
   folder.add(activeSlot().params, 'name').onChange(() => { updatePlates(); save(); });
   folder.add({ f: () => randomiseSlot(state.active) }, 'f').name('randomise slot  (R)');
-  folder.add({ f: randomiseBoth }, 'f').name('randomise both  (Shift R)');
+  folder.add({ f: randomiseAll }, 'f').name('randomise all  (Shift R)');
   folder.add(state, 'linkShared').name('link shared params').onChange(save);
+  folder.add(state, 'editAll').name('edit all slots at once').onChange(save);
   folder.add({ f: () => setSpecies(state.active, activeSlot().speciesId) }, 'f').name('reset slot');
   folder.add({ f: exportActive }, 'f').name('export slot  (E)');
 }
@@ -539,11 +559,11 @@ function addViewFolder() {
   const folder = gui.addFolder('view');
   folder.add(state, 'view', ['felted', 'grey', 'silhouette']).onChange(setView);
   folder.add(state, 'matchCamera').name('match camera').onChange(setMatchCamera);
-  folder.add(state, 'lookAtOther').name('look at the other slot').onChange(save);
+  folder.add(state, 'lookAtOther').name('look at partner (A↔B, C↔D)').onChange(save);
   folder.add(state, 'detail', Object.keys(GEO_DETAIL)).name('geometry detail')
     .onChange((v) => { setGeometryDetail(v); buildAll(); save(); });
   folder.add(state, 'spacing', 0.2, 1.6, 0.01).onChange(() => { buildAll(); save(); });
-  folder.add({ f: () => frameAll() }, 'f').name('frame both  (F)');
+  folder.add({ f: () => frameAll() }, 'f').name('frame all  (F)');
   folder.add({ f: () => frameAll(150) }, 'f').name('150px test  (D)');
   folder.add({ f: () => renderer.domElement.classList.toggle('squint') }, 'f').name('squint  (B)');
   folder.add(state, 'exposure', 0.1, 2, 0.01).onChange((v) => (renderer.toneMappingExposure = v));
@@ -572,7 +592,7 @@ function setStyle({ key, live }) {
 
 const MATCH_AIM = new THREE.Vector3(0, 0.8, -0.1);
 
-/** Frames both slots as spinoff/stage.js aimGameCamera frames a match, its 30° lens and all. */
+/** Frames every slot as spinoff/stage.js aimGameCamera frames a match, its 30° lens and all. */
 function setMatchCamera(on) {
   state.matchCamera = on;
   SLOTS.forEach((id) => built[id] && resetPlacement(id));
@@ -608,8 +628,8 @@ function buildGui() {
 }
 
 const KEY_ACTIONS = {
-  tab: () => { state.active = state.active === 'A' ? 'B' : 'A'; buildGui(); updatePlates(); },
-  r: (e) => (e.shiftKey ? randomiseBoth() : randomiseSlot(state.active)),
+  tab: () => { state.active = SLOTS[(slotIndex(state.active) + 1) % SLOTS.length]; buildGui(); updatePlates(); },
+  r: (e) => (e.shiftKey ? randomiseAll() : randomiseSlot(state.active)),
   f: () => { snapIndex = 0; frameAll(); },
   d: () => frameAll(150),
   arrowleft: () => orbitBy(-ORBIT_STEP, 0),

@@ -170,7 +170,7 @@ Built 2026-11-04 (the same plate: a hot face, a glint in each eye).
 
 ## Painterly
 
-Built 2026-11-04, off by default (`painterly`, per character; the species checker's style folder, "painterly", set on both slots).
+Built 2026-11-04, off by default (`painterly`, per character; the species checker's style folder, "painterly", set on every slot).
 `characters/paint.js`.
 
 - **Fur** (lion, llama), from Franz Marc's Blue Horse I: no highlights (roughness 1, sheen, specular and

@@ -95,7 +95,8 @@ the shell as a torso coat of flat scutes (`flat` near `proud`, so a low `coatBul
 
 Menus, top to bottom (`characters/species-checker.js` `buildGui`):
 
-1. **character**: editing slot, species, name, randomise slot/both, link shared params, reset, export.
+1. **character**: editing slot, species, name, randomise slot/all, link shared params, edit all slots at once (a trait row or preset changed on the
+   editing slot goes to every slot whose species has it), reset, export.
 2. **look**: the style switches (look-at, eye glint, painterly, shaped faces), then **paint**, its sliders named
    by paint style (`fur …`, `ink …`).
 3. **body**, 4. **head & face**, 5. **coat**, 6. **tail**, 7. **rig**: the param folders. BASE_GUI's rows come
@@ -103,10 +104,10 @@ Menus, top to bottom (`characters/species-checker.js` `buildGui`):
    (`GUI_SECTIONS` in `npc.js`); an empty section shows no folder.
 8. **animation**: animate, idle and walk layers, the pose picker, **victory dances**, and the raw pose sliders
    in a closed **debug pose** (a kit may add rows there under `'debug pose'`).
-9. **view**: view mode, match camera, look at the other slot, geometry detail, spacing, frame, 150px test, squint,
+9. **view**: view mode, match camera, look at partner, geometry detail, spacing, frame, 150px test, squint,
    exposure, tone mapping.
 
 Look at, for the turtle: the 150px test and the silhouette view (it must read as a turtle as a flat shape); the
 match camera (side on, as a fight sees it); painterly on, with the `ink …` sliders if its paint style is ink;
-randomise both with link shared params against each other species (a pair should differ only where the kits
+randomise all with link shared params against each other species (the slots should differ only where the kits
 do); each victory dance (`delighted` if the arms vanish); the debug pose sliders at their ends for clipping.

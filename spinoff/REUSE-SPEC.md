@@ -327,6 +327,23 @@ yours in the air at a time. Flies through walls for now. **Drawn as the trick it
 (spreading, growing, turning colour) played over the flight, so it flares as it arrives. **Open:** whether shots carry or knock loose donuts
 (§Power moves, tricks that steal), and whether bad guys throw them.
 
+### Tells before big attacks (brainstorm 2026-11-06)
+
+The designer: characters give a cue before a big attack, so the other side can read it and dodge. The body shows
+it (the emitter), and each weapon type's cue matches its role:
+
+| Weapon type | Projectile | Emitter cue | Gameplay role |
+| --- | --- | --- | --- |
+| Flame | Continuous stream or short fireball | Glow builds in the throat before firing | Area denial and close-range pressure |
+| Ember volley | Several small, fast sparks | Chest plates flare open | Chip damage and stun on rapid hits |
+| Slag | Slow, heavy molten ball | Chest glows dull orange and vents smoke | Big damage, but easy to dodge |
+| Frost or void | Slow crystal or dark shard that lingers | Eyes or crest change colour | Zoning and slowing the opponent |
+| Shockwave | Ground-travelling blast | Forearms slam down before release | Launches or knocks down opponents |
+
+Hooks already there: the trick shot's held wind-up (`charge`, sent to every tablet) is when a tell would play, and
+the dragon (BODIES.md §Dragon) has the throat, chest and crest to show it. Open: which fighters get which weapon
+type, and whether bad guys use tells too (a fair warning for the kids).
+
 ## Power moves: gestures behind a power bar
 
 Many-finger gestures are extra moves inside the fighter, unlocked only when a power bar is full

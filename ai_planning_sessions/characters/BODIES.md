@@ -185,11 +185,18 @@ Built 2026-11-04, off by default (`painterly`, per character; the species checke
   keeps it. The llama gets fur too: its fleece is a broad pale mass, like the horse, and its scalloped fleece
   geometry already gives the wool its edge; ink pooling would grey a cream fleece toward dirty, and a fray
   on top of the scallops reads moth-eaten (the cute rule).
+- **Accent pieces** (2026-11-06, user): the lion's mane and the llama's wool (the kit's `paint.accent`) take
+  their own fur stroke size (`accentSize`), apart from the body's. Merged, an accent piece is marked by its uv
+  lifted by 2 whole tiles, as the owl's plumage is for the ink.
+- **Defaults** (2026-11-06, the user's pick in the species checker): bands 3, brush 0.46, band spacing
+  (`light`) 0.8, fur stroke size 3 (broad planes, about one a part side), accent stroke size 0.3 (busy, small
+  planes on the mane and wool against the plain body), band edge (`soft`) 0.34, ink fray 0.78, feather rows
+  0.76. The numbers in the dated notes here are what each was when that note was written.
 - **Ink wash** (owl), from Ohara Koson's crow and Bada Shanren's Two Chicks: a ramp in the body colour's
   own family (value x0.55 to 22% paler), darker where the ink pools toward the silhouette (N·V), faint
   feather rows (a scallop texture, on what frays) and a frayed outline: near the rim (N·V under `FRAY_BAND`)
   the feathers and body discard fragments on a brush-noise pattern (see the 2026-11-05 note below). Alpha-test
-  discard, not blending: no sorting, one draw. Merged, plumage is marked by its uv lifted by 2 whole tiles.
+  discard, not blending: no sorting, one draw. Merged, plumage is marked by its uv lifted by 2 whole tiles (an accent piece).
 - **Brightness** (2026-11-05): the ramp picks only the colour; its brightness is the base's times the light the
   fragment gets, as felt. Fur rounds that light *up* to the top of its band (`paintBright`; bands 2 x `light` /
   `bands` apart, the soft edge set just past the top), so a painted character is never darker than the felt

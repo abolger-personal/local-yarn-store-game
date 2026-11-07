@@ -12,7 +12,7 @@ import {
 import { stepGlitter } from './glitter.js';
 import { randomTraits } from './visit.js';
 import { aimGameCamera } from '../spinoff/stage.js';
-import { FUR, setFur } from '../spinoff/fighter.js';
+import { FUR, LOOKS, setFur } from '../spinoff/fighter.js';
 import { PAINT } from './paint.js';
 
 console.info('LYS build', BUILD);
@@ -24,15 +24,15 @@ const slotIndex = (id) => SLOTS.indexOf(id);
 // partners square up: A and B, C and D
 const partnerOf = (id) => SLOTS[slotIndex(id) ^ 1];
 
-// BODIES.md §Face, §Look-at: one row per style switch, a boolean rig param set on every slot (default from
-// BASE_PARAMS); `live` switches take effect on the next frame, the rest rebuild the slots
+// BODIES.md §Face, §Look-at: one row per style switch, a boolean rig param set on every slot (default: the
+// game's, spinoff/fighter.js LOOKS); `live` switches take effect on the next frame, the rest rebuild the slots
 const STYLE_SWITCHES = Object.freeze([
   { key: 'lookAt', name: 'look-at', live: true },
   { key: 'eyeGlint', name: 'eye glint' },
   { key: 'painterly', name: 'painterly' },
   { key: 'shapedFaces', name: 'shaped faces' },
 ]);
-const STYLE = Object.freeze(Object.fromEntries(STYLE_SWITCHES.map(({ key }) => [key, BASE_PARAMS[key] ?? false])));
+const STYLE = Object.freeze(Object.fromEntries(STYLE_SWITCHES.map(({ key }) => [key, LOOKS[key] ?? BASE_PARAMS[key] ?? false])));
 const STORE_KEY = 'lys.speciesChecker.v1';
 
 const state = {
@@ -576,8 +576,8 @@ function addPaintKnobs(folder) {
   folder.add(PAINT.bands, 'value', 2, 6, 1).name('paint bands');
   folder.add(PAINT.brush, 'value', 0, 1, 0.01).name('brush strength');
   folder.add(PAINT.light, 'value', 0.3, 1.6, 0.01).name('paint band spacing');
-  folder.add(PAINT.size, 'value', 0.3, 3, 0.01).name('fur stroke size');
-  folder.add(PAINT.accentSize, 'value', 0.3, 3, 0.01).name('fur accent stroke size (mane, wool)');
+  folder.add(PAINT.size, 'value', 0.3, 6, 0.01).name('fur stroke size');
+  folder.add(PAINT.accentSize, 'value', 0.1, 3, 0.01).name('fur accent stroke size (mane, wool)');
   folder.add(PAINT.soft, 'value', 0, 0.5, 0.01).name('fur band edge');
   folder.add(PAINT.fray, 'value', 0, 0.8, 0.01).name('ink fray (outline)');
   folder.add(PAINT.feather, 'value', 0, 1, 0.01).name('ink feather rows');

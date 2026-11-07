@@ -6,15 +6,15 @@ import * as THREE from 'three';
 /** The knobs, shared by every painted material (species checker "style" folder). */
 export const PAINT = {
   bands: { value: 3 },
-  soft: { value: 0.06 },
-  size: { value: 1 },
-  accentSize: { value: 1 },
-  brush: { value: 0.35 },
+  soft: { value: 0.34 },
+  size: { value: 3 },
+  accentSize: { value: 0.3 },
+  brush: { value: 0.46 },
   streak: { value: 0.08 },
   light: { value: 0.8 },
   pool: { value: 0.45 },
-  fray: { value: 0.4 },
-  feather: { value: 0.35 },
+  fray: { value: 0.78 },
+  feather: { value: 0.76 },
 };
 
 /** The fur ramp: shadows deeper, more saturated and turned along the hue; lights brighter, as saturated as the fur. */

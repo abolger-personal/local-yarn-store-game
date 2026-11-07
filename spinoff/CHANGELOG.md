@@ -21,6 +21,8 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   goes to every slot whose animal has it.
 - **Accent stroke size:** the lion's mane and the llama's wool get their own fur stroke size slider ("fur accent stroke
   size"), apart from the rest of the fur.
+- **New paint defaults**, picked in the checker: broad fur planes on the body, small busy ones on the mane and wool,
+  softer band edges, a stronger ink fray and feather rows. The checker opens with the game's look switched on.
 
 ### Levels
 - **Level 5, the first generated level:** made by the level generator rather than by hand, the same layout every

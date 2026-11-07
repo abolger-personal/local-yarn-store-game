@@ -17,7 +17,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   paint and each animal's own face parts together), Coat, Tail, Rig, Animation (raw pose sliders tucked into a debug
   folder), View. Saved settings still load.
 - **Dress-up** shows however many animals there are.
-- **Four slots** (A to D, partners A↔B and C↔D square up), and **edit all slots at once**: a trait changed on one
+- **Five slots** (A to E, one per animal; partners A↔B and C↔D square up, E faces D), and **edit all slots at once**: a trait changed on one
   goes to every slot whose animal has it.
 - **Accent stroke size:** the lion's mane and the llama's wool get their own fur stroke size slider ("fur accent stroke
   size"), apart from the rest of the fur.

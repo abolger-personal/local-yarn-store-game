@@ -19,10 +19,10 @@ console.info('LYS build', BUILD);
 
 import './species.js';
 
-const SLOTS = ['A', 'B', 'C', 'D'];
+const SLOTS = ['A', 'B', 'C', 'D', 'E'];
 const slotIndex = (id) => SLOTS.indexOf(id);
-// partners square up: A and B, C and D
-const partnerOf = (id) => SLOTS[slotIndex(id) ^ 1];
+// partners square up: A and B, C and D; the odd one out (E) faces D
+const partnerOf = (id) => SLOTS[slotIndex(id) ^ 1] ?? SLOTS[slotIndex(id) - 1];
 
 // BODIES.md §Face, §Look-at: one row per style switch, a boolean rig param set on every slot (default: the
 // game's, spinoff/fighter.js LOOKS); `live` switches take effect on the next frame, the rest rebuild the slots
@@ -115,7 +115,7 @@ function slotX(id) {
 }
 
 // the match camera sees fighters side on, facing each other (spinoff/play.js placeFighter)
-const slotYaw = (id) => (state.matchCamera ? (slotIndex(id) % 2 ? -1 : 1) * Math.PI / 2 : 0);
+const slotYaw = (id) => (state.matchCamera ? Math.sign(slotX(partnerOf(id)) - slotX(id)) * Math.PI / 2 : 0);
 
 function measureHeight(root) {
   const box = new THREE.Box3().setFromObject(root);
@@ -559,7 +559,7 @@ function addViewFolder() {
   const folder = gui.addFolder('view');
   folder.add(state, 'view', ['felted', 'grey', 'silhouette']).onChange(setView);
   folder.add(state, 'matchCamera').name('match camera').onChange(setMatchCamera);
-  folder.add(state, 'lookAtOther').name('look at partner (A↔B, C↔D)').onChange(save);
+  folder.add(state, 'lookAtOther').name('look at partner (A↔B, C↔D, E→D)').onChange(save);
   folder.add(state, 'detail', Object.keys(GEO_DETAIL)).name('geometry detail')
     .onChange((v) => { setGeometryDetail(v); buildAll(); save(); });
   folder.add(state, 'spacing', 0.2, 1.6, 0.01).onChange(() => { buildAll(); save(); });

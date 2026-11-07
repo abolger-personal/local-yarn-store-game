@@ -12,6 +12,8 @@ const SLOW = [
   'characters/garments.test.mjs',
   'characters/store/walk.test.mjs',
   'characters/species.test.mjs',
+  // every species x costume x weapon: grows with each new species
+  'spinoff/fighter.test.mjs',
 ];
 
 const FAST = [
@@ -30,7 +32,6 @@ const FAST = [
   'characters/store/ui/lettering.test.mjs',
   'inventory/grid.test.mjs',
   'inventory/pick-place.test.mjs',
-  'spinoff/fighter.test.mjs',
   'spinoff/tricks.test.mjs',
   'spinoff/punches.test.mjs',
   'spinoff/kicks.test.mjs',

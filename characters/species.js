@@ -4,6 +4,7 @@ import './owl.js';
 import './llama.js';
 import './lion.js';
 import './dragon.js';
+import './turtle.js';
 
 export const SPECIES_IDS = Object.freeze(speciesIds());
 export { getSpecies, speciesIds, speciesList } from './npc.js';

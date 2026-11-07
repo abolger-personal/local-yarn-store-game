@@ -8,6 +8,11 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **The match code is in reusable pieces:** the stage, getting round it, fighting, the build round and the donut game
   each in their own file, so a different game could take the levels without the fighting, or the fighting without the
   levels. A recorded set of matches checks that nothing plays any differently.
+- **Two new animals: a turtle and a dragon.** The turtle, Shelly 🐢, is a snapping turtle made round and burly: a big
+  soft neck with folds, big eyes, a blunt round head, stubby legs, and a painted turtle's colours (a dark shell with
+  a bright rim and underside, bright stripes on the head and neck, all worked out from the fur). The dragon, Ember
+  🐉, is cute, not scary, and has no wings: a big round head, short muzzle, curled ivory horns, a soft crest, glossy
+  overlapping scales, a cream belly and a short curled tail with a spade tip.
 - **New animals are easy to add:** one list of species, each animal describing itself (its emoji, first fur colour,
   coat colour, where its gloves go), shared building blocks, and a step-by-step recipe
   (`ai_planning_sessions/characters/ADDING-A-SPECIES.md`). Next: a turtle.

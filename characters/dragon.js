@@ -35,8 +35,9 @@ const DEFAULT_PARAMS = {
   hornSpread:    0.500,
   hornTilt:      0.150,
   hornCurl:      2.00,
-  muzzleSize:    1.50,
-  muzzleDrop:    0.19,
+  muzzleSize:    1.20,
+  muzzleLength:  0.55,
+  muzzleDrop:    0.08,
   crestCount:    4,
   crestSize:     0.110,
 
@@ -74,7 +75,8 @@ const RANDOM_RANGES = Object.freeze({
   hornSpread:  [0.400, 0.600],
   hornTilt:    [0.000, 0.300],
   hornCurl:    [1.60, 2.60],
-  muzzleSize:  [1.30, 1.70],
+  muzzleSize:  [1.05, 1.35],
+  muzzleLength: [0.45, 0.70],
   crestCount:  [3, 5],
   crestSize:   [0.090, 0.130],
   spikeSize:   [0.075, 0.105],
@@ -124,11 +126,14 @@ function ridge(node, mat, { size, n, top, bottom, s, peak = 0.3 }) {
   }
 }
 
-// BODIES.md §Dragon: a short soft muzzle low on a round head, in the head's colour
+// BODIES.md §Dragon: a snout pushed out of the face, a bearded dragon's: broad, flat-topped, rounded at the tip, in
+// the head's colour; `muzzleSize` its width, `muzzleLength` how far it reaches out (head radii), its back buried
+const MUZZLE = Object.freeze({ wide: 0.42, flat: 0.60, out: 0.85 });
+
 function addMuzzle(ctx, P) {
-  const r = P.headRadius * P.muzzleSize, y = -P.headRadius * P.muzzleDrop;
-  const head = { at: [0, 0, 0], size: ctx.headScale };
-  const muzzle = { at: [0, y, onFront(head, 0, y)[2] - r * 0.16], size: [r * 0.40, r * 0.27, r * 0.30] };
+  const hr = P.headRadius, y = -hr * P.muzzleDrop, w = hr * MUZZLE.wide * P.muzzleSize, len = hr * P.muzzleLength;
+  const face = onFront({ at: [0, 0, 0], size: ctx.headScale }, 0, y)[2];
+  const muzzle = { at: [0, y, face + len * (MUZZLE.out - 1)], size: [w, w * MUZZLE.flat, len] };
   ctx.head.add(named(part(GEO.sphere, ctx.mat.body, { pos: muzzle.at, scale: muzzle.size }), 'muzzle'));
   if (P.shapedFaces) addFaceShapes(ctx, P, muzzle);
 }
@@ -229,7 +234,7 @@ const DRAGON_GUI = Object.freeze({
   'head & face': [
     ['hornSize', 0.010, 0.15], ['hornLength', 0.02, 0.35], ['hornSpread', 0.05, 1.0],
     ['hornTilt', -0.4, 0.8], ['hornCurl', 0, 4], ['hornColor', 'color'],
-    ['muzzleSize', 0.5, 2.2], ['muzzleDrop', 0.05, 0.6],
+    ['muzzleSize', 0.5, 2.2], ['muzzleLength', 0.05, 1.2], ['muzzleDrop', -0.2, 0.6],
     ['crestCount', 0, 7, 1], ['crestSize', 0.02, 0.22],
   ],
   coat: [

@@ -354,8 +354,11 @@ Decided 2026-11-06 (the designer: "cute, not scary, NO WINGS, but still dragon, 
 scales"). A striker and projectile shooter in the brawler, on the base two-legged rig.
 
 - **Croc tells vs dragon fixes.** A long, flat, wide snout -> a round head (`headShape` 1.00 x 0.95 x 1.05,
-  `headRadius` 0.195, about 0.45 of the height with the horns) and a short soft muzzle bump in the head's colour
-  (`muzzleSize`, `muzzleDrop`; cream didn't read as a dragon, 2026-11-06), nostrils and a soft brow over each eye under shaped faces (shape only). Low sprawl
+  `headRadius` 0.195, about 0.45 of the height with the horns) and a snout in the head's colour (cream didn't read as a
+  dragon, 2026-11-06), pushed out of the face like a bearded dragon's or a snake's: broad, flat-topped (height 0.6 of
+  its width), rounded at the tip, its back buried in the head (`muzzleLength` 0.55 head radii, how far it reaches;
+  `muzzleSize` its width; `muzzleDrop` 0.08, about level with the cheeks). Changed 2026-11-06: the muzzle was a
+  ball mostly inside the face, and its size slider only swelled it rounder., nostrils and a soft brow over each eye under shaped faces (shape only). Low sprawl
   -> upright, chunky, short thick limbs (`legHeight` 0.150, `limbThick` 0.044, torso 0.230 x 0.215 x 0.235).
   Uniform flat armour plates -> painted overlapping scales everywhere, and the belly an alligator's (below). A long
   thick tapering tail -> a short (0.200), curled (`tailCurl` 0.55) tail with a small ivory spade tip.

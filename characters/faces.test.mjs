@@ -87,6 +87,17 @@ function checkDragon(built, label) {
   checkBelly(built, label);
 }
 
+// BODIES.md §Dragon: the snout is pushed out of the face, and muzzleLength pushes it further, not fatter
+{
+  const front = (P) => {
+    const built = build(paramsOf('dragon', { ...P, mergeMeshes: false }), 'dragon'), z = (o) => Math.max(...vertices(o).map((v) => v.z));
+    return { tip: z(named(built, 'muzzle')[0]) - z(built.head.children[0]), hr: built.params.headRadius, w: named(built, 'muzzle')[0].scale.x };
+  };
+  const short = front({ muzzleLength: 0.3 }), long = front({ muzzleLength: 0.8 }), def = front({});
+  assert.ok(def.tip > 0.35 * def.hr, `dragon: the snout barely leaves the face (${(def.tip / def.hr).toFixed(2)} head radii)`);
+  assert.ok(long.tip - short.tip > 0.35 * def.hr && long.w === short.w, 'dragon: muzzleLength does not push the snout out');
+}
+
 // BODIES.md §Dragon: the chevron belly hugs the front of the torso, just proud, from the neck to under the tail root
 function checkBelly(built, label) {
   const P = built.params, [belly] = built.chest.children.filter((o) => o.name === 'belly');

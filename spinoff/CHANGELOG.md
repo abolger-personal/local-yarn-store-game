@@ -17,11 +17,16 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   paint and each animal's own face parts together), Coat, Tail, Rig, Animation (raw pose sliders tucked into a debug
   folder), View. Saved settings still load.
 - **Dress-up** shows however many animals there are.
+- **Four slots** (A to D, partners A↔B and C↔D square up), and **edit all slots at once**: a trait changed on one
+  goes to every slot whose animal has it.
 
 ### Levels
 - **Level 5, the first generated level:** made by the level generator rather than by hand, the same layout every
   time: a hill, narrow gaps, a shelf too high to jump to without the step beside it, and syrup. Double jumps
-  and chasing bad guys, as on level 4, and five bad guys.
+  and chasing bad guys, as on level 4, and two bad guys. The bad guys grow by one a level from here.
+- **Bad guys bump each other.** They used to walk through each other like the heroes do, so a pack of them chasing
+  the same donut stacked into what looked like one bad guy with an afterimage. Now they jostle and jam doorways;
+  heroes still pass through each other.
 
 ## 0.0.8 — 2026-11-05: Characters that look alive
 

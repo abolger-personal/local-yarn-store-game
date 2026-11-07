@@ -505,13 +505,16 @@ function shove(s, f, px, pz, held) {
   pushOut(s, f, f.r, f.h);
 }
 
+// REUSE-SPEC.md §Foes are solid, teammates aren't: heroes overlap, bad guys bump each other too
+const bumps = (a, b) => !(a.team === b.team && a.team === 'heroes') && !a.out && !b.out && overlapY(a, b);
+
 /** @param {Mind} mind */
 export function separate(s, mind) {
   const fs = s.fighters;
   for (let i = 0; i < fs.length; i++) {
     for (let j = i + 1; j < fs.length; j++) {
       const a = fs[i], b = fs[j], dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), gap = a.r + b.r - d;
-      if (a.team === b.team || a.out || b.out || gap <= 0 || !overlapY(a, b)) continue;
+      if (gap <= 0 || !bumps(a, b)) continue;
       const [ux, uz] = d > EPS ? [dx / d, dz / d] : [a.team === 'heroes' ? 1 : -1, 0];
       const held = [mind.holds(s, a), mind.holds(s, b)];
       for (const [f, sign, k] of [[a, -1, 0], [b, 1, 1]]) {

@@ -620,8 +620,10 @@ Later levels can bring new hand-made stages.
 - **Foes are solid, teammates aren't** (decided 2026-10-14, playtest: "fighter can walk straight
   through another fighter on the other team"). Bodies on different teams push each other apart,
   half each, so walking into a bad guy shoulders them aside rather than passing through; a jump
-  over is clear once your feet are above their head. Teammates overlap freely, so six heroes never
-  jam a doorway.
+  over is clear once your feet are above their head. Heroes overlap freely, so six heroes never
+  jam a doorway. Bad guys bump each other like foes (amended 2026-11-06, level 5 playtest: identical CPU
+  brains walked into the same spot and read as one bad guy with an afterimage); they stay a mob for now,
+  smarter teamwork later (brainstorm).
 - **Wading, not routing round** (decided 2026-10-14): a fighter tapped past a syrup puddle walks
   straight through it and is slowed; getting round it is the player's call.
 - **Friendly fire is off, as a setting.** Teammates pass through each other's attacks. Every
@@ -2013,11 +2015,12 @@ scary, for 4–6 year olds.
   off, so the jumping is the level's one new idea; level 4 has one too, Forts: Level 4). From level 5 the count grows by one CPU bad guy a level:
 
   ```
-  badGuys(level, grownups) = 1 for levels 1 to 4, else min(8, max(grownups, 1) + level - 1)
+  badGuys(level, grownups) = 1 for levels 1 to 4, else min(8, max(grownups, 1) + level - 4)
   ```
 
-  (amended 2026-10-18, user: level 4 keeps one bad guy, so chasing is its one new idea.) Two grownups on
-  level 5 face the kids with 4 CPU bad guys beside them; no grownups on level 5 is 5 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
+  (amended 2026-10-18, user: level 4 keeps one bad guy, so chasing is its one new idea; amended 2026-11-06,
+  user: ramp to 2 at level 5, five at once was a jump.) Two grownups on level 5 face the kids with 1 CPU bad guy
+  beside them; no grownups on level 5 is 2 CPU bad guys. Winning a match moves the room up a level; losing replays the level, never
   drops it (decided 2026-10-17; After the lobby: a win unlocks the next level).
 
   A grownup bad guy on level 1 (🥷, built 0.0.6) can't attack the kids: they can only defend

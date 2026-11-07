@@ -589,6 +589,10 @@ const shelfCount = (snap, team) => snap.shelves.find((s) => s.team === team).don
   assert.ok(foe.d >= 2 * R - 1e-9, `a foe is solid: never closer than two radii (${foe.d})`);
   assert.ok(foe.past, 'but you shoulder past them to where you tapped');
   assert.ok(mate.d < R, 'a teammate you can walk straight through');
+  const m = createMatch([hero, dummy, dummy2], STAGE), [a, b] = m.fighters.filter((f) => f.team === 'badGuys');
+  Object.assign(b, { x: a.x, z: a.z });
+  const snap = run(m, 30), gap = Math.hypot(me(snap, 'dummy').x - me(snap, 'dummy2').x, me(snap, 'dummy').z - me(snap, 'dummy2').z);
+  assert.ok(gap >= 2 * R - 1e-6, `bad guys bump each other apart like foes, so a mob can't stack into one (${gap})`);
 }
 
 {

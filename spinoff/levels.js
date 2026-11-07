@@ -119,7 +119,7 @@ export const matchOptions = (level) => ({ pieces: (level.number ?? 0) >= 2 ? pie
  * REUSE-SPEC.md §Bad guys, the bad-guy team grows level by level: CPU bad guys beside the grownups playing them. Level 1's
  * is the training dummy, levels 2 to 4 have one raider (level 3's knocks you off, level 4's chases you).
  */
-export const badGuys = (level, grownups = 0) => (level <= 4 ? 1 : Math.min(8, Math.max(grownups, 1) + level - 1));
+export const badGuys = (level, grownups = 0) => (level <= 4 ? 1 : Math.min(8, Math.max(grownups, 1) + level - 4));
 
 // Cake is spongy, so it goes crazy tall: decks a sponge jump high (too high on breakfast), and a tower in the
 // middle only a trampoline gets you up, from the icing pad at its foot. Each pad is a way up only where it touches the top's edge.

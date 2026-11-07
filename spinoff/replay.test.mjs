@@ -73,7 +73,7 @@ const RUNS = {
     [['kid', masher('kid', 4)], cpu('b1', 4), cpu('b2', 4)], 2400),
 };
 
-const HASHES = { build: '75f74082', dummy: '5c77020e', chase: '490489b8', cake: '4ce62f19' };
+const HASHES = { build: '75f74082', dummy: '5c77020e', chase: '419783c3', cake: '53c71991' };
 
 for (const [name, run] of Object.entries(RUNS)) {
   const got = run();

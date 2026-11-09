@@ -10,7 +10,7 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   levels. A recorded set of matches checks that nothing plays any differently.
 - **Two new animals: a turtle and a dragon.** The turtle, Shelly 🐢, is a snapping turtle made round and burly: a big
   soft neck with folds, big eyes, a blunt round head, stubby legs, and a painted turtle's colours (a dark shell with
-  a bright rim and underside, bright stripes on the head and neck, all worked out from the fur). The dragon, Ember
+  a bright rim, an underside of fitted plates like a real one's, bright stripes on the head and neck, all worked out from the fur). The dragon, Ember
   🐉, is cute, not scary, and has no wings: a big round head, snout like a bearded dragon's, big curled ivory horns, a big soft
   crest and back spikes, overlapping scales painted all over (head, arms and legs too), an alligator's
   belly of chevron plates from the neck to under the tail, and a short curled tail with a spade tip.

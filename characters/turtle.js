@@ -206,17 +206,11 @@ function addCarapace(ctx, P) {
   if (P.shellRim) back.add(named(part(shellBand(P, proud, edge - Math.PI * SHELL.rim, edge), ctx.mat.rim), 'rim'));
 }
 
-// BODIES.md §Turtle: the plastron in panels, two columns of four, on the skin, the seams between them its "abs"
-const PLASTRON = Object.freeze({ rows: [0.42, 0.08, -0.26, -0.60], col: 0.27, size: 0.50, lift: 0.004 });
+// BODIES.md §Turtle: the plastron, six pairs of fitted scutes on the skin, the seams between them its "abs"
+const PLASTRON = Object.freeze({ at: -0.10, size: 1.75, lift: 0.008 });
 
-function plastronPanels(P) {
-  const torso = [P.torsoW, P.torsoH, P.torsoD], size = P.torsoW * PLASTRON.size, key = `plastron|${torso}`;
-  if (!shells.has(key)) {
-    shells.set(key, mergeGeometries(PLASTRON.rows.flatMap((y) => [-1, 1].map((side) =>
-      skinDecal(torso, 'panel', [side * P.torsoW * PLASTRON.col, y * P.torsoH], size, PLASTRON.lift * 2))), false));
-  }
-  return shells.get(key);
-}
+const plastronPanels = (P) =>
+  skinDecal([P.torsoW, P.torsoH, P.torsoD], 'plastron', [0, PLASTRON.at * P.torsoH], P.torsoW * PLASTRON.size, PLASTRON.lift);
 
 function addPlastron(ctx, P) {
   if (P.plastron) ctx.chest.add(named(part(plastronPanels(P), ctx.mat.plastron), 'plastron'));

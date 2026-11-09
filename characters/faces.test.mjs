@@ -115,6 +115,16 @@ function checkDragon(built, label) {
   assert.ok(k.length && Math.min(...k) > 0.99 && Math.max(...k) < 1.05, `turtle: the head stripes stand off the skin (${Math.min(...k).toFixed(3)} to ${Math.max(...k).toFixed(3)})`);
 }
 
+// BODIES.md §Turtle: the plastron lies on the front of the torso, chest to below the belly, no backing standing off it
+{
+  const built = build(paramsOf('turtle', { mergeMeshes: false }), 'turtle'), P = built.params, vs = vertices(built.chest.getObjectByName('plastron'));
+  const k = vs.map((v) => Math.hypot(v.x / P.torsoW, v.y / P.torsoH, v.z / P.torsoD)), ys = vs.map((v) => v.y / P.torsoH);
+  assert.ok(Math.min(...k) > 1 && Math.max(...k) < 1.06 && Math.min(...vs.map((v) => v.z)) > 0, `turtle: the plastron sinks in, floats off or wraps round (${Math.min(...k).toFixed(3)} to ${Math.max(...k).toFixed(3)})`);
+  assert.ok(Math.max(...ys) > 0.5 && Math.max(...ys) < 0.75 && Math.min(...ys) < -0.7, `turtle: the plastron does not run chest to belly (${Math.max(...ys).toFixed(2)} to ${Math.min(...ys).toFixed(2)})`);
+  const wide = Math.max(...vs.map((v) => Math.abs(v.x))) / P.torsoW;
+  assert.ok(wide > 0.4 && wide < 0.6, `turtle: the plastron is not belly-wide (${wide.toFixed(2)} of the half width)`);
+}
+
 // BODIES.md §Turtle, colour: on every riot fur, a shell darker than the skin and a warm rim (or cream), never the
 // skin's opposite
 for (const { hex, name } of FUR) {

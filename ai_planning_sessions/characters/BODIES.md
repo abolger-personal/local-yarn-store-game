@@ -420,9 +420,10 @@ Status: decided 2026-11-06 (designer's references: a snapping turtle for shape, 
   marginal scutes (`shellRim`) as a band along it flush with the scute tops, is a loop standing upright round the
   body: perpendicular to the floor, never parallel (the designer, twice: first a flat ring like a hat brim, then a band
   round the bottom edge). `scuteGap` 3.0 puts the edge down the sides, behind the arms. The shell rides a joint of its
-  own (as the dragon's ridge), so garments fit the torso and scutes, not the shell over the shoulders. The plastron (`plastron`) in panels, the
-  turtle's "abs": two columns of four rounded squares in the rim colour on a dark shell-coloured backing, the seams
-  between them.
+  own (as the dragon's ridge), so garments fit the torso and scutes, not the shell over the shoulders. The plastron (`plastron`) in scutes, the
+  turtle's "abs": six pairs fitted to a rounded oval as a real one's (small gulars at the throat, the abdominals
+  biggest, a notch at the tail end), a seam down the middle and seams across rising to the sides, corners rounded.
+  Changed 2026-11-08 (the designer: two columns of rounded squares were "very square").
 - Not built: the hood. A shell overhanging the neck would clip the head as it turns (the neck pose is the
   shared rig's, a kit can't lean it forward), so the scutes start high (`scuteTop` 0.06) round the neck
   instead.

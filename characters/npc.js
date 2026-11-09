@@ -687,10 +687,27 @@ const heart = () => new THREE.Shape().moveTo(0, -0.5).bezierCurveTo(-0.15, -0.3,
 // BODIES.md §Dragon: a belly plate, flat across the top and pointed down
 const chevron = () => new THREE.Shape([[-0.5, 0.18], [0.5, 0.18], [0.5, -0.02], [0, -0.22], [-0.5, -0.02]].map(([x, y]) => new THREE.Vector2(x, y)));
 
-// BODIES.md §Turtle: a plastron panel, a rounded square
-const panel = (w = 0.5, h = 0.42, c = 0.14) => new THREE.Shape().moveTo(-w + c, -h).lineTo(w - c, -h).absarc(w - c, -h + c, c, -Math.PI / 2, 0)
-  .lineTo(w, h - c).absarc(w - c, h - c, c, 0, Math.PI / 2).lineTo(-w + c, h).absarc(-w + c, h - c, c, Math.PI / 2, Math.PI)
-  .lineTo(-w, -h + c).absarc(-w + c, -h + c, c, Math.PI, Math.PI * 1.5);
+// BODIES.md §Turtle: the plastron, 1 tall: six pairs of scutes fitted to a rounded oval, a seam down the middle, the
+// seams across rising to the sides ([at the middle, at the edge]), the tail end notched
+/** @type {[number, number][]} */
+const PLASTRON_SEAMS = [[0.47, 0.5], [0.33, 0.40], [0.15, 0.22], [0.02, 0.0], [-0.24, -0.18], [-0.35, -0.29], [-0.40, -0.47]];
+const plastronEdge = (y) => 0.30 * Math.cbrt(Math.max(0, 1 - Math.abs(y / 0.5) ** 3));
+
+/** Polygon `p` with its corners cut (Chaikin), twice: rounded. */
+const rounded = (p) => [0, 1].reduce((q) => q.flatMap((a, i) => {
+  const b = q[(i + 1) % q.length];
+  return [a.clone().lerp(b, 0.25), a.clone().lerp(b, 0.75)];
+}), p);
+
+/** The scute between seams `top` and `bot` on `side`, drawn in from its neighbours by `gap`. */
+function plastronScute([[topIn, topOut], [botIn, botOut]], side, gap = 0.022) {
+  const N = 5, rim = Array.from({ length: N + 1 }, (_, i) => topOut + ((botOut - topOut) * i) / N);
+  const p = [new THREE.Vector2(0, topIn), ...rim.map((y) => new THREE.Vector2(plastronEdge(y), y)), new THREE.Vector2(0, botIn)];
+  const c = p.reduce((s, v) => s.add(v), new THREE.Vector2()).divideScalar(p.length), flip = new THREE.Vector2(side, 1);
+  return new THREE.Shape(rounded(p.map((v) => v.clone().add(c.clone().sub(v).normalize().multiplyScalar(gap)).multiply(flip))));
+}
+
+const plastron = () => PLASTRON_SEAMS.slice(1).flatMap((s, i) => [-1, 1].map((side) => plastronScute([PLASTRON_SEAMS[i], s], side)));
 
 // BODIES.md §Turtle: a painted head stripe, 1 long, `w` thick, tapered to points, bowed a little; `upright` runs it up
 // and down instead of along
@@ -703,7 +720,7 @@ function stripe(w, upright = false) {
   return new THREE.Shape([...edge.map((t) => at(t, 1)), ...edge.reverse().map((t) => at(t, -1))]);
 }
 
-const DECALS = { slashes: () => capsule(0.36, 0.2), heart, chevron, panel, stripe };
+const DECALS = { slashes: () => capsule(0.36, 0.2), heart, chevron, plastron, stripe };
 
 /** Triangles `p` (flat xyz, three corners each), each split in four. */
 function split(p) {

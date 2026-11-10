@@ -61,9 +61,6 @@ export function defaultItem(type) {
   };
 }
 
-export const defaultOutfit = () =>
-  Object.fromEntries(Object.keys(GARMENTS).map((type) => [type, defaultItem(type)]));
-
 // VISUAL-DESIGN-FINISHED-OBJ.md §2b, real gauge
 const STITCH_W = Object.freeze({
   lace: 0.0035, fingering: 0.004, sport: 0.0045, dk: 0.0052,
@@ -466,12 +463,12 @@ function hatchRows(geo, rows) {
   geo.setAttribute('aHatchScale', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count).fill(rows), 1));
 }
 
-function flatColour(geo, colour, rows = 40) {
+function flatColour(geo, colour) {
   const { count } = geo.attributes.position;
   const colors = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) colour.toArray(colors, i * 3);
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  hatchRows(geo, rows);
+  hatchRows(geo, 40);
   return geo;
 }
 
@@ -1678,16 +1675,16 @@ function buildShawl(fit, f) {
   const acc = spec.button && f.accessory === 'none' ? { ...f, accessory: 'buttons' } : f;
   const [u0, u1] = open ? [open / TAU, 1 - open / TAU] : [0, 1];
   const hem = Array.from({ length: 257 }, (_, k) => fn(lerp(u0, u1, k / 256), 1, new THREE.Vector3()));
-  return offArms(fit, [...pieces, ...accessoryPieces(shawlAnchors(fn, chest, front, f, fit.torso[0]), acc)], fit.arm.r * 0.95, { flap: { hem, edging: edging.length }, keepWorn: true });
+  return offArms(fit, [...pieces, ...accessoryPieces(shawlAnchors(fn, chest, front, f, fit.torso[0]), acc)], { hem, edging: edging.length });
 }
 
-function offArms(fit, pieces, r, { flap = null, keepWorn = false } = {}) {
+function offArms(fit, pieces, flap = null) {
   const { chest } = fit.joints, toHem = flap && ontoLine(flap.hem);
   const skin = (geo, k) => {
     if (!flap) return neckSkin(geo, () => 0);
     return flapSkin(geo, fit, k >= 1 && k <= flap.edging ? toHem : null);
   };
-  return pieces.map((pc, k) => (pc.joint === chest ? piece(chest, armCapsules(skin(pc.geo, k), fit, r, { keepWorn }), armBones(fit)) : pc));
+  return pieces.map((pc, k) => (pc.joint === chest ? piece(chest, armCapsules(skin(pc.geo, k), fit), armBones(fit)) : pc));
 }
 
 function ontoLine(line) {
@@ -1729,14 +1726,14 @@ function armBones(fit) {
 }
 
 const ARM_ATTRIBUTES = ['aArmA0', 'aArmB0', 'aArmA1', 'aArmB1', 'aArmR'];
-function armCapsules(geo, fit, r, { keepWorn = false } = {}) {
-  const pos = geo.attributes.position, n = pos.count, p = new THREE.Vector3(), q = new THREE.Vector3();
+function armCapsules(geo, fit) {
+  const pos = geo.attributes.position, n = pos.count, p = new THREE.Vector3(), q = new THREE.Vector3(), r = fit.arm.r * 0.95;
   const arms = upperArms(fit).map(({ start, end }) => new THREE.Line3(start.clone().lerp(end, 0.15), end));
   arms.forEach(({ start, end }, s) => {
     geo.setAttribute(`aArmA${s}`, new THREE.BufferAttribute(new Float32Array(n * 3).map((_, i) => start.getComponent(i % 3)), 3));
     geo.setAttribute(`aArmB${s}`, new THREE.BufferAttribute(new Float32Array(n * 3).map((_, i) => end.getComponent(i % 3)), 3));
   });
-  const inside = (i) => keepWorn && arms.some((arm) => arm.closestPointToPointParameter(p.fromBufferAttribute(pos, i), false) >= 0
+  const inside = (i) => arms.some((arm) => arm.closestPointToPointParameter(p.fromBufferAttribute(pos, i), false) >= 0
     && arm.closestPointToPoint(p, true, q).distanceTo(p) < r * 0.8);
   geo.setAttribute('aArmR', new THREE.BufferAttribute(new Float32Array(n).map((_, i) => (inside(i) ? 0 : r)), 1));
   return geo;
@@ -1856,7 +1853,7 @@ function buildSweater(fit, f) {
     flower: [{ joint: chest, p: fn(0.06, 0.25, new THREE.Vector3()), n: new THREE.Vector3(0, 0, 1), size: f.thick * 4 }],
   };
   const acc = spec.open && f.accessory === 'none' ? { ...f, accessory: 'buttons' } : f;
-  return offArms(fit, [...pieces, ...accessoryPieces(anchors, acc)], fit.arm.r * 0.95, { keepWorn: true });
+  return offArms(fit, [...pieces, ...accessoryPieces(anchors, acc)]);
 }
 
 function neckband(fit, f, spec, fn) {
@@ -2080,7 +2077,7 @@ function sockLeg(fit, f, node, { spec, up, loose, bunch, thigh }, anchors) {
   anchors.flower.push({ joint, p: cuff, n: new THREE.Vector3(0, 0, 1), size: f.thick * 3 });
   anchors.buttons.push(...[0.15, 0.3, 0.45].map((v) => ({ joint, p: t.fn(0.25, v, new THREE.Vector3()), n: new THREE.Vector3(1, 0, 0), size: fit.leg.shinR * BUTTON_OF_SHIN })));
   const out = [piece(joint, t.geo, skin), ...edgePieces(joint, [ring(t.fn, 0)], f)];
-  if (!spec.noFoot) out.push(piece(node, sockFoot(fit, f, tib)));
+  if (!spec.noFoot) out.push(piece(node, sockFoot(f, tib)));
   return out;
 }
 
@@ -2094,7 +2091,7 @@ function overKnee(fit, f, shin, { node: thigh, reach, yBot, loose, bunch }) {
   return { t, joint: thigh, skin: [shin] };
 }
 
-function sockFoot(fit, f, tib) {
+function sockFoot(f, tib) {
   const c = new THREE.Vector3(FOOT.pos[0], -tib + FOOT.pos[1], FOOT.pos[2]);
   const r = FOOT.r.map((x) => x + f.thick * 1.1);
   const fn = bagBody(r, 1, c);

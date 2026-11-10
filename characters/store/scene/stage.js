@@ -111,8 +111,15 @@ export function tickDaylight(dt) {
   applyDaylight(shownT);
 }
 
+function onResize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+}
+
 export function installStage() {
   setUpRenderer();
   setUpControls();
   setUpLights();
+  addEventListener('resize', onResize);
 }

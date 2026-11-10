@@ -19,6 +19,9 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   (`ai_planning_sessions/characters/ADDING-A-SPECIES.md`). Next: a turtle.
 
 ### For the designer (species checker)
+- **The turtle's defaults are now your Zephyr:** yellow, low eyes, broad and short, with the shoulders set a little
+  wider (0.82) so the arms hang and swing clear of the body, and a slightly longer neck (0.095) so scarves sit under
+  the eyes. Scarves and shawls fit her: a shawl rides up over arms set that high.
 - **A new dance, the booty shake:** back turned, bum out, a look over the shoulder, wiggle wiggle, a slap, and round
   again. Every animal has it, in the dance menu here and in dress-up. Not yet a move in a match.
 - **Menus by part of the body:** Character, Look (with the paint sliders named by style), Body, Head & face (eyes, face

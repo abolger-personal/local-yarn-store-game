@@ -115,7 +115,9 @@ PATTERNS.md's old `["stripes", "star", "pom pom", "fringe"]` hint list:
   peep over an oversized chunky wrap.
 - **Ends lie on the body,** at no angle to it, on the torso where they actually hang (it curves
   back to the sides), with only the band's thickness between. Below the chest's widest point
-  they hang straight.
+  they hang straight. On a body wider than deep (the turtle) the band climbing from the ends to the
+  neck keeps to the chest's front, not to a round loop as wide as the shoulders (decided 2026-11-09:
+  that stood it off the chest, its ends 5% of the torso off).
 - **Trailing ends go behind,** like a scarf flung back. In front they trailed under the feet.
 - **Infinity is a closed loop gone round twice.** Its two strands have to pass each other, so they
   sit at different heights at the back and one in front of the other at the front, where the
@@ -168,7 +170,10 @@ PATTERNS.md's old `["stripes", "star", "pom pom", "fringe"]` hint list:
   so a bigger fit is a wider strap and a longer drop. A cross strap goes round the body, never
   through it, and comes down to the bag's top at the hip.
 - **Shawls** go over the shoulders and arms, never under them (no armhole), and drape over an arm
-  rather than cuffing it. An open shawl's top edge rolls over the collarbone with no corner. A shawl
+  rather than cuffing it. Where the arms are set high, so they leave the body above the shawl's
+  shoulder line (the turtle's), the shawl's top and the drape from it ride up over the arm too, a
+  capelet's as well (decided 2026-11-09: they came through it). An open shawl's top edge rolls over
+  the collarbone with no corner. A shawl
   is draped or tied and takes a pin (a shawl's alone): across the front edges draped, on one
   shoulder tied or on a shrug. A stole is a band, far shorter round the back than its ends. Its side
   panels lift with the arms like a cape, the cloth on the shoulder stays on it, the edging stays on

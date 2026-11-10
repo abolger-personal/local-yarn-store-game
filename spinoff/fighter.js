@@ -43,7 +43,7 @@ export const HAND_ICON = Object.freeze({
   scythe: '<g transform="rotate(35 24 24)"><rect x="22" y="12" width="4" height="27" rx="2"/><path d="M24 2l5 11h-10Z"/><path d="M24 37l2.4 4.6 5 .6-3.7 3.4 1 5-4.7-2.5-4.7 2.5 1-5-3.7-3.4 5-.6Z"/><path d="M24 11c10 0 17 10 16 23-4-8-9-14-16-16Z" fill="#2f6bff"/></g>',
   hammer: '<g transform="rotate(35 24 24)"><rect x="21.5" y="14" width="5" height="33" rx="1.5" fill="#26221f"/><path d="M21 30h6M21 35h6M21 40h6" stroke="#5a4636" stroke-width="2.5"/>'
     + '<rect x="9" y="1" width="30" height="16" rx="1" fill="#3a3a3e"/><path d="M9 6h30M14 1v16M33 1v16" stroke="#17171a" stroke-width="2"/><path d="M18 4l3 5-2 4M29 10l-4 3" stroke="currentColor" stroke-width="1.4" fill="none"/></g>',
-  cane: '<g transform="rotate(35 24 24)"><rect x="21.5" y="12" width="5" height="34" rx="2.5"/><circle cx="24" cy="10" r="8"/></g>',
+  cane: '<g transform="rotate(35 24 24)"><path d="M21.5 46V10h5v36Z"/><rect x="20" y="30" width="8" height="8" rx="2"/><path d="M24 2a4 4 0 0 1 4 4v4h-3V7a1 1 0 0 0-2 0v2h-3V6a4 4 0 0 1 4-4Z"/></g>',
   staff: '<g transform="rotate(35 24 24)"><rect x="21.5" y="1" width="5" height="46" rx="2.5" fill="#a8743f"/><rect x="20" y="20" width="8" height="14" rx="3"/><path d="M20 23h8M20 27h8M20 31h8" stroke="#fff8" stroke-width="1.5"/></g>',
   sai: '<g transform="rotate(35 24 24)"><path d="M22.5 31V8l1.5-6 1.5 6v23Z"/><path d="M24 31c-8 0-10-4-10-12M24 31c8 0 10-4 10-12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="21.5" y="31" width="5" height="12" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.5"/></g>',
 });
@@ -449,21 +449,25 @@ export function greathammerMeshes(color) {
   return [new THREE.Mesh(geo.haft, dark('#221e1b', 0.9)), new THREE.Mesh(geo.leather, dark('#4a3626', 0.75)), new THREE.Mesh(geo.head, iron)];
 }
 
-// tmnt/REUSE-SPEC.md §Hero chooser: a knobbed club, held like the sword and swung as it, hanging point-down at rest like a cane
-const CANE_PARTS = { shaft: 0.3, r: 0.018, knob: 0.042, clear: 0.03 };
+// tmnt/REUSE-SPEC.md §Hero chooser: a giant crochet hook for a cane, held like the sword and swung as it, hanging hook-down
+// at rest: a shaft narrowing to the throat, a round head with the hook's lip curled back over it (in y, so the side-on
+// camera sees it), a flat thumb rest
+const CANE_PARTS = { shaft: 0.3, r: 0.02, clear: 0.03 };
 // the cane at rest, as the character sees it: straight down, a touch forward, whatever the arm is doing
 const HANG = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, -1, 0.12).normalize());
 const HANG_UP = -Math.PI / 2 + 0.12;
 let caneGeo = null;
 function caneGeometry() {
-  const { shaft, r, knob } = CANE_PARTS;
+  const { shaft, r } = CANE_PARTS, end = shaft - 0.04, head = end + r * 0.6;
   caneGeo ??= {
     stick: mergeGeometries([
-      new THREE.CylinderGeometry(r, r * 1.2, shaft, 12).rotateX(Math.PI / 2).translate(0, 0, shaft / 2 - 0.04),
-      new THREE.SphereGeometry(r * 1.3, 12, 8).translate(0, 0, -0.04),
-      new THREE.SphereGeometry(knob, 16, 12).scale(1, 1, 1.15).translate(0, 0, shaft - 0.04 + knob * 0.8),
+      new THREE.CylinderGeometry(r * 0.7, r * 1.1, shaft, 12).rotateX(Math.PI / 2).translate(0, 0, shaft / 2 - 0.04),
+      new THREE.SphereGeometry(r * 1.1, 12, 8).translate(0, 0, -0.04),
+      new THREE.CylinderGeometry(r * 1.7, r * 1.7, 0.06, 16).rotateX(Math.PI / 2).scale(0.55, 1, 1).translate(0, 0, 0.1),
+      new THREE.SphereGeometry(r * 0.95, 12, 10).scale(1, 1, 1.2).translate(0, 0, head),
+      new THREE.TorusGeometry(r * 0.75, r * 0.38, 8, 14, Math.PI * 1.15).rotateY(Math.PI / 2).translate(0, r * 0.55, head - r * 0.15),
     ]),
-    ...swooshGeometry(0.06, shaft + knob, 0.11, shaft),
+    ...swooshGeometry(0.06, head + r, 0.11, shaft),
   };
   return caneGeo;
 }
@@ -493,8 +497,8 @@ function gripToFloor(built, cane) {
 }
 
 function addCane(built, color) {
-  const geo = caneGeometry(), { shaft, knob } = CANE_PARTS;
-  const cane = holdBlade(built, [new THREE.Mesh(geo.stick, candy(color))], geo, { tip: shaft - 0.04 + knob * 1.6, hangs: true });
+  const geo = caneGeometry(), { shaft, r } = CANE_PARTS;
+  const cane = holdBlade(built, [new THREE.Mesh(geo.stick, candy(color))], geo, { tip: shaft - 0.04 + r * 1.8, hangs: true });
   gripToFloor(built, cane);
   return cane;
 }

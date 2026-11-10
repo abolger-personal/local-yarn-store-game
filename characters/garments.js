@@ -2189,6 +2189,14 @@ export function lentPiece(wip, colourOf, width) {
   return anchor;
 }
 
+/** A knitted sleeve round a pole along +z, centred on the origin (a staff's grip wrap): `item`'s stitch and colour. */
+export function knitWrap(item, length, radius) {
+  const anchor = new THREE.Group();
+  const { geo } = tube(length / 2, -length / 2, () => radius, forView(fabric(item), { height: 1 }));
+  garmentMesh(anchor, [geo.rotateX(Math.PI / 2)]);
+  return anchor;
+}
+
 let material = null;
 
 export function garmentMaterial() {

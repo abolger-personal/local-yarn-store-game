@@ -5,7 +5,7 @@ import {
   lowestResting, phaseStep, stepMotion, walkGain, walkLayer, walkPhase,
 } from '../characters/npc.js';
 import { SPECIES_IDS } from '../characters/species.js';
-import { CRAFTS, STITCHES_BY_CRAFT, defaultItem, dress, undress, usualTool } from '../characters/garments.js';
+import { CRAFTS, STITCHES_BY_CRAFT, defaultItem, dress, knitWrap, undress, usualTool } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import { makeSparkle } from '../characters/sparkle.js';
 import { GLOVE, STRIKE, SWORD_MOVES, SWORD_UP, punchLayer, punchWeight, sample } from './punches.js';
@@ -44,17 +44,18 @@ export const HAND_ICON = Object.freeze({
   hammer: '<g transform="rotate(35 24 24)"><rect x="21.5" y="14" width="5" height="33" rx="1.5" fill="#26221f"/><path d="M21 30h6M21 35h6M21 40h6" stroke="#5a4636" stroke-width="2.5"/>'
     + '<rect x="9" y="1" width="30" height="16" rx="1" fill="#3a3a3e"/><path d="M9 6h30M14 1v16M33 1v16" stroke="#17171a" stroke-width="2"/><path d="M18 4l3 5-2 4M29 10l-4 3" stroke="currentColor" stroke-width="1.4" fill="none"/></g>',
   cane: '<g transform="rotate(35 24 24)"><rect x="21.5" y="12" width="5" height="34" rx="2.5"/><circle cx="24" cy="10" r="8"/></g>',
+  staff: '<g transform="rotate(35 24 24)"><rect x="21.5" y="1" width="5" height="46" rx="2.5" fill="#a8743f"/><rect x="20" y="20" width="8" height="14" rx="3"/><path d="M20 23h8M20 27h8M20 31h8" stroke="#fff8" stroke-width="1.5"/></g>',
   sai: '<g transform="rotate(35 24 24)"><path d="M22.5 31V8l1.5-6 1.5 6v23Z"/><path d="M24 31c-8 0-10-4-10-12M24 31c8 0 10-4 10-12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="21.5" y="31" width="5" height="12" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.5"/></g>',
 });
 // what flies off the hitting glove or the blade's tip as it lands; tapping the picked one goes to the next. The scythe's is fixed.
 const SWORD_TRICKS = Object.freeze(['sparkle', 'bubble', 'flame', 'bebop', 'shootingStar', 'bubblegumPop', 'smiteOfLight', 'speedLines', 'lightningStorm', 'atomicBall']);
 // tmnt/REUSE-SPEC.md §Hero chooser: Master Splinter's cane and Raphael's sai, a hero's only (not in HANDS), with the sword's tricks
-export const CANE = 'cane', SAI = 'sai';
+export const CANE = 'cane', SAI = 'sai', STAFF = 'staff';
 export const TRICKS = Object.freeze({
   gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame', 'bebop', 'starPunch', 'fireball', 'loveTap', 'bubblegumPop', 'powerPuff', 'magicStar', 'heartBlast', 'smiteOfLight', 'speedLines', 'lightningStorm', 'atomicBall']), sword: SWORD_TRICKS, scythe: Object.freeze(['music']),
   // lightning first: a trick the hammer doesn't have falls back to it
   hammer: Object.freeze(['lightning', 'zap']),
-  [CANE]: SWORD_TRICKS, [SAI]: SWORD_TRICKS,
+  [CANE]: SWORD_TRICKS, [SAI]: SWORD_TRICKS, [STAFF]: Object.freeze(['music']),
 });
 // REUSE-SPEC.md §Fighter chooser: the levels a player must have beaten for the chooser to offer each
 const UNLOCK = Object.freeze({ sword: 1, scythe: 2, hammer: 4 });
@@ -449,7 +450,7 @@ export function greathammerMeshes(color) {
 }
 
 // tmnt/REUSE-SPEC.md §Hero chooser: a knobbed club, held like the sword and swung as it, hanging point-down at rest like a cane
-const CANE_PARTS = { shaft: 0.3, r: 0.018, knob: 0.042, clear: 0.05, fit: [0.4, 1.6] };
+const CANE_PARTS = { shaft: 0.3, r: 0.018, knob: 0.042, clear: 0.03 };
 // the cane at rest, as the character sees it: straight down, a touch forward, whatever the arm is doing
 const HANG = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, -1, 0.12).normalize());
 const HANG_UP = -Math.PI / 2 + 0.12;
@@ -481,18 +482,20 @@ function hang(built, blade, arm, w) {
   blade.quaternion.premultiply(_none.identity().slerp(_hang, 1 - w));
 }
 
-/** A cane as long as the hand is high, so the knob just reaches the floor on every body. */
-function fitToFloor(built, cane) {
+/** One cane for every body: a hand nearer the floor than the cane is long grips it further down the shaft, so the knob
+ * just reaches the floor and the rest stands up past the hand (the designer, 2026-11-09: not a cane sized per animal). */
+function gripToFloor(built, cane) {
   built.root.updateMatrixWorld(true);
   const grip = cane.getWorldPosition(_grip).y, tip = cane.localToWorld(_tip.set(0, 0, cane.userData.tip)).y;
-  const k = THREE.MathUtils.clamp((grip - CANE_PARTS.clear) / (grip - tip), ...CANE_PARTS.fit);
-  cane.scale.setScalar(k);
+  const down = Math.max(0, CANE_PARTS.clear - tip) / Math.max(1e-6, grip - tip) * cane.userData.tip;
+  for (const part of cane.children) part.position.z -= down;
+  cane.userData.tip -= down;
 }
 
 function addCane(built, color) {
   const geo = caneGeometry(), { shaft, knob } = CANE_PARTS;
   const cane = holdBlade(built, [new THREE.Mesh(geo.stick, candy(color))], geo, { tip: shaft - 0.04 + knob * 1.6, hangs: true });
-  fitToFloor(built, cane);
+  gripToFloor(built, cane);
   return cane;
 }
 
@@ -523,6 +526,33 @@ function addSai(built, color) {
   const geo = saiGeometry();
   return holdBlade(built, [new THREE.Mesh(geo.metal, candy(color)), new THREE.Mesh(geo.grip, candy(color === WHITE ? '#ff3b7f' : WHITE))], geo,
     { tip: SAI_PARTS.point });
+}
+
+// tmnt/REUSE-SPEC.md §Hero chooser: Donatello's bo staff, held and swung as the Music Scythe with no blade, longer for
+// reach: a wooden pole, its grip wrapped in knitting in the picked colour
+const STAFF_PARTS = { butt: -0.34, top: 0.3, r: 0.022, wrap: [-0.19, 0.08], wood: '#a8743f' };
+let staffGeo = null;
+function staffGeometry() {
+  const { butt, top, r } = STAFF_PARTS;
+  staffGeo ??= {
+    pole: mergeGeometries([
+      new THREE.CylinderGeometry(r, r, top - butt, 12).rotateX(Math.PI / 2).translate(0, 0, (top + butt) / 2),
+      ...[butt, top].map((z) => new THREE.SphereGeometry(r, 12, 8).translate(0, 0, z)),
+    ]),
+    ...swooshGeometry(0.06, top, 0.11, top * 0.8),
+  };
+  return staffGeo;
+}
+
+function addStaff(built, color) {
+  const geo = staffGeometry(), { butt, top, r, wrap: [w0, w1], wood } = STAFF_PARTS;
+  const staff = holdBlade(built, [new THREE.Mesh(geo.pole, new THREE.MeshStandardMaterial({ color: wood, roughness: 0.8, metalness: 0 }))], geo, { tip: top, butt: butt - 0.04, both: true, lower: -0.1 });
+  // the scarves' stockinette, a size finer than theirs (about 10 stitches round), so it reads as knitting on a thin pole
+  const wrap = knitWrap({ ...wear('scarf', 'long', color), weight: 'bulky' }, w1 - w0, r * 1.25);
+  wrap.position.z = (w0 + w1) / 2;
+  wrap.traverse((o) => { o.userData.ownGeometry = true; });
+  staff.add(wrap);
+  return staff;
 }
 
 /** The Greathammer, held like the sword (REUSE-SPEC.md §Costumes): `built.sword`, so it swings on SWORD_MOVES. */
@@ -556,6 +586,8 @@ function reachPole(built, w) {
 function removeSword(built) {
   built.sword?.removeFromParent();
   for (const o of built.sword?.children ?? []) if (o instanceof THREE.Mesh) o.material.dispose();
+  // the staff's knitted wrap is its own geometry (the blades' are shared); its material is the garments' shared one
+  built.sword?.traverse((o) => { if (o.userData.ownGeometry && o instanceof THREE.Mesh) o.geometry.dispose(); });
   built.sword = null;
 }
 
@@ -1465,7 +1497,7 @@ export function stepTricks(built, punch, dt) {
 // readability in a match
 const PLAIN = typeof location !== 'undefined' && new URLSearchParams(location.search).has('plain');
 export const LOOKS = Object.freeze(Object.fromEntries(['lookAt', 'eyeGlint', 'painterly', 'shapedFaces'].map((k) => [k, !PLAIN])));
-const HOLD = { gloves: addGloves, sword: addSword, scythe: addScythe, hammer: addHammer, [CANE]: addCane, [SAI]: addSai };
+const HOLD = { gloves: addGloves, sword: addSword, scythe: addScythe, hammer: addHammer, [CANE]: addCane, [SAI]: addSai, [STAFF]: addStaff };
 
 /** Same order as the shop's `dressedCharacter` (store/sim/cast.js): dress unmerged, then merge. @param {Fighter} f */
 /** @param {string[]} [palette] the colours a hero's sweater colourwork is worked in */

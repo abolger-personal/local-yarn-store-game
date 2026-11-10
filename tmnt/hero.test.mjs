@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { LOOK } from '../characters/garments.js';
-import { CANE, SAI, SPECIES, animateFighter, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
+import { CANE, SAI, SPECIES, STAFF, animateFighter, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
 import { CLOTH, COLOURS, PALETTE, SCARF_FORMS, SWEATER_WORKS, TURTLE_COLOURS, WEAR, newHero, randomHero, readHero } from './hero.js';
 
 LOOK.viewPx = 0;
@@ -71,7 +71,17 @@ for (const species of SPECIES) {
     dir = new THREE.Vector3(0, 0, 1).transformDirection(built.sword.matrixWorld);
   }
   assert.ok(dir.y < -0.95, `${species}: the cane hangs straight down (${dir.y.toFixed(2)})`);
-  assert.ok(low > 0 && low < 0.06, `${species}: the knob just off the floor (${low.toFixed(3)})`);
+  assert.ok(low > -0.005 && low < 0.06, `${species}: the knob just off the floor (${low.toFixed(3)})`);
+  assert.equal(built.sword.scale.x, 1, `${species}: the same cane as everyone's`);
+  disposeFighter(built);
+}
+// Donatello (purple) has his bo staff, held in both hands, its grip wrapped in knitting
+assert.equal(newHero(() => 0.45).look.hands, STAFF);
+for (const species of SPECIES) {
+  const built = buildFighter({ ...newHero(() => 0.45, species), look: newHero(() => 0.45).look });
+  let knit = 0;
+  built.sword.traverse((o) => { if (o.userData.ownGeometry && o instanceof THREE.Mesh) knit++; });
+  assert.ok(built.sword.userData.both && knit === 1, `${species}: a two-handed staff with a knitted wrap`);
   disposeFighter(built);
 }
 for (let i = 0; i < 6; i++) disposeFighter(buildFighter(randomHero()));

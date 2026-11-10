@@ -40,7 +40,9 @@ If that value looks old, the browser is running cached code and nothing you chan
 | --- | --- |
 | `index.html` | A one-line redirect to the front door (`store.html`); point it at `spinoff/` locally for Donut Fighters. |
 | `store.html` | The yarn store's front door: the game's entrance and loading screen. See `ai_planning_sessions/VISUAL-DESIGN-2D.md`. |
-| `characters/species-checker.html` | Do two species read as different animals? Tuning surface, one character at a time. |
+| `characters/species-checker.html` | Do two species read as different animals? Tuning surface: five slots side by side, editing one (or all) at a time. |
+| `characters/dress-up.html` | Does one outfit fit every species? The same garments on each, pattern and "made with" overrides per item. |
+| `characters/sit-and-knit.html` | Does the craft animation read? One seated character knitting or crocheting (`characters/craft-anim.js`). |
 | `characters/crowd.html` | Does the randomiser make a cast or a zoo? Performance instrumentation lives here. |
 | `characters/puzzle.html` | Is the arrangement a PUZZLE? One customer, one display, and a switch on every hint. |
 | `characters/motion-lab.html` | Does motion survive being interrupted, and does personality read in how a character moves? See `characters/MOTION-TODO.md`. |

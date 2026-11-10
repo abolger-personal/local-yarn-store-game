@@ -431,19 +431,14 @@ const span = (range, u) => range[0] + (range[1] - range[0]) * clamp01(u);
 /**
  * @param {Record<string, number>} traits
  * @param {Record<string, number[]>} [ranges]
+ * @returns {Record<keyof typeof BASE_MOTION_RANGES | keyof typeof STYLE_RANGES, number>}
  */
 export function motionOf(traits, ranges = BASE_MOTION_RANGES) {
   const u = traitPositions(traits);
-  const pick = (k) => span(ranges[k] ?? BASE_MOTION_RANGES[k], u[k]);
-  const style = (k) => span(STYLE_RANGES[k], u[k]);
-  return {
-    stiff: pick('stiff'), zeta: pick('zeta'), idleAmp: pick('idleAmp'),
-    idleRate: pick('idleRate'), stride: pick('stride'), bounce: pick('bounce'),
-    kneeLift: pick('kneeLift'),
-    headArc: pick('headArc'), armGain: style('armGain'), sway: style('sway'),
-    lean: style('lean'), headCarry: style('headCarry'), headCock: style('headCock'),
-    attend: style('attend'), armTuck: style('armTuck'), tailCarry: style('tailCarry'),
-  };
+  return /** @type {any} */ (Object.fromEntries([
+    ...Object.entries(BASE_MOTION_RANGES).map(([k, r]) => [k, span(ranges[k] ?? r, u[k])]),
+    ...Object.entries(STYLE_RANGES).map(([k, r]) => [k, span(r, u[k])]),
+  ]));
 }
 
 // MOTION.md §Traits to motion

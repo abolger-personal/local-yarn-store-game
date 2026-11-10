@@ -1,8 +1,8 @@
-import { FACE_PAINTS, POSES, facePaintColorOf, getSpecies } from '../characters/npc.js';
-import { SPECIES, TEXTURES, TRICKS, animateFighter, buildFighter, disposeFighter, setFur, stepFighter, stepTricks } from '../spinoff/fighter.js';
+import { POSES, facePaintColorOf, getSpecies } from '../characters/npc.js';
+import { SPECIES, TEXTURES, TRICKS, animateFighter, disposeFighter, setFur, stepFighter, stepTricks } from '../spinoff/fighter.js';
 import { FACE_ICON, ICON, NONE, TRICK_ICON, svg, textured } from '../spinoff/icons.js';
 import { makeStage } from '../spinoff/stage.js';
-import { CLOTH, COLOURS, HERO_HANDS, PALETTE, PRESETS, handsOf, SCARF_FORMS, SWEATER_WORKS, WEAR, loadHero, newHero, randomHero, saveHero } from './hero.js';
+import { CLOTH, COLOURS, FACES, HERO_HANDS, PRESETS, buildHero, faceOf, handsOf, SCARF_FORMS, SWEATER_WORKS, WEAR, loadHero, newHero, randomHero, saveHero } from './hero.js';
 
 const LINE = 'fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"';
 const PICTURE = {
@@ -16,6 +16,10 @@ const PICTURE = {
   crew: '<path d="M18 20h12v12l8 4v6H18Z"/>',
   'knee-high': '<path d="M18 8h12v24l8 4v6H18Z"/>',
   'over-knee': '<path d="M18 2h12v30l8 4v6H18Z"/><path d="M18 8h12" stroke="#fff8" stroke-width="3"/>',
+};
+const FACE_PICTURE = {
+  ...FACE_ICON,
+  glasses: `${FACE_ICON.none}<g fill="none" stroke="#141414" stroke-width="3"><circle cx="17" cy="21" r="6.5"/><circle cx="31" cy="21" r="6.5"/><path d="M23.5 20h1"/></g>`,
 };
 const ROW_ICON = { scarf: '🧣', sweater: '🧥', socks: '🧦', bag: '🎒' };
 // REUSE-SPEC.md §Hero chooser: tapped again, the scarf is worn another way, the sweater in the next colourwork, socks
@@ -60,8 +64,8 @@ function render() {
     row('🐾', 'animal', pictures(SPECIES.map((s) => button('species', s, s, `<span class="emoji">${getSpecies(s).emoji}</span>`, s === species)).join(''))),
     row('🎨', 'fur', colours(swatchRow('fur', params.bodyColor, COLOURS))),
     ...Object.keys(WEAR).map(wearRow),
-    row('🎭', 'face paint', pictures(FACE_PAINTS.map((v) =>
-      button('facePaint', v, `${v} face paint`, svg(FACE_ICON[v], facePaintColorOf(params)), v === params.facePaint)).join(''))),
+    row('🎭', 'face', pictures(FACES.map((v) => button('facePaint', v, v === 'rings' ? 'mask' : v,
+      svg(FACE_PICTURE[v], facePaintColorOf(faceOf(hero).params)), v === (hero.look.glasses ? 'glasses' : params.facePaint))).join(''))),
     handsRow(),
   ].join('');
 }
@@ -82,7 +86,11 @@ const ACTIONS = {
     return true;
   },
   fur: (v) => { setFur(hero, v); },
-  facePaint: (v) => { hero.params.facePaint = v; },
+  // the glasses are one of the face choices: picking them takes the paint off, and the paint takes them off
+  facePaint: (v) => {
+    hero.look.glasses = v === 'glasses';
+    hero.params.facePaint = hero.look.glasses ? 'none' : v;
+  },
   hands: (v) => {
     const { look } = hero;
     if (v === look.hands) look.trick = cycle(TRICKS[v], look.trick);
@@ -106,7 +114,7 @@ const stage = makeStage(document.getElementById('stage'));
 
 function rebuild(reframe) {
   if (built) { stage.scene.remove(built.root); disposeFighter(built); }
-  built = buildFighter(hero, PALETTE);
+  built = buildHero(hero);
   stage.scene.add(built.root);
   if (reframe) stage.frame([built.root], { margin: 1.5 });
 }

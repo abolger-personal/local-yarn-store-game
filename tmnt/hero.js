@@ -1,6 +1,7 @@
-import { FACE_PAINTS, getSpecies } from '../characters/npc.js';
+import * as THREE from 'three';
+import { getSpecies } from '../characters/npc.js';
 import { COLOURWORKS, FORMS } from '../characters/garments.js';
-import { BAGS, CANE, MIC, NEEDLES, SCISSORS, STAFF, YARN_BALLS, SPECIES, TEXTURES, TRICKS, nearestSwatch, readFighter, setFur } from '../spinoff/fighter.js';
+import { BAGS, CANE, MIC, NEEDLES, SCISSORS, STAFF, YARN_BALLS, SPECIES, TEXTURES, TRICKS, buildFighter, nearestSwatch, readFighter, setFur } from '../spinoff/fighter.js';
 
 const HERO_KEY = 'tmnt.hero.v1';
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -25,6 +26,9 @@ export const WEAR = Object.freeze({
   scarf: ['trailing', 'long', 'cowl'], sweater: ['pullover', 'turtleneck', 'vest'], socks: ['crew', 'knee-high', 'over-knee'], bag: BAGS,
 });
 export const SCARF_FORMS = Object.freeze(FORMS.filter((f) => f !== 'wrapped twice'));
+// REUSE-SPEC.md §Hero chooser: face paint without the NFL eye black (it doesn't show on a turtle), and glasses
+export const PAINTS = Object.freeze(['none', 'rings', 'heart']);
+export const FACES = Object.freeze([...PAINTS, 'glasses']);
 const DEFAULT_HANDS = 'gloves';
 // REUSE-SPEC.md §Hero chooser: the gloves and the heroes' own; not the fighters' sword, scythe or hammer
 export const HERO_HANDS = Object.freeze([DEFAULT_HANDS, SCISSORS, NEEDLES, STAFF, YARN_BALLS, MIC, CANE]);
@@ -37,20 +41,20 @@ export const handsOf = (species) => (species === 'mouse' ? CANE : DEFAULT_HANDS)
 /** @returns {Hero['look']} */
 const blankLook = () => ({
   hat: null, hatColor: GREEN, hatStitch: 'stockinette', cape: null, capeColor: GREEN, capeStitch: 'stockinette', bag: null, bagColor: GREEN,
-  scarfForm: 'draped', sweaterWork: 'solid', hands: DEFAULT_HANDS, trick: TRICKS[DEFAULT_HANDS][0], gloves: GREEN,
+  scarfForm: 'draped', sweaterWork: 'solid', glasses: false, hands: DEFAULT_HANDS, trick: TRICKS[DEFAULT_HANDS][0], gloves: GREEN,
   ...Object.fromEntries(Object.keys(WEAR).flatMap((k) => [[k, null], [`${k}Color`, GREEN], [`${k}Stitch`, 'stockinette']])),
 });
 
 // REUSE-SPEC.md §Hero chooser: each turtle's own things on top of the scarf: Raphael (red) his knitting needles and red socks;
-// happy-go-lucky Michelangelo (orange) an open scarf, short socks, a backpack, cheek paint and his balls of yarn; nerdy
-// Donatello (purple) a cowl, a fanny pack and his bo staff; straight-laced Leonardo (blue) high boots, a drawstring bag
+// happy-go-lucky Michelangelo (orange) an open scarf, short socks, a backpack and his balls of yarn; nerdy
+// Donatello (purple) black-rimmed glasses, a cowl, a fanny pack and his bo staff; straight-laced Leonardo (blue) high boots, a drawstring bag
 // and his giant safety scissors, a half in each hand
 const ORANGE = COLOURS[0].hex, BLUE = COLOURS[1].hex, PURPLE = COLOURS[2].hex, RED = COLOURS[3].hex;
 const SIGNATURE = {
-  [PURPLE]: { look: { scarf: 'cowl', bag: 'crossbody pouch', bagColor: PURPLE, socks: 'knee-high', socksColor: PURPLE, hands: STAFF, trick: TRICKS[STAFF][0] } },
+  [PURPLE]: { look: { glasses: true, scarf: 'cowl', bag: 'crossbody pouch', bagColor: PURPLE, socks: 'knee-high', socksColor: PURPLE, hands: STAFF, trick: TRICKS[STAFF][0] } },
   [BLUE]: { look: { socks: 'over-knee', socksColor: BLUE, bag: 'drawstring bag', bagColor: BLUE, hands: SCISSORS, trick: TRICKS[SCISSORS][0] } },
   [RED]: { look: { hands: NEEDLES, trick: TRICKS[NEEDLES][0], socks: 'over-knee', socksColor: RED } },
-  [ORANGE]: { look: { scarf: 'long', scarfForm: 'draped', socks: 'crew', socksColor: ORANGE, bag: 'backpack', bagColor: ORANGE, hands: YARN_BALLS, trick: 'plain' }, facePaint: 'slashes' },
+  [ORANGE]: { look: { scarf: 'long', scarfForm: 'draped', socks: 'crew', socksColor: ORANGE, bag: 'backpack', bagColor: ORANGE, hands: YARN_BALLS, trick: 'plain' } },
 };
 const scarfLook = (colour) => ({ ...blankLook(), scarf: 'trailing', scarfColor: colour, gloves: colour, ...SIGNATURE[colour]?.look });
 // REUSE-SPEC.md §Hero chooser: leggy April is an orange llama: her jumpsuit a yellow sweater, her boots white socks, a
@@ -89,7 +93,8 @@ export function randomHero(rng = Math.random) {
   for (const [kind, list] of Object.entries(WEAR)) Object.assign(look, { [kind]: pickOf([...list, null], rng), [`${kind}Color`]: colour() });
   Object.assign(look, { sweaterWork: pickOf(SWEATER_WORKS, rng), scarfForm: pickOf(SCARF_FORMS, rng), hands: pickOf(HERO_HANDS, rng), gloves: colour() });
   look.trick = pickOf(TRICKS[look.hands], rng);
-  hero.params.facePaint = pickOf(FACE_PAINTS, rng);
+  hero.params.facePaint = pickOf(PAINTS, rng);
+  look.glasses = rng() < 0.25;
   return setFur(hero, pickOf(COLOURS, rng).hex);
 }
 
@@ -100,6 +105,7 @@ function readLook(raw) {
   for (const [kind, list] of Object.entries(WEAR)) {
     Object.assign(look, { [kind]: one(kind, list), [`${kind}Color`]: colour(`${kind}Color`), [`${kind}Stitch`]: one(`${kind}Stitch`, TEXTURES) });
   }
+  look.glasses = r.glasses === true;
   Object.assign(look, { sweaterWork: one('sweaterWork', SWEATER_WORKS), scarfForm: one('scarfForm', SCARF_FORMS), hands: one('hands', HERO_HANDS), gloves: colour('gloves') });
   look.trick = one('trick', TRICKS[look.hands]);
   return look;
@@ -109,6 +115,7 @@ function readLook(raw) {
 export function readHero(raw) {
   const f = readFighter(raw);
   if (!f) return null;
+  if (!PAINTS.includes(f.params.facePaint)) f.params.facePaint = 'none';
   return setFur({ species: f.species, params: f.params, look: readLook(raw.look) }, nearestSwatch(COLOURS, f.params.bodyColor).hex);
 }
 
@@ -119,4 +126,40 @@ export function loadHero() {
 /** Its own key: the donut fighters' save is on the same site. @param {Hero} h */
 export function saveHero(h) {
   try { localStorage.setItem(HERO_KEY, JSON.stringify(h)); } catch {}
+}
+
+// REUSE-SPEC.md §Hero chooser: the mask (rings) in the scarf's colour, so a turtle's sync up; on a turtle's big eyes, narrow
+const MASK_ON = Object.freeze({ turtle: 0.35 });
+/** The hero as it's built: the mask's colour and size set from the scarf and the animal. @param {Hero} hero @returns {Hero} */
+export function faceOf(hero) {
+  const { look, species } = hero, params = /** @type {Record<string, any>} */ ({ ...hero.params, facePaintColor: look.scarf ? look.scarfColor : '' });
+  if (params.facePaint === 'rings') params.facePaintSize = MASK_ON[species] ?? params.facePaintSize;
+  return { ...hero, params };
+}
+
+// REUSE-SPEC.md §Hero chooser: black-rimmed glasses, a rim round the front of each eye and a bridge between
+const RIM = new THREE.TorusGeometry(1, 0.1, 8, 28), BRIDGE = new THREE.CylinderGeometry(1, 1, 1, 8).rotateZ(Math.PI / 2);
+const GLASSES = { size: 1.12, ahead: 0.85, thick: 0.012 };
+function addGlasses(built) {
+  const black = built.addMaterial(new THREE.MeshStandardMaterial({ color: '#141414', roughness: 0.45 }));
+  const rims = built.joints.eye.map(({ node, r }) => {
+    const rim = new THREE.Mesh(RIM, black);
+    rim.position.copy(node.position).add(new THREE.Vector3(0, 0, r * GLASSES.ahead));
+    rim.scale.setScalar(r * GLASSES.size);
+    node.parent.add(rim);
+    return rim;
+  });
+  const [a, b] = rims, gap = Math.abs(a.position.x - b.position.x) - a.scale.x - b.scale.x;
+  if (gap <= 0) return;
+  const bridge = new THREE.Mesh(BRIDGE, black);
+  bridge.position.copy(a.position).add(b.position).multiplyScalar(0.5).add(new THREE.Vector3(0, a.scale.x * 0.3, 0));
+  bridge.scale.set(GLASSES.thick, gap, GLASSES.thick);
+  a.parent.add(bridge);
+}
+
+/** A hero built for the stage: as a fighter, with the hero colours for sweater colourwork, the face set, glasses on. @param {Hero} hero */
+export function buildHero(hero) {
+  const built = buildFighter(faceOf(hero), PALETTE);
+  if (hero.look.glasses) addGlasses(built);
+  return built;
 }

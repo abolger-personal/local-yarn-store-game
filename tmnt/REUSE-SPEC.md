@@ -153,15 +153,19 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
     round in a spiral, its strand running up over the whorl to the hook. The hands hold the bare shaft below it.
 - **Each turtle's own things** (decided 2026-11-09), on top of the turtle-colour scarf:
   - **Raphael** (red): his knitting needles and red over-knee socks.
-  - **Donatello** (purple), nerdy: a cowl, a fanny pack (the crossbody pouch), purple knee-high socks and his bo staff.
+  - **Donatello** (purple), nerdy: black-rimmed glasses, a cowl, a fanny pack (the crossbody pouch), purple knee-high socks and his bo staff.
   - **Michelangelo** (orange), happy-go-lucky: an open scarf (long, draped), short orange socks, an orange backpack,
-    cheek-slash face paint, and his balls of yarn.
+    and his balls of yarn.
   - **Leonardo** (blue), straight-laced: the trailing scarf, high blue boots (over-knee socks), a blue drawstring bag
     and his safety scissors.
   - **Master Splinter** (the sixth preset, decided 2026-11-10): an orange mouse in a red vest and white crew socks,
     with his cane in red. Picking the mouse for any hero gives the cane.
   - **April** (the fifth default), leggy: **an orange llama** (amended 2026-11-09) in her jumpsuit (the yellow
     pullover), white over-knee boots, a blue drawstring bag, a heart on her cheek, and her microphone.
+- **The face** (decided 2026-11-10): none, the mask (rings round the eyes), a heart, or **black-rimmed glasses**;
+  not the NFL eye black, which doesn't show on a turtle. The mask is the scarf's colour, so a turtle's sync up (the
+  fur's complement with no scarf), and narrow on a turtle's big eyes (`faceOf`). Glasses are a rim round the front
+  of each eye, and a bridge when the eyes are far enough apart (`buildHero`).
 - 🎲 any animal, colours and pieces. **🍕 a preset** (decided 2026-11-10): **six presets**, the four turtles, April and
   Master Splinter, in turn from a random one, so two taps never give the same. The page opens on the saved hero, or a preset when none is saved.
   👍 saves; there is no lobby to go to yet.

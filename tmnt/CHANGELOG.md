@@ -10,7 +10,7 @@ L.Y.S. spinoff's spinoff.
   a weapon, by pictures, no words needed. No hats or capes this time.
 - **Six presets, 🍕 to go through them:**
   - **Leonardo** (blue), straight-laced: a trailing scarf, high boots, a drawstring bag.
-  - **Donatello** (purple), nerdy: a cowl and a fanny pack.
+  - **Donatello** (purple), nerdy: black-rimmed glasses, a cowl and a fanny pack.
   - **Michelangelo** (orange), happy-go-lucky: an open scarf, short socks, a backpack.
   - **Raphael** (red): red over-knee socks.
   - **April**: an orange llama in a yellow jumpsuit and white boots, with a heart on her cheek.
@@ -25,6 +25,7 @@ L.Y.S. spinoff's spinoff.
   - **April:** a giant microphone, swung like the Greathammer, throwing stars.
   - **Master Splinter:** a giant crochet hook for a cane, hanging down to the floor like a walking stick.
   - Plus the boxing gloves. The fighting game's sword, scythe and hammer stay in the fighting game.
+- **Faces:** a mask round the eyes in the scarf's colour (narrow on a turtle), a heart, or black-rimmed glasses.
 - **A mouse**, the sixth animal: the lion with big round ears instead of a mane, and a bare tail.
 - **The hero colours** are the turtles' four (orange, blue, purple, red), turtle green, taxi yellow and white for
   clothes. Black and silver are for bad guys only.

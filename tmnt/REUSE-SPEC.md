@@ -138,8 +138,10 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
     held by the middle, swung as the sword. Each ball swings on its strand as a pendulum hung from the hand, so a punch
     flings them out and they swing back on their own. No tricks yet. A throw that spins out and comes back like the
     Greathammer's (`spinoff/hammer.js`) is planned 2026-11-09.
-  - **Donatello's bo staff:** held in both hands and swung as the Music Scythe, with no blade; longer, for reach. A
-    wooden pole with its grip wrapped in knitting (the scarves' stockinette) in the picked colour.
+  - **Donatello's bo staff is a giant drop spindle** (amended 2026-11-10, was a pole with a knitted grip): held in
+    both hands and swung as the Music Scythe, with no blade; longer, for reach. A wooden shaft to a point, a chunky
+    whorl near the top with a hook above it, and a cop of spun yarn in the picked colour under the whorl, wound
+    round in a spiral, its strand running up over the whorl to the hook. The hands hold the bare shaft below it.
 - **Each turtle's own things** (decided 2026-11-09), on top of the turtle-colour scarf:
   - **Raphael** (red): his sai and red over-knee socks.
   - **Donatello** (purple), nerdy: a cowl, a fanny pack (the crossbody pouch), purple knee-high socks and his bo staff.

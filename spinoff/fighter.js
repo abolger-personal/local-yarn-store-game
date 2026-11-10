@@ -5,7 +5,7 @@ import {
   lowestResting, phaseStep, stepMotion, walkGain, walkLayer, walkPhase,
 } from '../characters/npc.js';
 import { SPECIES_IDS } from '../characters/species.js';
-import { CRAFTS, STITCHES_BY_CRAFT, defaultItem, dress, knitWrap, undress, usualTool } from '../characters/garments.js';
+import { CRAFTS, STITCHES_BY_CRAFT, defaultItem, dress, undress, usualTool } from '../characters/garments.js';
 import { oklchOf } from '../inventory/yarn-look.js';
 import { buildFamily } from '../inventory/yarn-geometry.js';
 import { makeSparkle } from '../characters/sparkle.js';
@@ -48,7 +48,7 @@ export const HAND_ICON = Object.freeze({
   mic: '<g transform="rotate(35 24 24)"><rect x="20" y="20" width="8" height="26" rx="3" fill="#2a2628"/><rect x="18.5" y="19" width="11" height="5" rx="2"/><circle cx="24" cy="11" r="10" fill="#c9ccd2"/><path d="M15 8h18M14 12h20M16 16h16M20 2v18M28 2v18" stroke="#8a8e96" stroke-width="1.3"/></g>',
   needles: '<g stroke="currentColor" stroke-width="4" stroke-linecap="round"><path d="M10 40 36 6M38 40 12 6"/></g><circle cx="9" cy="41" r="4.5"/><circle cx="39" cy="41" r="4.5"/>',
   yarn: '<path d="M24 6c-6 0-9 6-9 10M24 6c6 0 9 6 9 10" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="13" cy="28" r="9"/><circle cx="35" cy="32" r="9"/><path d="M7 25c4 2 8 2 12 0M7 31c4 2 8 2 12 0M29 29c4 2 8 2 12 0M29 35c4 2 8 2 12 0" stroke="#fff8" stroke-width="1.5" fill="none"/>',
-  staff: '<g transform="rotate(35 24 24)"><rect x="21.5" y="1" width="5" height="46" rx="2.5" fill="#a8743f"/><rect x="20" y="20" width="8" height="14" rx="3"/><path d="M20 23h8M20 27h8M20 31h8" stroke="#fff8" stroke-width="1.5"/></g>',
+  staff: '<g transform="rotate(35 24 24)"><path d="M22 6h4l-.5 40-1.5 2-1.5-2Z" fill="#a8743f"/><rect x="13" y="8" width="22" height="5" rx="2.5" fill="#a8743f"/><path d="M24 14c6 3 6 13 0 17-6-4-6-14 0-17Z"/><path d="M19 18l10 2M18.5 22l11 2M19 26l10 2" stroke="#fff8" stroke-width="1.3"/><path d="M26 6c0-3-4-3-4-1" fill="none" stroke="#a8743f" stroke-width="1.5"/></g>',
   sai: '<g transform="rotate(35 24 24)"><path d="M22.5 31V8l1.5-6 1.5 6v23Z"/><path d="M24 31c-8 0-10-4-10-12M24 31c8 0 10-4 10-12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="21.5" y="31" width="5" height="12" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.5"/></g>',
 });
 // what flies off the hitting glove or the blade's tip as it lands; tapping the picked one goes to the next. The scythe's is fixed.
@@ -536,31 +536,42 @@ function addSai(built, color) {
     { tip: SAI_PARTS.point });
 }
 
-// tmnt/REUSE-SPEC.md §Hero chooser: Donatello's bo staff, held and swung as the Music Scythe with no blade, longer for
-// reach: a wooden pole, its grip wrapped in knitting in the picked colour
-const STAFF_PARTS = { butt: -0.34, top: 0.3, r: 0.022, wrap: [-0.19, 0.08], wood: '#a8743f' };
-let staffGeo = null;
-function staffGeometry() {
-  const { butt, top, r } = STAFF_PARTS;
-  staffGeo ??= {
-    pole: mergeGeometries([
-      new THREE.CylinderGeometry(r, r, top - butt, 12).rotateX(Math.PI / 2).translate(0, 0, (top + butt) / 2),
-      ...[butt, top].map((z) => new THREE.SphereGeometry(r, 12, 8).translate(0, 0, z)),
+// tmnt/REUSE-SPEC.md §Hero chooser: Donatello's bo staff is a giant drop spindle, held and swung as the Music Scythe with
+// no blade, longer for reach: a wooden shaft to a point, a chunky whorl near the top with a hook above it, a cop of spun
+// yarn in the picked colour under the whorl, wound round in a spiral, its strand running up over the whorl to the hook
+const SPINDLE = { butt: -0.34, top: 0.3, r: 0.018, whorl: [0.23, 0.075, 0.03], cop: [0.05, 0.21, 0.045], turns: 9, wood: '#a8743f' };
+let spindleGeo = null;
+function copGeometry() {
+  const [from, to, fat] = SPINDLE.cop, bulge = (t) => SPINDLE.r + (fat - SPINDLE.r) * Math.sin(Math.PI * t) ** 0.8;
+  const profile = Array.from({ length: 13 }, (_, i) => new THREE.Vector2(bulge(i / 12), from + ((to - from) * i) / 12));
+  const wind = new THREE.CatmullRomCurve3(Array.from({ length: SPINDLE.turns * 12 + 1 }, (_, i) => {
+    const t = i / (SPINDLE.turns * 12), a = t * SPINDLE.turns * 2 * Math.PI, rad = bulge(t) + 0.003;
+    return new THREE.Vector3(rad * Math.cos(a), rad * Math.sin(a), from + (to - from) * t);
+  }));
+  const [whorlAt] = SPINDLE.whorl, lead = new THREE.CatmullRomCurve3([[0, fat * 0.6, to], [0, 0.082, whorlAt], [0, 0.03, SPINDLE.top - 0.01]]
+    .map((v) => new THREE.Vector3(...v)));
+  return mergeGeometries([new THREE.LatheGeometry(profile, 16).rotateX(Math.PI / 2), new THREE.TubeGeometry(wind, 220, 0.004, 5),
+    new THREE.TubeGeometry(lead, 16, 0.003, 5)]);
+}
+
+function spindleGeometry() {
+  const { butt, top, r, whorl: [at, wide, thick] } = SPINDLE;
+  spindleGeo ??= {
+    wood: mergeGeometries([
+      new THREE.CylinderGeometry(r, r * 0.4, top - butt, 12).rotateX(-Math.PI / 2).translate(0, 0, (top + butt) / 2),
+      new THREE.CylinderGeometry(wide, wide * 0.85, thick, 24).rotateX(Math.PI / 2).translate(0, 0, at),
+      new THREE.TorusGeometry(0.012, 0.004, 6, 12, Math.PI * 1.4).rotateY(Math.PI / 2).translate(0, 0.012, top),
     ]),
+    cop: copGeometry(),
     ...swooshGeometry(0.06, top, 0.11, top * 0.8),
   };
-  return staffGeo;
+  return spindleGeo;
 }
 
 function addStaff(built, color) {
-  const geo = staffGeometry(), { butt, top, r, wrap: [w0, w1], wood } = STAFF_PARTS;
-  const staff = holdBlade(built, [new THREE.Mesh(geo.pole, new THREE.MeshStandardMaterial({ color: wood, roughness: 0.8, metalness: 0 }))], geo, { tip: top, butt: butt - 0.04, both: true, lower: -0.1 });
-  // the scarves' stockinette, a size finer than theirs (about 10 stitches round), so it reads as knitting on a thin pole
-  const wrap = knitWrap({ ...wear('scarf', 'long', color), weight: 'bulky' }, w1 - w0, r * 1.25);
-  wrap.position.z = (w0 + w1) / 2;
-  wrap.traverse((o) => { o.userData.ownGeometry = true; });
-  staff.add(wrap);
-  return staff;
+  const geo = spindleGeometry(), { butt, top, wood } = SPINDLE;
+  return holdBlade(built, [new THREE.Mesh(geo.wood, new THREE.MeshStandardMaterial({ color: wood, roughness: 0.8, metalness: 0 })),
+    new THREE.Mesh(geo.cop, knitMaterial(color))], geo, { tip: top, butt: butt - 0.04, both: true, lower: -0.1 });
 }
 
 // tmnt/REUSE-SPEC.md §Hero chooser: Michelangelo's nunchucks, two balls of yarn on one strand held by its middle. Each
@@ -703,8 +714,6 @@ function removeSword(built) {
   built.sword?.userData.pair?.removeFromParent();
   built.sword?.userData.pair?.children[0].material.dispose();
   for (const o of built.sword?.children ?? []) if (o instanceof THREE.Mesh) o.material.dispose();
-  // the staff's knitted wrap is its own geometry (the blades' are shared); its material is the garments' shared one
-  built.sword?.traverse((o) => { if (o.userData.ownGeometry && o instanceof THREE.Mesh) o.geometry.dispose(); });
   built.sword = null;
 }
 

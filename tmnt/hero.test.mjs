@@ -78,7 +78,7 @@ for (const species of SPECIES) {
   assert.equal(built.sword.scale.x, 1, `${species}: the same cane as everyone's`);
   disposeFighter(built);
 }
-// Donatello (purple): a cowl, a fanny pack and his bo staff, held in both hands, its grip wrapped in knitting
+// Donatello (purple): a cowl, a fanny pack and his bo staff, a giant drop spindle held in both hands
 const donnie = newHero(() => 0.45).look;
 assert.deepEqual([donnie.scarf, donnie.bag, donnie.socks, donnie.hands], ['cowl', 'crossbody pouch', 'knee-high', STAFF]);
 // Leonardo (blue): high boots and a knitting needle in each hand, gone again when he puts them down
@@ -90,9 +90,7 @@ disposeFighter(leo);
 assert.equal(pair.parent, null, 'the left needle goes with the right');
 for (const species of SPECIES) {
   const built = buildFighter({ ...newHero(() => 0.45, species), look: newHero(() => 0.45).look });
-  let knit = 0;
-  built.sword.traverse((o) => { if (o.userData.ownGeometry && o instanceof THREE.Mesh) knit++; });
-  assert.ok(built.sword.userData.both && knit === 1, `${species}: a two-handed staff with a knitted wrap`);
+  assert.ok(built.sword.userData.both && built.sword.children.length >= 4, `${species}: a two-handed spindle, wood and yarn`);
   disposeFighter(built);
 }
 // Michelangelo (orange) has his balls of yarn: hanging from the hand a ball apart, off the floor, flung out by a punch

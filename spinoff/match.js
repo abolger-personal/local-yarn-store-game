@@ -13,6 +13,8 @@ export const SHELF_WIDTH = SHELF.cols * SHELF.gap + 0.14;
 export const BRICK = 0.4;
 export const HIT_DEPTH = 0.35;
 export const HITSTOP_TICKS = 5;
+/** A snapshot's once-only event lists; the network sends them with the tick they happened on until every guest has surely had them. */
+export const EVENTS = /** @type {const} */ (['hits', 'fullBag', 'donutEvents', 'ringOuts', 'powers']);
 
 export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 /** The nearest point of a box's rounded core to (x, z): the box is everything within `round` of it, seen from above. */

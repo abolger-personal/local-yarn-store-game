@@ -1,7 +1,7 @@
 // The match host: one fixed tick of pure logic, no three.js, no Math.random (REUSE-SPEC.md §Milestones 1). It wires
 // the pieces: world.js (terrain), walk.js (getting round it), combat.js (fighting), build.js (the build round) and
 // donut-game.js (the game they're played for); here are the fighter record, input, the tick and the snapshot.
-import { ROUND_SECONDS, TICK_HZ } from './match.js';
+import { EVENTS, ROUND_SECONDS, TICK_HZ } from './match.js';
 import { cellUnder, fetchStep, fortGrid, pilesFor, readyInput, startWhenReady } from './build.js';
 import { bandOf, brickBox, floorBox, settleBricks } from './world.js';
 import { JUMP_SPEED, SPRING_LIFT, TURN_SPEED, airStep, jump, navigate, reachUp, separate, walkStep } from './walk.js';
@@ -192,11 +192,7 @@ export function snapshot(s) {
     shots: s.shots.map((t) => ({ id: t.id, by: t.by, trick: t.trick, x: t.x, y: t.y, z: t.z, ux: t.ux, uz: t.uz, left: t.left })),
     bricks: s.bricks.map((b) => ({ id: b.id, team: b.team, x: b.x, y: b.y, z: b.z, hits: b.hits, maxHits: b.maxHits, icing: b.icing })),
     shelves: s.shelves.map((sh) => ({ team: sh.team, x: sh.x, y: sh.y, z: sh.z, donuts: shelfLooks(sh) })),
-    hits: s.hits.map((h) => ({ ...h })),
-    fullBag: s.fullBag.map((e) => ({ ...e })),
-    donutEvents: s.donutEvents.map((e) => ({ ...e })),
-    ringOuts: s.ringOuts.map((e) => ({ ...e })),
-    powers: s.powers.map((e) => ({ ...e })),
+    .../** @type {any} */ (Object.fromEntries(EVENTS.map((k) => [k, s[k].map((e) => ({ ...e }))]))),
   };
 }
 

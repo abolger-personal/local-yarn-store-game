@@ -2,7 +2,7 @@
 // and draw the Snapshots that come down. It talks over any Link, so multiplayer.test.mjs runs it in memory;
 // together.js gives it the Trystero one from net.js.
 import { readFighter } from './fighter.js';
-import { ROUND_SECONDS, TICK_HZ } from './match.js';
+import { EVENTS, ROUND_SECONDS, TICK_HZ } from './match.js';
 import { POWERS } from './combat.js';
 import { MAX_FIGHTERS } from './roster.js';
 import { badGuys } from './levels.js';
@@ -29,8 +29,6 @@ const REFRESH = 15;
 const BEHIND = 4 * (TICK_HZ / SNAP_HZ), AHEAD = TICK_HZ / SNAP_HZ, KEEP = 8;
 const TEAMS = new Set(['heroes', 'badGuys']), THINGS = new Set(['donut', 'brick', 'fighter', 'pile']), FAR = 1e6;
 const FLAGS = ['away', 'drop', 'ready', 'go', 'sweep', 'charge'];
-/** A snapshot's once-only event lists, sent with the tick they happened on until every guest has surely had them. */
-const EVENTS = /** @type {const} */ (['hits', 'fullBag', 'donutEvents', 'ringOuts', 'powers']);
 /** @type {import('./match.js').Team} */
 const HEROES = 'heroes';
 /** @type {import('./match.js').Team} */

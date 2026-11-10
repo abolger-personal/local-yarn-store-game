@@ -276,7 +276,6 @@ export function facingGoal(s, f, it) {
   return { ...pointGoal(s, f, it.x + ux * away, it.z + uz * away, it.y), face: it };
 }
 
-
 // --- following a route ----------------------------------------------------------------------
 
 function plan(s, f) {
@@ -483,7 +482,6 @@ export function airStep(s, f, mind) {
   const top = f.vy <= 0 ? supportAt(s.solids, f.x, f.z, prevY) : -Infinity;
   if (top >= f.y) land(s, f, top);
 }
-
 
 const overlapY = (a, b) => a.y < b.y + b.h - STEP && b.y < a.y + a.h - STEP;
 

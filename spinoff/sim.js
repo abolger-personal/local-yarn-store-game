@@ -11,11 +11,6 @@ import {
   shelfStep, spawnSpot, stepDonut, teamLooks, touchDonuts,
 } from './donut-game.js';
 
-
-
-
-
-
 /** What walking asks the game (walk.js Mind): targets by thing, attacks that root or busy a fighter, the stomp's pop, guards. */
 /** @type {import('./walk.js').Mind} */
 const MIND = {
@@ -47,9 +42,6 @@ function moveFighter(s, f) {
   ringOut(s, f);
 }
 
-
-
-
 // --- input ----------------------------------------------------------------------------------
 
 function tapAbove(s, f, t) {
@@ -73,7 +65,6 @@ function jumpTap(s, f) {
   else if (f.jumps > 0) f.again = true;
 }
 
-
 function setAway(s, f, away) {
   if (away == null || away === f.away) return;
   f.away = away;
@@ -89,9 +80,7 @@ function applyInput(s, f, input) {
   else attackInput(s, f, input);
 }
 
-
 // --- the match ------------------------------------------------------------------------------
-
 
 function newFighter(e, at, y) {
   return { id: e.id, team: e.team, hands: e.hands ?? 'gloves', trick: e.trick ?? null, icing: e.look.frosting, block: null, placeCell: null, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
@@ -161,16 +150,13 @@ export function tick(s, inputs) {
   s.tick++;
 }
 
-
 /** Donuts and blocks: what a fighter touches or stands at. A toy (TOY) grabs nothing. */
 function grabStep(s, f) {
   touchDonuts(s, f);
   (s.phase === 'build' ? fetchStep : shelfStep)(s, f);
 }
 
-
 // --- the snapshot ---------------------------------------------------------------------------
-
 
 function moveOf(f) {
   if (f.pending || f.stun > 0) return f.hitMove;
@@ -194,7 +180,6 @@ const fighterView = (s, f) => ({
   invincible: f.inv > 0, respawn: f.out / TICK_HZ, target: f.dest ? { x: f.dest.x, y: f.dest.y, z: f.dest.z } : null, block: f.block,
   power: f.power, chain: chainOf(s, f), toy: f.toy?.kind ?? null, ...(f.attack?.turn && { turn: f.attack.turn }),
 });
-
 
 /** @returns {import('./match.js').Snapshot} */
 export function snapshot(s) {

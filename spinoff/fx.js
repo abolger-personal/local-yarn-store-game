@@ -81,7 +81,6 @@ function stepBit(b, dt) {
   b.mesh.scale.setScalar(b.size * Math.min(1, (BIT_LIFE - b.t) * 4));
 }
 
-
 const SHADOW_GEO = new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2);
 let shadowMat = null;
 

@@ -515,7 +515,6 @@ function trickPartsOnce() {
   return trickParts;
 }
 
-
 const bit = (geo, mat, [x, y, z], r) => {
   const m = geo.isObject3D ? geo : new THREE.Mesh(geo, mat);
   m.position.set(x, y, z);

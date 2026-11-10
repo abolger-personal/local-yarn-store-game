@@ -43,7 +43,6 @@ const standingAt = (f, sh, reach = SHELF_REACH, side = f.r) => f.onGround && Mat
 const guarding = (s, f) => standingAt(f, shelfOf(s, f.team), GUARD_REACH, 0);
 const guardOf = (s, team) => s.fighters.find((o) => o.team === team && guarding(s, o));
 
-
 /** The nearest spot touching the shelf's front; empty-handed at your own, right in front of it (to guard) where there's room.
  * Picked once a tap, again when the blocks or your hands change. */
 function shelfGoal(s, f, sh) {
@@ -165,7 +164,6 @@ export function touchDonuts(s, f) {
   }
   f.touching = now.map((d) => d.id);
 }
-
 
 /** Walking up to a guarded shelf: the guard shakes "no" (the full-bag event) once each time. True while guarded. */
 function guardStep(s, f) {

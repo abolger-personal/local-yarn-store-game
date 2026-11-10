@@ -24,7 +24,6 @@ function hostGone() {
 
 /** The host's page again, waiting for `expected` guests. */
 
-
 /** ▶️ on the host's end card: everyone to the next round, on the level `search` names (after a win, the next one). */
 function endRound(h, room, search) {
   h.again();

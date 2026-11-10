@@ -240,7 +240,6 @@ function endAttack(f) {
   f.attack = null;
 }
 
-
 function attackStep(s, f) {
   const a = f.attack;
   if (!a || f.still || f.freeze > 0) return;
@@ -349,7 +348,6 @@ function flyShot(s, t) {
   }
   return t.left > EPS;
 }
-
 
 /** 🦶 let go after a hold sweeps; otherwise a free fighter punches, kicks or stomps. */
 // REUSE-SPEC.md §Discoverable moves: 🦶 held and let go is the sweep (the tablet times the hold), on the ground; it cuts

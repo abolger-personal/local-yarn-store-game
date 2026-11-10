@@ -136,7 +136,6 @@ const HANG = MOVES.stomp.hang / MOVES.stomp.steps;
 /** How far round a stomp has turned while it hangs in the air (a spin or a backflip, `f.turn`), fast then settling. @param {FighterState} f */
 const stompTurn = (f) => (!f.onGround && f.move === 'kick' && f.turn ? 2 * Math.PI * (1 - (1 - Math.min(1, f.step / HANG)) ** 2) : 0);
 
-
 /** How far into its swing a fighter winding up for a shot holds it (REUSE-SPEC.md §Trick shots). */
 const WINDUP = 0.1;
 const SWEEP = DANCES['wuxia-turn'], SWEEP_SECONDS = MOVES.sweep.steps / TICK_HZ;

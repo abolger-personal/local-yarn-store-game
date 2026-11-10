@@ -9,10 +9,9 @@ entry.innerHTML = exteriorMarkup({
 dressExterior(entry);
 
 const door = document.getElementById('door');
-const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 door.addEventListener('click', (e) => {
-  if (still || door.classList.contains('open')) return;
+  if (door.classList.contains('open')) return;
   e.preventDefault();
   swingOpen(door, () => { location.href = door.getAttribute('href'); });
 });

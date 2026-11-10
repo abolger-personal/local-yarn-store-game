@@ -15,7 +15,7 @@ import { key, scene } from '../scene/stage.js';
 import { CHAIR_W } from '../scene/seating.js';
 import { FILL, atlas, boxes, sizeAtlas } from '../goods/items.js';
 import { YARN, YARN_FIT, bandMesh, tailMesh, yarnMeshes } from '../goods/yarn.js';
-import { YARN_COLORS, cellNameFor } from '../goods/stock.js';
+import { cellNameFor, colourOf } from '../goods/stock.js';
 
 let heldMat = null, heldSizeMat = null;
 
@@ -92,8 +92,6 @@ export function makeHeldNotion(item) {
   group.position.set(0, -0.02, 0.02);
   return group;
 }
-
-export const colourOf = (yarn) => YARN_COLORS[yarn.colorIndex % YARN_COLORS.length];
 
 export function outfitOf(npc) {
   const look = { worn: { ...npc.worn }, wips: npc.wips };

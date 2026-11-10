@@ -28,6 +28,8 @@ const packageFor = (name) => pick(PACKAGES[name] ?? [[1, 1]], simRng);
 
 export const YARN_COLORS = YARN_PALETTE.map((p) => p.hex);
 
+export const colourOf = (yarn) => YARN_COLORS[yarn.colorIndex % YARN_COLORS.length];
+
 const INK = '#241e22';
 
 const centredOn = (over, w, h) =>
@@ -75,7 +77,7 @@ export function addItem(display, shelf, spec, { c, r, over, avoidWall = false, s
       ...spec,
       display: display.id, shelf, c: cell.c, r: cell.r, w, h, layers,
       keys, layer: place(g, keys, index, layers),
-      color: spec.name === 'yarn' ? YARN_COLORS[spec.colorIndex % YARN_COLORS.length] : INK,
+      color: spec.name === 'yarn' ? colourOf(spec) : INK,
       yaw: scatterYaw(simRng), gone: false, held: false,
     });
     return index;

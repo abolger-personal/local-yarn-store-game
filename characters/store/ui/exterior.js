@@ -282,12 +282,15 @@ export function dressExterior(root) {
   for (const img of root.querySelectorAll('.worn-tex')) img.setAttribute('href', url);
 }
 
-export function swingOpen(door, then) {
+/** adds cls, then() once el's own transition ends (not a child's); at once if motion is reduced */
+export function afterOwnTransition(el, cls, then) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { then(); return; }
-  door.classList.add('open');
-  door.addEventListener('transitionend', function opened(e) {
-    if (e.target !== door) return;
-    door.removeEventListener('transitionend', opened);
+  el.classList.add(cls);
+  el.addEventListener('transitionend', function ended(e) {
+    if (e.target !== el) return;
+    el.removeEventListener('transitionend', ended);
     then();
   });
 }
+
+export const swingOpen = (door, then) => afterOwnTransition(door, 'open', then);

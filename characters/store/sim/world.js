@@ -24,9 +24,9 @@ import { buildChairs } from '../scene/seating.js';
 import { buildDisplays } from '../scene/displays.js';
 import { CAPACITY, boxes, edgeTop, fieldTop, shadows, sideEdge, sideField, sizeSide, sizeTop } from '../goods/items.js';
 import { refreshAll } from '../goods/paint.js';
-import { addItem } from '../goods/stock.js';
+import { addItem, colourOf } from '../goods/stock.js';
 import { TUTORIAL_DAYS, buildOrder, carryOver, resolveOrder, tutorialDay1 } from '../../../inventory/supply.js';
-import { STAND_TIME, buildBlobs, checkOutfit, colourOf, disposeRecord, dressedCharacter, measureSeatDrop, outfitOf, rollCheer,
+import { STAND_TIME, buildBlobs, checkOutfit, disposeRecord, dressedCharacter, measureSeatDrop, outfitOf, rollCheer,
   routeLength } from './cast.js';
 import { lentPiece } from '../../garments.js';
 

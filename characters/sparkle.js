@@ -9,13 +9,11 @@ export const SPARKLE_BITS = Object.freeze([
   [-0.07, 0.13, -0.02, 0.06], [0.09, 0.12, 0.01, 0.055],
 ]);
 
-const clamp01 = (x) => Math.min(1, Math.max(0, x));
-
 export function sparkleScale(t) {
   if (!(t >= 0) || t >= SPARKLE_TIME) return 0;
   const pop = t < 0.18 ? (t / 0.18) * 1.35 : 1 + 0.35 * Math.exp(-(t - 0.18) * 9);
   const pulse = 1 + 0.12 * Math.sin(t * 14);
-  return pop * pulse * clamp01((SPARKLE_TIME - t) / 0.5);
+  return pop * pulse * THREE.MathUtils.clamp((SPARKLE_TIME - t) / 0.5, 0, 1);
 }
 
 export function star(x, y, z, r) {
@@ -59,8 +57,4 @@ export function stepSparkle(s, dt) {
   if (!k) return;
   s.mesh.scale.setScalar(k);
   s.mesh.rotation.y = s.t * 2.2;
-}
-
-export function disposeSparkle(s) {
-  s.mesh.removeFromParent();
 }

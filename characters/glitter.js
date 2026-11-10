@@ -39,12 +39,12 @@ function tipNode(built, [part, side]) {
   return tip;
 }
 
-function pool(built, n, shape, mat) {
-  return Array.from({ length: n }, () => {
-    const m = new THREE.Mesh(shape, mat);
+function pool(parent, n, shape, matOf) {
+  return Array.from({ length: n }, (_, i) => {
+    const m = new THREE.Mesh(shape, matOf(i));
     Object.assign(m.userData, { age: Infinity, prop: true, noMerge: true });
     m.visible = false;
-    built.root.parent?.add(m);
+    parent?.add(m);
     return m;
   });
 }
@@ -54,8 +54,8 @@ function makeGlitter(built, name, look) {
   dot ??= new THREE.SphereGeometry(1, 8, 6);
   const mats = look.colours.map((color) => new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, toneMapped: false }));
   const g = { built, name, look, mats, bits: [], trail: [], t: 0, shed: 0, next: 0, tip: null, last: null };
-  if (look.line) Object.assign(g, { trail: pool(built, LINE, dot, mats[0]), tip: tipNode(built, look.line) });
-  else Object.assign(g, { trail: pool(built, TRAIL, geo, mats[0]), bits: chestBits(built, look, mats) });
+  if (look.line) Object.assign(g, { trail: pool(built.root.parent, LINE, dot, () => mats[0]), tip: tipNode(built, look.line) });
+  else Object.assign(g, { trail: pool(built.root.parent, TRAIL, geo, () => mats[0]), bits: chestBits(built, look, mats) });
   if (look.shades) g.shades = shades(built, mats);
   if (look.snap) Object.assign(g, { rods: neonRods(built, mats), step: -1, nextRod: 0, bursts: 0 });
   return g;
@@ -87,15 +87,13 @@ function neonRods(built, mats) {
     color: m.color, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
   }));
   mats.push(...halos);
-  return Array.from({ length: BURST * 2 }, (_, i) => {
-    const m = new THREE.Mesh(rod, mats[i % halos.length]), halo = new THREE.Mesh(rod, halos[i % halos.length]);
+  const rods = pool(built.root, BURST * 2, rod, (i) => mats[i % halos.length]);
+  for (const [i, m] of rods.entries()) {
+    const halo = new THREE.Mesh(rod, halos[i % halos.length]);
     halo.scale.set(3, 1, 3);
     m.add(halo);
-    Object.assign(m.userData, { age: Infinity, prop: true, noMerge: true });
-    m.visible = false;
-    built.root.add(m);
-    return m;
-  });
+  }
+  return rods;
 }
 
 /** On each step whose pose starts with `snap`, a ring of lines shoots out from the chest; they fly and fade. */
@@ -127,7 +125,7 @@ function burst(g) {
   }
 }
 
-export function disposeGlitter(g) {
+function disposeGlitter(g) {
   for (const m of [...g.bits, ...g.trail, ...(g.rods ?? []), g.shades]) m?.removeFromParent();
   for (const m of g.mats) m.dispose();
 }

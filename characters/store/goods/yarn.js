@@ -1,6 +1,6 @@
 import { items } from '../core/state.js';
 import { YARN_SHAPES } from '../../../inventory/catalog.js';
-import { placeMatrix, setInstance } from '../../../inventory/notions.js';
+import { instanced, placeMatrix, setInstance } from '../../../inventory/notions.js';
 import {
   BANDS,
   TAILS,
@@ -65,11 +65,8 @@ function yarnMat({ paper = false, hatch = false } = {}) {
 }
 
 function yarnInstances(geometry, material) {
-  const mesh = new THREE.InstancedMesh(geometry, material, CAPACITY);
-  mesh.instanceColor =
-    new THREE.InstancedBufferAttribute(new Float32Array(CAPACITY * 3).fill(1), 3);
+  const mesh = instanced(geometry, material, CAPACITY, true);
   mesh.count = CAPACITY;
-  mesh.frustumCulled = false;
   for (let i = 0; i < CAPACITY; i++) mesh.setMatrixAt(i, _hide);
   scene.add(mesh);
   return mesh;

@@ -1,5 +1,5 @@
 import { cast, displays, seats, shop } from '../core/state.js';
-import { cellRect } from '../../../inventory/notions.js';
+import { cellRect, softDiscTexture } from '../../../inventory/notions.js';
 import { BANDS, TAILS, bandMatrix, familyExtent, tailMatrix, yarnFit }
   from '../../../inventory/yarn-geometry.js';
 import { POSES, applyPose, lowestResting, seatedHipsAlong, phaseStep, stepMotion, valueOf, walkPhase, walkLayer,
@@ -13,11 +13,11 @@ import * as THREE from 'three';
 import { BOX_H, CELL, S, SEAT_H } from '../core/config.js';
 import { key, scene } from '../scene/stage.js';
 import { CHAIR_W } from '../scene/seating.js';
-import { FILL, atlas, sizeAtlas } from '../goods/items.js';
+import { FILL, atlas, boxes, sizeAtlas } from '../goods/items.js';
 import { YARN, YARN_FIT, bandMesh, tailMesh, yarnMeshes } from '../goods/yarn.js';
 import { YARN_COLORS, cellNameFor } from '../goods/stock.js';
 
-let heldMat = null, heldBoxMat = null, heldSizeMat = null;
+let heldMat = null, heldSizeMat = null;
 
 const HELD_W = CELL * FILL, HELD_H = BOX_H;
 
@@ -35,7 +35,6 @@ function heldMaterials() {
     map: atlas.texture, color: new THREE.Color('#241e22'),
     transparent: false, alphaTest: 0.45, side: THREE.DoubleSide,
   });
-  heldBoxMat ??= new THREE.MeshStandardMaterial({ color: '#e7ddc9', roughness: 0.85, metalness: 0 });
   heldSizeMat ??= new THREE.MeshBasicMaterial({
     map: sizeAtlas.texture, transparent: false, alphaTest: 0.45, side: THREE.DoubleSide,
   });
@@ -64,7 +63,7 @@ function heldYarn(item, group) {
 
 function heldBox(item, group) {
   const cellName = cellNameFor(item);
-  const box = new THREE.Mesh(new THREE.BoxGeometry(HELD_W, HELD_H, HELD_W), heldBoxMat);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(HELD_W, HELD_H, HELD_W), boxes.material);
   box.castShadow = true;
   group.add(box);
 
@@ -455,23 +454,10 @@ export function tickCast(dt) {
 
 let blobs = null, blobTex = null;
 
-function blobTexture() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const ctx = c.getContext('2d');
-  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-  g.addColorStop(0.0, 'rgba(0,0,0,0.55)');
-  g.addColorStop(0.5, 'rgba(0,0,0,0.30)');
-  g.addColorStop(1.0, 'rgba(0,0,0,0.00)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 64, 64);
-  return new THREE.CanvasTexture(c);
-}
-
 export function buildBlobs() {
   if (blobs) { scene.remove(blobs); blobs.geometry.dispose(); blobs.material.dispose(); blobs = null; }
   if (!S.blobShadows || !cast.length) return;
-  blobTex ??= blobTexture();
+  blobTex ??= Object.assign(softDiscTexture(0.5, 0.3), { colorSpace: THREE.NoColorSpace });
   blobs = new THREE.InstancedMesh(
     new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, opacity: 0.55 }),

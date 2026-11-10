@@ -123,14 +123,12 @@ const uniform = (value) => ({ value });
 // DESIGN-DECISIONS.md "Thickness comes from an edge pass": the shop and the demo both start here
 export const CARD_LOOK = Object.freeze({ shade: 0.28, edgeColor: '#1b1418', edgeGrow: 1.07 });
 
-export function notionMaterial(texture, { unlit = true, shade = 0 } = {}) {
-  const Material = unlit ? THREE.MeshBasicMaterial : THREE.MeshStandardMaterial;
-  const material = new Material({
+export function notionMaterial(texture, shade = 0) {
+  const material = new THREE.MeshBasicMaterial({
     map: texture,
     transparent: false,
     alphaTest: 0.45,
     side: THREE.DoubleSide,
-    ...(unlit ? {} : { roughness: 0.85, metalness: 0 }),
   });
   material.userData.uniforms = { uGrow: uniform(1), uShade: uniform(shade) };
   patchAtlasUV(material, '', 'diffuseColor.rgb *= mix(1.0 - uShade, 1.0, vLocalUv.y);');
@@ -159,15 +157,20 @@ export function makeEdge(field, color = CARD_LOOK.edgeColor) {
   return edge;
 }
 
-export function makeField(texture, capacity, opts = {}) {
+/** count 0, never culled; colored: white per-instance colours to tint */
+export function instanced(geometry, material, capacity, colored = false) {
+  const mesh = new THREE.InstancedMesh(geometry, material, capacity);
+  if (colored) mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3).fill(1), 3);
+  mesh.frustumCulled = false;
+  mesh.count = 0;
+  return mesh;
+}
+
+export function makeField(texture, capacity, shade = 0) {
   const geometry = new THREE.PlaneGeometry(1, 1);
   const cells = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4);
   geometry.setAttribute('aCell', cells);
-
-  const mesh = new THREE.InstancedMesh(geometry, notionMaterial(texture, opts), capacity);
-  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3).fill(1), 3);
-  mesh.frustumCulled = false;
-  mesh.count = 0;
+  const mesh = instanced(geometry, notionMaterial(texture, shade), capacity, true);
   mesh.userData.cells = cells;
   return mesh;
 }
@@ -193,13 +196,13 @@ export function setInstance(field, index, { matrix, rect, color }) {
   }
 }
 
-function softDiscTexture() {
+export function softDiscTexture(midStop = 0.7, midAlpha = 0.28) {
   const size = 64, canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
   const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   g.addColorStop(0, 'rgba(0,0,0,0.55)');
-  g.addColorStop(0.7, 'rgba(0,0,0,0.28)');
+  g.addColorStop(midStop, `rgba(0,0,0,${midAlpha})`);
   g.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size, size);
@@ -209,26 +212,15 @@ function softDiscTexture() {
 }
 
 export function makeShadows(capacity) {
-  const mesh = new THREE.InstancedMesh(
-    new THREE.PlaneGeometry(1, 1),
-    new THREE.MeshBasicMaterial({ map: softDiscTexture(), transparent: true, depthWrite: false }),
-    capacity,
-  );
-  mesh.frustumCulled = false;
-  mesh.count = 0;
+  const mesh = instanced(new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ map: softDiscTexture(), transparent: true, depthWrite: false }), capacity);
   mesh.renderOrder = -2;
   return mesh;
 }
 
 export function makeBoxes(capacity, color = '#e7ddc9') {
-  const mesh = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(1, 1, 1),
-    new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0 }),
-    capacity,
-  );
-  mesh.frustumCulled = false;
-  mesh.count = 0;
-  return mesh;
+  return instanced(new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0 }), capacity);
 }
 
 const _q = new THREE.Quaternion();

@@ -4,7 +4,7 @@ import { roomEnvironment } from './room-environment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
   CARD_LOOK, loadAtlas, cellRect, makeGridLines, makeField, makeEdge, makeShadows, makeBoxes, makeSizeAtlas,
-  setInstance, placeMatrix, placeBoxMatrix, placeLabelMatrix,
+  instanced, setInstance, placeMatrix, placeBoxMatrix, placeLabelMatrix,
 } from './notions.js';
 import {
   EMPTY, makeDisplay, gridSize, footprint, fits, place, lift, topAt, columnAt, slotRect,
@@ -39,7 +39,6 @@ const S = {
   // YARN-ASSET-SPIKE.md §14: a fine quantum
   layerRatio: 0.125,
   boxColor:   '#e7ddc9',
-  unlit:      true,
   showGrid:   true,
   liftHeight: 0.14,
   edge:       true,
@@ -336,10 +335,7 @@ function buildFamilyMesh(f) {
 }
 
 function yarnInstances(geometry) {
-  const mesh = new THREE.InstancedMesh(geometry, currentYarnMaterial(), YARN_CAPACITY);
-  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(YARN_CAPACITY * 3).fill(1), 3);
-  mesh.frustumCulled = false;
-  mesh.count = 0;
+  const mesh = instanced(geometry, currentYarnMaterial(), YARN_CAPACITY, true);
   scene.add(mesh);
   return mesh;
 }
@@ -1012,8 +1008,8 @@ const clock = new THREE.Timer();
 
 function buildNotionMeshes(loaded) {
   atlas = loaded;
-  field = makeField(atlas.texture, CAPACITY, { unlit: S.unlit, shade: S.shade });
-  fieldTop = makeField(atlas.texture, CAPACITY, { unlit: S.unlit, shade: S.shade });
+  field = makeField(atlas.texture, CAPACITY, S.shade);
+  fieldTop = makeField(atlas.texture, CAPACITY, S.shade);
   edge = makeEdge(field, S.edgeColor);
   edgeTop = makeEdge(fieldTop, S.edgeColor);
   for (const e of edges()) {
@@ -1026,7 +1022,7 @@ function buildNotionMeshes(loaded) {
   boxes.userData.owner = [];
 
   sizeAtlas = makeSizeAtlas(HOOK_SIZES_MM.map((mm) => mm.toFixed(1)));
-  sizeTag = makeField(sizeAtlas.texture, CAPACITY, { unlit: true, shade: 0 });
+  sizeTag = makeField(sizeAtlas.texture, CAPACITY);
 
   scene.add(field, edge, fieldTop, edgeTop, shadows, boxes, sizeTag);
 }

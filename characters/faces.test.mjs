@@ -19,11 +19,7 @@ const build = (P, id) => {
   built.root.updateMatrixWorld(true);
   return built;
 };
-const meshes = (root) => {
-  const out = [];
-  root.traverse((o) => { if (o.isMesh) out.push(o); });
-  return out;
-};
+const meshes = (root) => root.getObjectsByProperty('isMesh', true);
 const named = (built, name) => built.head.children.filter((o) => o.name === name);
 
 /** a head-local mesh's vertices, in head space */
@@ -99,25 +95,20 @@ function checkDragon(built, label) {
   assert.ok(long.tip - short.tip > 0.35 * def.hr && long.w === short.w, 'dragon: muzzleLength does not push the snout out');
 }
 
-// BODIES.md §Turtle: the turtle stands, so the shell's rim is a loop standing upright round its back (tall, shallow
-// front to back), never a ring parallel to the floor
 {
   const built = build(paramsOf('turtle', { mergeMeshes: false }), 'turtle'), P = built.params;
-  const rim = built.chest.getObjectByName('rim'), vs = vertices(rim);
-  const span = (k) => Math.max(...vs.map((v) => v[k])) - Math.min(...vs.map((v) => v[k]));
+  // BODIES.md §Turtle: the turtle stands, so the shell's rim is a loop standing upright round its back (tall, shallow
+  // front to back), never a ring parallel to the floor
+  const rim = vertices(built.chest.getObjectByName('rim'));
+  const span = (k) => Math.max(...rim.map((v) => v[k])) - Math.min(...rim.map((v) => v[k]));
   assert.ok(span('y') > 1.6 * P.torsoH && span('z') < 0.45 * P.torsoD, `turtle: the shell rim lies flat (tall ${(span('y') / P.torsoH).toFixed(2)}, deep ${(span('z') / P.torsoD).toFixed(2)})`);
-}
 
-// BODIES.md §Turtle: the head stripes are painted on, as face paint: lying on the skin, never standing off it
-{
-  const built = build(paramsOf('turtle', { mergeMeshes: false }), 'turtle'), skull = ellipsoid(built.head.children[0]);
-  const k = named(built, 'stripe').flatMap(vertices).map(skull);
-  assert.ok(k.length && Math.min(...k) > 0.99 && Math.max(...k) < 1.05, `turtle: the head stripes stand off the skin (${Math.min(...k).toFixed(3)} to ${Math.max(...k).toFixed(3)})`);
-}
+  // BODIES.md §Turtle: the head stripes are painted on, as face paint: lying on the skin, never standing off it
+  const stripe = named(built, 'stripe').flatMap(vertices).map(ellipsoid(built.head.children[0]));
+  assert.ok(stripe.length && Math.min(...stripe) > 0.99 && Math.max(...stripe) < 1.05, `turtle: the head stripes stand off the skin (${Math.min(...stripe).toFixed(3)} to ${Math.max(...stripe).toFixed(3)})`);
 
-// BODIES.md §Turtle: the plastron lies on the front of the torso, chest to below the belly, no backing standing off it
-{
-  const built = build(paramsOf('turtle', { mergeMeshes: false }), 'turtle'), P = built.params, vs = vertices(built.chest.getObjectByName('plastron'));
+  // BODIES.md §Turtle: the plastron lies on the front of the torso, chest to below the belly, no backing standing off it
+  const vs = vertices(built.chest.getObjectByName('plastron'));
   const k = vs.map((v) => Math.hypot(v.x / P.torsoW, v.y / P.torsoH, v.z / P.torsoD)), ys = vs.map((v) => v.y / P.torsoH);
   assert.ok(Math.min(...k) > 1 && Math.max(...k) < 1.06 && Math.min(...vs.map((v) => v.z)) > 0, `turtle: the plastron sinks in, floats off or wraps round (${Math.min(...k).toFixed(3)} to ${Math.max(...k).toFixed(3)})`);
   assert.ok(Math.max(...ys) > 0.5 && Math.max(...ys) < 0.75 && Math.min(...ys) < -0.7, `turtle: the plastron does not run chest to belly (${Math.max(...ys).toFixed(2)} to ${Math.min(...ys).toFixed(2)})`);

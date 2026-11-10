@@ -59,16 +59,21 @@ const jumpsuitLook = () => ({
   ...blankLook(), sweater: 'pullover', sweaterColor: TAXI, socks: 'over-knee', socksColor: WHITE, bag: 'drawstring bag', bagColor: BLUE,
   hands: MIC, trick: TRICKS[MIC][0], gloves: ORANGE,
 });
-const APRIL = { species: 'llama', fur: ORANGE, facePaint: 'heart' };
+// REUSE-SPEC.md §Hero chooser: the six presets: the four turtles, April, and Master Splinter (an orange mouse in a red
+// vest and white socks, with his cane)
+const turtle = (scarf) => ({ species: 'turtle', fur: GREEN, facePaint: SIGNATURE[scarf]?.facePaint, look: () => scarfLook(scarf) });
+const WHO = Object.freeze([
+  ...TURTLE_COLOURS.map(({ hex }) => turtle(hex)),
+  { species: 'llama', fur: ORANGE, facePaint: 'heart', look: jumpsuitLook },
+  { species: 'mouse', fur: ORANGE, look: () => ({ ...blankLook(), sweater: 'vest', sweaterColor: RED, socks: 'crew', socksColor: WHITE,
+    hands: CANE, trick: TRICKS[CANE][0], gloves: RED }) },
+]);
+/** How many presets 🍕 steps through. */
+export const PRESETS = WHO.length;
 
-/** How many presets 🍕 steps through: the four turtles and April. */
-export const PRESETS = TURTLE_COLOURS.length + 1;
-
-/** A turtle in one of the four turtles' scarves, or April; `species` given (the chooser's animal), that animal. @returns {Hero} */
+/** One of the presets; `species` given (the chooser's animal), in that animal. @returns {Hero} */
 export function newHero(rng = Math.random, species = undefined) {
-  const i = Math.floor(rng() * (TURTLE_COLOURS.length + 1)), scarf = TURTLE_COLOURS[i]?.hex;
-  const who = scarf ? { species: 'turtle', fur: GREEN, facePaint: SIGNATURE[scarf]?.facePaint, look: scarfLook(scarf) } : { ...APRIL, look: jumpsuitLook() };
-  const { look } = who, animal = species ?? who.species;
+  const who = WHO[Math.floor(rng() * PRESETS)], look = who.look(), animal = species ?? who.species;
   if (animal === 'mouse') Object.assign(look, { hands: handsOf(animal), trick: TRICKS[handsOf(animal)][0] });
   const params = structuredClone(getSpecies(animal).defaults);
   params.facePaint = who.facePaint ?? params.facePaint;

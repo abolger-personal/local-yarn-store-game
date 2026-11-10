@@ -146,11 +146,12 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
     cheek-slash face paint, and his balls of yarn.
   - **Leonardo** (blue), straight-laced: the trailing scarf, high blue boots (over-knee socks), a blue drawstring bag
     and his knitting needles.
-  - **Master Splinter**: picking the mouse gives the cane.
+  - **Master Splinter** (the sixth preset, decided 2026-11-10): an orange mouse in a red vest and white crew socks,
+    with his cane in red. Picking the mouse for any hero gives the cane.
   - **April** (the fifth default), leggy: **an orange llama** (amended 2026-11-09) in her jumpsuit (the yellow
     pullover), white over-knee boots, a blue drawstring bag, a heart on her cheek, and her microphone.
-- 🎲 any animal, colours and pieces. **🍕 a preset** (decided 2026-11-10): the four turtles and April in turn, from a
-  random one, so two taps never give the same. The page opens on the saved hero, or a preset when none is saved.
+- 🎲 any animal, colours and pieces. **🍕 a preset** (decided 2026-11-10): **six presets**, the four turtles, April and
+  Master Splinter, in turn from a random one, so two taps never give the same. The page opens on the saved hero, or a preset when none is saved.
   👍 saves; there is no lobby to go to yet.
 - Every colour is one of the six hero colours; anything else read from a save or another tablet snaps to the
   nearest (`readHero`). `tmnt/hero.test.mjs` checks it.

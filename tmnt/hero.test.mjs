@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { LOOK } from '../characters/garments.js';
 import { POSES } from '../characters/npc.js';
 import { CANE, MIC, NEEDLES, SAI, SPECIES, STAFF, YARN_BALLS, stepFighter, animateFighter, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
-import { CLOTH, COLOURS, PALETTE, SCARF_FORMS, SWEATER_WORKS, TURTLE_COLOURS, WEAR, newHero, randomHero, readHero } from './hero.js';
+import { CLOTH, COLOURS, PALETTE, PRESETS, SCARF_FORMS, SWEATER_WORKS, TURTLE_COLOURS, WEAR, newHero, randomHero, readHero } from './hero.js';
 
 LOOK.viewPx = 0;
 
@@ -11,16 +11,16 @@ for (const { hex, name } of CLOTH) {
   assert.ok(!isBadGuyCloth(hex) && !isBadGuyFur(hex), `${name} is a hero colour, not a bad guy's`);
 }
 
-// REUSE-SPEC.md §Hero chooser: a turtle in one of the four turtles' scarves, or in April's yellow jumpsuit
-const looks = new Set();
-for (const r of [0, 0.25, 0.45, 0.65, 0.95]) {
-  const { species, look } = newHero(() => r);
-  assert.equal(species, look.scarf ? 'turtle' : 'llama', 'the turtles are turtles, April a llama');
-  if (look.scarf) assert.ok(TURTLE_COLOURS.some((c) => c.hex === look.scarfColor), 'a turtle colour scarf');
-  else assert.ok(look.sweater && look.socks && look.sweaterColor === COLOURS[5].hex && look.socksColor === '#ffffff' && look.hands === MIC, 'a taxi yellow jumpsuit, white boots, her microphone');
-  looks.add(look.scarf ? look.scarfColor : 'jumpsuit');
-}
-assert.equal(looks.size, 5, 'all four scarves and the jumpsuit come up');
+// REUSE-SPEC.md §Hero chooser: six presets, the four turtles in their scarves, April and Master Splinter
+const presets = Array.from({ length: PRESETS }, (_, i) => newHero(() => (i + 0.5) / PRESETS));
+assert.equal(PRESETS, 6);
+presets.slice(0, 4).forEach(({ species, look }, i) => {
+  assert.equal(species, 'turtle');
+  assert.equal(look.scarfColor, TURTLE_COLOURS[i].hex, 'each turtle in his own colour');
+});
+const [april, splinter] = presets.slice(4).map(({ species, look }) => ({ species, ...look }));
+assert.deepEqual([april.species, april.sweaterColor, april.socksColor, april.hands], ['llama', COLOURS[5].hex, '#ffffff', MIC], 'April: a taxi yellow jumpsuit, white boots, her microphone');
+assert.deepEqual([splinter.species, splinter.sweater, splinter.hands], ['mouse', 'vest', CANE], 'Master Splinter: a vest and his cane');
 
 // the trust boundary: no hats or capes, no Sock Clan scarf, no colour outside the hero colours
 const hero = readHero({
@@ -49,15 +49,15 @@ for (const species of SPECIES) {
   }
 }
 // the sweater, tapped again, in each colourwork: its own colour first, then the other hero colours
-const april = newHero(() => 0.95);
+const jumpsuit = presets[4];
 for (const work of SWEATER_WORKS) {
-  const sweater = outfitOf({ ...april.look, sweaterWork: work }, PALETTE).sweater;
-  assert.equal(sweater.color1, april.look.sweaterColor, `${work}: the picked colour leads`);
+  const sweater = outfitOf({ ...jumpsuit.look, sweaterWork: work }, PALETTE).sweater;
+  assert.equal(sweater.color1, jumpsuit.look.sweaterColor, `${work}: the picked colour leads`);
   assert.equal(sweater.colourwork, work);
   assert.equal(sweater.colorCount, work === 'solid' ? 1 : PALETTE.length);
-  disposeFighter(buildFighter({ ...april, look: { ...april.look, sweaterWork: work } }, PALETTE));
+  disposeFighter(buildFighter({ ...jumpsuit, look: { ...jumpsuit.look, sweaterWork: work } }, PALETTE));
 }
-assert.equal(outfitOf({ ...april.look, sweaterWork: 'stripes' }).sweater.colorCount, 1, 'a fighter (no palette) keeps a one-colour sweater');
+assert.equal(outfitOf({ ...jumpsuit.look, sweaterWork: 'stripes' }).sweater.colorCount, 1, 'a fighter (no palette) keeps a one-colour sweater');
 // Raphael (red) has his sai and red socks; the mouse is Master Splinter, with his cane, hanging down to the floor at rest
 const raph = newHero(() => 0.65);
 assert.deepEqual([raph.look.scarfColor, raph.look.hands, raph.look.socksColor], [COLOURS[3].hex, SAI, COLOURS[3].hex]);

@@ -122,7 +122,6 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
 - Weapons: the gloves and the heroes' own; not the fighters' sword, Music Scythe or Greathammer (decided 2026-11-10;
   a saved one comes back as gloves). No unlocks yet; tapping again changes the trick. The heroes' own (decided
   2026-11-09):
-  - **The sai** (no longer Raphael's): a long point and two prongs curving forward from the guard, a white grip.
   - **Master Splinter's cane:** a giant crochet hook (amended 2026-11-09: a hook's lip, throat and thumb rest, not a
     knob), which hangs straight down at rest like a walking
     stick and swings up out of that into the sword's moves. One length for every animal (amended 2026-11-09, so it
@@ -132,15 +131,21 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
     as the Greathammer but never thrown. A dark handle, a band in the picked colour, a huge faceted silver grille,
     about half her height. It has the sword's effects, off the grille; April's preset starts on ✨ the stars
     (decided 2026-11-10), and tapping the mic again goes through the rest.
-  - **Leonardo's katanas are giant kid's safety scissors** (decided 2026-11-10), a half in each hand, so at rest
-    they read as his two katanas: a long blade with a rounded tip, a chunky handle loop round the hand in the
-    picked colour, a pivot screw. The right swung as the sword, the left held up at the sword's rest. Brainstorm
+  - **Leonardo's katanas are comically large kid's safety scissors** (decided 2026-11-10), a half in each hand,
+    crossed in front of him at rest like his two katanas (each half aimed past the middle; amended 2026-11-10: as
+    big as needed for his short arms to cross them; a handle shank four times the loop, so the blades reach well past
+    each other): a long blade with a rounded tip, a chunky
+    handle loop round the hand in the picked colour, a pivot screw. The right swung as the sword, the left held up at the sword's rest. Brainstorm
     2026-11-10: snipping shut as a hit lands.
   - **Raphael's sai are a pair of knitting needles** (decided 2026-11-10: stabbing, in pairs, like sai), one in each
-    hand, held as Leonardo's scissors are. Long points, a knob on each end. The sai stays pickable.
+    hand, the right swung as the sword, the left held up at its rest. Long points, a knob on each end. The sai has left
+    the game (decided 2026-11-10).
   - **Michelangelo's nunchucks are two balls of yarn on one strand** (decided 2026-11-09, "more fun to animate"),
     held by the middle, swung as the sword. Each ball swings on its strand as a pendulum hung from the hand, so a punch
-    flings them out and they swing back on their own. No tricks yet. A throw that spins out and comes back like the
+    flings them out and they swing back on their own. No tricks yet. **Planned 2026-11-10, with the levels:** the
+    swing is worked out in his own space, so only his arm moving (a punch, the idle bob) swings them; running,
+    jumping, landing and the chooser's turning don't. Work it out in the level's space instead, so the yarn trails
+    behind a run and bounces on a landing. A throw that spins out and comes back like the
     Greathammer's (`spinoff/hammer.js`) is planned 2026-11-09.
   - **Donatello's bo staff is a giant drop spindle** (amended 2026-11-10, was a pole with a knitted grip): held in
     both hands and swung as the Music Scythe, with no blade; longer, for reach. A wooden shaft to a point, a chunky
@@ -188,7 +193,6 @@ Sweater. Heroes don't get them. The design is open.
 ## Open questions
 
 - **Which theme?** Pick from the list in §The game.
-- **Does the sai stay,** or go now that no turtle has it? Fibre-arts look-alikes: a lucet, a seam ripper.
 - **Are weapons unlocked?** Unlocks from the fighting game carry over, or start fresh?
 - **Which scarf colour does each player get?** One of the four at random, or each tablet in a room a different
   one, so a full room reads as the four turtles? A fifth player in taxi yellow would be the April.

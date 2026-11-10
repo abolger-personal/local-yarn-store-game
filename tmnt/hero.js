@@ -1,6 +1,6 @@
 import { FACE_PAINTS, getSpecies } from '../characters/npc.js';
 import { COLOURWORKS, FORMS } from '../characters/garments.js';
-import { BAGS, CANE, MIC, NEEDLES, SAI, SCISSORS, STAFF, YARN_BALLS, SPECIES, TEXTURES, TRICKS, nearestSwatch, readFighter, setFur } from '../spinoff/fighter.js';
+import { BAGS, CANE, MIC, NEEDLES, SCISSORS, STAFF, YARN_BALLS, SPECIES, TEXTURES, TRICKS, nearestSwatch, readFighter, setFur } from '../spinoff/fighter.js';
 
 const HERO_KEY = 'tmnt.hero.v1';
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -27,7 +27,7 @@ export const WEAR = Object.freeze({
 export const SCARF_FORMS = Object.freeze(FORMS.filter((f) => f !== 'wrapped twice'));
 const DEFAULT_HANDS = 'gloves';
 // REUSE-SPEC.md §Hero chooser: the gloves and the heroes' own; not the fighters' sword, scythe or hammer
-export const HERO_HANDS = Object.freeze([DEFAULT_HANDS, SCISSORS, NEEDLES, SAI, STAFF, YARN_BALLS, MIC, CANE]);
+export const HERO_HANDS = Object.freeze([DEFAULT_HANDS, SCISSORS, NEEDLES, STAFF, YARN_BALLS, MIC, CANE]);
 // REUSE-SPEC.md §Hero chooser: the mouse is Master Splinter, with his cane
 export const handsOf = (species) => (species === 'mouse' ? CANE : DEFAULT_HANDS);
 

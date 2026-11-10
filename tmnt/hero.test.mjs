@@ -85,6 +85,14 @@ assert.deepEqual([donnie.scarf, donnie.bag, donnie.socks, donnie.hands], ['cowl'
 const leo = buildFighter(newHero(() => 0.25));
 const pair = leo.sword.userData.pair;
 assert.ok(pair?.parent && leo.sword.parent !== pair.parent, 'a half in each hand');
+// at rest the halves cross in front of him, like his katanas: each blade's tip past the middle
+for (let i = 0; i < 60; i++) animateFighter(leo, 1 / 60);
+leo.root.updateMatrixWorld(true);
+for (const half of [leo.sword, pair]) {
+  const grip = leo.root.worldToLocal(half.getWorldPosition(new THREE.Vector3()));
+  const tip = leo.root.worldToLocal(half.localToWorld(new THREE.Vector3(0, 0, leo.sword.userData.tip)));
+  assert.ok(Math.sign(tip.x) !== Math.sign(grip.x) && tip.z > grip.z, `the blades cross in front (${grip.x.toFixed(2)} → ${tip.x.toFixed(2)})`);
+}
 assert.deepEqual([newHero(() => 0.25).look.hands, newHero(() => 0.25).look.socks], [SCISSORS, 'over-knee']);
 disposeFighter(leo);
 assert.equal(pair.parent, null, 'the left half goes with the right');

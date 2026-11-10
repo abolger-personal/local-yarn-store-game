@@ -3,11 +3,11 @@ import * as THREE from 'three';
 import { BUILD, NAMES, POSES, applyPose, createCharacter, disposeCharacter, getSpecies, pick,
          setGeometryDetail, setViewMode, speciesIds } from '../npc.js';
 import '../species.js';
-import { STATE, TRAITS, consideredHere, interact, labelOf, makeNpc, makeWorld, noticeable,
+import { STATE, TRAITS, consideredHere, interact, makeNpc, makeWorld, noticeable,
          signGuestbook } from '../visit.js';
 import { describeWip, labelWant, wantFor, wantsOf, stow, WIP_STATE } from '../wip.js';
 import { HOOK_SIZES_MM, NOTION_NAMES, PATTERN_NAMES, SIZED_NOTIONS, TOOL_NOTIONS, YARN_COLOR_COUNT,
-         YARN_MATERIALS, YARN_SHAPES, YARN_WEIGHT_NAMES, CRAFTS, makeNotion, makePattern,
+         YARN_MATERIALS, labelOf, YARN_SHAPES, YARN_WEIGHT_NAMES, CRAFTS, makeNotion, makePattern,
          makeYarn } from '../../inventory/catalog.js';
 import { EMPTY, topAt } from '../../inventory/grid.js';
 import { openWithAtlas } from '../../inventory/notions.js';

@@ -1,9 +1,9 @@
 import { cast, seats, props, displays, items, shop, mover } from './core/state.js';
-import { SHOP_RANGE, SIZED_NOTIONS, YARN_SHAPES, yarnWeight } from '../../inventory/catalog.js';
+import { SHOP_RANGE, SIZED_NOTIONS, YARN_SHAPES, yarnWeight, labelOf } from '../../inventory/catalog.js';
 import { fits, footprint, makeDisplay, place, usableAt } from '../../inventory/grid.js';
 import { familyExtent, yarnFit } from '../../inventory/yarn-geometry.js';
 import { createCharacter, disposeCharacter, getSpecies, speciesIds } from '../npc.js';
-import { labelOf, obstacles, seatById } from '../visit.js';
+import { obstacles, seatById } from '../visit.js';
 import * as THREE from 'three';
 import { BOX_H, CELL, S, TALLEST_LAYERS } from './core/config.js';
 import { applyDaylight, camera, controls, renderer, scene, key as sun } from './scene/stage.js';

@@ -1,11 +1,11 @@
 
 import { activeDisplay, hoverTarget, raycaster, setRayFromEvent } from './pointer.js';
-import { FLAT_Q, dropMarker } from './glow.js';
+import { FLAT_Q, dropMarker, markerLook } from './glow.js';
 import { cast, seats, props, displays, aim, shop, touchView, touchHud, mover } from '../core/state.js';
 import { gridSize, remask, usableAt } from '../../../inventory/grid.js';
 import { seatById } from '../../visit.js';
 import * as THREE from 'three';
-import { CELL, GHOST_ALPHA, GHOST_NO, GHOST_OK, S } from '../core/config.js';
+import { CELL, GHOST_NO, GHOST_OK, S } from '../core/config.js';
 
 import { HALF_D, HALF_W, UP, clearGroup } from '../scene/room.js';
 import { CHAIR_W, chairGroup } from '../scene/seating.js';
@@ -26,7 +26,6 @@ const moveSize = (m) => {
 
 export const movePose = (m) => ({ x: m.x, z: m.z, yaw: isSeat(m) ? m.facing : m.yaw });
 
-export 
 const _floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
 const _floorHit = new THREE.Vector3();
@@ -86,10 +85,7 @@ function paintMoveGhost(m) {
   const { w, d: depth } = moveSize(m);
   const pose = movePose(m);
   dropMarker.visible = true;
-  dropMarker.material.color.set(mover.ok ? GHOST_OK : GHOST_NO);
-  dropMarker.material.depthTest = true;
-  dropMarker.material.opacity = GHOST_ALPHA;
-  dropMarker.renderOrder = 0;
+  markerLook(mover.ok ? GHOST_OK : GHOST_NO);
   dropMarker.position.set(pose.x, 0.006, pose.z);
   dropMarker.quaternion.setFromAxisAngle(UP, pose.yaw).multiply(FLAT_Q);
   dropMarker.scale.set(w * 1.06, depth * 1.06, 1);

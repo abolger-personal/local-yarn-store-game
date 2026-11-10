@@ -25,7 +25,7 @@ assert.equal(looks.size, 5, 'all four scarves and the jumpsuit come up');
 // the trust boundary: no hats or capes, no Sock Clan scarf, no colour outside the hero colours
 const hero = readHero({
   species: 'mouse', params: { bodyColor: '#fefefe' },
-  look: { hat: 'beanie', cape: 'cape', scarf: 'long', scarfForm: 'wrapped twice', scarfColor: '#c0c0c0', socks: 'nope', bagColor: '#fefefe', hands: 'scythe' },
+  look: { hat: 'beanie', cape: 'cape', scarf: 'long', scarfForm: 'wrapped twice', scarfColor: '#c0c0c0', socks: 'nope', bagColor: '#fefefe', hands: 'sword' },
 });
 assert.equal(hero.look.hat, null);
 assert.equal(hero.look.cape, null);
@@ -33,6 +33,7 @@ assert.equal(hero.look.scarf, 'long');
 assert.ok(SCARF_FORMS.includes(hero.look.scarfForm) && hero.look.scarfForm !== 'wrapped twice');
 assert.ok(CLOTH.some((c) => c.hex === hero.look.scarfColor), "a silver scarf snaps to a hero colour");
 assert.equal(hero.look.socks, null);
+assert.equal(hero.look.hands, 'gloves', "the fighters' sword isn't a hero's");
 assert.equal(hero.look.bagColor, '#ffffff', 'white clothes');
 assert.ok(COLOURS.some((c) => c.hex === hero.params.bodyColor), 'white fur snaps to a hero colour');
 assert.equal(readHero({ species: 'hydra' }), null);

@@ -2,7 +2,7 @@ import { FACE_PAINTS, POSES, facePaintColorOf, getSpecies } from '../characters/
 import { SPECIES, TEXTURES, TRICKS, animateFighter, buildFighter, disposeFighter, setFur, stepFighter, stepTricks } from '../spinoff/fighter.js';
 import { FACE_ICON, ICON, NONE, TRICK_ICON, svg, textured } from '../spinoff/icons.js';
 import { makeStage } from '../spinoff/stage.js';
-import { CLOTH, COLOURS, HERO_HANDS, PALETTE, handsOf, SCARF_FORMS, SWEATER_WORKS, WEAR, loadHero, newHero, randomHero, saveHero } from './hero.js';
+import { CLOTH, COLOURS, HERO_HANDS, PALETTE, PRESETS, handsOf, SCARF_FORMS, SWEATER_WORKS, WEAR, loadHero, newHero, randomHero, saveHero } from './hero.js';
 
 const LINE = 'fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"';
 const PICTURE = {
@@ -120,6 +120,14 @@ panel.addEventListener('click', (e) => {
 
 document.getElementById('dice').addEventListener('click', () => {
   hero = randomHero();
+  commit(true);
+});
+
+// REUSE-SPEC.md §Hero chooser: 🍕 the presets in turn, from a random one, so two taps never give the same
+let preset = Math.floor(Math.random() * PRESETS);
+document.getElementById('preset').addEventListener('click', () => {
+  preset = (preset + 1) % PRESETS;
+  hero = newHero(() => (preset + 0.5) / PRESETS);
   commit(true);
 });
 

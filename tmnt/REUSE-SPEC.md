@@ -119,8 +119,9 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
   the characters are small on a tablet): its own colour first, then the other five hero colours.
 - Socks: crew, knee-high, over-knee. Tapping them again knits them in the next stitch, as the fighters' hats do.
 - Bags: the fighters' three, or none.
-- Weapons: the fighters' four (gloves, sword, Music Scythe, Greathammer), plus two of the heroes' own, no unlocks
-  yet; tapping again changes the trick. Both are held and swung as the sword, with its tricks (decided 2026-11-09):
+- Weapons: the gloves and the heroes' own; not the fighters' sword, Music Scythe or Greathammer (decided 2026-11-10;
+  a saved one comes back as gloves). No unlocks yet; tapping again changes the trick. The heroes' own (decided
+  2026-11-09):
   - **Raphael's sai:** a long point and two prongs curving forward from the guard, a white grip.
   - **Master Splinter's cane:** a giant crochet hook (amended 2026-11-09: a hook's lip, throat and thumb rest, not a
     knob), which hangs straight down at rest like a walking
@@ -148,7 +149,9 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
   - **Master Splinter**: picking the mouse gives the cane.
   - **April** (the fifth default), leggy: **an orange llama** (amended 2026-11-09) in her jumpsuit (the yellow
     pullover), white over-knee boots, a blue drawstring bag, a heart on her cheek, and her microphone.
-- 🎲 any animal, colours and pieces. 👍 saves; there is no lobby to go to yet.
+- 🎲 any animal, colours and pieces. **🍕 a preset** (decided 2026-11-10): the four turtles and April in turn, from a
+  random one, so two taps never give the same. The page opens on the saved hero, or a preset when none is saved.
+  👍 saves; there is no lobby to go to yet.
 - Every colour is one of the six hero colours; anything else read from a save or another tablet snaps to the
   nearest (`readHero`). `tmnt/hero.test.mjs` checks it.
 

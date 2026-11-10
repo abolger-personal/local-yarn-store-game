@@ -77,8 +77,6 @@ function buildCraft() {
 }
 
 function buildSitter(randomise = false) {
-  if (craft) disposeCraft(craft);
-  craft = null;
   if (built) { scene.remove(built.root); disposeCharacter(built); }
   const kit = getSpecies(state.species);
   const P = structuredClone(kit.defaults);

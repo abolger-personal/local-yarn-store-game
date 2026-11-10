@@ -2,42 +2,17 @@
 
 What's new in Donut Fighters, the L.Y.S. spinoff.
 
-## 0.0.9 (in progress)
+## 0.0.9 — 2026-11-09: A turtle, a dragon and the first generated level
 
-### Under the hood
-- **The match code is in reusable pieces:** the stage, getting round it, fighting, the build round and the donut game
-  each in their own file, so a different game could take the levels without the fighting, or the fighting without the
-  levels. A recorded set of matches checks that nothing plays any differently.
-- **Fixed:** 👋 while waiting for the next round was wired twice; it waves bye once now.
-- **Two new animals: a turtle and a dragon.** The turtle, Shelly 🐢, is a snapping turtle made round and burly: a big
-  soft neck with folds, big eyes, a blunt round head, stubby legs, and a painted turtle's colours (a dark shell with
-  a bright rim, an underside of fitted plates like a real one's, bright stripes on the head and neck, all worked out from the fur). The dragon, Ember
-  🐉, is cute, not scary, and has no wings: a big round head, snout like a bearded dragon's, big curled ivory horns, a big soft
-  crest and back spikes, overlapping scales painted all over (head, arms and legs too), an alligator's
-  belly of chevron plates from the neck to under the tail, and a short curled tail with a spade tip.
-- **New animals are easy to add:** one list of species, each animal describing itself (its emoji, first fur colour,
-  coat colour, where its gloves go), shared building blocks, and a step-by-step recipe
-  (`ai_planning_sessions/characters/ADDING-A-SPECIES.md`). Next: a turtle.
-
-### For the designer (species checker)
-- **The turtle's defaults are now your Zephyr:** but green with a yellow plastron, low eyes, broad and short, with the shoulders set a little
-  wider (0.82) so the arms hang and swing clear of the body, and a slightly longer neck (0.095) so scarves sit under
-  the eyes. Scarves and shawls fit her: a shawl rides up over arms set that high.
-- **A new dance, the booty shake, a taunt:** back turned, sat back as into a chair and bent right over so the bum sticks
-  out, a look back over the shoulder, wiggle wiggle with the tail wagging, a slap on the bum, and round again. Every
-  animal has it, in the dance menu here and in dress-up. Not yet a move in a match.
-- **Menus by part of the body:** Character, Look (with the paint sliders named by style), Body, Head & face (eyes, face
-  paint and each animal's own face parts together), Coat, Tail, Rig, Animation (raw pose sliders tucked into a debug
-  folder), View. Saved settings still load.
-- **Dress-up** shows however many animals there are.
-- **Five slots** (A to E, one per animal; partners A↔B and C↔D square up, E faces D), and **edit all slots at once**: a trait changed on one
-  goes to every slot whose animal has it.
-- **Accent stroke size:** the lion's mane and the llama's wool get their own fur stroke size slider ("fur accent stroke
-  size"), apart from the rest of the fur.
-- **New paint defaults**, picked in the checker: broad fur planes on the body, small busy ones on the mane and wool,
-  softer band edges, a stronger ink fray and feather rows. The checker opens with the game's look switched on.
-- **The look is the default everywhere:** painterly, shaped faces, eye glint and look-at are on for every character, in
-  this game and in the yarn shop (which keeps its own yarn-shop colours). `?plain` still turns it off here.
+### Two new animals
+- **Shelly the turtle 🐢** is a snapping turtle made round and burly: a big soft neck with folds, big low eyes, a
+  blunt round head, stubby legs, and a painted turtle's colours. She's green with a yellow plastron (the plates
+  underneath, fitted like a real one's), a dark shell with a bright rim, and bright stripes on her head and neck, all
+  worked out from the fur.
+- **Ember the dragon 🐉** is cute, not scary, and has no wings: a big round head, a snout like a bearded dragon's, big
+  curled ivory horns, a big soft crest and back spikes, overlapping scales painted all over (head, arms and legs too),
+  an alligator's belly of chevron plates from the neck to under the tail, and a short curled tail with a spade tip.
+- Pick either one in the fighter chooser (🐾), alongside the lion, llama and owl.
 
 ### Levels
 - **Level 5, the first generated level:** made by the level generator rather than by hand, the same layout every
@@ -46,6 +21,35 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
 - **Bad guys bump each other.** They used to walk through each other like the heroes do, so a pack of them chasing
   the same donut stacked into what looked like one bad guy with an afterimage. Now they jostle and jam doorways;
   heroes still pass through each other.
+
+### For the designer (species checker)
+- **The turtle's defaults are your Zephyr's shape:** green with a yellow plastron, low eyes, broad and short, with the
+  shoulders set a little wider (0.82) so the arms hang and swing clear of the body, and a slightly longer neck (0.095)
+  so scarves sit under the eyes. Scarves and shawls fit her: a shawl rides up over arms set that high.
+- **A new dance, the booty shake, a taunt:** back turned, sat back as into a chair and bent right over so the bum sticks
+  out, a look back over the shoulder, wiggle wiggle with the tail wagging, a slap on the bum, and round again. Every
+  animal has it, in the dance menu here and in dress-up. Not yet a move in a match.
+- **Menus by part of the body:** Character, Look (with the paint sliders named by style), Body, Head & face (eyes, face
+  paint and each animal's own face parts together), Coat, Tail, Rig, Animation (raw pose sliders tucked into a debug
+  folder), View. Saved settings still load.
+- **Dress-up** shows however many animals there are.
+- **Five slots** (A to E, one per animal; partners A↔B and C↔D square up, E faces D), and **edit all slots at once**: a
+  trait changed on one goes to every slot whose animal has it.
+- **Accent stroke size:** the lion's mane and the llama's wool get their own fur stroke size slider ("fur accent stroke
+  size"), apart from the rest of the fur.
+- **New paint defaults**, picked in the checker: broad fur planes on the body, small busy ones on the mane and wool,
+  softer band edges, a stronger ink fray and feather rows. The checker opens with the game's look switched on.
+- **The look is the default everywhere:** painterly, shaped faces, eye glint and look-at are on for every character, in
+  this game and in the yarn shop (which keeps its own yarn-shop colours). `?plain` still turns it off here.
+
+### Under the hood
+- **New animals are easy to add:** one list of species, each animal describing itself (its emoji, first fur colour,
+  coat colour, where its gloves go), shared building blocks, and a step-by-step recipe
+  (`ai_planning_sessions/characters/ADDING-A-SPECIES.md`). The turtle and the dragon were made with it.
+- **The match code is in reusable pieces:** the stage, getting round it, fighting, the build round and the donut game
+  each in their own file, so a different game could take the levels without the fighting, or the fighting without the
+  levels. A recorded set of matches checks that nothing plays any differently.
+- **Fixed:** 👋 while waiting for the next round was wired twice; it waves bye once now.
 
 ## 0.0.8 — 2026-11-05: Characters that look alive
 

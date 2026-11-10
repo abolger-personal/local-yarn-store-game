@@ -17,7 +17,7 @@ import { facedCell, fortGrid } from './build.js';
 import { aimGameCamera, makeStage } from './stage.js';
 import { SHELF_WOOD, THEMES } from './scenery.js';
 import { PIPING, box, donutMesh, sameLook } from './treats.js';
-import { rosterOf } from './multiplayer.js';
+import { rosterOf, turn } from './multiplayer.js';
 import { joinMatch } from './together.js';
 import { bye, note } from './net.js';
 import { createCpu } from './cpu.js';
@@ -119,8 +119,6 @@ const fighters = new Map(), donuts = new Map(), bricks = new Map(), shelves = ne
 function tickDown(t, keys, dt) {
   for (const k of keys) t[k] = Math.max(0, t[k] - dt / TIMERS[k]);
 }
-
-const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 function poseOf(m, f) {
   if (f.move === 'sit') return MOVE_POSES.sit;
@@ -789,8 +787,7 @@ async function warmUp(...later) {
 async function play() {
   const roster = net?.start.roster ?? rosterOf(ME, mine, undefined, asked.number), entrants = cast(roster);
   const controls = createControls(ME, level.stage);
-  const button = (id) => document.getElementById(id);
-  attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: button('punch'), kick: button('kick'), drop: button('drop') }, keyHelp: button('keys') });
+  attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: el('punch'), kick: el('kick'), drop: el('drop') }, keyHelp: el('keys') });
   attachReady(controls);
   attachAim(controls);
   attachSweep(controls);

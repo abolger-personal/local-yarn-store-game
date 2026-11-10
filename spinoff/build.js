@@ -3,6 +3,7 @@
 import { BRICK, PILE_DX, SHELF_WIDTH, floorTop, groundOf, overlaps, spotRect } from './match.js';
 import { dropLayer, fits, footprint, makeDisplay, place, topAt } from '../inventory/grid.js';
 import { clamp, flat } from './world.js';
+import { event } from './donut-game.js';
 
 /** Blocks a stack may hold: two is as tall as level 1's wall, which nobody hops (the playability check proves it). */
 export const HEIGHT_LIMIT = 2;
@@ -85,8 +86,6 @@ export function onTop(grid, bricks, i) {
 // The build round itself (REUSE-SPEC.md §Forts): piles, fetching and placing blocks, 👍 and the start. Reports what
 // happened on the match's event channels: `s.fullBag` (a shake: can't do that) and `s.donutEvents` ('place', 'fetch').
 
-const event = (f, p) => ({ fighter: f.id, x: p.x, y: p.y, z: p.z });
-
 /** Each hero's pile beside where it starts, `pieces` blocks in its icing. */
 export const pilesFor = (fighters, pieces) => fighters.filter((f) => f.team === 'heroes' && !f.dummy)
   .map((f) => ({ owner: f.id, x: f.x + PILE_DX, y: f.y, z: f.z, count: pieces, icing: f.icing }));
@@ -94,8 +93,6 @@ export const pilesFor = (fighters, pieces) => fighters.filter((f) => f.team === 
 /** How close to its pile, or past a block's edge, a fighter reaches to pick a block up. */
 const FETCH_REACH = 0.35;
 const BLOCK_HITS = 2;
-
-// --- the build round (REUSE-SPEC.md §Forts) ------------------------------------------------
 
 function shake(s, f) { s.fullBag.push(event(f, f)); }
 

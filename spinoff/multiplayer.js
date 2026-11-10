@@ -186,7 +186,7 @@ export function lateJoiners(link) {
 }
 
 const lerp = (a, b, k) => a + (b - a) * k;
-const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+export const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 // a move's step too, while it's the same move, so a strike moves between snapshots rather than jumping 30 times a second
 const stepBetween = (a, b, k) => (a.move === b.move && b.step >= a.step ? lerp(a.step, b.step, k) : b.step);
 const between = (a, b, k) => (a && b ? { ...b, x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k), z: lerp(a.z, b.z, k), facing: a.facing + turn(b.facing - a.facing) * k, step: stepBetween(a, b, k) } : b);

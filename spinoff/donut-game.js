@@ -148,7 +148,7 @@ function bank(shelf, look) {
 }
 
 const touching = (f, d) => flat(f, d) < f.r + DONUT_REACH && d.y >= f.y - 0.1 && d.y <= f.y + f.h;
-const event = (f, p) => ({ fighter: f.id, x: p.x, y: p.y, z: p.z });
+export const event = (f, p) => ({ fighter: f.id, x: p.x, y: p.y, z: p.z });
 
 export function touchDonuts(s, f) {
   const now = s.donuts.filter((d) => touching(f, d));

@@ -274,11 +274,16 @@ function flyHammer(s, hm) {
   if (hm.t >= p.T) { f.chain = 0; return false; }
   const u = d > EPS ? { x: (p.x - hm.x) / d, z: (p.z - hm.z) / d } : ahead(f), sp = { x: p.x, y: p.y, z: p.z, r: HAMMER.r };
   Object.assign(hm, { x: p.x, y: p.y, z: p.z });
+  return !hitFirst(s, f, sp, { id: 'hammer', u }, { ...f, z: p.z }) && !hitBrick(s, sp, 'hammer', f.team);
+}
+
+/** Strikes the first foe of f's that sp touches (reaching as `from`, f by default); true if one was. */
+function hitFirst(s, f, sp, hit, from = f) {
   for (const o of s.fighters) {
-    const c = o.team !== f.team && canStrike(s, { ...f, z: p.z }, o) ? bodyContact(sp, o) : null;
-    if (c) { strike(s, f, o, c, { id: 'hammer', u }); return false; }
+    const c = o.team !== f.team && canStrike(s, from, o) ? bodyContact(sp, o) : null;
+    if (c) { strike(s, f, o, c, hit); return true; }
   }
-  return !hitBrick(s, sp, 'hammer', f.team);
+  return false;
 }
 
 export function attacks(s) {
@@ -339,11 +344,7 @@ function flyShot(s, t) {
   const f = s.fighters.find((o) => o.id === t.by), step = Math.min(t.left, t.speed * DT);
   Object.assign(t, { x: t.x + t.ux * step, z: t.z + t.uz * step, left: t.left - step });
   const sp = { x: t.x, y: t.y, z: t.z, r: MOVES.shot.r };
-  for (const o of s.fighters) {
-    const c = o.team !== f.team && canStrike(s, f, o) ? bodyContact(sp, o) : null;
-    if (c) { strike(s, f, o, c, { id: 'shot', u: { x: t.ux, z: t.uz } }); return false; }
-  }
-  return t.left > EPS;
+  return !hitFirst(s, f, sp, { id: 'shot', u: { x: t.ux, z: t.uz } }) && t.left > EPS;
 }
 
 /** 🦶 let go after a hold sweeps; otherwise a free fighter punches, kicks or stomps. */

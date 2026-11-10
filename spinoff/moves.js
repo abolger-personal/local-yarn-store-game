@@ -5,7 +5,7 @@ import { COMBO, countStrike, landHit, newCombo } from './punches.js';
 import { KICK_COMBO, strikeOf } from './kicks.js';
 import { HITSTOP_TICKS, TICK_HZ } from './match.js';
 import { MOVES } from './combat.js';
-import { makeStage } from './stage.js';
+import { BACK, makeStage } from './stage.js';
 
 // A look at the punches (punches.js) and kicks (kicks.js) on every species, from play.js's camera pitch, each landing and looping.
 setGeometryDetail('med');
@@ -15,7 +15,6 @@ const ROWS = [
 ];
 const STRINGS = { punch: COMBO, kick: KICK_COMBO };
 const SLOW = Number(new URLSearchParams(location.search).get('slow')) || 1;
-const PITCH = THREE.MathUtils.degToRad(35), VIEW = new THREE.Vector3(0, Math.sin(PITCH), Math.cos(PITCH));
 const stage = makeStage(document.getElementById('stage'));
 const period = (move) => MOVES[move].steps + HITSTOP_TICKS + 12;
 
@@ -47,7 +46,7 @@ const cast = ROWS.flatMap(([move, name, text], r) => {
     return { move, name, built, facing, combo: newCombo(move, STRINGS[move].length) };
   });
 });
-const fit = () => stage.frame([...labels, ...cast.map((m) => m.built.root)], { view: VIEW, margin: 1.05 });
+const fit = () => stage.frame([...labels, ...cast.map((m) => m.built.root)], { view: BACK, margin: 1.05 });
 fit();
 addEventListener('resize', fit);
 

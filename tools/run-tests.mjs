@@ -15,10 +15,12 @@ const SLOW = [
   'characters/species.test.mjs',
   // every species x costume x weapon: grows with each new species
   'spinoff/fighter.test.mjs',
+  // every species x every piece a hero can pick
+  'tmnt/hero.test.mjs',
 ];
 
 // every other test file; an entry with env in SLOW also runs here without it
-const FAST = globSync('{characters,inventory,spinoff}/**/*.test.mjs').sort().filter((f) => !SLOW.includes(f));
+const FAST = globSync('{characters,inventory,spinoff,tmnt}/**/*.test.mjs').sort().filter((f) => !SLOW.includes(f));
 
 const [section = 'fast', ...only] = process.argv.slice(2);
 const files = only.length ? only : { fast: FAST, slow: SLOW, all: [...FAST, ...SLOW] }[section];

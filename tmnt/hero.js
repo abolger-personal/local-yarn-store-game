@@ -1,0 +1,84 @@
+import { FACE_PAINTS, getSpecies } from '../characters/npc.js';
+import { FORMS } from '../characters/garments.js';
+import { BAGS, HANDS, SPECIES, TEXTURES, TRICKS, nearestSwatch, readFighter, setFur } from '../spinoff/fighter.js';
+
+const HERO_KEY = 'tmnt.hero.v1';
+const HEX = /^#[0-9a-f]{6}$/i;
+
+// REUSE-SPEC.md §Hero chooser: the four turtles' colours first, then turtle green and April's taxi yellow
+export const COLOURS = Object.freeze([
+  ['#ff7a1a', 'orange'], ['#2f6bff', 'blue'], ['#8154ff', 'purple'], ['#e8262b', 'red'],
+  ['#4fae3b', 'turtle green'], ['#ffc20e', 'taxi yellow'],
+].map(([hex, name]) => Object.freeze({ hex, name })));
+const GREEN = COLOURS[4].hex, TAXI = COLOURS[5].hex;
+export const TURTLE_COLOURS = COLOURS.slice(0, 4);
+
+// REUSE-SPEC.md §Hero chooser: scarves, sweaters (April's jumpsuit is one), socks and bags; no hats or capes;
+// wrapped twice is the Sock Clan's
+export const WEAR = Object.freeze({
+  scarf: ['trailing', 'long', 'cowl'], sweater: ['pullover', 'turtleneck', 'vest'], socks: ['crew', 'knee-high', 'over-knee'], bag: BAGS,
+});
+export const SCARF_FORMS = Object.freeze(FORMS.filter((f) => f !== 'wrapped twice'));
+const DEFAULT_HANDS = 'sword';
+
+/** @typedef {{ species: string, params: Record<string, any>, look: import('../spinoff/fighter.js').Look & Record<string, any> }} Hero */
+
+// every piece off, in the fighters' Look shape (no hat or cape: heroes don't get them)
+/** @returns {Hero['look']} */
+const blankLook = () => ({
+  hat: null, hatColor: GREEN, hatStitch: 'stockinette', cape: null, capeColor: GREEN, capeStitch: 'stockinette', bag: null, bagColor: GREEN,
+  scarfForm: 'draped', hands: DEFAULT_HANDS, trick: TRICKS[DEFAULT_HANDS][0], gloves: GREEN,
+  ...Object.fromEntries(Object.keys(WEAR).flatMap((k) => [[k, null], [`${k}Color`, GREEN], [`${k}Stitch`, 'stockinette']])),
+});
+
+const scarfLook = (colour) => ({ ...blankLook(), scarf: 'trailing', scarfColor: colour, gloves: colour });
+// REUSE-SPEC.md §Hero chooser: April's jumpsuit is a yellow sweater and yellow socks
+const jumpsuitLook = () => ({ ...blankLook(), sweater: 'pullover', sweaterColor: TAXI, socks: 'over-knee', socksColor: TAXI, gloves: TAXI });
+
+/** A turtle in one of the four turtles' scarves, or in April's jumpsuit. @returns {Hero} */
+export function newHero(rng = Math.random, species = 'turtle') {
+  const i = Math.floor(rng() * (TURTLE_COLOURS.length + 1));
+  const look = i < TURTLE_COLOURS.length ? scarfLook(TURTLE_COLOURS[i].hex) : jumpsuitLook();
+  return setFur({ species, params: structuredClone(getSpecies(species).defaults), look }, GREEN);
+}
+
+const pickOf = (list, rng) => list[Math.floor(rng() * list.length)];
+
+/** 🎲: any animal, any colours, each piece worn or not. @returns {Hero} */
+export function randomHero(rng = Math.random) {
+  const hero = newHero(rng, pickOf(SPECIES, rng)), { look } = hero, colour = () => pickOf(COLOURS, rng).hex;
+  getSpecies(hero.species).randomise(hero.params);
+  for (const [kind, list] of Object.entries(WEAR)) Object.assign(look, { [kind]: pickOf([...list, null], rng), [`${kind}Color`]: colour() });
+  Object.assign(look, { scarfForm: pickOf(SCARF_FORMS, rng), hands: pickOf(HANDS, rng), gloves: colour() });
+  look.trick = pickOf(TRICKS[look.hands], rng);
+  hero.params.facePaint = pickOf(FACE_PAINTS, rng);
+  return setFur(hero, colour());
+}
+
+function readLook(raw) {
+  const r = raw && typeof raw === 'object' ? raw : {}, look = blankLook();
+  const one = (k, list) => (list.includes(r[k]) ? r[k] : look[k]);
+  const colour = (k) => (HEX.test(r[k]) ? nearestSwatch(COLOURS, r[k]).hex : look[k]);
+  for (const [kind, list] of Object.entries(WEAR)) {
+    Object.assign(look, { [kind]: one(kind, list), [`${kind}Color`]: colour(`${kind}Color`), [`${kind}Stitch`]: one(`${kind}Stitch`, TEXTURES) });
+  }
+  Object.assign(look, { scarfForm: one('scarfForm', SCARF_FORMS), hands: one('hands', HANDS), gloves: colour('gloves') });
+  look.trick = one('trick', TRICKS[look.hands]);
+  return look;
+}
+
+/** Untrusted JSON from storage or another tablet → a Hero, or null; fur and clothes snap to the hero colours. @returns {Hero|null} */
+export function readHero(raw) {
+  const f = readFighter(raw);
+  if (!f) return null;
+  return setFur({ species: f.species, params: f.params, look: readLook(raw.look) }, nearestSwatch(COLOURS, f.params.bodyColor).hex);
+}
+
+export function loadHero() {
+  try { return readHero(JSON.parse(localStorage.getItem(HERO_KEY) ?? 'null')); } catch { return null; }
+}
+
+/** Its own key: the donut fighters' save is on the same site. @param {Hero} h */
+export function saveHero(h) {
+  try { localStorage.setItem(HERO_KEY, JSON.stringify(h)); } catch {}
+}

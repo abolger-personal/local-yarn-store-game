@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Turtles in Twine — choose</title>
+<link rel="stylesheet" href="../spinoff/spinoff.css" />
+</head>
+<body class="choose">
+<main id="stage"></main>
+<aside id="side">
+  <div id="panel"></div>
+  <div class="actions">
+    <button id="dice" aria-label="surprise me"><span class="emoji">🎲</span></button>
+    <button id="done" aria-label="done"><span class="emoji">👍</span></button>
+  </div>
+</aside>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.186.1/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.186.1/examples/jsm/",
+    "trystero": "https://esm.sh/trystero@0.26.0"
+  }
+}
+</script>
+<script type="module" src="choose.js"></script>
+</body>
+</html>

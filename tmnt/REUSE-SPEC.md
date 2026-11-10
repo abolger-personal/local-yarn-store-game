@@ -97,19 +97,33 @@ dark purple and grey for theirs (`isBadGuyCloth` / `isBadGuyFur`).
 **Kids can pick any animal** (decided 2026-11-09): turtle, mouse, lion, llama, owl or dragon, as in the fighters'
 chooser. The turtle is only the default.
 
-**The defaults** (decided 2026-11-09): a turtle wearing either
+**The defaults** (decided 2026-11-09): a turtle in turtle green wearing either
 - **a scarf** in one of orange, blue, purple or red (the four turtles), or
 - **a yellow jumpsuit** in taxi yellow (April), which is a yellow `sweater` and yellow `socks` from the existing
   wardrobe (`characters/garments.js`), not a new garment;
 
-with **a weapon** and **the existing hats** (beanie, pixie, beret, bucket, earflap).
+with **a weapon** (the sword for now; which one is open) and no hat.
 
-The donut fighters' chooser has no scarf, sweater or socks rows, so those are new rows over garments that already
-exist. The scarf's forms: draped, wrapped once, wrapped twice, tied, tucked.
+**What a hero picks** (decided 2026-11-09): animal, fur, **scarves, sweaters, socks, bags, face paint and the
+weapons**. **No hats and no capes** this time. The sweater row is how a kid makes April's jumpsuit. **The scarf
+worn "wrapped twice" is the Sock Clan's**, so heroes never get it; the other forms (draped, wrapped once, tied,
+tucked) they do.
 
-**Keep this game's saves apart from the donut fighters'** (planned 2026-11-09). Both games are on the same site,
-so they share `localStorage`. The fighters' keys are `lys.fighter.v1` and `lys.progress.v1`; this game needs its
-own keys so a hero doesn't overwrite a fighter.
+Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, over the fighters' `buildFighter`
+(whose `outfitOf` now also dresses a scarf, sweater and socks when a look has them) and their chooser pictures
+(`spinoff/icons.js`).
+- Scarves: trailing, long, cowl; tapping the one you wear again ties it another way.
+- Sweaters: pullover, turtleneck, vest. Socks: crew, knee-high, over-knee. Tapping either again knits it in the
+  next stitch, as the fighters' hats do.
+- Bags: the fighters' three, or none.
+- Weapons: all four (gloves, sword, Music Scythe, Greathammer), no unlocks yet; tapping again changes the trick.
+- 🎲 any animal, colours and pieces. 👍 saves; there is no lobby to go to yet.
+- Every colour is one of the six hero colours; anything else read from a save or another tablet snaps to the
+  nearest (`readHero`). `tmnt/hero.test.mjs` checks it.
+
+**Keep this game's saves apart from the donut fighters'** (decided 2026-11-09). Both games are on the same site,
+so they share `localStorage`. The fighters' keys are `lys.fighter.v1` and `lys.progress.v1`; the hero is
+`tmnt.hero.v1`, so a hero never overwrites a fighter.
 
 ## Bad guys
 
@@ -143,7 +157,6 @@ Sweater. Heroes don't get them. The design is open.
 - **What should The Sweater's gauntlets look like,** and how do they attack?
 - **Purple is a hero colour and a bad-guy colour.** Purple is one of the turtles' four, and the Sock Clan and The
   Sweater wear it too. Is that fine, as long as black and silver stay bad-guy only?
-- **How does a kid pick the jumpsuit?** As its own outfit tile, or by picking a yellow sweater and yellow socks?
 - **Are the six colours for clothes as well as fur?** Should white stay as a clothes colour, as it does in the
   fighting game?
 - **Where does "Turtleneck" go?** A power move, a pickup, a level name, or The Sweater's last form?

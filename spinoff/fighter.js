@@ -178,11 +178,15 @@ function wear(type, silhouette, color, stitch = 'stockinette') {
   };
 }
 
-/** @param {Look} look */
+/** @param {Look & Record<string, string|null>} look */
 export const outfitOf = (look) => ({
   hat: wear('hat', look.hat, look.hatColor, look.hatStitch),
   shawl: wear('shawl', look.cape, look.capeColor, look.capeStitch),
   bag: wear('bag', look.bag, look.bagColor),
+  // tmnt/REUSE-SPEC.md §Hero chooser: a hero's scarf, sweater and socks; a fighter's look has none
+  scarf: { ...wear('scarf', look.scarf, look.scarfColor, look.scarfStitch), ...(look.scarfForm && { form: look.scarfForm }) },
+  sweater: wear('sweater', look.sweater, look.sweaterColor, look.sweaterStitch),
+  socks: wear('socks', look.socks, look.socksColor, look.socksStitch),
 });
 
 const GLOVE_SIZE = 2.1;

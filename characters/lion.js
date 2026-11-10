@@ -382,7 +382,8 @@ const MOTION_RANGES = Object.freeze({
   kneeLift: [0.45, 1.05],
 });
 
-registerSpecies({
+// BODIES.md §Mouse: the mouse is this kit with ears for a mane
+export const LION = Object.freeze({
   id: 'lion',
   label: 'Lion',
   emoji: '🦁',
@@ -403,4 +404,6 @@ registerSpecies({
   // The arms vanish against the mane, so the tail carries the cheer: lifted clear of the body.
   delighted: Object.freeze({ ...POSES.delighted, tailLift: 0.9, tailWag: 1.6 }),
 });
+
+registerSpecies(LION);
 

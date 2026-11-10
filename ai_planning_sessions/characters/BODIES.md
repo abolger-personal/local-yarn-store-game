@@ -450,6 +450,15 @@ numbers below are the first turtle's.
 - Motion: slow and springy. Stiff 50–140, idle rate 0.40–0.95, head arc 0.60–1.20, bounce 0–0.03, short
   stride 1.25–1.60. Starting values.
 
+## Mouse
+
+Status: decided 2026-11-09 (the co-op side scroller's second hero, beside the turtle). `characters/mouse.js`.
+
+The lion kit exactly (`LION`, exported from `characters/lion.js`), with no mane and big round ears in its place:
+leaf ears 0.085 wide by 0.170 long, so each is a disc about 60% of the head's width, flattened to 0.35, spread
+0.60, tilted out 0.45, no pointed tips (`earPoint` 0). The tail keeps the lion's tuft for now. No coat folder in
+the checker and no mane presets.
+
 ## Shaped faces
 
 *Built 2026-11-04.* Cartoon animals are expressive in the face, but there's no budget for animating

@@ -4,24 +4,15 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>LYS — motion lab</title>
+<link rel="stylesheet" href="./viewer.css" />
 <style>
-  :root { color-scheme: light; }
-  html, body { margin: 0; height: 100%; overflow: hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
-  #app { position: fixed; inset: 0; }
-  canvas { display: block; transition: filter 120ms linear; }
-  canvas.squint { filter: blur(6px); }
   .panel {
     position: fixed; z-index: 10;
     background: rgba(255,255,255,.84); backdrop-filter: blur(6px);
     border: 1px solid rgba(0,0,0,.08); border-radius: 10px;
     padding: 9px 12px; font-size: 12px; line-height: 1.5; color: #333;
   }
-  #hud { left: 12px; bottom: 12px; max-width: 360px; }
-  #hud b { color: #111; }
-  #hud kbd {
-    background: #efefef; border: 1px solid #ddd; border-bottom-width: 2px;
-    border-radius: 4px; padding: 0 4px; font-size: 11px; font-family: ui-monospace, monospace;
-  }
+  #hud { background: rgba(255,255,255,.84); padding: 9px 12px; max-width: 360px; }
   #roster { right: 262px; bottom: 12px; font-size: 11px; max-height: 38vh; overflow: auto;
     max-width: calc(100vw - 290px); }
   #roster table { border-collapse: collapse; }

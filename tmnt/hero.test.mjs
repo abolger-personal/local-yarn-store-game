@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { LOOK } from '../characters/garments.js';
 import { SPECIES, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
-import { COLOURS, PALETTE, SCARF_FORMS, SWEATER_WORKS, TURTLE_COLOURS, WEAR, newHero, randomHero, readHero } from './hero.js';
+import { CLOTH, COLOURS, PALETTE, SCARF_FORMS, SWEATER_WORKS, TURTLE_COLOURS, WEAR, newHero, randomHero, readHero } from './hero.js';
 
 LOOK.viewPx = 0;
 
-for (const { hex, name } of COLOURS) {
+for (const { hex, name } of CLOTH) {
   assert.ok(!isBadGuyCloth(hex) && !isBadGuyFur(hex), `${name} is a hero colour, not a bad guy's`);
 }
 
@@ -22,15 +22,17 @@ assert.equal(looks.size, 5, 'all four scarves and the jumpsuit come up');
 
 // the trust boundary: no hats or capes, no Sock Clan scarf, no colour outside the hero colours
 const hero = readHero({
-  species: 'mouse', params: { bodyColor: '#000000' },
-  look: { hat: 'beanie', cape: 'cape', scarf: 'long', scarfForm: 'wrapped twice', scarfColor: '#c0c0c0', socks: 'nope', hands: 'scythe' },
+  species: 'mouse', params: { bodyColor: '#fefefe' },
+  look: { hat: 'beanie', cape: 'cape', scarf: 'long', scarfForm: 'wrapped twice', scarfColor: '#c0c0c0', socks: 'nope', bagColor: '#fefefe', hands: 'scythe' },
 });
 assert.equal(hero.look.hat, null);
 assert.equal(hero.look.cape, null);
 assert.equal(hero.look.scarf, 'long');
 assert.ok(SCARF_FORMS.includes(hero.look.scarfForm) && hero.look.scarfForm !== 'wrapped twice');
-assert.ok(COLOURS.some((c) => c.hex === hero.look.scarfColor) && COLOURS.some((c) => c.hex === hero.params.bodyColor));
+assert.ok(CLOTH.some((c) => c.hex === hero.look.scarfColor), "a silver scarf snaps to a hero colour");
 assert.equal(hero.look.socks, null);
+assert.equal(hero.look.bagColor, '#ffffff', 'white clothes');
+assert.ok(COLOURS.some((c) => c.hex === hero.params.bodyColor), 'white fur snaps to a hero colour');
 assert.equal(readHero({ species: 'hydra' }), null);
 
 // every piece a hero can pick dresses every animal

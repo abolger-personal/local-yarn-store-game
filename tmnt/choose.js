@@ -2,7 +2,7 @@ import { FACE_PAINTS, POSES, facePaintColorOf, getSpecies } from '../characters/
 import { HANDS, SPECIES, TEXTURES, TRICKS, animateFighter, buildFighter, disposeFighter, setFur, stepFighter, stepTricks } from '../spinoff/fighter.js';
 import { FACE_ICON, ICON, NONE, TRICK_ICON, svg, textured } from '../spinoff/icons.js';
 import { makeStage } from '../spinoff/stage.js';
-import { COLOURS, PALETTE, SCARF_FORMS, SWEATER_WORKS, WEAR, loadHero, newHero, randomHero, saveHero } from './hero.js';
+import { CLOTH, COLOURS, PALETTE, SCARF_FORMS, SWEATER_WORKS, WEAR, loadHero, newHero, randomHero, saveHero } from './hero.js';
 
 const LINE = 'fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"';
 const PICTURE = {
@@ -29,7 +29,7 @@ const panel = document.getElementById('panel');
 
 const button = (action, value, label, inner, on) =>
   `<button data-action="${action}" data-value="${value}" aria-label="${label}" aria-pressed="${on}">${inner}</button>`;
-const swatchRow = (action, current) => COLOURS.map(({ hex, name }) =>
+const swatchRow = (action, current, list = CLOTH) => list.map(({ hex, name }) =>
   button(action, hex, name, `<span class="dot" style="background:${hex}"></span>`, hex === current)).join('');
 const pictures = (html) => `<div class="choices pictures">${html}</div>`;
 const colours = (html) => `<div class="choices">${html}</div>`;
@@ -58,7 +58,7 @@ function render() {
   const { species, params } = hero;
   panel.innerHTML = [
     row('🐾', 'animal', pictures(SPECIES.map((s) => button('species', s, s, `<span class="emoji">${getSpecies(s).emoji}</span>`, s === species)).join(''))),
-    row('🎨', 'fur', colours(swatchRow('fur', params.bodyColor))),
+    row('🎨', 'fur', colours(swatchRow('fur', params.bodyColor, COLOURS))),
     ...Object.keys(WEAR).map(wearRow),
     row('🎭', 'face paint', pictures(FACE_PAINTS.map((v) =>
       button('facePaint', v, `${v} face paint`, svg(FACE_ICON[v], facePaintColorOf(params)), v === params.facePaint)).join(''))),

@@ -89,6 +89,7 @@ colours. Six, like the fighters' treats (`ROOM_TREATS` in `spinoff/roster.js`), 
 | orange `#ff6a00`, blue `#0056d6`, purple `#874efe`, red `#b51a00` | heroes | the four turtles' colours |
 | turtle green `#4f7a28` | heroes | the turtle's skin |
 | bright taxi yellow `#f5ec00` | heroes | April O'Neil's jumpsuit |
+| white `#ffffff` | heroes, clothes only | April's boots (decided 2026-11-09); never fur |
 | black, silver | bad guys only | |
 
 The chooser offers the six hero colours. Black and silver go only to bad guys, the way the donut fighters keep
@@ -159,7 +160,5 @@ Sweater. Heroes don't get them. The design is open.
 - **What should The Sweater's gauntlets look like,** and how do they attack?
 - **Purple is a hero colour and a bad-guy colour.** Purple is one of the turtles' four, and the Sock Clan and The
   Sweater wear it too. Is that fine, as long as black and silver stay bad-guy only?
-- **Are the six colours for clothes as well as fur?** Should white stay as a clothes colour, as it does in the
-  fighting game?
 - **Where does "Turtleneck" go?** A power move, a pickup, a level name, or The Sweater's last form?
 - **What does the booty shake do here?** It is a taunt in the fighting game, still open there too.

@@ -13,6 +13,8 @@ export const COLOURS = Object.freeze([
 const GREEN = COLOURS[4].hex, TAXI = COLOURS[5].hex;
 export const TURTLE_COLOURS = COLOURS.slice(0, 4);
 export const PALETTE = COLOURS.map((c) => c.hex);
+// REUSE-SPEC.md §Hero chooser: clothes also come in white (April's boots), fur never
+export const CLOTH = Object.freeze([...COLOURS, Object.freeze({ hex: '#ffffff', name: 'white' })]);
 // REUSE-SPEC.md §Hero chooser: the sweater, tapped again, in the next colourwork, so it reads as a sweater when small
 export const SWEATER_WORKS = COLOURWORKS;
 
@@ -49,19 +51,19 @@ const pickOf = (list, rng) => list[Math.floor(rng() * list.length)];
 
 /** 🎲: any animal, any colours, each piece worn or not. @returns {Hero} */
 export function randomHero(rng = Math.random) {
-  const hero = newHero(rng, pickOf(SPECIES, rng)), { look } = hero, colour = () => pickOf(COLOURS, rng).hex;
+  const hero = newHero(rng, pickOf(SPECIES, rng)), { look } = hero, colour = () => pickOf(CLOTH, rng).hex;
   getSpecies(hero.species).randomise(hero.params);
   for (const [kind, list] of Object.entries(WEAR)) Object.assign(look, { [kind]: pickOf([...list, null], rng), [`${kind}Color`]: colour() });
   Object.assign(look, { sweaterWork: pickOf(SWEATER_WORKS, rng), scarfForm: pickOf(SCARF_FORMS, rng), hands: pickOf(HANDS, rng), gloves: colour() });
   look.trick = pickOf(TRICKS[look.hands], rng);
   hero.params.facePaint = pickOf(FACE_PAINTS, rng);
-  return setFur(hero, colour());
+  return setFur(hero, pickOf(COLOURS, rng).hex);
 }
 
 function readLook(raw) {
   const r = raw && typeof raw === 'object' ? raw : {}, look = blankLook();
   const one = (k, list) => (list.includes(r[k]) ? r[k] : look[k]);
-  const colour = (k) => (HEX.test(r[k]) ? nearestSwatch(COLOURS, r[k]).hex : look[k]);
+  const colour = (k) => (HEX.test(r[k]) ? nearestSwatch(CLOTH, r[k]).hex : look[k]);
   for (const [kind, list] of Object.entries(WEAR)) {
     Object.assign(look, { [kind]: one(kind, list), [`${kind}Color`]: colour(`${kind}Color`), [`${kind}Stitch`]: one(`${kind}Stitch`, TEXTURES) });
   }

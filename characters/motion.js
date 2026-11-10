@@ -10,12 +10,7 @@ export const MOTION_KEYS = [...POSE_KEYS, 'hold'];
 const HOLD = MOTION_KEYS.indexOf('hold');
 const TAU = Math.PI * 2;
 
-export const REST_POSE = Object.freeze({
-  armSwing: 0, armSwingAlt: 0, armOut: 0, armOutAlt: 0, elbowBend: 0, legSwing: 0, kneeBend: 0,
-  hipFlex: 0, legOut: 0, legOutAlt: 0, spineBend: 0, spineRoll: 0, spineTwist: 0, earPerk: 0, earSplay: 0,
-  headYaw: 0, headPitch: 0, headTilt: 0, tailLift: 0, tailWag: 0, earFlap: 0,
-  holdItem: false, blink: 0,
-});
+export const REST_POSE = Object.freeze({ ...Object.fromEntries(POSE_KEYS.map((k) => [k, 0])), holdItem: false, blink: 0 });
 
 const definePoses = (raw) => Object.freeze(Object.fromEntries(
   Object.entries(raw).map(([name, pose]) => [name, Object.freeze({ ...REST_POSE, ...pose })]),
@@ -34,24 +29,18 @@ export const POSES = definePoses({
   'walk+carry': { armSwing: -0.10, armOut: 0.03, elbowBend: 1.40, legSwing: 0.30, kneeBend: 1.50, holdItem: true },
 });
 
+const NO_EXTRAS = Object.freeze({ turn: 0, rise: 0, travel: 0, shift: 0, flip: 0, roll: 0 });
+
 // ponytail: `shift` moves the whole root, so the feet slide with the hips; upgrade is hip abduction plus grounding that follows it.
 const resolveExtras = (steps) => {
-  let cur = { turn: 0, rise: 0, travel: 0, shift: 0, flip: 0, roll: 0 };
+  let cur = /** @type {Readonly<Record<string, number>>} */ (NO_EXTRAS);
   return steps.map((s) => {
-    cur = {
-      turn: s.turn ?? cur.turn,
-      flip: s.flip ?? cur.flip,
-      roll: s.roll ?? cur.roll,
-      rise: s.rise ?? cur.rise,
-      travel: s.travel ?? cur.travel,
-      shift: s.shift ?? cur.shift,
-    };
-    return Object.freeze(cur);
+    cur = Object.freeze(Object.fromEntries(Object.keys(NO_EXTRAS).map((k) => [k, s[k] ?? cur[k]])));
+    return cur;
   });
 };
 
 const resolveWalk = (steps, dance) => Object.freeze(steps.map((s) => s.walk ?? dance ?? 0));
-const NO_EXTRAS = Object.freeze({ turn: 0, rise: 0, travel: 0, shift: 0, flip: 0, roll: 0 });
 
 const defineDances = (raw) => Object.freeze(Object.fromEntries(
   Object.entries(raw).map(([name, d]) => [name, Object.freeze({
@@ -77,9 +66,9 @@ export const DANCE_POSES = definePoses({
   'rd-right': { armOut: 0.10, elbowBend: 0.06, legSwing: 0.95, hipFlex: 0.95, kneeBend: 1.90, headPitch: -0.05 },
   'rd-kick-l': { armOut: 0.10, elbowBend: 0.06, legSwing: -0.80, hipFlex: 0.80, kneeBend: 0.15, headPitch: -0.05 },
   'rd-kick-r': { armOut: 0.10, elbowBend: 0.06, legSwing: 0.80, hipFlex: 0.80, kneeBend: 0.15, headPitch: -0.05 },
-  'rd-hop': { armOut: 0.12, elbowBend: 0.06, legSwing: 0, hipFlex: 0.34, kneeBend: 0.82, headPitch: -0.05 },
-  'rd-behind-l': { armOut: 0.10, elbowBend: 0.06, legSwing: 0.72, hipFlex: 0, kneeBend: 0, headPitch: -0.05 },
-  'rd-behind-r': { armOut: 0.10, elbowBend: 0.06, legSwing: -0.72, hipFlex: 0, kneeBend: 0, headPitch: -0.05 },
+  'rd-hop': { armOut: 0.12, elbowBend: 0.06, hipFlex: 0.34, kneeBend: 0.82, headPitch: -0.05 },
+  'rd-behind-l': { armOut: 0.10, elbowBend: 0.06, legSwing: 0.72, headPitch: -0.05 },
+  'rd-behind-r': { armOut: 0.10, elbowBend: 0.06, legSwing: -0.72, headPitch: -0.05 },
 
   'floss-l': {
     armOutAlt: 1.05, armSwingAlt: -0.55, armOut: 0.30, elbowBend: 0.04,
@@ -114,7 +103,7 @@ export const DANCE_POSES = definePoses({
   },
   'wx-freeze': {
     legSwing: 0.55, hipFlex: 0.55, kneeBend: 2.3, legOut: 0.6, legOutAlt: 0.6,
-    spineBend: 0.55, spineRoll: 0.4, armSwing: -0.55, armSwingAlt: 0.55, armOut: 1.5, armOutAlt: -0.8, elbowBend: 0, headPitch: -0.25, headYaw: -0.35, earPerk: 0.35,
+    spineBend: 0.55, spineRoll: 0.4, armSwing: -0.55, armSwingAlt: 0.55, armOut: 1.5, armOutAlt: -0.8, headPitch: -0.25, headYaw: -0.35, earPerk: 0.35,
   },
 
   // the back tuck (DANCES.md §Gymnastics, Flips worked out): crouch with the arms back, up into a tuck, open out
@@ -127,8 +116,8 @@ export const DANCE_POSES = definePoses({
   // tumbling: no hands on the floor (a chibi head is lower than its raised hands upside down), so the run-in is the
   // hands-free versions, an aerial round-off (a star, legs wide) and a whip back (arched, arms reaching back)
   'tb-reach': { armSwing: -2.7, armOut: 0.2, elbowBend: 0.05, kneeBend: 0.5, hipFlex: 0.35, spineBend: 0.15 },
-  'tb-star': { armSwing: -2.8, armOut: 0.55, elbowBend: 0, legOut: 0.55, kneeBend: 0.05, spineBend: -0.1, headPitch: -0.2 },
-  'tb-whip': { armSwing: -2.9, armOut: 0.2, elbowBend: 0, kneeBend: 0.2, hipFlex: -0.5, spineBend: -0.65, headPitch: -0.5 },
+  'tb-star': { armSwing: -2.8, armOut: 0.55, legOut: 0.55, kneeBend: 0.05, spineBend: -0.1, headPitch: -0.2 },
+  'tb-whip': { armSwing: -2.9, armOut: 0.2, kneeBend: 0.2, hipFlex: -0.5, spineBend: -0.65, headPitch: -0.5 },
   'tb-pike': { hipFlex: 1.8, kneeBend: 0.05, spineBend: 0.4, armSwing: -1.3, armOut: 0.2, elbowBend: 0.05, headPitch: 0.3 },
   // the wolf: squatting on one leg, the other nearly straight in front, its foot just off the floor; the free leg
   // is the one turned out a little (`legOutAlt`), which is what straightens its knee
@@ -149,6 +138,7 @@ export const DANCE_POSES = definePoses({
   },
 });
 
+const LAND = { pose: 'bt-land', hold: 0.30 }, SALUTE = { pose: 'salute', hold: 0.90 };
 // the floor passes' run-in (DANCES.md §Gymnastics): a reach, an aerial round-off, a whip back, a rebound. All one way
 // round in the world: the round-off's half `turn` leaves the body facing back, so the same `flip` direction is a
 // back salto from then on; the pass travels the way the body first faced
@@ -165,12 +155,12 @@ const BEAM_DISMOUNT = [
   { pose: 'bt-crouch', hold: 0.30 },
   { pose: 'bt-tuck', hold: 0.75, air: true, rise: 0.95, flip: -TAU, turn: TAU },
   { pose: 'bt-open', hold: 0.70, air: true, rise: 0, flip: -2 * TAU, turn: 2 * TAU },
-  { pose: 'bt-land', hold: 0.30 },
+  LAND,
 ];
 
 export const DANCES = defineDances({
   riverdance: {
-    stiff: 520, zeta: 0.80, loop: true, walk: 0,
+    stiff: 520, zeta: 0.80, loop: true,
     steps: [
       { pose: 'rd-kick-l', hold: 0.19 },
       { pose: 'rd-hop', hold: 0.15, hop: 0.055 },
@@ -185,14 +175,14 @@ export const DANCES = defineDances({
     ],
   },
   floss: {
-    stiff: 380, zeta: 0.75, loop: true, walk: 0,
+    stiff: 380, zeta: 0.75, loop: true,
     steps: [
       { pose: 'floss-l', hold: 0.23, shift: -0.038 },
       { pose: 'floss-r', hold: 0.23, shift: 0.038 },
     ],
   },
   attitude: {
-    stiff: 190, zeta: 1.00, loop: false, walk: 0,
+    stiff: 190, zeta: 1.00,
     steps: [
       { pose: 'att-prep', hold: 0.35 },
       { pose: 'att-hold', hold: 1.40, rise: 0.02 },
@@ -200,7 +190,7 @@ export const DANCES = defineDances({
     ],
   },
   pirouette: {
-    stiff: 260, zeta: 0.95, loop: false, walk: 0,
+    stiff: 260, zeta: 0.95,
     steps: [
       { pose: 'pir-plie', hold: 0.34 },
       { pose: 'pir-turn', hold: 0.70, turn: TAU, rise: 0.035 },
@@ -212,66 +202,62 @@ export const DANCES = defineDances({
   // the jump is two `air` steps, up to the top tucking and down opening out, so grounding lets go for both and the
   // legs are straight again by the landing; the turns are whole, so it lands upright
   'back-tuck': {
-    stiff: 700, zeta: 0.85, loop: false, walk: 0,
+    stiff: 700, zeta: 0.85,
     steps: [
       { pose: 'bt-crouch', hold: 0.28 },
       { pose: 'bt-tuck', hold: 0.36, air: true, rise: 0.7, flip: -Math.PI },
       { pose: 'bt-open', hold: 0.34, air: true, rise: 0, flip: -TAU },
-      { pose: 'bt-land', hold: 0.30 },
-      { pose: 'salute', hold: 0.90 },
+      LAND, SALUTE,
     ],
   },
   // Simone Biles's beam dismount, the Biles (2019): a double back tuck with two twists, here from a standing jump;
   // the twists (`turn`) spread through both flips, about the flipping body. Far slower than hers: at a real ~1 s in the
   // air it was a blur on a small figure (playtest), so it hangs like a cartoon jump
   'biles-beam': {
-    stiff: 700, zeta: 0.85, loop: false, walk: 0,
+    stiff: 700, zeta: 0.85,
     // Rio 2016 beam final: mostly red, blue and silver stripes at the neck
     glitter: { colours: ['#e8102f', '#e8102f', '#e8102f', '#1f4fd8', '#dfe3ec'] },
-    steps: [...BEAM_DISMOUNT, { pose: 'salute', hold: 0.90 }],
+    steps: [...BEAM_DISMOUNT, SALUTE],
   },
   // the Biles on floor (2013): the run-in, then a double layout with the half twist in the second flip
   biles: {
-    stiff: 700, zeta: 0.85, loop: false, walk: 0,
+    stiff: 700, zeta: 0.85,
     // the Rio 2016 Games' colours
     glitter: { colours: ['#00b34a', '#ffd100', '#ff7a00', '#0080e0'], twinkle: 0.6 },
     steps: [
       ...RUN_IN,
       { pose: 'tb-layout', hold: 0.75, air: true, rise: 0.95, flip: 3 * TAU, travel: 1.15 },
       { pose: 'tb-layout', hold: 0.70, air: true, rise: 0, flip: 4 * TAU, turn: TAU, travel: 1.30 },
-      { pose: 'bt-land', hold: 0.30 },
-      { pose: 'salute', hold: 0.90 },
+      LAND, SALUTE,
     ],
   },
   // the triple-double (2019): the run-in, then a double back tuck with three twists
   'biles-ii': {
-    stiff: 700, zeta: 0.85, loop: false, walk: 0,
+    stiff: 700, zeta: 0.85,
     // Tokyo team final: red to white to blue, top to bottom
     glitter: { colours: ['#e8102f', '#ffffff', '#1f4fd8'], bands: true, count: 24 },
     steps: [
       ...RUN_IN,
       { pose: 'bt-tuck', hold: 0.75, air: true, rise: 0.95, flip: 3 * TAU, turn: 4 * Math.PI, travel: 1.15 },
       { pose: 'bt-open', hold: 0.70, air: true, rise: 0, flip: 4 * TAU, turn: 7 * Math.PI, travel: 1.30 },
-      { pose: 'bt-land', hold: 0.30 },
-      { pose: 'salute', hold: 0.90 },
+      LAND, SALUTE,
     ],
   },
   // the Biles II vault (2023), a Yurchenko double pike: the run-in stands in for the board and table
   'biles-ii-vault': {
-    stiff: 700, zeta: 0.85, loop: false, walk: 0,
+    stiff: 700, zeta: 0.85,
     // Paris vault final, her 7th gold: "power color" red, dense
     glitter: { colours: ['#b0001c', '#ff2847', '#ff8fa3'], count: 30, twinkle: 0.25 },
     steps: [
       ...RUN_IN,
       { pose: 'tb-pike', hold: 0.75, air: true, rise: 0.95, flip: 3 * TAU, travel: 1.15 },
       { pose: 'bt-open', hold: 0.70, air: true, rise: 0, flip: 4 * TAU, travel: 1.30 },
-      { pose: 'bt-land', hold: 0.30 },
-      { pose: 'salute', hold: 0.90 },
+      LAND, SALUTE,
     ],
   },
   // the beam dismount ending in a 2½ wolf turn instead of the salute, the one she made famous at Rio 2016
   'biles-wolf': {
-    stiff: 700, zeta: 0.85, loop: false, walk: 0,
+    stiff: 700, zeta: 0.85,
     // Paris "Luminous Legacy": a night sky with a constellation of crystals
     glitter: { colours: ['#1a237e', '#ffffff', '#a9c1ff', '#ffffff'], twinkle: 0.95 },
     steps: [
@@ -281,7 +267,7 @@ export const DANCES = defineDances({
     ],
   },
   'wuxia-turn': {
-    stiff: 420, zeta: 1.00, loop: false, walk: 0,
+    stiff: 420, zeta: 1.00,
     // an action line: the sweeping foot draws an ink stroke round the floor
     glitter: { colours: ['#1c1c24'], line: ['lowerLeg', 1] },
     steps: [
@@ -303,7 +289,7 @@ export const DANCES = defineDances({
     ],
   },
   'uptown-funk': {
-    stiff: 340, zeta: 0.70, loop: false, walk: 0.85,
+    stiff: 340, zeta: 0.70, walk: 0.85,
     // sunglasses for the strut, and neon speed lines off every snap (the designer)
     glitter: { colours: ['#ff2bd6', '#19e6ff', '#ffe81a'], count: 0, shades: true, snap: 'uf-snap' },
     steps: [
@@ -442,19 +428,14 @@ const span = (range, u) => range[0] + (range[1] - range[0]) * clamp01(u);
 /**
  * @param {Record<string, number>} traits
  * @param {Record<string, number[]>} [ranges]
+ * @returns {Record<keyof typeof BASE_MOTION_RANGES | keyof typeof STYLE_RANGES, number>}
  */
 export function motionOf(traits, ranges = BASE_MOTION_RANGES) {
   const u = traitPositions(traits);
-  const pick = (k) => span(ranges[k] ?? BASE_MOTION_RANGES[k], u[k]);
-  const style = (k) => span(STYLE_RANGES[k], u[k]);
-  return {
-    stiff: pick('stiff'), zeta: pick('zeta'), idleAmp: pick('idleAmp'),
-    idleRate: pick('idleRate'), stride: pick('stride'), bounce: pick('bounce'),
-    kneeLift: pick('kneeLift'),
-    headArc: pick('headArc'), armGain: style('armGain'), sway: style('sway'),
-    lean: style('lean'), headCarry: style('headCarry'), headCock: style('headCock'),
-    attend: style('attend'), armTuck: style('armTuck'), tailCarry: style('tailCarry'),
-  };
+  return /** @type {any} */ (Object.fromEntries([
+    ...Object.entries(BASE_MOTION_RANGES).map(([k, r]) => [k, span(ranges[k] ?? r, u[k])]),
+    ...Object.entries(STYLE_RANGES).map(([k, r]) => [k, span(r, u[k])]),
+  ]));
 }
 
 // MOTION.md §Traits to motion
@@ -600,15 +581,14 @@ export function integrate(m, target, dt, opts) {
   return m;
 }
 
-function advanceClocks(m, dt, opts) {
-  m.idlePhase += dt * BREATH_W * breathRate(opts.idleRate);
-  if (m.idlePhase > TAU * 1e6) m.idlePhase %= TAU;
-  m.fidgetPhase += dt * FIDGET_W * opts.idleRate
-    * dutyGate(m.idlePhase, opts.idleDuty ?? 1, m.seed);
-  if (m.fidgetPhase > TAU * 1e6) m.fidgetPhase %= TAU;
+const wrapPhase = (x) => (x > TAU * 1e6 ? x % TAU : x);
 
-  m.wagPhase += dt * WAG_W * (0.7 + 0.3 * opts.idleRate);
-  if (m.wagPhase > TAU * 1e6) m.wagPhase %= TAU;
+function advanceClocks(m, dt, opts) {
+  m.idlePhase = wrapPhase(m.idlePhase + dt * BREATH_W * breathRate(opts.idleRate));
+  m.fidgetPhase = wrapPhase(m.fidgetPhase + dt * FIDGET_W * opts.idleRate
+    * dutyGate(m.idlePhase, opts.idleDuty ?? 1, m.seed));
+
+  m.wagPhase = wrapPhase(m.wagPhase + dt * WAG_W * (0.7 + 0.3 * opts.idleRate));
 
   m.blinkT -= dt;
   if (m.blinkT < -BLINK_DUR) m.blinkT = 2 + Math.random() * 5;

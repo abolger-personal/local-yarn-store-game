@@ -139,12 +139,12 @@ const VOICE = {
   Withdrawal:    { full: (s) => `Hope it's alright… ${s}.`, short: (k) => `${k}…` },
 };
 
-export const voiceOf = (traits) => VOICES.reduce((best, t) => ((traits?.[t] ?? 0) > (traits?.[best] ?? 0) ? t : best));
+const voiceOf = (traits) => VOICES.reduce((best, t) => ((traits?.[t] ?? 0) > (traits?.[best] ?? 0) ? t : best));
 
 const SHORT_MAX = 24;
 const fit = (...options) => options.find((o) => o.length <= SHORT_MAX) ?? options.at(-1).slice(0, SHORT_MAX);
 
-export function factsOf(made, { workedHere = false } = {}) {
+function factsOf(made, { workedHere = false } = {}) {
   const items = [...(made.yarn ?? []), made.pattern].filter(Boolean);
   const facts = [];
   const at = items.find((it) => it.place);

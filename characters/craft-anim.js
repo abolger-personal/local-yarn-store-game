@@ -6,7 +6,7 @@ import { PATTERN_TYPES } from '../inventory/catalog.js';
 export const CRAFT_MODES = Object.freeze(['knit', 'crochet', 'idle']);
 export const TELLS = Object.freeze(['none', 'out']);
 
-export const STITCH_TIME = Object.freeze({ knit: 0.7, crochet: 0.9 });
+const STITCH_TIME = Object.freeze({ knit: 0.7, crochet: 0.9 });
 
 const RIGHT = -1, LEFT = 1;
 const HOLD_R = 0, HOLD_L = 1;
@@ -24,22 +24,19 @@ const ROWS = 18;
 const GLANCE_PERIOD = 4;
 
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
-const smooth = (a, b, x) => {
-  const t = clamp01((x - a) / (b - a));
-  return t * t * (3 - 2 * t);
-};
+const smooth = (a, b, x) => THREE.MathUtils.smoothstep(x, a, b);
 const bump = (a, b, x) => smooth(a, (a + b) / 2, x) - smooth((a + b) / 2, b, x);
 
 export const pieceScale = (type) => 2 + ((PATTERN_TYPES[type]?.yarnUnits ?? 3) - 3) * 0.7;
 
-export const skillRate = (skill) => 0.55 + 0.8 * clamp01((skill - 1) / 4);
+const skillRate = (skill) => 0.55 + 0.8 * clamp01((skill - 1) / 4);
 
 export function hesitation(skill, count) {
   const h = Math.sin(count * 78.233 + 1.7) * 43758.5453;
   return clamp01((5 - skill) / 4) * 0.6 * (h - Math.floor(h));
 }
 
-export const skillReach = (skill) => 1.2 - 0.1 * skill;
+const skillReach = (skill) => 1.2 - 0.1 * skill;
 
 export function stitchBeat(mode, phase, out) {
   const p = phase - Math.floor(phase);
@@ -57,7 +54,7 @@ export function stitchBeat(mode, phase, out) {
   return out;
 }
 
-export function toolTargets(mode, b, k, right, left) {
+function toolTargets(mode, b, k, right, left) {
   if (mode === 'crochet') {
     right.x = -0.008 * b.wrap * k - 0.03 * b.pull * k;
     right.y = 0.01 * b.wrap * k + 0.03 * b.pull * k;
@@ -132,7 +129,7 @@ function tellLayer(c, out) {
   out.headYaw += c.wallYaw * g * o;
 }
 
-export function craftLayer(c, out) {
+function craftLayer(c, out) {
   const h = c.hands;
   if (h <= 0.001) return;
   for (const k of HOLD_KEYS) out[k] += HOLD[k] * h;
@@ -230,22 +227,23 @@ function wingFrame(built, side) {
   );
 }
 
-function makeRibbon(n, mat) {
+function dynamicMesh(verts, index, mat) {
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 2 * 3), 3));
-  geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(n * 2 * 3), 3));
-  const index = [];
-  for (let i = 0; i < n - 1; i++) index.push(2 * i, 2 * i + 2, 2 * i + 1, 2 * i + 1, 2 * i + 2, 2 * i + 3);
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts * 3), 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(verts * 3), 3));
   geo.setIndex(index);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false;
   return mesh;
 }
 
+function makeRibbon(n, mat) {
+  const index = [];
+  for (let i = 0; i < n - 1; i++) index.push(2 * i, 2 * i + 2, 2 * i + 1, 2 * i + 1, 2 * i + 2, 2 * i + 3);
+  return dynamicMesh(n * 2, index, mat);
+}
+
 function makeStrand(mat) {
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(STRAND_N * 4 * 3), 3));
-  geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(STRAND_N * 4 * 3), 3));
   const index = [];
   for (let i = 0; i < STRAND_N - 1; i++) {
     for (let j = 0; j < 4; j++) {
@@ -253,10 +251,7 @@ function makeStrand(mat) {
       index.push(a, b, a + 4, b, b + 4, a + 4);
     }
   }
-  geo.setIndex(index);
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.frustumCulled = false;
-  return mesh;
+  return dynamicMesh(STRAND_N * 4, index, mat);
 }
 
 function buildProps(c) {
@@ -323,7 +318,7 @@ function gripAt(tool, tip, out) {
   return paw.applyMatrix4(_m1);
 }
 
-export function drapeAt(s, d, out) {
+function drapeAt(s, d, out) {
   const { y: y0, z: z0 } = d.work;
   const lap = Math.min(d.lapY, y0);
   let left = s, y = y0, z = z0;

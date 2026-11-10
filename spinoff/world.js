@@ -10,7 +10,7 @@ const PUSH_PASSES = 4;
 
 export const GRAVITY = 30;
 
-export const LEDGE_MARGIN = 0.05;
+const LEDGE_MARGIN = 0.05;
 export const CELL = 0.2;
 
 export { clamp };

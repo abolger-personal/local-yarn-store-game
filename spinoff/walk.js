@@ -19,13 +19,13 @@ export const AIR_SPEED = 4;
 export const SYRUP_SLOW = 0.45;
 export const JUMP_SPEED = 10;
 /** A route jumps up at most this share of a jump's height (v²/2g), leaving time to get over the edge: 1.3 at JUMP_SPEED. */
-export const JUMP_MARGIN = 0.78;
+const JUMP_MARGIN = 0.78;
 /** A trampoline's launch goes this many times as high as the stage's jump (REUSE-SPEC.md §Stages and difficulty are separate). */
 export const SPRING_LIFT = 2;
 /** On butter the velocity closes this share of the gap to the wanted one each tick, so you slide on and turn slowly... */
-export const BUTTER_GRIP = 0.05;
+const BUTTER_GRIP = 0.05;
 /** ...and the wanted speed toward the target is at most distance × this a second, so you overshoot a little and come back. */
-export const BUTTER_BRAKE = 2.5;
+const BUTTER_BRAKE = 2.5;
 const SETTLE = 0.1;
 const JUMP_REACH = 1.2;
 const JUMP_COST = 2;

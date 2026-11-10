@@ -15,7 +15,7 @@ export function mat(color, roughness = 0.7) {
 
 export const box = (w, h, d, color) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, 0.8));
 
-export function roundedRect(w, h, r) {
+function roundedRect(w, h, r) {
   const s = new THREE.Shape(), x = w / 2 - r, y = h / 2 - r;
   s.absarc(x, -y, r, -Math.PI / 2, 0);
   s.absarc(x, y, r, 0, Math.PI / 2);

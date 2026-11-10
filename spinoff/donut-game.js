@@ -18,7 +18,7 @@ const CREDIT_TICKS = 5 * TICK_HZ;
 export const POWER = Object.freeze({ perSecond: 1 / 45, hit: 0.06, ringOut: 0.12, pickup: 0.05, steal: 0.15, bank: 0.25 });
 const DONUT_REACH = 0.25;
 const DONUT_EDGE = 0.1;
-export const SHELF_REACH = 0.3;
+const SHELF_REACH = 0.3;
 /** How far in front of their shelf a foe stands guard: deep enough for where a ring-out drops them in. */
 export const GUARD_REACH = 1;
 const SHELF_GAP = 0.05;

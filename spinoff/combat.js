@@ -16,16 +16,16 @@ export const MATCH = Object.freeze({ friendlyFire: false, badGuysHit: true });
 export const canHit = (a, b, match = MATCH) => a.id !== b.id && (a.team !== b.team || match.friendlyFire)
   && (match.badGuysHit !== false || a.team !== 'badGuys' || b.team !== 'heroes');
 
-export const LUNGE = 0.3;
+const LUNGE = 0.3;
 export const LUNGE_RANGE = 0.8;
 const LUNGE_KEEP = 0.1;
 
-export const LAUNCH_SPEED = 5;
+const LAUNCH_SPEED = 5;
 /** Untouched this long, a fighter steadies: percent (and its wobble) drains at CALM_DRAIN a second. */
 export const CALM_TICKS = 1.5 * TICK_HZ;
 export const CALM_DRAIN = 30;
-export const STUN_TICKS = 8;
-export const STUN_PER_SPEED = 2;
+const STUN_TICKS = 8;
+const STUN_PER_SPEED = 2;
 /** A hit chain (REUSE-SPEC.md §Power moves): hits landed with no miss, no hit taken, and no pause this long. */
 const CHAIN_TICKS = 2.5 * TICK_HZ;
 
@@ -35,7 +35,7 @@ const CROWD_TICKS = TICK_HZ;
 /** What a full bar fires (Input.power): `toy` turns a foe into one of TOY's silly objects for a while. */
 export const POWERS = Object.freeze(['toy']);
 /** A toy's loot pops straight up at this speed (m/s). */
-export const POP = Object.freeze({ vy: 6 });
+const POP = Object.freeze({ vy: 6 });
 export const TOY = Object.freeze({ ticks: 3 * TICK_HZ, knock: 1.5, kinds: Object.freeze(['cottonBall', 'rubberDuck', 'teapot', 'sock']) });
 
 /**

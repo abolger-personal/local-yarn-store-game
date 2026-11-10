@@ -45,7 +45,7 @@ export function beatLevel(n) {
 }
 
 /** @param {Progress} p @param {string} name */
-export const reachedOn = (p, name) => p.reached[name] ?? 1;
+const reachedOn = (p, name) => p.reached[name] ?? 1;
 
 /**
  * A hero's result on level `n` of stage `name` (0: a layout picked by address). A win reaches the next level and ▶️

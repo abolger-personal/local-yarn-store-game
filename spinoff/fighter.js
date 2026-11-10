@@ -12,7 +12,7 @@ import { GLOVE, STRIKE, SWORD_MOVES, SWORD_UP, punchLayer, punchWeight, sample }
 import { HAMMER } from './hammer.js';
 import { kickLayer, kickLunge } from './kicks.js';
 
-export const FIGHTER_KEY = 'lys.fighter.v1';
+const FIGHTER_KEY = 'lys.fighter.v1';
 // the chooser's order, lion first: the registry's reversed, so seeded rosters draw as they always have
 export const SPECIES = Object.freeze([...SPECIES_IDS].reverse());
 
@@ -86,7 +86,7 @@ export function nearestSwatch(list, hex) {
  */
 
 /** @returns {Look} */
-export const defaultLook = () => ({
+const defaultLook = () => ({
   hat: 'beanie', hatColor: '#8be02a', hatStitch: 'rib', cape: 'cape', capeColor: '#8154ff', capeStitch: 'stockinette',
   bag: 'backpack', bagColor: '#ffd21a', gloves: '#ff3b7f', hands: 'gloves', trick: 'plain',
 });
@@ -185,7 +185,7 @@ export const outfitOf = (look) => ({
   bag: wear('bag', look.bag, look.bagColor),
 });
 
-export const GLOVE_SIZE = 2.1;
+const GLOVE_SIZE = 2.1;
 let gloveGeo = null;
 
 function gloveGeometry() {
@@ -222,7 +222,7 @@ function addGloves(built, color) {
   return built.gloves;
 }
 
-export function removeGloves(built) {
+function removeGloves(built) {
   for (const glove of built.gloves ?? []) glove.removeFromParent();
   built.gloves?.[0]?.material.dispose();
   built.gloves = [];
@@ -459,14 +459,14 @@ function reachPole(built, w) {
 }
 
 /** Drops the sword or the scythe (`built.sword` is whichever blade is held). */
-export function removeSword(built) {
+function removeSword(built) {
   built.sword?.removeFromParent();
   for (const o of built.sword?.children ?? []) if (o instanceof THREE.Mesh) o.material.dispose();
   built.sword = null;
 }
 
 /** Holds the sword or scythe at SWORD_MOVES' world angle above forward, whatever the arm is doing: a fan behind a slash, a streak behind a stab. */
-export function swingSword(built, punch) {
+function swingSword(built, punch) {
   const { sword } = built;
   if (!sword) return;
   let arm = 0;
@@ -1151,7 +1151,7 @@ export function addTricks(built, kind) {
   });
 }
 
-export function removeTricks(built) {
+function removeTricks(built) {
   for (const g of built.tricks ?? []) {
     g.removeFromParent();
     g.traverse((m) => m.material?.dispose());
@@ -1417,7 +1417,7 @@ export function wobbleAt(percent, cycles) {
 }
 
 /** The hitting glove stretches along the arm as it flies and squashes on landing; gloves are in joint-side order. */
-export function squashGloves(built, punch) {
+function squashGloves(built, punch) {
   const { stretch, size } = sample(GLOVE, punch?.step ?? 1);
   built.gloves.forEach((glove, i) => {
     const { r } = glove.userData, hits = punch && (i === 0) === (punch.arm < 0);

@@ -7,9 +7,9 @@ import { POWERS } from './combat.js';
 /** @typedef {import('./match.js').Input} Input @typedef {import('./match.js').FighterState} FighterState */
 /** @typedef {import('./match.js').Stage} Stage @typedef {{ x: number, y: number, z: number }} P3 @typedef {{ origin: P3, direction: P3 }} Ray */
 
-export const TAP_RADIUS = { donut: 0.55, foe: 0.55, me: 0.35, jump: 0.5, shelf: 0.75, brick: 0.4, pile: 0.5 };
-export const DONUT_UP = 0.2;
-export const SHELF_UP = 0.65;
+const TAP_RADIUS = { donut: 0.55, foe: 0.55, me: 0.35, jump: 0.5, shelf: 0.75, brick: 0.4, pile: 0.5 };
+const DONUT_UP = 0.2;
+const SHELF_UP = 0.65;
 
 /** The nearest floor top a ray crosses. @param {Stage} stage @param {Ray} ray */
 function topHit(stage, { origin: o, direction: d }) {
@@ -30,7 +30,7 @@ export function floorPoint(stage, ray) {
 }
 
 /** Closest approach of a ray to a point. @param {Ray} ray */
-export function rayDist({ origin: o, direction: d }, x, y, z) {
+function rayDist({ origin: o, direction: d }, x, y, z) {
   const dx = x - o.x, dy = y - o.y, dz = z - o.z;
   const t = Math.max(0, (dx * d.x + dy * d.y + dz * d.z) / (d.x * d.x + d.y * d.y + d.z * d.z));
   return Math.hypot(dx - d.x * t, dy - d.y * t, dz - d.z * t);
@@ -113,7 +113,7 @@ function targetOf(s, stage, snap, myId) {
 
 /** A finger's path on the screen, CSS pixels and milliseconds. @typedef {{ x: number, y: number, t: number }[]} Stroke */
 /** With a full power bar, a finger that has gone this far is drawing a gesture, not steering (REUSE-SPEC.md §Power moves). */
-export const DRAW_PX = 80;
+const DRAW_PX = 80;
 const pathLength = (pts) => pts.reduce((n, p, i) => (i ? n + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) : 0), 0);
 
 /** A finger moved: the steering one drags the target, until with a full bar it has gone DRAW_PX: then it's a drawing. */

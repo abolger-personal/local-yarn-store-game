@@ -8,9 +8,9 @@ import { event } from './donut-game.js';
 /** Blocks a stack may hold: two is as tall as level 1's wall, which nobody hops (the playability check proves it). */
 export const HEIGHT_LIMIT = 2;
 /** The cell you face is the one this far in front of your body (a narrow fighter's middle is 0.225 back from its front)... */
-export const PLACE_AHEAD = 0.225;
+const PLACE_AHEAD = 0.225;
 /** ...or, where that one can't take a block (a deck, the fence, the edge), the one this far in front, at your feet. */
-export const PLACE_NEAR = 0.2;
+const PLACE_NEAR = 0.2;
 const EDGE = 0.01;
 
 /** @typedef {{ x: number, y: number, z: number }} P3 */

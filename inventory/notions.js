@@ -131,6 +131,13 @@ function patchAtlasUV(material, extraVertex = '', extraFragment = '') {
   material.customProgramCacheKey = () => `notion-${extraVertex}${extraFragment}`;
 }
 
+export const glassMat = new THREE.MeshPhysicalMaterial({
+  color: '#eef4f2', transmission: 0.9, roughness: 0.45, thickness: 0.05,
+  ior: 1.3, clearcoat: 0.3, side: THREE.DoubleSide, transparent: true,
+});
+
+export const GLASS_T = 0.012;
+
 const uniform = (value) => ({ value });
 
 // DESIGN-DECISIONS.md "Thickness comes from an edge pass": the shop and the demo both start here

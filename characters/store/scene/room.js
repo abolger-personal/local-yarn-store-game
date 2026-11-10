@@ -3,6 +3,7 @@ import { ROOM } from '../core/config.js';
 import { camera, key, scene } from './stage.js';
 import { board, mergeMeshes, woodMesh } from './wood.js';
 import { paintWornWood } from './worn-wood.js';
+import { glassMat } from '../../../inventory/notions.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const roomGroup = new THREE.Group();
@@ -179,13 +180,6 @@ export const woodMat = stained('#d4a575', 0.78);
 export const seatMat = stained('#b27c51', 0.72);
 
 const counterMat = stained('#97653f', 0.75);
-
-export const glassMat = new THREE.MeshPhysicalMaterial({
-  color: '#eef4f2', transmission: 0.9, roughness: 0.45, thickness: 0.05,
-  ior: 1.3, clearcoat: 0.3, side: THREE.DoubleSide, transparent: true,
-});
-
-export const GLASS_T = 0.012;
 
 export function clearGroup(group) {
   for (const child of group.children.slice()) {

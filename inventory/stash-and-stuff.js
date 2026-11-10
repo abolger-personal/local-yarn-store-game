@@ -4,13 +4,13 @@ import { roomEnvironment } from './room-environment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
   CARD_LOOK, loadAtlas, cellRect, makeGridLines, makeField, makeEdge, makeShadows, makeBoxes, makeSizeAtlas,
-  instanced, setInstance, placeMatrix, placeBoxMatrix, placeLabelMatrix,
+  instanced, setInstance, glassMat, GLASS_T, placeMatrix, placeBoxMatrix, placeLabelMatrix,
 } from './notions.js';
 import {
   EMPTY, makeDisplay, gridSize, footprint, fits, place, lift, topAt, columnAt, slotRect,
   usableAt, clearShelf, fullyExposed, anySlot,
 } from './grid.js';
-import { makePicker, placeItem, scatterYaw, settleYaw } from './pick-place.js';
+import { frameGroup, makeFrame, makePicker, placeItem, scatterYaw, settleYaw } from './pick-place.js';
 import {
   YARN_FAMILIES, TIERS, BANDS, TAILS, buildFamily, buildBand, buildTail, bandMatrix, tailMatrix,
   familyFootprint, familyExtent, triangleCount, aspectDistance, yarnFit as sharedYarnFit,
@@ -82,11 +82,6 @@ const pegMask = (s, c) => c % 2 === 0;
 
 let boxHeightCtl = null, headroomCtl = null;
 
-function makeFrame(position, quaternion) {
-  const m = new THREE.Matrix4().compose(position, quaternion, new THREE.Vector3(1, 1, 1));
-  return { frame: m, frameInv: m.clone().invert(), quat: quaternion.clone() };
-}
-
 const displays = {
   shelf: { id: 'shelf', ...makeFrame(new THREE.Vector3(0, 0, 0), new THREE.Quaternion()),
            g: null, plane: 0, lines: [], panels: [], group: null, floors: [] },
@@ -99,12 +94,7 @@ let activeId = 'shelf';
 const activeDisplay = () => displays[activeId];
 const drag = { index: EMPTY, target: null };
 
-for (const d of Object.values(displays)) {
-  d.group = new THREE.Group();
-  d.group.matrixAutoUpdate = false;
-  d.group.matrix.copy(d.frame);
-  d.group.matrixWorldNeedsUpdate = true;
-}
+for (const d of Object.values(displays)) d.group = frameGroup(d.frame);
 
 const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -138,18 +128,6 @@ surface.rotation.x = -Math.PI / 2;
 surface.userData = { dispId: 'shelf', plane: 0 };
 displays.shelf.group.add(surface);
 displays.shelf.floors = [surface];
-
-const GLASS_THICKNESS = 0.012;
-const glassMaterial = new THREE.MeshPhysicalMaterial({
-  color: '#eef4f2',
-  transmission: 0.9,
-  roughness: 0.45,
-  thickness: 0.05,
-  ior: 1.3,
-  clearcoat: 0.3,
-  side: THREE.DoubleSide,
-  transparent: true,
-});
 
 function buildShelfGrid() {
   const mask = LAYOUTS[S.layout](S.cols, S.rows, S.shelves);
@@ -185,9 +163,9 @@ function layoutShelfLevel(disp, s, w, d) {
 }
 
 function glassPanel(w, d, s) {
-  const panel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), glassMaterial);
-  panel.scale.set(w * 1.04, GLASS_THICKNESS, d * 1.04);
-  panel.position.y = s * S.shelfGap - GLASS_THICKNESS / 2;
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), glassMat);
+  panel.scale.set(w * 1.04, GLASS_T, d * 1.04);
+  panel.position.y = s * S.shelfGap - GLASS_T / 2;
   panel.userData = { dispId: 'shelf', plane: s };
   return panel;
 }

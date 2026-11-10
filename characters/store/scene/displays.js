@@ -1,17 +1,13 @@
 import { touchView, seats, props, aim, mover, displays, items } from '../core/state.js';
 import { gridSize, makeDisplay } from '../../../inventory/grid.js';
-import { makeGridLines } from '../../../inventory/notions.js';
+import { GLASS_T, glassMat, makeGridLines } from '../../../inventory/notions.js';
 import * as THREE from 'three';
 import { BOX_H, CELL, FLOOR_HEADROOM, PILE_HEADROOM, ROOM, SHELF_GAP, SHELF_HEADROOM, SHELF_ROWS, SHELF_TILT } from '../core/config.js';
 import { scene } from './stage.js';
-import { COUNTER, GLASS_T, HALF_D, HALF_W, UP, clearGroup, glassMat, woodMat } from './room.js';
+import { COUNTER, HALF_D, HALF_W, UP, clearGroup, woodMat } from './room.js';
 import { CHAIR_W } from './seating.js';
 import { board, panel, turned, woodMesh } from './wood.js';
-
-function makeFrame(position, quaternion) {
-  const frame = new THREE.Matrix4().compose(position, quaternion, new THREE.Vector3(1, 1, 1));
-  return { frame, frameInv: frame.clone().invert(), quat: quaternion.clone() };
-}
+import { frameGroup, makeFrame } from '../../../inventory/pick-place.js';
 
 const SHELF_BASE_Y = 0.34;   // DISPLAYS.md §Wall shelves: top shelf at about NPC head height
 
@@ -126,13 +122,11 @@ export function applyTransform(d, x, z, yaw) {
 }
 
 function buildLevelFrames(d) {
-  const tilt = d.kind === 'shelf' ? SHELF_TILT : 0;
-  d.tilt = tilt;
   d.levels = [];
   for (let s = 0; s < d.g.shelves; s++) {
     const m = new THREE.Matrix4()
       .makeTranslation(0, s * d.gap, 0)
-      .multiply(new THREE.Matrix4().makeRotationX(tilt));
+      .multiply(new THREE.Matrix4().makeRotationX(d.tilt));
     const frame = d.frame.clone().multiply(m);
     d.levels.push({
       frame,
@@ -182,10 +176,7 @@ export function buildDisplays(n) {
   buildFloor();
   if (!byId(aim.active)) aim.active = displays[0]?.id ?? null;
   for (const d of displays) {
-    d.group = new THREE.Group();
-    d.group.matrixAutoUpdate = false;
-    d.group.matrix.copy(d.frame);
-    d.group.matrixWorldNeedsUpdate = true;
+    d.group = frameGroup(d.frame);
     displayGroup.add(d.group);
     buildFurniture(d);
   }

@@ -175,7 +175,8 @@ function buildCast() {
 
 function addPair(id, slot, slots) {
   const kit = getSpecies(id);
-  const params = { ...BASE_PARAMS, ...kit.defaults };
+  // BODIES.md §Turtle: the turtle's defaults are a designer's yellow; the all-species line-up is all one fur
+  const params = { ...BASE_PARAMS, ...kit.defaults, ...(S.allSpecies && { bodyColor: BASE_PARAMS.bodyColor }) };
   if (!S.allSpecies && !matrix) kit.randomise?.(params);
   const corner = matrix?.[slot];
   if (corner) {

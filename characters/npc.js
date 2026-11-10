@@ -148,14 +148,14 @@ export const BASE_RANDOM_RANGES = Object.freeze({
 });
 
 // BODIES.md §Colour
-export const FUR_MODES = [
+const FUR_MODES = [
   { weight: 45, sat: [0.06, 0.26], light: [0.22, 0.78] },
   { weight: 35, sat: [0.26, 0.52], light: [0.32, 0.62] },
   { weight: 20, sat: [0.52, 0.82], light: [0.28, 0.55] },
 ];
 
-export const ACCENT_SAT = [0.42, 0.78];
-export const ACCENT_LIGHT = [0.32, 0.62];
+const ACCENT_SAT = [0.42, 0.78];
+const ACCENT_LIGHT = [0.32, 0.62];
 
 export const NAMES = [
   'Marguerite', 'Bramble', 'Winifred', 'Otto', 'Pip', 'Hazel', 'Thistle', 'Cormac',
@@ -177,7 +177,7 @@ export const NAMES = [
 export const rand = (a, b) => a + Math.random() * (b - a);
 export const pick = (arr, rng = Math.random) => arr[Math.floor(rng() * arr.length)];
 export const hsl = (h, s, l) => `#${new THREE.Color().setHSL(h, s, l).getHexString()}`;
-export const randHex = (sat, light) => hsl(Math.random(), rand(...sat), rand(...light));
+const randHex = (sat, light) => hsl(Math.random(), rand(...sat), rand(...light));
 
 function weightedPick(modes) {
   const total = modes.reduce((sum, m) => sum + m.weight, 0);
@@ -189,13 +189,13 @@ function weightedPick(modes) {
   return modes.at(-1);
 }
 
-export function randomFur() {
+function randomFur() {
   const mode = weightedPick(FUR_MODES);
   return randHex(mode.sat, mode.light);
 }
 
 // BODIES.md §Colour
-export function deriveCoatColor(bodyHex) {
+function deriveCoatColor(bodyHex) {
   const base = {};
   new THREE.Color(bodyHex).getHSL(base);
   const dir = Math.random() < 0.5 ? -1 : 1;
@@ -221,46 +221,24 @@ export function slugify(text) {
   return slug || 'character';
 }
 
-export function feltMaterial(P, color) {
-  const material = new THREE.MeshPhysicalMaterial({
-    color: new THREE.Color(color),
-    roughness: P.roughness,
-    metalness: 0,
-    sheen: P.sheen,
-    sheenRoughness: P.sheenRoughness,
-    sheenColor: new THREE.Color(P.sheenTint),
-  });
-  material.userData.family = 'felt';
+function physical(family, color, opts) {
+  const material = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(color), metalness: 0, ...opts });
+  material.userData.family = family;
   return material;
 }
 
-export function eyeMaterial(P, color) {
-  const material = new THREE.MeshPhysicalMaterial({
-    color: new THREE.Color(color),
-    roughness: P.eyeRough,
-    metalness: 0,
-    sheen: P.eyeSheen,
-    sheenRoughness: P.eyeSheenRough,
-    sheenColor: new THREE.Color('#ffffff'),
-    clearcoat: P.eyeClearcoat,
-    clearcoatRoughness: 0.06,
-  });
-  material.userData.family = 'eye';
-  return material;
-}
+export const feltMaterial = (P, color) => physical('felt', color, {
+  roughness: P.roughness, sheen: P.sheen, sheenRoughness: P.sheenRoughness, sheenColor: new THREE.Color(P.sheenTint),
+});
 
-export function knitMaterial(color) {
-  const material = new THREE.MeshPhysicalMaterial({
-    color: new THREE.Color(color),
-    roughness: 0.72,
-    metalness: 0,
-    sheen: 1.0,
-    sheenRoughness: 0.45,
-    sheenColor: new THREE.Color('#ffffff'),
-  });
-  material.userData.family = 'knit';
-  return material;
-}
+const eyeMaterial = (P, color) => physical('eye', color, {
+  roughness: P.eyeRough, sheen: P.eyeSheen, sheenRoughness: P.eyeSheenRough, sheenColor: new THREE.Color('#ffffff'),
+  clearcoat: P.eyeClearcoat, clearcoatRoughness: 0.06,
+});
+
+export const knitMaterial = (color) => physical('knit', color, {
+  roughness: 0.72, sheen: 1.0, sheenRoughness: 0.45, sheenColor: new THREE.Color('#ffffff'),
+});
 
 const sharedMaterials = new Map();
 
@@ -279,13 +257,8 @@ function sharedMaterial(source) {
   return sharedMaterials.get(family);
 }
 
-export function clearSharedMaterials() {
-  for (const material of sharedMaterials.values()) material.dispose();
-  sharedMaterials.clear();
-}
-
-export const greyMat = new THREE.MeshStandardMaterial({ color: '#b9b4ad', roughness: 0.9, metalness: 0 });
-export const blackMat = new THREE.MeshBasicMaterial({ color: '#000000' });
+const greyMat = new THREE.MeshStandardMaterial({ color: '#b9b4ad', roughness: 0.9, metalness: 0 });
+const blackMat = new THREE.MeshBasicMaterial({ color: '#000000' });
 
 function baseMaterials(P, addMaterial) {
   return {
@@ -326,8 +299,6 @@ export function setGeometryDetail(level = 'high') {
   Object.assign(GEO, buildPrimitives(GEO_DETAIL[level] ?? GEO_DETAIL.high));
 }
 setGeometryDetail('high');
-
-export const getGeometryDetail = () => currentDetail;
 
 const sideName = (side) => (side < 0 ? 'right' : 'left');
 
@@ -482,7 +453,7 @@ function cachedGeometry(key, make) {
 
 export const scallopGeometry = (opts) => cachedGeometry(JSON.stringify(opts), () => makeScallopShell(opts));
 
-export function clearScallopCache() {
+function clearScallopCache() {
   for (const geometry of scallopCache.values()) geometry?.dispose();
   scallopCache.clear();
 }
@@ -496,7 +467,7 @@ function widestRowSin(rows, top, bottom) {
   return widest || 1e-3;
 }
 
-export function touchingScallopSize({ rows, perRow, top, bottom, maxSize = 0.45 }) {
+function touchingScallopSize({ rows, perRow, top, bottom, maxSize = 0.45 }) {
   const rowCount = Math.max(1, Math.round(rows));
   const columns = Math.max(3, Math.round(perRow));
   const across = ((Math.PI * 2) / columns) * widestRowSin(rowCount, top, bottom);
@@ -640,7 +611,7 @@ const PATCH_SEGMENTS = 24;
  * A patch of skin `lift` proud of head ellipsoid `head`, round the skin point over (x, y), `from` to `to` radians out.
  * @param {number[]} head @param {number[]} at @param {number[]} span @param {number} lift
  */
-export function skinPatch(head, [x, y], [from, to], lift) {
+function skinPatch(head, [x, y], [from, to], lift) {
   const key = `patch|${head}|${x}|${y}|${from}|${to}|${lift}`;
   return cachedGeometry(key, () => {
     const dir = new THREE.Vector3(x / head[0], y / head[1], skinZ(x, y, head) / head[2]).normalize();
@@ -806,7 +777,6 @@ export function addEars(ctx, P, opts) {
   for (const side of [-1, 1]) {
     const ear = joint(new THREE.Group(), `${sideName(side)}Ear`);
     ear.position.set(side * sx, sy, sz);
-    ear.rotation.set(P.earPerk ?? 0, 0, side * -(tilt + (P.earSplay ?? 0)));
     ear.add(part(geometry, material ?? ctx.mat.body, { pos: [0, length * 0.35, 0], scale }));
     ctx.head.add(ear);
     ctx.joints.ear.push({
@@ -869,7 +839,7 @@ function armFrame(P, bulge, armSwing) {
   return _arm;
 }
 
-export function minArmOut(P, bulge = 0, armSwing = 0) {
+function minArmOut(P, bulge = 0, armSwing = 0) {
   const { a, b, c, reach, x0, y0, cs, sn } = armFrame(P, bulge, armSwing);
 
   let prev = 0;
@@ -952,14 +922,11 @@ function buildLeg(side, P, mat, joints) {
   const [thigh, shin] = [femurOf(P), tibiaOf(P)];
   const upperLeg = joint(new THREE.Group(), `${sideName(side)}UpperLeg`);
   upperLeg.position.set(side * P.legSpread, P.hipInset, 0);
-  upperLeg.rotation.x = P.legSwing * side - P.hipFlex;
-  upperLeg.rotation.z = side * legOutOf(P, side);
   limbSegment(upperLeg, mat.body, P.limbThick, thigh, false);
   joints.upperLeg.push({ node: upperLeg, side });
 
   const lowerLeg = joint(new THREE.Group(), `${sideName(side)}LowerLeg`);
   lowerLeg.position.y = -thigh;
-  lowerLeg.rotation.x = kneeAmount(P.kneeBend, P.legSwing, side, legOutOf(P, side));
   limbSegment(lowerLeg, mat.body, P.limbThick * LIMB_TAPER, shin);
   const foot = buildFoot(shin, mat, side);
   lowerLeg.add(foot);
@@ -996,13 +963,11 @@ function buildArm(side, P, mat, joints, bulge) {
   const upperR = P.limbThick * 1.05;
   const upperArm = joint(new THREE.Group(), `${sideName(side)}UpperArm`);
   upperArm.position.set(side * P.torsoW * (P.shoulderOut + bulge), P.torsoH * P.shoulderLift, 0);
-  upperArm.rotation.set(P.armSwing, 0, side * clampArmOut(P, bulge, P.armOut, P.armSwing));
   limbSegment(upperArm, mat.body, upperR, P.upperArmLen);
   joints.upperArm.push({ node: upperArm, side });
 
   const lowerArm = joint(new THREE.Group(), `${sideName(side)}LowerArm`);
   lowerArm.position.y = -P.upperArmLen;
-  lowerArm.rotation.x = -P.elbowBend;
   limbSegment(lowerArm, mat.body, upperR * LIMB_TAPER, P.forearmLen);
   const { hand, hold } = buildHand(P, mat, side);
   lowerArm.add(hand);
@@ -1051,7 +1016,6 @@ function buildHeadNode(P) {
 
 function buildUpperBody(P, mat, joints, addMaterial, bulge) {
   const spine = joint(new THREE.Group(), 'spine');
-  spine.rotation.x = P.spineBend;
   const chest = buildChest(P, mat);
   spine.add(chest);
 
@@ -1079,12 +1043,6 @@ function buildBody(P, mat, joints, addMaterial, bulge) {
   return { root, hips, ...upper };
 }
 
-function disableShadowCasting(root) {
-  root.traverse((o) => {
-    if (o.isMesh) o.castShadow = false;
-  });
-}
-
 export function createCharacter(P, species) {
   const kit = resolveSpecies(species);
   const materials = [];
@@ -1101,7 +1059,7 @@ export function createCharacter(P, species) {
                 motion: makeMotion(POSES.rest), groundOffset: 0, seatDrop: 0 };
   kit.buildKit(ctx, P);
   if (P.painterly && kit.paint) paintCharacter(ctx, kit.paint);
-  if (!P.partShadows) disableShadowCasting(body.root);
+  if (!P.partShadows) body.root.traverse((o) => { if (o.isMesh) o.castShadow = false; });
   if (P.mergeMeshes !== false) mergeCharacter(ctx);
   applyPose(ctx, P);
   return ctx;
@@ -1137,25 +1095,16 @@ function bakedGeometry(mesh, toJointSpace) {
 
 function paintGeometry(geometry, color) {
   if (geometry.attributes.color) return geometry;
-  const { count } = geometry.attributes.position;
-  const colors = new Float32Array(count * 3);
-  for (let i = 0; i < count; i++) {
-    colors[i * 3] = color.r;
-    colors[i * 3 + 1] = color.g;
-    colors[i * 3 + 2] = color.b;
-  }
+  const rgb = color.toArray(), colors = new Float32Array(geometry.attributes.position.count * 3).map((_, i) => rgb[i % 3]);
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   return geometry;
 }
 
-function mergedMesh({ parts, shadow, material }) {
-  const geometry = parts.length === 1 ? parts[0] : mergeGeometries(parts, false);
-  if (parts.length > 1) parts.forEach((geo) => geo.dispose());
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.castShadow = shadow;
-  mesh.receiveShadow = shadow;
-  mesh.userData.merged = true;
-  return mesh;
+function mergedGeometry(parts) {
+  if (parts.length === 1) return parts[0];
+  const geometry = mergeGeometries(parts, false);
+  parts.forEach((geo) => geo.dispose());
+  return geometry;
 }
 
 function unmerge(mesh) {
@@ -1204,10 +1153,9 @@ function skinAt(bones) {
   const [root] = bones;
   const groups = skinnedGroups(bones, new THREE.Matrix4().copy(root.matrixWorld).invert());
   const skeleton = new THREE.Skeleton(bones);
-  for (const entry of groups.values()) {
-    const merged = mergedMesh(entry);
-    const mesh = new THREE.SkinnedMesh(merged.geometry, merged.material);
-    Object.assign(mesh, { castShadow: merged.castShadow, receiveShadow: merged.receiveShadow });
+  for (const { parts, shadow, material } of groups.values()) {
+    const mesh = new THREE.SkinnedMesh(mergedGeometry(parts), material);
+    Object.assign(mesh, { castShadow: shadow, receiveShadow: shadow });
     mesh.userData.merged = true;
     root.add(mesh);
     mesh.bind(skeleton, root.matrixWorld);
@@ -1215,12 +1163,8 @@ function skinAt(bones) {
 }
 
 function rigidTo(geo, index) {
-  const n = geo.attributes.position.count;
-  const skinIndex = new Uint16Array(n * 4), skinWeight = new Float32Array(n * 4);
-  for (let i = 0; i < n; i++) {
-    skinIndex[i * 4] = index;
-    skinWeight[i * 4] = 1;
-  }
+  const n = geo.attributes.position.count * 4;
+  const skinIndex = new Uint16Array(n).map((_, i) => (i % 4 ? 0 : index)), skinWeight = new Float32Array(n).map((_, i) => (i % 4 ? 0 : 1));
   geo.setAttribute('skinIndex', new THREE.BufferAttribute(skinIndex, 4));
   geo.setAttribute('skinWeight', new THREE.BufferAttribute(skinWeight, 4));
 }
@@ -1251,7 +1195,7 @@ function lowestFoot(P, pose) {
   return lowest;
 }
 
-export function groundCharacter(built, pose = built.params) {
+function groundCharacter(built, pose = built.params) {
   const y = (built.groundOffset ?? 0) + FOOT_SOLE - lowestFoot(built.params, pose);
   if (Number.isFinite(y)) built.root.position.y = y;
 }
@@ -1319,12 +1263,8 @@ function applyHead(joints, pose, P) {
   const head = 1 - neck;
   const curve = pose.neckCurve ?? 0;
   const steady = (pose.spineRoll ?? 0) * neckStabilise(P);
-  if (joints.neck) {
-    joints.neck.rotation.set(pitch * neck + curve, yaw * neck, -tilt * neck + steady);
-  }
-  if (joints.head) {
-    joints.head.rotation.set(pitch * head - curve, yaw * head, -tilt * head);
-  }
+  joints.neck.rotation.set(pitch * neck + curve, yaw * neck, -tilt * neck + steady);
+  joints.head.rotation.set(pitch * head - curve, yaw * head, -tilt * head);
   // ponytail: blink is a y-squash of the eye (reads as a squint); a lid disc if it matters at play distance
   const lid = 1 - (pose.blink ?? 0);
   for (const { node } of joints.eye) node.scale.y = lid;
@@ -1360,9 +1300,7 @@ export function applyPose(built, pose) {
     clampArmOut(params, bulge, pose.armOut - alt, pose.armSwing),
   ];
   applyLimbs(joints, pose, out);
-  if (joints.spine) {
-    joints.spine.rotation.set(pose.spineBend ?? 0, pose.spineTwist ?? 0, -(pose.spineRoll ?? 0));
-  }
+  joints.spine.rotation.set(pose.spineBend ?? 0, pose.spineTwist ?? 0, -(pose.spineRoll ?? 0));
   for (const { node, side, tilt } of joints.ear) {
     node.rotation.set(pose.earPerk ?? 0, 0, side * -(tilt + (pose.earSplay ?? 0)));
   }
@@ -1414,7 +1352,6 @@ function lookLayer(built, out, target, dt) {
 export function placePupils(built) {
   const { eyeYaw = 0, eyePitch = 0 } = built.look ?? {};
   for (const { pupil, rest, depth, r, ry, room } of built.joints.eye) {
-    if (!pupil) continue;
     const x = Math.sin(eyeYaw) * room[eyeYaw < 0 ? 0 : 1], y = -Math.sin(eyePitch) * room[eyePitch > 0 ? 2 : 3];
     pupil.position.set(x, y, rest - depth + depth * Math.sqrt(Math.max(0, 1 - (x / r) ** 2 - (y / ry) ** 2)));
   }
@@ -1483,19 +1420,14 @@ export function disposeCharacter(built) {
   });
 }
 
-const round3 = (n) => Math.round(n * 1000) / 1000;
-
-export function applyRanges(P, ranges) {
-  for (const [key, [a, b]] of Object.entries(ranges)) P[key] = round3(rand(a, b));
-  return P;
-}
+export const round3 = (n) => Math.round(n * 1000) / 1000;
 
 /**
  * @param {Record<string, any>} P
  * @param {Record<string, number[]>} [ranges]
  */
 export function randomiseBase(P, ranges = BASE_RANDOM_RANGES) {
-  applyRanges(P, ranges);
+  for (const [key, [a, b]] of Object.entries(ranges)) P[key] = round3(rand(a, b));
   P.bodyColor = randomFur();
   P.heldColor = randHex(ACCENT_SAT, ACCENT_LIGHT);
   P.name = pick(NAMES);
@@ -1512,7 +1444,7 @@ export function applyPreset(P, { presets, presetKey }, index) {
 export const randomPreset = (P, kit) => applyPreset(P, kit, Math.floor(Math.random() * kit.presets.length));
 
 /** BODIES.md §Randomisation: the base draw, the kit's own (`vary`), a coat preset, the coat colour from the fur. */
-export function randomiseKit(P, kit) {
+function randomiseKit(P, kit) {
   randomiseBase(P, kit.randomRanges);
   kit.vary?.(P);
   if (kit.presets) randomPreset(P, kit);
@@ -1520,7 +1452,7 @@ export function randomiseKit(P, kit) {
   return P;
 }
 
-export const SHARED_RANDOM_KEYS = ['bodyColor', 'heldColor'];
+const SHARED_RANDOM_KEYS = ['bodyColor', 'heldColor'];
 
 const sameRange = (a, b) => Boolean(a) && Boolean(b) && a[0] === b[0] && a[1] === b[1];
 

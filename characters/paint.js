@@ -119,7 +119,7 @@ const INK = `{${level('texture2D(paintBrushMap, vPaintUv * vec2(3.0, 2.0)).r', f
   outgoingLight = paintC * paintPooled * (1.0 + paintStroke * paintStreak + paintRows);
 }`;
 
-export const PAINT_STYLES = Object.freeze({
+const PAINT_STYLES = Object.freeze({
   fur: { ramp: FUR_RAMP, body: FUR },
   ink: { ramp: INK_RAMP, body: INK },
   scale: { ramp: FUR_RAMP, body: SCALE },

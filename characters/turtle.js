@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, GEO,
-  addEyes, addHead, addTail, addTorsoCoat, coatBulge,
-  feltMaterial, hsl, part, rand, registerSpecies, skinDecal,
+  addEyes, addTail, addTorsoCoat, cachedGeometry, coatBulge, joint,
+  feltMaterial, hsl, hslOf, part, rand, registerSpecies, skinDecal,
 } from './npc.js';
 import { named, onFront, softGeometry, softTriangle } from './faces.js';
 
@@ -97,8 +97,6 @@ const RANDOM_RANGES = Object.freeze({
   tailLength:  [0.055, 0.110],
 });
 
-const hslOf = (hex) => new THREE.Color(hex).getHSL({ h: 0, s: 0, l: 0 });
-
 // BODIES.md §Turtle, colour: the painted turtle's. A dark shell, a deep shade of the skin. (Lightnesses here are
 // three.js's working, linear ones: 0.05 shows about as dark as 0.25.)
 function deepShellColor(bodyHex) {
@@ -182,19 +180,14 @@ function addStripes(ctx, P) {
   ctx.neck.add(named(part(neck, ctx.mat.stripe, { pos: [0, P.headOverlap + P.neckLength / 2, 0] }), 'stripe'));
 }
 
-const shells = new Map();
-
 /**
  * The torso ellipsoid, `lift` proud, from `from` to `to` radians out from straight back: the turtle stands, so its
  * shell is a cap on its back and the shell's edge a loop standing upright round it, never a ring parallel to the floor.
  */
 function shellBand(P, lift, from, to) {
-  const key = `${P.torsoW}|${P.torsoH}|${P.torsoD}|${lift}|${from}|${to}`;
-  if (!shells.has(key)) {
-    const g = new THREE.SphereGeometry(1, 40, 16, 0, Math.PI * 2, from, to - from).rotateX(-Math.PI / 2);
-    shells.set(key, g.scale(P.torsoW + lift, P.torsoH + lift, P.torsoD + lift));
-  }
-  return shells.get(key);
+  return cachedGeometry(`shell|${P.torsoW}|${P.torsoH}|${P.torsoD}|${lift}|${from}|${to}`, () =>
+    new THREE.SphereGeometry(1, 40, 16, 0, Math.PI * 2, from, to - from).rotateX(-Math.PI / 2)
+      .scale(P.torsoW + lift, P.torsoH + lift, P.torsoD + lift));
 }
 
 // BODIES.md §Turtle: one carapace on the back under the scutes, so they are plates on a shell and never loose tiles,
@@ -207,8 +200,7 @@ const SHELL = Object.freeze({ under: 0.55, rim: 0.07 });
 function addCarapace(ctx, P) {
   if (!P.shell) return;
   const edge = Math.PI - P.scuteGap / 2, proud = ctx.bulge * P.torsoD;
-  const back = Object.assign(new THREE.Group(), { name: 'shell' });
-  back.userData.joint = true;
+  const back = joint(new THREE.Group(), 'shell');
   ctx.chest.add(back);
   back.add(named(part(shellBand(P, proud * SHELL.under, 0, edge), ctx.mat.scute), 'carapace'));
   if (P.shellRim) back.add(named(part(shellBand(P, proud, edge - Math.PI * SHELL.rim, edge), ctx.mat.rim), 'rim'));
@@ -240,8 +232,7 @@ function buildKit(ctx, P) {
   ctx.mat.stripe = ctx.addMaterial(feltMaterial(P, stripeColorOf(P)));
   ctx.mat.beak = ctx.addMaterial(feltMaterial(P, P.beakColor));
 
-  addHead(ctx, P);
-  addEyes(ctx, P, { head: ctx.headScale });
+  addEyes(ctx, P);
   addBeak(ctx, P);
   addNeckFolds(ctx, P);
   addStripes(ctx, P);

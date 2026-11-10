@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, GEO,
-  addConeEars, addEyes, addHead, addTail, facePaintColorFor, feltMaterial, part, registerSpecies, skinDecal,
+  addEars, addEyes, addTail, cachedGeometry, joint, facePaintColorFor, feltMaterial, part, registerSpecies, skinDecal,
 } from './npc.js';
-import { named, onFront, softGeometry } from './faces.js';
+import { named, onFront, softGeometry, unit } from './faces.js';
 
 const DEFAULT_PARAMS = {
   ...BASE_PARAMS,
@@ -50,7 +50,6 @@ const DEFAULT_PARAMS = {
   bellyPlates:   7,
   bellyWidth:    0.60,
 
-  tailLength:    0.200,
   tailThick:     0.040,
   tailDroop:    -0.55,
   tailCurl:      0.55,
@@ -87,7 +86,7 @@ const RANDOM_RANGES = Object.freeze({
 const spikeColorOf = (P) => P.spikeColor || facePaintColorFor(P.bodyColor);
 
 // a soft spike: an egg narrowing to a rounded point up +y, the cute rule's spike
-const softSpike = () => {
+const spikeGeometry = () => unit('spike', () => {
   const g = new THREE.SphereGeometry(1, 16, 12), pos = g.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const k = 1 - 0.75 * (pos.getY(i) + 1) / 2;
@@ -95,7 +94,7 @@ const softSpike = () => {
   }
   g.computeVertexNormals();
   return g;
-};
+});
 
 // a horn: a cone whose tip bends back (-z) by `curl` of its base radius
 const curvedHorn = (curl) => {
@@ -105,13 +104,10 @@ const curvedHorn = (curl) => {
   return g;
 };
 
-let spikeGeometry = null;
-const hornGeometries = new Map();
-
 /** A soft spike on ellipsoid `size` (centred on `node`), on its midline `phi` radians up from straight back. */
 function ridgeSpike(node, mat, { size, phi, s, sunk = 0.25 }) {
   const [, b, c] = size, up = Math.sin(phi) / b, out = -Math.cos(phi) / c, len = Math.hypot(up, out), lift = s * (1 - sunk);
-  node.add(part(spikeGeometry, mat, {
+  node.add(part(spikeGeometry(), mat, {
     pos: [0, b * Math.sin(phi) + (up / len) * lift, -c * Math.cos(phi) + (out / len) * lift],
     scale: [s * 0.45, s, s * 0.8], rot: [Math.atan2(out, up), 0, 0],
   }));
@@ -153,13 +149,12 @@ function addFaceShapes(ctx, P, muzzle) {
 }
 
 function addHorns(ctx, P) {
-  addConeEars(ctx, P, {
+  addEars(ctx, P, {
     size: P.hornSize, length: P.hornLength, spread: P.hornSpread, tilt: P.hornTilt,
-    lift: 0.95, back: -0.12, head: ctx.headScale, material: ctx.mat.horn,
+    lift: 0.95, back: -0.12, material: ctx.mat.horn,
   });
-  const key = P.hornCurl.toFixed(2);
-  if (!hornGeometries.has(key)) hornGeometries.set(key, curvedHorn(P.hornCurl));
-  for (const { node } of ctx.joints.ear) node.children[0].geometry = hornGeometries.get(key);
+  const horn = cachedGeometry(`horn|${P.hornCurl.toFixed(2)}`, () => curvedHorn(P.hornCurl));
+  for (const { node } of ctx.joints.ear) node.children[0].geometry = horn;
 }
 
 // BODIES.md §Dragon: a leafy crest down the back of the head, from behind the horns to the nape
@@ -171,8 +166,7 @@ const RIDGE = Object.freeze({ top: 1.00, bottom: -0.25 });
 
 function addRidge(ctx, P) {
   if (!P.spikes) return;
-  const back = Object.assign(new THREE.Group(), { name: 'ridge' });
-  back.userData.joint = true;
+  const back = joint(new THREE.Group(), 'ridge');
   ctx.chest.add(back);
   const k = 1 + ctx.bulge;
   ridge(back, ctx.mat.spike, { size: [P.torsoW * k, P.torsoH * k, P.torsoD * k], n: P.spikeCount, s: P.spikeSize, ...RIDGE });
@@ -181,18 +175,12 @@ function addRidge(ctx, P) {
 // BODIES.md §Dragon: the belly, an alligator's: chevron plates pointing down from the neck to under the tail root, each
 // a little prouder than the one below, so its point lies over the next
 const BELLY = Object.freeze({ top: 0.75, bottom: -0.92, lift: 0.003, step: 0.0015 });
-const bellies = new Map();
-
 function bellyGeometry(P) {
   const torso = [P.torsoW, P.torsoH, P.torsoD], n = Math.max(1, Math.round(P.bellyPlates)), size = 2 * P.torsoW * P.bellyWidth;
-  const key = `${torso}|${n}|${size}`;
-  if (!bellies.has(key)) {
-    bellies.set(key, mergeGeometries(Array.from({ length: n }, (_, i) => {
-      const t = n > 1 ? i / (n - 1) : 0.5, y = P.torsoH * (BELLY.top + (BELLY.bottom - BELLY.top) * t);
-      return skinDecal(torso, 'chevron', [0, y], size * (1 - 0.3 * t), BELLY.lift + (n - 1 - i) * BELLY.step);
-    }), false));
-  }
-  return bellies.get(key);
+  return cachedGeometry(`belly|${torso}|${n}|${size}`, () => mergeGeometries(Array.from({ length: n }, (_, i) => {
+    const t = n > 1 ? i / (n - 1) : 0.5, y = P.torsoH * (BELLY.top + (BELLY.bottom - BELLY.top) * t);
+    return skinDecal(torso, 'chevron', [0, y], size * (1 - 0.3 * t), BELLY.lift + (n - 1 - i) * BELLY.step);
+  }), false));
 }
 
 function addBelly(ctx, P) {
@@ -206,10 +194,10 @@ function addDragonTail(ctx, P) {
       const r = P.tailThick * 0.8 ** i, s = P.tailSpikeSize * 0.85 ** i;
       node.add(part(GEO.taper, ctx.mat.body, { pos: [0, 0, -len / 2], scale: [r, len, r], rot: [Math.PI / 2, 0, 0] }));
       node.add(part(GEO.sphere, ctx.mat.body, { scale: [r, r, r] }));
-      if (P.spikes) node.add(part(spikeGeometry, ctx.mat.spike, { pos: [0, r * 0.85, -len * 0.5], scale: [s * 0.45, s, s * 0.8], rot: [-0.35, 0, 0] }));
+      if (P.spikes) node.add(part(spikeGeometry(), ctx.mat.spike, { pos: [0, r * 0.85, -len * 0.5], scale: [s * 0.45, s, s * 0.8], rot: [-0.35, 0, 0] }));
       if (i < 2) return;
       const t = P.tipSize;
-      node.add(named(part(spikeGeometry, ctx.mat.horn, { pos: [0, 0, -len - t * 0.6], scale: [t * 0.35, t * 1.3, t], rot: [-Math.PI / 2, 0, 0] }), 'tailTip'));
+      node.add(named(part(spikeGeometry(), ctx.mat.horn, { pos: [0, 0, -len - t * 0.6], scale: [t * 0.35, t * 1.3, t], rot: [-Math.PI / 2, 0, 0] }), 'tailTip'));
     },
   });
 }
@@ -218,10 +206,8 @@ function buildKit(ctx, P) {
   ctx.mat.horn = ctx.addMaterial(feltMaterial(P, P.hornColor));
   ctx.mat.spike = ctx.addMaterial(feltMaterial(P, spikeColorOf(P)));
   ctx.mat.belly = ctx.addMaterial(feltMaterial(P, P.bellyColor));
-  spikeGeometry ??= softSpike();
 
-  addHead(ctx, P);
-  addEyes(ctx, P, { head: ctx.headScale });
+  addEyes(ctx, P);
   addMuzzle(ctx, P);
   addHorns(ctx, P);
   ridge(ctx.head, ctx.mat.spike, { size: ctx.headScale, n: P.crestCount, s: P.crestSize, ...CREST });

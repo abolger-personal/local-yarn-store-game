@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   BASE_GUI, BASE_MOTION_RANGES, BASE_PARAMS, BASE_RANDOM_RANGES, GEO, GUI_SECTIONS,
-  addEyes, addHead, addTail, createCharacter, getSpecies, part, registerSpecies, speciesIds,
+  addEyes, addTail, createCharacter, getSpecies, part, registerSpecies, speciesIds,
 } from './npc.js';
 import { SPECIES_IDS } from './species.js';
 
@@ -16,8 +16,7 @@ registerSpecies({
   motionRanges: BASE_MOTION_RANGES,
   headShape: [1, 0.9, 1.1],
   buildKit(ctx, P) {
-    addHead(ctx, P);
-    addEyes(ctx, P, { head: ctx.headScale });
+    addEyes(ctx, P);
     addTail(ctx, P, {
       dress: (node, i, len) => node.add(part(GEO.sphere, ctx.mat.body, { pos: [0, 0, -len / 2], scale: [P.tailThick, P.tailThick, len / 2] })),
     });

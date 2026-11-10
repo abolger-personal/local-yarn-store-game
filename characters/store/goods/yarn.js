@@ -1,6 +1,6 @@
 import { items } from '../core/state.js';
 import { YARN_SHAPES } from '../../../inventory/catalog.js';
-import { placeMatrix } from '../../../inventory/notions.js';
+import { placeMatrix, setInstance } from '../../../inventory/notions.js';
 import {
   BANDS,
   TAILS,
@@ -88,15 +88,8 @@ export function buildYarnMeshes() {
 }
 
 export function hideYarn(index, except = null) {
-  for (const shape of YARN_SHAPES) {
-    if (shape === except) continue;
-    yarnMeshes[shape].setMatrixAt(index, _hide);
-    yarnMeshes[shape].instanceMatrix.needsUpdate = true;
-  }
-  for (const m of [bandMesh, tailMesh]) {
-    m.setMatrixAt(index, _hide);
-    m.instanceMatrix.needsUpdate = true;
-  }
+  for (const shape of YARN_SHAPES) if (shape !== except) setInstance(yarnMeshes[shape], index, { matrix: _hide });
+  for (const m of [bandMesh, tailMesh]) setInstance(m, index, { matrix: _hide });
 }
 
 function yarnMatrix(item, p, F, grow) {
@@ -109,10 +102,7 @@ function yarnMatrix(item, p, F, grow) {
 
 function paintWool(index, item) {
   const mesh = yarnMeshes[item.shape];
-  mesh.setMatrixAt(index, _yarnMat);
-  mesh.instanceMatrix.needsUpdate = true;
-  mesh.setColorAt(index, _yarnCol.set(item.color));
-  mesh.instanceColor.needsUpdate = true;
+  setInstance(mesh, index, { matrix: _yarnMat, color: _yarnCol.set(item.color) });
   const hs = mesh.userData.hatchScale;
   hs.setX(index, YARN.hatchForBulk[(item.w ?? 1) - 1] ?? 1);
   hs.needsUpdate = true;
@@ -120,25 +110,20 @@ function paintWool(index, item) {
 
 function paintTrim(index, item) {
   if (BANDS[item.shape]) {
-    bandMesh.setMatrixAt(index, bandMatrix(item.shape, _bandLocal).premultiply(_yarnMat));
-    bandMesh.instanceMatrix.needsUpdate = true;
-    bandMesh.setColorAt(index, _yarnCol.set(YARN.bandColor));
-    bandMesh.instanceColor.needsUpdate = true;
+    setInstance(bandMesh, index, {
+      matrix: bandMatrix(item.shape, _bandLocal).premultiply(_yarnMat), color: _yarnCol.set(YARN.bandColor) });
   }
   if (TAILS[item.shape]) {
-    tailMesh.setMatrixAt(index, tailMatrix(item.shape, _tailLocal).premultiply(_yarnMat));
-    tailMesh.instanceMatrix.needsUpdate = true;
-    tailMesh.setColorAt(index, _yarnCol.set(item.color));
-    tailMesh.instanceColor.needsUpdate = true;
+    setInstance(tailMesh, index, {
+      matrix: tailMatrix(item.shape, _tailLocal).premultiply(_yarnMat), color: _yarnCol.set(item.color) });
   }
 }
 
 function paintYarnShadow(index, item, p, F, k) {
   const [uw, , ud] = familyExtent(item.shape, YARN.tier);
   _pos.set(p.shX ?? p.cx, p.shadowBase + 0.003, p.shZ ?? p.cz);
-  shadows.setMatrixAt(index,
-    placeMatrix(_pos, k * uw * 1.02, k * ud * 1.02, p.yaw, _shadowMat).premultiply(F));
-  shadows.instanceMatrix.needsUpdate = true;
+  setInstance(shadows, index,
+    { matrix: placeMatrix(_pos, k * uw * 1.02, k * ud * 1.02, p.yaw, _shadowMat).premultiply(F) });
 }
 
 export function paintYarn(display, index, p) {

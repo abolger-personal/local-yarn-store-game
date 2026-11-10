@@ -393,10 +393,7 @@ function paintYarn(display, index, { cx, cz, base, yaw }) {
   const fit = yarnFit(item.family, item.bulk);
   _yarnMat.compose(_p3.set(cx, base, cz), _q.setFromAxisAngle(UP, yaw), _s3.set(fit.k, fit.ky, fit.k))
     .premultiply(display.frame);
-  mesh.setMatrixAt(item.slot, _yarnMat);
-  mesh.instanceMatrix.needsUpdate = true;
-  mesh.setColorAt(item.slot, item.color);
-  mesh.instanceColor.needsUpdate = true;
+  setInstance(mesh, item.slot, { matrix: _yarnMat, color: item.color });
   const hs = mesh.userData.hatchScale;
   if (hs) { hs.setX(item.slot, hatchScaleOf(item)); hs.needsUpdate = true; }
   paintYarnDetails(item);
@@ -405,21 +402,15 @@ function paintYarn(display, index, { cx, cz, base, yaw }) {
 
 function paintYarnDetails(item) {
   if (item.bandSlot != null) {
-    const bm = bandMatrix(item.family, _bandLocal);
-    bandMesh.setMatrixAt(item.bandSlot, bm.premultiply(_yarnMat));
-    bandMesh.instanceMatrix.needsUpdate = true;
-    bandMesh.setColorAt(item.bandSlot, _yarnCol.set(YARN_LOOK.bandColor));
-    bandMesh.instanceColor.needsUpdate = true;
+    setInstance(bandMesh, item.bandSlot, {
+      matrix: bandMatrix(item.family, _bandLocal).premultiply(_yarnMat), color: _yarnCol.set(YARN_LOOK.bandColor) });
   }
 
   if (item.tailSlot != null) {
-    const tm = tailMatrix(item.family, _tailLocal);
-    tailMesh.setMatrixAt(item.tailSlot, tm.premultiply(_yarnMat));
     // ponytail: a non-square parent (the 2x1 skein) stretches the curl along with it. It reads
     // fine at 2x1; if a family ever goes wider, undo the parent's aspect on the tail instead.
-    tailMesh.instanceMatrix.needsUpdate = true;
-    tailMesh.setColorAt(item.tailSlot, item.color);
-    tailMesh.instanceColor.needsUpdate = true;
+    setInstance(tailMesh, item.tailSlot, {
+      matrix: tailMatrix(item.family, _tailLocal).premultiply(_yarnMat), color: item.color });
   }
 }
 
@@ -427,9 +418,8 @@ function paintYarnShadow(display, item, fit, { cx, cz, base, yaw }) {
   // DESIGN-DECISIONS.md perf rule 6
   const [uw, , ud] = familyExtent(item.family, S.tier);
   _pos.set(cx, base + 0.003, cz);
-  shadows.setMatrixAt(item.shadowSlot,
-    placeMatrix(_pos, fit.k * uw * 1.02, fit.k * ud * 1.02, yaw, _shadowMat).premultiply(display.frame));
-  shadows.instanceMatrix.needsUpdate = true;
+  setInstance(shadows, item.shadowSlot,
+    { matrix: placeMatrix(_pos, fit.k * uw * 1.02, fit.k * ud * 1.02, yaw, _shadowMat).premultiply(display.frame) });
 }
 
 function paintInstance(display, index, { cx, cz, boxBase, shadowBase, yaw }, { footW, footD, grow = 1 }) {
@@ -443,8 +433,8 @@ function paintInstance(display, index, { cx, cz, boxBase, shadowBase, yaw }, { f
   paintLabels(item, F, { cx, cz, boxBase, yaw }, { boxW, boxD, boxH });
 
   _pos.set(cx, shadowBase + 0.003, cz);
-  shadows.setMatrixAt(item.shadowSlot, placeMatrix(_pos, boxW * 1.08, boxD * 1.08, yaw, _shadowMat).premultiply(F));
-  shadows.instanceMatrix.needsUpdate = true;
+  setInstance(shadows, item.shadowSlot,
+    { matrix: placeMatrix(_pos, boxW * 1.08, boxD * 1.08, yaw, _shadowMat).premultiply(F) });
 }
 
 function paintLabels(item, F, { cx, cz, boxBase, yaw }, { boxW, boxD, boxH }) {

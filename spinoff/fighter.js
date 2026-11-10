@@ -45,6 +45,7 @@ export const HAND_ICON = Object.freeze({
   hammer: '<g transform="rotate(35 24 24)"><rect x="21.5" y="14" width="5" height="33" rx="1.5" fill="#26221f"/><path d="M21 30h6M21 35h6M21 40h6" stroke="#5a4636" stroke-width="2.5"/>'
     + '<rect x="9" y="1" width="30" height="16" rx="1" fill="#3a3a3e"/><path d="M9 6h30M14 1v16M33 1v16" stroke="#17171a" stroke-width="2"/><path d="M18 4l3 5-2 4M29 10l-4 3" stroke="currentColor" stroke-width="1.4" fill="none"/></g>',
   cane: '<g transform="rotate(35 24 24)"><path d="M21.5 46V10h5v36Z"/><rect x="20" y="30" width="8" height="8" rx="2"/><path d="M24 2a4 4 0 0 1 4 4v4h-3V7a1 1 0 0 0-2 0v2h-3V6a4 4 0 0 1 4-4Z"/></g>',
+  needles: '<g stroke="currentColor" stroke-width="4" stroke-linecap="round"><path d="M10 40 36 6M38 40 12 6"/></g><circle cx="9" cy="41" r="4.5"/><circle cx="39" cy="41" r="4.5"/>',
   yarn: '<path d="M24 6c-6 0-9 6-9 10M24 6c6 0 9 6 9 10" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="13" cy="28" r="9"/><circle cx="35" cy="32" r="9"/><path d="M7 25c4 2 8 2 12 0M7 31c4 2 8 2 12 0M29 29c4 2 8 2 12 0M29 35c4 2 8 2 12 0" stroke="#fff8" stroke-width="1.5" fill="none"/>',
   staff: '<g transform="rotate(35 24 24)"><rect x="21.5" y="1" width="5" height="46" rx="2.5" fill="#a8743f"/><rect x="20" y="20" width="8" height="14" rx="3"/><path d="M20 23h8M20 27h8M20 31h8" stroke="#fff8" stroke-width="1.5"/></g>',
   sai: '<g transform="rotate(35 24 24)"><path d="M22.5 31V8l1.5-6 1.5 6v23Z"/><path d="M24 31c-8 0-10-4-10-12M24 31c8 0 10-4 10-12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="21.5" y="31" width="5" height="12" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.5"/></g>',
@@ -52,12 +53,12 @@ export const HAND_ICON = Object.freeze({
 // what flies off the hitting glove or the blade's tip as it lands; tapping the picked one goes to the next. The scythe's is fixed.
 const SWORD_TRICKS = Object.freeze(['sparkle', 'bubble', 'flame', 'bebop', 'shootingStar', 'bubblegumPop', 'smiteOfLight', 'speedLines', 'lightningStorm', 'atomicBall']);
 // tmnt/REUSE-SPEC.md §Hero chooser: Master Splinter's cane and Raphael's sai, a hero's only (not in HANDS), with the sword's tricks
-export const CANE = 'cane', SAI = 'sai', STAFF = 'staff', YARN_BALLS = 'yarn';
+export const CANE = 'cane', SAI = 'sai', STAFF = 'staff', YARN_BALLS = 'yarn', NEEDLES = 'needles';
 export const TRICKS = Object.freeze({
   gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame', 'bebop', 'starPunch', 'fireball', 'loveTap', 'bubblegumPop', 'powerPuff', 'magicStar', 'heartBlast', 'smiteOfLight', 'speedLines', 'lightningStorm', 'atomicBall']), sword: SWORD_TRICKS, scythe: Object.freeze(['music']),
   // lightning first: a trick the hammer doesn't have falls back to it
   hammer: Object.freeze(['lightning', 'zap']),
-  [CANE]: SWORD_TRICKS, [SAI]: SWORD_TRICKS, [STAFF]: Object.freeze(['music']), [YARN_BALLS]: Object.freeze(['plain']),
+  [CANE]: SWORD_TRICKS, [SAI]: SWORD_TRICKS, [NEEDLES]: SWORD_TRICKS, [STAFF]: Object.freeze(['music']), [YARN_BALLS]: Object.freeze(['plain']),
 });
 // REUSE-SPEC.md §Fighter chooser: the levels a player must have beaten for the chooser to offer each
 const UNLOCK = Object.freeze({ sword: 1, scythe: 2, hammer: 4 });
@@ -618,6 +619,34 @@ function stepYarn(built, dt) {
   for (const ball of balls) placeBall(built, ball);
 }
 
+// tmnt/REUSE-SPEC.md §Hero chooser: Leonardo's two katanas are a pair of knitting needles, one in each hand: the right
+// one held and swung as the sword, the left held up at the sword's rest; a long point, a knob on the end
+const NEEDLE = { butt: -0.05, point: 0.27, tip: 0.05, r: 0.011 };
+let needleGeo = null;
+function needleGeometry() {
+  const { butt, point, tip, r } = NEEDLE;
+  needleGeo ??= {
+    needle: mergeGeometries([
+      new THREE.CylinderGeometry(r, r, point - butt, 10).rotateX(Math.PI / 2).translate(0, 0, (point + butt) / 2),
+      new THREE.ConeGeometry(r, tip, 10).rotateX(Math.PI / 2).translate(0, 0, point + tip / 2),
+      new THREE.SphereGeometry(r * 2.2, 12, 8).scale(1, 1, 0.7).translate(0, 0, butt - r),
+    ]),
+    ...swooshGeometry(0.06, point + tip, 0.11, point),
+  };
+  return needleGeo;
+}
+
+function addNeedles(built, color) {
+  const geo = needleGeometry(), right = holdBlade(built, [new THREE.Mesh(geo.needle, candy(color))], geo, { tip: NEEDLE.point + NEEDLE.tip });
+  const { parent, at } = gloveAnchors(built)[1], left = new THREE.Group().add(new THREE.Mesh(geo.needle, candy(color)));
+  left.children[0].castShadow = true;
+  left.position.set(...at);
+  parent.add(left);
+  right.userData.pair = left;
+  swingSword(built, null);
+  return right;
+}
+
 /** The Greathammer, held like the sword (REUSE-SPEC.md §Costumes): `built.sword`, so it swings on SWORD_MOVES. */
 function addHammer(built, color) {
   return holdBlade(built, greathammerMeshes(color), greathammerGeometry(), { tip: GREATHAMMER.top - GREATHAMMER.head[2] / 2 });
@@ -648,6 +677,8 @@ function reachPole(built, w) {
 /** Drops the sword or the scythe (`built.sword` is whichever blade is held). */
 function removeSword(built) {
   built.sword?.removeFromParent();
+  built.sword?.userData.pair?.removeFromParent();
+  built.sword?.userData.pair?.children[0].material.dispose();
   for (const o of built.sword?.children ?? []) if (o instanceof THREE.Mesh) o.material.dispose();
   // the staff's knitted wrap is its own geometry (the blades' are shared); its material is the garments' shared one
   built.sword?.traverse((o) => { if (o.userData.ownGeometry && o instanceof THREE.Mesh) o.geometry.dispose(); });
@@ -655,11 +686,17 @@ function removeSword(built) {
 }
 
 /** Holds the sword or scythe at SWORD_MOVES' world angle above forward, whatever the arm is doing: a fan behind a slash, a streak behind a stab; `dt` on, Michelangelo's yarn balls swing. */
+const armPitch = (built, held) => {
+  let arm = 0;
+  for (let n = held.parent; n && n !== built.chest; n = n.parent) arm += n.rotation.x;
+  return arm;
+};
+
 function swingSword(built, punch, dt = 0) {
   const { sword } = built;
   if (!sword) return;
-  let arm = 0;
-  for (let n = sword.parent; n && n !== built.chest; n = n.parent) arm += n.rotation.x;
+  const arm = armPitch(built, sword), { pair } = sword.userData;
+  if (pair) pair.rotation.x = -(SWORD_UP + armPitch(built, pair));
   const { up, swoosh, stab } = punch ? sample(SWORD_MOVES[punch.name], punch.step) : { up: SWORD_UP, swoosh: 0, stab: 0 };
   // the cane rises out of hanging down and back, through the sword's moves: the lift in the arm's plane, so it always
   // comes up in front, and `hang` takes off the arm's sideways tilt while it hangs
@@ -1561,7 +1598,7 @@ export function stepTricks(built, punch, dt) {
 // readability in a match
 const PLAIN = typeof location !== 'undefined' && new URLSearchParams(location.search).has('plain');
 export const LOOKS = Object.freeze(Object.fromEntries(['lookAt', 'eyeGlint', 'painterly', 'shapedFaces'].map((k) => [k, !PLAIN])));
-const HOLD = { gloves: addGloves, sword: addSword, scythe: addScythe, hammer: addHammer, [CANE]: addCane, [SAI]: addSai, [STAFF]: addStaff, [YARN_BALLS]: addYarn };
+const HOLD = { gloves: addGloves, sword: addSword, scythe: addScythe, hammer: addHammer, [CANE]: addCane, [SAI]: addSai, [STAFF]: addStaff, [YARN_BALLS]: addYarn, [NEEDLES]: addNeedles };
 
 /** Same order as the shop's `dressedCharacter` (store/sim/cast.js): dress unmerged, then merge. @param {Fighter} f */
 /** @param {string[]} [palette] the colours a hero's sweater colourwork is worked in */

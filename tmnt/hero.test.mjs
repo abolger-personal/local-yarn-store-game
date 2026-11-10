@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { LOOK } from '../characters/garments.js';
 import { POSES } from '../characters/npc.js';
-import { CANE, SAI, SPECIES, STAFF, YARN_BALLS, stepFighter, animateFighter, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
+import { CANE, NEEDLES, SAI, SPECIES, STAFF, YARN_BALLS, stepFighter, animateFighter, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
 import { CLOTH, COLOURS, PALETTE, SCARF_FORMS, SWEATER_WORKS, TURTLE_COLOURS, WEAR, newHero, randomHero, readHero } from './hero.js';
 
 LOOK.viewPx = 0;
@@ -72,12 +72,21 @@ for (const species of SPECIES) {
     dir = new THREE.Vector3(0, 0, 1).transformDirection(built.sword.matrixWorld);
   }
   assert.ok(dir.y < -0.95, `${species}: the cane hangs straight down (${dir.y.toFixed(2)})`);
-  assert.ok(low > -0.005 && low < 0.06, `${species}: the knob just off the floor (${low.toFixed(3)})`);
+  // one cane for everyone: a hand higher than the cane is long (the turtle) leaves it hovering
+  assert.ok(low > -0.005 && low < 0.1, `${species}: the hook off the floor, not far (${low.toFixed(3)})`);
   assert.equal(built.sword.scale.x, 1, `${species}: the same cane as everyone's`);
   disposeFighter(built);
 }
-// Donatello (purple) has his bo staff, held in both hands, its grip wrapped in knitting
-assert.equal(newHero(() => 0.45).look.hands, STAFF);
+// Donatello (purple): a cowl, a fanny pack and his bo staff, held in both hands, its grip wrapped in knitting
+const donnie = newHero(() => 0.45).look;
+assert.deepEqual([donnie.scarf, donnie.bag, donnie.socks, donnie.hands], ['cowl', 'crossbody pouch', 'knee-high', STAFF]);
+// Leonardo (blue): high boots and a knitting needle in each hand, gone again when he puts them down
+const leo = buildFighter(newHero(() => 0.25));
+const pair = leo.sword.userData.pair;
+assert.ok(pair?.parent && leo.sword.parent !== pair.parent, 'a needle in each hand');
+assert.deepEqual([newHero(() => 0.25).look.hands, newHero(() => 0.25).look.socks], [NEEDLES, 'over-knee']);
+disposeFighter(leo);
+assert.equal(pair.parent, null, 'the left needle goes with the right');
 for (const species of SPECIES) {
   const built = buildFighter({ ...newHero(() => 0.45, species), look: newHero(() => 0.45).look });
   let knit = 0;

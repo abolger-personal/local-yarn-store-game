@@ -127,6 +127,8 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
     stick and swings up out of that into the sword's moves. One length for every animal (amended 2026-11-09, so it
     reaches as far on all of them): a hand nearer the floor grips it further down the shaft, so the hook just clears
     the floor and the rest stands up past the hand.
+  - **Leonardo's katanas are a pair of knitting needles** (decided 2026-11-09), one in each hand: the right held
+    and swung as the sword, the left held up at the sword's rest. Long points, a knob on each end.
   - **Michelangelo's nunchucks are two balls of yarn on one strand** (decided 2026-11-09, "more fun to animate"),
     held by the middle, swung as the sword. Each ball swings on its strand as a pendulum hung from the hand, so a punch
     flings them out and they swing back on their own. No tricks yet. A throw that spins out and comes back like the
@@ -135,10 +137,11 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
     wooden pole with its grip wrapped in knitting (the scarves' stockinette) in the picked colour.
 - **Each turtle's own things** (decided 2026-11-09), on top of the turtle-colour scarf:
   - **Raphael** (red): his sai and red over-knee socks.
-  - **Donatello** (purple): his bo staff.
+  - **Donatello** (purple), nerdy: a cowl, a fanny pack (the crossbody pouch), purple knee-high socks and his bo staff.
   - **Michelangelo** (orange), happy-go-lucky: an open scarf (long, draped), short orange socks, an orange backpack,
     cheek-slash face paint, and his balls of yarn.
-  - **Leonardo** (blue): the sword, for now.
+  - **Leonardo** (blue), straight-laced: the trailing scarf, high blue boots (over-knee socks), a blue drawstring bag
+    and his knitting needles.
   - **Master Splinter**: picking the mouse gives the cane.
 - 🎲 any animal, colours and pieces. 👍 saves; there is no lobby to go to yet.
 - Every colour is one of the six hero colours; anything else read from a save or another tablet snaps to the
@@ -169,7 +172,7 @@ Sweater. Heroes don't get them. The design is open.
 ## Open questions
 
 - **Which theme?** Pick from the list in §The game.
-- **Leonardo:** is the sword his, or katanas? Should Raphael hold a sai in each hand?
+- **Should Raphael hold a sai in each hand,** now that Leonardo's needles show two can be held?
 - **Are weapons unlocked?** Unlocks from the fighting game carry over, or start fresh?
 - **Which scarf colour does each player get?** One of the four at random, or each tablet in a room a different
   one, so a full room reads as the four turtles? A fifth player in taxi yellow would be the April.

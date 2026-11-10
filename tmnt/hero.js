@@ -1,6 +1,6 @@
 import { FACE_PAINTS, getSpecies } from '../characters/npc.js';
 import { COLOURWORKS, FORMS } from '../characters/garments.js';
-import { BAGS, CANE, HANDS, SAI, STAFF, YARN_BALLS, SPECIES, TEXTURES, TRICKS, nearestSwatch, readFighter, setFur } from '../spinoff/fighter.js';
+import { BAGS, CANE, HANDS, NEEDLES, SAI, STAFF, YARN_BALLS, SPECIES, TEXTURES, TRICKS, nearestSwatch, readFighter, setFur } from '../spinoff/fighter.js';
 
 const HERO_KEY = 'tmnt.hero.v1';
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -26,7 +26,7 @@ export const WEAR = Object.freeze({
 });
 export const SCARF_FORMS = Object.freeze(FORMS.filter((f) => f !== 'wrapped twice'));
 const DEFAULT_HANDS = 'sword';
-export const HERO_HANDS = Object.freeze([...HANDS, SAI, STAFF, YARN_BALLS, CANE]);
+export const HERO_HANDS = Object.freeze([...HANDS, NEEDLES, SAI, STAFF, YARN_BALLS, CANE]);
 // REUSE-SPEC.md §Hero chooser: the mouse is Master Splinter, with his cane
 export const handsOf = (species) => (species === 'mouse' ? CANE : DEFAULT_HANDS);
 
@@ -41,11 +41,13 @@ const blankLook = () => ({
 });
 
 // REUSE-SPEC.md §Hero chooser: each turtle's own things on top of the scarf: Raphael (red) his sai and red socks;
-// happy-go-lucky Michelangelo (orange) an open scarf, short socks, a backpack, cheek paint and his balls of yarn; Donatello
-// (purple) his bo staff
-const ORANGE = COLOURS[0].hex, PURPLE = COLOURS[2].hex, RED = COLOURS[3].hex;
+// happy-go-lucky Michelangelo (orange) an open scarf, short socks, a backpack, cheek paint and his balls of yarn; nerdy
+// Donatello (purple) a cowl, a fanny pack and his bo staff; straight-laced Leonardo (blue) high boots, a drawstring bag
+// and his pair of knitting needles
+const ORANGE = COLOURS[0].hex, BLUE = COLOURS[1].hex, PURPLE = COLOURS[2].hex, RED = COLOURS[3].hex;
 const SIGNATURE = {
-  [PURPLE]: { look: { hands: STAFF, trick: TRICKS[STAFF][0] } },
+  [PURPLE]: { look: { scarf: 'cowl', bag: 'crossbody pouch', bagColor: PURPLE, socks: 'knee-high', socksColor: PURPLE, hands: STAFF, trick: TRICKS[STAFF][0] } },
+  [BLUE]: { look: { socks: 'over-knee', socksColor: BLUE, bag: 'drawstring bag', bagColor: BLUE, hands: NEEDLES, trick: TRICKS[NEEDLES][0] } },
   [RED]: { look: { hands: SAI, trick: TRICKS[SAI][0], socks: 'over-knee', socksColor: RED } },
   [ORANGE]: { look: { scarf: 'long', scarfForm: 'draped', socks: 'crew', socksColor: ORANGE, bag: 'backpack', bagColor: ORANGE, hands: YARN_BALLS, trick: 'plain' }, facePaint: 'slashes' },
 };

@@ -1,13 +1,12 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { roomEnvironment } from '../inventory/room-environment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
-  BASE_PARAMS, TONE_MAPPING, POSES, BUILD, MOTION_DEFAULTS,
-  createCharacter, setViewMode, disposeCharacter, stepMotion, resetMotion, motionOf, mergeCharacter,
+  BASE_PARAMS, TONE_MAPPING, POSES, BUILD,
+  createCharacter, setViewMode, disposeCharacter, stepMotion, resetMotion, mergeCharacter,
   setGeometryDetail, GEO_DETAIL, getSpecies, speciesIds, pick,
 } from './npc.js';
-import { randomTraits } from './visit.js';
+import { addGround, addLights, isFormField, makeViewer } from './viewer.js';
+import { randomOpts } from './slot-motion.js';
 import { GARMENTS, dress, heldAs, pileAs, randomItem, undress, worstOutfit } from './garments.js';
 import { H, W, snap } from './selfie-studio.js';
 import { SHOTS, shotFor } from './selfie.js';
@@ -59,56 +58,15 @@ const QUALITY_KEY = 'lys.crowd.quality';
 S.quality = localStorage.getItem(QUALITY_KEY) ?? S.quality;
 if (!QUALITY[S.quality]) S.quality = 'medium';
 
-const app = document.getElementById('app');
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setSize(innerWidth, innerHeight);
+const { renderer, scene, camera, controls } = makeViewer({ far: 200, minDistance: 0.5, maxDistance: 80 });
 function applyRenderScale() {
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2) * S.renderScale);
 }
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = TONE_MAPPING[S.toneMapping];
 renderer.toneMappingExposure = S.exposure;
-app.appendChild(renderer.domElement);
-
-const scene = new THREE.Scene();
-scene.background = new THREE.Color('#e8e2d9');
-
-const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 200);
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.minDistance = 0.5;
-controls.maxDistance = 80;
-
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(roomEnvironment(), 0.04).texture;
-
-const key = new THREE.DirectionalLight('#ffe6c4', 2.6);
-key.position.set(4, 6, 3);
-key.castShadow = true;
-key.shadow.mapSize.set(2048, 2048);
-key.shadow.camera.near = 0.5;
-key.shadow.camera.far = 30;
-key.shadow.camera.left = -5;
-key.shadow.camera.right = 5;
-key.shadow.camera.top = 5;
-key.shadow.camera.bottom = -5;
-key.shadow.bias = -0.0012;
-key.shadow.radius = 1;
-scene.add(key);
-scene.add(new THREE.HemisphereLight('#cfe0ff', '#8b7a68', 0.55));
-const rim = new THREE.DirectionalLight('#bcd4ff', 1.1);
-rim.position.set(-4, 2.5, -5);
-scene.add(rim);
-
-const ground = new THREE.Mesh(
-  new THREE.CircleGeometry(14, 96),
-  new THREE.ShadowMaterial({ opacity: 0.20 })
-);
-ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
-scene.add(ground);
+const key = addLights(scene, { near: 0.5, far: 30, left: -5, right: 5, top: 5, bottom: -5 },
+  { at: [4, 6, 3], rimAt: [-4, 2.5, -5], mapSize: 2048 });
+addGround(scene, 14, 96, 0.20);
 
 let blobTex = null;
 function blobTexture() {
@@ -228,7 +186,7 @@ function addMember(i, cols, rows) {
     species: kit.label,
     color: P.bodyColor,
     target: start,
-    opts: { ...MOTION_DEFAULTS, ...motionOf(randomTraits(), kit.motionRanges) },
+    opts: randomOpts(kit),
     wait: Math.random() * S.poseInterval,
   });
   resetMotion(built.motion, start);
@@ -576,9 +534,6 @@ gTune.add(tune, 'off', -1, 1.5, 0.01).name('aim aside').listen().onFinishChange(
 gTune.add({ f: searchInstead }, 'f').name('this species: search instead');
 gTune.add({ f: copyShots }, 'f').name('copy shot table');
 
-const typing = (t) => t instanceof HTMLElement
-  && (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA');
-
 const setView = (view) => {
   S.view = view;
   setViewMode(crowdGroup, S.view);
@@ -598,7 +553,7 @@ const KEYS = {
 };
 
 addEventListener('keydown', (e) => {
-  if (typing(e.target)) return;
+  if (isFormField(e.target)) return;
   KEYS[e.key.toLowerCase()]?.();
   if (e.code === 'Space') {
     e.preventDefault();
@@ -607,12 +562,6 @@ addEventListener('keydown', (e) => {
     toast(S.cyclePoses ? 'poses running' : 'poses paused');
   }
 }, true);
-
-addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-});
 
 function applyQuality(name) {
   const q = QUALITY[name] ?? QUALITY.medium;

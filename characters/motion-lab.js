@@ -10,6 +10,7 @@ import {
   spanBounds,
 } from './npc.js';
 import { randomTraits } from './visit.js';
+import { fitToWindow } from './viewer.js';
 import './species.js';
 
 console.info('LYS build', BUILD);
@@ -100,14 +101,7 @@ const ground = new THREE.Mesh(
 );
 scene.add(ground);
 
-function resize() {
-  const w = innerWidth, h = innerHeight;
-  renderer.setSize(w, h);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-}
-addEventListener('resize', resize);
-resize();
+fitToWindow(renderer, camera);
 
 /**
  * @typedef {{built: any, motion: any, opts: any, engine: string, traits: any,

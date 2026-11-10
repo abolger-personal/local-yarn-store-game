@@ -1,6 +1,4 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { roomEnvironment } from '../inventory/room-environment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
   TONE_MAPPING, POSES, MOTION_DEFAULTS, BUILD, createCharacter, disposeCharacter, applyPose, getSpecies,
@@ -12,6 +10,7 @@ import { makeSparkle, playSparkle, stepSparkle } from './sparkle.js';
 import { PATTERN_NAMES } from '../inventory/catalog.js';
 import { CHAIR_BACK_Z, CHAIR_W, SEAT_H } from './store/core/config.js';
 import { SPECIES_IDS } from './species.js';
+import { addGround, addLights, makeViewer } from './viewer.js';
 
 console.info('LYS build', BUILD);
 
@@ -20,33 +19,9 @@ const state = {
   color: '#c8657a', wallYaw: 0.9, view: 'close',
 };
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
+const { renderer, scene, camera, controls } = makeViewer({ minDistance: 0, maxDistance: Infinity });
 renderer.toneMapping = TONE_MAPPING.ACES;
 renderer.toneMappingExposure = 0.4;
-document.getElementById('app').appendChild(renderer.domElement);
-
-const scene = new THREE.Scene();
-scene.background = new THREE.Color('#e8e2d9');
-scene.environment = new THREE.PMREMGenerator(renderer).fromScene(roomEnvironment(), 0.04).texture;
-const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 100);
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-
-function addLights() {
-  const key = new THREE.DirectionalLight('#ffe6c4', 2.6);
-  key.position.set(2.2, 3.4, 1.8);
-  key.castShadow = true;
-  Object.assign(key.shadow.camera, { left: -1.5, right: 1.5, top: 1.5, bottom: -1.5 });
-  const rim = new THREE.DirectionalLight('#bcd4ff', 1.1);
-  rim.position.set(-2.4, 1.6, -2.4);
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(2, 48), new THREE.ShadowMaterial({ opacity: 0.22 }));
-  ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
-  scene.add(key, rim, new THREE.HemisphereLight('#cfe0ff', '#8b7a68', 0.55), ground);
-}
 
 function addChair() {
   const wood = new THREE.MeshStandardMaterial({ color: '#b27c51', roughness: 0.72 });
@@ -57,7 +32,8 @@ function addChair() {
   for (const m of [top, back]) m.castShadow = m.receiveShadow = true;
   scene.add(top, back);
 }
-addLights();
+addLights(scene, { left: -1.5, right: 1.5, top: 1.5, bottom: -1.5 }, { mapSize: 512, bias: 0 });
+addGround(scene, 2, 48);
 addChair();
 
 let built = null, craft = null, sparkle = null, opts = null, seatY = 0;
@@ -138,12 +114,6 @@ function tick() {
   controls.update();
   renderer.render(scene, camera);
 }
-
-addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-});
 
 buildSitter();
 buildGui();

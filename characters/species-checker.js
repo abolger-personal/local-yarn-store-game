@@ -1,16 +1,13 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { roomEnvironment } from '../inventory/room-environment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
-  TONE_MAPPING, POSES, GEO_DETAIL, BUILD, MOTION_DEFAULTS, BASE_PARAMS,
+  TONE_MAPPING, POSES, GEO_DETAIL, BUILD, BASE_PARAMS,
   createCharacter, applyPose, setViewMode, disposeCharacter,
   setGeometryDetail, getSpecies, speciesList, slugify, shareRandomParams, applyPreset, BASE_GUI, GUI_SECTIONS,
-  stepMotion, resetMotion, motionOf, walkPhase, walkLayer, walkGain, phaseStep,
-  DANCES, DANCE_NAMES, makeDance, stepDance, placeDancer,
+  resetMotion, DANCES, DANCE_NAMES,
 } from './npc.js';
-import { stepGlitter } from './glitter.js';
-import { randomTraits } from './visit.js';
+import { addGround, addLights, cameraKeys, frameObjects, makeViewer, onKeys } from './viewer.js';
+import { danceSlots, freshParams, nextDance, randomOpts, stepSlot } from './slot-motion.js';
 import { aimGameCamera } from '../spinoff/stage.js';
 import { FUR, LOOKS, setFur } from '../spinoff/fighter.js';
 import { PAINT } from './paint.js';
@@ -60,53 +57,10 @@ const state = {
     Object.fromEntries(SLOTS.map((id, i) => [id, { speciesId: speciesList()[i % speciesList().length].id, params: null }]))),
 };
 
-const freshParams = (speciesId) => Object.assign(
-  structuredClone(getSpecies(speciesId).defaults),
-  { mergeMeshes: false },
-);
-
-const app = document.getElementById('app');
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFShadowMap;
-app.appendChild(renderer.domElement);
-
-const scene = new THREE.Scene();
-scene.background = new THREE.Color('#e8e2d9');
-
-const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 100);
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.minDistance = 0.3;
-controls.maxDistance = 40;
-controls.autoRotateSpeed = 1.5;
-
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(roomEnvironment(), 0.04).texture;
-
-function addLights() {
-  const key = new THREE.DirectionalLight('#ffe6c4', 2.6);
-  key.position.set(2.2, 3.4, 1.8);
-  key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024);
-  Object.assign(key.shadow.camera, { near: 0.5, far: 14, left: -2, right: 2, top: 2, bottom: -2 });
-  key.shadow.bias = -0.0012;
-  key.shadow.radius = 1;
-  const rim = new THREE.DirectionalLight('#bcd4ff', 1.1);
-  rim.position.set(-2.4, 1.6, -2.4);
-  scene.add(key, rim, new THREE.HemisphereLight('#cfe0ff', '#8b7a68', 0.55));
-}
-addLights();
-
-const ground = new THREE.Mesh(
-  new THREE.CircleGeometry(2.6, 64),
-  new THREE.ShadowMaterial({ opacity: 0.22 })
-);
-ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
-scene.add(ground);
+const viewer = makeViewer();
+const { renderer, scene, camera, controls } = viewer;
+addLights(scene, { near: 0.5, far: 14, left: -2, right: 2, top: 2, bottom: -2 });
+const ground = addGround(scene, 2.6);
 
 const built = Object.fromEntries(SLOTS.map((id) => [id, null]));
 
@@ -141,10 +95,7 @@ function buildSlot(id) {
   scene.add(character.root);
   built[id] = character;
   slot.height = measureHeight(character.root);
-  slot.opts ??= {
-    ...MOTION_DEFAULTS,
-    ...motionOf(randomTraits(), getSpecies(slot.speciesId).motionRanges),
-  };
+  slot.opts ??= randomOpts(getSpecies(slot.speciesId));
   slot.base ??= { stiff: slot.opts.stiff, zeta: slot.opts.zeta };
   slot.phase ??= Math.random();
   if (state.play) resetMotion(character.motion, POSES[state.pose]);
@@ -155,64 +106,7 @@ function buildAll() {
   updatePlates();
 }
 
-function sceneBounds() {
-  const box = new THREE.Box3();
-  SLOTS.forEach((id) => built[id] && box.expandByObject(built[id].root));
-  return box;
-}
-
-const VIEW_DIR = new THREE.Vector3(0.32, 0.20, 1).normalize();
-
-function fitDistance(size, targetPx) {
-  const vFov = THREE.MathUtils.degToRad(camera.fov);
-  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
-  const depth = Math.max(size.z, 0.01) * 0.5;
-  return targetPx
-    ? (Math.max(size.y, 0.01) * innerHeight / targetPx) / (2 * Math.tan(vFov / 2)) + depth
-    : 1.15 * Math.max(size.y / (2 * Math.tan(vFov / 2)), size.x / (2 * Math.tan(hFov / 2))) + depth;
-}
-
-function frameAll(targetPx = 0) {
-  const box = sceneBounds();
-  if (box.isEmpty()) return;
-  const center = box.getCenter(new THREE.Vector3());
-  const size = box.getSize(new THREE.Vector3());
-  const dist = fitDistance(size, targetPx);
-
-  if (!Number.isFinite(dist) || !Number.isFinite(center.y)) {
-    console.warn('frameAll: non-finite bounds, check for undefined params');
-    return;
-  }
-  camera.filmOffset = ((size.x * 0.16) / dist) * camera.getFilmWidth();
-  camera.updateProjectionMatrix();
-  controls.target.copy(center);
-  camera.position.copy(center).addScaledVector(VIEW_DIR, dist);
-  controls.update();
-}
-
-const ORBIT_STEP = Math.PI / 12;
-const SNAP_VIEWS = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
-const spherical = new THREE.Spherical();
-let snapIndex = 0;
-
-function setOrbit(theta, phi) {
-  const offset = camera.position.clone().sub(controls.target);
-  spherical.setFromVector3(offset);
-  spherical.theta = theta ?? spherical.theta;
-  spherical.phi = THREE.MathUtils.clamp(phi ?? spherical.phi, 0.05, Math.PI - 0.05);
-  camera.position.copy(controls.target).add(offset.setFromSpherical(spherical));
-  controls.update();
-}
-
-function orbitBy(dTheta, dPhi) {
-  spherical.setFromVector3(camera.position.clone().sub(controls.target));
-  setOrbit(spherical.theta + dTheta, spherical.phi + dPhi);
-}
-
-function nextSnapView() {
-  snapIndex = (snapIndex + 1) % SNAP_VIEWS.length;
-  setOrbit(SNAP_VIEWS[snapIndex]);
-}
+const frameAll = (targetPx = 0) => frameObjects(viewer, Object.values(built).filter(Boolean).map((c) => c.root), targetPx);
 
 const plates = Object.fromEntries(SLOTS.map((id) => {
   const el = document.createElement('div');
@@ -253,18 +147,8 @@ function updatePlates() {
 }
 
 function save() {
-  const payload = {
-    active: state.active, view: state.view, pose: state.pose, detail: state.detail,
-    exposure: state.exposure, toneMapping: state.toneMapping, spacing: state.spacing,
-    linkShared: state.linkShared, editAll: state.editAll,
-    play: state.play, speed: state.speed, idle: state.idle, walk: state.walk,
-    repeat: state.repeat, side: state.side, slow: state.slow,
-    style: state.style, lookAtOther: state.lookAtOther, matchCamera: state.matchCamera,
-    slots: Object.fromEntries(SLOTS.map((id) => [id, {
-      speciesId: state.slots[id].speciesId,
-      params: state.slots[id].params,
-    }])),
-  };
+  const { dance: _dance, slots, ...rest } = state;
+  const payload = { ...rest, slots: Object.fromEntries(SLOTS.map((id) => [id, { speciesId: slots[id].speciesId, params: slots[id].params }])) };
   try { localStorage.setItem(STORE_KEY, JSON.stringify(payload)); } catch { /* quota */ }
 }
 
@@ -366,15 +250,7 @@ function nextPose() {
 
 function setPlay(on) {
   state.play = on;
-  if (!on && state.dance !== 'none') {
-    state.dance = 'none';
-    for (const id of SLOTS) {
-      const slot = state.slots[id];
-      slot.perf = null;
-      restoreSpring(slot);
-      if (built[id]) resetPlacement(id);
-    }
-  }
+  if (!on && state.dance !== 'none') setDance('none');
   if (on) SLOTS.forEach((id) => built[id] && resetMotion(built[id].motion, POSES[state.pose]));
   else setPose(state.pose);
   buildGui();
@@ -402,39 +278,10 @@ function exportActive() {
 
 const clock = new THREE.Timer();
 
-function stepDanceFor(id, character, slot, dt) {
-  if (!slot.perf) return null;
-  const d = stepDance(slot.perf, dt);
-  if (d.done) {
-    if (state.repeat) slot.perf = makeDance(state.dance);
-    else { slot.perf = null; state.dance = 'none'; restoreSpring(slot); buildGui(); }
-  }
-  return d;
-}
-
 // side on, a pass that travels starts half its length back, so it ends as far past the slot
 const passOf = (perf) => (state.side && DANCES[perf?.name]?.extras.at(-1).travel) || 0;
 
-function stepSlot(id, dt) {
-  const character = built[id];
-  if (!character) return;
-  const slot = state.slots[id];
-  slot.opts.idleAmount = state.idle ? 1 : 0;
-  const pass = passOf(slot.perf);
-  const d = stepDanceFor(id, character, slot, dt);
-  const walking = d ? d.walk > 0 : state.walk;
-  const dial = state.walk ? state.speed : 0;
-  const speed = d ? d.walk : dial;
-  const L = character.params.legHeight + character.params.hipInset;
-  const w = walkPhase(slot.phase, speed, L, slot.opts);
-  const gain = walkGain(character.motion, speed, dt, slot.opts);
-  slot.phase = (slot.phase + phaseStep(speed * dt, speed, L, slot.opts)) % 1;
-  stepMotion(character, d ? d.pose : POSES[state.pose], dt, slot.opts,
-    walking ? (out) => walkLayer(out, w, gain, slot.opts) : null);
-  if (d) placeDancer(character, d, { x: slotX(id) - pass / 2, yaw: state.side ? Math.PI / 2 : slotYaw(id) });
-  slot.glitter = stepGlitter(slot.glitter, character, slot.perf, d, dt);
-  character.lookTarget = lookTargetFor(id, slot);
-}
+const page = { state, ended: () => buildGui() };
 
 function lookTargetFor(id, slot) {
   const other = built[partnerOf(id)];
@@ -443,30 +290,20 @@ function lookTargetFor(id, slot) {
 }
 
 function stepAll(dt) {
-  for (const id of SLOTS) stepSlot(id, dt);
-}
-
-function restoreSpring(slot) {
-  if (!slot.base) return;
-  slot.opts.stiff = slot.base.stiff;
-  slot.opts.zeta = slot.base.zeta;
+  for (const id of SLOTS) {
+    const character = built[id];
+    if (!character) continue;
+    const slot = state.slots[id];
+    stepSlot(character, slot, dt, page, { x: slotX(id) - passOf(slot.perf) / 2, yaw: state.side ? Math.PI / 2 : slotYaw(id) });
+    character.lookTarget = lookTargetFor(id, slot);
+  }
 }
 
 function setDance(name) {
   state.dance = name;
   if (name !== 'none' && !state.play) setPlay(true);
-  for (const id of SLOTS) {
-    const slot = state.slots[id];
-    if (name === 'none') {
-      slot.perf = null;
-      restoreSpring(slot);
-      if (built[id]) resetPlacement(id);
-    } else {
-      slot.perf = makeDance(name);
-      slot.opts.stiff = DANCES[name].stiff;
-      slot.opts.zeta = DANCES[name].zeta;
-    }
-  }
+  danceSlots(SLOTS.map((id) => state.slots[id]), name);
+  if (name === 'none') SLOTS.forEach((id) => built[id] && resetPlacement(id));
   buildGui();
   save();
 }
@@ -630,18 +467,10 @@ function buildGui() {
   gui.onFinishChange(save);
 }
 
-const KEY_ACTIONS = {
+onKeys({
   tab: () => { state.active = SLOTS[(slotIndex(state.active) + 1) % SLOTS.length]; buildGui(); updatePlates(); },
   r: (e) => (e.shiftKey ? randomiseAll() : randomiseSlot(state.active)),
-  f: () => { snapIndex = 0; frameAll(); },
-  d: () => frameAll(150),
-  arrowleft: () => orbitBy(-ORBIT_STEP, 0),
-  arrowright: () => orbitBy(ORBIT_STEP, 0),
-  arrowup: () => orbitBy(0, -ORBIT_STEP),
-  arrowdown: () => orbitBy(0, ORBIT_STEP),
-  v: () => nextSnapView(),
-  t: () => { controls.autoRotate = !controls.autoRotate; },
-  b: () => renderer.domElement.classList.toggle('squint'),
+  ...cameraKeys(viewer, frameAll),
   e: () => exportActive(),
   1: () => setView('felted'),
   2: () => setView('grey'),
@@ -650,29 +479,8 @@ const KEY_ACTIONS = {
   m: () => setPlay(!state.play),
   i: () => { state.idle = !state.idle; refreshGui(); save(); },
   w: () => { state.walk = !state.walk; refreshGui(); save(); },
-  x: () => {
-    const all = ['none', ...DANCE_NAMES];
-    setDance(all[(all.indexOf(state.dance) + 1) % all.length]);
-  },
+  x: () => setDance(nextDance(state.dance)),
   c: () => { if (state.dance !== 'none') { const d = state.dance; setDance('none'); setDance(d); } },
-};
-
-const isFormField = (el) =>
-  el instanceof HTMLElement &&
-  (el.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName));
-
-addEventListener('keydown', (e) => {
-  if (isFormField(e.target)) return;
-  const action = KEY_ACTIONS[e.key.toLowerCase()];
-  if (!action) return;
-  e.preventDefault();
-  action(e);
-}, true);
-
-addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
 });
 
 load();

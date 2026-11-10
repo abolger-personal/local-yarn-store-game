@@ -134,7 +134,7 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
   - **Leonardo's katanas are comically large kid's safety scissors** (decided 2026-11-10), a half in each hand,
     crossed in front of him at rest like his two katanas (each half aimed past the middle; amended 2026-11-10: as
     big as needed for his short arms to cross them; a handle shank four times the loop, so the blades reach well past
-    each other): a long blade with a rounded tip, a chunky
+    each other; the handles very long ovals, amended 2026-11-10): a long blade with a rounded tip, a chunky
     handle loop round the hand in the picked colour, a pivot screw. The right swung as the sword, the left held up at the sword's rest. Brainstorm
     2026-11-10: snipping shut as a hit lands.
   - **Raphael's sai are a pair of knitting needles** (decided 2026-11-10: stabbing, in pairs, like sai), one in each

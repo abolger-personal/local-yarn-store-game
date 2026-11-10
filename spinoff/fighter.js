@@ -650,20 +650,22 @@ const addNeedles = (built, color) =>
 // turned in at rest so the blades cross in front of him: a long blade with a rounded tip (flat to the side-on camera), a
 // chunky handle loop in the picked colour round the hand, a pivot screw
 // cross: where each half aims at rest, from its grip: past the middle by this much of the grip's x, up, forward
-// the hand in the loop at the origin, a long handle shank to the pivot (amended 2026-11-10, four times as long, so the
-// blades reach well past each other), the blade beyond
-const SNIP = { blade: 0.52, shank: 0.16, wide: 0.06, loop: 0.045, cross: [0.4, 0.3, 0.35] };
-const SNIP_PIVOT = SNIP.loop * 0.9 + SNIP.shank, SNIP_TIP = SNIP_PIVOT + SNIP.blade;
+// the hand at the back of a long oval loop (amended 2026-11-10: very long ovals, not round loops), a handle shank on to
+// the pivot (four times the old loop, so the blades reach well past each other), the blade beyond
+const SNIP = { blade: 0.52, shank: 0.16, wide: 0.06, loop: [0.045, 0.16], cross: [0.4, 0.3, 0.35] };
+const SNIP_PIVOT = SNIP.loop[1] * 2 - SNIP.loop[0] + SNIP.shank, SNIP_TIP = SNIP_PIVOT + SNIP.blade;
 let scissorGeo = null;
 function scissorGeometry() {
-  const { shank, wide, loop } = SNIP, p = SNIP_PIVOT, end = SNIP_TIP;
+  const { shank, wide, loop: [across, along] } = SNIP, p = SNIP_PIVOT, end = SNIP_TIP, centre = along - across;
+  const oval = new THREE.CatmullRomCurve3(new THREE.EllipseCurve(0, centre, across, along).getPoints(32).slice(0, -1)
+    .map(({ x, y }) => new THREE.Vector3(0, x, y)), true);
   const s = new THREE.Shape().moveTo(p, -wide * 0.35).lineTo(end - 0.02, -wide * 0.25)
     .quadraticCurveTo(end + 0.015, wide * 0.1, end - 0.02, wide * 0.5).lineTo(p, wide * 0.65).lineTo(p, -wide * 0.35);
   scissorGeo ??= {
     blade: mergeGeometries([sideOn(s, 0.012), new THREE.CylinderGeometry(0.011, 0.011, 0.024, 10).rotateZ(Math.PI / 2).translate(0, 0, p + 0.01)]),
     handle: mergeGeometries([
-      new THREE.TorusGeometry(loop, 0.012, 8, 20).rotateY(Math.PI / 2),
-      new THREE.CapsuleGeometry(wide * 0.22, shank, 4, 10).rotateX(Math.PI / 2).scale(0.6, 1, 1).translate(0, 0, loop * 0.9 + shank / 2),
+      new THREE.TubeGeometry(oval, 64, 0.012, 8, true),
+      new THREE.CapsuleGeometry(wide * 0.22, shank, 4, 10).rotateX(Math.PI / 2).scale(0.6, 1, 1).translate(0, 0, centre + along + shank / 2 - 0.01),
     ]),
     ...swooshGeometry(0.06, end, 0.11, end * 0.8),
   };

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import {
   POSES, POSE_KEYS, MOTION_DEFAULTS, BASE_PARAMS, createCharacter, stepMotion, applyPose,
   valueOf, walkPhase, walkLayer, speciesIds, getSpecies, resetMotion, applyPreset,
-  DANCES, DANCE_NAMES, makeDance, stepDance, LIMB_TAPER, placeDancer,
+  DANCES, DANCE_NAMES, DANCE_POSES, makeDance, stepDance, LIMB_TAPER, placeDancer,
   motionOf, walkGain, tailBaseHeight, seatedHipsAlong, lowestResting, GEO,
 } from './npc.js';
 import { CHAIR_BACK_Z, CHAIR_W } from './store/core/config.js';
@@ -257,6 +257,17 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     return t;
   }
 
+  /** How far the torso's back reaches behind the heels in `pose`, in torso depths. */
+  function bumBehindHeels(built, pose) {
+    applyPose(built, pose);
+    built.root.updateMatrixWorld(true);
+    const torso = built.joints.chest.children[0], p = torso.geometry.attributes.position, v = new THREE.Vector3();
+    let back = Infinity;
+    for (let i = 0; i < p.count; i++) back = Math.min(back, v.fromBufferAttribute(p, i).applyMatrix4(torso.matrixWorld).z);
+    const heels = Math.min(...['leftFoot', 'rightFoot'].map((n) => new THREE.Box3().setFromObject(built.root.getObjectByName(n)).min.z));
+    return (heels - back) / built.params.torsoD;
+  }
+
   function perform(built, name, seconds = 3) {
     const o = { ...MOTION_DEFAULTS, idleAmount: 0, stiff: DANCES[name].stiff, zeta: DANCES[name].zeta };
     const perf = makeDance(name);
@@ -344,6 +355,8 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       `${id}: a booty shake swings the hips against the shoulders (${booty.counter}/${booty.swung} frames)`);
     assert.ok(booty.backTurned === booty.swung, `${id}: ...with its back turned (${booty.backTurned}/${booty.swung} frames)`);
     assert.ok(booty.rootY.min < standY - 0.02, `${id}: ...sat into the knees, bum out`);
+    const out = bumBehindHeels(build(id), DANCE_POSES['bs-bend']);
+    assert.ok(out > 0.5, `${id}: ...the bum stuck out behind the heels, not tipped over them (${out.toFixed(2)} of the torso's depth)`);
     assert.ok(Math.abs(booty.lastTurn % (2 * Math.PI)) < 1e-9, `${id}: ...and ends facing front again (${booty.lastTurn.toFixed(2)})`);
 
     const att = perform(build(id), 'attitude');

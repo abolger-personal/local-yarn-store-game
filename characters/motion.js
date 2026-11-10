@@ -62,9 +62,10 @@ const defineDances = (raw) => Object.freeze(Object.fromEntries(
   })]),
 ));
 
-// the booty shake, a taunt (DANCES.md §Booty shake): back turned, sat into the knees with the bum out, hands on the
+// the booty shake, a taunt (DANCES.md §Booty shake): back turned, the hips sat back behind the heels as into a chair
+// (the spine bends from the bottom of the torso, so bending alone tips the bum forward), bent well over, hands on the
 // knees, looking back over the shoulder
-const BOOTY = { hipFlex: 0.75, kneeBend: 0.95, spineBend: 0.35, armSwing: -0.45, armOut: 0.25, elbowBend: 0.35, headYaw: 0.9, headPitch: -0.25, tailLift: 0.9 };
+const BOOTY = { hipFlex: 1.35, kneeBend: 1.25, spineBend: 0.85, armSwing: -0.45, armOut: 0.25, elbowBend: 0.35, headYaw: 0.9, headPitch: -0.6, tailLift: 0.9 };
 
 export const DANCE_POSES = definePoses({
   'bs-bend': BOOTY,

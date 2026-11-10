@@ -127,6 +127,9 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
     stick and swings up out of that into the sword's moves. One length for every animal (amended 2026-11-09, so it
     reaches as far on all of them): a hand nearer the floor grips it further down the shaft, so the hook just clears
     the floor and the rest stands up past the hand.
+  - **April's comically oversize microphone** (decided 2026-11-09; a giant video camera was the other idea): wielded
+    as the Greathammer but never thrown. A dark handle, a band in the picked colour, a huge faceted silver grille,
+    about half her height.
   - **Leonardo's katanas are a pair of knitting needles** (decided 2026-11-09), one in each hand: the right held
     and swung as the sword, the left held up at the sword's rest. Long points, a knob on each end.
   - **Michelangelo's nunchucks are two balls of yarn on one strand** (decided 2026-11-09, "more fun to animate"),
@@ -143,6 +146,8 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
   - **Leonardo** (blue), straight-laced: the trailing scarf, high blue boots (over-knee socks), a blue drawstring bag
     and his knitting needles.
   - **Master Splinter**: picking the mouse gives the cane.
+  - **April** (the fifth default), leggy: **an orange llama** (amended 2026-11-09) in her jumpsuit (the yellow
+    pullover), white over-knee boots, a blue drawstring bag, a heart on her cheek, and her microphone.
 - 🎲 any animal, colours and pieces. 👍 saves; there is no lobby to go to yet.
 - Every colour is one of the six hero colours; anything else read from a save or another tablet snaps to the
   nearest (`readHero`). `tmnt/hero.test.mjs` checks it.

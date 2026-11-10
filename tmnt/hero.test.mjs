@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { LOOK } from '../characters/garments.js';
 import { POSES } from '../characters/npc.js';
-import { CANE, NEEDLES, SAI, SPECIES, STAFF, YARN_BALLS, stepFighter, animateFighter, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
+import { CANE, MIC, NEEDLES, SAI, SPECIES, STAFF, YARN_BALLS, stepFighter, animateFighter, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
 import { CLOTH, COLOURS, PALETTE, SCARF_FORMS, SWEATER_WORKS, TURTLE_COLOURS, WEAR, newHero, randomHero, readHero } from './hero.js';
 
 LOOK.viewPx = 0;
@@ -15,9 +15,9 @@ for (const { hex, name } of CLOTH) {
 const looks = new Set();
 for (const r of [0, 0.25, 0.45, 0.65, 0.95]) {
   const { species, look } = newHero(() => r);
-  assert.equal(species, 'turtle');
+  assert.equal(species, look.scarf ? 'turtle' : 'llama', 'the turtles are turtles, April a llama');
   if (look.scarf) assert.ok(TURTLE_COLOURS.some((c) => c.hex === look.scarfColor), 'a turtle colour scarf');
-  else assert.ok(look.sweater && look.socks && look.sweaterColor === COLOURS[5].hex && look.socksColor === '#ffffff', 'a taxi yellow jumpsuit, white boots');
+  else assert.ok(look.sweater && look.socks && look.sweaterColor === COLOURS[5].hex && look.socksColor === '#ffffff' && look.hands === MIC, 'a taxi yellow jumpsuit, white boots, her microphone');
   looks.add(look.scarf ? look.scarfColor : 'jumpsuit');
 }
 assert.equal(looks.size, 5, 'all four scarves and the jumpsuit come up');

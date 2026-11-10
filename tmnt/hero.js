@@ -1,6 +1,6 @@
 import { FACE_PAINTS, getSpecies } from '../characters/npc.js';
 import { COLOURWORKS, FORMS } from '../characters/garments.js';
-import { BAGS, CANE, HANDS, NEEDLES, SAI, STAFF, YARN_BALLS, SPECIES, TEXTURES, TRICKS, nearestSwatch, readFighter, setFur } from '../spinoff/fighter.js';
+import { BAGS, CANE, HANDS, MIC, NEEDLES, SAI, STAFF, YARN_BALLS, SPECIES, TEXTURES, TRICKS, nearestSwatch, readFighter, setFur } from '../spinoff/fighter.js';
 
 const HERO_KEY = 'tmnt.hero.v1';
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -26,7 +26,7 @@ export const WEAR = Object.freeze({
 });
 export const SCARF_FORMS = Object.freeze(FORMS.filter((f) => f !== 'wrapped twice'));
 const DEFAULT_HANDS = 'sword';
-export const HERO_HANDS = Object.freeze([...HANDS, NEEDLES, SAI, STAFF, YARN_BALLS, CANE]);
+export const HERO_HANDS = Object.freeze([...HANDS, NEEDLES, SAI, STAFF, YARN_BALLS, MIC, CANE]);
 // REUSE-SPEC.md §Hero chooser: the mouse is Master Splinter, with his cane
 export const handsOf = (species) => (species === 'mouse' ? CANE : DEFAULT_HANDS);
 
@@ -52,17 +52,23 @@ const SIGNATURE = {
   [ORANGE]: { look: { scarf: 'long', scarfForm: 'draped', socks: 'crew', socksColor: ORANGE, bag: 'backpack', bagColor: ORANGE, hands: YARN_BALLS, trick: 'plain' }, facePaint: 'slashes' },
 };
 const scarfLook = (colour) => ({ ...blankLook(), scarf: 'trailing', scarfColor: colour, gloves: colour, ...SIGNATURE[colour]?.look });
-// REUSE-SPEC.md §Hero chooser: April's jumpsuit is a yellow sweater, her boots white socks
-const jumpsuitLook = () => ({ ...blankLook(), sweater: 'pullover', sweaterColor: TAXI, socks: 'knee-high', socksColor: WHITE, gloves: TAXI });
+// REUSE-SPEC.md §Hero chooser: leggy April is an orange llama: her jumpsuit a yellow sweater, her boots white socks, a
+// blue drawstring bag, a heart on her cheek, her giant microphone
+const jumpsuitLook = () => ({
+  ...blankLook(), sweater: 'pullover', sweaterColor: TAXI, socks: 'over-knee', socksColor: WHITE, bag: 'drawstring bag', bagColor: BLUE,
+  hands: MIC, trick: TRICKS[MIC][0], gloves: ORANGE,
+});
+const APRIL = { species: 'llama', fur: ORANGE, facePaint: 'heart' };
 
-/** A turtle in one of the four turtles' scarves, or in April's jumpsuit. @returns {Hero} */
-export function newHero(rng = Math.random, species = 'turtle') {
+/** A turtle in one of the four turtles' scarves, or April; `species` given (the chooser's animal), that animal. @returns {Hero} */
+export function newHero(rng = Math.random, species = undefined) {
   const i = Math.floor(rng() * (TURTLE_COLOURS.length + 1)), scarf = TURTLE_COLOURS[i]?.hex;
-  const look = scarf ? scarfLook(scarf) : jumpsuitLook();
-  if (species === 'mouse') Object.assign(look, { hands: handsOf(species), trick: TRICKS[handsOf(species)][0] });
-  const params = structuredClone(getSpecies(species).defaults);
-  params.facePaint = SIGNATURE[scarf]?.facePaint ?? params.facePaint;
-  return setFur({ species, params, look }, GREEN);
+  const who = scarf ? { species: 'turtle', fur: GREEN, facePaint: SIGNATURE[scarf]?.facePaint, look: scarfLook(scarf) } : { ...APRIL, look: jumpsuitLook() };
+  const { look } = who, animal = species ?? who.species;
+  if (animal === 'mouse') Object.assign(look, { hands: handsOf(animal), trick: TRICKS[handsOf(animal)][0] });
+  const params = structuredClone(getSpecies(animal).defaults);
+  params.facePaint = who.facePaint ?? params.facePaint;
+  return setFur({ species: animal, params, look }, who.fur);
 }
 
 const pickOf = (list, rng) => list[Math.floor(rng() * list.length)];

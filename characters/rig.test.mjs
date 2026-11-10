@@ -10,8 +10,38 @@ import { CHAIR_BACK_Z, CHAIR_W } from './store/core/config.js';
 import './species.js';
 import { MANE_PRESETS, lightness as maneLightness, maneBases, maneCrownGap, snoutGap } from './lion.js';
 
-const build = (id) => createCharacter(
-  { ...BASE_PARAMS, ...getSpecies(id).defaults, mergeMeshes: false }, id);
+const build = (id, over) => createCharacter(
+  { ...BASE_PARAMS, ...getSpecies(id).defaults, ...over, mergeMeshes: false }, id);
+const lion = getSpecies('lion');
+const lionD = { ...BASE_PARAMS, ...lion.defaults };
+const HEAD = [1.04, 0.94, 1.00];
+const maneOf = (P) => {
+  const built = build('lion', P);
+  built.root.updateMatrixWorld(true);
+  return { built, mane: built.joints.head.getObjectByName('mane') };
+};
+const vertices = (mesh, m = mesh.matrix) => {
+  const pos = mesh.geometry.attributes.position;
+  return Array.from({ length: pos.count }, (_, i) => new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(m));
+};
+const withRandom = (gen, fn) => {
+  const real = Math.random;
+  Math.random = gen;
+  try { return fn(); } finally { Math.random = real; }
+};
+const inspect = (P) => {
+  const { built, mane } = maneOf(P);
+  assert.ok(mane, 'the mane shell must exist -- scallopGeometry returns null when every dome '
+    + 'falls inside the face gap, which presents as a lion with no mane at all');
+  const eye = built.joints.eye[0].node.position;
+  const win = P.eyeRadius * 1.5;
+  let overEye = 0, maxR = 0;
+  for (const v of vertices(mane)) {
+    maxR = Math.max(maxR, Math.hypot(v.x, v.z));
+    if (Math.abs(Math.abs(v.x) - Math.abs(eye.x)) <= win && Math.abs(v.y - eye.y) <= win && v.z > eye.z) overEye++;
+  }
+  return { overEye, maxR };
+};
 
 function tipOf(built, node) {
   built.root.updateMatrixWorld(true);
@@ -441,51 +471,22 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
 }
 
 {
-  const kit = getSpecies('lion');
-
-  const lionOf = (P) => {
-    const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, 'lion');
-    built.root.updateMatrixWorld(true);
-    let mane = null;
-    built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
-    assert.ok(mane, 'the mane shell must exist -- scallopGeometry returns null when every dome '
-      + 'falls inside the face gap, which presents as a lion with no mane at all');
-    return { built, mane };
-  };
-  const inspect = (P) => {
-    const { built, mane } = lionOf(P);
-    const eye = built.joints.eye[0].node.position;
-    const ex = Math.abs(eye.x);
-    const ey = eye.y;
-    const ez = eye.z;
-    const win = P.eyeRadius * 1.5;
-    const pos = mane.geometry.attributes.position;
-    const v = new THREE.Vector3();
-    let overEye = 0, maxR = 0;
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i).applyMatrix4(mane.matrix);
-      maxR = Math.max(maxR, Math.hypot(v.x, v.z));
-      if (Math.abs(Math.abs(v.x) - ex) <= win && Math.abs(v.y - ey) <= win && v.z > ez) overEye++;
-    }
-    return { overEye, maxR };
-  };
-
   const skinZ = (P) => {
     const k = 1 - ((-P.headRadius * P.muzzleDrop) / (P.headRadius * 0.94)) ** 2;
     return k > 0 ? P.headRadius * Math.sqrt(k) : 0;
   };
   const protrusion = (P) => P.headRadius * P.muzzleStart + P.muzzleLength - skinZ(P);
 
-  for (const maneFaceGap of [kit.defaults.maneFaceGap, ...kit.randomRanges.maneFaceGap]) {
-    const P = { ...kit.defaults, maneFaceGap };
+  for (const maneFaceGap of [lion.defaults.maneFaceGap, ...lion.randomRanges.maneFaceGap]) {
+    const P = { ...lion.defaults, maneFaceGap };
     assert.equal(inspect(P).overEye, 0,
       `lion: mane must not hang in front of the eyes at gap ${maneFaceGap} -- `
       + 'that is a hood, not a mane');
   }
 
-  for (const maneTouch of [kit.defaults.maneTouch, ...kit.randomRanges.maneTouch]) {
+  for (const maneTouch of [lion.defaults.maneTouch, ...lion.randomRanges.maneTouch]) {
     for (const preset of [{}, ...MANE_PRESETS]) {
-      const P = { ...kit.defaults, ...preset, maneTouch };
+      const P = { ...lion.defaults, ...preset, maneTouch };
       const headHalf = P.headRadius * 1.04;
       const { maxR, overEye } = inspect(P);
       assert.ok(maxR - headHalf > headHalf * 0.15,
@@ -502,22 +503,17 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     const capFront = (P) => P.headRadius * P.muzzleStart + P.muzzleLength
       + P.muzzleWidth * LIMB_TAPER * P.muzzleRound - skinZ(P);
 
-    assert.ok(capFront(kit.defaults) > 0.02,
+    assert.ok(capFront(lion.defaults) > 0.02,
       `lion: the default snout must clear the skull -- cap front `
-      + `${capFront(kit.defaults).toFixed(4)}`);
-    assert.ok(snoutGap(kit.defaults) >= 0 && snoutGap(kit.defaults) < 0.5,
-      `lion: the default snout must read as a cat -- gap ${snoutGap(kit.defaults).toFixed(3)}`);
+      + `${capFront(lion.defaults).toFixed(4)}`);
+    assert.ok(snoutGap(lion.defaults) >= 0 && snoutGap(lion.defaults) < 0.5,
+      `lion: the default snout must read as a cat -- gap ${snoutGap(lion.defaults).toFixed(3)}`);
 
-    const real = Math.random;
     let seed = 0x2545f491;
-    Math.random = () => {
-      seed = (seed * 1664525 + 1013904223) >>> 0;
-      return seed / 0x100000000;
-    };
-    try {
+    withRandom(() => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 0x100000000), () => {
       let worstCap = Infinity, worstGap = -Infinity, bestGap = Infinity;
       for (let n = 0; n < 600; n++) {
-        const P = kit.randomise(structuredClone(kit.defaults));
+        const P = lion.randomise(structuredClone(lion.defaults));
         worstCap = Math.min(worstCap, capFront(P));
         worstGap = Math.max(worstGap, snoutGap(P));
         bestGap = Math.min(bestGap, snoutGap(P));
@@ -533,39 +529,28 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       assert.ok(worstGap + 1 <= 2 && bestGap + 1 >= 1,
         `lion: a snout must be 1 to 2 nose-depths off the face -- got `
         + `${(bestGap + 1).toFixed(3)} to ${(worstGap + 1).toFixed(3)}`);
-    } finally {
-      Math.random = real;
-    }
+    });
   }
 
-  assert.ok(inspect({ ...kit.defaults, maneFaceGap: 0 }).overEye > 0,
+  assert.ok(inspect({ ...lion.defaults, maneFaceGap: 0 }).overEye > 0,
     'lion: a mane with no face gap is a hood and must cover the eyes -- if it does not, the eye '
     + 'check is measuring nothing');
-  assert.ok(protrusion({ ...kit.defaults, muzzleStart: 0.24 }) < 0,
+  assert.ok(protrusion({ ...lion.defaults, muzzleStart: 0.24 }) < 0,
     'lion: a 0.24 muzzle start is meant to bury the snout -- that was the first shipped bug');
-  assert.ok(snoutGap({ ...kit.defaults, muzzleLength: 0.105 }) > 0.5,
+  assert.ok(snoutGap({ ...lion.defaults, muzzleLength: 0.105 }) > 0.5,
     'lion: muzzleLength 0.105 is meant to read as a fox -- it was the shipped default, and if it '
     + 'now passes the band then the nose or the head moved and the band needs re-measuring');
 }
 
 {
-  const kit = getSpecies('lion');
 
   const measure = (P) => {
     const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, 'lion');
     built.root.updateMatrixWorld(true);
     const ear = built.joints.ear[0];
     const span = (mesh) => {
-      const pos = mesh.geometry.attributes.position;
-      const v = new THREE.Vector3();
-      let maxX = 0, minY = Infinity, maxY = -Infinity;
-      for (let i = 0; i < pos.count; i++) {
-        v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrix);
-        maxX = Math.max(maxX, Math.abs(v.x));
-        minY = Math.min(minY, v.y);
-        maxY = Math.max(maxY, v.y);
-      }
-      return { maxX, minY, maxY };
+      const vs = vertices(mesh);
+      return { maxX: Math.max(...vs.map((v) => Math.abs(v.x))), minY: Math.min(...vs.map((v) => v.y)), maxY: Math.max(...vs.map((v) => v.y)) };
     };
     const meshes = ear.node.children.filter((c) => c.isMesh).map(span);
     assert.equal(meshes.length, 2, 'lion: an ear is a leaf plus a point');
@@ -575,10 +560,10 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     return { leaf, tip, leafAtJoin, past: tip.maxY - leaf.maxY, length: ear.length };
   };
 
-  const R = kit.randomRanges;
-  for (const earWidth of [kit.defaults.earWidth, ...R.earWidth]) {
-    for (const earFlatten of [kit.defaults.earFlatten, ...R.earFlatten]) {
-      const m = measure({ ...kit.defaults, earWidth, earFlatten });
+  const R = lion.randomRanges;
+  for (const earWidth of [lion.defaults.earWidth, ...R.earWidth]) {
+    for (const earFlatten of [lion.defaults.earFlatten, ...R.earFlatten]) {
+      const m = measure({ ...lion.defaults, earWidth, earFlatten });
       assert.ok(Math.abs(m.tip.maxX / m.leafAtJoin - 1) < 0.02,
         `lion: the ear point must be as wide as the ear where it joins -- `
         + `${m.tip.maxX.toFixed(4)} against ${m.leafAtJoin.toFixed(4)} `
@@ -586,14 +571,14 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     }
   }
 
-  for (const earPoint of [kit.defaults.earPoint, ...R.earPoint]) {
-    const m = measure({ ...kit.defaults, earPoint });
+  for (const earPoint of [lion.defaults.earPoint, ...R.earPoint]) {
+    const m = measure({ ...lion.defaults, earPoint });
     assert.ok(m.past > m.length * 0.10,
       `lion: the point must clear the leaf -- only ${m.past.toFixed(4)} at earPoint ${earPoint}`);
   }
 
   {
-    const m = measure(kit.defaults);
+    const m = measure(lion.defaults);
     assert.ok(Math.abs((m.leafAtJoin * 0.92) / m.leafAtJoin - 1) > 0.02,
       'lion: a 0.92 constant is meant to fail tangency -- if 0.02 no longer catches it the '
       + 'tolerance is too loose to measure anything');
@@ -602,15 +587,8 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
 
 {
   const asymmetry = (mesh) => {
-    const pos = mesh.geometry.attributes.position;
-    const v = new THREE.Vector3();
-    const xs = [];
-    let maxAbs = 0;
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrix);
-      xs.push(v.x);
-      maxAbs = Math.max(maxAbs, Math.abs(v.x));
-    }
+    const xs = vertices(mesh).map((v) => v.x);
+    const maxAbs = Math.max(...xs.map(Math.abs));
     const a = [...xs].sort((p, q) => p - q);
     const b = xs.map((x) => -x).sort((p, q) => p - q);
     let err = 0;
@@ -618,18 +596,9 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     return err / a.length / maxAbs;
   };
 
-  const maneOf = (over) => {
-    const P = { ...BASE_PARAMS, ...getSpecies('lion').defaults, ...over, mergeMeshes: false };
-    const built = createCharacter(P, 'lion');
-    built.root.updateMatrixWorld(true);
-    let mane = null;
-    built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
-    return mane;
-  };
-
   for (const manePerRow of [3, 4, 9, 11]) {
     for (const maneFaceGap of [0, 1.124, 2.5, 3.1]) {
-      const mane = maneOf({ manePerRow, maneFaceGap, maneStagger: false });
+      const { mane } = maneOf({ manePerRow, maneFaceGap, maneStagger: false });
       if (!mane) continue;
       const m = asymmetry(mane);
       assert.ok(m < 1e-6,
@@ -639,7 +608,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   }
 
   for (const manePerRow of [3, 11]) {
-    const m = asymmetry(maneOf({ manePerRow, maneStagger: true }));
+    const m = asymmetry(maneOf({ manePerRow, maneStagger: true }).mane);
     assert.ok(m < 1e-6,
       `lion: a staggered mane must be symmetric too -- ${m.toExponential(2)} `
       + `at perRow ${manePerRow}`);
@@ -684,21 +653,15 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   const TILT = { owl: 'tuftTilt', dragon: 'hornTilt' };
 
   const deepest = (id, over) => {
-    const P = { ...BASE_PARAMS, ...getSpecies(id).defaults, ...over, mergeMeshes: false };
-    const built = createCharacter(P, id);
+    const built = build(id, over);
     built.root.updateMatrixWorld(true);
-    const [ax, ay, az] = getSpecies(id).headShape.map((f) => f * P.headRadius);
-    const v = new THREE.Vector3();
+    const [ax, ay, az] = getSpecies(id).headShape.map((f) => f * built.params.headRadius);
     let best = Infinity;
     for (const ear of built.joints.ear) {
       for (const child of ear.node.children) {
         if (!child.isMesh) continue;
-        const pos = child.geometry.attributes.position;
         const m = new THREE.Matrix4().multiplyMatrices(ear.node.matrix, child.matrix);
-        for (let i = 0; i < pos.count; i++) {
-          v.fromBufferAttribute(pos, i).applyMatrix4(m);
-          best = Math.min(best, Math.hypot(v.x / ax, v.y / ay, v.z / az));
-        }
+        for (const v of vertices(child, m)) best = Math.min(best, Math.hypot(v.x / ax, v.y / ay, v.z / az));
       }
     }
     return best;
@@ -719,24 +682,17 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   }
 }
 
-{
-  const kit = getSpecies('lion');
-  const MIN = 5;
-
-  assert.ok(kit.defaults.maneRows >= MIN,
-    `lion: the default mane needs at least ${MIN} rows, has ${kit.defaults.maneRows}`);
-
+// presets are what randomise draws from, so one under a floor ships on rerolls
+for (const [key, MIN] of [['maneRows', 5], ['maneBottom', 0.5], ['maneProud', 1]]) {
+  assert.ok(lion.defaults[key] >= MIN, `lion: the default ${key} ${lion.defaults[key]} is under the ${MIN} floor`);
   MANE_PRESETS.forEach((preset, i) => {
-    assert.ok(preset.maneRows >= MIN,
-      `lion: mane preset ${i} has ${preset.maneRows} rows, below the ${MIN} floor -- presets are `
-      + 'what randomise draws from, so a short one ships on rerolls');
+    assert.ok(preset[key] >= MIN, `lion: mane preset ${i} has ${key} ${preset[key]}, under the ${MIN} floor`);
   });
-
-  const rowsEntry = kit.gui.coat.find((e) => e[0] === 'maneRows');
-  assert.ok(rowsEntry, 'lion: maneRows must still be on the mane folder');
-  assert.ok(rowsEntry[1] >= MIN,
-    `lion: the maneRows slider starts at ${rowsEntry[1]}, below the ${MIN} floor`);
+  const entry = lion.gui.coat.find((e) => e[0] === key);
+  assert.ok(entry, `lion: ${key} must still be on the mane folder`);
+  assert.ok(entry[1] >= MIN, `lion: the ${key} slider starts at ${entry[1]}, under the ${MIN} floor`);
 }
+assert.equal(lion.gui.coat.find((e) => e[0] === 'maneProud')[2], 3, 'lion: the maneProud slider must run to 3');
 
 {
   const MIN_PROUD = 0.15;
@@ -773,15 +729,13 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
 }
 
 {
-  const kit = getSpecies('lion');
-  const D = { ...BASE_PARAMS, ...kit.defaults };
   const KEYS = ['maneDrop', 'maneTall', 'maneTouch', 'maneFaceGap', 'maneHug', 'manePush'];
-  const spans = KEYS.map((k) => kit.randomRanges[k]);
+  const spans = KEYS.map((k) => lion.randomRanges[k]);
   const corners = [];
   for (const preset of [{}, ...MANE_PRESETS]) {
     for (const maneSides of [4, 6]) {
       for (let m = 0; m < (1 << KEYS.length); m++) {
-        const P = { ...D, ...preset, maneSides };
+        const P = { ...lionD, ...preset, maneSides };
         KEYS.forEach((k, j) => { P[k] = spans[j][(m >> j) & 1]; });
         corners.push(P);
       }
@@ -790,14 +744,10 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   const where = (P) => `${KEYS.map((k) => `${k}=${P[k]}`).join(' ')} sides=${P.maneSides} `
     + `rows=${P.maneRows} bottom=${P.maneBottom} proud=${P.maneProud}`;
 
-  const HEAD = [1.04, 0.94, 1.00];
   for (const P of corners) {
     for (const maneBottom of [P.maneBottom, 0.5, 1.0]) {
       const Q = { ...P, maneBottom };
-      const built = createCharacter({ ...BASE_PARAMS, ...Q, mergeMeshes: false }, 'lion');
-      built.root.updateMatrixWorld(true);
-      let mane = null;
-      built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
+      const { mane } = maneOf(Q);
       assert.ok(mane, `lion: no mane shell to measure at ${where(Q)}`);
       for (const b of maneBases(Q)) {
         const v = b.clone().applyMatrix4(mane.matrix).divideScalar(Q.headRadius);
@@ -810,21 +760,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   }
 
   for (const P of corners) {
-    const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, 'lion');
-    built.root.updateMatrixWorld(true);
-    let shell = null;
-    built.joints.head.traverse((c) => { if (c.name === 'mane') shell = c; });
-
-    const eye = built.joints.eye[0].node.position;
-    const win = P.eyeRadius * 1.5;
-    const pos = shell.geometry.attributes.position;
-    const v = new THREE.Vector3();
-    let overEye = 0;
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i).applyMatrix4(shell.matrix);
-      if (Math.abs(Math.abs(v.x) - Math.abs(eye.x)) <= win && Math.abs(v.y - eye.y) <= win
-        && v.z > eye.z) overEye++;
-    }
+    const { overEye } = inspect(P);
     assert.equal(overEye, 0,
       `lion: mane must not hang in front of the eyes -- ${overEye} vertices do at ${where(P)}`);
   }
@@ -836,34 +772,16 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       + `bare head at maneTop=${P.maneTop} ${where(P)}`);
   }
 
-  const MIN = 0.50;
-  assert.ok(kit.defaults.maneBottom >= MIN,
-    `lion: the default mane stops at ${kit.defaults.maneBottom}, above the ${MIN} equator floor`);
-  MANE_PRESETS.forEach((preset, i) => {
-    assert.ok(preset.maneBottom >= MIN,
-      `lion: mane preset ${i} stops at ${preset.maneBottom}, above the ${MIN} equator floor`);
-  });
-  const bottomEntry = kit.gui.coat.find((e) => e[0] === 'maneBottom');
-  assert.ok(bottomEntry, 'lion: maneBottom must still be on the mane folder');
-  assert.ok(bottomEntry[1] >= MIN,
-    `lion: the maneBottom slider starts at ${bottomEntry[1]}, above the ${MIN} equator floor`);
-
-  const dropEntry = kit.gui.coat.find((e) => e[0] === 'maneDrop');
+  const dropEntry = lion.gui.coat.find((e) => e[0] === 'maneDrop');
   assert.ok(dropEntry && dropEntry[1] >= 0,
     `lion: the maneDrop slider starts at ${dropEntry?.[1]} -- a mane never sits ABOVE the skull `
     + 'it grows from, and the skull pull-in can only crush those rows flat onto the crown');
 }
 
 {
-  const kit = getSpecies('lion');
-  const D = { ...BASE_PARAMS, ...kit.defaults };
-  const HEAD = [1.04, 0.94, 1.00];
 
   const backCover = (P) => {
-    const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, 'lion');
-    built.root.updateMatrixWorld(true);
-    let mane = null;
-    built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
+    const { built, mane } = maneOf(P);
     const { head } = built.joints;
     const toLocal = head.matrixWorld.clone().invert();
     const r = P.headRadius;
@@ -889,9 +807,9 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   };
 
   for (const [label, preset] of [['default', {}], ...MANE_PRESETS.map((p, i) => [`preset ${i}`, p])]) {
-    const extremes = [{}, { maneSides: 4, maneHug: kit.randomRanges.maneHug[1], manePush: kit.randomRanges.manePush[0] }];
-    for (const extra of extremes) for (const maneTouch of [kit.defaults.maneTouch, kit.randomRanges.maneTouch[0]]) {
-      const cover = backCover({ ...D, ...preset, ...extra, maneTouch });
+    const extremes = [{}, { maneSides: 4, maneHug: lion.randomRanges.maneHug[1], manePush: lion.randomRanges.manePush[0] }];
+    for (const extra of extremes) for (const maneTouch of [lion.defaults.maneTouch, lion.randomRanges.maneTouch[0]]) {
+      const cover = backCover({ ...lionD, ...preset, ...extra, maneTouch });
       assert.ok(cover >= 0.98,
         `lion: from behind, the mane must cover the back of the head -- ${label} covers `
         + `${Math.round(cover * 100)}% of the skull within its own reach at maneTouch ${maneTouch}`);
@@ -900,13 +818,8 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
 }
 
 {
-  const kit = getSpecies('lion');
-  const D = { ...BASE_PARAMS, ...kit.defaults };
   const crownCovered = (P) => {
-    const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, 'lion');
-    built.root.updateMatrixWorld(true);
-    let mane = null;
-    built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
+    const { built, mane } = maneOf(P);
     const { head } = built.joints;
     const r = P.headRadius;
     const from = new THREE.Vector3(0, 5 * r, 0).applyMatrix4(head.matrixWorld);
@@ -915,7 +828,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     return Boolean(hit)
       && hit.point.clone().applyMatrix4(head.matrixWorld.clone().invert()).y / r > 0.94;
   };
-  for (const base of [D, { ...D, maneDrop: 0.4 }, { ...D, maneSides: 4 }, { ...D, maneSides: 6 }]) {
+  for (const base of [lionD, { ...lionD, maneDrop: 0.4 }, { ...lionD, maneSides: 4 }, { ...lionD, maneSides: 6 }]) {
     for (let i = 0; i <= 15; i++) {
       const P = { ...base, maneTop: i * 0.02 };
       const saysCovered = maneCrownGap(P) <= 0;
@@ -927,31 +840,23 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
 }
 
 {
-  const kit = getSpecies('lion');
-  const D = { ...BASE_PARAMS, ...kit.defaults };
-  const HEAD = [1.04, 0.94, 1.00];
   const cases = [['default', {}], ...MANE_PRESETS.map((p, i) => [`preset ${i}`, p])]
     .flatMap(([name, p]) => [[name, p], [`${name} at maneBottom 1.0`, { ...p, maneBottom: 1.0 }]]);
   for (const [label, preset] of cases) {
-    const P = { ...D, ...preset };
-    const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, 'lion');
-    built.root.updateMatrixWorld(true);
-    let mane = null;
-    built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
-    const pos = mane.geometry.attributes.position;
+    const P = { ...lionD, ...preset };
+    const { mane } = maneOf(P);
     const { index } = mane.geometry;
-    const at = (i) => new THREE.Vector3().fromBufferAttribute(pos, i)
-      .applyMatrix4(mane.matrix).divideScalar(P.headRadius);
+    const at = vertices(mane).map((v) => v.divideScalar(P.headRadius));
     const norm = (v) => Math.hypot(v.x / HEAD[0], v.y / HEAD[1], v.z / HEAD[2]);
     const fur = new Set();
-    for (let i = 0; i < pos.count; i++) if (Math.abs(norm(at(i)) - 1.02) < 1e-7) fur.add(i);
+    at.forEach((v, i) => { if (Math.abs(norm(v) - 1.02) < 1e-7) fur.add(i); });
     assert.ok(fur.size > 50, `lion: ${label} has no underfur to check (${fur.size} vertices)`);
     let lowest = Infinity;
     for (let t = 0; t < index.count; t += 3) {
       const tri = [index.getX(t), index.getX(t + 1), index.getX(t + 2)];
       if (!tri.every((i) => fur.has(i))) continue;
       for (let e = 0; e < 3; e++) {
-        lowest = Math.min(lowest, norm(at(tri[e]).add(at(tri[(e + 1) % 3])).multiplyScalar(0.5)));
+        lowest = Math.min(lowest, norm(at[tri[e]].clone().add(at[tri[(e + 1) % 3]]).multiplyScalar(0.5)));
       }
     }
     assert.ok(lowest > 1.003,
@@ -961,14 +866,8 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
 }
 
 {
-  const kit = getSpecies('lion');
-  const D = { ...BASE_PARAMS, ...kit.defaults };
-  const HEAD = [1.04, 0.94, 1.00];
   const leans = (P) => {
-    const built = createCharacter({ ...BASE_PARAMS, ...P, mergeMeshes: false }, 'lion');
-    built.root.updateMatrixWorld(true);
-    let mane = null;
-    built.joints.head.traverse((c) => { if (c.name === 'mane') mane = c; });
+    const { mane } = maneOf(P);
     const per = new THREE.ConeGeometry(1, 1, P.maneSides).attributes.position.count;
     const pos = mane.geometry.attributes.position;
     return maneBases(P).map((unit, i) => {
@@ -981,19 +880,19 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     });
   };
 
-  for (const maneTall of [D.maneTall, ...kit.randomRanges.maneTall]) {
-    for (const maneBottom of [D.maneBottom, 1.0]) {
-      const worst = Math.max(...leans({ ...D, maneHug: 0, maneTall, maneBottom }).map((s) => s.lean));
+  for (const maneTall of [lionD.maneTall, ...lion.randomRanges.maneTall]) {
+    for (const maneBottom of [lionD.maneBottom, 1.0]) {
+      const worst = Math.max(...leans({ ...lionD, maneHug: 0, maneTall, maneBottom }).map((s) => s.lean));
       assert.ok(worst < 0.5,
         `lion: at maneHug 0 every spike must grow straight out of the skull -- one leans `
         + `${worst.toFixed(1)} degrees off it at maneTall ${maneTall}, maneBottom ${maneBottom}`);
     }
   }
 
-  for (const maneBottom of [D.maneBottom, 0.8, 1.0]) {
-    const spikes = leans({ ...D, maneBottom });
+  for (const maneBottom of [lionD.maneBottom, 0.8, 1.0]) {
+    const spikes = leans({ ...lionD, maneBottom });
     const last = spikes.filter((s) => s.row > 1 - 1e-9).map((s) => s.lean);
-    const want = D.maneHug * 90;
+    const want = lionD.maneHug * 90;
     assert.ok(last.length && last.every((l) => Math.abs(l - want) < 1),
       `lion: the mane's last row must fold ${want.toFixed(0)} degrees against the skull at `
       + `maneBottom ${maneBottom} -- got ${last.map((l) => l.toFixed(1)).join(', ')}`);
@@ -1005,55 +904,25 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
 }
 
 {
-  const kit = getSpecies('lion');
   const MIN = 28;
-  const real = Math.random;
-  let seed = 7;
-  Math.random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  let worst = Infinity, at = '';
-  try {
+  let seed = 7, worst = Infinity, at = '';
+  withRandom(() => ((seed = (seed * 16807) % 2147483647) / 2147483647), () => {
     for (let i = 0; i < 2000; i++) {
-      const P = kit.randomise(structuredClone({ ...BASE_PARAMS, ...kit.defaults }));
+      const P = lion.randomise(structuredClone(lionD));
       const gap = Math.abs(maneLightness(P.maneColor) - maneLightness(P.bodyColor));
       if (gap < worst) { worst = gap; at = `body ${P.bodyColor}, mane ${P.maneColor}`; }
     }
-  } finally {
-    Math.random = real;
-  }
+  });
   assert.ok(worst >= MIN,
     `lion: a random mane must differ from its body by at least ${MIN} L* -- got ${worst.toFixed(1)} (${at})`);
-  const D = { ...BASE_PARAMS, ...kit.defaults };
-  const gap = Math.abs(maneLightness(D.maneColor) - maneLightness(D.bodyColor));
+  const gap = Math.abs(maneLightness(lionD.maneColor) - maneLightness(lionD.bodyColor));
   assert.ok(gap >= MIN, `lion: the default mane is only ${gap.toFixed(1)} L* from the default body`);
 }
 
 {
-  const kit = getSpecies('lion');
-  const MIN = 1.0;
-  assert.ok(kit.defaults.maneProud >= MIN,
-    `lion: the default maneProud ${kit.defaults.maneProud} is under the ${MIN} floor`);
-  MANE_PRESETS.forEach((preset, i) => {
-    assert.ok(preset.maneProud >= MIN,
-      `lion: mane preset ${i} has maneProud ${preset.maneProud}, under the ${MIN} floor`);
-  });
-  const entry = kit.gui.coat.find((e) => e[0] === 'maneProud');
-  assert.ok(entry, 'lion: maneProud must still be on the mane folder');
-  assert.ok(entry[1] >= MIN && entry[2] === 3,
-    `lion: the maneProud slider must run ${MIN} to 3 -- it runs ${entry[1]} to ${entry[2]}`);
-}
-
-{
-  const kit = getSpecies('lion');
-  const D = { ...BASE_PARAMS, ...kit.defaults };
-  const real = Math.random;
   let seed = 11;
-  Math.random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const lions = [];
-  try {
-    for (let i = 0; i < 1500; i++) lions.push(kit.randomise(structuredClone(D)));
-  } finally {
-    Math.random = real;
-  }
+  const lions = withRandom(() => ((seed = (seed * 16807) % 2147483647) / 2147483647),
+    () => Array.from({ length: 1500 }, () => lion.randomise(structuredClone(lionD))));
   const spread = (f) => {
     const v = lions.map(f).sort((a, b) => a - b);
     return v[Math.floor(0.9 * (v.length - 1))] / v[Math.floor(0.1 * (v.length - 1))];
@@ -1071,7 +940,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   }
 
   for (const key of ['torsoW', 'torsoH', 'torsoD', 'upperArmLen', 'forearmLen']) {
-    assert.ok(!(key in kit.randomRanges),
+    assert.ok(!(key in lion.randomRanges),
       `lion: ${key} is drawn by varyBody, so randomRanges must not draw it too -- one draw would be thrown away`);
   }
 
@@ -1079,11 +948,11 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     const ratio = (P.upperArmLen + P.forearmLen) / (P.legHeight + P.torsoH);
     assert.ok(ratio <= 0.70 + 0.01, `lion: arm ratio ${ratio.toFixed(3)} is over the 0.70 cap`);
   }
-  const torsoH = D.torsoH * 0.72 * 0.92;
-  const legHeight = kit.randomRanges.legHeight[0];
+  const torsoH = lionD.torsoH * 0.72 * 0.92;
+  const legHeight = lion.randomRanges.legHeight[0];
   const armTotal = 0.70 * (legHeight + torsoH);
-  const split = D.upperArmLen / (D.upperArmLen + D.forearmLen);
-  const worst = createCharacter({ ...D, legHeight, torsoH, upperArmLen: armTotal * split,
+  const split = lionD.upperArmLen / (lionD.upperArmLen + lionD.forearmLen);
+  const worst = createCharacter({ ...lionD, legHeight, torsoH, upperArmLen: armTotal * split,
     forearmLen: armTotal * (1 - split), mergeMeshes: false }, 'lion');
   worst.root.updateMatrixWorld(true);
   const low = (n) => new THREE.Box3().setFromObject(n).min.y;
@@ -1092,7 +961,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   assert.ok(clear > 0.02, `lion: at the arm cap's worst corner the hands clear the floor by only ${clear.toFixed(4)}`);
 
   const cap = Math.sqrt(1 - (1 - 0.25) ** 2);
-  const ring = cap - kit.randomRanges.pupilScale[1];
+  const ring = cap - lion.randomRanges.pupilScale[1];
   assert.ok(ring >= 0.05,
     `lion: the largest random pupil leaves only ${ring.toFixed(3)} of the eye's radius of white showing`);
 }
@@ -1223,9 +1092,8 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
   const reach = L.params.tailLength * Math.sin(0.5);
   assert.ok(moved > 0.6 * reach, `lion: a 0.5 rad wag moves the tip ${moved.toFixed(3)} of a possible ${reach.toFixed(3)}`);
 
-  const lion = getSpecies('lion');
   for (let i = 0; i < 300; i++) {
-    const P = lion.randomise(structuredClone({ ...BASE_PARAMS, ...lion.defaults }));
+    const P = lion.randomise(structuredClone(lionD));
     const ratio = P.tailLength / tailBaseHeight(P);
     assert.ok(ratio <= 1.0 + 1e-9, `lion: a random tail ${ratio.toFixed(3)}x its base height can reach the floor`);
   }

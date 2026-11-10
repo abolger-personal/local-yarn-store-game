@@ -1051,7 +1051,6 @@ loadAtlas(ATLAS_URL, S.theme).then((loaded) => {
   layoutPegDisplay();
 
   rebuild();
-  if (location.hash === '#test') keyboardPlaneTest();
 
   renderer.setAnimationLoop(() => {
     controls.update();
@@ -1063,38 +1062,3 @@ loadAtlas(ATLAS_URL, S.theme).then((loaded) => {
     `<b>atlas failed to load</b><br>${err.message}<br>` +
     `<span style="opacity:.7">run notion_processing.py first</span>`;
 });
-
-function keyboardPlaneTest() {
-  scene.updateMatrixWorld(true);
-  camera.updateMatrixWorld(true);
-  const { victimIndex, clientX, clientY } = holdOverClearColumn(displays.shelf.g);
-
-  onPointerMove({ clientX, clientY });
-  console.log('TEST target on plane 0:', JSON.stringify(drag.target));
-
-  dispatchEvent(new KeyboardEvent('keydown', { key: ']' }));
-  console.log('TEST after ]: plane', displays.shelf.plane, '(expect 1) target now', JSON.stringify(drag.target));
-
-  onPointerDown({ button: 0, clientX, clientY });
-  const after = items[victimIndex];
-  console.log('TEST after drop: shelf', after.shelf, 'c', after.c, 'r', after.r, '(expect 1 2 2)');
-}
-
-function holdOverClearColumn(g) {
-  const victimIndex = 0;
-  const victim = items[victimIndex];
-  lift(g, victim.keys);
-  drag.index = victimIndex;
-  displays.shelf.plane = 0;
-  if (activeId !== 'shelf') setActiveId('shelf', false);
-
-  for (const it of items) {
-    if (it !== victim && it.display === 'shelf' && it.c === 2 && it.r === 2 && it.keys) lift(g, it.keys);
-  }
-  const rect = slotRect(g, 2, 2, 1, 1);
-  const worldPt = new THREE.Vector3(rect.x, shelfBaseY(0, 0) + S.boxHeight / 2, rect.z).applyMatrix4(displays.shelf.frame);
-  const proj = worldPt.clone().project(camera);
-  const clientX = (proj.x * 0.5 + 0.5) * innerWidth;
-  const clientY = (-proj.y * 0.5 + 0.5) * innerHeight;
-  return { victimIndex, clientX, clientY };
-}

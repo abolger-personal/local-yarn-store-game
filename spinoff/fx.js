@@ -1,6 +1,6 @@
 // Contact you can feel (REUSE-SPEC.md §Milestones 1): BAM bursts, icing chunks and confetti, screen shake, floor shadows.
 import * as THREE from 'three';
-import { floorTop } from './controls.js';
+import { floorTop } from './match.js';
 
 /** @typedef {import('./match.js').HitEvent} HitEvent */
 

@@ -132,12 +132,17 @@ function frontGap(s, f) {
 /** playtest: a foe that walks past you got away, so with nothing to hit in front an attack turns you to the nearest foe a step away. */
 function faceFoe(s, f, m) {
   if (!m.reach || frontGap(s, f) <= LUNGE_RANGE) return;
-  let best = null, bestGap = LUNGE_RANGE;
+  faceNearest(s, f, LUNGE_RANGE, (o) => Math.abs(o.y - f.y) <= f.h);
+}
+
+function faceNearest(s, f, reach, ok) {
+  let best = null, bestGap = reach;
   for (const o of s.fighters) {
     const gap = flat(f, o) - f.r - o.r;
-    if (canStrike(s, f, o) && Math.abs(o.y - f.y) <= f.h && gap <= bestGap) [best, bestGap] = [o, gap];
+    if (canStrike(s, f, o) && ok(o) && gap <= bestGap) [best, bestGap] = [o, gap];
   }
   if (best && flat(f, best) > EPS) f.facing = Math.atan2(best.z - f.z, best.x - f.x);
+  return best;
 }
 
 /** A stomp steers onto its foe, and hangs before it dives. True while it hangs. */
@@ -155,15 +160,7 @@ export function stompAir(s, f) {
 }
 
 /** The foe a stomp starting now homes onto: the nearest one below within reach, faced. */
-function stompTarget(s, f) {
-  let best = null, bestGap = MOVES.stomp.home.reach;
-  for (const o of s.fighters) {
-    const gap = flat(f, o) - f.r - o.r;
-    if (canStrike(s, f, o) && o.y < f.y && gap <= bestGap) [best, bestGap] = [o, gap];
-  }
-  if (best && flat(f, best) > EPS) f.facing = Math.atan2(best.z - f.z, best.x - f.x);
-  return best?.id ?? null;
-}
+const stompTarget = (s, f) => faceNearest(s, f, MOVES.stomp.home.reach, (o) => o.y < f.y)?.id ?? null;
 
 function lungeFor(s, f, m) {
   const gap = frontGap(s, f);

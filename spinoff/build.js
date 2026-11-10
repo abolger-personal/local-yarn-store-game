@@ -1,6 +1,6 @@
 // The build round's floor grid (REUSE-SPEC.md §Forts, Building is carrying blocks): a team's third cut into BRICK cells
 // on inventory/grid.js, rebuilt from the bricks standing there, so the sim and the page find the same cells.
-import { BRICK, PILE_DX, SHELF_WIDTH, groundOf, outside, overlaps, spotRect } from './match.js';
+import { BRICK, PILE_DX, SHELF_WIDTH, floorTop, groundOf, overlaps, spotRect } from './match.js';
 import { dropLayer, fits, footprint, makeDisplay, place, topAt } from '../inventory/grid.js';
 import { clamp, flat } from './world.js';
 
@@ -14,16 +14,9 @@ const EDGE = 0.01;
 
 /** @typedef {{ x: number, y: number, z: number }} P3 */
 
-/** The highest floor top at (x, z), or null off the stage. @param {import('./match.js').Stage} stage */
-function floorTopAt(stage, x, z) {
-  let top = null;
-  for (const f of stage.floors) if (outside(f, x, z) === 0 && (top === null || f.y > top)) top = f.y;
-  return top;
-}
-
 /** The one floor top under the whole of a cell, or null when it straddles two (or the stage's edge). */
 function cellTop(stage, x0, z0) {
-  const tops = [[EDGE, EDGE], [BRICK - EDGE, EDGE], [EDGE, BRICK - EDGE], [BRICK - EDGE, BRICK - EDGE]].map(([dx, dz]) => floorTopAt(stage, x0 + dx, z0 + dz));
+  const tops = [[EDGE, EDGE], [BRICK - EDGE, EDGE], [EDGE, BRICK - EDGE], [BRICK - EDGE, BRICK - EDGE]].map(([dx, dz]) => floorTop(stage, x0 + dx, z0 + dz));
   return tops.every((t) => t !== null && t === tops[0]) ? tops[0] : null;
 }
 

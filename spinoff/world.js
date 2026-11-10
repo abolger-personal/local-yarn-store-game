@@ -1,7 +1,7 @@
 // The stage as terrain: the solids a body stands on and is pushed out of, the patches it stands in (syrup, butter,
 // trampolines), the band it stays in (REUSE-SPEC.md §Navigation). Knows nothing of fighting or donuts: any game on these
 // stages can use it. State it reads: `s.stage`, `s.band`, `s.solids`; bricks: `s.bricks`, `s.floorBoxes`.
-import { BRICK, TICK_HZ, coreOf, groundOf, outside } from './match.js';
+import { BRICK, TICK_HZ, clamp, coreOf, groundOf, outside } from './match.js';
 
 export const DT = 1 / TICK_HZ;
 export const EPS = 1e-6;
@@ -13,7 +13,7 @@ export const GRAVITY = 30;
 export const LEDGE_MARGIN = 0.05;
 export const CELL = 0.2;
 
-export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+export { clamp };
 
 export const flat = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 export const inXZ = (b, x, z) => outside(b, x, z) === 0;

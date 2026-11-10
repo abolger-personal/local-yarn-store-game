@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { createControls, floorPoint, floorTop, pickTarget, walkTarget } from './controls.js';
+import { createControls, floorPoint, pickTarget, walkTarget } from './controls.js';
 import { createMatch as createSim, snapshot as simSnap, tick as simTick } from './sim.js';
-import { TICK_HZ } from './match.js';
+import { TICK_HZ, floorTop } from './match.js';
 import { TUTORIAL } from './levels.js';
 
 const { stage: STAGE } = TUTORIAL;

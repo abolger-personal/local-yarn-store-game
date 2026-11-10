@@ -1,6 +1,6 @@
 // Taps to Inputs (REUSE-SPEC.md §Navigation: tap to move). Classification is pure; the DOM glue is thin.
 import * as THREE from 'three';
-import { BRICK, outside } from './match.js';
+import { BRICK, floorTop, outside } from './match.js';
 import { POWERS } from './combat.js';
 
 /** @typedef {import('./match.js').Snapshot} Snapshot @typedef {import('./match.js').Target} Target */
@@ -11,21 +11,12 @@ export const TAP_RADIUS = { donut: 0.55, foe: 0.55, me: 0.35, jump: 0.5, shelf: 
 export const DONUT_UP = 0.2;
 export const SHELF_UP = 0.65;
 
-const inside = (f, x, z) => outside(f, x, z) === 0;
-
-/** The highest floor top at (x, z) no higher than maxY, or null off the stage. @param {Stage} stage */
-export function floorTop(stage, x, z, maxY = Infinity) {
-  let top = null;
-  for (const f of stage.floors) if (f.y <= maxY && inside(f, x, z) && (top === null || f.y > top)) top = f.y;
-  return top;
-}
-
 /** The nearest floor top a ray crosses. @param {Stage} stage @param {Ray} ray */
 function topHit(stage, { origin: o, direction: d }) {
   let best = null;
   for (const f of stage.floors) {
     const t = (f.y - o.y) / d.y, x = o.x + d.x * t, z = o.z + d.z * t;
-    if (t > 0 && inside(f, x, z) && !(best && best.t < t)) best = { t, x, z };
+    if (t > 0 && outside(f, x, z) === 0 && !(best && best.t < t)) best = { t, x, z };
   }
   return best;
 }

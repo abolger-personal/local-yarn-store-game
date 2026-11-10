@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { LOOK } from '../characters/garments.js';
 import { POSES } from '../characters/npc.js';
-import { CANE, MIC, NEEDLES, SAI, SPECIES, STAFF, YARN_BALLS, stepFighter, animateFighter, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
+import { CANE, MIC, NEEDLES, SCISSORS, SPECIES, STAFF, YARN_BALLS, stepFighter, animateFighter, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
 import { CLOTH, COLOURS, PALETTE, PRESETS, SCARF_FORMS, SWEATER_WORKS, TURTLE_COLOURS, WEAR, newHero, randomHero, readHero } from './hero.js';
 
 LOOK.viewPx = 0;
@@ -58,9 +58,9 @@ for (const work of SWEATER_WORKS) {
   disposeFighter(buildFighter({ ...jumpsuit, look: { ...jumpsuit.look, sweaterWork: work } }, PALETTE));
 }
 assert.equal(outfitOf({ ...jumpsuit.look, sweaterWork: 'stripes' }).sweater.colorCount, 1, 'a fighter (no palette) keeps a one-colour sweater');
-// Raphael (red) has his sai and red socks; the mouse is Master Splinter, with his cane, hanging down to the floor at rest
+// Raphael (red) has his knitting needles and red socks; the mouse is Master Splinter, with his cane, hanging down to the floor at rest
 const raph = newHero(() => 0.65);
-assert.deepEqual([raph.look.scarfColor, raph.look.hands, raph.look.socksColor], [COLOURS[3].hex, SAI, COLOURS[3].hex]);
+assert.deepEqual([raph.look.scarfColor, raph.look.hands, raph.look.socksColor], [COLOURS[3].hex, NEEDLES, COLOURS[3].hex]);
 assert.equal(newHero(() => 0, 'mouse').look.hands, CANE);
 for (const species of SPECIES) {
   const built = buildFighter({ ...newHero(() => 0, species), look: { ...newHero(() => 0).look, hands: CANE } });
@@ -81,13 +81,13 @@ for (const species of SPECIES) {
 // Donatello (purple): a cowl, a fanny pack and his bo staff, a giant drop spindle held in both hands
 const donnie = newHero(() => 0.45).look;
 assert.deepEqual([donnie.scarf, donnie.bag, donnie.socks, donnie.hands], ['cowl', 'crossbody pouch', 'knee-high', STAFF]);
-// Leonardo (blue): high boots and a knitting needle in each hand, gone again when he puts them down
+// Leonardo (blue): high boots and a half of his scissors in each hand, gone again when he puts them down
 const leo = buildFighter(newHero(() => 0.25));
 const pair = leo.sword.userData.pair;
-assert.ok(pair?.parent && leo.sword.parent !== pair.parent, 'a needle in each hand');
-assert.deepEqual([newHero(() => 0.25).look.hands, newHero(() => 0.25).look.socks], [NEEDLES, 'over-knee']);
+assert.ok(pair?.parent && leo.sword.parent !== pair.parent, 'a half in each hand');
+assert.deepEqual([newHero(() => 0.25).look.hands, newHero(() => 0.25).look.socks], [SCISSORS, 'over-knee']);
 disposeFighter(leo);
-assert.equal(pair.parent, null, 'the left needle goes with the right');
+assert.equal(pair.parent, null, 'the left half goes with the right');
 for (const species of SPECIES) {
   const built = buildFighter({ ...newHero(() => 0.45, species), look: newHero(() => 0.45).look });
   assert.ok(built.sword.userData.both && built.sword.children.length >= 4, `${species}: a two-handed spindle, wood and yarn`);

@@ -122,7 +122,7 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
 - Weapons: the gloves and the heroes' own; not the fighters' sword, Music Scythe or Greathammer (decided 2026-11-10;
   a saved one comes back as gloves). No unlocks yet; tapping again changes the trick. The heroes' own (decided
   2026-11-09):
-  - **Raphael's sai:** a long point and two prongs curving forward from the guard, a white grip.
+  - **The sai** (no longer Raphael's): a long point and two prongs curving forward from the guard, a white grip.
   - **Master Splinter's cane:** a giant crochet hook (amended 2026-11-09: a hook's lip, throat and thumb rest, not a
     knob), which hangs straight down at rest like a walking
     stick and swings up out of that into the sword's moves. One length for every animal (amended 2026-11-09, so it
@@ -132,8 +132,12 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
     as the Greathammer but never thrown. A dark handle, a band in the picked colour, a huge faceted silver grille,
     about half her height. It has the sword's effects, off the grille; April's preset starts on ✨ the stars
     (decided 2026-11-10), and tapping the mic again goes through the rest.
-  - **Leonardo's katanas are a pair of knitting needles** (decided 2026-11-09), one in each hand: the right held
-    and swung as the sword, the left held up at the sword's rest. Long points, a knob on each end.
+  - **Leonardo's katanas are giant kid's safety scissors** (decided 2026-11-10), a half in each hand, so at rest
+    they read as his two katanas: a long blade with a rounded tip, a chunky handle loop round the hand in the
+    picked colour, a pivot screw. The right swung as the sword, the left held up at the sword's rest. Brainstorm
+    2026-11-10: snipping shut as a hit lands.
+  - **Raphael's sai are a pair of knitting needles** (decided 2026-11-10: stabbing, in pairs, like sai), one in each
+    hand, held as Leonardo's scissors are. Long points, a knob on each end. The sai stays pickable.
   - **Michelangelo's nunchucks are two balls of yarn on one strand** (decided 2026-11-09, "more fun to animate"),
     held by the middle, swung as the sword. Each ball swings on its strand as a pendulum hung from the hand, so a punch
     flings them out and they swing back on their own. No tricks yet. A throw that spins out and comes back like the
@@ -143,12 +147,12 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
     whorl near the top with a hook above it, and a cop of spun yarn in the picked colour under the whorl, wound
     round in a spiral, its strand running up over the whorl to the hook. The hands hold the bare shaft below it.
 - **Each turtle's own things** (decided 2026-11-09), on top of the turtle-colour scarf:
-  - **Raphael** (red): his sai and red over-knee socks.
+  - **Raphael** (red): his knitting needles and red over-knee socks.
   - **Donatello** (purple), nerdy: a cowl, a fanny pack (the crossbody pouch), purple knee-high socks and his bo staff.
   - **Michelangelo** (orange), happy-go-lucky: an open scarf (long, draped), short orange socks, an orange backpack,
     cheek-slash face paint, and his balls of yarn.
   - **Leonardo** (blue), straight-laced: the trailing scarf, high blue boots (over-knee socks), a blue drawstring bag
-    and his knitting needles.
+    and his safety scissors.
   - **Master Splinter** (the sixth preset, decided 2026-11-10): an orange mouse in a red vest and white crew socks,
     with his cane in red. Picking the mouse for any hero gives the cane.
   - **April** (the fifth default), leggy: **an orange llama** (amended 2026-11-09) in her jumpsuit (the yellow
@@ -184,7 +188,7 @@ Sweater. Heroes don't get them. The design is open.
 ## Open questions
 
 - **Which theme?** Pick from the list in §The game.
-- **Should Raphael hold a sai in each hand,** now that Leonardo's needles show two can be held?
+- **Does the sai stay,** or go now that no turtle has it? Fibre-arts look-alikes: a lucet, a seam ripper.
 - **Are weapons unlocked?** Unlocks from the fighting game carry over, or start fresh?
 - **Which scarf colour does each player get?** One of the four at random, or each tablet in a room a different
   one, so a full room reads as the four turtles? A fifth player in taxi yellow would be the April.

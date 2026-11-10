@@ -46,6 +46,7 @@ export const HAND_ICON = Object.freeze({
     + '<rect x="9" y="1" width="30" height="16" rx="1" fill="#3a3a3e"/><path d="M9 6h30M14 1v16M33 1v16" stroke="#17171a" stroke-width="2"/><path d="M18 4l3 5-2 4M29 10l-4 3" stroke="currentColor" stroke-width="1.4" fill="none"/></g>',
   cane: '<g transform="rotate(35 24 24)"><path d="M21.5 46V10h5v36Z"/><rect x="20" y="30" width="8" height="8" rx="2"/><path d="M24 2a4 4 0 0 1 4 4v4h-3V7a1 1 0 0 0-2 0v2h-3V6a4 4 0 0 1 4-4Z"/></g>',
   mic: '<g transform="rotate(35 24 24)"><rect x="20" y="20" width="8" height="26" rx="3" fill="#2a2628"/><rect x="18.5" y="19" width="11" height="5" rx="2"/><circle cx="24" cy="11" r="10" fill="#c9ccd2"/><path d="M15 8h18M14 12h20M16 16h16M20 2v18M28 2v18" stroke="#8a8e96" stroke-width="1.3"/></g>',
+  scissors: '<g transform="rotate(35 24 24)"><path d="M21 28 18 4c3-1 5 0 5 2l2 22Z" fill="#c9ccd2"/><path d="M27 28 30 4c-3-1-5 0-5 2l-2 22Z" fill="#dfe2e7"/><circle cx="18" cy="37" r="6" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="30" cy="37" r="6" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="24" cy="27" r="2" fill="#666"/></g>',
   needles: '<g stroke="currentColor" stroke-width="4" stroke-linecap="round"><path d="M10 40 36 6M38 40 12 6"/></g><circle cx="9" cy="41" r="4.5"/><circle cx="39" cy="41" r="4.5"/>',
   yarn: '<path d="M24 6c-6 0-9 6-9 10M24 6c6 0 9 6 9 10" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="13" cy="28" r="9"/><circle cx="35" cy="32" r="9"/><path d="M7 25c4 2 8 2 12 0M7 31c4 2 8 2 12 0M29 29c4 2 8 2 12 0M29 35c4 2 8 2 12 0" stroke="#fff8" stroke-width="1.5" fill="none"/>',
   staff: '<g transform="rotate(35 24 24)"><path d="M22 6h4l-.5 40-1.5 2-1.5-2Z" fill="#a8743f"/><rect x="13" y="8" width="22" height="5" rx="2.5" fill="#a8743f"/><path d="M24 14c6 3 6 13 0 17-6-4-6-14 0-17Z"/><path d="M19 18l10 2M18.5 22l11 2M19 26l10 2" stroke="#fff8" stroke-width="1.3"/><path d="M26 6c0-3-4-3-4-1" fill="none" stroke="#a8743f" stroke-width="1.5"/></g>',
@@ -54,12 +55,12 @@ export const HAND_ICON = Object.freeze({
 // what flies off the hitting glove or the blade's tip as it lands; tapping the picked one goes to the next. The scythe's is fixed.
 const SWORD_TRICKS = Object.freeze(['sparkle', 'bubble', 'flame', 'bebop', 'shootingStar', 'bubblegumPop', 'smiteOfLight', 'speedLines', 'lightningStorm', 'atomicBall']);
 // tmnt/REUSE-SPEC.md §Hero chooser: Master Splinter's cane and Raphael's sai, a hero's only (not in HANDS), with the sword's tricks
-export const CANE = 'cane', SAI = 'sai', STAFF = 'staff', YARN_BALLS = 'yarn', NEEDLES = 'needles', MIC = 'mic';
+export const CANE = 'cane', SAI = 'sai', STAFF = 'staff', YARN_BALLS = 'yarn', NEEDLES = 'needles', MIC = 'mic', SCISSORS = 'scissors';
 export const TRICKS = Object.freeze({
   gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame', 'bebop', 'starPunch', 'fireball', 'loveTap', 'bubblegumPop', 'powerPuff', 'magicStar', 'heartBlast', 'smiteOfLight', 'speedLines', 'lightningStorm', 'atomicBall']), sword: SWORD_TRICKS, scythe: Object.freeze(['music']),
   // lightning first: a trick the hammer doesn't have falls back to it
   hammer: Object.freeze(['lightning', 'zap']),
-  [CANE]: SWORD_TRICKS, [SAI]: SWORD_TRICKS, [NEEDLES]: SWORD_TRICKS, [MIC]: SWORD_TRICKS, [STAFF]: Object.freeze(['music']), [YARN_BALLS]: Object.freeze(['plain']),
+  [CANE]: SWORD_TRICKS, [SAI]: SWORD_TRICKS, [NEEDLES]: SWORD_TRICKS, [MIC]: SWORD_TRICKS, [SCISSORS]: SWORD_TRICKS, [STAFF]: Object.freeze(['music']), [YARN_BALLS]: Object.freeze(['plain']),
 });
 // REUSE-SPEC.md §Fighter chooser: the levels a player must have beaten for the chooser to offer each
 const UNLOCK = Object.freeze({ sword: 1, scythe: 2, hammer: 4 });
@@ -648,16 +649,40 @@ function needleGeometry() {
   return needleGeo;
 }
 
-function addNeedles(built, color) {
-  const geo = needleGeometry(), right = holdBlade(built, [new THREE.Mesh(geo.needle, candy(color))], geo, { tip: NEEDLE.point + NEEDLE.tip });
-  const { parent, at } = gloveAnchors(built)[1], left = new THREE.Group().add(new THREE.Mesh(geo.needle, candy(color)));
-  left.children[0].castShadow = true;
+/** A weapon in each hand: `parts()` held as the sword in the right, another set held up at rest in the left. */
+function holdPair(built, parts, geo, userData) {
+  const right = holdBlade(built, parts(), geo, userData);
+  const { parent, at } = gloveAnchors(built)[1], left = new THREE.Group().add(...parts());
+  for (const m of left.children) m.castShadow = true;
   left.position.set(...at);
   parent.add(left);
   right.userData.pair = left;
   swingSword(built, null);
   return right;
 }
+
+const addNeedles = (built, color) =>
+  holdPair(built, () => [new THREE.Mesh(needleGeometry().needle, candy(color))], needleGeometry(), { tip: NEEDLE.point + NEEDLE.tip });
+
+// tmnt/REUSE-SPEC.md §Hero chooser: Leonardo's katanas are giant kid's safety scissors, a half in each hand: a long blade
+// with a rounded tip (flat to the side-on camera), a chunky handle loop in the picked colour round the hand, a pivot screw
+const SNIP = { blade: 0.28, root: 0.03, wide: 0.032, loop: 0.036 };
+let scissorGeo = null;
+function scissorGeometry() {
+  const { blade, root, wide, loop } = SNIP, s = new THREE.Shape().moveTo(root, -wide * 0.35).lineTo(blade - 0.02, -wide * 0.25)
+    .quadraticCurveTo(blade + 0.015, wide * 0.1, blade - 0.02, wide * 0.5).lineTo(root, wide * 0.65).lineTo(root, -wide * 0.35);
+  scissorGeo ??= {
+    blade: mergeGeometries([sideOn(s, 0.012), new THREE.CylinderGeometry(0.009, 0.009, 0.02, 10).rotateZ(Math.PI / 2).translate(0, 0, root + 0.008)]),
+    loop: new THREE.TorusGeometry(loop, 0.012, 8, 20).rotateY(Math.PI / 2).translate(0, 0, root - loop * 0.9),
+    ...swooshGeometry(0.06, blade, 0.11, blade * 0.8),
+  };
+  return scissorGeo;
+}
+
+const addScissors = (built, color) => holdPair(built, () => [
+  new THREE.Mesh(scissorGeometry().blade, new THREE.MeshStandardMaterial({ color: '#d4d7dc', roughness: 0.3, metalness: 0.7 })),
+  new THREE.Mesh(scissorGeometry().loop, candy(color)),
+], scissorGeometry(), { tip: SNIP.blade });
 
 // tmnt/REUSE-SPEC.md §Hero chooser: April's comically oversize microphone, wielded as the Greathammer but never thrown:
 // a dark handle, a band in the picked colour, a huge faceted silver grille
@@ -712,7 +737,7 @@ function reachPole(built, w) {
 function removeSword(built) {
   built.sword?.removeFromParent();
   built.sword?.userData.pair?.removeFromParent();
-  built.sword?.userData.pair?.children[0].material.dispose();
+  for (const o of built.sword?.userData.pair?.children ?? []) o.material.dispose();
   for (const o of built.sword?.children ?? []) if (o instanceof THREE.Mesh) o.material.dispose();
   built.sword = null;
 }
@@ -1630,7 +1655,7 @@ export function stepTricks(built, punch, dt) {
 // readability in a match
 const PLAIN = typeof location !== 'undefined' && new URLSearchParams(location.search).has('plain');
 export const LOOKS = Object.freeze(Object.fromEntries(['lookAt', 'eyeGlint', 'painterly', 'shapedFaces'].map((k) => [k, !PLAIN])));
-const HOLD = { gloves: addGloves, sword: addSword, scythe: addScythe, hammer: addHammer, [CANE]: addCane, [SAI]: addSai, [STAFF]: addStaff, [YARN_BALLS]: addYarn, [NEEDLES]: addNeedles, [MIC]: addMic };
+const HOLD = { gloves: addGloves, sword: addSword, scythe: addScythe, hammer: addHammer, [CANE]: addCane, [SAI]: addSai, [STAFF]: addStaff, [YARN_BALLS]: addYarn, [NEEDLES]: addNeedles, [MIC]: addMic, [SCISSORS]: addScissors };
 
 /** Same order as the shop's `dressedCharacter` (store/sim/cast.js): dress unmerged, then merge. @param {Fighter} f */
 /** @param {string[]} [palette] the colours a hero's sweater colourwork is worked in */

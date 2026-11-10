@@ -122,17 +122,22 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
 - Weapons: the fighters' four (gloves, sword, Music Scythe, Greathammer), plus two of the heroes' own, no unlocks
   yet; tapping again changes the trick. Both are held and swung as the sword, with its tricks (decided 2026-11-09):
   - **Raphael's sai:** a long point and two prongs curving forward from the guard, a white grip.
-  - **Master Splinter's cane:** a club with a round knob on the end, which hangs straight down at rest like a walking
+  - **Master Splinter's cane:** a giant crochet hook (amended 2026-11-09: a hook's lip, throat and thumb rest, not a
+    knob), which hangs straight down at rest like a walking
     stick and swings up out of that into the sword's moves. One length for every animal (amended 2026-11-09, so it
-    reaches as far on all of them): a hand nearer the floor grips it further down the shaft, so the knob just clears
+    reaches as far on all of them): a hand nearer the floor grips it further down the shaft, so the hook just clears
     the floor and the rest stands up past the hand.
+  - **Michelangelo's nunchucks are two balls of yarn on one strand** (decided 2026-11-09, "more fun to animate"),
+    held by the middle, swung as the sword. Each ball swings on its strand as a pendulum hung from the hand, so a punch
+    flings them out and they swing back on their own. No tricks yet. A throw that spins out and comes back like the
+    Greathammer's (`spinoff/hammer.js`) is planned 2026-11-09.
   - **Donatello's bo staff:** held in both hands and swung as the Music Scythe, with no blade; longer, for reach. A
     wooden pole with its grip wrapped in knitting (the scarves' stockinette) in the picked colour.
 - **Each turtle's own things** (decided 2026-11-09), on top of the turtle-colour scarf:
   - **Raphael** (red): his sai and red over-knee socks.
   - **Donatello** (purple): his bo staff.
   - **Michelangelo** (orange), happy-go-lucky: an open scarf (long, draped), short orange socks, an orange backpack,
-    cheek-slash face paint, and gloves until his nunchucks exist.
+    cheek-slash face paint, and his balls of yarn.
   - **Leonardo** (blue): the sword, for now.
   - **Master Splinter**: picking the mouse gives the cane.
 - 🎲 any animal, colours and pieces. 👍 saves; there is no lobby to go to yet.
@@ -164,8 +169,6 @@ Sweater. Heroes don't get them. The design is open.
 ## Open questions
 
 - **Which theme?** Pick from the list in §The game.
-- **Michelangelo's nunchucks:** circular needles, two needle tips on a cable (brainstorm 2026-11-09)? Thrown and
-  spinning back like the Greathammer's throw (`spinoff/hammer.js`).
 - **Leonardo:** is the sword his, or katanas? Should Raphael hold a sai in each hand?
 - **Are weapons unlocked?** Unlocks from the fighting game carry over, or start fresh?
 - **Which scarf colour does each player get?** One of the four at random, or each tablet in a room a different

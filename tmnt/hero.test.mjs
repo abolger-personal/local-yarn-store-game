@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { LOOK } from '../characters/garments.js';
-import { CANE, SAI, SPECIES, STAFF, animateFighter, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
+import { POSES } from '../characters/npc.js';
+import { CANE, SAI, SPECIES, STAFF, YARN_BALLS, stepFighter, animateFighter, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
 import { CLOTH, COLOURS, PALETTE, SCARF_FORMS, SWEATER_WORKS, TURTLE_COLOURS, WEAR, newHero, randomHero, readHero } from './hero.js';
 
 LOOK.viewPx = 0;
@@ -84,5 +85,20 @@ for (const species of SPECIES) {
   assert.ok(built.sword.userData.both && knit === 1, `${species}: a two-handed staff with a knitted wrap`);
   disposeFighter(built);
 }
+// Michelangelo (orange) has his balls of yarn: hanging from the hand a ball apart, off the floor, flung out by a punch
+const mikey = buildFighter(newHero(() => 0.05));
+assert.equal(newHero(() => 0.05).look.hands, YARN_BALLS);
+for (let i = 0; i < 180; i++) animateFighter(mikey, 1 / 60);
+const hand = mikey.root.worldToLocal(mikey.sword.getWorldPosition(new THREE.Vector3())), balls = mikey.sword.userData.balls;
+for (const b of balls) assert.ok(b.p.y < hand.y && b.p.y >= 0.04 && Math.abs(b.p.distanceTo(hand) - b.len) < 0.01, `a ball hangs on its strand (${b.p.distanceTo(hand).toFixed(3)} of ${b.len})`);
+assert.ok(balls[0].p.distanceTo(balls[1].p) >= 0.084 - 1e-6, 'the balls a ball apart');
+const rest = balls.map((b) => b.p.clone());
+let flung = 0;
+for (let i = 0; i <= 30; i++) {
+  stepFighter(mikey, 1 / 60, POSES.rest, 0, { name: 'cross', arm: -1, step: i / 60 });
+  flung = Math.max(flung, ...balls.map((b, j) => b.p.distanceTo(rest[j])));
+}
+assert.ok(flung > 0.2, `a cross flings the yarn (${flung.toFixed(2)})`);
+disposeFighter(mikey);
 for (let i = 0; i < 6; i++) disposeFighter(buildFighter(randomHero()));
 console.log('hero ok');

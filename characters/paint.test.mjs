@@ -11,6 +11,8 @@ const paramsOf = (id, extra = {}) => ({ ...BASE_PARAMS, ...getSpecies(id).defaul
 const hsl = (rgb) => new THREE.Color(...rgb).getHSL({ h: 0, s: 0, l: 0 });
 const chroma = (rgb) => Math.max(...rgb) - Math.min(...rgb);
 const saturation = (rgb) => chroma(rgb) / Math.max(...rgb, 1e-9);
+// merged accent pieces are lifted 2 tiles in uv
+const lifted = (uv) => Array.from({ length: uv.count }, (_, i) => uv.getY(i)).filter((y) => y > 1.5).length;
 
 // the fur ramp: lit is brighter and as saturated (no grey wash), shadow deeper and more saturated, in the same family
 for (const hex of ['#3a5fcd', '#c8752e', '#8f8f96', '#4caf50', '#e8d9bd', '#6e4220']) {
@@ -52,11 +54,7 @@ for (const id of speciesIds()) {
   const shader = { uniforms: {}, vertexShader: THREE.ShaderLib.physical.vertexShader, fragmentShader: THREE.ShaderLib.physical.fragmentShader };
   felt(on)[0].onBeforeCompile(shader);
   assert.ok(!style || shader.vertexShader.includes('vPaintUv = uv') && shader.fragmentShader.includes('outgoingLight = paintC'), `${id}: the paint never reaches the shader`);
-  const draws = (painterly) => {
-    let n = 0;
-    createCharacter(paramsOf(id, { painterly, mergeMeshes: true }), id).root.traverse((o) => { if (o.isMesh) n++; });
-    return n;
-  };
+  const draws = (painterly) => createCharacter(paramsOf(id, { painterly, mergeMeshes: true }), id).root.getObjectsByProperty('isMesh', true).length;
   assert.equal(draws(true), draws(false), `${id}: painted and merged, the character costs more draws`);
 }
 
@@ -71,9 +69,7 @@ for (const id of speciesIds()) {
   merged.root.traverse((o) => { if (o.userData.merged && o.material.userData.paint) ink.push(o); });
   assert.equal(ink.length, 1, 'the merged owl is not one ink draw');
   assert.notEqual(ink[0].material.onBeforeCompile, THREE.Material.prototype.onBeforeCompile, 'merged, the owl loses its ink shader');
-  const uv = ink[0].geometry.attributes.uv;
-  let accented = 0;
-  for (let i = 0; i < uv.count; i++) accented += uv.getY(i) > 1.5 ? 1 : 0;
+  const { uv } = ink[0].geometry.attributes, accented = lifted(uv);
   assert.ok(accented > 0 && accented < uv.count, `merged, ${accented} of ${uv.count} owl vertices are marked as plumage`);
 }
 // BODIES.md §Painterly, accent pieces: the mane and the wool take their own fur stroke size; merged, they are the only
@@ -81,19 +77,11 @@ for (const id of speciesIds()) {
 for (const [id, key] of [['lion', 'mane'], ['llama', 'fleece']]) {
   const kit = createCharacter(paramsOf(id, { painterly: true }), id);
   assert.ok(kit.mat[key].userData.accent && kit.materials.every((m) => m === kit.mat[key] || !m.userData.accent), `${id}: the ${key} is not its only accent piece`);
-  let lifted = 0, accentVerts = 0;
-  kit.root.traverse((o) => {
-    if (!o.isMesh || !o.geometry.attributes.uv) return;
-    const { uv } = o.geometry.attributes;
-    for (let i = 0; i < uv.count; i++) lifted += uv.getY(i) > 1.5 ? 1 : 0;
-  });
-  assert.equal(lifted, 0, `${id}: unmerged, a part's uv already reads as an accent piece`);
+  let unmerged = 0, accentVerts = 0;
+  kit.root.traverse((o) => { if (o.isMesh && o.geometry.attributes.uv) unmerged += lifted(o.geometry.attributes.uv); });
+  assert.equal(unmerged, 0, `${id}: unmerged, a part's uv already reads as an accent piece`);
   const merged = createCharacter(paramsOf(id, { painterly: true, mergeMeshes: true }), id);
-  merged.root.traverse((o) => {
-    if (!o.userData.merged || !o.material.userData.paint) return;
-    const { uv } = o.geometry.attributes;
-    for (let i = 0; i < uv.count; i++) accentVerts += uv.getY(i) > 1.5 ? 1 : 0;
-  });
+  merged.root.traverse((o) => { if (o.userData.merged && o.material.userData.paint) accentVerts += lifted(o.geometry.attributes.uv); });
   assert.ok(accentVerts > 0, `${id}: merged, the ${key} is not marked as an accent piece`);
 }
 {

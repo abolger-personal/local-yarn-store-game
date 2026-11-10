@@ -55,11 +55,7 @@ function pixelsOf(built, camera, group) {
   return n;
 }
 
-const named = (built, name) => {
-  const out = [];
-  built.root.traverse((o) => { if (o.name === name) out.push(o); });
-  return out;
-};
+const named = (built, name) => built.root.getObjectsByProperty('name', name);
 
 // look-at: the head turns toward the camera, and more of the eyes show from the match camera
 for (const id of speciesIds()) {
@@ -154,11 +150,7 @@ for (const id of speciesIds()) {
   }
   const [glint] = named(createCharacter(paramsOf(id), id), 'glint');
   assert.ok(glint.material.userData.family === 'eye' && glint.material.color.getHex() === 0xffffff, `${id}: the glint is not a white glassy eye part`);
-  const draws = (extra) => {
-    let n = 0;
-    createCharacter(paramsOf(id, { mergeMeshes: true, ...extra }), id).root.traverse((o) => { if (o.isMesh) n++; });
-    return n;
-  };
+  const draws = (extra) => createCharacter(paramsOf(id, { mergeMeshes: true, ...extra }), id).root.getObjectsByProperty('isMesh', true).length;
   for (const facePaint of PAINTED) assert.equal(draws({ facePaint }), draws({ eyeGlint: false }), `${id}: ${facePaint} face paint adds draws`);
 }
 

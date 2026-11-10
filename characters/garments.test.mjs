@@ -24,6 +24,10 @@ const craftOf = (stitch) => Object.keys(STITCHES_BY_CRAFT).find((c) => STITCHES_
 const boxOf = (mesh) => new THREE.Box3().setFromObject(mesh);
 const bandOf = (built) => built.garments.find((m) => m.isSkinnedMesh);
 const onNeck = (mesh) => (i) => mesh.geometry.attributes.skinWeight.getY(i) > 0.5;
+const worldYs = (built, m) => {
+  built.root.updateMatrixWorld(true);
+  return Array.from({ length: m.geometry.attributes.position.count }, (_, i) => m.getVertexPosition(i, new THREE.Vector3()).applyMatrix4(m.matrixWorld).y);
+};
 
 {
   let n = 0;
@@ -830,15 +834,11 @@ for (const id of speciesIds()) {
   const built = build(id), fit = bodyFit(built), f = fabric(item('scarf'));
   dress(built, { scarf: item('scarf', { silhouette: 'trailing', form: 'wrapped once', edge: 'none', accessory: 'none' }) });
   const m = bandOf(built), v = new THREE.Vector3();
-  const world = () => {
-    built.root.updateMatrixWorld(true);
-    return Array.from({ length: m.geometry.attributes.position.count }, (_, i) => m.getVertexPosition(i, new THREE.Vector3()).applyMatrix4(m.matrixWorld).y);
-  };
-  const still = world(), floorY = Math.min(...still);
+  const still = worldYs(built, m), floorY = Math.min(...still);
   const lying = still.map((y, i) => (y < floorY + f.thick * 2.5 ? i : -1)).filter((i) => i >= 0);
   assert.ok(lying.length > 20, `${id}: only ${lying.length} vertices of a trailing scarf lie on the floor`);
   built.joints.spine.rotation.x = 0.45;
-  const leant = world();
+  const leant = worldYs(built, m);
   const rose = Math.max(...lying.map((i) => leant[i] - still[i]));
   assert.ok(rose < f.thick, `${id}: leaning forward lifts the trailing scarf ${rose.toFixed(3)} off the floor -- it should stay down`);
   built.joints.spine.rotation.x = 0;
@@ -870,18 +870,13 @@ for (const id of speciesIds()) {
 for (const id of speciesIds()) {
   const built = build(id), f = fabric(item('scarf'));
   const m = dress(built, { scarf: item('scarf', { silhouette: 'trailing', form: 'wrapped once', edge: 'none', accessory: 'none' }) }).find((g) => g.isSkinnedMesh);
-  const v = new THREE.Vector3();
-  const world = () => {
-    built.root.updateMatrixWorld(true);
-    return Array.from({ length: m.geometry.attributes.position.count }, (_, i) => m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld).y);
-  };
-  const still = world(), floorY = Math.min(...still);
+  const still = worldYs(built, m), floorY = Math.min(...still);
   const lying = still.map((y, i) => (y < floorY + f.thick * 2.5 ? i : -1)).filter((i) => i >= 0);
   let moved = 0;
   for (const [pose, rise] of [['att-prep', 0], ['att-hold', 0.02]]) {
     applyPose(built, DANCE_POSES[pose]);
     built.root.position.y += rise;
-    const now = world();
+    const now = worldYs(built, m);
     moved = Math.max(moved, ...lying.map((i) => Math.abs(now[i] - still[i])));
   }
   assert.ok(moved < 0.005, `${id}: the attitude moves the trailing scarf's floor run ${moved.toFixed(3)} up or down -- it should lie still on the floor`);

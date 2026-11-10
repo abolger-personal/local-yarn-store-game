@@ -14,7 +14,8 @@ const GREEN = COLOURS[4].hex, TAXI = COLOURS[5].hex;
 export const TURTLE_COLOURS = COLOURS.slice(0, 4);
 export const PALETTE = COLOURS.map((c) => c.hex);
 // REUSE-SPEC.md §Hero chooser: clothes also come in white (April's boots), fur never
-export const CLOTH = Object.freeze([...COLOURS, Object.freeze({ hex: '#ffffff', name: 'white' })]);
+const WHITE = '#ffffff';
+export const CLOTH = Object.freeze([...COLOURS, Object.freeze({ hex: WHITE, name: 'white' })]);
 // REUSE-SPEC.md §Hero chooser: the sweater, tapped again, in the next colourwork, so it reads as a sweater when small
 export const SWEATER_WORKS = COLOURWORKS;
 
@@ -37,8 +38,8 @@ const blankLook = () => ({
 });
 
 const scarfLook = (colour) => ({ ...blankLook(), scarf: 'trailing', scarfColor: colour, gloves: colour });
-// REUSE-SPEC.md §Hero chooser: April's jumpsuit is a yellow sweater and yellow socks
-const jumpsuitLook = () => ({ ...blankLook(), sweater: 'pullover', sweaterColor: TAXI, socks: 'over-knee', socksColor: TAXI, gloves: TAXI });
+// REUSE-SPEC.md §Hero chooser: April's jumpsuit is a yellow sweater, her boots white socks
+const jumpsuitLook = () => ({ ...blankLook(), sweater: 'pullover', sweaterColor: TAXI, socks: 'knee-high', socksColor: WHITE, gloves: TAXI });
 
 /** A turtle in one of the four turtles' scarves, or in April's jumpsuit. @returns {Hero} */
 export function newHero(rng = Math.random, species = 'turtle') {

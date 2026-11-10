@@ -15,7 +15,7 @@ for (const r of [0, 0.25, 0.45, 0.65, 0.95]) {
   const { species, look } = newHero(() => r);
   assert.equal(species, 'turtle');
   if (look.scarf) assert.ok(TURTLE_COLOURS.some((c) => c.hex === look.scarfColor), 'a turtle colour scarf');
-  else assert.ok(look.sweater && look.socks && look.sweaterColor === look.socksColor && look.socksColor === COLOURS[5].hex, 'the jumpsuit is taxi yellow');
+  else assert.ok(look.sweater && look.socks && look.sweaterColor === COLOURS[5].hex && look.socksColor === '#ffffff', 'a taxi yellow jumpsuit, white boots');
   looks.add(look.scarf ? look.scarfColor : 'jumpsuit');
 }
 assert.equal(looks.size, 5, 'all four scarves and the jumpsuit come up');

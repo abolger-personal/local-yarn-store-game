@@ -100,8 +100,8 @@ chooser. The turtle is only the default.
 
 **The defaults** (decided 2026-11-09): a turtle in turtle green wearing either
 - **a scarf** in one of orange, blue, purple or red (the four turtles), or
-- **a yellow jumpsuit** in taxi yellow (April), which is a yellow `sweater` and yellow `socks` from the existing
-  wardrobe (`characters/garments.js`), not a new garment;
+- **a yellow jumpsuit** in taxi yellow (April), which is a yellow `sweater` from the existing wardrobe
+  (`characters/garments.js`), not a new garment, with **white boots**: white knee-high `socks` (amended 2026-11-09);
 
 with **a weapon** (the sword for now; which one is open) and no hat.
 

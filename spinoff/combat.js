@@ -16,16 +16,16 @@ export const MATCH = Object.freeze({ friendlyFire: false, badGuysHit: true });
 export const canHit = (a, b, match = MATCH) => a.id !== b.id && (a.team !== b.team || match.friendlyFire)
   && (match.badGuysHit !== false || a.team !== 'badGuys' || b.team !== 'heroes');
 
-export const LUNGE = 0.3;
+const LUNGE = 0.3;
 export const LUNGE_RANGE = 0.8;
 const LUNGE_KEEP = 0.1;
 
-export const LAUNCH_SPEED = 5;
+const LAUNCH_SPEED = 5;
 /** Untouched this long, a fighter steadies: percent (and its wobble) drains at CALM_DRAIN a second. */
 export const CALM_TICKS = 1.5 * TICK_HZ;
 export const CALM_DRAIN = 30;
-export const STUN_TICKS = 8;
-export const STUN_PER_SPEED = 2;
+const STUN_TICKS = 8;
+const STUN_PER_SPEED = 2;
 /** A hit chain (REUSE-SPEC.md §Power moves): hits landed with no miss, no hit taken, and no pause this long. */
 const CHAIN_TICKS = 2.5 * TICK_HZ;
 
@@ -35,7 +35,7 @@ const CROWD_TICKS = TICK_HZ;
 /** What a full bar fires (Input.power): `toy` turns a foe into one of TOY's silly objects for a while. */
 export const POWERS = Object.freeze(['toy']);
 /** A toy's loot pops straight up at this speed (m/s). */
-export const POP = Object.freeze({ vy: 6 });
+const POP = Object.freeze({ vy: 6 });
 export const TOY = Object.freeze({ ticks: 3 * TICK_HZ, knock: 1.5, kinds: Object.freeze(['cottonBall', 'rubberDuck', 'teapot', 'sock']) });
 
 /**
@@ -132,12 +132,17 @@ function frontGap(s, f) {
 /** playtest: a foe that walks past you got away, so with nothing to hit in front an attack turns you to the nearest foe a step away. */
 function faceFoe(s, f, m) {
   if (!m.reach || frontGap(s, f) <= LUNGE_RANGE) return;
-  let best = null, bestGap = LUNGE_RANGE;
+  faceNearest(s, f, LUNGE_RANGE, (o) => Math.abs(o.y - f.y) <= f.h);
+}
+
+function faceNearest(s, f, reach, ok) {
+  let best = null, bestGap = reach;
   for (const o of s.fighters) {
     const gap = flat(f, o) - f.r - o.r;
-    if (canStrike(s, f, o) && Math.abs(o.y - f.y) <= f.h && gap <= bestGap) [best, bestGap] = [o, gap];
+    if (canStrike(s, f, o) && ok(o) && gap <= bestGap) [best, bestGap] = [o, gap];
   }
   if (best && flat(f, best) > EPS) f.facing = Math.atan2(best.z - f.z, best.x - f.x);
+  return best;
 }
 
 /** A stomp steers onto its foe, and hangs before it dives. True while it hangs. */
@@ -155,15 +160,7 @@ export function stompAir(s, f) {
 }
 
 /** The foe a stomp starting now homes onto: the nearest one below within reach, faced. */
-function stompTarget(s, f) {
-  let best = null, bestGap = MOVES.stomp.home.reach;
-  for (const o of s.fighters) {
-    const gap = flat(f, o) - f.r - o.r;
-    if (canStrike(s, f, o) && o.y < f.y && gap <= bestGap) [best, bestGap] = [o, gap];
-  }
-  if (best && flat(f, best) > EPS) f.facing = Math.atan2(best.z - f.z, best.x - f.x);
-  return best?.id ?? null;
-}
+const stompTarget = (s, f) => faceNearest(s, f, MOVES.stomp.home.reach, (o) => o.y < f.y)?.id ?? null;
 
 function lungeFor(s, f, m) {
   const gap = frontGap(s, f);
@@ -240,7 +237,6 @@ function endAttack(f) {
   f.attack = null;
 }
 
-
 function attackStep(s, f) {
   const a = f.attack;
   if (!a || f.still || f.freeze > 0) return;
@@ -278,11 +274,16 @@ function flyHammer(s, hm) {
   if (hm.t >= p.T) { f.chain = 0; return false; }
   const u = d > EPS ? { x: (p.x - hm.x) / d, z: (p.z - hm.z) / d } : ahead(f), sp = { x: p.x, y: p.y, z: p.z, r: HAMMER.r };
   Object.assign(hm, { x: p.x, y: p.y, z: p.z });
+  return !hitFirst(s, f, sp, { id: 'hammer', u }, { ...f, z: p.z }) && !hitBrick(s, sp, 'hammer', f.team);
+}
+
+/** Strikes the first foe of f's that sp touches (reaching as `from`, f by default); true if one was. */
+function hitFirst(s, f, sp, hit, from = f) {
   for (const o of s.fighters) {
-    const c = o.team !== f.team && canStrike(s, { ...f, z: p.z }, o) ? bodyContact(sp, o) : null;
-    if (c) { strike(s, f, o, c, { id: 'hammer', u }); return false; }
+    const c = o.team !== f.team && canStrike(s, from, o) ? bodyContact(sp, o) : null;
+    if (c) { strike(s, f, o, c, hit); return true; }
   }
-  return !hitBrick(s, sp, 'hammer', f.team);
+  return false;
 }
 
 export function attacks(s) {
@@ -343,13 +344,8 @@ function flyShot(s, t) {
   const f = s.fighters.find((o) => o.id === t.by), step = Math.min(t.left, t.speed * DT);
   Object.assign(t, { x: t.x + t.ux * step, z: t.z + t.uz * step, left: t.left - step });
   const sp = { x: t.x, y: t.y, z: t.z, r: MOVES.shot.r };
-  for (const o of s.fighters) {
-    const c = o.team !== f.team && canStrike(s, f, o) ? bodyContact(sp, o) : null;
-    if (c) { strike(s, f, o, c, { id: 'shot', u: { x: t.ux, z: t.uz } }); return false; }
-  }
-  return t.left > EPS;
+  return !hitFirst(s, f, sp, { id: 'shot', u: { x: t.ux, z: t.uz } }) && t.left > EPS;
 }
-
 
 /** 🦶 let go after a hold sweeps; otherwise a free fighter punches, kicks or stomps. */
 // REUSE-SPEC.md §Discoverable moves: 🦶 held and let go is the sweep (the tablet times the hold), on the ground; it cuts

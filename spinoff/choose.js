@@ -158,10 +158,13 @@ const ACTIONS = {
 
 function choose(action, value) {
   const set = ACTIONS[action] ?? ((v) => { fighter.look[action] = v; });
-  const reframe = set(value) === true;
+  commit(set(value) === true);
+}
+
+function commit(reframe, cheers = reframe) {
   saveFighter(fighter);
   rebuild(reframe);
-  if (reframe) cheer = 1.4;
+  if (cheers) cheer = 1.4;
   render();
 }
 
@@ -190,20 +193,14 @@ panel.addEventListener('click', (e) => {
 
 document.getElementById('dice').addEventListener('click', () => {
   fighter = allowed(keepRole(randomFighter()));
-  saveFighter(fighter);
-  rebuild(true);
-  cheer = 1.4;
-  render();
+  commit(true);
 });
 
 // REUSE-SPEC.md §Bad guys, Play a bad guy: 🥷 again is a hero, in the colours saved underneath
 document.getElementById('bad').addEventListener('click', () => {
   const { badGuy: _, ...hero } = fighter;
   fighter = allowed(fighter.badGuy ? hero : { ...fighter, badGuy: true });
-  saveFighter(fighter);
-  rebuild(false);
-  cheer = 1.4;
-  render();
+  commit(false, true);
 });
 
 // dev mode: the effects randomizer, for whoever opened the game with ?debug=1; a kid never sees 🧪

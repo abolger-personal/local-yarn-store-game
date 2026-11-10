@@ -1,7 +1,7 @@
 // The match host: one fixed tick of pure logic, no three.js, no Math.random (REUSE-SPEC.md §Milestones 1). It wires
 // the pieces: world.js (terrain), walk.js (getting round it), combat.js (fighting), build.js (the build round) and
 // donut-game.js (the game they're played for); here are the fighter record, input, the tick and the snapshot.
-import { ROUND_SECONDS, TICK_HZ } from './match.js';
+import { EVENTS, ROUND_SECONDS, TICK_HZ } from './match.js';
 import { cellUnder, fetchStep, fortGrid, pilesFor, readyInput, startWhenReady } from './build.js';
 import { bandOf, brickBox, floorBox, settleBricks } from './world.js';
 import { JUMP_SPEED, SPRING_LIFT, TURN_SPEED, airStep, jump, navigate, reachUp, separate, walkStep } from './walk.js';
@@ -10,11 +10,6 @@ import {
   INVINCIBLE_TICKS, drop, grab, holds, icingOf, leader, makeShelf, powerUp, resolve, ringOut, shelfBox, shelfLooks, shelfOf,
   shelfStep, spawnSpot, stepDonut, teamLooks, touchDonuts,
 } from './donut-game.js';
-
-
-
-
-
 
 /** What walking asks the game (walk.js Mind): targets by thing, attacks that root or busy a fighter, the stomp's pop, guards. */
 /** @type {import('./walk.js').Mind} */
@@ -47,9 +42,6 @@ function moveFighter(s, f) {
   ringOut(s, f);
 }
 
-
-
-
 // --- input ----------------------------------------------------------------------------------
 
 function tapAbove(s, f, t) {
@@ -73,7 +65,6 @@ function jumpTap(s, f) {
   else if (f.jumps > 0) f.again = true;
 }
 
-
 function setAway(s, f, away) {
   if (away == null || away === f.away) return;
   f.away = away;
@@ -89,9 +80,7 @@ function applyInput(s, f, input) {
   else attackInput(s, f, input);
 }
 
-
 // --- the match ------------------------------------------------------------------------------
-
 
 function newFighter(e, at, y) {
   return { id: e.id, team: e.team, hands: e.hands ?? 'gloves', trick: e.trick ?? null, icing: e.look.frosting, block: null, placeCell: null, h: e.height, w: e.width, r: e.width / 2, reach: e.reach, dummy: Boolean(e.dummy),
@@ -161,16 +150,13 @@ export function tick(s, inputs) {
   s.tick++;
 }
 
-
 /** Donuts and blocks: what a fighter touches or stands at. A toy (TOY) grabs nothing. */
 function grabStep(s, f) {
   touchDonuts(s, f);
   (s.phase === 'build' ? fetchStep : shelfStep)(s, f);
 }
 
-
 // --- the snapshot ---------------------------------------------------------------------------
-
 
 function moveOf(f) {
   if (f.pending || f.stun > 0) return f.hitMove;
@@ -195,7 +181,6 @@ const fighterView = (s, f) => ({
   power: f.power, chain: chainOf(s, f), toy: f.toy?.kind ?? null, ...(f.attack?.turn && { turn: f.attack.turn }),
 });
 
-
 /** @returns {import('./match.js').Snapshot} */
 export function snapshot(s) {
   return {
@@ -207,11 +192,7 @@ export function snapshot(s) {
     shots: s.shots.map((t) => ({ id: t.id, by: t.by, trick: t.trick, x: t.x, y: t.y, z: t.z, ux: t.ux, uz: t.uz, left: t.left })),
     bricks: s.bricks.map((b) => ({ id: b.id, team: b.team, x: b.x, y: b.y, z: b.z, hits: b.hits, maxHits: b.maxHits, icing: b.icing })),
     shelves: s.shelves.map((sh) => ({ team: sh.team, x: sh.x, y: sh.y, z: sh.z, donuts: shelfLooks(sh) })),
-    hits: s.hits.map((h) => ({ ...h })),
-    fullBag: s.fullBag.map((e) => ({ ...e })),
-    donutEvents: s.donutEvents.map((e) => ({ ...e })),
-    ringOuts: s.ringOuts.map((e) => ({ ...e })),
-    powers: s.powers.map((e) => ({ ...e })),
+    .../** @type {any} */ (Object.fromEntries(EVENTS.map((k) => [k, s[k].map((e) => ({ ...e }))]))),
   };
 }
 

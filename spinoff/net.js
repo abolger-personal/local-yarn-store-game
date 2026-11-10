@@ -14,7 +14,7 @@ async function roomsOf() {
 }
 const rooms = await roomsOf();
 
-export const { selfId, note, homeOnly, inRoom, setRoom } = rooms;
+export const { selfId, note, inRoom, setRoom } = rooms;
 
 /** A `?name=1` switch that sticks through every page after it, until the tap page opens again without it. */
 function flagged(name) {

@@ -1,5 +1,5 @@
 // The Greathammer's throw: one path for the aiming preview (play.js) and the flight (sim.js). REUSE-SPEC.md §Costumes, The Greathammer.
-import { groundOf } from './match.js';
+import { clamp, groundOf } from './match.js';
 
 /**
  * `short`..`long`: the oval's length at k 0 and 1, `wide` its width for its length; `speed` a second along it; `chest` the
@@ -17,8 +17,6 @@ export const aimOf = (held) => (held < HAMMER.aim ? null : Math.min(1, (held - H
 
 /** Where a fighter `h` tall throws from: its chest, facing its way. @param {{ x: number, y: number, z: number, facing: number }} f */
 export const handOf = (f, h) => ({ x: f.x, y: f.y + HAMMER.chest * h, z: f.z, facing: f.facing });
-
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 /**
  * The hammer `t` seconds after a throw of size `k` from `from`: an oval flat at chest height, its long side along the facing,

@@ -22,9 +22,6 @@ function hostGone() {
   el('gone-bye').addEventListener('click', bye);
 }
 
-/** The host's page again, waiting for `expected` guests. */
-
-
 /** ▶️ on the host's end card: everyone to the next round, on the level `search` names (after a win, the next one). */
 function endRound(h, room, search) {
   h.again();
@@ -132,6 +129,5 @@ export async function joinMatch(search, mine, level) {
   if (!isCode(code)) return null;
   if (debugging()) showDebug();
   for (const c of document.querySelectorAll('.end .code')) c.innerHTML = codeHtml(code);
-  el('wait-bye').addEventListener('click', bye);
   return q.has('host') ? host(code, mine, level) : guest(code, mine);
 }

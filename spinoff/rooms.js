@@ -4,7 +4,7 @@
 import { getRelaySockets, joinRoom, selfId } from 'trystero';
 import { clockSlack, isHomeRoute, netProblem, remoteOf, roomName, routeNote } from './roster.js';
 
-export const APP_ID = 'lys-donut-fighters';
+const APP_ID = 'lys-donut-fighters';
 export { selfId };
 
 // REUSE-SPEC.md §Multiplayer: no STUN servers, so a tablet only knows its home-network addresses and

@@ -18,7 +18,7 @@ const CREDIT_TICKS = 5 * TICK_HZ;
 export const POWER = Object.freeze({ perSecond: 1 / 45, hit: 0.06, ringOut: 0.12, pickup: 0.05, steal: 0.15, bank: 0.25 });
 const DONUT_REACH = 0.25;
 const DONUT_EDGE = 0.1;
-export const SHELF_REACH = 0.3;
+const SHELF_REACH = 0.3;
 /** How far in front of their shelf a foe stands guard: deep enough for where a ring-out drops them in. */
 export const GUARD_REACH = 1;
 const SHELF_GAP = 0.05;
@@ -42,7 +42,6 @@ const standingAt = (f, sh, reach = SHELF_REACH, side = f.r) => f.onGround && Mat
 /** REUSE-SPEC.md §Mode: a guard standing in front of its shelf blocks the grab; one knocked to its end doesn't. */
 const guarding = (s, f) => standingAt(f, shelfOf(s, f.team), GUARD_REACH, 0);
 const guardOf = (s, team) => s.fighters.find((o) => o.team === team && guarding(s, o));
-
 
 /** The nearest spot touching the shelf's front; empty-handed at your own, right in front of it (to guard) where there's room.
  * Picked once a tap, again when the blocks or your hands change. */
@@ -149,7 +148,7 @@ function bank(shelf, look) {
 }
 
 const touching = (f, d) => flat(f, d) < f.r + DONUT_REACH && d.y >= f.y - 0.1 && d.y <= f.y + f.h;
-const event = (f, p) => ({ fighter: f.id, x: p.x, y: p.y, z: p.z });
+export const event = (f, p) => ({ fighter: f.id, x: p.x, y: p.y, z: p.z });
 
 export function touchDonuts(s, f) {
   const now = s.donuts.filter((d) => touching(f, d));
@@ -165,7 +164,6 @@ export function touchDonuts(s, f) {
   }
   f.touching = now.map((d) => d.id);
 }
-
 
 /** Walking up to a guarded shelf: the guard shakes "no" (the full-bag event) once each time. True while guarded. */
 function guardStep(s, f) {

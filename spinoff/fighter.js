@@ -12,7 +12,7 @@ import { GLOVE, STRIKE, SWORD_MOVES, SWORD_UP, punchLayer, punchWeight, sample }
 import { HAMMER } from './hammer.js';
 import { kickLayer, kickLunge } from './kicks.js';
 
-export const FIGHTER_KEY = 'lys.fighter.v1';
+const FIGHTER_KEY = 'lys.fighter.v1';
 // the chooser's order, lion first: the registry's reversed, so seeded rosters draw as they always have
 export const SPECIES = Object.freeze([...SPECIES_IDS].reverse());
 
@@ -86,7 +86,7 @@ export function nearestSwatch(list, hex) {
  */
 
 /** @returns {Look} */
-export const defaultLook = () => ({
+const defaultLook = () => ({
   hat: 'beanie', hatColor: '#8be02a', hatStitch: 'rib', cape: 'cape', capeColor: '#8154ff', capeStitch: 'stockinette',
   bag: 'backpack', bagColor: '#ffd21a', gloves: '#ff3b7f', hands: 'gloves', trick: 'plain',
 });
@@ -185,7 +185,7 @@ export const outfitOf = (look) => ({
   bag: wear('bag', look.bag, look.bagColor),
 });
 
-export const GLOVE_SIZE = 2.1;
+const GLOVE_SIZE = 2.1;
 let gloveGeo = null;
 
 function gloveGeometry() {
@@ -205,7 +205,7 @@ const onHands = (built) => built.holds.map((hold) => ({ parent: hold.parent, at:
 export const gloveAnchors = (built) => built.species.gloveAnchors?.(built, handGlove(built.params)) ?? onHands(built);
 
 /** Boxing gloves on both hands, or both wing tips (REUSE-SPEC.md §Costumes). */
-export function addGloves(built, color) {
+function addGloves(built, color) {
   removeTricks(built);
   removeSword(built);
   removeGloves(built);
@@ -222,7 +222,7 @@ export function addGloves(built, color) {
   return built.gloves;
 }
 
-export function removeGloves(built) {
+function removeGloves(built) {
   for (const glove of built.gloves ?? []) glove.removeFromParent();
   built.gloves?.[0]?.material.dispose();
   built.gloves = [];
@@ -322,7 +322,7 @@ function holdBlade(built, parts, geo, userData) {
 }
 
 /** A toy sword (REUSE-SPEC.md §Costumes). */
-export function addSword(built, color) {
+function addSword(built, color) {
   const geo = swordGeometry();
   return holdBlade(built, [new THREE.Mesh(geo.handle, candy(color)), new THREE.Mesh(geo.trim, candy(color === WHITE ? '#ff3b7f' : WHITE))], geo,
     { tip: SWORD.grip / 2 + 0.012 + SWORD.blade + SWORD.wide / 2 });
@@ -330,7 +330,7 @@ export function addSword(built, color) {
 
 const CRESCENT = '#2f6bff';
 /** The Music Scythe, held in both hands: a pole in `color`, a glowing blue crescent (REUSE-SPEC.md §Costumes). */
-export function addScythe(built, color) {
+function addScythe(built, color) {
   const geo = scytheGeometry();
   const glow = new THREE.MeshStandardMaterial({ color: CRESCENT, emissive: CRESCENT, emissiveIntensity: 0.7, roughness: 0.3, metalness: 0 });
   return holdBlade(built, [new THREE.Mesh(geo.pole, candy(color)), new THREE.Mesh(geo.crescent, glow),
@@ -432,7 +432,7 @@ export function greathammerMeshes(color) {
 }
 
 /** The Greathammer, held like the sword (REUSE-SPEC.md §Costumes): `built.sword`, so it swings on SWORD_MOVES. */
-export function addHammer(built, color) {
+function addHammer(built, color) {
   return holdBlade(built, greathammerMeshes(color), greathammerGeometry(), { tip: GREATHAMMER.top - GREATHAMMER.head[2] / 2 });
 }
 
@@ -459,14 +459,14 @@ function reachPole(built, w) {
 }
 
 /** Drops the sword or the scythe (`built.sword` is whichever blade is held). */
-export function removeSword(built) {
+function removeSword(built) {
   built.sword?.removeFromParent();
   for (const o of built.sword?.children ?? []) if (o instanceof THREE.Mesh) o.material.dispose();
   built.sword = null;
 }
 
 /** Holds the sword or scythe at SWORD_MOVES' world angle above forward, whatever the arm is doing: a fan behind a slash, a streak behind a stab. */
-export function swingSword(built, punch) {
+function swingSword(built, punch) {
   const { sword } = built;
   if (!sword) return;
   let arm = 0;
@@ -514,7 +514,6 @@ function trickPartsOnce() {
   };
   return trickParts;
 }
-
 
 const bit = (geo, mat, [x, y, z], r) => {
   const m = geo.isObject3D ? geo : new THREE.Mesh(geo, mat);
@@ -899,16 +898,14 @@ const LAYOUT = {
 };
 
 const TWO = THREE.DoubleSide;
+const unlit = (color) => new THREE.MeshBasicMaterial({ color, side: TWO, toneMapped: false });
+const cartoon = (color) => new THREE.MeshToonMaterial({ color, side: TWO });
 /** What a bit's surface is made of, by finish: flat paper; a glow (flat, with a halo: see adorn); neon, a white-hot
  * middle in a strong glow of its colour (adorn; not added light: on the stages' near-white backgrounds that only ever
  * made white spots, playtest); cartoon shading, and a sticker (that, outlined in white); shiny candy; chrome and glitter
  * (pictures of a shine, turning with the bit, so lit the same anywhere); or yarn. Shared per finish and colour. */
 const FINISH = {
-  flat: (color) => new THREE.MeshBasicMaterial({ color, side: TWO, toneMapped: false }),
-  glow: (color) => new THREE.MeshBasicMaterial({ color, side: TWO, toneMapped: false }),
-  neon: (color) => new THREE.MeshBasicMaterial({ color, side: TWO, toneMapped: false }),
-  toon: (color) => new THREE.MeshToonMaterial({ color, side: TWO }),
-  sticker: (color) => new THREE.MeshToonMaterial({ color, side: TWO }),
+  flat: unlit, glow: unlit, neon: unlit, toon: cartoon, sticker: cartoon,
   glossy: (color) => new THREE.MeshStandardMaterial({ color, side: TWO, roughness: 0.12, metalness: 0 }),
   chrome: (color, p) => new THREE.MeshMatcapMaterial({ color, side: TWO, matcap: matcapOf(p, 'chrome') }),
   glitter: (color, p) => new THREE.MeshMatcapMaterial({ color, side: TWO, matcap: matcapOf(p, 'glitter') }),
@@ -1154,7 +1151,7 @@ export function addTricks(built, kind) {
   });
 }
 
-export function removeTricks(built) {
+function removeTricks(built) {
   for (const g of built.tricks ?? []) {
     g.removeFromParent();
     g.traverse((m) => m.material?.dispose());
@@ -1297,8 +1294,9 @@ export function poseShotTrick(g, at, dir, done, t) {
   flicker(spin, fx, k * fx.life);
 }
 
-/** Shows only `side`'s trick (none for null), `t` seconds after its hit, upright, moving as its EFFECT says. */
-function poseTricks(built, side, t) {
+/** Shows only `side`'s trick (none for null), `t` seconds after its hit, upright, moving as its EFFECT says: the chooser's
+ * show-off, `t` seconds after its jab would land, as in a fight. */
+export function showOffTrick(built, side, t) {
   for (const g of built.tricks ?? []) {
     const { spin, anchor } = g.userData, { fx } = spin.userData, k = t / fx.life;
     g.visible = g.userData.side === side && t >= 0 && k < 1;
@@ -1352,8 +1350,6 @@ function spray(g, turn) {
 
 // REUSE-SPEC.md §Fighter chooser: the preview never hits anything, so its trick stays out to be seen
 export const SHOW_OFF = EFFECT.life;
-/** The chooser's trick, `t` seconds after its jab would land, as in a fight. */
-export const showOffTrick = (built, side, t) => poseTricks(built, side, t);
 
 /** The hitting hand's trick pops off it as the swoosh starts, as big and as long as the chooser's show-off (playtest: shown
  * only through the swoosh, at a third of that size, it was all but invisible in a fight). */
@@ -1367,22 +1363,20 @@ export function stepTricks(built, punch, dt) {
   showOffTrick(built, built.trickSide ?? null, built.trickT);
 }
 
-/** Same order as the shop's `dressedCharacter` (store/sim/cast.js): dress unmerged, then merge. @param {Fighter} f */
 // REUSE-SPEC.md §Look, the 0.0.8 art pass: every fighter wears these; ?plain on the page turns them off, to compare
 // readability in a match
 const PLAIN = typeof location !== 'undefined' && new URLSearchParams(location.search).has('plain');
 export const LOOKS = Object.freeze(Object.fromEntries(['lookAt', 'eyeGlint', 'painterly', 'shapedFaces'].map((k) => [k, !PLAIN])));
+const HOLD = { gloves: addGloves, sword: addSword, scythe: addScythe, hammer: addHammer };
 
+/** Same order as the shop's `dressedCharacter` (store/sim/cast.js): dress unmerged, then merge. @param {Fighter} f */
 export function buildFighter(f) {
   const built = createCharacter({ ...BASE_PARAMS, ...f.params, ...LOOKS, mergeMeshes: false }, f.species);
   built.root.updateMatrixWorld(true);
   built.root.userData.across = new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3()).x;
   dress(built, outfitOf(f.look));
   mergeCharacter(built);
-  if (f.look.hands === 'sword') addSword(built, f.look.gloves);
-  else if (f.look.hands === 'scythe') addScythe(built, f.look.gloves);
-  else if (f.look.hands === 'hammer') addHammer(built, f.look.gloves);
-  else addGloves(built, f.look.gloves);
+  (HOLD[f.look.hands] ?? addGloves)(built, f.look.gloves);
   const tricks = TRICKS[f.look.hands] ?? TRICKS.gloves;
   addTricks(built, tricks.length === 1 ? tricks[0] : f.look.trick);
   return built;
@@ -1423,7 +1417,7 @@ export function wobbleAt(percent, cycles) {
 }
 
 /** The hitting glove stretches along the arm as it flies and squashes on landing; gloves are in joint-side order. */
-export function squashGloves(built, punch) {
+function squashGloves(built, punch) {
   const { stretch, size } = sample(GLOVE, punch?.step ?? 1);
   built.gloves.forEach((glove, i) => {
     const { r } = glove.userData, hits = punch && (i === 0) === (punch.arm < 0);

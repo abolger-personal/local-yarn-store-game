@@ -64,7 +64,7 @@ function leave(id) {
   dress();
 }
 
-const show = (id, on) => document.getElementById(id).classList.toggle('hidden', !on);
+const show = (ids, on) => { for (const id of [ids].flat()) document.getElementById(id).classList.toggle('hidden', !on); };
 
 function showCode(code) {
   document.getElementById('code').innerHTML = `${codeHtml(code)}${'<span></span>'.repeat(CODE_LENGTH - code.length)}`;
@@ -87,10 +87,8 @@ function enter(next, hosting = false) {
   room.on('playing', (_, from) => waitForRound(from));
   waitForRound(null);
   showCode(next);
-  show('start', false);
-  show('keypad', false);
+  show(['start', 'keypad', 'picker'], false);
   show('inroom', true);
-  show('picker', false);
   show('go', hosting);
   room.hello();
 }
@@ -104,12 +102,8 @@ let picked = { stage: '', level: 0 };
 const everyone = () => (room ? heroesProgress([...cast.values()]) : [loadProgress()]);
 
 function pick() {
-  show('start', false);
-  show('inroom', false);
-  show('picker', true);
-  show('dial', false);
-  show('pick-go', false);
-  show('stage-list', true);
+  show(['start', 'inroom', 'dial', 'pick-go'], false);
+  show(['picker', 'stage-list'], true);
   document.getElementById('stage-list').innerHTML = roomStages()
     .map((s) => `<button data-stage="${s}" aria-label="${s}"><span class="emoji">${STAGE_PICTURE[s] ?? '❓'}</span></button>`).join('');
 }
@@ -148,9 +142,7 @@ function exit() {
   for (const id of cast.keys()) if (id !== selfId) leave(id);
   typed = [];
   showCode([]);
-  show('inroom', false);
-  show('keypad', false);
-  show('picker', false);
+  show(['inroom', 'keypad', 'picker'], false);
   show('start', true);
 }
 

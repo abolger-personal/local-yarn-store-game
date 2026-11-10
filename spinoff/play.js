@@ -17,7 +17,7 @@ import { facedCell, fortGrid } from './build.js';
 import { aimGameCamera, makeStage } from './stage.js';
 import { SHELF_WOOD, THEMES } from './scenery.js';
 import { PIPING, box, donutMesh, sameLook } from './treats.js';
-import { rosterOf } from './multiplayer.js';
+import { rosterOf, turn } from './multiplayer.js';
 import { joinMatch } from './together.js';
 import { bye, note } from './net.js';
 import { createCpu } from './cpu.js';
@@ -120,8 +120,6 @@ function tickDown(t, keys, dt) {
   for (const k of keys) t[k] = Math.max(0, t[k] - dt / TIMERS[k]);
 }
 
-const turn = (a) => Math.atan2(Math.sin(a), Math.cos(a));
-
 function poseOf(m, f) {
   if (f.move === 'sit') return MOVE_POSES.sit;
   if (m.t.joy > 0) return POSES.delighted;
@@ -135,7 +133,6 @@ function poseOf(m, f) {
 const HANG = MOVES.stomp.hang / MOVES.stomp.steps;
 /** How far round a stomp has turned while it hangs in the air (a spin or a backflip, `f.turn`), fast then settling. @param {FighterState} f */
 const stompTurn = (f) => (!f.onGround && f.move === 'kick' && f.turn ? 2 * Math.PI * (1 - (1 - Math.min(1, f.step / HANG)) ** 2) : 0);
-
 
 /** How far into its swing a fighter winding up for a shot holds it (REUSE-SPEC.md §Trick shots). */
 const WINDUP = 0.1;
@@ -790,8 +787,7 @@ async function warmUp(...later) {
 async function play() {
   const roster = net?.start.roster ?? rosterOf(ME, mine, undefined, asked.number), entrants = cast(roster);
   const controls = createControls(ME, level.stage);
-  const button = (id) => document.getElementById(id);
-  attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: button('punch'), kick: button('kick'), drop: button('drop') }, keyHelp: button('keys') });
+  attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: el('punch'), kick: el('kick'), drop: el('drop') }, keyHelp: el('keys') });
   attachReady(controls);
   attachAim(controls);
   attachSweep(controls);

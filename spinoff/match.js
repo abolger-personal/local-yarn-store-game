@@ -13,8 +13,10 @@ export const SHELF_WIDTH = SHELF.cols * SHELF.gap + 0.14;
 export const BRICK = 0.4;
 export const HIT_DEPTH = 0.35;
 export const HITSTOP_TICKS = 5;
+/** A snapshot's once-only event lists; the network sends them with the tick they happened on until every guest has surely had them. */
+export const EVENTS = /** @type {const} */ (['hits', 'fullBag', 'donutEvents', 'ringOuts', 'powers']);
 
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 /** The nearest point of a box's rounded core to (x, z): the box is everything within `round` of it, seen from above. */
 export function coreOf(b, x, z) {
   const r = b.round ?? 0;
@@ -24,6 +26,12 @@ export function coreOf(b, x, z) {
 export function outside(b, x, z) {
   const c = coreOf(b, x, z);
   return Math.max(0, Math.hypot(x - c.x, z - c.z) - c.r);
+}
+/** The highest floor top at (x, z) no higher than maxY, or null off the stage. @param {Stage} stage */
+export function floorTop(stage, x, z, maxY = Infinity) {
+  let top = null;
+  for (const f of stage.floors) if (f.y <= maxY && outside(f, x, z) === 0 && (top === null || f.y > top)) top = f.y;
+  return top;
 }
 
 /** Rectangles seen from above overlap by more than a rounding error. @param {{x0: number, x1: number, z0: number, z1: number}} a @param {{x0: number, x1: number, z0: number, z1: number}} b */

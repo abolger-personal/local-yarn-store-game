@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
-import { createControls, floorPoint, floorTop, pickTarget, walkTarget } from './controls.js';
+import { createControls, floorPoint, pickTarget, walkTarget } from './controls.js';
 import { createMatch as createSim, snapshot as simSnap, tick as simTick } from './sim.js';
-import { createMatch, snapshot, tick } from './fake-match.js';
-import { ROUND_SECONDS, TICK_HZ } from './match.js';
+import { TICK_HZ, floorTop } from './match.js';
 import { TUTORIAL } from './levels.js';
 
 const { stage: STAGE } = TUTORIAL;
@@ -84,33 +83,6 @@ assert.deepEqual(pickTarget(STAGE, snap, tap(front.x + 0.2, 0.2, front.z + 0.2),
   c.up(1);
   c.move(1, tap(3, 0, 0));
   assert.equal(c.take(snap).target, null, 'a lifted finger stops steering');
-}
-
-{
-  const entrants = [
-    { id: 'me', team: 'heroes', height: 1, width: 0.6, reach: 0.4, look: look('#ff3b7f') },
-    { id: 'dummy', team: 'badGuys', height: 1, width: 0.6, reach: 0.4, look: look('#7b2fbf'), dummy: true },
-  ];
-  const state = createMatch(entrants, STAGE);
-  const count = (s) => s.donuts.length + s.shelves.reduce((n, sh) => n + sh.donuts.length, 0) + s.fighters.filter((f) => f.carrying).length;
-  assert.equal(count(snapshot(state)), 24, 'the stand-in match holds all 24 donuts');
-  const me = () => snapshot(state).fighters.find((f) => f.id === 'me');
-  const x0 = me().x;
-  tick(state, { me: { target: { x: x0 + 1, z: 0.6 }, punch: false, kick: false } });
-  for (let i = 0; i < 10; i++) tick(state, {});
-  assert.ok(me().x > x0 && Math.abs(me().facing) < 1e-9, 'the stand-in walks toward a tapped x/z point, facing it');
-  tick(state, { me: { target: { stop: true }, punch: false, kick: false } });
-  assert.ok(me().target === null && me().vx === 0, 'stop stops');
-  tick(state, { me: { target: { thing: 'fighter', id: 'dummy' }, punch: false, kick: false } });
-  let hits = [];
-  for (let i = 0; i < 400 && !hits.length; i++) {
-    tick(state, { me: { target: null, punch: i % 30 === 0, kick: false } });
-    hits = snapshot(state).hits;
-  }
-  assert.equal(hits[0]?.on, 'fighter', 'a punch next to the dummy lands, once, as a HitEvent');
-  assert.equal(count(snapshot(state)), 24, 'still 24 donuts after the hit');
-  for (let i = 0; i < ROUND_SECONDS * TICK_HZ; i++) tick(state, {});
-  assert.ok(snapshot(state).over && snapshot(state).winner === 'badGuys', 'the clock runs out and the fuller shelf wins');
 }
 
 {

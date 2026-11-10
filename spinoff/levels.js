@@ -72,15 +72,14 @@ const TOWER = /** @type {const} */ ({ kind: 'deck', x0: -9, x1: -6, z0: -2, z1: 
 const STEP_UP = /** @type {const} */ ({ kind: 'deck', x0: -8.4, x1: -6.6, z0: 0, z1: 1.2, y: 1.2 });
 const LOW_STACK = /** @type {const} */ ({ kind: 'deck', x0: -2.8, x1: -1.6, z0: -2, z1: -0.4, y: 0.8 });
 const mirrored = (f) => ({ ...f, x0: -f.x1, x1: -f.x0 });
+const BARE = { puddles: Object.freeze([]), starts: BUILDING.stage.starts, bricks: Object.freeze([]) };
 /** @type {Level} */
 const JUMPING = Object.freeze({ theme: 'breakfast', number: 3, match: Object.freeze({ ...MATCH, doubleJump: true, badGuyPace: 0.2 }), stage: Object.freeze({
   ...TABLE,
   floors: Object.freeze([TABLE.floors[0], ...[TOWER, STEP_UP, LOW_STACK].flatMap((f) => [f, mirrored(f)]),
     { kind: 'deck', x0: -0.6, x1: 0.6, z0: -0.6, z1: 0.6, y: 1.8 }]),
   shelves: Object.freeze(TABLE.shelves.map((sh) => ({ ...sh, y: TOWER.y }))),
-  puddles: Object.freeze([]),
-  starts: BUILDING.stage.starts,
-  bricks: Object.freeze([]),
+  ...BARE,
 }) });
 
 // REUSE-SPEC.md §Forts, Level 4: the chasing level. Flat floor, each shelf on it near its end (a fight there is near an
@@ -91,9 +90,7 @@ const CHASE = Object.freeze({ theme: 'breakfast', number: 4, match: Object.freez
   ...TABLE,
   floors: Object.freeze([TABLE.floors[0], LOW_STACK, mirrored(LOW_STACK)]),
   shelves: Object.freeze(TABLE.shelves.map((sh) => ({ ...sh, x: Math.sign(sh.x) * CHASE_SHELF_X, y: 0 }))),
-  puddles: Object.freeze([]),
-  starts: BUILDING.stage.starts,
-  bricks: Object.freeze([]),
+  ...BARE,
 }) });
 
 // GENERATED-LEVELS.md §Recommendation: level 5, the first generated level. A fixed seed, so it is the same stage every

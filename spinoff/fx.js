@@ -1,6 +1,6 @@
 // Contact you can feel (REUSE-SPEC.md §Milestones 1): BAM bursts, icing chunks and confetti, screen shake, floor shadows.
 import * as THREE from 'three';
-import { floorTop } from './controls.js';
+import { floorTop } from './match.js';
 
 /** @typedef {import('./match.js').HitEvent} HitEvent */
 
@@ -80,7 +80,6 @@ function stepBit(b, dt) {
   }
   b.mesh.scale.setScalar(b.size * Math.min(1, (BIT_LIFE - b.t) * 4));
 }
-
 
 const SHADOW_GEO = new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2);
 let shadowMat = null;

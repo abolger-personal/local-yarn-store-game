@@ -33,7 +33,7 @@ const SPOT_XS = [-6, -4.8], SPOT_ZS = [-1.6, -0.8, 0, 0.8, 1.6];
 const HERO_DECK = { x0: -9, x1: -6, z0: -2, z1: -0.8 };
 
 /** The heroes' start spots for this seed, in the order heroes take them. @param {number} seed @returns {import('./match.js').StartSpot[]} */
-export function startSpots(seed) {
+function startSpots(seed) {
   const r = rng(~seed);
   const all = SPOT_XS.flatMap((x) => SPOT_ZS.map((z) => ({ x, z }))).filter((p) => !overlaps(spotRect(p), HERO_DECK));
   return all.map((p) => /** @type {const} */ ([r(), p])).sort((a, b) => a[0] - b[0]).slice(0, MAX_HEROES).map(([, p]) => p);

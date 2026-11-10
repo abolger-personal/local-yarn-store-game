@@ -69,10 +69,10 @@ function icingPads(springs) {
   });
 }
 
-function cakeBackdrop(backWall) {
-  const wall = box(26, 7, 0.4, CAKE_WALL);
+function backdrop(backWall, wallColor, skirtColor) {
+  const wall = box(26, 7, 0.4, wallColor);
   wall.position.set(0, 2.8, backWall - 0.2);
-  const skirting = box(26, 0.5, 0.2, GINGER.heroes);
+  const skirting = box(26, 0.5, 0.2, skirtColor);
   skirting.position.set(0, 0.25, backWall - 0.05);
   return [wall, skirting];
 }
@@ -180,14 +180,6 @@ function breakfastFloor(f) {
   return g;
 }
 
-function breakfastBackdrop(backWall) {
-  const wall = box(26, 7, 0.4, BREAKFAST_WALL);
-  wall.position.set(0, 2.8, backWall - 0.2);
-  const skirting = box(26, 0.5, 0.2, WAFFLE.dough);
-  skirting.position.set(0, 0.25, backWall - 0.05);
-  return [wall, skirting];
-}
-
 export const SHELF_WOOD = Object.freeze({ back: '#9a5b2c', plank: '#7a4520' });
 
 // What each surface shows from a distance, for the visibility rules (visibility.test.mjs, REUSE-SPEC.md §Stage visibility rules)
@@ -203,8 +195,8 @@ const PAD_RIM = 1 - (1 - (2 * PAD.pipe) / 0.45) ** 2; // on a 0.45 pad
  *   brick: (team: import('./match.js').Team, icing: string) => Paint[] }} Surfaces
  */
 const breakfast = (stage) => [...stage.floors.map(breakfastFloor), ...syrupPools(stage.puddles), ...butterSlicks(stage.butter ?? []),
-  syrupDrips(groundOf(stage)), ...breakfastBackdrop(stage.backWall)];
-const cake = (stage) => [...stage.floors.map(floorMesh), ...icingPads(stage.springs ?? []), ...groundTreats(groundOf(stage)), ...cakeBackdrop(stage.backWall)];
+  syrupDrips(groundOf(stage)), ...backdrop(stage.backWall, BREAKFAST_WALL, WAFFLE.dough)];
+const cake = (stage) => [...stage.floors.map(floorMesh), ...icingPads(stage.springs ?? []), ...groundTreats(groundOf(stage)), ...backdrop(stage.backWall, CAKE_WALL, GINGER.heroes)];
 
 /**
  * @typedef {{ background: string, scenery: (stage: Stage) => THREE.Object3D[], brick: (b: import('./match.js').BrickState) => any,

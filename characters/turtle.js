@@ -10,8 +10,8 @@ import { named, onFront, softGeometry, softTriangle } from './faces.js';
 const DEFAULT_PARAMS = {
   ...BASE_PARAMS,
   name:          'Shelly',
-  // BODIES.md §Turtle: the designer's Zephyr (2026-11-09)
-  bodyColor:     '#ffd21a',
+  // BODIES.md §Turtle: the designer's Zephyr (2026-11-09), green with a yellow plastron
+  bodyColor:     '#1fd18b',
 
   // BODIES.md §Turtle: burly, low and round
   legHeight:     0.152,
@@ -46,7 +46,7 @@ const DEFAULT_PARAMS = {
   stripeWidth:   0.055,
 
   shell:         true,
-  scuteColor:    '#5d4d18',
+  scuteColor:    '#0b5e3d',
   rimColor:      '',
   shellRim:      true,
   plastron:      true,
@@ -119,9 +119,9 @@ const rimColorOf = (P) => {
   const i = rimHue(P.bodyColor);
   return i < 0 ? '#fff1cc' : hsl(WARM[i], 0.95, WARM_LIGHT[i]);
 };
-// the plastron a real one's yellow-orange; on a yellow or orange skin, cream
-const PLASTRON_HUE = 0.11;
-const plastronColorOf = (P) => (hueGap(hslOf(P.bodyColor).h, PLASTRON_HUE) < 0.08 ? '#fff1cc' : hsl(PLASTRON_HUE, 0.95, 0.42));
+// the plastron yellow; on a yellow or orange skin, cream
+const PLASTRON_HUE = 0.135;
+const plastronColorOf = (P) => (hueGap(hslOf(P.bodyColor).h, PLASTRON_HUE) < 0.08 ? '#fff1cc' : hsl(PLASTRON_HUE, 0.95, 0.52));
 // the stripes a light yellow; on a yellow skin, cream
 const stripeColorOf = (P) => P.stripeColor || (hueGap(hslOf(P.bodyColor).h, WARM[2]) < 0.1 ? '#fff6dc' : hsl(WARM[2], 0.95, 0.42));
 

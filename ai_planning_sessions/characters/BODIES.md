@@ -397,7 +397,7 @@ scales"). A striker and projectile shooter in the brawler, on the base two-legge
 Status: decided 2026-11-06 (designer's references: a snapping turtle for shape, a painted turtle for colour).
 `characters/turtle.js`.
 
-Defaults the designer's Zephyr (decided 2026-11-09): yellow, torso 0.257 × 0.201 × 0.217, low eyes (`eyeLift` 0.099),
+Defaults the designer's Zephyr (decided 2026-11-09) but green with a yellow plastron, not yellow overall, torso 0.257 × 0.201 × 0.217, low eyes (`eyeLift` 0.099),
 shoulders at `shoulderOut` 0.82 (hers 0.623 buried the shoulder in the torso, so the arms stood 83° out) and
 `shoulderLift` 0.648 so the arms clear the body, neck 0.095 (hers 0.060) so scarves sit under the low eyes. The
 numbers below are the first turtle's.
@@ -436,7 +436,7 @@ numbers below are the first turtle's.
   picked"; the complement gave a pink turtle teal accents, a mid raspberry shell): skin is the fur; the shell
   (`scuteColor`) a DARK shade of it (linear lightness 0.05–0.08); the rim (`rimColor`) WARM, never the skin's opposite:
   the first of scarlet, orange, yellow at least 0.10 round the hue circle from the skin (scarlet on every cool fur,
-  yellow on pinks, red on lemon), cream on a skin too warm for all three; the plastron a real one's yellow-orange,
+  yellow on pinks, red on lemon), cream on a skin too warm for all three; the plastron yellow (decided 2026-11-09),
   cream on a yellow or orange skin; the stripes (`stripeColor`) a light yellow, cream on a yellow skin. Rim and
   stripe stay derived (`''`) until picked. Tested on every riot fur: the shell darker than the skin by 0.1 luma, the
   rim warm.

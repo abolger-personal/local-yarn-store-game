@@ -10,12 +10,7 @@ export const MOTION_KEYS = [...POSE_KEYS, 'hold'];
 const HOLD = MOTION_KEYS.indexOf('hold');
 const TAU = Math.PI * 2;
 
-export const REST_POSE = Object.freeze({
-  armSwing: 0, armSwingAlt: 0, armOut: 0, armOutAlt: 0, elbowBend: 0, legSwing: 0, kneeBend: 0,
-  hipFlex: 0, legOut: 0, legOutAlt: 0, spineBend: 0, spineRoll: 0, spineTwist: 0, earPerk: 0, earSplay: 0,
-  headYaw: 0, headPitch: 0, headTilt: 0, tailLift: 0, tailWag: 0, earFlap: 0,
-  holdItem: false, blink: 0,
-});
+export const REST_POSE = Object.freeze({ ...Object.fromEntries(POSE_KEYS.map((k) => [k, 0])), holdItem: false, blink: 0 });
 
 const definePoses = (raw) => Object.freeze(Object.fromEntries(
   Object.entries(raw).map(([name, pose]) => [name, Object.freeze({ ...REST_POSE, ...pose })]),
@@ -34,24 +29,18 @@ export const POSES = definePoses({
   'walk+carry': { armSwing: -0.10, armOut: 0.03, elbowBend: 1.40, legSwing: 0.30, kneeBend: 1.50, holdItem: true },
 });
 
+const NO_EXTRAS = Object.freeze({ turn: 0, rise: 0, travel: 0, shift: 0, flip: 0, roll: 0 });
+
 // ponytail: `shift` moves the whole root, so the feet slide with the hips; upgrade is hip abduction plus grounding that follows it.
 const resolveExtras = (steps) => {
-  let cur = { turn: 0, rise: 0, travel: 0, shift: 0, flip: 0, roll: 0 };
+  let cur = /** @type {Readonly<Record<string, number>>} */ (NO_EXTRAS);
   return steps.map((s) => {
-    cur = {
-      turn: s.turn ?? cur.turn,
-      flip: s.flip ?? cur.flip,
-      roll: s.roll ?? cur.roll,
-      rise: s.rise ?? cur.rise,
-      travel: s.travel ?? cur.travel,
-      shift: s.shift ?? cur.shift,
-    };
-    return Object.freeze(cur);
+    cur = Object.freeze(Object.fromEntries(Object.keys(NO_EXTRAS).map((k) => [k, s[k] ?? cur[k]])));
+    return cur;
   });
 };
 
 const resolveWalk = (steps, dance) => Object.freeze(steps.map((s) => s.walk ?? dance ?? 0));
-const NO_EXTRAS = Object.freeze({ turn: 0, rise: 0, travel: 0, shift: 0, flip: 0, roll: 0 });
 
 const defineDances = (raw) => Object.freeze(Object.fromEntries(
   Object.entries(raw).map(([name, d]) => [name, Object.freeze({

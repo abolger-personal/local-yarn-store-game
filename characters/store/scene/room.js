@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { ROOM } from '../core/config.js';
 import { camera, key, scene } from './stage.js';
 import { board, mergeMeshes, woodMesh } from './wood.js';
-import { paintWornWood } from './worn-wood.js';
+import { paintWornWood, seeded } from './worn-wood.js';
 import { glassMat } from '../../../inventory/notions.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -43,8 +43,7 @@ function paintBoard(ctx, rnd, [x, y, bw, len]) {
 }
 
 function paintPlanks(ctx, w, h) {
-  let seed = 7;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const rnd = seeded(7);
   const boards = 10, bw = w / boards;
   for (let b = 0; b < boards; b++) {
     for (let y = -rnd() * h; y < h;) {

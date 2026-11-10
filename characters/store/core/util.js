@@ -11,6 +11,10 @@ export function runSteps(steps) {
 
 export const rnd = (n, rng) => Math.floor(rng() * n);
 
+export const pickFrom = (list, rng) => list[Math.floor(rng() * list.length)];
+
+export const between = (rng, a, b) => a + rng() * (b - a);
+
 const mix = (a) => {
   let t = Math.imul(a ^ (a >>> 15), 1 | a);
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;

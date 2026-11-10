@@ -1,11 +1,9 @@
 // DESIGN-DECISIONS.md §6 "Supply system"; the order's shape is PLAYING-AT-YOUR-PACE.md §5.
 
 import { anySlot, fits, place } from './grid.js';
-import { mulberry32 } from '../characters/store/core/util.js';
+import { mulberry32, pickFrom } from '../characters/store/core/util.js';
 import { SHOP_RANGE, TOOL_FOR_CRAFT, YARN_COLOR_COUNT, makeStockNotion, makeStockPattern, makeYarn, stockPatternFor,
   yarnUnits } from './catalog.js';
-
-const pickFrom = (list, rng) => list[Math.floor(rng() * list.length)];
 
 // DESIGN-DECISIONS.md §6: six colour families.
 const FAMILIES = 6;

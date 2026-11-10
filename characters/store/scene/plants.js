@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import { mulberry32 } from '../core/util.js';
+import { between, mulberry32 } from '../core/util.js';
 
-const between = (rng, a, b) => a + rng() * (b - a);
 const count = (rng, lo, hi) => lo + Math.floor(rng() * (hi - lo + 1));
 
 const GREENS = { bush: '#6f9c58', spiky: '#5d8c4c', cactus: '#82a67c', trailing: '#68a05c' };

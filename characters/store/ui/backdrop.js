@@ -1,5 +1,4 @@
-const pick = (rng, list) => list[Math.floor(rng() * list.length)];
-const between = (rng, a, b) => a + rng() * (b - a);
+import { between, pickFrom } from '../core/util.js';
 
 const SKIES = [
   { name: 'day', top: '#6fb3e8', bottom: '#d9eef7', orb: '#fff6c9', far: '#a9c4d6', near: '#56687a', lit: 0.05, tint: null },
@@ -154,8 +153,8 @@ function shadow(ctx, { project, feet }) {
 
 export function paintBackdrop(ctx, view, rng) {
   const { width: w, height: h } = ctx.canvas;
-  const sky = pick(rng, SKIES);
-  const kind = view.horizon.y > 0 ? 'pavement' : pick(rng, Object.keys(GROUNDS));
+  const sky = pickFrom(SKIES, rng);
+  const kind = view.horizon.y > 0 ? 'pavement' : pickFrom(Object.keys(GROUNDS), rng);
   inHorizonFrame(ctx, view, () => city(ctx, rng, sky, { w, h }));
   ground(ctx, rng, { sky, kind, view, w, h });
   shadow(ctx, view);

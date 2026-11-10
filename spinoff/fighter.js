@@ -59,7 +59,7 @@ export const TRICKS = Object.freeze({
   gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame', 'bebop', 'starPunch', 'fireball', 'loveTap', 'bubblegumPop', 'powerPuff', 'magicStar', 'heartBlast', 'smiteOfLight', 'speedLines', 'lightningStorm', 'atomicBall']), sword: SWORD_TRICKS, scythe: Object.freeze(['music']),
   // lightning first: a trick the hammer doesn't have falls back to it
   hammer: Object.freeze(['lightning', 'zap']),
-  [CANE]: SWORD_TRICKS, [SAI]: SWORD_TRICKS, [NEEDLES]: SWORD_TRICKS, [MIC]: Object.freeze(['plain']), [STAFF]: Object.freeze(['music']), [YARN_BALLS]: Object.freeze(['plain']),
+  [CANE]: SWORD_TRICKS, [SAI]: SWORD_TRICKS, [NEEDLES]: SWORD_TRICKS, [MIC]: SWORD_TRICKS, [STAFF]: Object.freeze(['music']), [YARN_BALLS]: Object.freeze(['plain']),
 });
 // REUSE-SPEC.md §Fighter chooser: the levels a player must have beaten for the chooser to offer each
 const UNLOCK = Object.freeze({ sword: 1, scythe: 2, hammer: 4 });

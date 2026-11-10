@@ -19,7 +19,7 @@ presets.slice(0, 4).forEach(({ species, look }, i) => {
   assert.equal(look.scarfColor, TURTLE_COLOURS[i].hex, 'each turtle in his own colour');
 });
 const [april, splinter] = presets.slice(4).map(({ species, look }) => ({ species, ...look }));
-assert.deepEqual([april.species, april.sweaterColor, april.socksColor, april.hands], ['llama', COLOURS[5].hex, '#ffffff', MIC], 'April: a taxi yellow jumpsuit, white boots, her microphone');
+assert.deepEqual([april.species, april.sweaterColor, april.socksColor, april.hands, april.trick], ['llama', COLOURS[5].hex, '#ffffff', MIC, 'sparkle'], 'April: a taxi yellow jumpsuit, white boots, her microphone throwing stars');
 assert.deepEqual([splinter.species, splinter.sweater, splinter.hands], ['mouse', 'vest', CANE], 'Master Splinter: a vest and his cane');
 
 // the trust boundary: no hats or capes, no Sock Clan scarf, no colour outside the hero colours

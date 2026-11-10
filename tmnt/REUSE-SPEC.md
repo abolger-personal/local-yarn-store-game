@@ -130,7 +130,8 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
     the floor and the rest stands up past the hand.
   - **April's comically oversize microphone** (decided 2026-11-09; a giant video camera was the other idea): wielded
     as the Greathammer but never thrown. A dark handle, a band in the picked colour, a huge faceted silver grille,
-    about half her height.
+    about half her height. It has the sword's effects, off the grille; April's preset starts on ✨ the stars
+    (decided 2026-11-10), and tapping the mic again goes through the rest.
   - **Leonardo's katanas are a pair of knitting needles** (decided 2026-11-09), one in each hand: the right held
     and swung as the sword, the left held up at the sword's rest. Long points, a knob on each end.
   - **Michelangelo's nunchucks are two balls of yarn on one strand** (decided 2026-11-09, "more fun to animate"),

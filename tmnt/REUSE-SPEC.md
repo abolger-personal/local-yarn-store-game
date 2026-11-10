@@ -73,21 +73,9 @@ code, the session that outlasts every screen, late joiners, kept rooms, the host
 **Keep the emojis and what they mean** (decided 2026-11-09): 🏠 starts a room, 🔑 types a code, 👋 waves bye and
 leaves, ✏️ goes back to dress up, 👍 moves on, ▶️ plays.
 
-**The room code is dated 90s things instead of desserts** (decided 2026-11-09). The donut fighters' code is four
-out of six treats (`ROOM_TREATS` in `spinoff/roster.js`, 1296 codes). This game swaps the six for its own set. The
-twenty to choose from (brainstorm 2026-11-09):
-
-☎️ telephone · 📞 receiver · 📟 pager · 📠 fax · 📼 videotape · 📹 camcorder · 🎥 movie camera · 📽️ projector ·
-📺 TV · 📻 radio · 💾 floppy disk · 💿 CD · 📀 DVD · 💽 minidisc · 🕹️ joystick · 👾 space invader · 🖲️ trackball ·
-📷 camera · 🛼 roller skate · 📇 card index (a Rolodex)
-
-Notes for picking them:
-- **Avoid look-alike pairs.** Kids who can't read match codes by shape and colour, so take at most one of each:
-  📹 / 🎥 / 📷 / 📽️, 💿 / 📀 / 💽, ☎️ / 📞.
-- **🛼 is a newer emoji (2020)** and may show as a blank box on old tablets; check it on the oldest tablet first.
-- **Six or eight?** Six keeps the same keypad and 1296 codes, which is plenty for one home network. Eight gives
-  4096 and a bigger keypad.
-- A suggested six that don't look alike: ☎️ 📼 📺 💾 🕹️ 📟. For eight, add 👾 and 📻.
+**The room code is four out of six dated 90s things instead of desserts** (decided 2026-11-09): ☎️ 📼 👾 💾 🕹️ 📟
+(telephone, videotape, space invader, floppy disk, joystick, pager), picked by the designer for the spread of
+colours. Six, like the fighters' treats (`ROOM_TREATS` in `spinoff/roster.js`), so the same keypad and 1296 codes.
 
 ## Hero chooser
 
@@ -122,7 +110,6 @@ own keys so a hero doesn't overwrite a fighter.
 ## Open questions
 
 - **Which theme?** Pick from the list in §The game.
-- **Which six room pictures?** Or eight; see §Rooms and the lobby.
 - **Which weapon is the default, and are weapons unlocked?** The fighters' are 🥊 gloves, a sword, the Music Scythe
   and the Greathammer, unlocked by levels beaten there. TMNT's are katanas, a bo staff, sais and nunchucks.
   - Is there one weapon per scarf colour, as each turtle had his own?

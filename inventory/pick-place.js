@@ -80,8 +80,7 @@ function axisDistance(k, { disp, shelf, item }, px, py) {
   if (!base) return Math.hypot(top.x - px, top.y - py);
   const dx = base.x - top.x, dy = base.y - top.y;
   const len2 = dx * dx + dy * dy;
-  const t = len2 < 1e-9 ? 0
-    : Math.min(1, Math.max(0, ((px - top.x) * dx + (py - top.y) * dy) / len2));
+  const t = len2 < 1e-9 ? 0 : THREE.MathUtils.clamp(((px - top.x) * dx + (py - top.y) * dy) / len2, 0, 1);
   return Math.hypot(top.x + dx * t - px, top.y + dy * t - py);
 }
 

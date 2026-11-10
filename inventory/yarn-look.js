@@ -16,31 +16,24 @@ export const YARN_LOOK = Object.freeze({
   bandColor: '#f6efe1',
 });
 
-export function oklch(l, c, h, target = new THREE.Color()) {
+function oklabToLinear(l, c, h) {
   const a = c * Math.cos((h * Math.PI) / 180), b = c * Math.sin((h * Math.PI) / 180);
   const l_ = (l + 0.3963377774 * a + 0.2158037573 * b) ** 3;
   const m_ = (l - 0.1055613458 * a - 0.0638541728 * b) ** 3;
   const s_ = (l - 0.0894841775 * a - 1.2914855480 * b) ** 3;
-  return target.setRGB(
-    Math.max(0, 4.0767416621 * l_ - 3.3077115913 * m_ + 0.2309699292 * s_),
-    Math.max(0, -1.2684380046 * l_ + 2.6097574011 * m_ - 0.3413193965 * s_),
-    Math.max(0, -0.0041960863 * l_ - 0.7034186147 * m_ + 1.7076147010 * s_),
-    THREE.LinearSRGBColorSpace,
-  );
-}
-
-function inGamut(l, c, h) {
-  const a = c * Math.cos((h * Math.PI) / 180), b = c * Math.sin((h * Math.PI) / 180);
-  const l_ = (l + 0.3963377774 * a + 0.2158037573 * b) ** 3;
-  const m_ = (l - 0.1055613458 * a - 0.0638541728 * b) ** 3;
-  const s_ = (l - 0.0894841775 * a - 1.2914855480 * b) ** 3;
-  const rgb = [
+  return [
     4.0767416621 * l_ - 3.3077115913 * m_ + 0.2309699292 * s_,
     -1.2684380046 * l_ + 2.6097574011 * m_ - 0.3413193965 * s_,
     -0.0041960863 * l_ - 0.7034186147 * m_ + 1.7076147010 * s_,
   ];
-  return rgb.every((v) => v >= -1e-4 && v <= 1 + 1e-4);
 }
+
+export function oklch(l, c, h, target = new THREE.Color()) {
+  const [r, g, b] = oklabToLinear(l, c, h).map((v) => Math.max(0, v));
+  return target.setRGB(r, g, b, THREE.LinearSRGBColorSpace);
+}
+
+const inGamut = (l, c, h) => oklabToLinear(l, c, h).every((v) => v >= -1e-4 && v <= 1 + 1e-4);
 
 // YARN-ASSET-SPIKE.md §14: out of gamut, reduce chroma and keep hue and lightness.
 export function oklchClamped(l, c, h, target = new THREE.Color()) {
@@ -75,7 +68,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 
 export function yarnColor(rng = Math.random, target = new THREE.Color(),
                           { spread = 1, hue = null } = {}) {
-  const t = Math.min(1, Math.max(0, spread));
+  const t = THREE.MathUtils.clamp(spread, 0, 1);
   const full = familyOf(rng());
   const lMin = lerp(TIGHT.lMin, full.lMin, t), lMax = lerp(TIGHT.lMax, full.lMax, t);
   const cMin = lerp(TIGHT.cMin, full.cMin, t), cMax = lerp(TIGHT.cMax, full.cMax, t);

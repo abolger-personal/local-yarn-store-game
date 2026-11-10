@@ -303,6 +303,8 @@ Tried first, and dropped (playtest 2026-11-04): a kick pressed again in a kick's
 knock the foe away, so the sweep turned round at nobody; only off a kick that landed, it was too hard to find; with a
 press kept and a grace period, it fired after every landed kick and stopped you dead while they wandered off.
 
+**Built 2026-11-09:** the taunt's dance, `booty-shake` (characters/DANCES.md), every species; not yet a move.
+
 **Open:** what each other move does (an escape, a dodge, a taunt that fills the bar; a backing-up retreat sweep is
 an idea for the round-off or back tuck), fight speed against readable speed, how each is found (combos, drawn shapes,
 situations), whether bad guys get them, and whether they work with a weapon in hand or are a reward for fighting

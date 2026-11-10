@@ -262,7 +262,7 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
     const perf = makeDance(name);
     const seen = {
       footLift: 0, footStride: 0, frozenStride: 0, armGapY: 0, armGapX: 0, armGapZ: 0,
-      armPair: 0, shift: 0, counter: 0, swung: 0, groundedBack: 0,
+      armPair: 0, shift: 0, counter: 0, swung: 0, backTurned: 0, lastTurn: 0, groundedBack: 0,
       roll: 0, twist: 0, turn: 0, travel: 0, rise: 0, rootY: { min: Infinity, max: -Infinity },
     };
     let phase = 0;
@@ -292,7 +292,9 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       if (Math.abs(d.shift) > 0.02) {
         seen.swung += 1;
         if (Math.sign(d.shift) !== Math.sign(valueOf(built.motion, 'spineRoll'))) seen.counter += 1;
+        if (Math.abs(d.turn - Math.PI) < 0.2) seen.backTurned += 1;
       }
+      seen.lastTurn = d.turn;
       seen.twist = Math.max(seen.twist, Math.abs(valueOf(built.motion, 'spineTwist')));
       seen.turn = Math.max(seen.turn, Math.abs(d.turn));
       seen.travel = Math.max(seen.travel, Math.abs(d.travel));
@@ -335,6 +337,14 @@ const pose = (built, extra) => applyPose(built, { ...POSES.rest, ...extra });
       `${id}: ...and the HIPS actually moving -- got ${floss.shift.toFixed(3)}`);
     assert.ok(floss.counter > floss.swung * 0.9,
       `${id}: ...opposite each other -- hips countered the lean on only ${floss.counter}/${floss.swung} frames`);
+
+    // DANCES.md §Booty shake: back to them, the hips swinging with the shoulders against them, sat low; round again
+    const standY = build(id).root.position.y, booty = perform(build(id), 'booty-shake');
+    assert.ok(booty.shift > 0.02 && booty.counter > booty.swung * 0.9,
+      `${id}: a booty shake swings the hips against the shoulders (${booty.counter}/${booty.swung} frames)`);
+    assert.ok(booty.backTurned === booty.swung, `${id}: ...with its back turned (${booty.backTurned}/${booty.swung} frames)`);
+    assert.ok(booty.rootY.min < standY - 0.02, `${id}: ...sat into the knees, bum out`);
+    assert.ok(Math.abs(booty.lastTurn % (2 * Math.PI)) < 1e-9, `${id}: ...and ends facing front again (${booty.lastTurn.toFixed(2)})`);
 
     const att = perform(build(id), 'attitude');
     assert.ok(att.footLift > 0.08, `${id}: an attitude lifts the working leg behind`);

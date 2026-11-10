@@ -62,7 +62,16 @@ const defineDances = (raw) => Object.freeze(Object.fromEntries(
   })]),
 ));
 
+// the booty shake, a taunt (DANCES.md §Booty shake): back turned, sat into the knees with the bum out, hands on the
+// knees, looking back over the shoulder
+const BOOTY = { hipFlex: 0.75, kneeBend: 0.95, spineBend: 0.35, armSwing: -0.45, armOut: 0.25, elbowBend: 0.35, headYaw: 0.9, headPitch: -0.25, tailLift: 0.9 };
+
 export const DANCE_POSES = definePoses({
+  'bs-bend': BOOTY,
+  'bs-l': { ...BOOTY, spineRoll: 0.24, tailWag: 1, headTilt: 0.15 },
+  'bs-r': { ...BOOTY, spineRoll: -0.24, tailWag: -1, headTilt: -0.15 },
+  'bs-slap': { ...BOOTY, armSwing: 0.4, armSwingAlt: 0.8, elbowBend: 0.6 },
+
   'rd-left':  { armOut: 0.10, elbowBend: 0.06, legSwing: -0.95, hipFlex: 0.95, kneeBend: 1.90, headPitch: -0.05 },
   'rd-right': { armOut: 0.10, elbowBend: 0.06, legSwing: 0.95, hipFlex: 0.95, kneeBend: 1.90, headPitch: -0.05 },
   'rd-kick-l': { armOut: 0.10, elbowBend: 0.06, legSwing: -0.80, hipFlex: 0.80, kneeBend: 0.15, headPitch: -0.05 },
@@ -278,6 +287,18 @@ export const DANCES = defineDances({
       { pose: 'wx-crouch', hold: 0.22 },
       { pose: 'wx-sweep', hold: 0.60, turn: TAU },
       { pose: 'wx-freeze', hold: 1.50 },
+    ],
+  },
+  // the hips swing by `shift`, the shoulders countering (as the floss's); a whole turn back round to finish
+  'booty-shake': {
+    stiff: 420, zeta: 0.65, loop: false, walk: 0,
+    steps: [
+      { pose: 'bs-bend', hold: 0.40, turn: Math.PI },
+      ...[1, 2, 3].flatMap(() => [{ pose: 'bs-l', hold: 0.15, shift: -0.035 }, { pose: 'bs-r', hold: 0.15, shift: 0.035 }]),
+      { pose: 'bs-slap', hold: 0.35, shift: 0 },
+      ...[1, 2].flatMap(() => [{ pose: 'bs-l', hold: 0.12, shift: -0.035 }, { pose: 'bs-r', hold: 0.12, shift: 0.035 }]),
+      { pose: 'bs-bend', hold: 0.20, shift: 0 },
+      { pose: 'salute', hold: 0.60, turn: TAU },
     ],
   },
   'uptown-funk': {

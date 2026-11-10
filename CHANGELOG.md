@@ -2,6 +2,13 @@
 
 What's new in L.Y.S. — Local Yarn Store. [Play it here.](https://abolger-personal.github.io/local-yarn-store-game/)
 
+## Unreleased
+
+### Fixes
+- A name with a quotation mark in it no longer breaks the puzzle bench's pickers: text shown in the
+  shop is escaped the same way everywhere.
+- The puzzle bench now resizes with its window, as the shop does.
+
 ## 0.0.1 — 2026-10-13
 
 ### The shop

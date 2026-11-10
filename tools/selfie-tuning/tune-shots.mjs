@@ -7,7 +7,8 @@ import * as THREE from 'three';
 import { createCharacter, disposeCharacter, getSpecies, speciesIds } from '../../characters/npc.js';
 import '../../characters/species.js';
 import { GARMENTS, LOOK, dress, heldAs, pileAs, randomItem, undress } from '../../characters/garments.js';
-import { SHOTS, drawShot, idLook, seeded, seenShare, selfieScore, shoot } from '../../characters/selfie.js';
+import { SHOTS, drawShot, idLook, seenShare, selfieScore, shoot } from '../../characters/selfie.js';
+import { mulberry32 } from '../../characters/store/core/util.js';
 import { PATTERN_DESIGNS } from '../../inventory/catalog.js';
 
 const BODIES = 6, SEEDS = 10, GOOD = 0.4, DRAWS = 600, TOP = 4, KEEP = 6;
@@ -114,7 +115,7 @@ function tune([id, type, silhouette], warm) {
   let kept = [], seedMaxes = [];
   for (let seed = 1; seed <= SEEDS; seed++) {
     const bodies = Array.from({ length: BODIES }, () => body(id, type, silhouette));
-    const top = searchSeed(bodies, type, [...kept.map((r) => r.shot), ...starts], seeded(Math.floor(Math.random() * 2 ** 32)));
+    const top = searchSeed(bodies, type, [...kept.map((r) => r.shot), ...starts], mulberry32(Math.floor(Math.random() * 2 ** 32)));
     for (const { built } of bodies) { undress(built); disposeCharacter(built); }
     seedMaxes = [...seedMaxes, top[0]?.mean ?? 0];
     kept = [...kept, ...top].toSorted((a, b) => b.mean - a.mean).slice(0, KEEP);

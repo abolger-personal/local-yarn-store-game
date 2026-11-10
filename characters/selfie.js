@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { POSES, applyPose } from './npc.js';
+import { mulberry32 } from './store/core/util.js';
 
 // SELFIES.md §1 rule 1
 const ARM = { armSwing: -1.0, armSwingAlt: -1.0, armOut: 0.25, armOutAlt: 0.25, elbowBend: 0.1, earPerk: 0.3 };
@@ -508,16 +509,6 @@ function facing(built, camera) {
   return ahead.dot(camera.position.clone().sub(head.getWorldPosition(new THREE.Vector3())).normalize());
 }
 
-export function seeded(seed) {
-  let s = seed >>> 0;
-  return () => {
-    s = (s + 0x6D2B79F5) >>> 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 function meshesOf(built) {
   const meshes = [];
   built.root.traverseVisible((o) => { if (o.isMesh) meshes.push(o); });
@@ -560,7 +551,7 @@ export function drawShot(rng, around, spread) {
 
 export function scoredSelfie(built, camera, type, look = idLook(built)) {
   const worn = built.garments ?? [], showing = worn.some((m) => m.parent === built.holds[1]);
-  const ctx = { type, parts: subjectParts(worn, type), look, all: meshesOf(built) }, rng = seeded(0x5e1f1e);
+  const ctx = { type, parts: subjectParts(worn, type), look, all: meshesOf(built) }, rng = mulberry32(0x5e1f1e);
   let best = { shot: null, score: -Infinity };
   const tryShot = (shot) => {
     shoot(built, camera, shot, showing);

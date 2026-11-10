@@ -127,13 +127,11 @@ const PAINT_STYLES = Object.freeze({
 
 const TILE = 128;
 
-function drawBrush(g) {
-  g.fillStyle = 'rgb(128,128,128)';
-  g.fillRect(0, 0, TILE, TILE);
-  for (let i = 0; i < 90; i++) {
-    const x = Math.random() * TILE, y = Math.random() * TILE, v = Math.floor(60 + Math.random() * 136);
-    const len = 14 + Math.random() * 30, w = 2 + Math.random() * 5, tilt = (Math.random() - 0.5) * 0.5;
-    g.fillStyle = `rgba(${v},${Math.floor(Math.random() * 255)},${v},0.35)`;
+/** `n` ellipses at random, each `blot()` ({ len, w, tilt, fill }), wrapped round the tile's edges. */
+function blots(g, n, blot) {
+  for (let i = 0; i < n; i++) {
+    const x = Math.random() * TILE, y = Math.random() * TILE, { len, w, tilt, fill } = blot();
+    g.fillStyle = fill;
     for (const [dx, dy] of [[0, 0], [-TILE, 0], [TILE, 0], [0, -TILE], [0, TILE]]) {
       g.beginPath();
       g.ellipse(x + dx, y + dy, len, w, tilt, 0, Math.PI * 2);
@@ -141,26 +139,20 @@ function drawBrush(g) {
     }
   }
 }
+
+const drawBrush = (g) => blots(g, 90, () => {
+  const v = Math.floor(60 + Math.random() * 136);
+  return { len: 14 + Math.random() * 30, w: 2 + Math.random() * 5, tilt: (Math.random() - 0.5) * 0.5,
+    fill: `rgba(${v},${Math.floor(Math.random() * 255)},${v},0.35)` };
+});
 
 /** Marc's planes: a dozen broad swaths a tile, each one flat value, edges kept. */
-function drawPlanes(g) {
-  g.fillStyle = 'rgb(128,128,128)';
-  g.fillRect(0, 0, TILE, TILE);
-  for (let i = 0; i < 12; i++) {
-    const x = Math.random() * TILE, y = Math.random() * TILE, v = Math.floor(40 + Math.random() * 176);
-    const len = 36 + Math.random() * 40, w = 12 + Math.random() * 14, tilt = (Math.random() - 0.5) * 1.2;
-    g.fillStyle = `rgba(${v},${v},${v},0.8)`;
-    for (const [dx, dy] of [[0, 0], [-TILE, 0], [TILE, 0], [0, -TILE], [0, TILE]]) {
-      g.beginPath();
-      g.ellipse(x + dx, y + dy, len, w, tilt, 0, Math.PI * 2);
-      g.fill();
-    }
-  }
-}
+const drawPlanes = (g) => blots(g, 12, () => {
+  const v = Math.floor(40 + Math.random() * 176);
+  return { len: 36 + Math.random() * 40, w: 12 + Math.random() * 14, tilt: (Math.random() - 0.5) * 1.2, fill: `rgba(${v},${v},${v},0.8)` };
+});
 
 function drawFeathers(g) {
-  g.fillStyle = 'rgb(150,150,150)';
-  g.fillRect(0, 0, TILE, TILE);
   g.strokeStyle = 'rgb(20,20,20)';
   g.lineWidth = 3;
   const step = TILE / 8;
@@ -174,8 +166,6 @@ function drawFeathers(g) {
 // overlapping round scales, rows drawn bottom up so each covers the tops of the row below: a light middle (the
 // shine) to a dark lower edge
 function drawScales(g) {
-  g.fillStyle = 'rgb(128,128,128)';
-  g.fillRect(0, 0, TILE, TILE);
   const step = TILE / 4, r = step * 0.62;
   for (let row = 4; row >= -1; row--) for (let col = -1; col <= 4; col++) {
     const x = (col + (row % 2 ? 0.5 : 0)) * step, y = row * step * 0.75;
@@ -192,15 +182,18 @@ function drawScales(g) {
   }
 }
 
-/** A tiling grey texture drawn on a canvas once; a flat grey pixel where there is no canvas (node tests). */
-function canvasTexture(draw) {
+/** A tiling texture drawn on a canvas of `grey` once; a flat grey pixel where there is no canvas (node tests). */
+function canvasTexture(draw, grey = 128) {
   if (typeof document === 'undefined') {
     const flat = new THREE.DataTexture(new Uint8Array([128, 128, 128, 255]), 1, 1);
     flat.needsUpdate = true;
     return flat;
   }
   const canvas = Object.assign(document.createElement('canvas'), { width: TILE, height: TILE });
-  draw(canvas.getContext('2d'));
+  const g = canvas.getContext('2d');
+  g.fillStyle = `rgb(${grey},${grey},${grey})`;
+  g.fillRect(0, 0, TILE, TILE);
+  draw(g);
   const map = new THREE.CanvasTexture(canvas);
   map.wrapS = map.wrapT = THREE.RepeatWrapping;
   return map;
@@ -208,7 +201,7 @@ function canvasTexture(draw) {
 
 let maps = null;
 const paintMaps = () => (maps ??= {
-  brush: { value: canvasTexture(drawBrush) }, feather: { value: canvasTexture(drawFeathers) }, plane: { value: canvasTexture(drawPlanes) },
+  brush: { value: canvasTexture(drawBrush) }, feather: { value: canvasTexture(drawFeathers, 150) }, plane: { value: canvasTexture(drawPlanes) },
   scale: { value: canvasTexture(drawScales) },
 });
 

@@ -45,8 +45,8 @@ started from, and the built kit departs from them where the designer's reference
 | `coatColorKey` | none: no coat colour, nothing derived or shared | `'scuteColor'` |
 | `coatOf(fur)` | `deriveCoatColor`; the coat colour from the fur (the lion's is `deriveManeColor`) | the default |
 | `presets` + `presetKey` | none; both or neither (`rig.test.mjs` checks the pair), the preset slider applies `presets[i]` | 6 scute layouts, `'scutePreset'` |
-| `vary(P)` | none; the kit's own draws after the base draw, before the preset (the owl's tail clamp) | keep a long tail off the floor, as the owl's `shortenTail` |
-| `randomise(P)` | `randomiseKit`: base draw, `vary`, a random preset, the coat colour. Write your own only when a draw must come in a different order (the lion: body, tail and snout before the preset, mane sides after) | the default |
+| `vary(P)` | none; the kit's own draws after the base draw, before the preset (the owl's tail clamp; the lion's body, tail, snout and mane sides) | keep a long tail off the floor, as the owl's `shortenTail` |
+| `randomise(P)` | `randomiseKit`: base draw, `vary`, a random preset, the coat colour. Write your own only when a draw must come after the preset or the coat colour; no kit does | the default |
 | `paint` | no painterly look: `{ style: 'fur', accent: [materials with their own stroke size] }` or `{ style: 'ink', accent: [materials that fray] }` (BODIES.md §Painterly) | `{ style: 'ink', accent: ['scute'] }` |
 | `delighted` | `POSES.delighted`; a cheer for a body whose arms don't read (the llama's ears, the lion's tail) | a head bob: `{ ...POSES.delighted, headPitch: -0.4 }` |
 | `wingShape(P)` | none; the owl's wing ellipsoid, for craft-anim's hands | none |
@@ -56,24 +56,24 @@ started from, and the built kit departs from them where the designer's reference
 
 All in `npc.js`. Reuse them before writing geometry.
 
-- `addHead(ctx, P)`: the head ellipsoid from `headShape`, in the body felt; first thing in `buildKit`. Its radii
-  are then `ctx.headScale`, which `addEyes`, `addEars` and any shell on the head take as `head`.
-- `addEyes(ctx, P, { head, squash })`: eyes seated on the head, and the face paint (BODIES.md §Eyes and ears).
-- `addEars(ctx, P, opts)` / `addConeEars`: leaf or cone ears on the skull (BODIES.md §Eyes and ears).
+- The head is there before `buildKit` runs: `createCharacter` adds the ellipsoid from `headShape`, in the body felt,
+  and puts its radii in `ctx.headScale`, which `addEyes` and `addEars` seat on and any shell on the head scales by.
+- `addEyes(ctx, P, { squash })`: eyes seated on the head, and the face paint (BODIES.md §Eyes and ears).
+- `addEars(ctx, P, opts)`: cone ears on the skull, or `shape: 'leaf'` (BODIES.md §Eyes and ears).
 - `addTail(ctx, P, { segments, dress })`: the sprung tail; `dress(node, i, len)` hangs the kit's geometry on each
   segment (BODIES.md §Tail). Every species has one; `rig.test.mjs` checks it clears the floor and the seat.
 - Coats (BODIES.md §Coats): name the params `${coat}Rows`, `${coat}PerRow`, `${coat}Top`, `${coat}Bottom`,
   `${coat}Size`, `${coat}Flat`, `${coat}Proud`, `${coat}Stagger` (and `${coat}AutoSize`, `${coat}Touch` for a coat
   sized to touch; optional `${coat}Sides` for faceted plates, `${coat}Gap` for a bare front), and `addTorsoCoat(ctx, P, { on, coat, material })` lays the torso shell while `P[on]`,
   `coatBulge(P, on, coat)` is the kit's bulge, `coatSize(P, coat, shape)` sizes a shell on another part (the
-  llama's neck ruff). For anything else, `scallopGeometry` + `scallopMesh`.
+  llama's neck ruff). For anything else, `addScallops(parent, shell, material, { pos, scale, rot })`.
 - `feltMaterial(P, colour)` through `ctx.addMaterial`, and `ctx.mat.<name>` so tests and paint can find it.
 - `part(geometry, material, { pos, scale, rot })` over the shared `GEO` primitives; `named(...)` from `faces.js`
   for a part a test looks up by name.
-- `applyPreset(P, kit, i)`, `randomPreset(P, kit)`, `randomiseBase(P, ranges)`, `randomiseKit(P, kit)`: the
-  preset and randomise steps, for a kit that writes its own `randomise`.
+- `applyPreset(P, kit, i)`, `randomiseBase(P, ranges)`: the preset and randomise steps, for a kit that writes its
+  own `randomise`.
 
-The turtle's `buildKit`, in words: `addHead`; its shell and beak materials; eyes with `head: ctx.headScale`; a beak
+The turtle's `buildKit`, in words: its shell and beak materials; eyes; a beak
 on the front of the head (the owl's `addBeak` is the model, a shaped-faces variant under `P.shapedFaces`); no ears;
 the shell as a torso coat of flat scutes (`flat` near `proud`, so a low `coatBulge`); a short tail through
 `addTail`.

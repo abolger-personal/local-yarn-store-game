@@ -176,20 +176,24 @@ export function resolveColourwork(colourwork, count) {
 
 const _inv = new THREE.Matrix4(), _rel = new THREE.Matrix4(), _box = new THREE.Box3();
 
+function ownMeshes(node, out = []) {
+  for (const child of node.children) {
+    if (child.userData.joint || child.userData.garment) continue;
+    ownMeshes(child, out);
+    if (child.isMesh) out.push(child);
+  }
+  return out;
+}
+
+function boxIn(inv, mesh) {
+  if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+  return _box.copy(mesh.geometry.boundingBox).applyMatrix4(_rel.multiplyMatrices(inv, mesh.matrixWorld));
+}
+
 function carried(joint) {
   _inv.copy(joint.matrixWorld).invert();
   const box = new THREE.Box3();
-  const visit = (node) => {
-    for (const child of node.children) {
-      if (child.userData.joint || child.userData.garment) continue;
-      if (child.isMesh) {
-        if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
-        box.union(_box.copy(child.geometry.boundingBox).applyMatrix4(_rel.multiplyMatrices(_inv, child.matrixWorld)));
-      }
-      visit(child);
-    }
-  };
-  visit(joint);
+  for (const mesh of ownMeshes(joint)) box.union(boxIn(_inv, mesh));
   return box;
 }
 
@@ -953,19 +957,8 @@ function coverUnderHat(built, f) {
 }
 
 function coats(head, skull, crown) {
-  const out = [], box = new THREE.Box3();
-  const visit = (node) => {
-    for (const mesh of node.children) {
-      if (mesh.userData.joint || mesh.userData.garment) continue;
-      visit(mesh);
-      if (!mesh.isMesh || mesh === skull) continue;
-      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
-      box.copy(mesh.geometry.boundingBox).applyMatrix4(_rel.multiplyMatrices(_inv.copy(head.matrixWorld).invert(), mesh.matrixWorld));
-      if (box.containsPoint(crown)) out.push(mesh);
-    }
-  };
-  visit(head);
-  return out;
+  _inv.copy(head.matrixWorld).invert();
+  return ownMeshes(head).filter((mesh) => mesh !== skull && boxIn(_inv, mesh).containsPoint(crown));
 }
 
 function pressMesh(built, head, mesh, cover) {

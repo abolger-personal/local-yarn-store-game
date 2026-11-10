@@ -452,7 +452,7 @@ numbers below are the first turtle's.
 
 ## Mouse
 
-Status: decided 2026-11-09 (the co-op side scroller's second hero, beside the turtle). `characters/mouse.js`.
+Status: decided 2026-11-09 (Turtles in Twine's second hero, beside the turtle; tmnt/REUSE-SPEC.md). `characters/mouse.js`.
 
 The lion kit exactly (`LION`, exported from `characters/lion.js`), with no mane and big round ears in its place:
 leaf ears 0.085 wide by 0.170 long, so each is a disc about 60% of the head's width, flattened to 0.35, spread

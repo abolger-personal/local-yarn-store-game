@@ -178,14 +178,21 @@ function wear(type, silhouette, color, stitch = 'stockinette') {
   };
 }
 
-/** @param {Look & Record<string, string|null>} look */
-export const outfitOf = (look) => ({
+// tmnt/REUSE-SPEC.md §Hero chooser: a hero's sweater in colourwork, its own colour first, then the rest of `palette`
+const worked = (item, work, palette) => {
+  if (!work || work === 'solid') return item;
+  const colours = [item.color1, ...palette.filter((c) => c !== item.color1)];
+  return { ...item, colourwork: work, colorCount: colours.length, ...Object.fromEntries(colours.map((c, i) => [`color${i + 1}`, c])) };
+};
+
+/** @param {Look & Record<string, string|null>} look @param {string[]} [palette] */
+export const outfitOf = (look, palette = []) => ({
   hat: wear('hat', look.hat, look.hatColor, look.hatStitch),
   shawl: wear('shawl', look.cape, look.capeColor, look.capeStitch),
   bag: wear('bag', look.bag, look.bagColor),
   // tmnt/REUSE-SPEC.md §Hero chooser: a hero's scarf, sweater and socks; a fighter's look has none
   scarf: { ...wear('scarf', look.scarf, look.scarfColor, look.scarfStitch), ...(look.scarfForm && { form: look.scarfForm }) },
-  sweater: wear('sweater', look.sweater, look.sweaterColor, look.sweaterStitch),
+  sweater: worked(wear('sweater', look.sweater, look.sweaterColor, look.sweaterStitch), look.sweaterWork, palette),
   socks: wear('socks', look.socks, look.socksColor, look.socksStitch),
 });
 
@@ -1374,11 +1381,12 @@ export const LOOKS = Object.freeze(Object.fromEntries(['lookAt', 'eyeGlint', 'pa
 const HOLD = { gloves: addGloves, sword: addSword, scythe: addScythe, hammer: addHammer };
 
 /** Same order as the shop's `dressedCharacter` (store/sim/cast.js): dress unmerged, then merge. @param {Fighter} f */
-export function buildFighter(f) {
+/** @param {string[]} [palette] the colours a hero's sweater colourwork is worked in */
+export function buildFighter(f, palette) {
   const built = createCharacter({ ...BASE_PARAMS, ...f.params, ...LOOKS, mergeMeshes: false }, f.species);
   built.root.updateMatrixWorld(true);
   built.root.userData.across = new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3()).x;
-  dress(built, outfitOf(f.look));
+  dress(built, outfitOf(f.look, palette));
   mergeCharacter(built);
   (HOLD[f.look.hands] ?? addGloves)(built, f.look.gloves);
   const tricks = TRICKS[f.look.hands] ?? TRICKS.gloves;

@@ -2,7 +2,7 @@ import { FACE_PAINTS, POSES, facePaintColorOf, getSpecies } from '../characters/
 import { HANDS, SPECIES, TEXTURES, TRICKS, animateFighter, buildFighter, disposeFighter, setFur, stepFighter, stepTricks } from '../spinoff/fighter.js';
 import { FACE_ICON, ICON, NONE, TRICK_ICON, svg, textured } from '../spinoff/icons.js';
 import { makeStage } from '../spinoff/stage.js';
-import { COLOURS, SCARF_FORMS, WEAR, loadHero, newHero, randomHero, saveHero } from './hero.js';
+import { COLOURS, PALETTE, SCARF_FORMS, SWEATER_WORKS, WEAR, loadHero, newHero, randomHero, saveHero } from './hero.js';
 
 const LINE = 'fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"';
 const PICTURE = {
@@ -18,6 +18,9 @@ const PICTURE = {
   'over-knee': '<path d="M18 2h12v30l8 4v6H18Z"/><path d="M18 8h12" stroke="#fff8" stroke-width="3"/>',
 };
 const ROW_ICON = { scarf: '🧣', sweater: '🧥', socks: '🧦', bag: '🎒' };
+// REUSE-SPEC.md §Hero chooser: tapped again, the scarf is worn another way, the sweater in the next colourwork, socks
+// or a bag in the next stitch
+const AGAIN = { scarf: ['scarfForm', SCARF_FORMS], sweater: ['sweaterWork', SWEATER_WORKS] };
 
 let hero = loadHero() ?? newHero();
 let built = null, cheer = 0, spin = 0, swing = 1, shows = -1;
@@ -35,7 +38,7 @@ const row = (icon, label, ...lines) => `<div class="row" role="group" aria-label
 
 function wearRow(kind) {
   const { look } = hero, { [kind]: current, [`${kind}Color`]: colour, [`${kind}Stitch`]: stitch } = look;
-  const again = kind === 'scarf' ? look.scarfForm : stitch;
+  const again = look[(AGAIN[kind] ?? [`${kind}Stitch`])[0]];
   const tiles = [null, ...WEAR[kind]].map((v) => button(kind, v ?? '', v === current ? `${v}, ${again}, tap again to change` : v ?? 'none',
     svg(v ? textured(PICTURE[v], kind === 'scarf' ? '' : stitch) : NONE, v ? colour : '#9a8f84'), v === current)).join('');
   return row(ROW_ICON[kind], kind, pictures(tiles), colours(swatchRow(`${kind}Color`, colour)));
@@ -65,12 +68,10 @@ function render() {
 
 const cycle = (list, v) => list[(list.indexOf(v) + 1) % list.length];
 
-// REUSE-SPEC.md §Hero chooser: the scarf you wear, tapped again, is worn another way; a sweater or socks, knitted in the next stitch
 function wearOrRestyle(kind, v) {
-  const { look } = hero;
+  const { look } = hero, [key, list] = AGAIN[kind] ?? [`${kind}Stitch`, TEXTURES];
   if (!v || v !== look[kind]) look[kind] = v || null;
-  else if (kind === 'scarf') look.scarfForm = cycle(SCARF_FORMS, look.scarfForm);
-  else look[`${kind}Stitch`] = cycle(TEXTURES, look[`${kind}Stitch`]);
+  else look[key] = cycle(list, look[key]);
 }
 
 const ACTIONS = {
@@ -100,7 +101,7 @@ const stage = makeStage(document.getElementById('stage'));
 
 function rebuild(reframe) {
   if (built) { stage.scene.remove(built.root); disposeFighter(built); }
-  built = buildFighter(hero);
+  built = buildFighter(hero, PALETTE);
   stage.scene.add(built.root);
   if (reframe) stage.frame([built.root], { margin: 1.5 });
 }

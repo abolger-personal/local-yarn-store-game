@@ -86,9 +86,9 @@ colours. Six, like the fighters' treats (`ROOM_TREATS` in `spinoff/roster.js`), 
 
 | Colour | Who | What it's for |
 |---|---|---|
-| orange, blue, purple, red | heroes | the four turtles' colours |
-| turtle green | heroes | the turtle's skin |
-| bright taxi yellow | heroes | April O'Neil's jumpsuit |
+| orange `#ff6a00`, blue `#0056d6`, purple `#874efe`, red `#b51a00` | heroes | the four turtles' colours |
+| turtle green `#4f7a28` | heroes | the turtle's skin |
+| bright taxi yellow `#f5ec00` | heroes | April O'Neil's jumpsuit |
 | black, silver | bad guys only | |
 
 The chooser offers the six hero colours. Black and silver go only to bad guys, the way the donut fighters keep
@@ -113,8 +113,10 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
 (whose `outfitOf` now also dresses a scarf, sweater and socks when a look has them) and their chooser pictures
 (`spinoff/icons.js`).
 - Scarves: trailing, long, cowl; tapping the one you wear again ties it another way.
-- Sweaters: pullover, turtleneck, vest. Socks: crew, knee-high, over-knee. Tapping either again knits it in the
-  next stitch, as the fighters' hats do.
+- Sweaters: pullover, turtleneck, vest. Tapping the sweater you wear again works it in the next colourwork (solid,
+  stripes, checks, colour-block, motif, fair isle, marled; decided 2026-11-09, so a sweater reads as a sweater when
+  the characters are small on a tablet): its own colour first, then the other five hero colours.
+- Socks: crew, knee-high, over-knee. Tapping them again knits them in the next stitch, as the fighters' hats do.
 - Bags: the fighters' three, or none.
 - Weapons: all four (gloves, sword, Music Scythe, Greathammer), no unlocks yet; tapping again changes the trick.
 - 🎲 any animal, colours and pieces. 👍 saves; there is no lobby to go to yet.

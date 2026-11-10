@@ -1,17 +1,20 @@
 import { FACE_PAINTS, getSpecies } from '../characters/npc.js';
-import { FORMS } from '../characters/garments.js';
+import { COLOURWORKS, FORMS } from '../characters/garments.js';
 import { BAGS, HANDS, SPECIES, TEXTURES, TRICKS, nearestSwatch, readFighter, setFur } from '../spinoff/fighter.js';
 
 const HERO_KEY = 'tmnt.hero.v1';
 const HEX = /^#[0-9a-f]{6}$/i;
 
-// REUSE-SPEC.md §Hero chooser: the four turtles' colours first, then turtle green and April's taxi yellow
+// REUSE-SPEC.md §Hero chooser: the designer's six (2026-11-09), the four turtles' colours first, then turtle green and April's taxi yellow
 export const COLOURS = Object.freeze([
-  ['#ff7a1a', 'orange'], ['#2f6bff', 'blue'], ['#8154ff', 'purple'], ['#e8262b', 'red'],
-  ['#4fae3b', 'turtle green'], ['#ffc20e', 'taxi yellow'],
+  ['#ff6a00', 'orange'], ['#0056d6', 'blue'], ['#874efe', 'purple'], ['#b51a00', 'red'],
+  ['#4f7a28', 'turtle green'], ['#f5ec00', 'taxi yellow'],
 ].map(([hex, name]) => Object.freeze({ hex, name })));
 const GREEN = COLOURS[4].hex, TAXI = COLOURS[5].hex;
 export const TURTLE_COLOURS = COLOURS.slice(0, 4);
+export const PALETTE = COLOURS.map((c) => c.hex);
+// REUSE-SPEC.md §Hero chooser: the sweater, tapped again, in the next colourwork, so it reads as a sweater when small
+export const SWEATER_WORKS = COLOURWORKS;
 
 // REUSE-SPEC.md §Hero chooser: scarves, sweaters (April's jumpsuit is one), socks and bags; no hats or capes;
 // wrapped twice is the Sock Clan's
@@ -27,7 +30,7 @@ const DEFAULT_HANDS = 'sword';
 /** @returns {Hero['look']} */
 const blankLook = () => ({
   hat: null, hatColor: GREEN, hatStitch: 'stockinette', cape: null, capeColor: GREEN, capeStitch: 'stockinette', bag: null, bagColor: GREEN,
-  scarfForm: 'draped', hands: DEFAULT_HANDS, trick: TRICKS[DEFAULT_HANDS][0], gloves: GREEN,
+  scarfForm: 'draped', sweaterWork: 'solid', hands: DEFAULT_HANDS, trick: TRICKS[DEFAULT_HANDS][0], gloves: GREEN,
   ...Object.fromEntries(Object.keys(WEAR).flatMap((k) => [[k, null], [`${k}Color`, GREEN], [`${k}Stitch`, 'stockinette']])),
 });
 
@@ -49,7 +52,7 @@ export function randomHero(rng = Math.random) {
   const hero = newHero(rng, pickOf(SPECIES, rng)), { look } = hero, colour = () => pickOf(COLOURS, rng).hex;
   getSpecies(hero.species).randomise(hero.params);
   for (const [kind, list] of Object.entries(WEAR)) Object.assign(look, { [kind]: pickOf([...list, null], rng), [`${kind}Color`]: colour() });
-  Object.assign(look, { scarfForm: pickOf(SCARF_FORMS, rng), hands: pickOf(HANDS, rng), gloves: colour() });
+  Object.assign(look, { sweaterWork: pickOf(SWEATER_WORKS, rng), scarfForm: pickOf(SCARF_FORMS, rng), hands: pickOf(HANDS, rng), gloves: colour() });
   look.trick = pickOf(TRICKS[look.hands], rng);
   hero.params.facePaint = pickOf(FACE_PAINTS, rng);
   return setFur(hero, colour());
@@ -62,7 +65,7 @@ function readLook(raw) {
   for (const [kind, list] of Object.entries(WEAR)) {
     Object.assign(look, { [kind]: one(kind, list), [`${kind}Color`]: colour(`${kind}Color`), [`${kind}Stitch`]: one(`${kind}Stitch`, TEXTURES) });
   }
-  Object.assign(look, { scarfForm: one('scarfForm', SCARF_FORMS), hands: one('hands', HANDS), gloves: colour('gloves') });
+  Object.assign(look, { sweaterWork: one('sweaterWork', SWEATER_WORKS), scarfForm: one('scarfForm', SCARF_FORMS), hands: one('hands', HANDS), gloves: colour('gloves') });
   look.trick = one('trick', TRICKS[look.hands]);
   return look;
 }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { LOOK } from '../characters/garments.js';
-import { SPECIES, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur } from '../spinoff/fighter.js';
-import { COLOURS, SCARF_FORMS, TURTLE_COLOURS, WEAR, newHero, randomHero, readHero } from './hero.js';
+import { SPECIES, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
+import { COLOURS, PALETTE, SCARF_FORMS, SWEATER_WORKS, TURTLE_COLOURS, WEAR, newHero, randomHero, readHero } from './hero.js';
 
 LOOK.viewPx = 0;
 
@@ -43,5 +43,15 @@ for (const species of SPECIES) {
     }
   }
 }
+// the sweater, tapped again, in each colourwork: its own colour first, then the other hero colours
+const april = newHero(() => 0.95);
+for (const work of SWEATER_WORKS) {
+  const sweater = outfitOf({ ...april.look, sweaterWork: work }, PALETTE).sweater;
+  assert.equal(sweater.color1, april.look.sweaterColor, `${work}: the picked colour leads`);
+  assert.equal(sweater.colourwork, work);
+  assert.equal(sweater.colorCount, work === 'solid' ? 1 : PALETTE.length);
+  disposeFighter(buildFighter({ ...april, look: { ...april.look, sweaterWork: work } }, PALETTE));
+}
+assert.equal(outfitOf({ ...april.look, sweaterWork: 'stripes' }).sweater.colorCount, 1, 'a fighter (no palette) keeps a one-colour sweater');
 for (let i = 0; i < 6; i++) disposeFighter(buildFighter(randomHero()));
 console.log('hero ok');

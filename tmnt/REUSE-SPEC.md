@@ -37,7 +37,7 @@ Decided 2026-11-09:
 
 Brainstorm 2026-11-09: the mouse as **Sensei Spindle** (Splinter); **Bobble & Rock-Stitchy** (Bebop & Rocksteady);
 the **Loom-o-drome** (the Technodrome); sock silhouette as Sock Clan rank (crew for footsoldiers, over-knee for
-elites); The Sweater wearing, or being, the `sweater` garment; **Purl Power!** (Turtle Power) on the title screen.
+elites); **Purl Power!** (Turtle Power) on the title screen.
 
 ## The game
 
@@ -94,18 +94,40 @@ colours. Six, like the fighters' treats (`ROOM_TREATS` in `spinoff/roster.js`), 
 The chooser offers the six hero colours. Black and silver go only to bad guys, the way the donut fighters keep
 dark purple and grey for theirs (`isBadGuyCloth` / `isBadGuyFur`).
 
-**The defaults** (decided 2026-11-09):
-- **species:** turtle;
-- **a scarf** in one of orange, blue, purple or red;
-- **a weapon**;
-- **the existing hats** (beanie, pixie, beret, bucket, earflap).
+**Kids can pick any animal** (decided 2026-11-09): turtle, mouse, lion, llama, owl or dragon, as in the fighters'
+chooser. The turtle is only the default.
 
-The donut fighters' chooser has no scarf row, so the scarf row is new. The scarf garment already exists, with its
-forms: draped, wrapped once, wrapped twice, tied, tucked.
+**The defaults** (decided 2026-11-09): a turtle wearing either
+- **a scarf** in one of orange, blue, purple or red (the four turtles), or
+- **a yellow jumpsuit** in taxi yellow (April), which is a yellow `sweater` and yellow `socks` from the existing
+  wardrobe (`characters/garments.js`), not a new garment;
+
+with **a weapon** and **the existing hats** (beanie, pixie, beret, bucket, earflap).
+
+The donut fighters' chooser has no scarf, sweater or socks rows, so those are new rows over garments that already
+exist. The scarf's forms: draped, wrapped once, wrapped twice, tied, tucked.
 
 **Keep this game's saves apart from the donut fighters'** (planned 2026-11-09). Both games are on the same site,
 so they share `localStorage`. The fighters' keys are `lys.fighter.v1` and `lys.progress.v1`; this game needs its
 own keys so a hero doesn't overwrite a fighter.
+
+## Bad guys
+
+All CPU (decided 2026-11-09). Their colours are purple, black and silver.
+
+**The Sock Clan** (decided 2026-11-09) wear
+- **socks** (`socks` in `characters/garments.js`), each sock colour drawn at random from purple, black and silver;
+- **large scarves that cover their faces**, ninja style. The existing scarf forms all sit below the face, so a
+  face-covering scarf is a new scarf form (planned 2026-11-09);
+- **hats** (the existing ones);
+- **no sweaters**: the sweater is The Sweater's.
+
+**The Sweater** (decided 2026-11-09) is **gigantic**, in a gigantic silver and purple `sweater`, a silver hat and a
+purple capelet (`capelet` is one of the fighters' capes). Gigantic means everything scales up together: things are
+as big as they look, so the boss's hit box and reach grow with the drawing.
+
+**The Sweater's gauntlets** (planned 2026-11-09): a new weapon, after the Shredder's clawed gauntlets, made for The
+Sweater. Heroes don't get them. The design is open.
 
 ## Open questions
 
@@ -117,8 +139,11 @@ own keys so a hero doesn't overwrite a fighter.
   - Do unlocks carry over from the fighting game, or start fresh?
 - **Which scarf colour does each player get?** One of the four at random, or each tablet in a room a different
   one, so a full room reads as the four turtles? A fifth player in taxi yellow would be the April.
-- **Can heroes be other species?** The turtle is the default, but the mouse, lion, llama, owl and dragon could all
-  still be picked.
+- **Which animal is The Sweater?** Or a random one each time?
+- **What should The Sweater's gauntlets look like,** and how do they attack?
+- **Purple is a hero colour and a bad-guy colour.** Purple is one of the turtles' four, and the Sock Clan and The
+  Sweater wear it too. Is that fine, as long as black and silver stay bad-guy only?
+- **How does a kid pick the jumpsuit?** As its own outfit tile, or by picking a yellow sweater and yellow socks?
 - **Are the six colours for clothes as well as fur?** Should white stay as a clothes colour, as it does in the
   fighting game?
 - **Where does "Turtleneck" go?** A power move, a pickup, a level name, or The Sweater's last form?

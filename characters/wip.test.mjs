@@ -24,6 +24,9 @@ const npcWith = (wips, over = {}) => ({
   name: 'Test', id: 'n1', traits: TRAITS(), prefs: PREFS(),
   worn: Object.fromEntries(WEAR_SLOTS.map((s) => [s, null])), wips, ...over,
 });
+// a finished object; a round stamps when it was finished
+const fo = (id, type, round) => ({ id, state: WIP_STATE.FINISHED, progress: 100, yarn: [], tool: null,
+  pattern: { ...makePattern(seq(0.5), type), patternType: type }, ...(round !== undefined && { finishedRound: round }) });
 
 {
   const cost = Object.fromEntries(Object.entries(PATTERN_TYPES).map(([t, p]) => [t, p.yarnUnits]));
@@ -285,9 +288,6 @@ const npcWith = (wips, over = {}) => ({
 }
 
 {
-  const fo = (id, type) => ({ id, state: WIP_STATE.FINISHED, progress: 100,
-                              pattern: { ...makePattern(seq(0.5), type), patternType: type },
-                              yarn: [], tool: null });
   assert.equal(slotFor(fo('a', 'hat')), 'head');
   assert.equal(slotFor(fo('a', 'sweater')), 'torso');
   assert.equal(slotFor(fo('a', 'scarf')), 'neck', 'a cowl is a scarf, so the neck');
@@ -334,10 +334,6 @@ const npcWith = (wips, over = {}) => ({
 }
 
 {
-  const fo = (id, type, round) => ({ id, state: WIP_STATE.FINISHED, progress: 100, yarn: [],
-                                     tool: null, finishedRound: round,
-                                     pattern: { ...makePattern(seq(0.5), type), patternType: type } });
-
   const npc = npcWith([fo('early hat', 'hat', 3), fo('late hat', 'hat', 9)]);
   wearOrOffer(npc);
   assert.equal(npc.worn.head.id, 'early hat', 'the first one finished is the one being worn');
@@ -379,9 +375,7 @@ const npcWith = (wips, over = {}) => ({
 }
 
 {
-  const fo = (id) => ({ id, state: WIP_STATE.FINISHED, progress: 100, yarn: [], tool: null,
-                        pattern: { ...makePattern(seq(0.5), 'hat'), patternType: 'hat' } });
-  const old = fo('old'), lent = fo('lent');
+  const old = fo('old', 'hat'), lent = fo('lent', 'hat');
   const npc = npcWith([old, lent]);
   npc.worn.head = old;
   const world = { lent: [{ npc: 'Test', npcId: 'n1', wip: lent }], backPile: [] };
@@ -392,7 +386,7 @@ const npcWith = (wips, over = {}) => ({
   assert.deepEqual(world.backPile.map((b) => b.wip.id), ['old'],
     '"place any previously offscreen item the NPC was wearing in a pile"');
 
-  assert.equal(returnToNpc(world, npc, fo('never')), false);
+  assert.equal(returnToNpc(world, npc, fo('never', 'hat')), false);
 }
 
 {

@@ -1,20 +1,16 @@
 import * as THREE from 'three';
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, GEO,
-  addConeEars, addEyes, addHead, addTail, addTorsoCoat, coatBulge,
-  feltMaterial, part, registerSpecies, scallopGeometry, scallopMesh, tailBaseHeight,
+  addEars, addEyes, addTail, addTorsoCoat, coatBulge,
+  feltMaterial, part, registerSpecies, addScallops, tailBaseHeight,
 } from './npc.js';
-import { named, onFront } from './faces.js';
+import { named, onFront, unit } from './faces.js';
 
 const DEFAULT_PARAMS = {
   ...BASE_PARAMS,
   name:          'Hoot',
-  footColor:     '#e0a53c',
 
   headYawMax:    4.60,
-
-  // BODIES.md §Face
-  facePaintSize:   1.00,
 
   tuftSize:      0.049,
   tuftSpread:    0.694,
@@ -80,15 +76,6 @@ const RANDOM_RANGES = Object.freeze({
 
 const WING_OFFSET = 0.012;
 
-const wingScale = (P) => {
-  const cover = P.limbThick * 1.05 + WING_OFFSET + 0.004;
-  return [
-    Math.max(P.wingLength * P.wingWidth, cover),
-    P.wingLength * 0.52,
-    Math.max(P.wingLength * P.wingDepth, cover),
-  ];
-};
-
 const headShell = (P) => ({
   rows: Math.max(1, Math.round(P.featherRows * 0.7)),
   perRow: P.featherPerRow,
@@ -108,26 +95,23 @@ const wingShell = (P) => ({
 
 function addHeadPlumage(ctx, P) {
   if (!P.feathers || !P.featherHead) return;
-  const shell = scallopMesh(scallopGeometry(headShell(P)), ctx.mat.feather, ctx.headScale);
-  if (shell) ctx.head.add(shell);
+  addScallops(ctx.head, headShell(P), ctx.mat.feather, { scale: ctx.headScale });
 }
 
 // BODIES.md §Shaped faces: one short beak whose blunt tip curls gently down
 const BEAK = Object.freeze({ wide: 0.50, tall: 0.42, length: 1.45, buried: 0.60, curl: 0.85, rings: 6 });
 
-const curledBeak = () => {
+const beakGeometry = () => unit('owlBeak', () => {
   const g = new THREE.CylinderGeometry(0.18, 1, 1, 12, BEAK.rings), pos = g.attributes.position;
   for (let i = 0; i < pos.count; i++) pos.setZ(i, pos.getZ(i) + BEAK.curl * (pos.getY(i) + 0.5) ** 3);
   g.translate(0, 0.5, 0).computeVertexNormals();
   return g;
-};
-let beakGeometry = null;
+});
 
 function addShapedBeak(ctx, P) {
   const s = P.beakSize, y = -P.headRadius * 0.10, head = { at: [0, 0, 0], size: ctx.headScale };
   const skin = onFront(head, 0, y)[2];
-  beakGeometry ??= curledBeak();
-  ctx.head.add(named(part(beakGeometry, ctx.mat.beak, {
+  ctx.head.add(named(part(beakGeometry(), ctx.mat.beak, {
     pos: [0, y, skin - s * BEAK.buried], scale: [s * BEAK.wide, s * BEAK.length, s * BEAK.tall], rot: [Math.PI * 0.5, 0, 0],
   }), 'beak'));
 }
@@ -146,34 +130,31 @@ function addBeak(ctx, P) {
 
 const WING_ROLL = 0.08;
 
-export const wingShape = (P) => ({ pos: [WING_OFFSET, -P.wingLength * 0.42, 0], scale: wingScale(P), roll: WING_ROLL });
+export const wingShape = (P) => {
+  const cover = P.limbThick * 1.05 + WING_OFFSET + 0.004;
+  return {
+    pos: [WING_OFFSET, -P.wingLength * 0.42, 0], roll: WING_ROLL,
+    scale: [Math.max(P.wingLength * P.wingWidth, cover), P.wingLength * 0.52, Math.max(P.wingLength * P.wingDepth, cover)],
+  };
+};
 
 function addWing(shoulder, side, ctx, P) {
-  const scale = wingScale(P);
-  const pos = [side * WING_OFFSET, -P.wingLength * 0.42, 0];
-  const rot = [0, 0, side * WING_ROLL];
-  shoulder.add(part(GEO.sphere, ctx.mat.body, { pos, scale, rot }));
-  if (!P.feathers || !P.featherWings) return;
-
-  const shell = scallopMesh(scallopGeometry(wingShell(P)), ctx.mat.feather, scale);
-  if (!shell) return;
-  shell.position.set(...pos);
-  shell.rotation.set(...rot);
-  shoulder.add(shell);
+  const { pos: [x, y, z], scale, roll } = wingShape(P), place = { pos: [side * x, y, z], scale, rot: [0, 0, side * roll] };
+  shoulder.add(part(GEO.sphere, ctx.mat.body, place));
+  if (P.feathers && P.featherWings) addScallops(shoulder, wingShell(P), ctx.mat.feather, place);
 }
 
 function buildKit(ctx, P) {
   ctx.mat.feather = ctx.addMaterial(feltMaterial(P, P.featherColor));
   ctx.mat.beak = ctx.addMaterial(feltMaterial(P, P.beakColor));
 
-  addHead(ctx, P);
   addHeadPlumage(ctx, P);
-  addEyes(ctx, P, { head: ctx.headScale });
+  addEyes(ctx, P);
   addBeak(ctx, P);
   addTorsoCoat(ctx, P, { on: 'feathers', coat: 'feather', material: ctx.mat.feather });
-  addConeEars(ctx, P, {
+  addEars(ctx, P, {
     size: P.tuftSize, length: P.tuftSize * 2.4,
-    spread: P.tuftSpread, tilt: P.tuftTilt, lift: 0.55, head: ctx.headScale,
+    spread: P.tuftSpread, tilt: P.tuftTilt, lift: 0.55,
   });
   for (const { node, side } of ctx.joints.upperArm) addWing(node, side, ctx, P);
   addTail(ctx, P, { dress: (node, i, len) => addTailFan(node, len, ctx, P) });

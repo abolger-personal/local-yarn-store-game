@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeMotion, integrate, compose, tailStep, POSE_KEYS, POSES } from './motion.js';
 import { paintMaterial } from './paint.js';
+import { named, skinZ } from './faces.js';
 
 export const BUILD = '2026-09-26.8-tails';
 
@@ -177,6 +178,7 @@ export const NAMES = [
 export const rand = (a, b) => a + Math.random() * (b - a);
 export const pick = (arr, rng = Math.random) => arr[Math.floor(rng() * arr.length)];
 export const hsl = (h, s, l) => `#${new THREE.Color().setHSL(h, s, l).getHexString()}`;
+export const hslOf = (hex) => new THREE.Color(hex).getHSL({ h: 0, s: 0, l: 0 });
 const randHex = (sat, light) => hsl(Math.random(), rand(...sat), rand(...light));
 
 function weightedPick(modes) {
@@ -196,8 +198,7 @@ function randomFur() {
 
 // BODIES.md §Colour
 function deriveCoatColor(bodyHex) {
-  const base = {};
-  new THREE.Color(bodyHex).getHSL(base);
+  const base = hslOf(bodyHex);
   const dir = Math.random() < 0.5 ? -1 : 1;
   const l = THREE.MathUtils.clamp(base.l + dir * rand(0.12, 0.30), 0.06, 0.94);
   const s = THREE.MathUtils.clamp(base.s * rand(0.65, 1.5), 0.03, 0.88);
@@ -209,8 +210,7 @@ function deriveCoatColor(bodyHex) {
 const GREY_FUR = 0.12, GREY_ACCENT = 0.03;
 
 export function facePaintColorFor(bodyHex) {
-  const body = {};
-  new THREE.Color(bodyHex).getHSL(body);
+  const body = hslOf(bodyHex);
   return hsl(body.s < GREY_FUR ? GREY_ACCENT : (body.h + 0.5) % 1, 0.85, 0.55);
 }
 
@@ -302,12 +302,8 @@ setGeometryDetail('high');
 
 const sideName = (side) => (side < 0 ? 'right' : 'left');
 
-const named = (node, name) => {
-  node.name = name;
-  return node;
-};
-
-const joint = (node, name) => {
+/** @template {THREE.Object3D} T @param {T} node @param {string} name @returns {T} */
+export const joint = (node, name) => {
   node.userData.joint = true;
   return named(node, name);
 };
@@ -445,13 +441,14 @@ function makeScallopShell(opts) {
 
 const scallopCache = new Map();
 
-function cachedGeometry(key, make) {
+/** Geometry `make` builds, kept per GEO detail under `key`; rebuilt when the detail changes. */
+export function cachedGeometry(key, make) {
   const at = `${key}|${currentDetail}`;
   if (!scallopCache.has(at)) scallopCache.set(at, make());
   return scallopCache.get(at);
 }
 
-export const scallopGeometry = (opts) => cachedGeometry(JSON.stringify(opts), () => makeScallopShell(opts));
+const scallopGeometry = (opts) => cachedGeometry(JSON.stringify(opts), () => makeScallopShell(opts));
 
 function clearScallopCache() {
   for (const geometry of scallopCache.values()) geometry?.dispose();
@@ -495,23 +492,21 @@ export function coatBulge(P, on, coat) {
 }
 
 /** The kit's head: an ellipsoid of `headShape` × headRadius in the body felt; its radii go in ctx.headScale. */
-export function addHead(ctx, P) {
+function addHead(ctx, P) {
   ctx.headScale = ctx.species.headShape.map((k) => P.headRadius * k);
   ctx.head.add(part(GEO.sphere, ctx.mat.body, { scale: ctx.headScale }));
 }
 
 export function addTorsoCoat(ctx, P, { on, coat, material }) {
-  if (!P[on]) return;
-  const shell = scallopMesh(scallopGeometry(torsoShell(P, coat)), material, [P.torsoW, P.torsoH, P.torsoD]);
-  if (shell) ctx.chest.add(shell);
+  if (P[on]) addScallops(ctx.chest, torsoShell(P, coat), material, { scale: [P.torsoW, P.torsoH, P.torsoD] });
 }
 
-export function scallopMesh(geometry, material, scale) {
+/** The scallop shell `opts` on `parent`, placed as a part (`place`: pos, scale, rot); null, nothing added, when it has no scallops. */
+export function addScallops(parent, opts, material, place) {
+  const geometry = scallopGeometry(opts);
   if (!geometry) return null;
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.scale.set(...scale);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
+  const mesh = part(geometry, material, place);
+  parent.add(mesh);
   return mesh;
 }
 
@@ -520,13 +515,7 @@ const eyeWhiteDepth = (P) => P.eyeRadius * 0.55;
 // BODIES.md §Eyes and ears
 const EYE_PROUD = 0.25;
 
-const skinZ = (x, y, head) => {
-  const k = 1 - (x / head[0]) ** 2 - (y / head[1]) ** 2;
-  return k > 0 ? head[2] * Math.sqrt(k) : 0;
-};
-
 function eyeSeat(P, { spread, lift, front, head }) {
-  if (!head) return front;
   const skin = skinZ(P.headRadius * spread, P.headRadius * lift, head);
   return Math.max(front, (skin - eyeWhiteDepth(P) * (1 - EYE_PROUD)) / P.headRadius);
 }
@@ -555,7 +544,6 @@ const REACH_STEPS = 24;
 
 /** How far (a share of the eye's radius) the white shows above the skin from the eye's middle along `dir`. @param {number[]} dir */
 function whiteReach(P, { squash, head }, at, dir) {
-  if (!head) return 1;
   const [ux, uy] = dir;
   const depth = eyeWhiteDepth(P);
   for (let i = 1; i <= REACH_STEPS; i++) {
@@ -585,14 +573,9 @@ function buildEye(side, P, mat, placement) {
   return { group, pupil, rest: pupil.position.z, depth, r: P.eyeRadius, ry: P.eyeRadius * squash, room: pupilRoom(P, placement, group.position) };
 }
 
-export function addEyes(ctx, P, opts = {}) {
-  const placement = {
-    spread: opts.spread ?? P.eyeSpread,
-    lift: opts.lift ?? P.eyeLift,
-    front: opts.front ?? P.eyeFront,
-    squash: opts.squash ?? 1,
-    head: opts.head,
-  };
+/** The eyes, seated on the head (ctx.headScale), `squash` tall, and the face paint. */
+export function addEyes(ctx, P, { squash = 1 } = {}) {
+  const placement = { spread: P.eyeSpread, lift: P.eyeLift, front: P.eyeFront, squash, head: ctx.headScale };
   placement.front = eyeSeat(P, placement);
   if (P.eyeGlint) ctx.mat.glint ??= ctx.addMaterial(Object.assign(eyeMaterial(P, '#ffffff'), { emissive: new THREE.Color('#ffffff') }));
   for (const side of [-1, 1]) {
@@ -600,7 +583,7 @@ export function addEyes(ctx, P, opts = {}) {
     ctx.head.add(joint(group, `${sideName(side)}Eye`));
     ctx.joints.eye.push({ node: group, ...eye });
   }
-  if (opts.head) addFace(ctx, P, placement);
+  addFace(ctx, P, placement);
 }
 
 // BODIES.md §Face paint: it lies this far proud of the skull
@@ -760,7 +743,6 @@ const EAR_SEAT = 0.95;
 
 function earSeat(P, { spread, lift, back, head }) {
   const x = P.headRadius * spread, y = P.headRadius * lift, z = P.headRadius * back;
-  if (!head) return [x, y, z];
   const norm = Math.hypot(x / head[0], y / head[1], z / head[2]);
   const k = norm > EAR_SEAT ? EAR_SEAT / norm : 1;
   return [x * k, y * k, z * k];
@@ -772,7 +754,7 @@ export function addEars(ctx, P, opts) {
   const leaf = shape === 'leaf';
   const geometry = leaf ? GEO.sphere : GEO.cone;
   const scale = leaf ? [size, length * 0.5, size * flatten] : [size, length, size];
-  const [sx, sy, sz] = earSeat(P, { spread, lift, back, head: opts.head });
+  const [sx, sy, sz] = earSeat(P, { spread, lift, back, head: ctx.headScale });
 
   for (const side of [-1, 1]) {
     const ear = joint(new THREE.Group(), `${sideName(side)}Ear`);
@@ -785,8 +767,6 @@ export function addEars(ctx, P, opts) {
     });
   }
 }
-
-export const addConeEars = (ctx, P, opts) => addEars(ctx, P, { ...opts, shape: 'cone' });
 
 // BODIES.md §Tail
 const TAIL_BASE = 0.55;
@@ -1045,8 +1025,7 @@ function buildBody(P, mat, joints, addMaterial, bulge) {
 
 export function createCharacter(P, species) {
   const kit = resolveSpecies(species);
-  const materials = [];
-  const addMaterial = (m) => { materials.push(m); return m; };
+  const materials = [], addMaterial = (m) => { materials.push(m); return m; };
   const mat = baseMaterials(P, addMaterial);
   const joints = {
     hips: null, spine: null, chest: null, neck: null, head: null,
@@ -1054,9 +1033,9 @@ export function createCharacter(P, species) {
   };
   const bulge = Math.max(0, kit.coatBulge?.(P) ?? 0);
   const body = buildBody(P, mat, joints, addMaterial, bulge);
-
   const ctx = { ...body, joints, materials, mat, addMaterial, params: P, species: kit, bulge,
                 motion: makeMotion(POSES.rest), groundOffset: 0, seatDrop: 0 };
+  addHead(ctx, P);
   kit.buildKit(ctx, P);
   if (P.painterly && kit.paint) paintCharacter(ctx, kit.paint);
   if (!P.partShadows) body.root.traverse((o) => { if (o.isMesh) o.castShadow = false; });
@@ -1441,13 +1420,11 @@ export function applyPreset(P, { presets, presetKey }, index) {
   return Object.assign(P, presets[((index % count) + count) % count]);
 }
 
-export const randomPreset = (P, kit) => applyPreset(P, kit, Math.floor(Math.random() * kit.presets.length));
-
 /** BODIES.md §Randomisation: the base draw, the kit's own (`vary`), a coat preset, the coat colour from the fur. */
 function randomiseKit(P, kit) {
   randomiseBase(P, kit.randomRanges);
   kit.vary?.(P);
-  if (kit.presets) randomPreset(P, kit);
+  if (kit.presets) applyPreset(P, kit, Math.floor(Math.random() * kit.presets.length));
   if (kit.coatColorKey) P[kit.coatColorKey] = kit.coatOf(P.bodyColor);
   return P;
 }

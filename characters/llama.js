@@ -1,7 +1,7 @@
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, GEO,
-  addEars, addEyes, addHead, addTail, addTorsoCoat, coatBulge, coatSize,
-  feltMaterial, POSES, part, registerSpecies, scallopGeometry, scallopMesh,
+  addEars, addEyes, addTail, addTorsoCoat, coatBulge, coatSize,
+  feltMaterial, POSES, part, registerSpecies, addScallops,
 } from './npc.js';
 import { named, softGeometry } from './faces.js';
 
@@ -175,10 +175,7 @@ function addNeckFleece(ctx, P) {
   const half = (P.neckLength * P.fleeceNeckCoverage) / 2;
   // BODIES.md §Llama: ruff cap
   const radius = Math.min(P.neckThick * P.fleeceNeckSpread, half * 1.7);
-  const shell = scallopMesh(scallopGeometry(neckShell(P)), ctx.mat.fleece, [radius, half, radius]);
-  if (!shell) return;
-  shell.position.y = half;
-  ctx.neck.add(shell);
+  addScallops(ctx.neck, neckShell(P), ctx.mat.fleece, { scale: [radius, half, radius], pos: [0, half, 0] });
 }
 
 function buildKit(ctx, P) {
@@ -186,14 +183,13 @@ function buildKit(ctx, P) {
   ctx.mat.muzzle = ctx.addMaterial(feltMaterial(P, P.muzzleColor));
   ctx.mat.nose = ctx.addMaterial(feltMaterial(P, P.noseColor));
 
-  addHead(ctx, P);
-  addEyes(ctx, P, { squash: 1.1, head: ctx.headScale });
+  addEyes(ctx, P, { squash: 1.1 });
   addMuzzle(ctx, P);
   addNose(ctx, P);
   addEars(ctx, P, {
     size: P.earWidth, length: P.earLength, shape: 'leaf',
     spread: P.earSpread, tilt: P.earTilt, lift: 0.72, back: -0.10,
-    flatten: P.earFlatten, head: ctx.headScale,
+    flatten: P.earFlatten,
   });
   addTorsoCoat(ctx, P, { on: 'fleece', coat: 'fleece', material: ctx.mat.fleece });
   addNeckFleece(ctx, P);

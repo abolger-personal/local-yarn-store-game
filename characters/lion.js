@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import {
   BASE_PARAMS, BASE_RANDOM_RANGES, BASE_MOTION_RANGES, GEO,
-  addEars, addEyes, addHead, addTail, coatSize, hsl, pick, rand, randomPreset, tailBaseHeight,
-  feltMaterial, LIMB_TAPER, POSES, part, randomiseBase, registerSpecies, scallopAngles,
-  scallopBases, scallopGeometry, scallopMesh,
+  addEars, addEyes, addTail, coatSize, hsl, hslOf, pick, rand, round3, tailBaseHeight,
+  feltMaterial, LIMB_TAPER, POSES, part, registerSpecies, scallopAngles,
+  scallopBases, addScallops,
 } from './npc.js';
-import { named, softGeometry, softTriangle } from './faces.js';
+import { named, skinZ, softGeometry, softTriangle } from './faces.js';
 
 const TIP = LIMB_TAPER;
 
@@ -34,9 +34,6 @@ const DEFAULT_PARAMS = {
   footColor:     '#6b5336',
 
   headYawMax:    1.30,
-
-  // BODIES.md §Face
-  facePaintSize:   1.00,
 
   shoulderOut:   0.88,
   shoulderLift:  0.32,
@@ -100,8 +97,6 @@ export const MANE_PRESETS = Object.freeze([
   { maneRows: 6, manePerRow: 15, maneProud: 1.501, maneStagger: false, maneTop: 0.10, maneBottom: 0.92 },
   { maneRows: 5, manePerRow: 15, maneProud: 1.140, maneStagger: true,  maneTop: 0.12, maneBottom: 0.97 },
 ]);
-
-const MANE = Object.freeze({ presets: MANE_PRESETS, presetKey: 'manePreset' });
 
 const DRAWN_AS_ONE = new Set(['torsoW', 'torsoH', 'torsoD', 'upperArmLen', 'forearmLen']);
 
@@ -203,14 +198,9 @@ function noseAt(P) {
   return { r, centre: front - r * 0.90, back: front - depth, depth, front };
 }
 
-function headSkinZ(P) {
-  const k = 1 - (-P.muzzleDrop / HEAD_SHAPE[1]) ** 2;
-  return k > 0 ? P.headRadius * HEAD_SHAPE[2] * Math.sqrt(k) : 0;
-}
-
 export const snoutGap = (P) => {
   const nose = noseAt(P);
-  return (nose.back - headSkinZ(P)) / nose.depth;
+  return (nose.back - P.headRadius * skinZ(0, -P.muzzleDrop, HEAD_SHAPE)) / nose.depth;
 };
 
 function addNose(ctx, P) {
@@ -239,13 +229,12 @@ function addWhiskerPads(ctx, P) {
 function addMane(ctx, P) {
   if (!P.mane) return;
   const radius = P.headRadius;
-  const shell = scallopMesh(scallopGeometry(maneShell(P)), ctx.mat.mane,
-    [radius, radius * P.maneTall, radius]);
+  const shell = addScallops(ctx.head, maneShell(P), ctx.mat.mane, {
+    scale: [radius, radius * P.maneTall, radius], pos: [0, -radius * P.maneDrop, radius * P.manePush],
+  });
   if (!shell) return;
   shell.name = 'mane';
   shell.userData.trimUnderHat = true;
-  shell.position.set(0, -P.headRadius * P.maneDrop, P.headRadius * P.manePush);
-  ctx.head.add(shell);
 }
 
 const JOIN = 0.5;
@@ -269,14 +258,13 @@ function buildKit(ctx, P) {
   ctx.mat.muzzle = ctx.addMaterial(feltMaterial(P, P.muzzleColor));
   ctx.mat.nose = ctx.addMaterial(feltMaterial(P, P.noseColor));
 
-  addHead(ctx, P);
-  addEyes(ctx, P, { squash: 1.0, head: ctx.headScale });
+  addEyes(ctx, P);
   addMuzzle(ctx, P);
   addNose(ctx, P);
   addEars(ctx, P, {
     size: P.earWidth, length: P.earLength, shape: 'leaf',
     spread: P.earSpread, tilt: P.earTilt, lift: 0.70, back: -0.14,
-    flatten: P.earFlatten, head: ctx.headScale,
+    flatten: P.earFlatten,
   });
   addEarTips(ctx, P);
   addMane(ctx, P);
@@ -298,11 +286,8 @@ function addLionTail(ctx, P) {
 }
 
 function solveSnout(P) {
-  const gap = SNOUT_GAP[0] + Math.random() * (SNOUT_GAP[1] - SNOUT_GAP[0]);
-  const tipW = P.muzzleWidth * TIP;
-  const r = tipW * P.noseSize;
-  const depth = r * 1.80;
-  const front = headSkinZ(P) + gap * depth + (1 - NOSE_PROUD) * depth - tipW * P.muzzleRound;
+  const { depth } = noseAt(P), skin = P.headRadius * skinZ(0, -P.muzzleDrop, HEAD_SHAPE);
+  const front = skin + rand(...SNOUT_GAP) * depth + (1 - NOSE_PROUD) * depth - P.muzzleWidth * TIP * P.muzzleRound;
   P.muzzleLength = front - P.headRadius * P.muzzleStart;
   if (P.muzzleLength >= MIN_MUZZLE) return;
   P.muzzleLength = MIN_MUZZLE;
@@ -319,8 +304,7 @@ export function lightness(hex) {
 const MIN_MANE_CONTRAST = 28;
 
 function deriveManeColor(bodyHex) {
-  const body = {};
-  new THREE.Color(bodyHex).getHSL(body);
+  const body = hslOf(bodyHex);
   const target = rand(MIN_MANE_CONTRAST, 44);
   const bodyL = lightness(bodyHex);
   const darker = Math.random() < 0.75;
@@ -346,7 +330,6 @@ const MAX_ARM_RATIO = 0.70;
 
 // BODIES.md §Lion: tail clears the floor
 const TAIL_RATIO = [0.85, 1.00];
-const round3 = (n) => Math.round(n * 1000) / 1000;
 
 function varyBody(P) {
   const body = rand(...BODY_SIZE);
@@ -357,15 +340,11 @@ function varyBody(P) {
   for (const k of ['upperArmLen', 'forearmLen']) P[k] = round3(P[k] / Math.max(1, over));
 }
 
-function randomiseLion(P) {
-  randomiseBase(P, RANDOM_RANGES);
+function varyLion(P) {
   varyBody(P);
   P.tailLength = rand(...TAIL_RATIO) * tailBaseHeight(P);
   solveSnout(P);
-  randomPreset(P, MANE);
   P.maneSides = pick([4, 5, 6]);
-  P.maneColor = deriveManeColor(P.bodyColor);
-  return P;
 }
 
 const LION_GUI = Object.freeze({
@@ -416,10 +395,11 @@ registerSpecies({
   buildKit,
   coatColorKey: 'maneColor',
   coatOf: deriveManeColor,
-  randomise: randomiseLion,
+  vary: varyLion,
   // BODIES.md §Painterly
   paint: { style: 'fur', accent: ['mane'] },
-  ...MANE,
+  presets: MANE_PRESETS,
+  presetKey: 'manePreset',
   // The arms vanish against the mane, so the tail carries the cheer: lifted clear of the body.
   delighted: Object.freeze({ ...POSES.delighted, tailLift: 0.9, tailWag: 1.6 }),
 });

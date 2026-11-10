@@ -2,7 +2,22 @@ import * as THREE from 'three';
 import { SHAPE_UNITS } from './catalog.js';
 
 export const TIERS = Object.freeze(['chunky', 'low', 'med']);
-export const tierIndex = (t) => Math.max(0, TIERS.indexOf(t));
+/** @param {number|string} t */
+export const tierIndex = (t) => (typeof t === 'number' ? t : Math.max(0, TIERS.indexOf(t)));
+
+/**
+ * @template T
+ * @param {(name: string, tier: number|string) => T} fn
+ * @returns {(name: string, tier?: number|string) => T}
+ */
+function memo(fn) {
+  const cache = new Map();
+  return (name, tier = 1) => {
+    const key = `${name}@${tier}`;
+    if (!cache.has(key)) cache.set(key, fn(name, tier));
+    return cache.get(key);
+  };
+}
 
 export const YARN_FAMILIES = Object.freeze(['ball', 'cake', 'skein', 'cone', 'mini']);
 
@@ -71,7 +86,7 @@ function seat(g) {
 export function buildFamily(name, tier = 1) {
   const make = BUILDERS[name];
   if (!make) throw new Error(`unknown yarn family: ${name}`);
-  return seat(make(typeof tier === 'string' ? tierIndex(tier) : tier));
+  return seat(make(tierIndex(tier)));
 }
 
 export const FAMILY_FOOTPRINT = Object.freeze({
@@ -88,9 +103,6 @@ export const familyFootprint = (name, bulk = 1) => {
   return [w + bulk - 1, h + bulk - 1];
 };
 
-export const buildAll = (tier = 1) =>
-  Object.fromEntries(YARN_FAMILIES.map((n) => [n, buildFamily(n, tier)]));
-
 export const BANDS = Object.freeze({
   ball:    { r: 0.53, y: 0.50, h: 0.30, axis: 'y' },
   cake:    { r: 0.53, y: 0.49, h: 0.34, axis: 'y' },
@@ -100,16 +112,11 @@ export const BANDS = Object.freeze({
   mini:    { r: 0.178, y: 0.50, h: 0.20, axis: 'x' },
 });
 
-const _height = new Map();
-const familyHeight = (name) => {
-  if (!_height.has(name)) _height.set(name, buildFamily(name, 1).boundingBox.max.y);
-  return _height.get(name);
-};
+const familyHeight = memo((name) => buildFamily(name, 1).boundingBox.max.y);
 
 /** @param {number|string} [tier] */
 export const buildBand = (tier = 1) =>
-  new THREE.CylinderGeometry(1, 1, 1, [10, 14, 18][typeof tier === 'string' ? tierIndex(tier) : tier],
-                             1, true);
+  new THREE.CylinderGeometry(1, 1, 1, [10, 14, 18][tierIndex(tier)], 1, true);
 
 const _rz = new THREE.Matrix4();
 const _tz = new THREE.Matrix4();
@@ -135,7 +142,7 @@ function tailCurve() {
 
 /** @param {number|string} [tier] */
 export const buildTail = (tier = 1) => {
-  const t = typeof tier === 'string' ? tierIndex(tier) : tier;
+  const t = tierIndex(tier);
   return new THREE.TubeGeometry(tailCurve(), [8, 12, 16][t], 0.075, [3, 4, 5][t], false);
 };
 
@@ -161,19 +168,12 @@ export function tailMatrix(name, target = new THREE.Matrix4()) {
 
 export const triangleCount = (g) => (g.index ? g.index.count : g.attributes.position.count) / 3;
 
-const _extent = new Map();
-
-/** @param {string} name @param {number|string} [tier] */
-export function familyExtent(name, tier = 1) {
-  const cacheKey = `${name}@${tier}`;
-  if (_extent.has(cacheKey)) return _extent.get(cacheKey);
+export const familyExtent = memo((name, tier) => {
   const g = buildFamily(name, tier);
   const b = g.boundingBox;
-  const out = Object.freeze([b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z]);
   g.dispose();
-  _extent.set(cacheKey, out);
-  return out;
-}
+  return Object.freeze([b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z]);
+});
 
 // YARN-ASSET-SPIKE.md §14: squash to meet the layer grid, never stretch.
 export const SETTLE_MIN = 0.82;
@@ -186,17 +186,13 @@ function meshVolume(g) {
   return Math.abs(v) / 6;
 }
 
-const _perUnit = new Map();
-const volumePerUnit = (name, tier) => {
-  const cacheKey = `${name}@${tier}`;
-  if (!_perUnit.has(cacheKey)) {
-    const g = buildFamily(name, tier);
-    const [uw, , ud] = familyExtent(name, tier);
-    _perUnit.set(cacheKey, meshVolume(g) / Math.max(uw, ud) ** 3 / SHAPE_UNITS[name]);
-    g.dispose();
-  }
-  return _perUnit.get(cacheKey);
-};
+const volumePerUnit = memo((name, tier) => {
+  const g = buildFamily(name, tier);
+  const [uw, , ud] = familyExtent(name, tier);
+  const v = meshVolume(g) / Math.max(uw, ud) ** 3 / SHAPE_UNITS[name];
+  g.dispose();
+  return v;
+});
 
 const SCALED_TO_UNITS = ['ball', 'cone'];
 
@@ -223,20 +219,11 @@ export function yarnFit(family, footW, footD,
   return { k, ky: k * settle, layers, w: footW, h: footD };
 }
 
-const _aspect = new Map();
-
 /** @param {string} name @param {number|string} [tier] */
 export function familyAspect(name, tier = 1) {
-  const cacheKey = `${name}@${tier}`;
-  if (_aspect.has(cacheKey)) return _aspect.get(cacheKey);
-  const g = buildFamily(name, tier);
-  const b = g.boundingBox;
-  const d = [b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z];
+  const d = familyExtent(name, tier);
   const m = Math.max(...d);
-  const out = Object.freeze(d.map((v) => v / m));
-  g.dispose();
-  _aspect.set(cacheKey, out);
-  return out;
+  return d.map((v) => v / m);
 }
 
 /** @param {string} a @param {string} b @param {number|string} [tier] */
@@ -245,30 +232,20 @@ export const aspectDistance = (a, b, tier = 1) => {
   return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
 };
 
-const _relief = new Map();
-
 const DOWN = new THREE.Vector3(0, -1, 0);
 
 const RELIEF_N = 48;
 
-/**
- * @param {string} name @param {number|string} [tier]
- * @returns {{top: (x: number, z: number) => number, bottom: (x: number, z: number) => number}}
- */
-export function familyRelief(name, tier = 1) {
-  const cacheKey = `${name}@${tier}`;
-  if (_relief.has(cacheKey)) return _relief.get(cacheKey);
+export const familyRelief = memo((name, tier) => {
   const geo = buildFamily(name, tier);
   const b = geo.boundingBox.clone();
   const { top, bottom } = castRelief(geo, b);
   geo.dispose();
-  const out = {
+  return {
     top: (x, z) => sampleRelief(top, b, x, z, Math.max),
     bottom: (x, z) => sampleRelief(bottom, b, x, z, Math.min),
   };
-  _relief.set(cacheKey, out);
-  return out;
-}
+});
 
 
 function castRelief(geo, b) {

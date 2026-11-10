@@ -1,5 +1,6 @@
 // Usage: node tools/run-tests.mjs [fast|slow|all] [file ...] (see tools/README.md)
 import { spawnSync } from 'node:child_process';
+import { globSync } from 'node:fs';
 
 const LIMIT_MS = 2000;
 
@@ -16,40 +17,8 @@ const SLOW = [
   'spinoff/fighter.test.mjs',
 ];
 
-const FAST = [
-  'characters/motion.test.mjs',
-  'characters/paint.test.mjs',
-  'characters/glitter.test.mjs',
-  'characters/faces.test.mjs',
-  'characters/visit.test.mjs',
-  'characters/guestbook.test.mjs',
-  'characters/wip.test.mjs',
-  'characters/store/plants.test.mjs',
-  'characters/store/wood.test.mjs',
-  'characters/store/speed.test.mjs',
-  'characters/store/view.test.mjs',
-  'inventory/supply.test.mjs',
-  'characters/store/ui/lettering.test.mjs',
-  'inventory/grid.test.mjs',
-  'inventory/pick-place.test.mjs',
-  'spinoff/tricks.test.mjs',
-  'spinoff/punches.test.mjs',
-  'spinoff/kicks.test.mjs',
-  'spinoff/stage.test.mjs',
-  'spinoff/roster.test.mjs',
-  'spinoff/controls.test.mjs',
-  'spinoff/sim.test.mjs',
-  'spinoff/replay.test.mjs',
-  'spinoff/hammer.test.mjs',
-  'spinoff/build.test.mjs',
-  'spinoff/cpu.test.mjs',
-  'spinoff/multiplayer.test.mjs',
-  'spinoff/together.test.mjs',
-  'spinoff/levels.test.mjs',
-  'spinoff/progress.test.mjs',
-  'spinoff/generate.test.mjs',
-  'spinoff/visibility.test.mjs',
-];
+// every other test file; an entry with env in SLOW also runs here without it
+const FAST = globSync('{characters,inventory,spinoff}/**/*.test.mjs').sort().filter((f) => !SLOW.includes(f));
 
 const [section = 'fast', ...only] = process.argv.slice(2);
 const files = only.length ? only : { fast: FAST, slow: SLOW, all: [...FAST, ...SLOW] }[section];

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
 import { LOOK } from '../characters/garments.js';
-import { SPECIES, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
+import { CANE, SAI, SPECIES, animateFighter, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
 import { CLOTH, COLOURS, PALETTE, SCARF_FORMS, SWEATER_WORKS, TURTLE_COLOURS, WEAR, newHero, randomHero, readHero } from './hero.js';
 
 LOOK.viewPx = 0;
@@ -55,5 +56,23 @@ for (const work of SWEATER_WORKS) {
   disposeFighter(buildFighter({ ...april, look: { ...april.look, sweaterWork: work } }, PALETTE));
 }
 assert.equal(outfitOf({ ...april.look, sweaterWork: 'stripes' }).sweater.colorCount, 1, 'a fighter (no palette) keeps a one-colour sweater');
+// Raphael (red) has his sai and red socks; the mouse is Master Splinter, with his cane, hanging down to the floor at rest
+const raph = newHero(() => 0.65);
+assert.deepEqual([raph.look.scarfColor, raph.look.hands, raph.look.socksColor], [COLOURS[3].hex, SAI, COLOURS[3].hex]);
+assert.equal(newHero(() => 0, 'mouse').look.hands, CANE);
+for (const species of SPECIES) {
+  const built = buildFighter({ ...newHero(() => 0, species), look: { ...newHero(() => 0).look, hands: CANE } });
+  let low = Infinity, dir = null;
+  // a whole idle cycle: the knob's lowest is what touches down
+  for (let i = 0; i < 180; i++) {
+    animateFighter(built, 1 / 60);
+    built.root.updateMatrixWorld(true);
+    low = Math.min(low, built.sword.localToWorld(new THREE.Vector3(0, 0, built.sword.userData.tip)).y);
+    dir = new THREE.Vector3(0, 0, 1).transformDirection(built.sword.matrixWorld);
+  }
+  assert.ok(dir.y < -0.95, `${species}: the cane hangs straight down (${dir.y.toFixed(2)})`);
+  assert.ok(low > 0 && low < 0.06, `${species}: the knob just off the floor (${low.toFixed(3)})`);
+  disposeFighter(built);
+}
 for (let i = 0; i < 6; i++) disposeFighter(buildFighter(randomHero()));
 console.log('hero ok');

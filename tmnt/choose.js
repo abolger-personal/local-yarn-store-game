@@ -1,8 +1,8 @@
 import { FACE_PAINTS, POSES, facePaintColorOf, getSpecies } from '../characters/npc.js';
-import { HANDS, SPECIES, TEXTURES, TRICKS, animateFighter, buildFighter, disposeFighter, setFur, stepFighter, stepTricks } from '../spinoff/fighter.js';
+import { SPECIES, TEXTURES, TRICKS, animateFighter, buildFighter, disposeFighter, setFur, stepFighter, stepTricks } from '../spinoff/fighter.js';
 import { FACE_ICON, ICON, NONE, TRICK_ICON, svg, textured } from '../spinoff/icons.js';
 import { makeStage } from '../spinoff/stage.js';
-import { CLOTH, COLOURS, PALETTE, SCARF_FORMS, SWEATER_WORKS, WEAR, loadHero, newHero, randomHero, saveHero } from './hero.js';
+import { CLOTH, COLOURS, HERO_HANDS, PALETTE, handsOf, SCARF_FORMS, SWEATER_WORKS, WEAR, loadHero, newHero, randomHero, saveHero } from './hero.js';
 
 const LINE = 'fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"';
 const PICTURE = {
@@ -46,7 +46,7 @@ function wearRow(kind) {
 
 function handsRow() {
   const { look } = hero;
-  const tiles = HANDS.map((v) => {
+  const tiles = HERO_HANDS.map((v) => {
     const on = v === look.hands, icon = on && TRICKS[v].length > 1 && TRICK_ICON[look.trick];
     const badge = icon ? `<text x="38" y="14" font-size="18" text-anchor="middle">${icon}</text>` : '';
     return button('hands', v, on && TRICKS[v].length > 1 ? `${v}, ${look.trick}, tap again to change` : v, svg(PICTURE[v] + badge, look.gloves), on);
@@ -75,7 +75,12 @@ function wearOrRestyle(kind, v) {
 }
 
 const ACTIONS = {
-  species: (v) => { hero = setFur({ ...newHero(Math.random, v), look: hero.look }, hero.params.bodyColor); return true; },
+  // the mouse picks up Master Splinter's cane; any other animal keeps what it held
+  species: (v) => {
+    const look = v === 'mouse' ? { ...hero.look, hands: handsOf(v), trick: TRICKS[handsOf(v)][0] } : hero.look;
+    hero = setFur({ ...newHero(Math.random, v), look }, hero.params.bodyColor);
+    return true;
+  },
   fur: (v) => { setFur(hero, v); },
   facePaint: (v) => { hero.params.facePaint = v; },
   hands: (v) => {

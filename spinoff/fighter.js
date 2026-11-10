@@ -43,12 +43,18 @@ export const HAND_ICON = Object.freeze({
   scythe: '<g transform="rotate(35 24 24)"><rect x="22" y="12" width="4" height="27" rx="2"/><path d="M24 2l5 11h-10Z"/><path d="M24 37l2.4 4.6 5 .6-3.7 3.4 1 5-4.7-2.5-4.7 2.5 1-5-3.7-3.4 5-.6Z"/><path d="M24 11c10 0 17 10 16 23-4-8-9-14-16-16Z" fill="#2f6bff"/></g>',
   hammer: '<g transform="rotate(35 24 24)"><rect x="21.5" y="14" width="5" height="33" rx="1.5" fill="#26221f"/><path d="M21 30h6M21 35h6M21 40h6" stroke="#5a4636" stroke-width="2.5"/>'
     + '<rect x="9" y="1" width="30" height="16" rx="1" fill="#3a3a3e"/><path d="M9 6h30M14 1v16M33 1v16" stroke="#17171a" stroke-width="2"/><path d="M18 4l3 5-2 4M29 10l-4 3" stroke="currentColor" stroke-width="1.4" fill="none"/></g>',
+  cane: '<g transform="rotate(35 24 24)"><rect x="21.5" y="12" width="5" height="34" rx="2.5"/><circle cx="24" cy="10" r="8"/></g>',
+  sai: '<g transform="rotate(35 24 24)"><path d="M22.5 31V8l1.5-6 1.5 6v23Z"/><path d="M24 31c-8 0-10-4-10-12M24 31c8 0 10-4 10-12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="21.5" y="31" width="5" height="12" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.5"/></g>',
 });
 // what flies off the hitting glove or the blade's tip as it lands; tapping the picked one goes to the next. The scythe's is fixed.
+const SWORD_TRICKS = Object.freeze(['sparkle', 'bubble', 'flame', 'bebop', 'shootingStar', 'bubblegumPop', 'smiteOfLight', 'speedLines', 'lightningStorm', 'atomicBall']);
+// tmnt/REUSE-SPEC.md §Hero chooser: Master Splinter's cane and Raphael's sai, a hero's only (not in HANDS), with the sword's tricks
+export const CANE = 'cane', SAI = 'sai';
 export const TRICKS = Object.freeze({
-  gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame', 'bebop', 'starPunch', 'fireball', 'loveTap', 'bubblegumPop', 'powerPuff', 'magicStar', 'heartBlast', 'smiteOfLight', 'speedLines', 'lightningStorm', 'atomicBall']), sword: Object.freeze(['sparkle', 'bubble', 'flame', 'bebop', 'shootingStar', 'bubblegumPop', 'smiteOfLight', 'speedLines', 'lightningStorm', 'atomicBall']), scythe: Object.freeze(['music']),
+  gloves: Object.freeze(['plain', 'sparkle', 'bubble', 'flame', 'bebop', 'starPunch', 'fireball', 'loveTap', 'bubblegumPop', 'powerPuff', 'magicStar', 'heartBlast', 'smiteOfLight', 'speedLines', 'lightningStorm', 'atomicBall']), sword: SWORD_TRICKS, scythe: Object.freeze(['music']),
   // lightning first: a trick the hammer doesn't have falls back to it
   hammer: Object.freeze(['lightning', 'zap']),
+  [CANE]: SWORD_TRICKS, [SAI]: SWORD_TRICKS,
 });
 // REUSE-SPEC.md §Fighter chooser: the levels a player must have beaten for the chooser to offer each
 const UNLOCK = Object.freeze({ sword: 1, scythe: 2, hammer: 4 });
@@ -442,6 +448,83 @@ export function greathammerMeshes(color) {
   return [new THREE.Mesh(geo.haft, dark('#221e1b', 0.9)), new THREE.Mesh(geo.leather, dark('#4a3626', 0.75)), new THREE.Mesh(geo.head, iron)];
 }
 
+// tmnt/REUSE-SPEC.md §Hero chooser: a knobbed club, held like the sword and swung as it, hanging point-down at rest like a cane
+const CANE_PARTS = { shaft: 0.3, r: 0.018, knob: 0.042, clear: 0.05, fit: [0.4, 1.6] };
+// the cane at rest, as the character sees it: straight down, a touch forward, whatever the arm is doing
+const HANG = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, -1, 0.12).normalize());
+const HANG_UP = -Math.PI / 2 + 0.12;
+let caneGeo = null;
+function caneGeometry() {
+  const { shaft, r, knob } = CANE_PARTS;
+  caneGeo ??= {
+    stick: mergeGeometries([
+      new THREE.CylinderGeometry(r, r * 1.2, shaft, 12).rotateX(Math.PI / 2).translate(0, 0, shaft / 2 - 0.04),
+      new THREE.SphereGeometry(r * 1.3, 12, 8).translate(0, 0, -0.04),
+      new THREE.SphereGeometry(knob, 16, 12).scale(1, 1, 1.15).translate(0, 0, shaft - 0.04 + knob * 0.8),
+    ]),
+    ...swooshGeometry(0.06, shaft + knob, 0.11, shaft),
+  };
+  return caneGeo;
+}
+
+const _hang = new THREE.Quaternion(), _held = new THREE.Quaternion(), _tip = new THREE.Vector3(), _grip = new THREE.Vector3();
+const _plane = new THREE.Quaternion(), _x = new THREE.Euler(), _none = new THREE.Quaternion();
+/**
+ * Takes `1 - w` of the arm's sideways tilt off a hanging blade (w: how far into a swing): the turn from hanging down in the
+ * arm's plane to straight down, put on the whole swing, so it stays small and never flips.
+ */
+function hang(built, blade, arm, w) {
+  if (!blade.userData.hangs || w >= 1) return;
+  blade.parent.updateWorldMatrix(true, false);
+  _hang.copy(blade.parent.getWorldQuaternion(_held).invert()).multiply(built.root.getWorldQuaternion(_held)).multiply(HANG);
+  _hang.multiply(_plane.setFromEuler(_x.set(-(HANG_UP + arm), 0, 0)).invert());
+  blade.quaternion.premultiply(_none.identity().slerp(_hang, 1 - w));
+}
+
+/** A cane as long as the hand is high, so the knob just reaches the floor on every body. */
+function fitToFloor(built, cane) {
+  built.root.updateMatrixWorld(true);
+  const grip = cane.getWorldPosition(_grip).y, tip = cane.localToWorld(_tip.set(0, 0, cane.userData.tip)).y;
+  const k = THREE.MathUtils.clamp((grip - CANE_PARTS.clear) / (grip - tip), ...CANE_PARTS.fit);
+  cane.scale.setScalar(k);
+}
+
+function addCane(built, color) {
+  const geo = caneGeometry(), { shaft, knob } = CANE_PARTS;
+  const cane = holdBlade(built, [new THREE.Mesh(geo.stick, candy(color))], geo, { tip: shaft - 0.04 + knob * 1.6, hangs: true });
+  fitToFloor(built, cane);
+  return cane;
+}
+
+// tmnt/REUSE-SPEC.md §Hero chooser: Raphael's sai, held and swung as the sword: a long point, two prongs curving
+// forward from the guard (in y, so the side-on camera sees them), a white grip
+const SAI_PARTS = { grip: 0.08, point: 0.3, r: 0.011, prong: 0.055, reach: 0.07 };
+let saiGeo = null;
+function saiGeometry() {
+  const { grip, point, r, prong, reach } = SAI_PARTS;
+  const curve = (side) => new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 0, 0.004), new THREE.Vector3(0, side * prong, 0.004),
+    new THREE.Vector3(0, side * prong, reach));
+  saiGeo ??= {
+    metal: mergeGeometries([
+      new THREE.CylinderGeometry(r * 0.25, r, point, 10).rotateX(Math.PI / 2).translate(0, 0, point / 2),
+      ...[-1, 1].map((side) => new THREE.TubeGeometry(curve(side), 12, r * 0.8, 8)),
+      ...[-1, 1].map((side) => new THREE.SphereGeometry(r * 0.9, 8, 6).translate(0, side * prong, reach)),
+    ]),
+    grip: mergeGeometries([
+      new THREE.CylinderGeometry(r * 1.5, r * 1.5, grip, 10).rotateX(Math.PI / 2).translate(0, 0, -grip / 2),
+      new THREE.SphereGeometry(r * 2, 10, 8).translate(0, 0, -grip),
+    ]),
+    ...swooshGeometry(0.06, point, 0.11, point * 0.8),
+  };
+  return saiGeo;
+}
+
+function addSai(built, color) {
+  const geo = saiGeometry();
+  return holdBlade(built, [new THREE.Mesh(geo.metal, candy(color)), new THREE.Mesh(geo.grip, candy(color === WHITE ? '#ff3b7f' : WHITE))], geo,
+    { tip: SAI_PARTS.point });
+}
+
 /** The Greathammer, held like the sword (REUSE-SPEC.md §Costumes): `built.sword`, so it swings on SWORD_MOVES. */
 function addHammer(built, color) {
   return holdBlade(built, greathammerMeshes(color), greathammerGeometry(), { tip: GREATHAMMER.top - GREATHAMMER.head[2] / 2 });
@@ -483,7 +566,11 @@ function swingSword(built, punch) {
   let arm = 0;
   for (let n = sword.parent; n && n !== built.chest; n = n.parent) arm += n.rotation.x;
   const { up, swoosh, stab } = punch ? sample(SWORD_MOVES[punch.name], punch.step) : { up: SWORD_UP, swoosh: 0, stab: 0 };
-  sword.rotation.x = -(up + arm);
+  // the cane rises out of hanging down and back, through the sword's moves: the lift in the arm's plane, so it always
+  // comes up in front, and `hang` takes off the arm's sideways tilt while it hangs
+  const w = punch ? punchWeight(punch.step) : 0;
+  sword.rotation.set(-((sword.userData.hangs ? THREE.MathUtils.lerp(HANG_UP, up, w) : up) + arm), 0, 0);
+  hang(built, sword, arm, w);
   const { fan, streak } = sword.userData;
   fan.visible = swoosh > 0.02 && stab < 0.5;
   streak.visible = swoosh > 0.02 && stab >= 0.5;
@@ -1378,7 +1465,7 @@ export function stepTricks(built, punch, dt) {
 // readability in a match
 const PLAIN = typeof location !== 'undefined' && new URLSearchParams(location.search).has('plain');
 export const LOOKS = Object.freeze(Object.fromEntries(['lookAt', 'eyeGlint', 'painterly', 'shapedFaces'].map((k) => [k, !PLAIN])));
-const HOLD = { gloves: addGloves, sword: addSword, scythe: addScythe, hammer: addHammer };
+const HOLD = { gloves: addGloves, sword: addSword, scythe: addScythe, hammer: addHammer, [CANE]: addCane, [SAI]: addSai };
 
 /** Same order as the shop's `dressedCharacter` (store/sim/cast.js): dress unmerged, then merge. @param {Fighter} f */
 /** @param {string[]} [palette] the colours a hero's sweater colourwork is worked in */

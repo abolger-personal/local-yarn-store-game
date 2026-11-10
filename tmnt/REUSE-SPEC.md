@@ -119,7 +119,15 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
   the characters are small on a tablet): its own colour first, then the other five hero colours.
 - Socks: crew, knee-high, over-knee. Tapping them again knits them in the next stitch, as the fighters' hats do.
 - Bags: the fighters' three, or none.
-- Weapons: all four (gloves, sword, Music Scythe, Greathammer), no unlocks yet; tapping again changes the trick.
+- Weapons: the fighters' four (gloves, sword, Music Scythe, Greathammer), plus two of the heroes' own, no unlocks
+  yet; tapping again changes the trick. Both are held and swung as the sword, with its tricks (decided 2026-11-09):
+  - **Raphael's sai:** a long point and two prongs curving forward from the guard, a white grip.
+  - **Master Splinter's cane:** a club with a round knob on the end, which hangs straight down at rest like a walking
+    stick, as long as the hand is high so the knob just clears the floor, and swings up out of that into the sword's
+    moves.
+- **Each turtle's own things** (decided 2026-11-09): the red-scarf default is Raphael, with his sai and red
+  over-knee socks. The mouse is Master Splinter: picking the mouse gives the cane. Blue, purple and orange have the
+  sword until their own are decided.
 - 🎲 any animal, colours and pieces. 👍 saves; there is no lobby to go to yet.
 - Every colour is one of the six hero colours; anything else read from a save or another tablet snaps to the
   nearest (`readHero`). `tmnt/hero.test.mjs` checks it.
@@ -149,11 +157,9 @@ Sweater. Heroes don't get them. The design is open.
 ## Open questions
 
 - **Which theme?** Pick from the list in §The game.
-- **Which weapon is the default, and are weapons unlocked?** The fighters' are 🥊 gloves, a sword, the Music Scythe
-  and the Greathammer, unlocked by levels beaten there. TMNT's are katanas, a bo staff, sais and nunchucks.
-  - Is there one weapon per scarf colour, as each turtle had his own?
-  - Are new weapons added?
-  - Do unlocks carry over from the fighting game, or start fresh?
+- **Leonardo's, Donatello's and Michelangelo's weapons?** Blue, purple and orange have the sword for now. TMNT's are
+  katanas, a bo staff and nunchucks. Should Raphael hold a sai in each hand?
+- **Are weapons unlocked?** Unlocks from the fighting game carry over, or start fresh?
 - **Which scarf colour does each player get?** One of the four at random, or each tablet in a room a different
   one, so a full room reads as the four turtles? A fifth player in taxi yellow would be the April.
 - **Which animal is The Sweater?** Or a random one each time?

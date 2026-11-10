@@ -1,5 +1,14 @@
 export const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
+/** @param {[string, () => void][]} steps @returns {string[]} the steps that threw */
+export function runSteps(steps) {
+  const broken = [];
+  for (const [name, step] of steps) {
+    try { step(); } catch (err) { broken.push(name); console.error(`install ${name} failed:`, err); }
+  }
+  return broken;
+}
+
 export const rnd = (n, rng) => Math.floor(rng() * n);
 
 const mix = (a) => {

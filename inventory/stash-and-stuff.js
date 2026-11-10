@@ -18,9 +18,6 @@ import {
 import { SHADING, YARN_LOOK, makeMatcap, makePaperMatcap, makeToonRamp, yarnMaterial, bakeVertexAO, makeHull,
          yarnColor, applyHatching, addHatchScale } from './yarn-look.js';
 
-// Relative to this module, not the page, so it still resolves when served below a site root (GitHub Pages).
-const ATLAS_URL = new URL('../ai_planning_sessions/inventory/illustrations/build', import.meta.url).href;
-
 const HOOK_SIZES_MM = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 8.0, 9.0, 10.0, 12.0];
 
 const S = {
@@ -1027,7 +1024,7 @@ function buildNotionMeshes(loaded) {
   scene.add(field, edge, fieldTop, edgeTop, shadows, boxes, sizeTag);
 }
 
-loadAtlas(ATLAS_URL, S.theme).then((loaded) => {
+loadAtlas(undefined, S.theme).then((loaded) => {
   buildNotionMeshes(loaded);
 
   buildYarnMeshes();

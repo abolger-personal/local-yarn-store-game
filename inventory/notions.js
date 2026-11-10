@@ -3,7 +3,10 @@
 import * as THREE from 'three';
 import { gridSize, usableAt } from './grid.js';
 
-export async function loadAtlas(baseUrl, theme = 'default') {
+// Relative to this module, not the page, so it still resolves when served below a site root (GitHub Pages).
+const ATLAS_URL = new URL('../ai_planning_sessions/inventory/illustrations/build', import.meta.url).href;
+
+export async function loadAtlas(baseUrl = ATLAS_URL, theme = 'default') {
   const manifest = await (await fetch(`${baseUrl}/${theme}.json`)).json();
   const texture = await new THREE.TextureLoader().loadAsync(`${baseUrl}/${manifest.atlas}`);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -11,6 +14,16 @@ export async function loadAtlas(baseUrl, theme = 'default') {
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.generateMipmaps = true;
   return { texture, manifest, names: Object.keys(manifest.cells) };
+}
+
+/** open(loaded) once the atlas loads; fail(stage, err) if either throws, stage 'atlas' or `opening` */
+export function openWithAtlas(open, opening, fail) {
+  loadAtlas()
+    .catch((err) => { fail('atlas', err); throw err; })
+    .then((loaded) => {
+      try { open(loaded); } catch (err) { fail(opening, err); }
+    })
+    .catch(() => {});
 }
 
 export function extendAtlas(loaded, shapes, { cell = 128 } = {}) {

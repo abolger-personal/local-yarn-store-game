@@ -10,11 +10,11 @@ import { HOOK_SIZES_MM, NOTION_NAMES, PATTERN_NAMES, SIZED_NOTIONS, TOOL_NOTIONS
          YARN_MATERIALS, YARN_SHAPES, YARN_WEIGHT_NAMES, CRAFTS, makeNotion, makePattern,
          makeYarn } from '../../inventory/catalog.js';
 import { EMPTY, topAt } from '../../inventory/grid.js';
-import { loadAtlas } from '../../inventory/notions.js';
+import { openWithAtlas } from '../../inventory/notions.js';
 
 import { S } from './core/config.js';
 import { aim, clocks, displays, items, shop, simRng, takeViewDirty, touchView } from './core/state.js';
-import { esc, freshSeed } from './core/util.js';
+import { esc, freshSeed, runSteps } from './core/util.js';
 import { installStage, renderer, scene, camera, controls } from './scene/stage.js';
 import { buildRoomShell, cullWalls } from './scene/room.js';
 import { installSeating, buildChairs } from './scene/seating.js';
@@ -30,9 +30,6 @@ import { abortDrag } from './interact/pick.js';
 import { clearSelection } from './interact/move.js';
 import { castGroup, bodyParams, installWorld, room, sizeInstanceBuffers } from './sim/world.js';
 import { frameRoom } from './ui/framing.js';
-
-// Relative to this module, not the page, so a site served below its root (GitHub Pages) still finds it.
-const ATLAS_URL = new URL('../../ai_planning_sessions/inventory/illustrations/build', import.meta.url).href;
 
 const panels = {
   who: document.getElementById('who'),
@@ -387,16 +384,12 @@ function onRailChange(e) {
 }
 
 function buildBench() {
-  /** @type {[string, () => void][]} */
-  const steps = [
+  runSteps([
     ['stage', installStage], ['room', buildRoomShell], ['seating', installSeating],
     ['displays', installDisplays], ['placeholder art', installPlaceholderArt],
     ['feedback', installFeedback], ['input', installInput],
     ['world', installWorld], ['bench', installBench],
-  ];
-  for (const [name, step] of steps) {
-    try { step(); } catch (err) { console.error(`install ${name} failed:`, err); }
-  }
+  ]);
 }
 
 const clock = new THREE.Timer();
@@ -432,21 +425,14 @@ function openTheBench(loaded) {
   touchView();
 }
 
-function bootFailed(stage, err, hint) {
+function bootFailed(stage, err) {
   console.error(`puzzle bench failed during ${stage}:`, err);
+  const hint = stage === 'atlas'
+    ? 'run illustrations/notion_processing.py, and serve over http' : 'the atlas loaded fine — see the console';
   panels.palette.innerHTML =
     `<b>${esc(stage)} failed</b><br />${esc(err.message)}<br /><span class="k">${hint}</span>`;
 }
 
 console.info('LYS puzzle bench, build', BUILD);
 buildBench();
-loadAtlas(ATLAS_URL)
-  .catch((err) => {
-    bootFailed('the atlas', err, 'run illustrations/notion_processing.py, and serve over http');
-    throw err;
-  })
-  .then((loaded) => {
-    try { openTheBench(loaded); }
-    catch (err) { bootFailed('opening the bench', err, 'the atlas loaded fine — see the console'); }
-  })
-  .catch(() => {});
+openWithAtlas(openTheBench, 'opening the bench', bootFailed);

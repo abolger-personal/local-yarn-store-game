@@ -19,8 +19,9 @@ What's new in Donut Fighters, the L.Y.S. spinoff.
   (`ai_planning_sessions/characters/ADDING-A-SPECIES.md`). Next: a turtle.
 
 ### For the designer (species checker)
-- **A new dance, the booty shake:** back turned, bum out, a look over the shoulder, wiggle wiggle, a slap, and round
-  again. Every animal has it, in the dance menu here and in dress-up. Not yet a move in a match.
+- **A new dance, the booty shake, a taunt:** back turned, sat back as into a chair and bent right over so the bum sticks
+  out, a look back over the shoulder, wiggle wiggle with the tail wagging, a slap on the bum, and round again. Every
+  animal has it, in the dance menu here and in dress-up. Not yet a move in a match.
 - **Menus by part of the body:** Character, Look (with the paint sliders named by style), Body, Head & face (eyes, face
   paint and each animal's own face parts together), Coat, Tail, Rig, Animation (raw pose sliders tucked into a debug
   folder), View. Saved settings still load.

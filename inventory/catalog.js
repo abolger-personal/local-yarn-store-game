@@ -1,6 +1,6 @@
 // Pure data, no three.js or DOM (DESIGN-DECISIONS.md §3). Sources: PATTERNS.md, YARN.md, NOTIONS.md.
 
-import { mulberry32 } from '../characters/store/core/util.js';
+import { mulberry32, pickFrom } from '../characters/store/core/util.js';
 
 export const CRAFTS = Object.freeze(['knitting', 'crochet']);
 
@@ -56,8 +56,6 @@ export const SHAPE_UNITS = Object.freeze({ skein: 1, ball: 2, cone: 4 });
 export const YARN_COLOR_COUNT = 48;
 
 export const yarnUnits = (item) => (item.name === 'yarn' ? SHAPE_UNITS[item.shape] ?? 1 : 0);
-
-const pickFrom = (list, rng) => list[Math.floor(rng() * list.length)];
 
 export function makePattern(rng = Math.random, type = pickFrom(STOCKED, rng)) {
   const spec = PATTERN_TYPES[type];

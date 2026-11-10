@@ -1,11 +1,9 @@
 import { TONE_MAPPING, getSpecies } from '../../npc.js';
 import { heldAs, pileAs, wornAs } from '../../garments.js';
 import { snap } from '../../selfie-studio.js';
-import { YARN_COLORS } from '../goods/stock.js';
+import { colourOf } from '../goods/stock.js';
 import { S } from '../core/config.js';
 import { shop } from '../core/state.js';
-
-const colourOf = (yarn) => YARN_COLORS[yarn.colorIndex % YARN_COLORS.length];
 
 const subjectOf = (wip) => (wip ? wornAs(wip, colourOf) ?? heldAs(wip, colourOf) : null);
 

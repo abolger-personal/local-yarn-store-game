@@ -100,9 +100,8 @@ function paintTopLabels(index, g, item, rect, sizeRect) {
 
 export function paintShadow(index, g, scale = 1.08) {
   _pos.set(g.shX, g.shadowBase + 0.003, g.shZ);
-  shadows.setMatrixAt(index,
-    placeMatrix(_pos, g.w * scale, g.d * scale, g.yaw, _shadowMat).premultiply(g.F));
-  shadows.instanceMatrix.needsUpdate = true;
+  setInstance(shadows, index,
+    { matrix: placeMatrix(_pos, g.w * scale, g.d * scale, g.yaw, _shadowMat).premultiply(g.F) });
 }
 
 function paintInstance(display, index, p) {
@@ -125,8 +124,7 @@ function paintInstance(display, index, p) {
 export function hideItem(index) {
   hideBox(index);
   hideYarn(index);
-  shadows.setMatrixAt(index, _hide);
-  shadows.instanceMatrix.needsUpdate = true;
+  setInstance(shadows, index, { matrix: _hide });
 }
 
 const SETTLE = {

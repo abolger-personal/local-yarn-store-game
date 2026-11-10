@@ -1,7 +1,8 @@
 import { cast, items, shop, clocks } from '../core/state.js';
 import { esc } from '../core/util.js';
 import { S } from '../core/config.js';
-import { labelOf, maxWips, STATE, TRAITS, labelWant } from '../../visit.js';
+import { maxWips, STATE, TRAITS, labelWant } from '../../visit.js';
+import { labelOf } from '../../../inventory/catalog.js';
 import { WIP_STATE, describeWip, WEAR_SLOTS } from '../../wip.js';
 import { renderer } from '../scene/stage.js';
 import { guestbookLine } from './book.js';

@@ -4,6 +4,7 @@ import { ACTION, STATE } from '../../visit.js';
 import { bandCard, tagCard } from '../../guestbook.js';
 import { S } from '../core/config.js';
 import { cast, drag, items, shop } from '../core/state.js';
+import { esc } from '../core/util.js';
 import { renderer } from '../scene/stage.js';
 import { pickCandidate, raycaster, seenAt, setRayFromEvent } from '../interact/pointer.js';
 import { CELL, INK, layout, svgLettering } from './lettering.js';
@@ -24,8 +25,6 @@ function wrap(text, cap) {
   return rows;
 }
 
-const escape = (s) => s.replace(/[&<"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '"': '&quot;' })[c]);
-
 function drawBand({ head, body }) {
   let y = PAD, art = '';
   for (const row of wrap(head, HEAD)) {
@@ -35,7 +34,7 @@ function drawBand({ head, body }) {
   }
   art += `<path d="M${PAD} ${y} H${W - PAD}" stroke="${INK}" stroke-width="2" />`;
   const h = Math.round(y + RULE_GAP);
-  band.innerHTML = `<h2><svg viewBox="0 0 ${W} ${h}" role="img" aria-label="${escape(head)}">${art}</svg></h2>${body}`;
+  band.innerHTML = `<h2><svg viewBox="0 0 ${W} ${h}" role="img" aria-label="${esc(head)}">${art}</svg></h2>${body}`;
   band.hidden = false;
 }
 

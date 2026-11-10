@@ -25,14 +25,14 @@ export const _hide = new THREE.Matrix4().makeScale(0, 0, 0);
 
 export function buildItemMeshes(loaded) {
   atlas = extendAtlas(loaded, PLACEHOLDER_ART);
-  sideField = makeField(atlas.texture, CAPACITY * 4, { unlit: true, shade: CARD_LOOK.shade });
+  sideField = makeField(atlas.texture, CAPACITY * 4, CARD_LOOK.shade);
   sideEdge = makeEdge(sideField);
-  fieldTop = makeField(atlas.texture, CAPACITY, { unlit: true, shade: CARD_LOOK.shade });
+  fieldTop = makeField(atlas.texture, CAPACITY, CARD_LOOK.shade);
   edgeTop = makeEdge(fieldTop);
   shadows = makeShadows(CAPACITY);
   boxes = makeBoxes(CAPACITY, '#e7ddc9');
   sizeAtlas = makeSizeAtlas(HOOK_SIZES_MM.map((mm) => mm.toFixed(1)));
-  sizeSide = makeField(sizeAtlas.texture, CAPACITY * 4, { unlit: true, shade: 0 });
-  sizeTop = makeField(sizeAtlas.texture, CAPACITY, { unlit: true, shade: 0 });
+  sizeSide = makeField(sizeAtlas.texture, CAPACITY * 4);
+  sizeTop = makeField(sizeAtlas.texture, CAPACITY);
   scene.add(sideField, sideEdge, fieldTop, edgeTop, shadows, boxes, sizeSide, sizeTop);
 }

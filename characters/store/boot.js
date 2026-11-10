@@ -2,7 +2,8 @@ import { shop, cast, clocks, takeHudDirty, takeViewDirty } from './core/state.js
 import { installInput } from './interact/input.js';
 import * as THREE from 'three';
 import { BUILD, setGeometryDetail } from '../npc.js';
-import { loadAtlas } from '../../inventory/notions.js';
+import { openWithAtlas } from '../../inventory/notions.js';
+import { runSteps } from './core/util.js';
 import '../species.js';
 import { STATE } from '../visit.js';
 
@@ -25,26 +26,17 @@ import { installLabel, redrawLabel } from './ui/label.js';
 import { frameRoom } from './ui/framing.js';
 import { checkWallCulling, checkItemSizes, checkSlotMasking, checkFloorTiling, checkDisplayMoves, checkHeldItem, checkSunPools } from './checks.js';
 
-// Relative to this module, not the page, so a site served below its root (GitHub Pages) still finds it.
-const ATLAS_URL = new URL('../../ai_planning_sessions/inventory/illustrations/build', import.meta.url).href;
-
 console.info('LYS build', BUILD);
 
 function buildShop(pageSteps) {
-  /** @type {[string, () => void][]} */
-  const steps = [
+  const broken = runSteps([
     ['stage', installStage], ['room', buildRoomShell], ['props', installProps], ['seating', installSeating],
     ['displays', installDisplays], ['placeholder art', installPlaceholderArt],
     ['feedback', installFeedback], ['move mode', installMove], ['input', installInput],
     ['world', installWorld], ['book', installBook], ['board', installBoard], ['label', installLabel],
     ...pageSteps,
-  ];
-  const broken = [];
-  for (const [name, step] of steps) {
-    try { step(); } catch (err) { broken.push(name); console.error(`install ${name} failed:`, err); }
-  }
+  ]);
   console.assert(broken.length === 0, 'shop built with broken subsystems:', broken);
-  return broken;
 }
 
 function runChecks() {
@@ -133,10 +125,5 @@ function openTheShop(loaded, page) {
 
 export function bootShop(/** @type {Page} */ page) {
   buildShop(page.steps);
-  loadAtlas(ATLAS_URL)
-    .catch((err) => { bootFailed('atlas', err, page); throw err; })
-    .then((loaded) => {
-      try { openTheShop(loaded, page); } catch (err) { bootFailed('opening the shop', err, page); }
-    })
-    .catch(() => {});
+  openWithAtlas((loaded) => openTheShop(loaded, page), 'opening the shop', (stage, err) => bootFailed(stage, err, page));
 }

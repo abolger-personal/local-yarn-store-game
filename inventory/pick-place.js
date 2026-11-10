@@ -14,11 +14,24 @@ import { EMPTY, gridSize, topAt, columnAt, slotRect, footprint, fits, place, nea
  * @param [opts.grabRadius] () => screen-space slack in CSS px
  * @param [opts.snapCells] () => drop reach, in slots
  */
+export function makeFrame(position, quaternion) {
+  const frame = new THREE.Matrix4().compose(position, quaternion, new THREE.Vector3(1, 1, 1));
+  return { frame, frameInv: frame.clone().invert(), quat: quaternion.clone() };
+}
+
+/** a group placed by `frame` alone (matrixAutoUpdate off) */
+export function frameGroup(frame) {
+  const group = new THREE.Group();
+  group.matrixAutoUpdate = false;
+  group.matrix.copy(frame);
+  group.matrixWorldNeedsUpdate = true;
+  return group;
+}
+
 export function makePicker(opts) {
   const k = pickerState(opts);
   return {
     castLocal: (disp, shelf, height) => castLocal(k, disp, shelf, height),
-    slotScreenPos: (disp, shelf, item, height) => slotScreenPos(k, disp, shelf, item, height),
     pickCandidate: (event) => pickCandidate(k, event),
     seenAt: (event) => seenAt(k, event),
     hoverTarget: (event) => hoverTarget(k, event),
@@ -80,8 +93,7 @@ function axisDistance(k, { disp, shelf, item }, px, py) {
   if (!base) return Math.hypot(top.x - px, top.y - py);
   const dx = base.x - top.x, dy = base.y - top.y;
   const len2 = dx * dx + dy * dy;
-  const t = len2 < 1e-9 ? 0
-    : Math.min(1, Math.max(0, ((px - top.x) * dx + (py - top.y) * dy) / len2));
+  const t = len2 < 1e-9 ? 0 : THREE.MathUtils.clamp(((px - top.x) * dx + (py - top.y) * dy) / len2, 0, 1);
   return Math.hypot(top.x + dx * t - px, top.y + dy * t - py);
 }
 
@@ -302,4 +314,3 @@ function contactBase({ g, items, opts, memo }, index, j) {
   return best;
 }
 
-export { EMPTY, footprint, fits, dropLayer, place, slotRect, columnAt, topAt } from './grid.js';

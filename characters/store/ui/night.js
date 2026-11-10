@@ -1,7 +1,7 @@
 import { shop } from '../core/state.js';
 import { planTomorrow, restart } from '../sim/world.js';
 import { HANDOVER_DAYS, choicesFor, describeSlot, slipLine } from '../../../inventory/supply.js';
-import { dressExterior, exteriorMarkup, swingOpen } from './exterior.js';
+import { afterOwnTransition, dressExterior, exteriorMarkup, swingOpen } from './exterior.js';
 import { CELL, INK, layout, svgLettering } from './lettering.js';
 import { closeBook, openBook } from './book.js';
 
@@ -81,13 +81,7 @@ function onPick(event) {
 function openTomorrow() {
   restart({ order });
   order = planned = null;
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { night.close(); return; }
-  night.classList.add('leaving');
-  night.addEventListener('transitionend', function gone(e) {
-    if (e.target !== night) return;
-    night.removeEventListener('transitionend', gone);
-    night.close();
-  });
+  afterOwnTransition(night, 'leaving', () => night.close());
 }
 
 export function installNight() {

@@ -1,6 +1,19 @@
-export const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/** @param {[string, () => void][]} steps @returns {string[]} the steps that threw */
+export function runSteps(steps) {
+  const broken = [];
+  for (const [name, step] of steps) {
+    try { step(); } catch (err) { broken.push(name); console.error(`install ${name} failed:`, err); }
+  }
+  return broken;
+}
 
 export const rnd = (n, rng) => Math.floor(rng() * n);
+
+export const pickFrom = (list, rng) => list[Math.floor(rng() * list.length)];
+
+export const between = (rng, a, b) => a + rng() * (b - a);
 
 const mix = (a) => {
   let t = Math.imul(a ^ (a >>> 15), 1 | a);

@@ -1,4 +1,4 @@
-function seeded(seed) {
+export function seeded(seed) {
   return () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 }
 

@@ -3,7 +3,7 @@ import { yarnMeshes, YARN } from '../goods/yarn.js';
 import { activeDisplay, firstFreeSlot } from './pointer.js';
 import { displays, items, aim, drag, mover } from '../core/state.js';
 import { esc } from '../core/util.js';
-import { labelOf } from '../../visit.js';
+import { labelOf } from '../../../inventory/catalog.js';
 import { gridSize, slotRect, EMPTY } from '../../../inventory/grid.js';
 import * as THREE from 'three';
 import { GHOST_OK, layerY, GHOST_ALPHA, GHOST_NO, S } from '../core/config.js';
@@ -30,13 +30,10 @@ const _glowS = new THREE.Vector3();
 const _glowOff = new THREE.Vector3();
 
 function readHeldBox(item, index) {
-  if (item.name !== 'yarn') {
-    boxes.getMatrixAt(index, _glowM);
-    _glowM.decompose(_glowP, _glowQ, _glowS);
-    return;
-  }
-  yarnMeshes[item.shape].getMatrixAt(index, _glowM);
+  const yarn = item.name === 'yarn';
+  (yarn ? yarnMeshes[item.shape] : boxes).getMatrixAt(index, _glowM);
   _glowM.decompose(_glowP, _glowQ, _glowS);
+  if (!yarn) return;
   const [uw, uh, ud] = familyExtent(item.shape, YARN.tier);
   _glowP.add(_glowOff.set(0, (uh * _glowS.y) / 2, 0).applyQuaternion(_glowQ));
   _glowS.set(_glowS.x * uw, _glowS.y * uh, _glowS.z * ud);
@@ -127,23 +124,24 @@ export const dropMarker = new THREE.Mesh(
   })
 );
 
+export function markerLook(color, { depthTest = true, opacity = GHOST_ALPHA, renderOrder = 0 } = {}) {
+  dropMarker.material.color.set(color);
+  dropMarker.material.depthTest = depthTest;
+  dropMarker.material.opacity = opacity;
+  dropMarker.renderOrder = renderOrder;
+}
+
 function ghostNoRoom(disp) {
   const { w, d } = gridSize(disp.g);
   dropMarker.visible = true;
-  dropMarker.material.color.set(GHOST_NO);
-  dropMarker.material.depthTest = false;
-  dropMarker.renderOrder = 4;
-  dropMarker.material.opacity = 0.5;   // STORE-SCENE.md §Drop feedback
+  markerLook(GHOST_NO, { depthTest: false, opacity: 0.5, renderOrder: 4 });   // STORE-SCENE.md §Drop feedback
   dropMarker.position.set(0, 0.004, 0).applyMatrix4(levelFrame(disp, disp.plane));
   dropMarker.quaternion.copy(disp.levels?.[disp.plane]?.quat ?? disp.quat).multiply(FLAT_Q);
   dropMarker.scale.set(w, d, 1);
 }
 
 function ghostSlot(disp, item, t) {
-  dropMarker.material.color.set(GHOST_OK);
-  dropMarker.material.depthTest = true;
-  dropMarker.material.opacity = GHOST_ALPHA;
-  dropMarker.renderOrder = 0;
+  markerLook(GHOST_OK);
   const rect = slotRect(disp.g, t.c, t.r, t.w ?? item.w, t.h ?? item.h);
   dropMarker.position.set(rect.x, layerY(t.layer) + 0.004, rect.z)
     .applyMatrix4(levelFrame(disp, disp.plane));

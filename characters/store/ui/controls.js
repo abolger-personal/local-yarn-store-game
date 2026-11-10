@@ -1,6 +1,6 @@
 import { setMoveMode } from '../interact/input.js';
 import { S } from '../core/config.js';
-import { camera, controls, renderer } from '../scene/stage.js';
+import { controls } from '../scene/stage.js';
 import { YAW_STEP, cancelMove, rotateMovable } from '../interact/move.js';
 import { frameRoom, viewSide, viewTop } from './framing.js';
 
@@ -31,12 +31,6 @@ const SWALLOW = new Set(['tab', ' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrow
 const isTyping = (t) => t instanceof HTMLElement
   && (t.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(t.tagName) || Boolean(t.closest('dialog')));
 
-function onResize() {
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-}
-
 export function installControls(extraKeys = {}, after = () => {}) {
   const keys = { ...PLAYER_KEYS, ...extraKeys };
   document.getElementById('frameBtn').addEventListener('click', () => frameRoom());
@@ -50,5 +44,4 @@ export function installControls(extraKeys = {}, after = () => {}) {
     action();
     after();
   }, true);
-  addEventListener('resize', onResize);
 }

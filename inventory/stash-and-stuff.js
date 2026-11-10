@@ -4,22 +4,19 @@ import { roomEnvironment } from './room-environment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import {
   CARD_LOOK, loadAtlas, cellRect, makeGridLines, makeField, makeEdge, makeShadows, makeBoxes, makeSizeAtlas,
-  setInstance, placeMatrix, placeBoxMatrix, placeLabelMatrix,
+  instanced, setInstance, glassMat, GLASS_T, placeMatrix, placeBoxMatrix, placeLabelMatrix,
 } from './notions.js';
 import {
   EMPTY, makeDisplay, gridSize, footprint, fits, place, lift, topAt, columnAt, slotRect,
   usableAt, clearShelf, fullyExposed, anySlot,
 } from './grid.js';
-import { makePicker, placeItem, scatterYaw, settleYaw } from './pick-place.js';
+import { frameGroup, makeFrame, makePicker, placeItem, scatterYaw, settleYaw } from './pick-place.js';
 import {
   YARN_FAMILIES, TIERS, BANDS, TAILS, buildFamily, buildBand, buildTail, bandMatrix, tailMatrix,
   familyFootprint, familyExtent, triangleCount, aspectDistance, yarnFit as sharedYarnFit,
 } from './yarn-geometry.js';
 import { SHADING, YARN_LOOK, makeMatcap, makePaperMatcap, makeToonRamp, yarnMaterial, bakeVertexAO, makeHull,
          yarnColor, applyHatching, addHatchScale } from './yarn-look.js';
-
-// Relative to this module, not the page, so it still resolves when served below a site root (GitHub Pages).
-const ATLAS_URL = new URL('../ai_planning_sessions/inventory/illustrations/build', import.meta.url).href;
 
 const HOOK_SIZES_MM = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 8.0, 9.0, 10.0, 12.0];
 
@@ -39,7 +36,6 @@ const S = {
   // YARN-ASSET-SPIKE.md §14: a fine quantum
   layerRatio: 0.125,
   boxColor:   '#e7ddc9',
-  unlit:      true,
   showGrid:   true,
   liftHeight: 0.14,
   edge:       true,
@@ -86,11 +82,6 @@ const pegMask = (s, c) => c % 2 === 0;
 
 let boxHeightCtl = null, headroomCtl = null;
 
-function makeFrame(position, quaternion) {
-  const m = new THREE.Matrix4().compose(position, quaternion, new THREE.Vector3(1, 1, 1));
-  return { frame: m, frameInv: m.clone().invert(), quat: quaternion.clone() };
-}
-
 const displays = {
   shelf: { id: 'shelf', ...makeFrame(new THREE.Vector3(0, 0, 0), new THREE.Quaternion()),
            g: null, plane: 0, lines: [], panels: [], group: null, floors: [] },
@@ -103,12 +94,7 @@ let activeId = 'shelf';
 const activeDisplay = () => displays[activeId];
 const drag = { index: EMPTY, target: null };
 
-for (const d of Object.values(displays)) {
-  d.group = new THREE.Group();
-  d.group.matrixAutoUpdate = false;
-  d.group.matrix.copy(d.frame);
-  d.group.matrixWorldNeedsUpdate = true;
-}
+for (const d of Object.values(displays)) d.group = frameGroup(d.frame);
 
 const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -142,18 +128,6 @@ surface.rotation.x = -Math.PI / 2;
 surface.userData = { dispId: 'shelf', plane: 0 };
 displays.shelf.group.add(surface);
 displays.shelf.floors = [surface];
-
-const GLASS_THICKNESS = 0.012;
-const glassMaterial = new THREE.MeshPhysicalMaterial({
-  color: '#eef4f2',
-  transmission: 0.9,
-  roughness: 0.45,
-  thickness: 0.05,
-  ior: 1.3,
-  clearcoat: 0.3,
-  side: THREE.DoubleSide,
-  transparent: true,
-});
 
 function buildShelfGrid() {
   const mask = LAYOUTS[S.layout](S.cols, S.rows, S.shelves);
@@ -189,9 +163,9 @@ function layoutShelfLevel(disp, s, w, d) {
 }
 
 function glassPanel(w, d, s) {
-  const panel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), glassMaterial);
-  panel.scale.set(w * 1.04, GLASS_THICKNESS, d * 1.04);
-  panel.position.y = s * S.shelfGap - GLASS_THICKNESS / 2;
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), glassMat);
+  panel.scale.set(w * 1.04, GLASS_T, d * 1.04);
+  panel.position.y = s * S.shelfGap - GLASS_T / 2;
   panel.userData = { dispId: 'shelf', plane: s };
   return panel;
 }
@@ -336,10 +310,7 @@ function buildFamilyMesh(f) {
 }
 
 function yarnInstances(geometry) {
-  const mesh = new THREE.InstancedMesh(geometry, currentYarnMaterial(), YARN_CAPACITY);
-  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(YARN_CAPACITY * 3).fill(1), 3);
-  mesh.frustumCulled = false;
-  mesh.count = 0;
+  const mesh = instanced(geometry, currentYarnMaterial(), YARN_CAPACITY, true);
   scene.add(mesh);
   return mesh;
 }
@@ -393,10 +364,7 @@ function paintYarn(display, index, { cx, cz, base, yaw }) {
   const fit = yarnFit(item.family, item.bulk);
   _yarnMat.compose(_p3.set(cx, base, cz), _q.setFromAxisAngle(UP, yaw), _s3.set(fit.k, fit.ky, fit.k))
     .premultiply(display.frame);
-  mesh.setMatrixAt(item.slot, _yarnMat);
-  mesh.instanceMatrix.needsUpdate = true;
-  mesh.setColorAt(item.slot, item.color);
-  mesh.instanceColor.needsUpdate = true;
+  setInstance(mesh, item.slot, { matrix: _yarnMat, color: item.color });
   const hs = mesh.userData.hatchScale;
   if (hs) { hs.setX(item.slot, hatchScaleOf(item)); hs.needsUpdate = true; }
   paintYarnDetails(item);
@@ -405,21 +373,15 @@ function paintYarn(display, index, { cx, cz, base, yaw }) {
 
 function paintYarnDetails(item) {
   if (item.bandSlot != null) {
-    const bm = bandMatrix(item.family, _bandLocal);
-    bandMesh.setMatrixAt(item.bandSlot, bm.premultiply(_yarnMat));
-    bandMesh.instanceMatrix.needsUpdate = true;
-    bandMesh.setColorAt(item.bandSlot, _yarnCol.set(YARN_LOOK.bandColor));
-    bandMesh.instanceColor.needsUpdate = true;
+    setInstance(bandMesh, item.bandSlot, {
+      matrix: bandMatrix(item.family, _bandLocal).premultiply(_yarnMat), color: _yarnCol.set(YARN_LOOK.bandColor) });
   }
 
   if (item.tailSlot != null) {
-    const tm = tailMatrix(item.family, _tailLocal);
-    tailMesh.setMatrixAt(item.tailSlot, tm.premultiply(_yarnMat));
     // ponytail: a non-square parent (the 2x1 skein) stretches the curl along with it. It reads
     // fine at 2x1; if a family ever goes wider, undo the parent's aspect on the tail instead.
-    tailMesh.instanceMatrix.needsUpdate = true;
-    tailMesh.setColorAt(item.tailSlot, item.color);
-    tailMesh.instanceColor.needsUpdate = true;
+    setInstance(tailMesh, item.tailSlot, {
+      matrix: tailMatrix(item.family, _tailLocal).premultiply(_yarnMat), color: item.color });
   }
 }
 
@@ -427,9 +389,8 @@ function paintYarnShadow(display, item, fit, { cx, cz, base, yaw }) {
   // DESIGN-DECISIONS.md perf rule 6
   const [uw, , ud] = familyExtent(item.family, S.tier);
   _pos.set(cx, base + 0.003, cz);
-  shadows.setMatrixAt(item.shadowSlot,
-    placeMatrix(_pos, fit.k * uw * 1.02, fit.k * ud * 1.02, yaw, _shadowMat).premultiply(display.frame));
-  shadows.instanceMatrix.needsUpdate = true;
+  setInstance(shadows, item.shadowSlot,
+    { matrix: placeMatrix(_pos, fit.k * uw * 1.02, fit.k * ud * 1.02, yaw, _shadowMat).premultiply(display.frame) });
 }
 
 function paintInstance(display, index, { cx, cz, boxBase, shadowBase, yaw }, { footW, footD, grow = 1 }) {
@@ -443,8 +404,8 @@ function paintInstance(display, index, { cx, cz, boxBase, shadowBase, yaw }, { f
   paintLabels(item, F, { cx, cz, boxBase, yaw }, { boxW, boxD, boxH });
 
   _pos.set(cx, shadowBase + 0.003, cz);
-  shadows.setMatrixAt(item.shadowSlot, placeMatrix(_pos, boxW * 1.08, boxD * 1.08, yaw, _shadowMat).premultiply(F));
-  shadows.instanceMatrix.needsUpdate = true;
+  setInstance(shadows, item.shadowSlot,
+    { matrix: placeMatrix(_pos, boxW * 1.08, boxD * 1.08, yaw, _shadowMat).premultiply(F) });
 }
 
 function paintLabels(item, F, { cx, cz, boxBase, yaw }, { boxW, boxD, boxH }) {
@@ -1022,8 +983,8 @@ const clock = new THREE.Timer();
 
 function buildNotionMeshes(loaded) {
   atlas = loaded;
-  field = makeField(atlas.texture, CAPACITY, { unlit: S.unlit, shade: S.shade });
-  fieldTop = makeField(atlas.texture, CAPACITY, { unlit: S.unlit, shade: S.shade });
+  field = makeField(atlas.texture, CAPACITY, S.shade);
+  fieldTop = makeField(atlas.texture, CAPACITY, S.shade);
   edge = makeEdge(field, S.edgeColor);
   edgeTop = makeEdge(fieldTop, S.edgeColor);
   for (const e of edges()) {
@@ -1036,12 +997,12 @@ function buildNotionMeshes(loaded) {
   boxes.userData.owner = [];
 
   sizeAtlas = makeSizeAtlas(HOOK_SIZES_MM.map((mm) => mm.toFixed(1)));
-  sizeTag = makeField(sizeAtlas.texture, CAPACITY, { unlit: true, shade: 0 });
+  sizeTag = makeField(sizeAtlas.texture, CAPACITY);
 
   scene.add(field, edge, fieldTop, edgeTop, shadows, boxes, sizeTag);
 }
 
-loadAtlas(ATLAS_URL, S.theme).then((loaded) => {
+loadAtlas(undefined, S.theme).then((loaded) => {
   buildNotionMeshes(loaded);
 
   buildYarnMeshes();
@@ -1051,7 +1012,6 @@ loadAtlas(ATLAS_URL, S.theme).then((loaded) => {
   layoutPegDisplay();
 
   rebuild();
-  if (location.hash === '#test') keyboardPlaneTest();
 
   renderer.setAnimationLoop(() => {
     controls.update();
@@ -1063,38 +1023,3 @@ loadAtlas(ATLAS_URL, S.theme).then((loaded) => {
     `<b>atlas failed to load</b><br>${err.message}<br>` +
     `<span style="opacity:.7">run notion_processing.py first</span>`;
 });
-
-function keyboardPlaneTest() {
-  scene.updateMatrixWorld(true);
-  camera.updateMatrixWorld(true);
-  const { victimIndex, clientX, clientY } = holdOverClearColumn(displays.shelf.g);
-
-  onPointerMove({ clientX, clientY });
-  console.log('TEST target on plane 0:', JSON.stringify(drag.target));
-
-  dispatchEvent(new KeyboardEvent('keydown', { key: ']' }));
-  console.log('TEST after ]: plane', displays.shelf.plane, '(expect 1) target now', JSON.stringify(drag.target));
-
-  onPointerDown({ button: 0, clientX, clientY });
-  const after = items[victimIndex];
-  console.log('TEST after drop: shelf', after.shelf, 'c', after.c, 'r', after.r, '(expect 1 2 2)');
-}
-
-function holdOverClearColumn(g) {
-  const victimIndex = 0;
-  const victim = items[victimIndex];
-  lift(g, victim.keys);
-  drag.index = victimIndex;
-  displays.shelf.plane = 0;
-  if (activeId !== 'shelf') setActiveId('shelf', false);
-
-  for (const it of items) {
-    if (it !== victim && it.display === 'shelf' && it.c === 2 && it.r === 2 && it.keys) lift(g, it.keys);
-  }
-  const rect = slotRect(g, 2, 2, 1, 1);
-  const worldPt = new THREE.Vector3(rect.x, shelfBaseY(0, 0) + S.boxHeight / 2, rect.z).applyMatrix4(displays.shelf.frame);
-  const proj = worldPt.clone().project(camera);
-  const clientX = (proj.x * 0.5 + 0.5) * innerWidth;
-  const clientY = (-proj.y * 0.5 + 0.5) * innerHeight;
-  return { victimIndex, clientX, clientY };
-}

@@ -82,7 +82,7 @@ const LAMPS_ON = [0.45, 0.8];
 const _a = new THREE.Vector3(), _b = new THREE.Vector3();
 const _ca = new THREE.Color(), _cb = new THREE.Color();
 const mixColor = (target, a, b, t) => target.copy(_ca.set(a)).lerp(_cb.set(b), t);
-const mix = (a, b, t) => a + (b - a) * t;
+const mix = THREE.MathUtils.lerp;
 
 export function applyDaylight(t) {
   const { morning: m, afternoon: a } = LOOKS;
@@ -111,8 +111,15 @@ export function tickDaylight(dt) {
   applyDaylight(shownT);
 }
 
+function onResize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+}
+
 export function installStage() {
   setUpRenderer();
   setUpControls();
   setUpLights();
+  addEventListener('resize', onResize);
 }

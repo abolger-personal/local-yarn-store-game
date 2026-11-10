@@ -456,7 +456,7 @@ Status: decided 2026-11-09 (the co-op side scroller's second hero, beside the tu
 
 The lion kit exactly (`LION`, exported from `characters/lion.js`), with no mane and big round ears in its place:
 leaf ears 0.085 wide by 0.170 long, so each is a disc about 60% of the head's width, flattened to 0.35, spread
-0.60, tilted out 0.45, no pointed tips (`earPoint` 0). The tail keeps the lion's tuft for now. No coat folder in
+0.60, tilted out 0.45, no pointed tips (`earPoint` 0). The tail is the lion's without its tuft (`tailTuft` false). No coat folder in
 the checker and no mane presets.
 
 ## Shaped faces

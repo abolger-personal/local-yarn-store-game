@@ -68,6 +68,7 @@ const DEFAULT_PARAMS = {
   tailThick:     0.016,
   tailDroop:    -1.00,
   tailCurl:      0.85,
+  tailTuft:      true,
   maneColor:     '#6e4220',
   manePreset:    0,
   maneRows:      8,
@@ -278,7 +279,7 @@ function addLionTail(ctx, P) {
     dress(node, i, len) {
       node.add(part(GEO.cyl, ctx.mat.body, { pos: [0, 0, -len / 2], scale: [r, len, r], rot: [Math.PI / 2, 0, 0] }));
       node.add(part(GEO.sphere, ctx.mat.body, { scale: [r, r, r] }));
-      if (i === 2) {
+      if (i === 2 && P.tailTuft) {
         node.add(part(GEO.sphere, ctx.mat.mane, { pos: [0, 0, -len], scale: [r * 2.6, r * 2.6, r * 3.4] }));
       }
     },

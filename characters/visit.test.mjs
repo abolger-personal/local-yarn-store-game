@@ -37,7 +37,7 @@ const ROOM = {
 
 const SEATS = [{ id: 'chair-a', x: -1.5, z: -0.5, facing: 0 }, { id: 'chair-b', x: -1.5, z: 0.5, facing: 0 }];
 
-function fixture({ rng = seq(0.5), traits, seats = SEATS, wips } = {}) {
+function fixture({ rng = seq(0.5), traits, seats = SEATS, wips, closing } = {}) {
   const pile = {
     id: 'pile', kind: 'pile', x: 0, z: 0, w: 1, d: 1, wallRow: -1,
     standAt: { x: 0, z: 0.9 },
@@ -66,6 +66,7 @@ function fixture({ rng = seq(0.5), traits, seats = SEATS, wips } = {}) {
     prefs: { ...PREFS }, rng,
   });
   npc.wips = wips ?? [WIP()];
+  if (closing) Object.assign(npc, { state: STATE.CLOSEOUT, closeoutStep: 0 });
   world.npcs.push(npc);
   return { world, pile, shelf, items, npc, add };
 }
@@ -321,10 +322,7 @@ const runCloseout = (world, npc) => {
 };
 
 {
-  const { world, npc } = fixture();
-  npc.state = STATE.CLOSEOUT;
-  npc.closeoutStep = 0;
-  npc.wips = [WIP()];
+  const { world, npc } = fixture({ closing: true });
 
   assert.deepEqual(closeoutFor(npc), [ACTION.SIGN_GUESTBOOK, ACTION.LEAVE],
     'nothing to lend, so no lending step exists at all');
@@ -343,9 +341,7 @@ const runCloseout = (world, npc) => {
 }
 
 {
-  const { world, npc } = fixture();
-  npc.state = STATE.CLOSEOUT;
-  npc.closeoutStep = 0;
+  const { world, npc } = fixture({ closing: true });
   npc.wips = [WIP({ state: WIP_STATE.FINISHED, progress: 100 })];
 
   const seen = runCloseout(world, npc);
@@ -357,9 +353,7 @@ const runCloseout = (world, npc) => {
 }
 
 {
-  const { world, npc } = fixture();
-  npc.state = STATE.CLOSEOUT;
-  npc.closeoutStep = 0;
+  const { world, npc } = fixture({ closing: true });
   npc.wips = [
     WIP({ id: 'WIP 1', state: WIP_STATE.FINISHED, progress: 100 }),
     WIP({ id: 'WIP 2', state: WIP_STATE.FINISHED, progress: 100 }),
@@ -374,15 +368,15 @@ const runCloseout = (world, npc) => {
 }
 
 {
-  const { world, npc } = fixture();
-  npc.state = STATE.CLOSEOUT;
-  npc.closeoutStep = 0;
+  const { world, npc } = fixture({ closing: true });
   npc.worn.head = WIP({ id: 'already worn', state: WIP_STATE.FINISHED, progress: 100 });
   npc.wips = [WIP({ id: 'spare hat', state: WIP_STATE.FINISHED, progress: 100 })];
 
   advanceRound(world);
   assert.equal(npc.action.type, ACTION.SIGN_GUESTBOOK, 'signing comes first');
   assert.equal(world.guestbook.length, 1, 'and writes the entry');
+  assert.equal(world.guestbook[0].kind, 'photo', 'making something outranks happy/disappointed');
+  assert.ok(world.guestbook[0].tags.includes('lent'), 'and the spare being lent is tagged');
   assert.deepEqual(npc.wips.map((w) => w.id), ['spare hat'],
     'the object being lent is STILL theirs while they sign');
   assert.equal(world.lent.length, 0, 'nothing has been handed over yet');
@@ -397,10 +391,7 @@ const runCloseout = (world, npc) => {
 }
 
 {
-  const { world, npc } = fixture();
-  npc.state = STATE.CLOSEOUT;
-  npc.closeoutStep = 0;
-  npc.wips = [WIP()];
+  const { world, npc } = fixture({ closing: true });
   npc.bought.push({ name: 'crochet-hook', size: 4.5 });
   runCloseout(world, npc);
   assert.equal(world.guestbook[0].mood, 'happy', 'leaving with a purchase reads as happy');
@@ -468,18 +459,12 @@ const runCloseout = (world, npc) => {
 }
 
 {
-  const bought = fixture();
-  bought.npc.state = STATE.CLOSEOUT;
-  bought.npc.closeoutStep = 0;
-  bought.npc.wips = [WIP()];
+  const bought = fixture({ closing: true });
   bought.npc.willReturn = true;
   runCloseout(bought.world, bought.npc);
   assert.deepEqual(bought.world.returning.map((n) => n.id), ['n1'], 'a buyer goes on the list');
 
-  const idle = fixture();
-  idle.npc.state = STATE.CLOSEOUT;
-  idle.npc.closeoutStep = 0;
-  idle.npc.wips = [WIP()];
+  const idle = fixture({ closing: true });
   runCloseout(idle.world, idle.npc);
   assert.deepEqual(idle.world.returning, [], 'a browser who bought nothing is not a regular');
 }
@@ -576,15 +561,11 @@ const runCloseout = (world, npc) => {
 }
 
 {
-  const { world, npc } = fixture();
-  npc.state = STATE.CLOSEOUT;
-  npc.closeoutStep = 0;
-  npc.wips = [WIP()];
+  const { world, npc } = fixture({ closing: true });
   npc.willReturn = true;
   runCloseout(world, npc);
   rejoin(npc);
-  npc.state = STATE.CLOSEOUT;
-  npc.closeoutStep = 0;
+  Object.assign(npc, { state: STATE.CLOSEOUT, closeoutStep: 0 });
   npc.willReturn = true;
   runCloseout(world, npc);
   assert.equal(world.returning.length, 1, 'one entry per customer, however often they visit');
@@ -592,10 +573,7 @@ const runCloseout = (world, npc) => {
 }
 
 {
-  const { world, npc } = fixture();
-  npc.state = STATE.CLOSEOUT;
-  npc.closeoutStep = 0;
-  npc.wips = [WIP()];
+  const { world, npc } = fixture({ closing: true });
   npc.bought.push({ name: 'yarn', weight: 'bulky', material: 'wool' },
                   { name: 'crochet-hook', size: 4.5 });
   npc.chatted = true;
@@ -609,10 +587,7 @@ const runCloseout = (world, npc) => {
 }
 
 {
-  const { world, npc } = fixture();
-  npc.state = STATE.CLOSEOUT;
-  npc.closeoutStep = 0;
-  npc.wips = [WIP()];
+  const { world, npc } = fixture({ closing: true });
   npc.roundsInStore = npc.maxRounds;
 
   runCloseout(world, npc);
@@ -623,26 +598,11 @@ const runCloseout = (world, npc) => {
 {
   for (const [what, set] of [['sat and worked', (n) => { n.satAndWorked = true; }],
                              ['needed nothing', (n) => { n.wips = []; }]]) {
-    const { world, npc } = fixture();
-    npc.state = STATE.CLOSEOUT;
-    npc.closeoutStep = 0;
-    npc.wips = [WIP()];
+    const { world, npc } = fixture({ closing: true });
     set(npc);
     runCloseout(world, npc);
     assert.equal(world.guestbook[0].mood, 'happy', `bought nothing but ${what}: happy`);
   }
-}
-
-{
-  const { world, npc } = fixture();
-  npc.state = STATE.CLOSEOUT;
-  npc.closeoutStep = 0;
-  npc.worn.head = WIP({ id: 'worn hat', state: WIP_STATE.FINISHED, progress: 100 });
-  npc.wips = [WIP({ id: 'spare hat', state: WIP_STATE.FINISHED, progress: 100 })];
-
-  runCloseout(world, npc);
-  assert.equal(world.guestbook[0].kind, 'photo', 'making something outranks happy/disappointed');
-  assert.ok(world.guestbook[0].tags.includes('lent'), 'and the spare being lent is tagged');
 }
 
 {

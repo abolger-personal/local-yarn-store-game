@@ -995,11 +995,13 @@ function trimUnder(geo, under) {
   geo.setIndex(keep);
 }
 
-function loopRadius(fit, y, pad) {
+function loopRadius(fit, y, pad, toward = null) {
   const { torso, neck } = fit;
   const sk = fit.skull;
   const chestY = y + neck.y;
-  const onTorso = chestY < torso[1] ? Math.max(torso[0], torso[2]) * Math.sqrt(Math.max(0, 1 - (chestY / torso[1]) ** 2)) : 0;
+  // VISUAL-DESIGN-FINISHED-OBJ.md, scarf shapes: toward a point, a body wider than deep keeps to its chest's front
+  const round = toward ? Math.max(torso[2], Math.hypot(toward.x, toward.z) / Math.hypot(toward.x / torso[0], toward.z / torso[2])) : Math.max(torso[0], torso[2]);
+  const onTorso = chestY < torso[1] ? round * Math.sqrt(Math.max(0, 1 - (chestY / torso[1]) ** 2)) : 0;
   const hy = (y - neck.headY) / sk[1];
   const onHead = Math.abs(hy) < 1 ? Math.max(sk[0], sk[2]) * Math.sqrt(1 - hy * hy) : 0;
   return Math.max(neck.r, y < neck.coatTop ? neck.coatR : 0, onTorso, onHead) + pad;
@@ -1205,7 +1207,7 @@ function bandSeat(fit, clear, { H, wraps }, seat) {
 
 const bandDrop = (clear, from, to) => [0.35, 0.7].map((t) => {
   const p = from.clone().lerp(to, t);
-  const r = Math.hypot(p.x, p.z), R = clear(p.y);
+  const r = Math.hypot(p.x, p.z), R = clear(p.y, p);
   return r < R ? p.set((p.x * R) / r, p.y, (p.z * R) / r) : p;
 });
 
@@ -1225,7 +1227,7 @@ function bandSpine(fit, f, spec, { width, H, T }) {
   const { torso, neck: nk } = fit;
   const tuck = f.form === 'tucked' ? 0.35 : 1, wraps = BAND_WRAPS[f.form] ?? 1;
   const x = torso[0] * (spec.cross ? 0.05 : 0.28) + (wraps ? 0 : width * 0.5);
-  const seat = scarfSeat(f), clear = (y) => loopRadius(fit, y - nk.y, T * 1.15 * seat.snug);
+  const seat = scarfSeat(f), clear = (y, toward) => loopRadius(fit, y - nk.y, T * 1.15 * seat.snug, toward);
   const { y0, rise, hoop, lean } = bandSeat(fit, clear, { H, wraps }, seat);
   const endTop = Math.min(nk.y, torso[1] * 0.9, seat.big ? y0 - H : Infinity);
   const [endA, endB] = spec.ends.map((k, i) => endPath(fit, f, i ? -x : x, k * torso[1] * f.fit * tuck, { back: spec.back?.[i], top: endTop }));
@@ -1603,20 +1605,28 @@ function shawlShape(fit, f, spec) {
   const pad = f.thick * 1.6;
   const r = [Math.max(torso[0], fit.shoulderX) + pad, torso[1] + pad, torso[2] + pad];
   const flare = (1 - f.drape) * 0.25 + (f.fit > 1 ? (f.fit - 1) * 0.3 : 0);
-  const top = 0.17 * Math.PI;
-  const p = new THREE.Vector3();
+  const top = 0.17 * Math.PI, p = new THREE.Vector3();
   const fall = r[1] * 1.6;
-  const side = sideHem(fit, r, spec.arm ?? 0.5), arms = upperArms(fit), clear = fit.arm.r * 1.15 + pad;
+  const side = sideHem(fit, r, spec.arm ?? 0.5), { arms, clear, high, lift } = shawlArms(fit, r, pad);
   return (u, v, out) => {
     const th = spec.hem ? frontCurve(u * TAU, v, spec.open) : u * TAU, drop = spec.hem ? rollDown(Math.abs(Math.atan2(Math.sin(th), Math.cos(th))), spec.open) : 0;
     const reach = SHOULDER + (spec.hem ? (spec.hem(th, side) * torso[1] * f.fit) / fall : spec.depth(th) * Math.PI * f.fit);
     const phi = lerp(Math.min(top + drop * ROLL * 0.5, reach), reach, v);
     if (phi <= SHOULDER) onEllipsoid(r, phi, th, out);
-    else hangBelow(onEllipsoid(r, SHOULDER, th, p), (phi - SHOULDER) * fall, flare / r[1], out);
+    else hangBelow(lift(onEllipsoid(r, SHOULDER, th, p)), (phi - SHOULDER) * fall, flare / r[1], out);
     bunched(out, drop, v);
-    if (spec.circle) return flared(out, spec.circle, { top: onEllipsoid(r, top, th, p).y, around: th, drape: f.drape });
-    return phi > SHOULDER ? overArms(out, arms, clear) : out;
+    if (spec.circle) flared(out, spec.circle, { top: onEllipsoid(r, top, th, p).y, around: th, drape: f.drape });
+    if (spec.circle && !high) return out;
+    return phi > SHOULDER ? overArms(out, arms, clear) : lift(out);
   };
+}
+
+// VISUAL-DESIGN-FINISHED-OBJ.md, shawls: an arm set high leaves the body above the cap's edge, so the cap, and the
+// drape from it, ride up over the arm
+function shawlArms(fit, r, pad) {
+  const arms = upperArms(fit), clear = fit.arm.r * 1.15 + pad;
+  const high = arms.some(({ start }) => start.y - fit.arm.r > r[1] * Math.cos(SHOULDER));
+  return { arms, clear, high, lift: (q) => (high ? capOverArms(q, arms, clear) : q) };
 }
 
 function upperArms(fit) {
@@ -1641,6 +1651,17 @@ function overArms(p, arms, clear) {
     // capsule exit exactly if the step shows.
     out.set(p.x, 0, p.z).normalize();
     for (let i = 0; i < 64 && underArm(p, arm, clear); i++) p.addScaledVector(out, clear / 4);
+  }
+  return p;
+}
+
+function capOverArms(p, arms, clear) {
+  const q = new THREE.Vector3(), d = new THREE.Vector3();
+  for (const arm of arms) {
+    if (arm.closestPointToPoint(p, true, q).distanceTo(p) >= clear) continue;
+    d.subVectors(p, q).setY(Math.abs(p.y - q.y));
+    if (d.lengthSq() < 1e-10) d.copy(UP);
+    p.copy(q).addScaledVector(d.normalize(), clear);
   }
   return p;
 }

@@ -397,6 +397,11 @@ scales"). A striker and projectile shooter in the brawler, on the base two-legge
 Status: decided 2026-11-06 (designer's references: a snapping turtle for shape, a painted turtle for colour).
 `characters/turtle.js`.
 
+Defaults the designer's Zephyr (decided 2026-11-09): yellow, torso 0.257 × 0.201 × 0.217, low eyes (`eyeLift` 0.099),
+shoulders at `shoulderOut` 0.82 (hers 0.623 buried the shoulder in the torso, so the arms stood 83° out) and
+`shoulderLift` 0.648 so the arms clear the body, neck 0.095 (hers 0.060) so scarves sit under the low eyes. The
+numbers below are the first turtle's.
+
 - Burrowy and burly: a sturdy little tank, round and never mean. Broad torso (0.245 × 0.220 × 0.235), broad
   high shoulders (`shoulderLift` 0.40: at the base 0.30 a shawl sinks into the body in the attitude; wider
   `shoulderOut` or `clampArmOut` failed the fighter's two-handed scythe and sword checks), thick limbs (`limbThick` 0.046), stubby legs

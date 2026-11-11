@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeMotion, integrate, compose, tailStep, POSE_KEYS, POSES } from './motion.js';
-import { paintMaterial } from './paint.js';
+import { INK_SEEN_FROM, PAINT, inkEdgeMaterial, paintMaterial } from './paint.js';
 import { named, skinZ } from './faces.js';
 
 export const BUILD = '2026-09-26.8-tails';
@@ -719,15 +719,17 @@ export function skinDecal(head, kind, [x, y], size, lift) {
 
 // BODIES.md §Face paint: on the cheekbone (facePaintDown, facePaintOut in eye radii from the eye), or one heart on the right cheek
 
-function facePaintGeometry(P, placement, side) {
+// `edge`: the ink edge under it instead, that much wider all round and half as proud
+function facePaintGeometry(P, placement, side, edge = 0) {
   const { spread, lift, squash, head } = placement, eye = [side * P.headRadius * spread, P.headRadius * lift];
+  const proud = edge ? ACCENT_LIFT / 2 : ACCENT_LIFT;
   if (P.facePaint !== 'rings') {
     /** @type {[number, number]} */
     const cheek = [eye[0] + side * P.eyeRadius * P.facePaintOut, eye[1] - P.eyeRadius * squash * P.facePaintDown];
-    return skinDecal(head, P.facePaint, cheek, P.eyeRadius * 1.5 * P.facePaintSize, ACCENT_LIFT);
+    return skinDecal(head, P.facePaint, cheek, P.eyeRadius * 1.5 * P.facePaintSize + 2 * edge, proud);
   }
-  const rim = rimAngle(P, placement, side, ACCENT_LIFT);
-  return skinPatch(head, eye, [rim, rim + (P.eyeRadius * P.facePaintSize) / meanOf(head)], ACCENT_LIFT);
+  const rim = rimAngle(P, placement, side, ACCENT_LIFT), out = edge / meanOf(head);
+  return skinPatch(head, eye, [rim - out, rim + (P.eyeRadius * P.facePaintSize) / meanOf(head) + out], proud);
 }
 
 function addFace(ctx, P, placement) {
@@ -735,6 +737,8 @@ function addFace(ctx, P, placement) {
   ctx.mat.facePaint ??= ctx.addMaterial(feltMaterial(P, facePaintColorOf(P)));
   for (const side of P.facePaint === 'heart' ? [-1] : [-1, 1]) {
     ctx.head.add(named(part(facePaintGeometry(P, placement, side), ctx.mat.facePaint), 'facePaint'));
+    // tmnt/REUSE-SPEC.md §Ink outlines: the mask and face paint outlined too, while the ink trial is on
+    if (PAINT.ink.value) ctx.head.add(named(part(facePaintGeometry(P, placement, side, PAINT.ink.value * INK_SEEN_FROM), inkEdgeMaterial()), 'facePaintInk'));
   }
 }
 

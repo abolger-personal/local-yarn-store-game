@@ -9,6 +9,10 @@ import { levelsBeaten } from './progress.js';
 import { STRIKE } from './punches.js';
 import { FACE_ICON, ICON, NONE, TRICK_ICON, svg, textured } from './icons.js';
 import { aimGameCamera, makeStage } from './stage.js';
+import { inkFromQuery, inkOutline } from '../characters/paint.js';
+
+// the species checker's ink trial: ?ink=0.002&pool=1 (tmnt/REUSE-SPEC.md §Ink outlines)
+const inked = inkFromQuery();
 
 // REUSE-SPEC.md §Fighter chooser: the sword shows once this tablet's player has beaten level 1, the scythe level 2, the Greathammer level 4
 const beaten = levelsBeaten();
@@ -139,6 +143,7 @@ const stage = makeStage(document.getElementById('stage'));
 function rebuild(reframe) {
   if (built) { stage.scene.remove(built.root); disposeFighter(built); }
   built = buildFighter(paint(fighter));
+  if (inked) inkOutline(built.root);
   if (menuEffect) addTricks(built, menuEffect);
   else if (rolled !== null) addTricks(built, rollEffect(rolled));
   stage.scene.add(built.root);

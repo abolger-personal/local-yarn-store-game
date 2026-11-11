@@ -64,6 +64,84 @@ elites); **Purl Power!** (Turtle Power) on the title screen.
   9. Night-time campsite: tents, lanterns, fireflies, shadow bad guys.
   10. Bookshelf: book-stack stairs, page bridges, bookworms.
 
+  The first level settles it for now: a real playground (§Level 1), at kid size, not mouse size.
+
+## Level 1: the Capuano playground
+
+**The first level is the Capuano playground** (decided 2026-11-10): Glen Park, 150 Glen St, East Somerville, on the
+grounds of the Capuano Early Childhood Center. The real one, as it is, not a made-up playground; a kid who plays there
+should know it. Turned into a 2D side scroll in the 2.5D band.
+
+- **Behind it, the soccer field, barely seen** (decided 2026-11-10): Capuano Field (Glen Field) is right there, a
+  turf field with white and yellow lines and tall light poles. Far back, pale, low contrast.
+- **Comic-book art, the heroes standing out** (decided 2026-11-10): flat colours and ink lines like the logo, but
+  **thinner ink on the level than on the characters**, so they read first.
+- **The real playground's colours** (decided 2026-11-10) for the level's palette.
+- **Its pieces are the obstacles and the cover** (decided 2026-11-10): fire poles and the play structures to get
+  over, round and down, and for bad guys to jump out from behind; it's a side-scrolling brawler.
+- **The equipment is played on** (decided 2026-11-10), even where a real side scroller wouldn't: heroes **climb the
+  steps**, **ride the slides down**, **wobble across the clatter bridge** and **slide down the fire pole**. **A jump
+  gets you on** (decided 2026-11-10): nothing grabs a hero walking past.
+- **The fire pole is yellow** (decided 2026-11-10), on the big structure, across from the bear cave; hard to see in
+  the screenshots, but there.
+- **Bad guys use the equipment too** (decided 2026-11-10): they slide, cross the bridge and drop down the pole, and
+  hide behind the pieces to jump out.
+- **The playground fades behind the heroes** (decided 2026-11-10): lighter and flatter than the real thing, with
+  **thinner ink** than the characters', but **not all the way to pastel**; it stays the real playground's colours.
+- **The violet spiral slide stays violet** (decided 2026-11-10), though purple is the Sock Clan's.
+- **The heroes pop** (decided 2026-11-10): something behind them to lift them off the playground, an action glow
+  or a shadow; which is open. With **URL params as sliders** to try it on a tablet, like the choosers' `?ink=` and
+  `?pool=` (§Ink outlines): how faded the level is, how strong the glow or shadow is, and the outline (`?ink=0`
+  tries the heroes with no outline at all).
+  **Built for the chooser to try** (2026-11-10): `tmnt/choose.html?glow=0.6&shadow=0.4` (each 0 to 1; off without
+  them), the glow in the scarf's colour (the gloves' with no scarf), the shadow a dark halo, both soft and behind
+  the hero (`addPop` in `hero.js`). The level's fade slider comes with the level.
+- **The swings move and heroes ride them** (decided 2026-11-10): jump on, swing, and be **launched**; a swing can go
+  **all the way round, 360°**, though real ones can't.
+- **No hurry, no going back** (decided 2026-11-10): the game never pushes the players along. The camera follows
+  forward and doesn't come back (the side-scroller rule), and **nobody gets further forward than the slowest player**
+  lets the camera go.
+- **The boss is a Sock Clan elite** (decided 2026-11-10), **a dragon** in **over-knee socks** and **a massive hat like
+  a ninja's**, who **breathes fire**. Built in a later session; the level first.
+- **The finale has a fire pole** (decided 2026-11-10): the heroes slide down it into the boss fight.
+- **Route** (decided 2026-11-10): seen from Glen St, north to south (below).
+- **No triple-deckers** (decided 2026-11-10). **The telephone pole and street signs stay**, and the **ONE WAY**
+  sign points the way the level scrolls.
+
+What it looks like (the designer's Google Maps screenshots, Street View from Glen St, August 2026, and overhead,
+2026-11-10; colours eyeballed from them, to tune):
+- **Two play structures** on a poured rubber floor: a smaller one by Glen St and a big one in the middle. Both are
+  **royal-blue posts** (about `#2f3db8`) with **marigold-yellow railings and panels** (`#f0b648`), **teal-green
+  hip roofs** like little pagodas (`#2e6b58`), dark decks, **green play panels** (a tic-tac-toe spinner, `#2f7a50`),
+  a **dark green wavy slide**, a **violet tube-and-spiral slide** (`#6b55d9`), a rope-and-plank **clatter bridge**
+  (yellow ropes) between towers, ladders, steps, and a grey dome (the "bear cave" a 2011 write-up mentions, with a
+  fire pole, a rock wall and stepping stools; not seen in the screenshots).
+- **Blue arch swings**: a row of four along Palmer Ave and two more sets near the middle, **blue** hoop frames.
+- **The floor** in big soft blobs: **slate blue** (`#7085b8`), **teal** (`#5e9e8f`) and **terracotta** (`#c48a5e`)
+  under the big structure, with circles of the other colours dotted in it.
+- **Round it:** black chain-link fence, black benches and picnic tables, a telephone pole and street signs on Glen
+  St, big street trees, triple-deckers behind (left out), the school's brick to the south (Fountain
+  Ave). Across Palmer Ave an asphalt yard **painted with a big teal and green labyrinth**, a red circle and hopscotch.
+- **The field** to the east: green turf, white and yellow lines, white goals, light poles, a tall building far off.
+  From Glen St it shows **through the structures**, so it really is the backdrop.
+- From the 2014 renovation: the rubber floor, a picket gate, shade trees; a shade structure opened October 2025.
+
+Brainstorm 2026-11-10:
+- **Seen from Glen St, the way Street View is** (the route, decided 2026-11-10): the camera looks east, so the field is behind the structures, and
+  the level runs **along Glen St, north to south**: the painted labyrinth and hopscotch across Palmer Ave (flat, the
+  first fight) → the row of arch swings (swinging hazards) → the small structure (up the steps, down the green wavy
+  slide) → the big structure (the clatter bridge, the violet spiral, the green panels, the bear cave) → the swing
+  sets by the middle → out at the school's brick on Fountain Ave.
+- **Where the Sock Clan come from:** behind the fire pole and the posts, down a slide, out of the bear cave, from
+  behind the swings, over the fence from the field.
+- **Layers:** the field and its light poles far back, the fence and trees behind the play band, the play pieces in
+  it, a post or a swing chain passing close in front now and then.
+- **The real pieces in the real order** (decided 2026-11-10), not laid out by hand and not shuffled: a kit of the
+  playground's pieces (the swings, the two structures, the slides, the bridge, the pole, the bear cave), always in the
+  route's order; the seed (`spinoff/generate.js`'s, so every tablet builds the same level from what the host sends)
+  only varies the spacing and where the bad guys hide and come from. Planned 2026-11-10: the generator's problem
+  kinds become pieces (tall = a structure, step up = its steps, moat = the gap the clatter bridge crosses).
+
 ## Rooms and the lobby
 
 **Keep and reuse every room and coordination screen** (decided 2026-11-09): the lobby, joining with a picture
@@ -135,7 +213,9 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
     crossed in front of him at rest like his two katanas (each half aimed past the middle; amended 2026-11-10: as
     big as needed for his short arms to cross them; a handle shank four times the loop, so the blades reach well past
     each other; the handles very long ovals, amended 2026-11-10): a long blade with a rounded tip, a chunky
-    handle loop round the hand in the picked colour, a pivot screw. The right swung as the sword, the left held up at the sword's rest. Brainstorm
+    handle loop round the hand in the picked colour, a pivot screw. The right swung as the sword, the left held up at the sword's rest.
+    As a punch starts both halves uncross out to their own sides (`SNIP_GUARD`, 2026-11-10), so the blades don't cut
+    through him on the way. Brainstorm
     2026-11-10: snipping shut as a hit lands.
   - **Raphael's sai are a pair of knitting needles** (decided 2026-11-10: stabbing, in pairs, like sai), one in each
     hand, the right swung as the sword, the left held up at its rest. Long points, a knob on each end. The sai has left
@@ -165,12 +245,57 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
 - **The face** (decided 2026-11-10): none, the mask (rings round the eyes), a heart, or **black-rimmed glasses**;
   not the NFL eye black, which doesn't show on a turtle. The mask is the scarf's colour, so a turtle's sync up (the
   fur's complement with no scarf), and narrow on a turtle's big eyes (`faceOf`). Glasses are a rim round the front
-  of each eye, and a bridge when the eyes are far enough apart (`buildHero`).
+  of each eye, and a bridge when the eyes are far enough apart (`buildHero`). **All four turtles start in their
+  masks** (amended 2026-11-10, the kids asked), Donatello's glasses over his; the face row still picks one or the other.
 - 🎲 any animal, colours and pieces. **🍕 a preset** (decided 2026-11-10): **six presets**, the four turtles, April and
   Master Splinter, in turn from a random one, so two taps never give the same. The page opens on the saved hero, or a preset when none is saved.
   👍 saves; there is no lobby to go to yet.
+- **The hero turns all the way round** (decided 2026-11-10), to the shell at the back, before turning back the other
+  way; the fighters' chooser only sways.
 - Every colour is one of the six hero colours; anything else read from a save or another tablet snaps to the
   nearest (`readHero`). `tmnt/hero.test.mjs` checks it.
+
+**The chooser sets the scene** (planned 2026-11-10). Today it's the donut fighters' plain cream (`makeStage`'s
+`background`, `--cream` in `spinoff/spinoff.css`), which says nothing about the story. It gets a logo and a backdrop.
+
+- **The logo is the splash screen** (decided 2026-11-10). It goes where the donut fighters' splash is, the
+  tap-to-play button in `spinoff/index.html` that goes fullscreen, loads the rooms and opens the chooser in a frame.
+  `tmnt/index.html` is that page with the logo as the button. Draft: `tmnt/logo.svg` (2026-11-10), each part named
+  by `id` so it can be edited by hand or in an editor.
+  - **After the 1987 cartoon logo, not the arcade games** (decided 2026-11-10): *Teenage Mitten Knitting* in
+    white on a red banner, **TURTLES** big, green and arched with a thick black outline, and *Turtles in Twine:
+    The Sweater's Revenge* under it. **A giant silver ball of yarn** behind it all, where the cartoon has its sewer
+    lid, its end trailing out. The logo is the one place outside the bad guys that silver shows.
+  - **TURTLES is knitted** (decided 2026-11-10): stockinette Vs all over the letters, in place of the cartoon's
+    lumps; the edges wobble a little, hand-made. The draft uses Luckiest Guy (Google Fonts), each letter set on the
+    arch by itself and stretched to the same width, so it lands the same whichever font draws it.
+  - **🐢👆 under the logo, as emoji** (decided 2026-11-10), like the fighters' 🍩👆, so a player who can't read
+    still sees what to do: tap. They're on the page, not in `logo.svg`.
+- **The backdrop** (planned 2026-11-10): somewhere in the story, not a flat colour. Brainstorm 2026-11-10:
+  - the turtles' lair: the yarn store's back room or under its floor, at mouse size; yarn bins as walls, a
+    pizza box, a TV, Master Splinter's rug;
+  - a city at dusk behind them, the 90s cartoon's skyline, with a water tower and rooftop to stand on;
+  - a preview of the first level once the theme is picked (§The game), so the chooser is where the story starts;
+  - The Sweater hinted at: a giant silhouette, a pulled thread running off screen, a "wanted" poster;
+  - built like the levels will be, flat painted layers at a few depths (2.5D), plus a floor the hero stands on.
+
+**Ink outlines on the characters, to match the logo** (brainstorm 2026-11-10). Today the painter (`characters/paint.js`)
+draws no line round a character: the ink style frays at the silhouette (`fray`) and darkens towards it (`pool`, 0.45,
+not on the species checker's dials). Ways to get a cartoon outline, cheapest first:
+  - **pool turned up**: darker towards the silhouette, already in the shader; reads as a soft brush edge, not a line,
+    and is thicker where a part curves away slowly;
+  - **a back-face shell**: each mesh again, black, seen from inside, pushed out along its normals, as the fighters'
+    sticker finish does in white (`adorn` in `spinoff/fighter.js`). A real line outside the silhouette and round
+    every piece (scarf, socks, weapon). Clean to a few pixels wide; wider, it splits at sharp corners and swallows
+    thin things (fingers, needles, scissor blades). Twice the meshes to draw;
+  - **an edge pass over the whole picture** (depth and normals): even lines everywhere, creases too, but a full-screen
+    pass every frame on a tablet GPU.
+
+On the species checker to try (2026-11-10), off in every game: **ink pool** (the owl's, as before), **fur pool**
+(the same darkening for every other animal, `PAINT.edgePool`, 0 in the games) and **ink outline** (the back-face
+shell, `inkOutline` in `characters/paint.js`, width 0 and hidden in the games; only the checker adds it). Never
+round the eyes, so no line on the pupils (2026-11-10). Saved characters can be checked on either chooser with
+`?ink=0.002&pool=1` on its address; without it the choosers are as before.
 
 **Keep this game's saves apart from the donut fighters'** (decided 2026-11-09). Both games are on the same site,
 so they share `localStorage`. The fighters' keys are `lys.fighter.v1` and `lys.progress.v1`; the hero is

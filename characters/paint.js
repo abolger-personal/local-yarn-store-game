@@ -13,6 +13,9 @@ export const PAINT = {
   streak: { value: 0.08 },
   light: { value: 0.8 },
   pool: { value: 0.45 },
+  // the fur's and scales' pool, off in the games (species checker trial, tmnt/REUSE-SPEC.md §Ink outlines)
+  edgePool: { value: 0 },
+  ink: { value: 0 },
   fray: { value: 0.78 },
   feather: { value: 0.76 },
   scales: { value: 0.5 },
@@ -69,7 +72,7 @@ uniform sampler2D paintBrushMap;
 uniform sampler2D paintFeatherMap;
 uniform sampler2D paintPlaneMap;
 uniform sampler2D paintScaleMap;
-uniform float paintSize, paintBands, paintSoft, paintBrush, paintStreak, paintLevel, paintPool, paintFray, paintFeather, paintAccent, paintAccentSize, paintScales, paintScaleSize;
+uniform float paintSize, paintBands, paintSoft, paintBrush, paintStreak, paintLevel, paintPool, paintEdgePool, paintFray, paintFeather, paintAccent, paintAccentSize, paintScales, paintScaleSize;
 varying vec2 vPaintUv;
 // BODIES.md §Painterly, accent pieces: by material, or merged, by uv lifted 2 whole tiles
 #define paintAccented max(paintAccent, step(1.5, vPaintUv.y))`;
@@ -100,14 +103,16 @@ const level = (stroke, banded) => `
 
 // fur: a few broad planes a part (Marc), not hair; ink: the fine brush
 const PLANES = level('texture2D(paintPlaneMap, vPaintUv / mix(paintSize, paintAccentSize, paintAccented)).r', true);
+// ink's pool for fur and scales: darker towards the silhouette
+const EDGE = '(1.0 - paintEdgePool * smoothstep(0.35, 0.0, abs(dot(normalize(normal), normalize(vViewPosition)))))';
 const FUR = `{${PLANES}
-  outgoingLight = paintC * (1.0 + paintStroke * paintStreak);
+  outgoingLight = paintC * ${EDGE} * (1.0 + paintStroke * paintStreak);
 }`;
 
 // BODIES.md §Dragon, scales: the fur's planes, and overlapping scales painted over all but the accent pieces
 const SCALE = `{${PLANES}
   float paintScaled = (texture2D(paintScaleMap, vPaintUv * vec2(6.0, 3.0) / paintScaleSize).r - 0.5) * paintScales * (1.0 - paintAccented);
-  outgoingLight = paintC * (1.0 + paintStroke * paintStreak + paintScaled);
+  outgoingLight = paintC * ${EDGE} * (1.0 + paintStroke * paintStreak + paintScaled);
 }`;
 
 const INK = `{${level('texture2D(paintBrushMap, vPaintUv * vec2(3.0, 2.0)).r', false)}
@@ -210,7 +215,7 @@ function uniformsFor(material) {
   return {
     paintBrushMap: brush, paintFeatherMap: feather, paintPlaneMap: plane, paintScaleMap: scale,
     paintScales: PAINT.scales, paintScaleSize: PAINT.scaleSize, paintSize: PAINT.size, paintBands: PAINT.bands, paintSoft: PAINT.soft,
-    paintBrush: PAINT.brush, paintStreak: PAINT.streak, paintLevel: PAINT.light, paintPool: PAINT.pool,
+    paintBrush: PAINT.brush, paintStreak: PAINT.streak, paintLevel: PAINT.light, paintPool: PAINT.pool, paintEdgePool: PAINT.edgePool,
     paintFray: PAINT.fray, paintFeather: PAINT.feather, paintAccent: { value: material.userData.accent ? 1 : 0 }, paintAccentSize: PAINT.accentSize,
   };
 }
@@ -237,4 +242,52 @@ export function paintMaterial(material, style, accent = material.userData.accent
   material.onBeforeCompile = (shader) => inject(shader, style, material);
   material.customProgramCacheKey = () => `paint-${style}`;
   return material;
+}
+
+// ponytail: the ink outline is a species checker trial (tmnt/REUSE-SPEC.md §Ink outlines), on no game's characters yet
+let ink = null;
+/** The outline's material: a mesh again in ink, seen from inside, pushed out along its normals by a share of its distance, so the line is as wide on screen near or far; hidden at width 0. */
+export const inkMaterial = () => (ink ??= Object.assign(new THREE.MeshBasicMaterial({ color: '#141414', side: THREE.BackSide }), {
+  visible: PAINT.ink.value > 0,
+  onBeforeCompile: (shader) => {
+    shader.uniforms.paintInk = PAINT.ink;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float paintInk;')
+      .replace('#include <project_vertex>', `#include <project_vertex>
+  #ifdef USE_SKINNING
+  vec3 paintInkNormal = objectNormal;
+  #else
+  vec3 paintInkNormal = normal;
+  #endif
+  mvPosition.xyz += normalize(normalMatrix * paintInkNormal) * paintInk * -mvPosition.z;
+  gl_Position = projectionMatrix * mvPosition;`);
+  },
+}));
+
+/** Outlines every opaque mesh under `root` in ink (`PAINT.ink` wide), skinned ones on their own skeleton. */
+export function inkOutline(root) {
+  const meshes = [];
+  root.traverse((o) => { if (o.isMesh && !o.userData.ink && !o.material.transparent && !['eye', 'ink'].includes(o.material.userData.family)) meshes.push(o); });
+  for (const m of meshes) {
+    const line = new (m.isSkinnedMesh ? THREE.SkinnedMesh : THREE.Mesh)(m.geometry, inkMaterial());
+    if (m.isSkinnedMesh) line.bind(m.skeleton, m.bindMatrix);
+    Object.assign(line, { castShadow: false, raycast: () => {} }).userData.ink = true;
+    m.add(line);
+  }
+}
+
+// ponytail: face paint is an open patch, with no back to outline, so it gets an ink edge under it instead, built in,
+// as wide as the outline is from this far away (about the chooser's camera); nearer or further it's wider or thinner
+export const INK_SEEN_FROM = 2.5;
+let edge = null;
+/** The face paint's ink edge, shared by every character. */
+export const inkEdgeMaterial = () => (edge ??= Object.assign(new THREE.MeshBasicMaterial({ color: '#141414' }), { userData: { family: 'ink', shared: true } }));
+
+/** The ink trial on a game's page, from its address (?ink= outline width, ?pool= fur pool); off without them. True if outlined. */
+export function inkFromQuery(query = globalThis.location?.search ?? '') {
+  const q = new URLSearchParams(query), dial = (k, max) => Math.min(max, Math.max(0, Number(q.get(k)) || 0));
+  PAINT.edgePool.value = dial('pool', 1);
+  PAINT.ink.value = dial('ink', 0.02);
+  inkMaterial().visible = PAINT.ink.value > 0;
+  return PAINT.ink.value > 0;
 }

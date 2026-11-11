@@ -65,7 +65,8 @@ const jumpsuitLook = () => ({
 });
 // REUSE-SPEC.md §Hero chooser: the six presets: the four turtles, April, and Master Splinter (an orange mouse in a red
 // vest and white socks, with his cane)
-const turtle = (scarf) => ({ species: 'turtle', fur: GREEN, facePaint: SIGNATURE[scarf]?.facePaint, look: () => scarfLook(scarf) });
+// every turtle starts in his mask (amended 2026-11-10, the kids asked), Donatello's glasses over his
+const turtle = (scarf) => ({ species: 'turtle', fur: GREEN, facePaint: 'rings', look: () => scarfLook(scarf) });
 const WHO = Object.freeze([
   ...TURTLE_COLOURS.map(({ hex }) => turtle(hex)),
   { species: 'llama', fur: ORANGE, facePaint: 'heart', look: jumpsuitLook },
@@ -162,4 +163,45 @@ export function buildHero(hero) {
   const built = buildFighter(faceOf(hero), PALETTE);
   if (hero.look.glasses) addGlasses(built);
   return built;
+}
+
+// REUSE-SPEC.md §Level 1, the heroes pop: a soft glow in the hero's scarf colour and a dark shadow, behind them, each
+// as strong as its URL value (?glow=, ?shadow=, 0 to 1); two materials for every hero, set as each is added
+const POP = { glow: null, shadow: null };
+let popMap = null;
+function popTexture() {
+  if (popMap) return popMap;
+  const c = Object.assign(document.createElement('canvas'), { width: 128, height: 128 }), g = c.getContext('2d');
+  const r = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  r.addColorStop(0, '#fff'); r.addColorStop(0.45, '#fffc'); r.addColorStop(1, '#fff0');
+  g.fillStyle = r;
+  g.fillRect(0, 0, 128, 128);
+  return (popMap = new THREE.CanvasTexture(c));
+}
+
+/** The pop strengths from the page's address, each clamped to 0..1; 0 (off) without them. */
+export function popFromQuery(query = globalThis.location?.search ?? '') {
+  const q = new URLSearchParams(query), dial = (k) => Math.min(1, Math.max(0, Number(q.get(k)) || 0));
+  return { glow: dial('glow'), shadow: dial('shadow') };
+}
+
+const _mid = new THREE.Vector3(), _away = new THREE.Vector3(), _size = new THREE.Vector3(), _one = new THREE.Quaternion();
+/** Puts `kind` behind `built`, `strength` strong, `colour`, kept on the far side of the hero from the camera, `grow` times its height across. */
+function popSprite(built, kind, strength, colour, grow) {
+  const box = new THREE.Box3().setFromObject(built.root), h = box.getSize(_size).y, centre = built.root.worldToLocal(box.getCenter(new THREE.Vector3()));
+  const material = (POP[kind] ??= new THREE.SpriteMaterial({ map: popTexture(), depthWrite: false }));
+  Object.assign(material, { opacity: strength }).color.set(colour);
+  const sprite = Object.assign(new THREE.Sprite(material), { frustumCulled: false });
+  sprite.onBeforeRender = (_r, _s, camera) => {
+    built.root.localToWorld(_mid.copy(centre));
+    _away.copy(_mid).sub(camera.position).normalize().multiplyScalar(h * 0.6);
+    sprite.matrixWorld.compose(_mid.add(_away), _one, _size.setScalar(h * grow));
+  };
+  built.root.add(sprite);
+}
+
+/** The heroes pop off the playground: `pop.shadow` a dark halo behind, `pop.glow` the scarf's colour (the gloves' with no scarf). */
+export function addPop(built, hero, pop) {
+  if (pop.shadow) popSprite(built, 'shadow', pop.shadow, '#141414', 1.9);
+  if (pop.glow) popSprite(built, 'glow', pop.glow, hero.look.scarf ? hero.look.scarfColor : hero.look.gloves, 1.6);
 }

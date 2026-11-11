@@ -2,7 +2,13 @@ import { POSES, facePaintColorOf, getSpecies } from '../characters/npc.js';
 import { SPECIES, TEXTURES, TRICKS, animateFighter, disposeFighter, setFur, stepFighter, stepTricks } from '../spinoff/fighter.js';
 import { FACE_ICON, ICON, NONE, TRICK_ICON, svg, textured } from '../spinoff/icons.js';
 import { makeStage } from '../spinoff/stage.js';
-import { CLOTH, COLOURS, FACES, HERO_HANDS, PRESETS, buildHero, faceOf, handsOf, SCARF_FORMS, SWEATER_WORKS, WEAR, loadHero, newHero, randomHero, saveHero } from './hero.js';
+import { CLOTH, COLOURS, FACES, HERO_HANDS, PRESETS, buildHero, faceOf, handsOf, SCARF_FORMS, SWEATER_WORKS, WEAR, addPop, loadHero, newHero, popFromQuery, randomHero, saveHero } from './hero.js';
+import { inkFromQuery, inkOutline } from '../characters/paint.js';
+
+// the species checker's ink trial: ?ink=0.002&pool=1 (tmnt/REUSE-SPEC.md §Ink outlines)
+const inked = inkFromQuery();
+// REUSE-SPEC.md §Level 1: the heroes' glow and shadow to try, ?glow=0.6&shadow=0.4
+const pop = popFromQuery();
 
 const LINE = 'fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"';
 const PICTURE = {
@@ -115,6 +121,8 @@ const stage = makeStage(document.getElementById('stage'));
 function rebuild(reframe) {
   if (built) { stage.scene.remove(built.root); disposeFighter(built); }
   built = buildHero(hero);
+  if (inked) inkOutline(built.root);
+  addPop(built, hero, pop);
   stage.scene.add(built.root);
   if (reframe) stage.frame([built.root], { margin: 1.5 });
 }
@@ -148,7 +156,8 @@ rebuild(true);
 stage.run((dt) => {
   cheer = Math.max(0, cheer - dt);
   spin += dt;
-  built.root.rotation.y = 0.55 * Math.sin(spin * 0.5);
+  // REUSE-SPEC.md §Hero chooser: all the way round to the shell before turning back the other way
+  built.root.rotation.y = Math.PI * Math.sin(spin * 0.3);
   swing = Math.min(1, swing + dt / 0.7);
   if (swing < 1) stepFighter(built, dt, POSES.rest, 0, { name: SHOW_MOVES[shows % SHOW_MOVES.length], arm: -1, step: swing });
   else {

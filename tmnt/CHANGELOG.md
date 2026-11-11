@@ -16,9 +16,12 @@ L.Y.S. spinoff's spinoff.
   - **April**: an orange llama in a yellow jumpsuit and white boots, with a heart on her cheek.
   - **Master Splinter**: an orange mouse in a red vest.
 
+  All four turtles start in their masks, Donatello's glasses over his.
+
   A first visit gets one of the six; after that the page opens on your saved hero. 🎲 still makes a random one.
 - **The weapons are craft tools:**
   - **Leonardo:** comically large safety scissors, a half in each hand, crossed in front of him like his katanas.
+    They uncross out to the sides when he punches, so they don't cut through him.
   - **Raphael:** a pair of knitting needles, for stabbing.
   - **Donatello:** a bo staff that is a giant drop spindle, with yarn wound on it in his colour.
   - **Michelangelo:** two balls of yarn on a strand, which swing and fling out when he punches.
@@ -26,6 +29,9 @@ L.Y.S. spinoff's spinoff.
   - **Master Splinter:** a giant crochet hook for a cane, hanging down to the floor like a walking stick.
   - Plus the boxing gloves. The fighting game's sword, scythe and hammer stay in the fighting game.
 - **Faces:** a mask round the eyes in the scarf's colour (narrow on a turtle), a heart, or black-rimmed glasses.
+- **The hero turns all the way round** on the chooser, so you see the shell, then back the other way.
+- **The logo** (`tmnt/logo.svg`): after the 1987 cartoon's, *Teenage Mitten Knitting* on a red banner, **TURTLES**
+  knitted in green, on a giant silver ball of yarn. Not on a page yet.
 - **A mouse**, the sixth animal: the lion with big round ears instead of a mane, and a bare tail.
 - **The hero colours** are the turtles' four (orange, blue, purple, red), turtle green, taxi yellow and white for
   clothes. Black and silver are for bad guys only.

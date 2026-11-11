@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { LOOK } from '../characters/garments.js';
 import { POSES, facePaintColorOf } from '../characters/npc.js';
 import { CANE, MIC, NEEDLES, SCISSORS, SPECIES, STAFF, YARN_BALLS, stepFighter, animateFighter, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
-import { CLOTH, COLOURS, PALETTE, PRESETS, buildHero, faceOf, SCARF_FORMS, SWEATER_WORKS, TURTLE_COLOURS, WEAR, newHero, randomHero, readHero } from './hero.js';
+import { CLOTH, COLOURS, PALETTE, PRESETS, buildHero, faceOf, popFromQuery, SCARF_FORMS, SWEATER_WORKS, TURTLE_COLOURS, WEAR, newHero, randomHero, readHero } from './hero.js';
 
 LOOK.viewPx = 0;
 
@@ -94,6 +94,14 @@ for (const half of [leo.sword, pair]) {
   assert.ok(Math.sign(tip.x) !== Math.sign(grip.x) && tip.z > grip.z, `the blades cross in front (${grip.x.toFixed(2)} → ${tip.x.toFixed(2)})`);
 }
 assert.deepEqual([newHero(() => 0.25).look.hands, newHero(() => 0.25).look.socks], [SCISSORS, 'over-knee']);
+// mid-punch they uncross, each half out on its own side, so neither cuts through him
+stepFighter(leo, 1 / 60, POSES.rest, 0, { name: 'jab', arm: -1, step: 0.4 });
+leo.root.updateMatrixWorld(true);
+for (const half of [leo.sword, pair]) {
+  const grip = leo.root.worldToLocal(half.getWorldPosition(new THREE.Vector3()));
+  const tip = leo.root.worldToLocal(half.localToWorld(new THREE.Vector3(0, 0, leo.sword.userData.tip)));
+  assert.equal(Math.sign(tip.x), Math.sign(grip.x), `uncrossed mid-punch (${grip.x.toFixed(2)} → ${tip.x.toFixed(2)})`);
+}
 disposeFighter(leo);
 assert.equal(pair.parent, null, 'the left half goes with the right');
 for (const species of SPECIES) {
@@ -118,7 +126,8 @@ assert.ok(flung > 0.2, `a cross flings the yarn (${flung.toFixed(2)})`);
 disposeFighter(mikey);
 // the face: no NFL eye black; the mask in the scarf's colour, narrow on a turtle; Donatello in black-rimmed glasses
 assert.equal(readHero({ species: 'owl', params: { facePaint: 'slashes' } }).params.facePaint, 'none');
-assert.equal(newHero(() => 0.05).params.facePaint, 'none', 'Michelangelo without cheek paint');
+presets.slice(0, 4).forEach((t) => assert.equal(t.params.facePaint, 'rings', 'every turtle starts in his mask'));
+assert.ok(presets[2].look.glasses, 'Donatello\'s glasses over his mask');
 const masked = newHero(() => 0.65);
 masked.params.facePaint = 'rings';
 assert.equal(facePaintColorOf(faceOf(masked).params), masked.look.scarfColor, 'the mask the scarf\'s colour');
@@ -127,4 +136,7 @@ const nerd = buildHero(newHero(() => 0.45)), head = nerd.joints.eye[0].node.pare
 assert.equal(head.children.filter((o) => o instanceof THREE.Mesh && o.material.color?.getHexString() === '141414').length, 2, 'a rim round each eye');
 disposeFighter(nerd);
 for (let i = 0; i < 6; i++) disposeFighter(buildHero(randomHero()));
+// the glow and shadow to try: off without the address saying so, clamped when it does
+assert.deepEqual(popFromQuery(''), { glow: 0, shadow: 0 });
+assert.deepEqual(popFromQuery('?glow=2&shadow=-1'), { glow: 1, shadow: 0 });
 console.log('hero ok');

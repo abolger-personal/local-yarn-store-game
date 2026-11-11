@@ -653,6 +653,8 @@ const addNeedles = (built, color) =>
 // the hand at the back of a long oval loop (amended 2026-11-10: very long ovals, not round loops), a handle shank on to
 // the pivot (four times the old loop, so the blades reach well past each other), the blade beyond
 const SNIP = { blade: 0.52, shank: 0.16, wide: 0.06, loop: [0.045, 0.16], cross: [0.4, 0.3, 0.35] };
+// while the other hand punches, the left half out to its own side, up and forward, clear of the body
+const SNIP_GUARD = [-1.5, 0.4, 0.6];
 const SNIP_PIVOT = SNIP.loop[1] * 2 - SNIP.loop[0] + SNIP.shank, SNIP_TIP = SNIP_PIVOT + SNIP.blade;
 let scissorGeo = null;
 function scissorGeometry() {
@@ -753,8 +755,10 @@ function swingSword(built, punch, dt = 0) {
   const w = punch ? punchWeight(punch.step) : 0;
   sword.rotation.set(-((sword.userData.hangs ? THREE.MathUtils.lerp(HANG_UP, up, w) : up) + arm), 0, 0);
   hang(built, sword, arm, w);
-  crossIn(built, sword, w);
-  if (pair) crossIn(built, pair, 0, sword.userData.cross);
+  // the scissors uncross out to the side as a punch starts, so neither half cuts through the body on the way
+  const guard = sword.userData.cross?.map((v, i) => THREE.MathUtils.lerp(v, SNIP_GUARD[i], w));
+  crossIn(built, sword, w, guard);
+  if (pair) crossIn(built, pair, 0, guard);
   stepYarn(built, dt);
   const { fan, streak } = sword.userData;
   fan.visible = swoosh > 0.02 && stab < 0.5;

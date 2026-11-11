@@ -28,7 +28,8 @@ Decided 2026-11-09:
   (after *Turtles in Time*, 1991, and *Shredder's Revenge*, 2022).
 - The folder is `tmnt/`, the release branches `tmnt-X.Y.Z`, the tags `tmnt-X.Y.Z`. The first branch is
   `tmnt-0.0.1`, from `donut-fight-0.0.9`.
-- Battle cries the game must use somewhere: **"Cowl-abunga!"** and **"Tubular!"**. **Turtleneck** must be used
+- Battle cries the game must use somewhere: **"Cowl-abunga!"** and **"Tubular!"**. Cowl-abunga! comes off a launch from the
+  swings or the bars (decided 2026-11-10, §Level 1). **Turtleneck** must be used
   in the game too; where is open.
 - **The Sweater** is the final boss (in place of the Shredder).
 - **The Sock Clan** are the foot soldiers (in place of the Foot Clan). They **wear socks**: the designer's sock
@@ -82,10 +83,15 @@ should know it. Turned into a 2D side scroll in the 2.5D band.
 - **The equipment is played on** (decided 2026-11-10), even where a real side scroller wouldn't: heroes **climb the
   steps**, **ride the slides down**, **wobble across the clatter bridge** and **slide down the fire pole**. **A jump
   gets you on** (decided 2026-11-10): nothing grabs a hero walking past.
-- **The fire pole is yellow** (decided 2026-11-10), on the big structure, across from the bear cave; hard to see in
-  the screenshots, but there.
+- **The fire pole is yellow** (decided 2026-11-10), **in the middle of structure A**: off the 6 ft deck, beside the top
+  of the steps down to the bridge, under a yellow hoop (the designer's close-up, 2026-11-10).
 - **Bad guys use the equipment too** (decided 2026-11-10): they slide, cross the bridge and drop down the pole, and
   hide behind the pieces to jump out.
+- **Bad guys go a quarter of the heroes' speed** (decided 2026-11-10), on foot and on every piece (climbing, steps,
+  the bridge, the pole): the donut fighters had to slow theirs to a quarter, since bad guys as fast as the heroes are
+  far too hard for four-year-olds, and climbing would make it worse. One factor, used by every piece's movement.
+  **Everything at a quarter**, slides and the pole too (decided 2026-11-10); the designer will change it after a
+  playtest if it looks really weird.
 - **The playground fades behind the heroes** (decided 2026-11-10): lighter and flatter than the real thing, with
   **thinner ink** than the characters', but **not all the way to pastel**; it stays the real playground's colours.
 - **The violet spiral slide stays violet** (decided 2026-11-10), though purple is the Sock Clan's.
@@ -113,8 +119,8 @@ What it looks like (the designer's Google Maps screenshots, Street View from Gle
 - **Two play structures** on a poured rubber floor: a smaller one by Glen St and a big one in the middle. Both are
   **royal-blue posts** (about `#2f3db8`) with **marigold-yellow railings and panels** (`#f0b648`), **teal-green
   hip roofs** like little pagodas (`#2e6b58`), dark decks, **green play panels** (a tic-tac-toe spinner, `#2f7a50`),
-  a **dark green wavy slide**, a **violet tube-and-spiral slide** (`#6b55d9`), a rope-and-plank **clatter bridge**
-  (yellow ropes) between towers, ladders, steps, and a grey dome (the "bear cave" a 2011 write-up mentions, with a
+  a **dark green wavy slide**, a **teal curly slide** two decks high off the far tower (up a second flight of stairs), a **violet tube-and-spiral slide** (`#6b55d9`), a rope-and-plank **clatter bridge**
+  (yellow ropes) between towers, ladders, steps, a grey rock-climbing dome joined to the tall tower's deck (and, from a 2011 write-up, a
   fire pole, a rock wall and stepping stools; not seen in the screenshots).
 - **Blue arch swings**: a row of four along Palmer Ave and two more sets near the middle, **blue** hoop frames.
 - **The floor** in big soft blobs: **slate blue** (`#7085b8`), **teal** (`#5e9e8f`) and **terracotta** (`#c48a5e`)
@@ -129,18 +135,113 @@ What it looks like (the designer's Google Maps screenshots, Street View from Gle
 Brainstorm 2026-11-10:
 - **Seen from Glen St, the way Street View is** (the route, decided 2026-11-10): the camera looks east, so the field is behind the structures, and
   the level runs **along Glen St, north to south**: the painted labyrinth and hopscotch across Palmer Ave (flat, the
-  first fight) → the row of arch swings (swinging hazards) → the small structure (up the steps, down the green wavy
-  slide) → the big structure (the clatter bridge, the violet spiral, the green panels, the bear cave) → the swing
-  sets by the middle → out at the school's brick on Fountain Ave.
+  first fight) → the row of arch swings (swinging hazards) → structure A, unwrapped (§The pieces: the climbing dome
+  with the bear cave under it, the squiggle climber, the fire pole, the steps down onto the clatter bridge, the
+  tic-tac-toe tower, the climbing grid, the top deck and the teal curly slide), with B's violet slides behind it →
+  the swing sets by the middle → out at the school's brick on Fountain Ave.
 - **Where the Sock Clan come from:** behind the fire pole and the posts, down a slide, out of the bear cave, from
   behind the swings, over the fence from the field.
 - **Layers:** the field and its light poles far back, the fence and trees behind the play band, the play pieces in
   it, a post or a swing chain passing close in front now and then.
-- **The real pieces in the real order** (decided 2026-11-10), not laid out by hand and not shuffled: a kit of the
-  playground's pieces (the swings, the two structures, the slides, the bridge, the pole, the bear cave), always in the
-  route's order; the seed (`spinoff/generate.js`'s, so every tablet builds the same level from what the host sends)
-  only varies the spacing and where the bad guys hide and come from. Planned 2026-11-10: the generator's problem
-  kinds become pieces (tall = a structure, step up = its steps, moat = the gap the clatter bridge crosses).
+- **The real pieces, recombined** (amended 2026-11-10): structure A as the real playground has it would take about
+  twenty seconds to play, too short. So **every piece is its own module** (the dome and bear cave, the squiggle
+  climber, the fire pole, the steps, the bridge, each tower, the grid, the top deck, each slide, the swings), and the
+  generator (`spinoff/generate.js`'s seeded `rng`, so every tablet builds the same level from what the host sends)
+  **strings them into a longer level**. The real playground is what the pieces look like, and how they fit together,
+  not the one order they come in. Planned 2026-11-10 (§Pieces as modules): how the pieces join.
+
+
+### Unwrapping the structures
+
+**The real structures are 3D; the level is a side scroll** (decided 2026-11-10), so it takes liberties. The
+screenshots look at the structures' backs: the climbing dome's face, the way up it, is on the far side of the
+structure (Street View sees the crawl space under it). Climbing every side of the real thing would mean swinging the
+camera round it, and the camera only scrolls along x (§The game). Ways to unwrap it, brainstorm 2026-11-10:
+
+1. **Unfold it like a paper model:** walk round each structure in the route's order and lay every face it has side
+   by side along x, each turned to face the camera, so the climbing dome's face shows. Decks, steps and slides keep
+   their heights; only where they are along x is made up. Nothing new for the camera, the floors or the generator.
+2. **Use the depth band:** the far side's pieces are at the back of the 2.5D band, the near side's at the front; the
+   structure's near panels go see-through (a dollhouse cut-away) when a hero is behind them.
+3. **A track that bends round the structures** (Klonoa, Kirby 64): the level is still a strip you walk left to
+   right, but the strip curves through the 3D playground and the camera turns with it, staying side-on. The truest
+   to the real place and the most work: the camera, the floors and the generator all learn curves.
+
+**Corners straightened** (decided 2026-11-10): where the real structure turns a corner, the level goes straight on.
+The first: off the tic-tac-toe tower, the stairs up to the top deck and the teal curly slide run at 90° to the first
+tower and the clatter bridge; in the level they carry on in the same line.
+The **climbing grid** on the structure's far side (opposite the tic-tac-toe panel, unseen in the photos) is moved
+in between the lower and the higher decks, so the tic-tac-toe stretch has a climb.
+
+**The pieces are the playground's, re-ordered for play** whichever way: what a kid recognises is the pieces (the
+slides, the dome, the bridge, the pole, the panels, the bear cave), not where they are in plan.
+
+### Pieces as modules
+
+Planned 2026-11-10: each piece in the table below is a module the generator can place again and again.
+- **A module knows its ends:** how high it is where you come in and where you leave (the steps: in at 6 ft, out at
+  4 ft; the bridge: 4 in, 4 out; the grid: 4 in, 7.5 out; a slide: in at its deck, out at the ground), how wide it is,
+  its decks, climbs and rides, and its hiding and burst spots.
+- **The generator joins ends that match:** after a piece that leaves at 4 ft comes one that starts at 4 ft (the
+  bridge, the tic-tac-toe tower, the grid); after one that leaves at the ground, a ground stretch or a way up (the
+  dome, the squiggle climber, a swing). So the decks and slides always meet the way they do on the real structure,
+  and a structure can be as long as the level needs: up the dome, across, down the steps, over a bridge, up the grid,
+  down the teal slide, and round again with a different order.
+- **Between structures, ground:** fights on the rubber floor, the swings, the painted labyrinth.
+- **A level takes 90 seconds to 2 minutes for the designer to play, fighting included** (decided 2026-11-10); kids
+  take longer. The
+  real structure A takes about 20 seconds, so a level is roughly four to six structure-strings with ground fights
+  between. Planned 2026-11-10: the generator measures length as the time a hero takes to get through each module
+  (walking, climbing, riding at hero speed, plus its fights), not as distance, and stops adding when the total
+  reaches the target; a check in its test.
+- **The real structure A is one of the strings** (the order in §The pieces), a good first one to build and test.
+- Brainstorm 2026-11-10: a roof caps a tower at most every so often; the bear cave and the fire pole come as a pair,
+  facing each other, as on A.
+
+### The pieces
+
+Planned 2026-11-10, drafted from the screenshots; the designer corrects them before any level code. The side views
+are `tmnt/level1-pieces.svg` (seen from Glen St, left = north = where the level starts; feet; dashed pink = a guess;
+every piece has an `id`). **Heroes are kid-sized** (decided 2026-11-10): about 3 ft 10 in, so a 4 ft deck is chest
+high and the towers' roofs are about three heroes up. In the game's units a hero's own height sets the scale.
+
+Every piece is solid (simple posts, boxes and tubes in flat colours and thin ink), so heroes walk in front of and
+behind it in the 2.5D band. **A jump gets you on** anything; nothing grabs a hero walking past. What's new to the
+code: today a level knows only flat floors (`Floor` in `spinoff/match.js`, ground, deck or hill). Decks are decks;
+**slide, pole, swing, bridge and burst** are new kinds.
+
+| Piece (`id`) | Size (ft) | Stand on | On, what it does, off | Bad guys | Seed varies |
+|---|---|---|---|---|---|
+| Painted labyrinth and hopscotch (across Palmer Ave) | flat, ~30 | ground | the start; flat, the first fight | walk in from the left edge | how many |
+| Arch swings, a row of four (`swings`) | hoops 9.5 tall, 7 apart; seats 2 up, one a bucket | the seat | jump on; swings by itself, faster the more you ride; jump off **launched** along the swing; can go **all the way round** | ride them too; launched at you | when each seat's swing starts |
+| Green wavy slide (`a-wavy-slide`) | from the 7 ft deck, 9 long | — | down only: jump on at the top, carried down fast, off at the bottom | slide down at you | — |
+| Tower with a roof (`a-tower-high`) | deck 7 (check), roof 15 | the deck | a deck; posts are cover | hide behind posts, jump out | — |
+| Low deck (`a-deck-low`) | deck 6 (check) | the deck | a deck | hide behind the panels | — |
+| Yellow fire pole (`a-fire-pole`, moved 2026-11-10) | ~10, from the 6 ft deck | — | in the middle of A, across from the bear cave: jump to grab it from the deck, **slide down** to the ground | slide down at you | — |
+| Squiggle climber (`a-squiggle-climber`, confirmed 2026-11-10) | ground to the 6 ft deck | the rungs | a yellow **squiggle climber**: one upright pole, its rungs snaking left and right up it: **climb** it | climb after you | — |
+| Steps (`a-steps`) | 4 steps, the low deck down to the bridge; **not to the ground** (corrected 2026-11-10) | each step | between the deck and the bridge, walked either way | come down them at you | — |
+| Climbing dome (`a-climbing-dome`, grey, under the tall tower) | 8 wide, up to the deck | its face, then the deck | **a rock-climbing dome joined to the tall tower's deck** (decided 2026-11-10): its climbing face is on the structure's far side, turned to the camera here (§Unwrapping); jump on and **climb up it** onto the deck. **Underneath it is the bear cave** (decided 2026-11-10; none on B): kids crawl in, and **bad guys burst out** of it, in waves | burst out of the cave; climb the dome after you | how many come out, when |
+| Clatter bridge (`a-bridge`) | 11 long at 4 ft | the planks | a deck that **wobbles** as anyone crosses, more with more feet | cross it at you | — |
+| Tower with the tic-tac-toe panel (`a-tower-b`) | deck 4, roof 13 | the deck | a deck; the panel is cover (spinnable? brainstorm) | hide behind the panel | — |
+| Climbing grid (`a-climbing-grid`, added 2026-11-10) | a ladder-grid about 4 or 5 rungs, the 4 ft deck up to the top deck | the rungs | **climb** it, like the dome; another way up beside the stairs | climb after you | — |
+| Stairs up (`a-stairs-up`, added 2026-11-10) | 5 steps, the tic-tac-toe tower's 4 ft deck up to the top deck | each step | walk up | come down at you | — |
+| Top deck (`a-deck-top`, added 2026-11-10) | 7.5 ft, small | the deck | the top of the curly slide | hide, jump out | — |
+| Teal curly slide (`a-curly-slide`) | from the top deck, **two decks high** (corrected 2026-11-10) | — | down only, curling; the longest, fastest ride in A | slide at you | — |
+| Step-downs (`a-step-downs`) | 3, 2, 1 | each | down off the structure | — | — |
+| **B** (behind A; from Palmer Ave, Nov 2020, 2026-11-10). **Mostly scenery** (decided 2026-11-10): bridges kids chase each other round, less fun to play on than A. Its pieces stay in the drawing; only its two yellow bars join the kit. | | | | | |
+| Spinner panel (`b-spinner-panel`) | a round panel at the deck's end | — | a white disc with coloured dots; spin it? (brainstorm) | hide behind | — |
+| Violet curly slide (`b-spiral`) | from the 4 ft deck | — | down only, curling (the violet spiral seen from Glen St? check) | slide at you | — |
+| Long deck (`b-deck-long`) | ~22 long, 4 ft (check), yellow panels | the deck | a long walkway | fight along it | its length |
+| Blue arches (`b-arches`) | two hoops over the deck | — | over the deck; climbed or hung from? (brainstorm) | — | — |
+| **Two yellow bars** (`b-bars`, decided 2026-11-10, corrected: not monkey bars; in the kit) | two single bars side by side, **one higher than the other** (decided 2026-11-10), like uneven bars, waist to chest high on a kid (about 3 and 3.5) | — | the designer's kids do gymnastics off them: **jump to grab** a bar, **swing round it, all the way round**, and **let go to fly**, launched the way you're swinging: **fly from one bar and catch the other**, an uneven-bars routine; **launch up onto a deck**; or **launch into bad guys** to knock them over. **"Cowl-abunga!"** comes off a launch from the bars or the swings (decided 2026-11-10). The swings' ride and launch, round a fixed bar | a quarter as fast, as everything | where they go (on the ground or under a deck to launch onto it), how many, **their heights** |
+| Stairs (`b-stairs`) | ground up to the deck | each step | walk up | come down at you | — |
+| Tower (`b-tower`) | deck 5 (check), roof 14, violet panel | the deck | a deck | hide, jump out | — |
+| Violet slide (`b-straight-slide`) | from the tower | — | down only, short | slide at you | — |
+| Rubber floor (slate blue, teal, terracotta) | the whole band | ground | ground | — | where the blobs fall |
+| Chain-link fence, benches (`d-fence`, `d-bench`) | fence 4 | — | the front edge of the band, close to the camera | climb over from the field? (brainstorm) | — |
+| Telephone pole, ONE WAY and NO PARKING (`d-telephone-pole`) | ~30 tall | — | in front, now and then; **ONE WAY points the way the level goes** | — | — |
+| The field (backdrop) | far | — | far back, faded, seen through the structures | — | — |
+| The finale's fire pole | tall | — | the heroes slide down it into the boss fight (the boss, a later session) | — | — |
 
 ## Rooms and the lobby
 

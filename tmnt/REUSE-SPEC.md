@@ -109,7 +109,8 @@ should know it. Turned into a 2D side scroll in the 2.5D band.
   lets the camera go.
 - **The boss is a Sock Clan elite** (decided 2026-11-10), **a dragon** in **over-knee socks** and **a massive hat like
   a ninja's**, who **breathes fire**. Built in a later session; the level first.
-- **The finale has a fire pole** (decided 2026-11-10): the heroes slide down it into the boss fight.
+- **The finale has a fire pole** (decided 2026-11-10): the heroes slide down it into the boss fight. Brainstorm
+  2026-11-10: **a big wall across the band at the finale, with a row of fire poles** down from it.
 - **Route** (decided 2026-11-10): seen from Glen St, north to south (below).
 - **No triple-deckers** (decided 2026-11-10). **The telephone pole and street signs stay**, and the **ONE WAY**
   sign points the way the level scrolls.
@@ -194,6 +195,8 @@ Planned 2026-11-10: each piece in the table below is a module the generator can 
   between. Planned 2026-11-10: the generator measures length as the time a hero takes to get through each module
   (walking, climbing, riding at hero speed, plus its fights), not as distance, and stops adding when the total
   reaches the target; a check in its test.
+- **Long structures, fewer to a level** (decided 2026-11-10): 7 to 14 pieces to a structure, about five to a level,
+  each typically half again as long as it is deep (to shut the ground, a structure has to reach across the band's 18 ft).
 - **The real structure A is one of the strings** (the order in §The pieces), a good first one to build and test.
 - Brainstorm 2026-11-10: a roof caps a tower at most every so often; the bear cave and the fire pole come as a pair,
   facing each other, as on A.
@@ -242,6 +245,50 @@ code: today a level knows only flat floors (`Floor` in `spinoff/match.js`, groun
 | Telephone pole, ONE WAY and NO PARKING (`d-telephone-pole`) | ~30 tall | — | in front, now and then; **ONE WAY points the way the level goes** | — | — |
 | The field (backdrop) | far | — | far back, faded, seen through the structures | — | — |
 | The finale's fire pole | tall | — | the heroes slide down it into the boss fight (the boss, a later session) | — | — |
+
+### Building it
+
+Planned 2026-11-10: **a single-player level from the generator, no bad guys yet**, the structures first. Built on the
+donut fighters' level code, which already does most of it (mapped 2026-11-10):
+- a `Stage` is floors (`Floor` in `spinoff/match.js`: an x/z box with its top at `y`), and fighters already walk,
+  jump, fall off deck edges and land (`spinoff/walk.js`, `world.js` `supportAt`), so **decks work as soon as they're
+  floors**. A floor is solid down to the ground and walking can't step up even a little, so **stairs are a slope**,
+  taught with the other new behaviours (step 3).
+- **Nobody walks past the playground** (decided 2026-11-10), **but the band keeps its depth**: a structure **turns
+  90° at its joins** (decided 2026-11-10: 90° only, it's a playground; 45° is brainstorm, it needs turned floors),
+  running along the level, across the band and back, never backwards. Its pieces are 7 ft broad, trimmed where they
+  meet the band's edge. The generator keeps a turned structure only if there's **no way through on foot**, round it in
+  depth or between its parts (a path search, a hero's width of room); decks, climbs and stairs stand in the way, under
+  a slide is open. Kids may walk round part of one, up and down the band, to get on (decided 2026-11-10). When ten
+  seeded turnings don't shut the ground, it tries another structure; a deck is never stretched across the band (a
+  real one is about 7 ft deep). The low deck's fire pole and squiggle climber, which hang off its side, are pieces of their own: the
+  squiggle climber starts a structure, the fire pole ends one. Walking under the bridge and crawling into the bear cave
+  need decks that aren't solid to the ground: later. **The same piece twice in a row is fine, and so is jumping
+  straight onto a deck or the bridge** to start a structure (decided 2026-11-10: kids tap where they go), but not onto
+  a climb or stairs. `tmnt/map.html?seed=1` draws a generated level side on and from above, to check it;
+- the camera already follows your fighter along x, clamped to the ground's ends (`follow` in `spinoff/play.js`);
+- one hero with no network is `createMatch` in `spinoff/sim.js` with a single entrant and the keyboard controls.
+What the donut code assumes that a long level doesn't (to change in this game's code, not theirs): terrain mirrored
+in an 18-wide arena (`generate.js`), a fixed 26-wide backdrop, a fixed fall-off box and respawn at a shelf, a
+90-second round clock, the camera starting at x = -4.5.
+
+In steps, each one playable and checked before the next:
+1. **The generator, alone** (built 2026-11-10: `tmnt/generate.js`, `tmnt/pieces.js` the catalogue, checked by
+   `tmnt/generate.test.mjs`; a 4 ft deck is the fighters' 0.9, one jump up; a fight's time guessed at 6 s a ground
+   stretch till bad guys fight): every piece a module with its
+   width, its in and out heights, its floors, and its climbs, rides, swings and bridges; `generateLevel(seed)` strings
+   modules whose ends match, ground stretches between structures, until the time budget (90 s to 2 min) is met, and
+   returns a `Stage` the donut code can run, plus the new pieces. Its test: the same seed gives the same level, every
+   join matches, every deck is reachable with a jump or a climb, and every level's time is in budget.
+2. **See it and walk it** (`tmnt/level.html`): the level drawn in simple posts, decks, rails and tubes in the
+   playground's colours, the field faint behind; your saved hero, arrow keys and jump; decks and steps work. No clock.
+3. **The new behaviours, one at a time, each with its check:** climb (the dome, the grid, the squiggle climber), ride
+   down (the slides, the pole), the wobbling bridge, swing round and launch (the swings, the bars, all the way
+   round), and the one-way camera.
+   **Falling off a deck isn't a death** (decided 2026-11-10): it's a game for kids, so the hero lands, is **dizzy for a
+   moment and delayed**, then carries on.
+4. Later sessions: bad guys (out of the bear cave, at a quarter speed) and fights, more players, the fade and glow
+   sliders on the level, the finale's fire pole and the boss.
 
 ## Rooms and the lobby
 

@@ -16,7 +16,7 @@ const SLOW = [
   // every species x costume x weapon: grows with each new species
   'spinoff/fighter.test.mjs',
   // every species x every piece a hero can pick
-  'tmnt/hero.test.mjs',
+  'tmnt/hero.test.mjs', 'tmnt/generate.test.mjs',
 ];
 
 // every other test file; an entry with env in SLOW also runs here without it

@@ -147,9 +147,10 @@ document.getElementById('preset').addEventListener('click', () => {
   commit(true);
 });
 
+// 👍 saves and goes on to pick where to play, as the donut fighters' does
 document.getElementById('done').addEventListener('click', () => {
   saveHero(hero);
-  cheer = 1.4;
+  location.href = 'lobby.html';
 });
 
 rebuild(true);

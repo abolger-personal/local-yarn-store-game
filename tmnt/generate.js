@@ -9,7 +9,7 @@ import { FT, JUMP_FT, PIECES, joins } from './pieces.js';
 /**
  * @typedef {import('../spinoff/match.js').Floor} Floor
  * @typedef {{ x: number, z: number, h: number }} Cursor  where the next piece starts, and its heading (degrees from x toward z)
- * @typedef {Floor & { y0: number, y1: number, kind: string }} Climb  the climb's face, up from y0 to y1
+ * @typedef {Floor & { y0: number, y1: number, h: number, kind: string }} Climb  the climb's face, up from y0 to y1 along heading h
  * @typedef {{ x0: number, z0: number, y0: number, x1: number, z1: number, y1: number, kind: string, box: Box }} Path
  *   a ride or stairs, `box` the ground it stands on
  * @typedef {{ x0: number, x1: number, z0: number, z1: number }} Box
@@ -153,7 +153,7 @@ function place(L, p, c) {
     L.floors.push(b);
     L.bridges.push(b);
   }
-  for (const k of p.climbs ?? []) L.climbs.push({ ...strip(c, at(k.x0), at(k.x1)), y0: r3(at(k.y0)), y1: r3(at(k.y1)), kind: k.kind });
+  for (const k of p.climbs ?? []) L.climbs.push({ ...strip(c, at(k.x0), at(k.x1)), y0: r3(at(k.y0)), y1: r3(at(k.y1)), h: c.h, kind: k.kind });
   const path = (q, kind) => {
     const a = along(c, at(q.x0)), b = along(c, at(q.x1));
     return { x0: a.x, z0: a.z, y0: r3(at(q.y0)), x1: b.x, z1: b.z, y1: r3(at(q.y1)), kind, box: strip(c, at(q.x0), at(q.x1)) };
@@ -220,6 +220,40 @@ const emptyLevel = () => ({
   ...parts(), backWall: BAND.z0, shelves: [{ team: 'heroes', x: 0.5, z: -1.7, y: 0 }], zones: [], puddles: [], bricks: [],
   ringOut: { x0: -2, x1: 0, z1: 3.5, y: -3 }, starts: [{ x: 1, z: 0 }], structures: [], spans: [], seconds: 0,
 });
+
+// ponytail: till a hero walks up and down stairs, a flight is a few deep steps, each an easy hop (playtest 2026-11-10:
+// a run of little steps stuck up through the bridge where they met it, and one block as high as the top was a wall
+// where a flight turned off a low step); a climb is solid to its top (equipment.js takes a hero up it)
+const STEP_RISE = 0.4;
+const solidTo = (b, y) => ({ kind: /** @type {const} */ ('deck'), x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1, y });
+
+/** Box `b` cut into `n` steps along `axis`, from y0 up to y1 toward its high end (`up`: the end with more x or z). */
+function steps(b, axis, up, [y0, y1], n) {
+  const [lo, hi] = axis === 'x' ? [b.x0, b.x1] : [b.z0, b.z1];
+  return Array.from({ length: n }, (_, i) => {
+    const k = up ? i : n - 1 - i;
+    return { ...solidTo(b, r3(y0 + ((y1 - y0) * (i + 1)) / n)), [`${axis}0`]: r3(lo + ((hi - lo) * k) / n), [`${axis}1`]: r3(lo + ((hi - lo) * (k + 1)) / n) };
+  });
+}
+
+/** A flight of stairs as deep steps up toward its high end. @param {Path} q */
+function stairSteps(q) {
+  const axis = Math.abs(q.z1 - q.z0) > Math.abs(q.x1 - q.x0) ? 'z' : 'x', lo = Math.min(q.y0, q.y1), hi = Math.max(q.y0, q.y1);
+  return steps(q.box, axis, (q[`${axis}1`] > q[`${axis}0`]) === (q.y1 > q.y0), [lo, hi], Math.ceil((hi - lo) / STEP_RISE));
+}
+
+/**
+ * Level `L` as the donut fighters' sim (spinoff/sim.js) should have it: its climbs solid to their tops, its stairs as
+ * deep steps, and a deck
+ * that reaches the band's edge carried on past it, so pushing a hero out of it goes back the way it came, not round
+ * the end along the edge.
+ * @param {Level} L @returns {Level}
+ */
+export function forSim(L) {
+  const past = (f) => ({ ...f, z0: f.z0 <= BAND.z0 + 1e-6 ? BAND.z0 - 2 : f.z0, z1: f.z1 >= BAND.z1 - 1e-6 ? BAND.z1 + 2 : f.z1 });
+  const [ground, ...rest] = L.floors, solids = [...L.climbs.map((c) => solidTo(c, c.y1)), ...L.stairs.flatMap(stairSteps)];
+  return { ...L, floors: [ground, ...[...rest, ...solids].map(past)] };
+}
 
 /**
  * Level 1 for this seed: ground, then structures turning through the band with ground between, until it takes

@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { JUMP_SPEED, reachUp } from '../spinoff/walk.js';
-import { SECONDS, generateLevel, secondsOf, standing, structure } from './generate.js';
+import { SECONDS, forSim, generateLevel, secondsOf, standing, structure } from './generate.js';
+import { LOOK } from '../characters/garments.js';
+import { MATCH } from '../spinoff/combat.js';
+import { entrantOf } from '../spinoff/fighter.js';
+import { SIM } from '../spinoff/sim.js';
+import { buildHero, faceOf, newHero } from './hero.js';
 import { DROP_FT, FT, JUMP_FT, PIECES, REAL_A, joins } from './pieces.js';
 import { rng } from '../spinoff/generate.js';
 
@@ -59,4 +64,19 @@ for (let seed = 0; seed < 200; seed++) {
 assert.ok(turned > 1000, `structures turn, not just lie across the band (${turned} decks not across it)`);
 assert.notDeepEqual(generateLevel(1).structures, generateLevel(2).structures, 'seeds differ');
 assert.ok(Object.values(PIECES).every((p) => secondsOf(p) > 0));
+// in the donut fighters' sim, a hero that can't jump, sent (by its route-finder) to a spot past the first structure,
+// never gets there: decks, climbs and stairs (steps, till step 3) stand in the way, with no way round them on foot
+LOOK.viewPx = 0;
+for (const seed of [1, 2, 3]) {
+  const raw = generateLevel(seed), L = forSim(raw), hero = newHero(() => 0.25);
+  const s = SIM.createMatch([entrantOf(faceOf(hero), buildHero(hero), { id: 'me', team: 'heroes' })], L, { match: MATCH });
+  s.jump = { speed: 0, up: 0, spring: 0, springUp: 0 };
+  const first = raw.spans[0], idle = { target: null, punch: false, kick: false };
+  for (let i = 0; i < 900; i++) {
+    s.t0 = s.tick;
+    SIM.tick(s, { me: i % 60 === 0 ? { ...idle, target: { x: first.x1 + 3, z: 0 } } : idle });
+  }
+  const { x } = SIM.snapshot(s).fighters[0];
+  assert.ok(x < first.x1, `seed ${seed}: on foot, no way past the first structure (got to ${x.toFixed(2)}, it ends at ${first.x1})`);
+}
 console.log('generate ok', generateLevel(1).structures.map((s) => s.join('>')).join(' | '), generateLevel(1).seconds, 's');

@@ -31,7 +31,8 @@ export const PIECES = Object.freeze({
   // the structures fill the band, so the low deck's ways up and down from the ground are pieces of their own (unwrapped):
   // the squiggle climber starts a structure, the fire pole ends one
   squiggle: { id: 'squiggle', w: 3, in: 0, out: 6, climbs: [{ x0: 0, x1: 1, y0: 0, y1: 6, kind: 'squiggle' }], decks: [{ x0: 1, x1: 3, y: 6 }] },
-  pole: { id: 'pole', w: 3, in: 6, out: 0, decks: [{ x0: 0, x1: 2, y: 6 }], rides: [{ x0: 2.5, y0: 6, x1: 2.5, y1: 0, kind: 'pole' }] },
+  // the pole a foot out from the deck, so you land clear of it (playtest 2026-11-10: down, back up, down again)
+  pole: { id: 'pole', w: 4, in: 6, out: 0, decks: [{ x0: 0, x1: 2, y: 6 }], rides: [{ x0: 3, y0: 6, x1: 3, y1: 0, kind: 'pole' }] },
   steps: { id: 'steps', w: 6, in: 6, out: 4, stairs: [{ x0: 0, y0: 6, x1: 6, y1: 4 }] },
   bridge: { id: 'bridge', w: 11, in: 4, out: 4, bridge: { x0: 0, x1: 11, y: 4 } },
   ticTacToe: { id: 'ticTacToe', w: 6, in: 4, out: 4, decks: [{ x0: 0, x1: 6, y: 4 }], cover: [3] },

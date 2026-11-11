@@ -280,9 +280,24 @@ In steps, each one playable and checked before the next:
    modules whose ends match, ground stretches between structures, until the time budget (90 s to 2 min) is met, and
    returns a `Stage` the donut code can run, plus the new pieces. Its test: the same seed gives the same level, every
    join matches, every deck is reachable with a jump or a climb, and every level's time is in budget.
-2. **See it and walk it** (`tmnt/level.html`): the level drawn in simple posts, decks, rails and tubes in the
-   playground's colours, the field faint behind; your saved hero, arrow keys and jump; decks and steps work. No clock.
-3. **The new behaviours, one at a time, each with its check:** climb (the dome, the grid, the squiggle climber), ride
+2. **See it and walk it** (built 2026-11-10, to try: the chooser's 👍 goes on to `tmnt/lobby.html`, the donut
+   fighters' lobby with only its playing-alone way through, ✏️ and 👍, then the stage, **🛝 the playground** (the
+   fighters' 🥞), level 1, ▶️, a new generated level each play; `tmnt/level.html` draws it in `tmnt/scenery.js`).
+   Till step 3, climbs and stairs are steps a jump high in the sim (`forSim` in `generate.js`), so they stand in the
+   way and a hero jumps up them; decks that reach the band's edge carry on past it in the sim, or its push-out slid a
+   hero round them. Checked: a hero that can't jump, sent past the first structure, never gets there.
+   The level is drawn in simple posts, decks, rails and tubes in the playground's colours, the field faint behind;
+   your saved hero, arrow keys, taps and jump. No clock.
+   Playtest 2026-11-10: the playground's shapes feel great. Fixed from it: **no falling off the front (or back) of
+   the band**, ever (decided 2026-11-10; the hero is held inside it); **double jump** on, as the fighters' later levels;
+   the fighters' **air kick spins** (a spinning jump kick up, a backflip down), and punches and kicks show; a blue sky
+   behind the field, sun and skylight, and a little texture (the rubber's crumbs, the panels' slots, mown turf).
+   Decks overlapping at a turn flickered; each is now drawn a hair apart from its neighbours. **Planned 2026-11-10,
+   later: decks are mesh**, as a real playground's are: punched metal panels full of holes to let the rain through, not
+   solid slabs (the key look that's missing).
+3. **The new behaviours, one at a time, each with its check:** **climbing built first** (2026-11-10, `tmnt/equipment.js`,
+   `tmnt/equipment.test.mjs`; the playtest kept falling off the dome's steps): walk into a climb from its foot and you go
+   up its face at 1.2 a second, held there, and step on at the top; a climb is solid to its top in the sim. Then: climb (the dome, the grid, the squiggle climber), ride
    down (the slides, the pole), the wobbling bridge, swing round and launch (the swings, the bars, all the way
    round), and the one-way camera.
    **Falling off a deck isn't a death** (decided 2026-11-10): it's a game for kids, so the hero lands, is **dizzy for a

@@ -50,6 +50,10 @@ for (let seed = 0; seed < 200; seed++) {
   assert.deepEqual(generateLevel(seed), L, 'the same seed, the same level');
   assert.ok(L.rides.some((q) => q.kind === 'pole'), `seed ${seed}: a fire pole in every level`);
   assert.ok(L.climbs.some((c) => c.kind === 'grid'), `seed ${seed}: a climbing grid in every level`);
+  // no piece lies over another, seen from above (playtest 2026-11-12: slides and bridges half inside decks)
+  const plan = [...standing(L), ...L.rides.filter((q) => q.kind === 'slide').map((q) => q.box)];
+  const over = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0));
+  assert.ok(plan.every((a, i) => plan.slice(i + 1).every((b) => over(a, b) <= 0.011)), `seed ${seed}: no piece over another`);
   assert.ok(L.seconds >= SECONDS.min && L.seconds <= SECONDS.max, `seed ${seed}: ${L.seconds} s`);
   // one ground, the lowest, under everything; every deck on it, and none higher than a piece's
   const [ground, ...rest] = L.floors;
@@ -80,5 +84,18 @@ for (const seed of [1, 2, 3]) {
   }
   const { x } = SIM.snapshot(s).fighters[0];
   assert.ok(x < first.x1, `seed ${seed}: on foot, no way past the first structure (got to ${x.toFixed(2)}, it ends at ${first.x1})`);
+}
+// pizza slices: one for every slide, bridge and fire pole and every pair of bars or swings, in the level, off the ground
+for (let seed = 0; seed < 20; seed++) {
+  const L = generateLevel(seed, 2), [ground] = L.floors;
+  assert.equal(L.slices.length, L.rides.length + L.bridges.length + L.swings.length / 2, `seed ${seed}: a slice at each`);
+  assert.ok(L.slices.every((s) => s.y > 0.4 && s.x > ground.x0 && s.x < ground.x1 + 3 && s.z >= ground.z0 && s.z <= ground.z1), `seed ${seed}: slices in the level`);
+}
+// level 2: swings or bars on every ground stretch, the swings first; level 1 is as it was
+for (let seed = 0; seed < 20; seed++) {
+  const two = generateLevel(seed, 2), kinds = two.swings.map((p) => p.kind);
+  assert.ok(kinds[0] === 'swing' && kinds.includes('bar'), `seed ${seed}: level 2 opens on the swings and has the bars`);
+  assert.ok(two.swings.length >= 2 * (two.structures.length + 1), `seed ${seed}: something to swing on at every ground stretch`);
+  assert.deepEqual(generateLevel(seed, 1), generateLevel(seed));
 }
 console.log('generate ok', generateLevel(1).structures.map((s) => s.join('>')).join(' | '), generateLevel(1).seconds, 's');

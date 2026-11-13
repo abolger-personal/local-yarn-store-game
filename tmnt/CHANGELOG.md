@@ -3,7 +3,21 @@
 What's new in Turtles in Twine: The Sweater's Revenge, the Teenage Mitten Knitting Turtles' co-op side scroller, the
 L.Y.S. spinoff's spinoff.
 
-## 0.0.1 (in progress)
+## 0.0.1
+
+### The playground
+- **Jump forward.** Hold an arrow and press Space, or double tap a spot, to jump toward it. Do it again in the air
+  for a double jump, and steer while you fly.
+- **Dismounts off the bars and swings.** Tap where to go, then press 🥊 and 🦶 as the turtle spins round and takes
+  off. Different buttons give different Simone Biles dismounts, with "Cowl-a-bunga!" across the screen. Press
+  nothing and you just land.
+- **Find the pizza.** A sign at the start points the way, and a giant glowing pizza waits at the end. Pizza slices
+  hang in the tricky spots along the way: halfway down the slides, on the wobbly bridge, at the top of the fire
+  pole, and up in the air past the bars and swings.
+
+### Getting in
+- **A splash screen** (`tmnt/`): the logo, knitted TURTLES on a silver ball of yarn, with 🐢👆 under it. Tap it and
+  the game goes fullscreen and stays there from screen to screen.
 
 ### The heroes
 - **A hero chooser** (`tmnt/choose.html`): pick an animal, its fur, a scarf, a sweater, socks, a bag, face paint and

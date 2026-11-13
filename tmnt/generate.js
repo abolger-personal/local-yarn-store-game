@@ -18,7 +18,7 @@ import { FT, JUMP_FT, PIECES, joins } from './pieces.js';
  * @typedef {{ x: number, z: number }} Spot
  * @typedef {Omit<import('../spinoff/match.js').Stage, 'floors'> & { floors: Floor[], climbs: Climb[], rides: Path[],
  *   stairs: Path[], swings: Pivot[], bridges: (Floor & { h: number })[], bursts: Spot[], covers: Spot[], structures: string[][],
- *   spans: { x0: number, x1: number }[], seconds: number }} Level
+ *   spans: { x0: number, x1: number }[], seconds: number, slices: { x: number, y: number, z: number }[] }} Level
  */
 
 // REUSE-SPEC.md §Level 1: 90 s to 2 min for the designer, fighting included; structures 3 to 5 s' walk apart
@@ -134,14 +134,22 @@ export function blocks(floors, x0, x1) {
 /** Does a piece `len` long from cursor `c` keep its run inside the band? */
 const fits = (c, len) => Math.abs(along(c, len).z) <= BAND.z1 + 1e-6;
 
+/** The cursor turned to heading `h`: round a corner, the next piece starts off the last one's side, back from its end,
+ *  so they share an edge and neither lies over the other (playtest 2026-11-12: slides and bridges half inside decks). */
+function corner(c, h) {
+  if (h === c.h) return c;
+  const from = dirOf(c.h), to = dirOf(h), half = BREADTH / 2;
+  return { x: r3(c.x + (to.x - from.x) * half), z: r3(c.z + (to.z - from.z) * half), h };
+}
+
 /** The cursor turned for the next piece, `len` long: a seeded turn of TURNS that keeps it in the band. Heading for the
  *  far side is likelier, since crossing it is what shuts the ground, and so is keeping on as it was, for long runs
  *  (straight on always fits). */
 function turn(r, c, len) {
-  const can = TURNS.map((d) => c.h + d).filter((h) => Math.abs(h) <= 90 && fits({ ...c, h }, len));
+  const can = TURNS.map((d) => c.h + d).filter((h) => Math.abs(h) <= 90 && fits(corner(c, h), len));
   const weight = (h) => (h !== 0 && Math.sign(h) === -Math.sign(c.z) ? 3 : 1) * (h === c.h ? 3 : 1), total = can.reduce((t, h) => t + weight(h), 0);
   let pick = r() * total;
-  return { ...c, h: can.find((h) => (pick -= weight(h)) < 0) ?? 0 };
+  return corner(c, can.find((h) => (pick -= weight(h)) < 0) ?? 0);
 }
 
 /** Piece `p` laid from cursor `c` into level parts `L`; returns the cursor at its far end. */
@@ -172,14 +180,24 @@ export const standing = (T) => [...T.floors.filter((f) => f.kind !== 'ground'), 
 /** Empty lists for a structure's parts, to lay it out and keep it only if it shuts the ground. */
 const parts = () => ({ floors: [], climbs: [], rides: [], stairs: [], swings: [], bridges: [], bursts: [], covers: [] });
 
-/** Structure `ids` from x, turning as the seed says; its parts and how far along x it reaches. */
+/** Everything of a structure seen from above: what stands, and its slides. */
+const footprint = (T) => [...standing(T), ...T.rides.filter((q) => q.kind === 'slide').map((q) => q.box)];
+/** How much ground two boxes share. */
+const shared = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0));
+
+/** Structure `ids` from x, turning as the seed says; `tidy` if no piece lies over another (doubling back can); its parts and how far along x it reaches. */
 function lay(r, ids, x) {
   const T = parts();
   // from near one edge, so a turn can carry it across the band
   let c = { x, z: r3((r() < 0.5 ? -1 : 1) * (EDGE + r() * (BAND.z1 - EDGE))), h: 0 };
-  for (const id of ids) c = place(T, PIECES[id], turn(r, c, PIECES[id].w * FT));
+  let tidy = true;
+  for (const id of ids) {
+    const before = footprint(T);
+    c = place(T, PIECES[id], turn(r, c, PIECES[id].w * FT));
+    tidy &&= !footprint(T).some((a) => !before.includes(a) && before.some((b) => shared(a, b) > 0.01));
+  }
   const all = standing(T);
-  return { T, x0: Math.min(x, ...all.map((f) => f.x0)), x1: Math.max(c.x, ...all.map((f) => f.x1)) };
+  return { T, tidy, x0: Math.min(x, ...all.map((f) => f.x0)), x1: Math.max(c.x, ...all.map((f) => f.x1)) };
 }
 
 /** A structure from x, turned till it shuts the ground: a few seeded turnings of each of the seed's structures, the
@@ -190,8 +208,8 @@ function build(L, r, x, ok) {
   for (;;) {
     const ids = shortStructure(r, room, ok);
     for (let i = 0; i < TRIES; i++) {
-      const { T, x0, x1 } = lay(r, ids, x);
-      if (blocks(standing(T), x0, x1)) return keep(L, T, ids, x0, x1);
+      const { T, tidy, x0, x1 } = lay(r, ids, x);
+      if (tidy && blocks(standing(T), x0, x1)) return keep(L, T, ids, x0, x1);
     }
   }
 }
@@ -204,11 +222,13 @@ function keep(L, T, ids, x0, x1) {
   return x1;
 }
 
-/** A ground stretch, 3 to 5 s' walk, sometimes with the bars or the swings in the middle; returns where it ends. */
-function gap(L, r, x) {
-  const seconds = GAP.min + r() * (GAP.max - GAP.min), len = seconds * WALK_SPEED, extra = PIECES[GROUND_PIECES[Math.floor(r() * 2)]];
+/** A ground stretch, 3 to 5 s' walk, sometimes with the bars or the swings in the middle (`always`: with that one);
+ *  returns where it ends. */
+function gap(L, r, x, always = null) {
+  const seconds = GAP.min + r() * (GAP.max - GAP.min), len = seconds * WALK_SPEED, drawn = PIECES[GROUND_PIECES[Math.floor(r() * 2)]];
+  const extra = always ? PIECES[always] : drawn, some = r() < 0.5;
   L.seconds += seconds + FIGHT_SECONDS;
-  if (r() < 0.5) {
+  if (always || some) {
     place(L, extra, { x: x + (len - extra.w * FT) / 2, z: 0, h: 0 });
     L.seconds += (extra.swings ?? []).length * SWING_SECONDS;
   }
@@ -218,41 +238,42 @@ function gap(L, r, x) {
 /** @returns {Level} an empty level, its one hero start and shelf at the left end (spinoff/sim.js needs a shelf) */
 const emptyLevel = () => ({
   ...parts(), backWall: BAND.z0, shelves: [{ team: 'heroes', x: 0.5, z: -1.7, y: 0 }], zones: [], puddles: [], bricks: [],
-  ringOut: { x0: -2, x1: 0, z1: 3.5, y: -3 }, starts: [{ x: 1, z: 0 }], structures: [], spans: [], seconds: 0,
+  ringOut: { x0: -2, x1: 0, z1: 3.5, y: -3 }, starts: [{ x: 1, z: 0 }], structures: [], spans: [], seconds: 0, slices: [],
 });
 
-// ponytail: till a hero walks up and down stairs, a flight is a few deep steps, each an easy hop (playtest 2026-11-10:
-// a run of little steps stuck up through the bridge where they met it, and one block as high as the top was a wall
-// where a flight turned off a low step); a climb is solid to its top (equipment.js takes a hero up it)
-const STEP_RISE = 0.4;
+// a climb is solid to its top, and so is a flight of stairs, to its high end: equipment.js takes a hero up either
+// (playtest 2026-11-12: as steps, each was narrower than a hero, who bounced at the foot of a flight for ever)
 const solidTo = (b, y) => ({ kind: /** @type {const} */ ('deck'), x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1, y });
 
-/** Box `b` cut into `n` steps along `axis`, from y0 up to y1 toward its high end (`up`: the end with more x or z). */
-function steps(b, axis, up, [y0, y1], n) {
-  const [lo, hi] = axis === 'x' ? [b.x0, b.x1] : [b.z0, b.z1];
-  return Array.from({ length: n }, (_, i) => {
-    const k = up ? i : n - 1 - i;
-    return { ...solidTo(b, r3(y0 + ((y1 - y0) * (i + 1)) / n)), [`${axis}0`]: r3(lo + ((hi - lo) * k) / n), [`${axis}1`]: r3(lo + ((hi - lo) * (k + 1)) / n) };
-  });
-}
-
-/** A flight of stairs as deep steps up toward its high end. @param {Path} q */
-function stairSteps(q) {
-  const axis = Math.abs(q.z1 - q.z0) > Math.abs(q.x1 - q.x0) ? 'z' : 'x', lo = Math.min(q.y0, q.y1), hi = Math.max(q.y0, q.y1);
-  return steps(q.box, axis, (q[`${axis}1`] > q[`${axis}0`]) === (q.y1 > q.y0), [lo, hi], Math.ceil((hi - lo) / STEP_RISE));
-}
+/** A flight of stairs as something to climb: up its slope from its low end. @param {Path} q @returns {Climb} */
+const stairClimb = (q) => /** @type {any} */ ({ ...q.box, y0: Math.min(q.y0, q.y1), y1: Math.max(q.y0, q.y1), h: q.y1 >= q.y0 ? q.h : q.h + 180, kind: 'stairs' });
+/** Everything in level `L` a hero climbs: its climbs, and its stairs. @param {Level} L @returns {Climb[]} */
+export const climbsOf = (L) => [...L.climbs, ...L.stairs.map(stairClimb)];
 
 /**
- * Level `L` as the donut fighters' sim (spinoff/sim.js) should have it: its climbs solid to their tops, its stairs as
- * deep steps, and a deck
+ * Level `L` as the donut fighters' sim (spinoff/sim.js) should have it: its climbs and stairs solid to their tops, and a deck
  * that reaches the band's edge carried on past it, so pushing a hero out of it goes back the way it came, not round
  * the end along the edge.
  * @param {Level} L @returns {Level}
  */
 export function forSim(L) {
   const past = (f) => ({ ...f, z0: f.z0 <= BAND.z0 + 1e-6 ? BAND.z0 - 2 : f.z0, z1: f.z1 >= BAND.z1 - 1e-6 ? BAND.z1 + 2 : f.z1 });
-  const [ground, ...rest] = L.floors, solids = [...L.climbs.map((c) => solidTo(c, c.y1)), ...L.stairs.flatMap(stairSteps)];
+  const [ground, ...rest] = L.floors, solids = climbsOf(L).map((c) => solidTo(c, c.y1));
   return { ...L, floors: [ground, ...[...rest, ...solids].map(past)] };
+}
+
+// REUSE-SPEC.md §Pizza: slices where they're a bother to get: halfway down every slide (ride it, don't skip it), in
+// the middle of every rocking bridge, at the top of every fire pole (jump for it), and up where a launch off each
+// pair of bars or swings flies. Worked out from the level, so every tablet has the same.
+const SLICE = Object.freeze({ up: 0.5, pole: 0.25, flight: { on: 2.5, y: 3.1 } });
+function slicesOf(L) {
+  const at = (x, y, z) => ({ x: r3(x), y: r3(y), z: r3(z) }), slides = L.rides.filter((q) => q.kind === 'slide'), poles = L.rides.filter((q) => q.kind === 'pole');
+  return [
+    ...slides.map((q) => at((q.x0 + q.x1) / 2, (q.y0 + q.y1) / 2 + SLICE.up, (q.z0 + q.z1) / 2)),
+    ...L.bridges.map((b) => at((b.x0 + b.x1) / 2, b.y + SLICE.up, (b.z0 + b.z1) / 2)),
+    ...poles.map((q) => at(q.x0, q.top - SLICE.pole, q.z0)),
+    ...L.swings.filter((_, i) => i % 2).map((p) => at(p.x + SLICE.flight.on, SLICE.flight.y, p.z)),
+  ].sort((a, b) => a.x - b.x);
 }
 
 // REUSE-SPEC.md §Level 1: a fire pole and a climbing grid in every level (decided 2026-11-12): the way down off its
@@ -260,16 +281,18 @@ export function forSim(L) {
 const MUST = [(ids) => ids.at(-1) === 'pole', (ids) => ids[0] === 'grid'];
 
 /**
- * Level 1 for this seed: ground, then structures turning through the band with ground between, until it takes
- * `SECONDS.min` to `max`.
- * @param {number} seed @returns {Level}
+ * A level for this seed: ground, then structures turning through the band with ground between, until it takes
+ * `SECONDS.min` to `max`. Level `n` 2 and on (REUSE-SPEC.md §Level 2) has swings or bars on every ground stretch, the
+ * swings first, so they can be played with; its ground time can run it a little over.
+ * @param {number} seed @param {number} [n] @returns {Level}
  */
-export function generateLevel(seed) {
-  const r = rng(seed), L = emptyLevel();
-  let x = gap(L, r, 0);
-  while (L.seconds < SECONDS.min) x = gap(L, r, build(L, r, x, MUST[L.structures.length]));
+export function generateLevel(seed, n = 1) {
+  const r = rng(seed), L = emptyLevel(), ground = () => (n >= 2 ? ['swings', 'bars'][L.structures.length % 2] : null);
+  let x = gap(L, r, 0, ground());
+  while (L.seconds < SECONDS.min) x = gap(L, r, build(L, r, x, MUST[L.structures.length]), ground());
   L.floors.unshift({ kind: 'ground', x0: 0, x1: r3(x), z0: BAND.z0, z1: BAND.z1, y: 0 });
   Object.assign(L.ringOut, { x1: r3(x + 2) });
   L.seconds = r3(L.seconds);
+  L.slices = slicesOf(L);
   return L;
 }

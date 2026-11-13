@@ -15,8 +15,9 @@ if (!mine) location.replace('choose.html');
 
 // the playground's stage is a slide (the donut fighters' breakfast is a pancake)
 const STAGE_PICTURE = { playground: '🛝' };
-// ponytail: one level for now, a new generated one each play; levels and unlocks come with the progress code
-const LEVELS = { playground: [1] };
+// ponytail: both open, a new generated one each play; level 2 has swings or bars on every ground stretch (REUSE-SPEC.md
+// §Level 2); unlocks come with the progress code
+const LEVELS = { playground: [1, 2] };
 const DIAL = 9;
 let picked = { stage: '', level: 0 };
 

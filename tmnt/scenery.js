@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { BRIDGE } from './equipment.js';
 import { FT, POLE_OUT } from './pieces.js';
 
 // REUSE-SPEC.md §Level 1, Building it, step 2: the generated level drawn in simple posts, decks, panels, tubes and
@@ -82,13 +83,13 @@ function deck(f, i) {
 // what sways under a hero (decided 2026-11-12: the climbing grid, the bridge): each part's move for a swing of -1..1,
 // and how hard it's going
 const swayers = new Map();
-const sways = (key, move) => swayers.set(key, { move, amp: 0 });
+const sways = (key, move, rate = 7) => swayers.set(key, { move, rate, amp: 0 });
 
 /** The parts keyed by the level's own climbs and bridges in `active` sway at `s` seconds; the others settle. */
 export function sway(active, s) {
   for (const [key, w] of swayers) {
     w.amp += ((active.has(key) ? 1 : 0) - w.amp) * 0.1;
-    w.move(Math.sin(s * 7) * w.amp);
+    w.move(Math.sin(s * w.rate) * w.amp);
   }
 }
 
@@ -108,7 +109,7 @@ function bridge(b) {
   for (const x of [-len / 2, len / 2]) for (const z of [-w / 2, w / 2]) g.add(block([POST, b.y + RAIL, POST], C.post, [x, -b.y, z]));
   g.position.set((b.x0 + b.x1) / 2, b.y, (b.z0 + b.z1) / 2);
   g.rotation.y = (-b.h * Math.PI) / 180;
-  sways(b, (v) => { hang.rotation.x = v * 0.05; });
+  sways(b, (v) => { hang.rotation.x = v * BRIDGE.roll; }, BRIDGE.rate);
   return g.add(hang);
 }
 
@@ -153,7 +154,7 @@ function pole(p) {
 function path(p) {
   const a = new THREE.Vector3(p.x0, p.y0, p.z0), b = new THREE.Vector3(p.x1, p.y1, p.z1);
   if (p.kind === 'pole') return pole(p);
-  const v = new THREE.Vector3().subVectors(b, a), breadth = p.kind === 'stairs' ? 1.2 : 0.5;
+  const v = new THREE.Vector3().subVectors(b, a), breadth = p.kind === 'stairs' ? 1.2 : 1.1;
   const m = new THREE.Mesh(new THREE.BoxGeometry(breadth, SLAB, v.length()), mat(p.kind === 'stairs' ? C.deck : C.slide));
   m.position.copy(a).addScaledVector(v, 0.5);
   m.lookAt(b);
@@ -167,8 +168,26 @@ function swing(s) {
   const color = s.kind === 'bar' ? C.rail : C.post;
   g.add(rod(ends[0], ends[1], s.kind === 'bar' ? 0.025 : 0.04, color));
   for (const e of ends) g.add(rod(e, new THREE.Vector3(e.x, 0, e.z), 0.04, color));
-  if (s.kind === 'swing') g.add(block([0.35, 0.04, 0.15], '#141414', [s.x, s.y - s.arm, s.z]), rod(top, new THREE.Vector3(s.x, s.y - s.arm, s.z), 0.008, '#555555'));
+  if (s.kind === 'swing') g.add(seat(s, top));
   return g;
+}
+
+// each swing's seat and chain, hung from its beam, to turn with whoever is on it
+const seats = new Map();
+function seat(s, top) {
+  // built swinging along +x, its seat across that with a chain up from each end, then turned to the swing's heading
+  const turned = new THREE.Group(), hang = new THREE.Group(), wide = 0.4;
+  turned.position.copy(top);
+  turned.rotation.y = (-s.h * Math.PI) / 180;
+  hang.add(block([0.15, 0.04, wide], '#141414', [0, -s.arm, 0]));
+  for (const z of [-wide / 2, wide / 2]) hang.add(rod(new THREE.Vector3(0, 0, z), new THREE.Vector3(0, -s.arm, z), 0.008, '#555555'));
+  seats.set(s, (a) => { hang.rotation.z = a; });
+  return turned.add(hang);
+}
+
+/** Swing `on`'s seat is `a` radians round from hanging straight down; every other seat hangs still. */
+export function swingSeats(on, a) {
+  for (const [s, turn] of seats) turn(s === on ? a : 0);
 }
 
 /** The rubber floor under the band in big soft blobs of slate blue, teal and terracotta, and grass round it. */
@@ -215,10 +234,66 @@ function field(ground) {
   return g;
 }
 
+// REUSE-SPEC.md §Pizza: what a level is for. A sign at the start points the way; a giant glowing pizza waits at the
+// end, by the gate; slices hang in the awkward places (generate.js). Each is its drawing (pizza.svg, slice.svg,
+// pizza-sign.svg, in the logo's ink) on a card, flat and bright, with a shine behind the pizza (playtest 2026-11-12: a soft glow was not so cute).
+const pictures = new Map();
+function card(file, size) {
+  if (!pictures.has(file)) {
+    const map = Object.assign(new THREE.TextureLoader().load(file), { colorSpace: THREE.SRGBColorSpace });
+    pictures.set(file, new THREE.MeshBasicMaterial({ map, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide }));
+  }
+  return new THREE.Mesh(new THREE.PlaneGeometry(size, size), pictures.get(file));
+}
+let shine = null;
+/** The shine behind a pizza, `size` across: shine.svg's inked rays and sparkles, facing the camera, turning (pizzaTime). */
+function glow(size) {
+  shine ??= new THREE.SpriteMaterial({ map: Object.assign(new THREE.TextureLoader().load('shine.svg'), { colorSpace: THREE.SRGBColorSpace }), transparent: true, depthWrite: false });
+  const sprite = new THREE.Sprite(shine);
+  sprite.scale.setScalar(size);
+  return sprite;
+}
+
+const slices = [];
+/** A slice to find, turning where it hangs. */
+function slice(at) {
+  const g = new THREE.Group(), turn = card('slice.svg', 0.8);
+  g.add(glow(1.7), turn);
+  g.position.set(at.x, at.y, at.z);
+  slices.push({ g, turn, y: at.y });
+  return g;
+}
+
+// the giant pizza at the end, glowing, facing the camera
+let pie = null;
+function bigPizza(ground) {
+  pie = new THREE.Group().add(glow(5), card('pizza.svg', 2.4));
+  pie.position.set(ground.x1 - 0.4, 2.4, ground.z0 + 0.5);
+  return pie;
+}
+
+/** The sign at the start: a pizza and an arrow, the way the level goes. */
+function sign(ground) {
+  const board = card('pizza-sign.svg', 1.2);
+  board.position.set(ground.x0 + 2, 1.9, ground.z0 + 0.5);
+  return new THREE.Group().add(board, block([0.08, 1.4, 0.08], IRON, [ground.x0 + 2, 0, ground.z0 + 0.46]));
+}
+
+/** The slices turn and bob at `t` seconds, those in `taken` (by their place in the level's list) gone; the giant pizza bobs. */
+export function pizzaTime(t, taken) {
+  slices.forEach((s, i) => {
+    s.g.visible = !taken.has(i);
+    s.turn.rotation.y = t * 2 + i;
+    s.g.position.y = s.y + Math.sin(t * 3 + i) * 0.05;
+  });
+  if (shine) shine.rotation = t * 0.6;
+  if (pie) pie.position.y = 2.4 + Math.sin(t * 1.5) * 0.08;
+}
+
 /** Everything of level `L` to see, but the heroes. @param {Level} L */
 export function playground(L) {
   const [ground, ...decks] = L.floors;
-  return [floor(ground), field(ground), fence(ground), ...decks.filter((f) => !L.bridges.includes(/** @type {any} */ (f))).map(deck), ...L.bridges.map(bridge), ...L.climbs.map(climb), ...[...L.stairs, ...L.rides].map(path), ...L.swings.map(swing)];
+  return [floor(ground), field(ground), fence(ground), sign(ground), bigPizza(ground), ...L.slices.map(slice), ...decks.filter((f) => !L.bridges.includes(/** @type {any} */ (f))).map(deck), ...L.bridges.map(bridge), ...L.climbs.map(climb), ...[...L.stairs, ...L.rides].map(path), ...L.swings.map(swing)];
 }
 
 /** Outdoors (playtest 2026-11-10): a blue sky fading to a pale horizon behind the field, and sunlight and skylight on the

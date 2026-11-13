@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- REUSE-SPEC.md §Pizza: the giant pizza at the end of a level, in the logo's ink: thick black lines, flat colours -->
+  <g stroke="#141414" stroke-linejoin="round" stroke-linecap="round">
+    <circle id="crust" cx="256" cy="256" r="236" fill="#c98a3c" stroke-width="16"/>
+    <circle id="cheese" cx="256" cy="256" r="192" fill="#f6c544" stroke="#a8661a" stroke-width="7"/>
+    <g id="cuts" fill="none" stroke="#d9a02c" stroke-width="6">
+      <path d="M256 64V448M64 256H448M120 120L392 392M392 120L120 392"/>
+    </g>
+    <g id="pepperoni" fill="#c0392b" stroke-width="7">
+      <circle cx="196" cy="150" r="34"/><circle cx="340" cy="176" r="36"/><circle cx="150" cy="270" r="32"/>
+      <circle cx="262" cy="262" r="34"/><circle cx="370" cy="300" r="33"/><circle cx="214" cy="370" r="35"/><circle cx="318" cy="390" r="28"/>
+    </g>
+    <g id="shine" fill="none" stroke="#fff6c8" stroke-width="9" opacity="0.85">
+      <path d="M92 190a180 180 0 0 1 70-88M186 138a26 26 0 0 1 22-10M330 162a26 26 0 0 1 22-8M252 248a24 24 0 0 1 20-8"/>
+    </g>
+  </g>
+</svg>

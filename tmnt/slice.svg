@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- REUSE-SPEC.md §Pizza: a slice to find, its crust up and its tip down, in the logo's ink -->
+  <g stroke="#141414" stroke-linejoin="round" stroke-linecap="round">
+    <path id="cheese" d="M256 486L62 150Q256 70 450 150Z" fill="#f6c544" stroke-width="18"/>
+    <path id="crust" d="M44 132Q256 28 468 132L446 186Q256 98 66 186Z" fill="#c98a3c" stroke-width="16"/>
+    <g id="pepperoni" fill="#c0392b" stroke-width="8">
+      <circle cx="210" cy="232" r="38"/><circle cx="316" cy="262" r="34"/><circle cx="252" cy="350" r="30"/>
+    </g>
+    <g id="shine" fill="none" stroke="#fff6c8" stroke-width="10" opacity="0.85">
+      <path d="M112 128Q180 92 250 84M196 220a28 28 0 0 1 24-12M304 252a24 24 0 0 1 20-10"/>
+    </g>
+  </g>
+</svg>

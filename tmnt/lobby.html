@@ -6,9 +6,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>Turtles in Twine — play</title>
+<!-- every page runs inside the tap page (index.html), which keeps fullscreen and the rooms -->
+<script>if (top === self) location.replace(`./?open=${encodeURIComponent(location.pathname.split('/').pop() + location.search)}`);</script>
 <link rel="stylesheet" href="../spinoff/spinoff.css" />
 </head>
 <body class="lobby">
+<!-- the lobby's page is three rows (spinoff.css): a bar on top, the room, the buttons; the bar is empty till there are rooms -->
+<header class="bar"></header>
 <main id="stage"></main>
 <!-- REUSE-SPEC.md §Level 1, Building it: the donut fighters' lobby, single player only for now: ✏️ your hero, 👍 pick where -->
 <footer>

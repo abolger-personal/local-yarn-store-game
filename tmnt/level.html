@@ -6,7 +6,18 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>Turtles in Twine — the playground</title>
+<!-- every page runs inside the tap page (index.html), which keeps fullscreen and the rooms -->
+<script>if (top === self) location.replace(`./?open=${encodeURIComponent(location.pathname.split('/').pop() + location.search)}`);</script>
 <link rel="stylesheet" href="../spinoff/spinoff.css" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&amp;display=swap" />
+<style>
+  /* REUSE-SPEC.md §Dismounts: "Cowl-a-bunga!" in large letters, in the logo's lettering, over the game for a moment */
+  #shout { position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; pointer-events: none; opacity: 0; rotate: -6deg;
+    font: 15vmin 'Luckiest Guy', 'Arial Black', Impact, sans-serif; color: #7ed957; -webkit-text-stroke: 1vmin #141414; paint-order: stroke fill; }
+  #shout small { font-size: 5vmin; -webkit-text-stroke-width: 0.5vmin; color: #fffdf5; }
+  #shout.go { animation: shout 1.2s ease-out; }
+  @keyframes shout { 0% { opacity: 0; scale: 0.3; } 15% { opacity: 1; scale: 1.1; } 70% { opacity: 1; scale: 1; } 100% { opacity: 0; scale: 1.25; } }
+</style>
 </head>
 <body class="play">
 <main id="stage"></main>
@@ -15,6 +26,7 @@
   <div class="corner">
     <button id="leave" aria-label="wave bye, back to the lobby"><span class="emoji">👋</span></button>
   </div>
+  <div id="slices" class="count" aria-label="pizza slices found">🍕 0</div>
 </header>
 <dl id="keys" class="keys" hidden aria-label="keyboard keys">
   <dt><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd></dt><dd>walk</dd>
@@ -22,6 +34,7 @@
   <dt><kbd>Z</kbd></dt><dd><span class="emoji">🥊</span></dd>
   <dt><kbd>X</kbd></dt><dd><span class="emoji">🦶</span></dd>
 </dl>
+<div id="shout" aria-live="polite">Cowl-a-bunga!<small id="move"></small></div>
 <div class="moves">
   <button id="punch" aria-label="punch"><span class="emoji">🥊</span></button>
   <button id="kick" aria-label="kick"><span class="emoji">🦶</span></button>

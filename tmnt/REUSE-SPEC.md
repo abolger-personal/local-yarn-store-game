@@ -234,7 +234,7 @@ code: today a level knows only flat floors (`Floor` in `spinoff/match.js`, groun
 | Squiggle climber (`a-squiggle-climber`, confirmed 2026-11-10) | ground to the 6 ft deck | the rungs | a yellow **squiggle climber**: one upright pole, its rungs snaking left and right up it: **climb** it | climb after you | — |
 | Steps (`a-steps`) | 4 steps, the low deck down to the bridge; **not to the ground** (corrected 2026-11-10) | each step | between the deck and the bridge, walked either way | come down them at you | — |
 | Climbing dome (`a-climbing-dome`, grey, under the tall tower) | 8 wide, up to the deck | its face, then the deck | **a rock-climbing dome joined to the tall tower's deck** (decided 2026-11-10): its climbing face is on the structure's far side, turned to the camera here (§Unwrapping); jump on and **climb up it** onto the deck. **Underneath it is the bear cave** (decided 2026-11-10; none on B): kids crawl in, and **bad guys burst out** of it, in waves | burst out of the cave; climb the dome after you | how many come out, when |
-| Clatter bridge (`a-bridge`) | 11 long at 4 ft | the planks | drawn as sagging planks with yellow rope rails, and **sways when crossed** (built 2026-11-12, the sway shared with the climbing grid; to look at only, the walking is still flat); a deck that **wobbles** as anyone crosses, more with more feet | cross it at you | — |
+| Clatter bridge (`a-bridge`) | 11 long at 4 ft | the planks | drawn as sagging planks with yellow rope rails, and **sways when crossed** (built 2026-11-12, the sway shared with the climbing grid). **Playtest 2026-11-12: the wobble was cute but no trouble, so it now rocks enough to slide you**: side to side through 14° each way, once every two and a half seconds, harder the longer you're on it (full in about a second); a hero on it slides across with the roll, about 0.6 units each way, most of the way to its side, so off the middle you slide off (`BRIDGE` in `tmnt/equipment.js`). The hero is drawn riding the planks up and down. **Falling off the bridge's side is on purpose** (decided 2026-11-12), though it means a hero slides through the rope rails. It is still solid underneath; a deck that **wobbles** as anyone crosses, more with more feet | cross it at you | — |
 | Tower with the tic-tac-toe panel (`a-tower-b`) | deck 4, roof 13 | the deck | a deck; the panel is cover (spinnable? brainstorm) | hide behind the panel | — |
 | Climbing grid (`a-climbing-grid`, added 2026-11-10; **corrected 2026-11-12** from the designer's walk-round photos) | **the black chain ladder with the droop in it**: chains with four metal rungs, leaning out from the deck beside the spiral slide down to the ground (about 4 ft up, check), sagging in the middle; not the deck-to-top-deck ladder first guessed | the rungs | **climb** it from the ground, like the dome; planned 2026-11-12: drawn leaning and drooping and **swaying as you climb** (decided 2026-11-12, built); **one in every level**, the way up onto its second structure | climb after you | — |
 | Yellow loop ladder (`a-loop-ladder`, planned 2026-11-12, from the photos) | an upright ladder of rounded yellow rungs, ground to a low deck | the rungs | **climb** it; a different piece from the grid (decided 2026-11-12) | climb after you | — |
@@ -279,6 +279,153 @@ unless it says so:
 - **Heights are exaggerated** in levels anyway, so the chain ladder's guessed 4 ft deck is fine.
 - **The pole was too fast**: half the slides' speed (built 2026-11-12). The slides are fine. The bridge glitch hasn't
   come back.
+
+### The bars and the swings, built
+
+Built 2026-11-12 (`startSwing`, `swingStep` in `tmnt/equipment.js`); the designer's rules, decided the same day:
+- **Getting on:** jump into a bar or a swing and you catch it; or **tap it** from close by and you hop on. Walking
+  past or under one never grabs you.
+- **On it** you hang with your feet out and your head toward the bar, swinging; a swing goes higher the longer you
+  ride, and its seat goes with you.
+- **Getting off:** **tap the next bar, or the ground, or jump**: you go **all the way round once** and let go on the
+  way up, **launched** the way you were turning, toward where you tapped (a jump launches the way the level runs).
+  The launch is a little stronger than a jump, so from the bars it can land you on a deck.
+- **Bar to bar, swing to swing:** tap the other one and you fly to it and catch it straight away; the one you just
+  left can't be caught again for half a second.
+- **A tap is generous and remembered** (playtest 2026-11-12: four taps to get on): anywhere along the bar counts, and
+  so does where a finger on the bar or seat itself lands on the ground behind it; the hero walks over and hops on
+  when it gets there, unless you tap somewhere else or jump first.
+- Checked through the game's rules on a generated level: a bar launch flies about 2.4 units up and lands 3 units on;
+  bar to bar and swing to swing catch. **Not looked at in a browser when written.**
+- Not built: launching into bad guys; bad guys using them; a swing keeping its swing
+  after you leave it.
+
+**Pieces don't lie over each other** (built 2026-11-12, playtest: slides and bridges half inside decks). Round a
+corner, the next piece now starts off the last one's side, sharing an edge, and a layout where a piece doubles back
+over another is thrown away (`corner`, `tidy` in `tmnt/generate.js`; checked on 200 levels).
+
+**Stairs carry you up** (built 2026-11-12; playtest: stuck on a bridge lying across the level, unable to get onto
+the next piece). The next piece was a flight of stairs, and each of its stand-in steps was narrower than a hero, who
+bounced at its foot for ever. A flight is now climbed like the chain ladder: walk into its low end and you go up its
+slope and step off at the top; from the top you walk across and step down off its end (`climbsOf` in
+`tmnt/generate.js`). Replayed on 20 bridges lying across the level: none stuck. **Playtest 2026-11-12: a hero on a
+flight floated over the ramp**, standing level with its top. The sim only has flat floors, so the flight stays solid
+to its high end there, but a hero on it is now drawn down on the slope (its shadow too), and walking off the low end
+puts it down at the low end's height (`stairDip`, `stairsOff` in `tmnt/equipment.js`).
+
+### Dismounts from button combos
+
+Brainstorm 2026-11-12, the designer's ask: **button combos should give the Simone Biles dismounts already designed**
+(`ai_planning_sessions/characters/DANCES.md` §Gymnastics; built as dances in `characters/motion.js`, each with its
+leotard's sparkle), and **never at random: the player has to learn which buttons give which move.** The five built:
+
+| Move (`id`) | What it is |
+|---|---|
+| `biles-beam` | the beam dismount: a double back tuck with two twists |
+| `biles-wolf` | the beam dismount ending in the 2½ wolf turn |
+| `biles` | the floor Biles: a double layout with a half twist |
+| `biles-ii` | the triple-double: a double back tuck with three twists |
+| `biles-ii-vault` | the Yurchenko double pike, off a run-in |
+
+The donut fighters' sweep already plays one such dance from the sim (`wuxia-turn`), so the drawing is there to
+reuse.
+
+Decided 2026-11-12:
+- **Dismounts are only off the bars and the swings.** Slides and decks already have the flips and attacks.
+- **A dismount launches you further** than a plain launch.
+- **A dismount lands on an enemy:** tap an enemy as you leave and you come down on that spot, hitting it **if it is
+  still there when you land**. Enemies move, so it takes **timing, or a tag team**: one hero holds or herds the
+  enemy while another dismounts onto it.
+- **A small target to start with** (decided 2026-11-12): the landing has to be nearly on the enemy. Widen it if it
+  proves too hard.
+- **A dismount that lands is a one-hit knockout** (decided 2026-11-12): the bad guy goes **straight over the back
+  fence**, whatever its damage percent.
+- **"Cowl-a-bunga!" appears in large letters** when a hero does a dismount (decided 2026-11-12). Built the same
+  day on every launch off a bar or a swing, since that is the only dismount so far: the logo's lettering, green
+  with a black outline, across the screen for about a second. It moves to the named dismounts when they exist.
+- Not built: there are no enemies in a level yet.
+
+**Built 2026-11-12** (playtest: "I see Cowl-a-bunga but dismounts aren't working": only the launch and the shout
+existed). Coming off a bar or a swing now plays a Biles move through the flight, its own jump and travel left out
+since the launch is those, then its landing (the wolf turn too, not the salute), with its leotard's sparkle.
+- **Which move: the buttons pressed after you tap where to go** (decided 2026-11-12, the designer: pressing them
+  beforehand, hanging on the bar, was too easy): while the turtle turns round the bar and in the first 0.4 s of the
+  flight. Presses before the tap don't count (`DISMOUNTS` in `tmnt/equipment.js`). **The designer hasn't confirmed this mapping**; it was built so the moves could be seen:
+
+  | Pressed after the tap | Dismount |
+  |---|---|
+  | nothing | no flips: a plain landing, and no shout |
+  | 🥊 | `biles` |
+  | 🦶 | `biles-ii` |
+  | 🥊🥊 | `biles-wolf` |
+  | 🦶🦶 | `biles-ii-vault` |
+  | 🥊 then 🦶 | `biles-beam` |
+
+  The last two presses count if they are a pair, else the last one. Decided 2026-11-12, the designer: the beam
+  dismount is "way too cool to exist without the player having to put some work in", so it takes the 1-2 combo and
+  pressing nothing gives no flips. "Cowl-a-bunga!" shows when a move is picked.
+  **Presses count on the bar and for the first 0.4 s of the flight** (playtest 2026-11-12: pressed in the air they
+  did nothing, so every dismount was the beam one); through the flight the buttons pick the move and don't attack.
+- **Further:** the launch is stronger (to about 3 units high and up to 6.7 along), and with a spot tapped it goes at
+  the speed that comes down on that spot. Replayed through the game's rules: a tap 3 units on lands 3.0 on, 5 lands
+  5.0, and two full flips fit in the 0.87 s flight.
+- Bar to bar and swing to swing are a catch, not a dismount: no move and no shout.
+- **Playtest 2026-11-12: "a sort of triple flip whatever I press."** Measured: the buttons do pick different moves,
+  but every one of the five is **two flips in the air** after the full turn on the bar, in 0.87 s. They differ only
+  in twists (beam and wolf 2, the Biles ½, the triple-double 3, the double pike 0) and in body shape (tucked, laid
+  out, piked); the wolf turn differs from the beam dismount only after landing. So they read alike. Built the same
+  day: **the move's name appears under "Cowl-a-bunga!"**, so the buttons can at least be told apart. Open: how to
+  make them look different to a child (fewer flips so the shape shows, a slower flight, a coloured trail each).
+- Not built: landing on an enemy; any way to learn the buttons without being told.
+
+Other ways the buttons could pick the move, brainstorm:
+1. **In the air off a bar or a swing, the buttons you press are the dismount.** The launch is the take-off: 🥊, 🦶,
+   🥊🥊, 🦶🦶, 🥊🦶 before you land, one move each. It fits what a dismount is, and the bars and swings become
+   where you learn them.
+2. **How you leave picks it.** Tapping the ground gives one, tapping the next bar another, jumping off a third: no
+   new buttons at all.
+3. **A string on the ground.** 🥊 and 🦶 in a string of three, the third press being the move: eight strings from two
+   buttons, on top of the punch and kick strings that exist.
+4. **Hold one, tap the other**, next to the holds that exist (🥊 held is the shot, 🦶 held is the sweep).
+Each needs a way to learn it without reading: the buttons flashing the string, a picture card when one is found.
+Open: whether the landing aims at where the enemy was when you tapped or follows it a
+little; what a miss costs.
+
+### Jumping forward
+
+Decided and built 2026-11-12 (playtest: a slice out by the fire pole couldn't be reached, since a jump only went
+straight up):
+- **A jump while walking carries on the way you were going**: an arrow held with Space, or a tap to walk and then a
+  tap above the head.
+- **A double tap on a spot is a jump to it**; a third tap at once is the double jump. The taps count as a pair
+  within 0.35 s.
+- **In the air an arrow or a tap steers**, not during a dismount's flight, which goes where it was sent.
+- Only in this game: the donut fighters' jump is unchanged.
+
+### Pizza
+
+Decided and built 2026-11-12 (the designer: "the characters have no idea what they should be going for"):
+- **A sign at the start**: a pizza and an arrow, pointing the way the level goes.
+- **A giant glowing pizza at the end**, by the iron gate, in the characters' ink (a black outline) with the same shine
+  behind it. It is what you're walking toward.
+- **Drawn as pictures** (`tmnt/pizza.svg`, `tmnt/slice.svg`, `tmnt/pizza-sign.svg`, 2026-11-12, in the logo's thick
+  ink), each on a flat card in the level, so what was checked as a drawing is what shows.
+- **Pizza slices in the places that are a bother to get to**, to reward the trickier routes: halfway down every
+  slide (so you ride it), in the middle of every rocking bridge, at the top of every fire pole (so you jump for
+  it), and up where a launch off each pair of bars or swings flies. They turn, in front of a shine (`tmnt/shine.svg`: inked rays and sparkles, turning slowly; playtest 2026-11-12, the soft glow was "not so cute", the turning 2D slice "very cute"); getting to one eats it, and
+  🍕 at the top of the screen counts them. Worked out from the level (`slicesOf` in `tmnt/generate.js`), so every
+  tablet has the same.
+- **Pizza can be stolen from opponents** (decided 2026-11-12), as donuts are in the donut fighters. Not built: there
+  are no opponents in a level yet, and it needs deciding what a bad guy holding pizza does with it.
+- Not built: anything the slices are for (a score, an unlock, the attack item); a slice count on finishing; reaching
+  the giant pizza doing anything of its own (the gate beside it ends the level).
+
+### Level 2
+
+Built 2026-11-12, the designer's ask: **a generated level 2 to work on the swings**, since a level 1 seed can have
+none. The lobby's dial now offers 1 and 2. Level 2 is level 1's generator with **swings or bars on every ground
+stretch**, the swings first, then turn about (`generateLevel(seed, 2)`). Both levels are generated for now; the
+hand-made tutorial strip that is to be level 1 (§From the walk-round photos) isn't built.
 
 ### Building it
 
@@ -457,7 +604,10 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
 
 - **The logo is the splash screen** (decided 2026-11-10). It goes where the donut fighters' splash is, the
   tap-to-play button in `spinoff/index.html` that goes fullscreen, loads the rooms and opens the chooser in a frame.
-  `tmnt/index.html` is that page with the logo as the button. Draft: `tmnt/logo.svg` (2026-11-10), each part named
+  `tmnt/index.html` is that page with the logo as the button. **Built 2026-11-12**: the logo and 🐢👆 are the
+  tap-to-play button; it goes fullscreen, loads the rooms (`spinoff/rooms.js`, **multiplayer from the start**,
+  decided 2026-11-12) and opens the chooser in a frame; the chooser, the lobby and the level, opened by themselves,
+  come back to it. Not done: the lobby still offers single player only, so nothing joins a room yet. Draft: `tmnt/logo.svg` (2026-11-10), each part named
   by `id` so it can be edited by hand or in an editor.
   - **After the 1987 cartoon logo, not the arcade games** (decided 2026-11-10): *Teenage Mitten Knitting* in
     white on a red banner, **TURTLES** big, green and arched with a thick black outline, and *Turtles in Twine:
@@ -571,6 +721,11 @@ as big as they look, so the boss's hit box and reach grow with the drawing.
 **The Sweater's gauntlets** (planned 2026-11-09): a new weapon, after the Shredder's clawed gauntlets, made for The
 Sweater. Heroes don't get them. The design is open.
 
+**Todo: The Sweater's claw weapons** (2026-11-12, not started). The gauntlets need designing and building. Brainstorm
+2026-11-12, the designer's: probably **rakes or combs, or something else cutely villainous**, worn as claws. Brainstorm
+2026-11-12: **wool combs or hand carders**, the real spiked tools for untangling fleece, one on each paw; they fit
+the yarn theme the way the Shredder's claws fit his. Till then The Sweater's design has bare black gloves.
+
 ## Open questions
 
 - **Which theme?** Pick from the list in §The game.
@@ -579,7 +734,8 @@ Sweater. Heroes don't get them. The design is open.
   one, so a full room reads as the four turtles? A fifth player in taxi yellow would be the April.
 - **Which animal is The Sweater?** Or a random one each time? Open until the designer's kids vote (2026-11-12);
   the outfit is decided (§Bad guys) and works on every animal tried.
-- **What should The Sweater's gauntlets look like,** and how do they attack?
+- **What should The Sweater's gauntlets look like,** and how do they attack? Brainstorm 2026-11-12: rakes or combs as claws
+  (§Bad guys, the todo).
 - **Purple is a hero colour and a bad-guy colour.** Purple is one of the turtles' four, and the Sock Clan and The
   Sweater wear it too. Is that fine, as long as black and silver stay bad-guy only?
 - **Where does "Turtleneck" go?** A power move, a pickup, a level name, or The Sweater's last form?

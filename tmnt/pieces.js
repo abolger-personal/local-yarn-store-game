@@ -9,10 +9,14 @@ export const JUMP_FT = 4;
 /** How far down a piece can start below where the last left off, stepping off the end. */
 export const DROP_FT = 1.5;
 
+/** How far out from its deck the fire pole stands, ft. */
+export const POLE_OUT = 2;
+
 /**
  * @typedef {{ x0: number, x1: number, y: number }} Deck  a top to stand on
  * @typedef {{ x0: number, x1: number, y0: number, y1: number, kind: 'dome'|'grid'|'squiggle' }} Climb  up from y0 to y1
- * @typedef {{ x0: number, y0: number, x1: number, y1: number, kind: 'slide'|'pole' }} Ride  down, from (x0, y0) to (x1, y1)
+ * @typedef {{ x0: number, y0: number, x1: number, y1: number, kind: 'slide'|'pole', top?: number }} Ride
+ *   down, from (x0, y0) to (x1, y1); a pole stands up to `top`, grabbed anywhere up it
  * @typedef {{ x0: number, y0: number, x1: number, y1: number }} Stairs  walked up or down
  * @typedef {{ x: number, y: number, arm: number, span: number, kind: 'swing'|'bar' }} Swing
  *   round a pivot at (x, y), `arm` out; the bar or the swing's top beam `span` long, across the way it swings
@@ -31,12 +35,15 @@ export const PIECES = Object.freeze({
   // the structures fill the band, so the low deck's ways up and down from the ground are pieces of their own (unwrapped):
   // the squiggle climber starts a structure, the fire pole ends one
   squiggle: { id: 'squiggle', w: 3, in: 0, out: 6, climbs: [{ x0: 0, x1: 1, y0: 0, y1: 6, kind: 'squiggle' }], decks: [{ x0: 1, x1: 3, y: 6 }] },
-  // the pole a foot out from the deck, so you land clear of it (playtest 2026-11-10: down, back up, down again)
-  pole: { id: 'pole', w: 4, in: 6, out: 0, decks: [{ x0: 0, x1: 2, y: 6 }], rides: [{ x0: 3, y0: 6, x1: 3, y1: 0, kind: 'pole' }] },
+  // the pole 2 ft out from the deck (`POLE_OUT`), so you land clear of it (playtest 2026-11-10: down, back up, down
+  // again), with 3 ft of room past it to land in (2026-11-12: one turned to the band's edge wedged a hero against its deck)
+  pole: { id: 'pole', w: 7, in: 6, out: 0, decks: [{ x0: 0, x1: 2, y: 6 }], rides: [{ x0: 2 + POLE_OUT, y0: 6, x1: 2 + POLE_OUT, y1: 0, kind: 'pole', top: 13.5 }] },
   steps: { id: 'steps', w: 6, in: 6, out: 4, stairs: [{ x0: 0, y0: 6, x1: 6, y1: 4 }] },
   bridge: { id: 'bridge', w: 11, in: 4, out: 4, bridge: { x0: 0, x1: 11, y: 4 } },
   ticTacToe: { id: 'ticTacToe', w: 6, in: 4, out: 4, decks: [{ x0: 0, x1: 6, y: 4 }], cover: [3] },
-  grid: { id: 'grid', w: 3.5, in: 4, out: 7.5, climbs: [{ x0: 0, x1: 3.5, y0: 4, y1: 7.5, kind: 'grid' }] },
+  // the climbing grid: the black chain ladder with the droop in it, leaning out from a 4 ft deck to the ground
+  // (corrected 2026-11-12 from the walk-round photos)
+  grid: { id: 'grid', w: 6, in: 0, out: 4, climbs: [{ x0: 0, x1: 2.5, y0: 0, y1: 4, kind: 'grid' }], decks: [{ x0: 2.5, x1: 6, y: 4 }] },
   stairsUp: { id: 'stairsUp', w: 3.5, in: 4, out: 7.5, stairs: [{ x0: 0, y0: 4, x1: 3.5, y1: 7.5 }] },
   topDeck: { id: 'topDeck', w: 3.5, in: 7.5, out: 7.5, decks: [{ x0: 0, x1: 3.5, y: 7.5 }], cover: [1.75] },
   tealSlide: { id: 'tealSlide', w: 8, in: 7.5, out: 0, rides: [{ x0: 0, y0: 7.5, x1: 8, y1: 0, kind: 'slide' }] },
@@ -48,7 +55,7 @@ export const PIECES = Object.freeze({
 });
 
 /** Structure A as the real playground has it, unwrapped (REUSE-SPEC.md §The pieces): one string the generator can make. */
-export const REAL_A = Object.freeze(['dome', 'lowDeck', 'steps', 'bridge', 'ticTacToe', 'grid', 'topDeck', 'tealSlide']);
+export const REAL_A = Object.freeze(['dome', 'lowDeck', 'steps', 'bridge', 'ticTacToe', 'stairsUp', 'topDeck', 'tealSlide']);
 
 /** Does a piece starting `inn` ft up follow one leaving `out` ft up: level, a jump up, or a step down off the end. */
 export const joins = (out, inn) => inn === out || (inn > out ? inn - out <= JUMP_FT : out - inn <= DROP_FT);

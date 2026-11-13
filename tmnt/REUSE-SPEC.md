@@ -45,6 +45,16 @@ elites); **Purl Power!** (Turtle Power) on the title screen.
 - **Up to 5 players, all heroes** (decided 2026-11-09). No playable bad guys for now: it is one continuous side
   scroller, so there's no second team to join. Bad guys are CPU only.
 - **Co-op all the way** (decided 2026-11-09): everyone on one team, the way the arcade games were.
+- **No health points** (decided 2026-11-12: "who likes those?"). Nobody has a health bar to run down. What you pick
+  up changes how you attack for a while instead (§From the walk-round photos), and falling off a deck leaves you dizzy,
+  not hurt (§Building it). Brainstorm 2026-11-12: what a bad guy's hit does to a hero.
+- **Bad guys are beaten by leaving the playground** (decided 2026-11-12): a ring-out, as in the donut fighters, sends
+  a bad guy **over the iron fence along the back** (§The pieces), where they **stand, sad**, watching. Not built yet:
+  there are no bad guys in the level so far. **For now** (decided 2026-11-12): the donut fighters' **damage percent**
+  as it is (hits build it up, and knockback grows with it); **a big enough hit in any direction** sends them over the
+  back. If that's too easy, narrow which hits count or make the bad guys tougher.
+- **Todo: the trailing scarf's physics** (2026-11-12). Trailing behind a hero that can backflip looks odd, and not in a
+  good way. Not started.
 - **Side scrolling in 2.5D** (decided 2026-11-09): keep the donut fighters' depth band you walk around in; the
   camera scrolls along the level (x) only.
 - **The level generator** (decided 2026-11-09): use the donut fighters' (`spinoff/generate.js`, a pure function of
@@ -218,15 +228,16 @@ code: today a level knows only flat floors (`Floor` in `spinoff/match.js`, groun
 | Painted labyrinth and hopscotch (across Palmer Ave) | flat, ~30 | ground | the start; flat, the first fight | walk in from the left edge | how many |
 | Arch swings, a row of four (`swings`) | hoops 9.5 tall, 7 apart; seats 2 up, one a bucket | the seat | jump on; swings by itself, faster the more you ride; jump off **launched** along the swing; can go **all the way round** | ride them too; launched at you | when each seat's swing starts |
 | Green wavy slide (`a-wavy-slide`) | from the 7 ft deck, 9 long | — | down only: jump on at the top, carried down fast, off at the bottom | slide down at you | — |
-| Tower with a roof (`a-tower-high`) | deck 7 (check), roof 15 | the deck | a deck; posts are cover | hide behind posts, jump out | — |
+| Tower with a roof (`a-tower-high`) | deck 7 (check), roof 15 | the deck | **no roofs for now** (decided 2026-11-12); a deck; posts are cover | hide behind posts, jump out | — |
 | Low deck (`a-deck-low`) | deck 6 (check) | the deck | a deck | hide behind the panels | — |
-| Yellow fire pole (`a-fire-pole`, moved 2026-11-10) | ~10, from the 6 ft deck | — | in the middle of A, across from the bear cave: jump to grab it from the deck, **slide down** to the ground | slide down at you | — |
+| Yellow fire pole (`a-fire-pole`, moved 2026-11-10) | ~10, from the 6 ft deck | — | in the middle of A, across from the bear cave: jump to grab it from the deck, **slide down** to the ground. **A fire pole in every level** (decided 2026-11-12: the designer's kids missed it): the generator's first structure always ends on it; drawn 13.5 ft tall with its hoop over the top; **jump and grab it anywhere up it: the higher, the longer the ride** (decided 2026-11-12; the deck stays 6 ft) | slide down at you | — |
 | Squiggle climber (`a-squiggle-climber`, confirmed 2026-11-10) | ground to the 6 ft deck | the rungs | a yellow **squiggle climber**: one upright pole, its rungs snaking left and right up it: **climb** it | climb after you | — |
 | Steps (`a-steps`) | 4 steps, the low deck down to the bridge; **not to the ground** (corrected 2026-11-10) | each step | between the deck and the bridge, walked either way | come down them at you | — |
 | Climbing dome (`a-climbing-dome`, grey, under the tall tower) | 8 wide, up to the deck | its face, then the deck | **a rock-climbing dome joined to the tall tower's deck** (decided 2026-11-10): its climbing face is on the structure's far side, turned to the camera here (§Unwrapping); jump on and **climb up it** onto the deck. **Underneath it is the bear cave** (decided 2026-11-10; none on B): kids crawl in, and **bad guys burst out** of it, in waves | burst out of the cave; climb the dome after you | how many come out, when |
-| Clatter bridge (`a-bridge`) | 11 long at 4 ft | the planks | a deck that **wobbles** as anyone crosses, more with more feet | cross it at you | — |
+| Clatter bridge (`a-bridge`) | 11 long at 4 ft | the planks | drawn as sagging planks with yellow rope rails, and **sways when crossed** (built 2026-11-12, the sway shared with the climbing grid; to look at only, the walking is still flat); a deck that **wobbles** as anyone crosses, more with more feet | cross it at you | — |
 | Tower with the tic-tac-toe panel (`a-tower-b`) | deck 4, roof 13 | the deck | a deck; the panel is cover (spinnable? brainstorm) | hide behind the panel | — |
-| Climbing grid (`a-climbing-grid`, added 2026-11-10) | a ladder-grid about 4 or 5 rungs, the 4 ft deck up to the top deck | the rungs | **climb** it, like the dome; another way up beside the stairs | climb after you | — |
+| Climbing grid (`a-climbing-grid`, added 2026-11-10; **corrected 2026-11-12** from the designer's walk-round photos) | **the black chain ladder with the droop in it**: chains with four metal rungs, leaning out from the deck beside the spiral slide down to the ground (about 4 ft up, check), sagging in the middle; not the deck-to-top-deck ladder first guessed | the rungs | **climb** it from the ground, like the dome; planned 2026-11-12: drawn leaning and drooping and **swaying as you climb** (decided 2026-11-12, built); **one in every level**, the way up onto its second structure | climb after you | — |
+| Yellow loop ladder (`a-loop-ladder`, planned 2026-11-12, from the photos) | an upright ladder of rounded yellow rungs, ground to a low deck | the rungs | **climb** it; a different piece from the grid (decided 2026-11-12) | climb after you | — |
 | Stairs up (`a-stairs-up`, added 2026-11-10) | 5 steps, the tic-tac-toe tower's 4 ft deck up to the top deck | each step | walk up | come down at you | — |
 | Top deck (`a-deck-top`, added 2026-11-10) | 7.5 ft, small | the deck | the top of the curly slide | hide, jump out | — |
 | Teal curly slide (`a-curly-slide`) | from the top deck, **two decks high** (corrected 2026-11-10) | — | down only, curling; the longest, fastest ride in A | slide at you | — |
@@ -241,10 +252,33 @@ code: today a level knows only flat floors (`Floor` in `spinoff/match.js`, groun
 | Tower (`b-tower`) | deck 5 (check), roof 14, violet panel | the deck | a deck | hide, jump out | — |
 | Violet slide (`b-straight-slide`) | from the tower | — | down only, short | slide at you | — |
 | Rubber floor (slate blue, teal, terracotta) | the whole band | ground | ground | — | where the blobs fall |
+| Black iron fence and gate (`d-iron-fence`, decided 2026-11-12) | fence 4, pickets | — | **along the back edge of the band, round the park**, and across the level's end; **the level ends out its iron gate, and you go on to school** (the next level; till it's built the gate leads back to the lobby) | — | — |
 | Chain-link fence, benches (`d-fence`, `d-bench`) | fence 4 | — | the front edge of the band, close to the camera | climb over from the field? (brainstorm) | — |
 | Telephone pole, ONE WAY and NO PARKING (`d-telephone-pole`) | ~30 tall | — | in front, now and then; **ONE WAY points the way the level goes** | — | — |
 | The field (backdrop) | far | — | far back, faded, seen through the structures | — | — |
 | The finale's fire pole | tall | — | the heroes slide down it into the boss fight (the boss, a later session) | — | — |
+
+### From the walk-round photos
+
+Decided 2026-11-12, from the designer's seven photos walking all the way round the big structure; **not built yet**
+unless it says so:
+- **Level 1 is one hand-made strip, the tutorial**: the big structure unwound in the order you walk round it. **Levels 2
+  and on are generated** (the generator stays). **It runs in the photos' order**: from the end with the steep hooded
+  slide, round the structure, to the swings, and out the iron gate to school.
+- **A piece seen from two sides appears twice**: at the end of one side's stretch and the start of the next. Corners
+  aren't marked any other way.
+- **Double jump stays, but only once you're on a deck**: it can't be used to reach a deck from the ground, so the
+  climbs are the ways up. The second jump works whenever the first took off from anything above the ground (a deck,
+  the bridge, a step, the top of a climb), so you can double-jump off a deck down toward the ground.
+- **The tic-tac-toe panel and the gear panel pay out**: **each punch spins one** cylinder (or one gear) to a new face;
+  get three in a row and an item pops out (a donut from the donut fighters for now; to be replaced).
+- **No health points in this game.** The item is **an attack modifier**: for a while you shoot donuts, or something
+  like it. Planned 2026-11-12, not for now: what it shoots, how long it lasts.
+- **The spiral slide rides like a spiral**, not a straight line drawn curly: **once round from an ordinary deck, twice
+  round from a really tall one**, by the height of the deck the generator hangs it from.
+- **Heights are exaggerated** in levels anyway, so the chain ladder's guessed 4 ft deck is fine.
+- **The pole was too fast**: half the slides' speed (built 2026-11-12). The slides are fine. The bridge glitch hasn't
+  come back.
 
 ### Building it
 
@@ -442,6 +476,13 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
   - The Sweater hinted at: a giant silhouette, a pulled thread running off screen, a "wanted" poster;
   - built like the levels will be, flat painted layers at a few depths (2.5D), plus a floor the hero stands on.
 
+**This game's ink and paint** (decided 2026-11-12, the designer's settings from the species checker; built): every
+hero and villain in this game is painted with paint bands 5, brush strength 1, band spacing 0.99, fur stroke size
+2.59, accent stroke size 0.66, band edge 0.17, ink fray 0.56, feather rows 0.84, ink pool 0, **fur pool 1** and
+**ink outline 0.0015** (`GAME_PAINT` in `tmnt/hero.js`). Only this game's pages set them; the yarn store and the
+donut fighters are as before. The `?ink=` and `?pool=` trial below is gone from this game's pages. The playground
+itself has no ink lines yet.
+
 **Ink outlines on the characters, to match the logo** (brainstorm 2026-11-10). Today the painter (`characters/paint.js`)
 draws no line round a character: the ink style frays at the silhouette (`fray`) and darkens towards it (`pool`, 0.45,
 not on the species checker's dials). Ways to get a cartoon outline, cheapest first:
@@ -468,12 +509,48 @@ so they share `localStorage`. The fighters' keys are `lys.fighter.v1` and `lys.p
 
 All CPU (decided 2026-11-09). Their colours are purple, black and silver.
 
+**The villain designer** (decided and built 2026-11-12): the hero chooser opened with `?debug=1` (as the donut
+fighters' dev mode) shows a button that steps 🐢 → 🧦 → 🧶: design a hero, a Sock Clan soldier, or The Sweater. Each
+is saved under its own key (`tmnt.sock.v1`, `tmnt.sweater.v1`), so a villain never overwrites a hero. A villain picks
+from **every garment built** (`GARMENTS` in `characters/garments.js`: all the hats, shawls as capes, scarves,
+sweaters, socks and bags), every scarf form, the fighters' weapons, and **more colours** (purple, black and silver,
+the heroes' seven, the donut fighters' twelve). Garments with no icon drawn yet show their name. Not done: the bad
+guys in a level don't read these designs yet; The Sweater isn't shown gigantic in the designer; the donut chooser's
+effects try-out (🧪) isn't ported.
+
+**The Sock Clan's soldiers, designed** (decided 2026-11-12, made in the villain designer; `VILLAINS.sock` in
+`tmnt/hero.js`; **more than one kind of bad guy**). All wear a black hood, a purple triangle shawl, a black vest,
+socks in single crochet, and silver hands:
+1. **a black owl** in black over-knee socks, with a heart on its cheek and **a scythe**;
+2. **a black llama** in black over-knee socks, with bare gloves, its shawl in garter stitch;
+3. **a red lion** with a pink mane, in **red crew socks**, with **balls of yarn**, its hood and shawl in garter stitch.
+4. **a purple mouse**, dressed unlike the other three: a red hood, a red kerchief wrapped twice, a purple half-circle
+   shawl, a violet cropped sweater in fair isle, red knee-high socks, red hands and **the hammer** (lightning);
+5. **a red dragon**, to round it out: a black hood, a purple capelet in garter stitch, a purple infinity scarf, tied,
+   the same violet fair isle cropped sweater, red over-knee socks, red hands and **the flame sword**. It fits level
+   1's boss (§Level 1: a dragon elite in over-knee socks, breathing fire); the boss's massive ninja hat is still to
+   make.
+
+In the villain designer, 🍕 steps through them. The look differs from the 2026-11-09 list below in
+three ways the designer chose: it wears a vest (the list says no sweaters), it has no face-covering scarf (the hood
+does that job), and its socks are over-knee (the brainstormed rank idea had over-knee for elites).
+
 **The Sock Clan** (decided 2026-11-09) wear
 - **socks** (`socks` in `characters/garments.js`), each sock colour drawn at random from purple, black and silver;
 - **large scarves that cover their faces**, ninja style. The existing scarf forms all sit below the face, so a
   face-covering scarf is a new scarf form (planned 2026-11-09);
 - **hats** (the existing ones);
 - **no sweaters**: the sweater is The Sweater's.
+
+**The Sweater, designed** (2026-11-12, made in the villain designer, "almost right"; `VILLAINS.sweater` in
+`tmnt/hero.js`): **a lion in its natural fur**, a black earflap hat in waffle stitch, a purple cape, **a silver
+trailing scarf wrapped twice**, a black fair isle vest, black over-knee socks, black gloves (the atomic ball). That
+answers "which animal is The Sweater?" for now. **Still wrong: the scarf.** It is to **cover half the face or more**,
+ninja style. Measured 2026-11-12 on this lion: the scarf's top sits a little below the eyes (0.63 up, the eyes'
+bottom edge at 0.69, the head's top at 0.99), so only the chin is covered. The scarf's size dial (`fit`, 0.2 to 1.6,
+fixed at 1 in the games) can't fix it: a bigger fit makes the scarf loose and it settles onto the shoulders, and
+the wrap is held to the narrow part of the neck and never passes the bottom of the eyes (`wrapRise` in
+`characters/garments.js`). Planned 2026-11-12: a face-covering wrap, the new scarf form below.
 
 **The Sweater** (decided 2026-11-09) is **gigantic**, in a gigantic silver and purple `sweater`, a silver hat and a
 purple capelet (`capelet` is one of the fighters' capes). Gigantic means everything scales up together: things are

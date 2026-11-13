@@ -46,4 +46,8 @@ const down = walk([dome], 6, [slide]);
 assert.ok(down.mid > 0.5 && down.mid < 1.1 && down.x > slide.x1 && down.y < 0.01, `rode the slide down (halfway along ${down.mid?.toFixed(2)} up)`);
 const fell = walk([dome], 6);
 assert.ok(fell.mid < 0.05, `without riding, off the deck's end is straight down (${fell.mid?.toFixed(2)})`);
+// the fire pole is grabbed anywhere up it, jumping: from higher, a longer ride; not from above its top
+const pole = /** @type {any} */ ({ x0: 5, z0: 0, y0: 1.35, x1: 5, z1: 0, y1: 0, top: 3, kind: 'pole' });
+const grab = (y) => startRide([pole], { x: 4.6, z: 0, y, r: 0.47, onGround: false });
+assert.ok(grab(2.5)?.len === 2.5 && grab(1.35)?.len === 1.35 && grab(3.6) === null, 'the higher the grab, the longer the ride');
 console.log('equipment ok');

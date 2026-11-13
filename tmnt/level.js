@@ -12,7 +12,7 @@ import { aimGameCamera, makeStage } from '../spinoff/stage.js';
 import { climbStep, rideStep, startClimb, startRide } from './equipment.js';
 import { BAND, forSim, generateLevel } from './generate.js';
 import { buildHero, faceOf, loadHero } from './hero.js';
-import { outdoors, playground } from './scenery.js';
+import { GATE, outdoors, playground, sway } from './scenery.js';
 
 // REUSE-SPEC.md §Level 1, Building it, step 2: the hero walks a generated level on the donut fighters' sim
 // (spinoff/sim.js), with their keys and taps; decks are floors, so walking, jumping and falling off work already.
@@ -38,7 +38,7 @@ const state = SIM.createMatch([entrantOf(faceOf(mine), built, { id: ME, team: 'h
 const controls = createControls(ME, solid);
 attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: el('punch'), kick: el('kick'), drop: el('drop') }, keyHelp: el('keys') });
 
-let yaw = 0, shown = null, using = null;
+let yaw = 0, shown = null, using = null, out = false;
 const combo = { punch: newCombo(), kick: newCombo('kick', KICK_COMBO.length) };
 // as the donut fighters' play page: a kick in the air turns you right round, a spinning jump kick on the way up, a
 // backflip on the way down
@@ -73,6 +73,22 @@ function afterTick() {
   }
   if (using && !using.step(f, using.k)) using = null;
   f.z = Math.min(BAND.z1 - f.r, Math.max(BAND.z0 + f.r, f.z));
+  throughGate(f);
+}
+
+// REUSE-SPEC.md §Level 1: the level ends out the iron gate, on the way to school (decided 2026-11-12)
+// ponytail: school isn't a level yet, so the gate leads back to the lobby; the fence either side of it isn't solid
+function throughGate(f) {
+  if (out || f.x < ground.x1 - 0.4) return;
+  if (Math.abs(f.z) > GATE - f.r) { f.x = ground.x1 - 0.4; return; }
+  out = true;
+  location.href = 'lobby.html';
+}
+
+/** What sways under the hero: the climb it's on, the bridges it stands on. */
+function swaying(f) {
+  const on = (b) => f.onGround && Math.abs(f.y - b.y) < 0.05 && f.x > b.x0 && f.x < b.x1 && f.z > b.z0 && f.z < b.z1;
+  return new Set([...(using?.step === climbStep ? [using.k.c] : []), ...level.bridges.filter(on)]);
 }
 
 // the match camera (GAME_VIEW), following the hero along the level, held off the ends
@@ -93,6 +109,7 @@ stage.run((dt) => {
   }
   const f = snap.fighters.find((o) => o.id === ME);
   drawHero(f, dt, snap.tick);
+  sway(swaying(f), snap.tick / TICK_HZ);
   follow(f, dt);
 });
 el('leave').addEventListener('click', () => { location.href = 'lobby.html'; });

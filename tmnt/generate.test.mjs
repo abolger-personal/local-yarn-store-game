@@ -48,6 +48,8 @@ let turned = 0;
 for (let seed = 0; seed < 200; seed++) {
   const L = generateLevel(seed);
   assert.deepEqual(generateLevel(seed), L, 'the same seed, the same level');
+  assert.ok(L.rides.some((q) => q.kind === 'pole'), `seed ${seed}: a fire pole in every level`);
+  assert.ok(L.climbs.some((c) => c.kind === 'grid'), `seed ${seed}: a climbing grid in every level`);
   assert.ok(L.seconds >= SECONDS.min && L.seconds <= SECONDS.max, `seed ${seed}: ${L.seconds} s`);
   // one ground, the lowest, under everything; every deck on it, and none higher than a piece's
   const [ground, ...rest] = L.floors;

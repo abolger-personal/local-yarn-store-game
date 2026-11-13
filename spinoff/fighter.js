@@ -106,7 +106,7 @@ const defaultLook = () => ({
 export function setFur(f, fur) {
   const kit = getSpecies(f.species);
   f.params.bodyColor = fur;
-  f.params[kit.coatColorKey] = kit.coatOf(fur);
+  if (kit.coatColorKey) f.params[kit.coatColorKey] = kit.coatOf(fur);
   return f;
 }
 

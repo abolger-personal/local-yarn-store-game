@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FT } from './pieces.js';
+import { FT, POLE_OUT } from './pieces.js';
 
 // REUSE-SPEC.md §Level 1, Building it, step 2: the generated level drawn in simple posts, decks, panels, tubes and
 // bars in the playground's colours (§Level 1, What it looks like), the field far behind. Plain shapes, no ink yet.
@@ -47,6 +47,9 @@ function mat(color, tex = '', repeat = 1) {
   return mats.set(key, new THREE.MeshStandardMaterial({ color, roughness: 0.85, map })).get(key);
 }
 const POST = 0.06, SLAB = 0.06, RAIL = 0.45;
+const IRON = '#1c1c1e', FENCE = 4 * FT;
+/** Half the gap in the fence at the level's end: the gate. */
+export const GATE = 0.7;
 
 /** A box `w` by `h` by `d` with its bottom middle at (x, y, z). */
 function block([w, h, d], color, [x, y, z], tex = '', repeat = 1) {
@@ -76,6 +79,52 @@ function deck(f, i) {
   return g;
 }
 
+// what sways under a hero (decided 2026-11-12: the climbing grid, the bridge): each part's move for a swing of -1..1,
+// and how hard it's going
+const swayers = new Map();
+const sways = (key, move) => swayers.set(key, { move, amp: 0 });
+
+/** The parts keyed by the level's own climbs and bridges in `active` sway at `s` seconds; the others settle. */
+export function sway(active, s) {
+  for (const [key, w] of swayers) {
+    w.amp += ((active.has(key) ? 1 : 0) - w.amp) * 0.1;
+    w.move(Math.sin(s * 7) * w.amp);
+  }
+}
+
+// the climbing grid and the bridge: how far their middles droop; how broad the grid is
+const SAG = 0.12, NET = 2.5 * FT;
+
+/** The clatter bridge: planks sagging between its end posts, yellow rope rails each side.
+ *  ponytail: open underneath to look at, but solid to the ground in play, as every floor is (spinoff/sim.js). */
+function bridge(b) {
+  const [len, w] = b.h === 0 ? [b.x1 - b.x0, b.z1 - b.z0] : [b.z1 - b.z0, b.x1 - b.x0], g = new THREE.Group(), hang = new THREE.Group();
+  const at = (k, y, z) => new THREE.Vector3(len * (k - 0.5), y - (SAG / 2) * Math.sin(Math.PI * k), z);
+  for (let i = 0; i < 8; i++) {
+    const m = at((i + 0.5) / 8, -0.04, 0);
+    hang.add(block([len / 8 - 0.02, 0.04, w], C.deck, [m.x, m.y, 0]));
+    for (const z of [-w / 2, w / 2]) for (const y of [0.22, 0.45]) hang.add(rod(at(i / 8, y, z), at((i + 1) / 8, y, z), 0.015, C.rail));
+  }
+  for (const x of [-len / 2, len / 2]) for (const z of [-w / 2, w / 2]) g.add(block([POST, b.y + RAIL, POST], C.post, [x, -b.y, z]));
+  g.position.set((b.x0 + b.x1) / 2, b.y, (b.z0 + b.z1) / 2);
+  g.rotation.y = (-b.h * Math.PI) / 180;
+  sways(b, (v) => { hang.rotation.x = v * 0.05; });
+  return g.add(hang);
+}
+
+/** The climbing grid: black chains with four metal rungs, hung from the deck's edge, leaning out to the ground and
+ *  drooping in the middle. Built along +x from its hinge at the top, then turned to the climb's heading. */
+function net(c) {
+  const t = (c.h * Math.PI) / 180, len = c.h === 0 ? c.x1 - c.x0 : c.z1 - c.z0, rise = c.y1 - c.y0, g = new THREE.Group(), hang = new THREE.Group();
+  const at = (k, z) => new THREE.Vector3(-len * (1 - k), -rise * (1 - k) - SAG * Math.sin(Math.PI * k), z);
+  for (const z of [-NET / 2, NET / 2]) for (let i = 0; i < 8; i++) hang.add(rod(at(i / 8, z), at((i + 1) / 8, z), 0.012, IRON));
+  for (const k of [0.2, 0.4, 0.6, 0.8]) hang.add(rod(at(k, -NET / 2), at(k, NET / 2), 0.02, C.dome));
+  g.position.set((c.x0 + c.x1) / 2 + (Math.cos(t) * len) / 2, c.y1, (c.z0 + c.z1) / 2 + (Math.sin(t) * len) / 2);
+  g.rotation.y = -t;
+  sways(c, (v) => { hang.rotation.z = v * 0.07; });
+  return g.add(hang);
+}
+
 /** A climb: the dome a grey half ball, the grid and the squiggle climber yellow rungs between blue posts. */
 function climb(c) {
   const w = c.x1 - c.x0, d = c.z1 - c.z0, cx = (c.x0 + c.x1) / 2, cz = (c.z0 + c.z1) / 2;
@@ -85,16 +134,25 @@ function climb(c) {
     m.position.set(cx, c.y0, cz);
     return m;
   }
+  if (c.kind === 'grid') return net(c);
   const g = new THREE.Group(), rungs = Math.max(2, Math.round((c.y1 - c.y0) / (1.2 * FT)));
   for (const z of [c.z0, c.z1]) g.add(block([POST, c.y1 - c.y0, POST], C.post, [cx, c.y0, z]));
   for (let i = 1; i <= rungs; i++) g.add(rod(new THREE.Vector3(cx, c.y0 + (i * (c.y1 - c.y0)) / rungs, c.z0), new THREE.Vector3(cx, c.y0 + (i * (c.y1 - c.y0)) / rungs, c.z1), 0.025, C.rail));
   return g;
 }
 
+/** The fire pole: up past its deck and hooped back over to it, to reach out and grab. */
+function pole(p) {
+  const t = (p.h * Math.PI) / 180, { top } = p, head = new THREE.Vector3(p.x0, top, p.z0);
+  const out = POLE_OUT * FT, back = new THREE.Vector3(p.x0 - Math.cos(t) * out, top, p.z0 - Math.sin(t) * out), g = new THREE.Group();
+  g.add(rod(new THREE.Vector3(p.x1, p.y1, p.z1), head, 0.04, C.pole), rod(head, back, 0.04, C.pole), rod(back, new THREE.Vector3(back.x, p.y0, back.z), 0.04, C.pole));
+  return g;
+}
+
 /** Stairs or a slide: a slab from one end to the other, `breadth` across; a pole: a yellow rod. */
 function path(p) {
   const a = new THREE.Vector3(p.x0, p.y0, p.z0), b = new THREE.Vector3(p.x1, p.y1, p.z1);
-  if (p.kind === 'pole') return rod(a, b, 0.03, C.pole);
+  if (p.kind === 'pole') return pole(p);
   const v = new THREE.Vector3().subVectors(b, a), breadth = p.kind === 'stairs' ? 1.2 : 0.5;
   const m = new THREE.Mesh(new THREE.BoxGeometry(breadth, SLAB, v.length()), mat(p.kind === 'stairs' ? C.deck : C.slide));
   m.position.copy(a).addScaledVector(v, 0.5);
@@ -127,6 +185,24 @@ function floor(ground) {
   return g;
 }
 
+/** A run of black iron fence from `a` to `b` on the ground: two rails and a picket every few inches. */
+function ironRun(a, b) {
+  const v = new THREE.Vector3().subVectors(b, a), n = Math.max(1, Math.round(v.length() / 0.1)), g = new THREE.Group();
+  const pickets = new THREE.InstancedMesh(new THREE.BoxGeometry(0.02, FENCE, 0.02), mat(IRON), n + 1), m = new THREE.Matrix4();
+  for (let i = 0; i <= n; i++) pickets.setMatrixAt(i, m.makeTranslation(a.x + (v.x * i) / n, FENCE / 2, a.z + (v.z * i) / n));
+  for (const y of [0.12, FENCE - 0.08]) g.add(rod(new THREE.Vector3(a.x, y, a.z), new THREE.Vector3(b.x, y, b.z), 0.015, IRON));
+  return g.add(pickets);
+}
+
+/** The park's black iron fence (REUSE-SPEC.md §Level 1, decided 2026-11-12): along the back of the band, and across
+ *  the level's end, its gate standing open in the middle, the way out to school. */
+function fence(ground) {
+  const P = (x, z) => new THREE.Vector3(x, 0, z), back = ground.z0 - 0.3, { x1 } = ground, g = new THREE.Group();
+  g.add(ironRun(P(ground.x0 - 30, back), P(x1, back)), ironRun(P(x1, back), P(x1, -GATE)), ironRun(P(x1, GATE), P(x1, ground.z1 + 1)));
+  for (const z of [-GATE, GATE]) g.add(block([0.08, FENCE + 0.25, 0.08], IRON, [x1, 0, z]), ironRun(P(x1, z), P(x1 + 0.9, z * 1.5)));
+  return g;
+}
+
 /** Capuano Field far behind, barely seen: turf, its white lines, goals and light poles, faded toward the sky. */
 function field(ground) {
   const g = new THREE.Group(), len = ground.x1 - ground.x0 + 60, cx = (ground.x0 + ground.x1) / 2, z = -14;
@@ -142,7 +218,7 @@ function field(ground) {
 /** Everything of level `L` to see, but the heroes. @param {Level} L */
 export function playground(L) {
   const [ground, ...decks] = L.floors;
-  return [floor(ground), field(ground), ...decks.map(deck), ...L.climbs.map(climb), ...[...L.stairs, ...L.rides].map(path), ...L.swings.map(swing)];
+  return [floor(ground), field(ground), fence(ground), ...decks.filter((f) => !L.bridges.includes(/** @type {any} */ (f))).map(deck), ...L.bridges.map(bridge), ...L.climbs.map(climb), ...[...L.stairs, ...L.rides].map(path), ...L.swings.map(swing)];
 }
 
 /** Outdoors (playtest 2026-11-10): a blue sky fading to a pale horizon behind the field, and sunlight and skylight on the

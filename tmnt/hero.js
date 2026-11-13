@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { getSpecies } from '../characters/npc.js';
-import { COLOURWORKS, FORMS } from '../characters/garments.js';
-import { BAGS, CANE, MIC, NEEDLES, SCISSORS, STAFF, YARN_BALLS, SPECIES, TEXTURES, TRICKS, buildFighter, nearestSwatch, readFighter, setFur } from '../spinoff/fighter.js';
+import { PAINT, inkMaterial, inkOutline } from '../characters/paint.js';
+import { COLOURWORKS, FORMS, GARMENTS } from '../characters/garments.js';
+import { BAGS, CAPES, CLOTH as RIOT, HANDS, CANE, MIC, NEEDLES, SCISSORS, STAFF, YARN_BALLS, SPECIES, TEXTURES, TRICKS, buildFighter, nearestSwatch, readFighter, setFur } from '../spinoff/fighter.js';
 
 const HERO_KEY = 'tmnt.hero.v1';
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -39,10 +40,10 @@ export const handsOf = (species) => (species === 'mouse' ? CANE : DEFAULT_HANDS)
 
 // every piece off, in the fighters' Look shape (no hat or cape: heroes don't get them)
 /** @returns {Hero['look']} */
-const blankLook = () => ({
-  hat: null, hatColor: GREEN, hatStitch: 'stockinette', cape: null, capeColor: GREEN, capeStitch: 'stockinette', bag: null, bagColor: GREEN,
-  scarfForm: 'draped', sweaterWork: 'solid', glasses: false, hands: DEFAULT_HANDS, trick: TRICKS[DEFAULT_HANDS][0], gloves: GREEN,
-  ...Object.fromEntries(Object.keys(WEAR).flatMap((k) => [[k, null], [`${k}Color`, GREEN], [`${k}Stitch`, 'stockinette']])),
+const blankLook = (base = GREEN) => ({
+  hat: null, hatColor: base, hatStitch: 'stockinette', cape: null, capeColor: base, capeStitch: 'stockinette', bag: null, bagColor: base,
+  scarfForm: 'draped', sweaterWork: 'solid', glasses: false, hands: DEFAULT_HANDS, trick: TRICKS[DEFAULT_HANDS][0], gloves: base,
+  ...Object.fromEntries(Object.keys(WEAR).flatMap((k) => [[k, null], [`${k}Color`, base], [`${k}Stitch`, 'stockinette']])),
 });
 
 // REUSE-SPEC.md §Hero chooser: each turtle's own things on top of the scarf: Raphael (red) his knitting needles and red socks;
@@ -85,48 +86,118 @@ export function newHero(rng = Math.random, species = undefined) {
   return setFur({ species: animal, params, look }, who.fur);
 }
 
+// REUSE-SPEC.md §Bad guys: purple, black and silver are theirs. The villain designer (the chooser with ?debug=1) has
+// every garment built (characters/garments.js), hats and capes too, every scarf form, the fighters' weapons, and
+// the fighters' colours on top of the heroes' and their own (decided 2026-11-12)
+const BLACK = '#141414', SILVER = '#c0c4cc';
+const VILLAIN_COLOURS = Object.freeze([{ hex: PURPLE, name: 'purple' }, { hex: BLACK, name: 'black' }, { hex: SILVER, name: 'silver' }].map((c) => Object.freeze(c)));
+const unique = (list) => list.filter((c, i) => list.findIndex((o) => o.hex === c.hex) === i);
+const ALL_CLOTH = Object.freeze(unique([...VILLAIN_COLOURS, ...CLOTH, ...RIOT]));
+const kinds = (type) => GARMENTS[type].silhouettes;
+const ALL_WEAR = Object.freeze({
+  hat: kinds('hat'), cape: [...new Set([...CAPES, ...kinds('shawl')])], scarf: kinds('scarf'), sweater: kinds('sweater'), socks: kinds('socks'), bag: kinds('bag'),
+});
+
+/** What a chooser offers and a save keeps: a hero's, or a villain's (everything).
+ *  @typedef {{ key: string, wear: Record<string, readonly string[]>, cloth: readonly { hex: string, name: string }[],
+ *   fur: readonly { hex: string, name: string }[], forms: readonly string[], hands: readonly string[], palette: string[], base: string }} Kit */
+/** @type {Kit} */
+const HERO_KIT = Object.freeze({ key: HERO_KEY, wear: WEAR, cloth: CLOTH, fur: COLOURS, forms: SCARF_FORMS, hands: HERO_HANDS, palette: PALETTE, base: GREEN });
+/** @returns {Kit} */
+const villainKit = (key) => Object.freeze({
+  key, wear: ALL_WEAR, cloth: ALL_CLOTH, fur: ALL_CLOTH, forms: FORMS, hands: [...new Set([...HERO_HANDS, ...HANDS])],
+  palette: VILLAIN_COLOURS.map((c) => c.hex), base: BLACK,
+});
+export const KITS = Object.freeze({ hero: HERO_KIT, sock: villainKit('tmnt.sock.v1'), sweater: villainKit('tmnt.sweater.v1') });
+
+// REUSE-SPEC.md §Bad guys: the Sock Clan's soldiers, made in the villain designer (2026-11-12), all in a black hood, a
+// purple triangle shawl, a black vest, socks and silver hands: a black owl with a heart on its cheek and a scythe, a
+// black llama with bare gloves, a red lion in red crew socks with balls of yarn, and two in their own clothes.
+const SOCK_LOOK = {
+  hat: 'hood', hatColor: BLACK, cape: 'triangle', capeColor: PURPLE, sweater: 'vest', sweaterColor: BLACK, socks: 'over-knee', socksColor: BLACK,
+  socksStitch: 'single crochet', scarfForm: 'wrapped twice', scarfColor: PURPLE, gloves: SILVER,
+};
+const VILLAINS = {
+  sock: [
+    { species: 'owl', params: { bodyColor: BLACK, featherColor: '#464444', facePaint: 'heart' }, look: { ...SOCK_LOOK, hands: 'scythe', trick: 'music' } },
+    { species: 'llama', params: { bodyColor: BLACK, fleeceColor: '#464444' }, look: { ...SOCK_LOOK, capeStitch: 'garter' } },
+    { species: 'lion', params: { bodyColor: RED, maneColor: '#fb8ca3' }, look: {
+      ...SOCK_LOOK, hatStitch: 'garter', capeStitch: 'garter', socks: 'crew', socksColor: RED, hands: YARN_BALLS, trick: 'plain' } },
+    // the odd one out: a purple mouse in a red hood and kerchief, a violet fair isle cropped sweater, with the hammer
+    { species: 'mouse', params: { bodyColor: PURPLE, maneColor: '#391057' }, look: {
+      hat: 'hood', hatColor: RED, cape: 'half circle', capeColor: PURPLE, scarf: 'kerchief', scarfColor: RED, scarfForm: 'wrapped twice',
+      sweater: 'cropped', sweaterColor: '#8154ff', sweaterWork: 'fair isle', socks: 'knee-high', socksColor: RED, hands: 'hammer', trick: 'lightning',
+      gloves: RED, bagColor: WHITE, bagStitch: 'rib' } },
+    // a red dragon in a black hood, over-knee socks and the flame sword: level 1's boss (REUSE-SPEC.md §Level 1)
+    { species: 'dragon', params: { bodyColor: RED }, look: {
+      hat: 'hood', hatColor: BLACK, cape: 'capelet', capeColor: PURPLE, capeStitch: 'garter', scarf: 'infinity', scarfColor: PURPLE, scarfForm: 'tied',
+      sweater: 'cropped', sweaterColor: '#8154ff', sweaterWork: 'fair isle', socks: 'over-knee', socksColor: RED, hands: 'sword', trick: 'flame',
+      gloves: RED, bagColor: WHITE, bagStitch: 'rib' } },
+  ],
+  // The Sweater, nearly as the designer wants it (2026-11-12; its scarf is to cover half its face): a lion in its
+  // natural fur, a black earflap hat, a purple cape, a silver trailing scarf wrapped twice, a black fair isle vest
+  sweater: [{ species: 'lion', look: {
+    hat: 'earflap', hatColor: BLACK, hatStitch: 'waffle', cape: 'cape', capeColor: PURPLE, capeStitch: 'single crochet', scarf: 'trailing',
+    scarfColor: SILVER, scarfForm: 'wrapped twice', sweater: 'vest', sweaterColor: BLACK, sweaterWork: 'fair isle', socks: 'over-knee',
+    socksColor: BLACK, trick: 'atomicBall', gloves: BLACK, bagColor: '#ff3b7f',
+  } }],
+};
+/** How many kinds of Sock Clan soldier there are. */
+export const SOCK_KINDS = VILLAINS.sock.length;
+/** A Sock Clan soldier (`sock`, its `kind`th) or The Sweater (`sweater`) to design from; in another `species`, the
+ *  same clothes on its natural fur. @returns {Hero} */
+export function newVillain(role, species = undefined, kind = 0) {
+  const who = VILLAINS[role][kind % VILLAINS[role].length], animal = species ?? who.species, own = animal === who.species ? who.params : {};
+  return { species: animal, params: { ...structuredClone(getSpecies(animal).defaults), ...own }, look: { ...blankLook(BLACK), ...who.look } };
+}
+
 const pickOf = (list, rng) => list[Math.floor(rng() * list.length)];
 
-/** 🎲: any animal, any colours, each piece worn or not. @returns {Hero} */
-export function randomHero(rng = Math.random) {
-  const hero = newHero(rng, pickOf(SPECIES, rng)), { look } = hero, colour = () => pickOf(CLOTH, rng).hex;
+/** 🎲: any animal, any colours, each piece worn or not, of what `kit` offers. @param {Kit} kit @returns {Hero} */
+export function randomHero(rng = Math.random, kit = HERO_KIT) {
+  const animal = pickOf(SPECIES, rng), hero = kit === HERO_KIT ? newHero(rng, animal) : newVillain('sweater', animal);
+  const { look } = hero, colour = () => pickOf(kit.cloth, rng).hex;
   getSpecies(hero.species).randomise(hero.params);
-  for (const [kind, list] of Object.entries(WEAR)) Object.assign(look, { [kind]: pickOf([...list, null], rng), [`${kind}Color`]: colour() });
-  Object.assign(look, { sweaterWork: pickOf(SWEATER_WORKS, rng), scarfForm: pickOf(SCARF_FORMS, rng), hands: pickOf(HERO_HANDS, rng), gloves: colour() });
+  for (const [kind, list] of Object.entries(kit.wear)) Object.assign(look, { [kind]: pickOf([...list, null], rng), [`${kind}Color`]: colour() });
+  Object.assign(look, { sweaterWork: pickOf(SWEATER_WORKS, rng), scarfForm: pickOf(kit.forms, rng), hands: pickOf(kit.hands, rng), gloves: colour() });
   look.trick = pickOf(TRICKS[look.hands], rng);
   hero.params.facePaint = pickOf(PAINTS, rng);
   look.glasses = rng() < 0.25;
-  return setFur(hero, pickOf(COLOURS, rng).hex);
+  return setFur(hero, pickOf(kit.fur, rng).hex);
 }
 
-function readLook(raw) {
-  const r = raw && typeof raw === 'object' ? raw : {}, look = blankLook();
+/** @param {Kit} kit */
+function readLook(raw, kit) {
+  const r = raw && typeof raw === 'object' ? raw : {}, look = blankLook(kit.base);
   const one = (k, list) => (list.includes(r[k]) ? r[k] : look[k]);
-  const colour = (k) => (HEX.test(r[k]) ? nearestSwatch(CLOTH, r[k]).hex : look[k]);
-  for (const [kind, list] of Object.entries(WEAR)) {
+  const colour = (k) => (HEX.test(r[k]) ? nearestSwatch(kit.cloth, r[k]).hex : look[k]);
+  for (const [kind, list] of Object.entries(kit.wear)) {
     Object.assign(look, { [kind]: one(kind, list), [`${kind}Color`]: colour(`${kind}Color`), [`${kind}Stitch`]: one(`${kind}Stitch`, TEXTURES) });
   }
   look.glasses = r.glasses === true;
-  Object.assign(look, { sweaterWork: one('sweaterWork', SWEATER_WORKS), scarfForm: one('scarfForm', SCARF_FORMS), hands: one('hands', HERO_HANDS), gloves: colour('gloves') });
+  Object.assign(look, { sweaterWork: one('sweaterWork', SWEATER_WORKS), scarfForm: one('scarfForm', kit.forms), hands: one('hands', kit.hands), gloves: colour('gloves') });
   look.trick = one('trick', TRICKS[look.hands]);
   return look;
 }
 
-/** Untrusted JSON from storage or another tablet → a Hero, or null; fur and clothes snap to the hero colours. @returns {Hero|null} */
-export function readHero(raw) {
+/** Untrusted JSON from storage or another tablet → a Hero, or null; fur and clothes snap to the hero colours (a
+ *  villain's clothes to its kit's, its fur kept: natural, till one is picked). @param {Kit} kit @returns {Hero|null} */
+export function readHero(raw, kit = HERO_KIT) {
   const f = readFighter(raw);
   if (!f) return null;
   if (!PAINTS.includes(f.params.facePaint)) f.params.facePaint = 'none';
-  return setFur({ species: f.species, params: f.params, look: readLook(raw.look) }, nearestSwatch(COLOURS, f.params.bodyColor).hex);
+  const hero = { species: f.species, params: f.params, look: readLook(raw.look, kit) };
+  return kit === HERO_KIT ? setFur(hero, nearestSwatch(COLOURS, f.params.bodyColor).hex) : hero;
 }
 
-export function loadHero() {
-  try { return readHero(JSON.parse(localStorage.getItem(HERO_KEY) ?? 'null')); } catch { return null; }
+/** @param {Kit} kit */
+export function loadHero(kit = HERO_KIT) {
+  try { return readHero(JSON.parse(localStorage.getItem(kit.key) ?? 'null'), kit); } catch { return null; }
 }
 
-/** Its own key: the donut fighters' save is on the same site. @param {Hero} h */
-export function saveHero(h) {
-  try { localStorage.setItem(HERO_KEY, JSON.stringify(h)); } catch {}
+/** Its own key: the donut fighters' save is on the same site; a villain's design under its kit's. @param {Hero} h @param {Kit} kit */
+export function saveHero(h, kit = HERO_KIT) {
+  try { localStorage.setItem(kit.key, JSON.stringify(h)); } catch {}
 }
 
 // REUSE-SPEC.md §Hero chooser: the mask (rings) in the scarf's colour, so a turtle's sync up; on a turtle's big eyes, narrow
@@ -158,10 +229,23 @@ function addGlasses(built) {
   a.parent.add(bridge);
 }
 
-/** A hero built for the stage: as a fighter, with the hero colours for sweater colourwork, the face set, glasses on. @param {Hero} hero */
-export function buildHero(hero) {
-  const built = buildFighter(faceOf(hero), PALETTE);
+// REUSE-SPEC.md §Ink outlines: this game's painter dials (decided 2026-11-12, set on the species checker): bolder
+// bands and brush, the fur pooling dark at its edge, and a thin ink outline. Only this game's pages set them.
+const GAME_PAINT = Object.freeze({
+  bands: 5, brush: 1, light: 0.99, size: 2.59, accentSize: 0.66, soft: 0.17, fray: 0.56, feather: 0.84, pool: 0, edgePool: 1, ink: 0.0015, scales: 0.5, scaleSize: 1,
+});
+function gamePaint() {
+  for (const [k, v] of Object.entries(GAME_PAINT)) PAINT[k].value = v;
+  inkMaterial().visible = true;
+}
+
+/** A hero built for the stage: as a fighter, with the hero colours for sweater colourwork, the face set, glasses on,
+ *  painted and outlined in this game's ink. @param {Hero} hero */
+export function buildHero(hero, palette = PALETTE) {
+  gamePaint();
+  const built = buildFighter(faceOf(hero), palette);
   if (hero.look.glasses) addGlasses(built);
+  inkOutline(built.root);
   return built;
 }
 

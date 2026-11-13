@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { LOOK } from '../characters/garments.js';
 import { POSES, facePaintColorOf } from '../characters/npc.js';
 import { CANE, MIC, NEEDLES, SCISSORS, SPECIES, STAFF, YARN_BALLS, stepFighter, animateFighter, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
-import { CLOTH, COLOURS, PALETTE, PRESETS, buildHero, faceOf, popFromQuery, SCARF_FORMS, SWEATER_WORKS, TURTLE_COLOURS, WEAR, newHero, randomHero, readHero } from './hero.js';
+import { CLOTH, COLOURS, PALETTE, PRESETS, buildHero, faceOf, popFromQuery, SCARF_FORMS, SWEATER_WORKS, TURTLE_COLOURS, WEAR, KITS, SOCK_KINDS, newHero, newVillain, randomHero, readHero } from './hero.js';
+import { setFur } from '../spinoff/fighter.js';
 
 LOOK.viewPx = 0;
 
@@ -139,4 +140,35 @@ for (let i = 0; i < 6; i++) disposeFighter(buildHero(randomHero()));
 // the glow and shadow to try: off without the address saying so, clamped when it does
 assert.deepEqual(popFromQuery(''), { glow: 0, shadow: 0 });
 assert.deepEqual(popFromQuery('?glow=2&shadow=-1'), { glow: 1, shadow: 0 });
+// the villain designer keeps what a hero's save drops: a hat, a cape, the scarf wrapped twice, the villains' colours
+const worn = { hat: 'hood', hatColor: '#141414', cape: 'capelet', scarf: 'chunky wrap', scarfForm: 'wrapped twice', socks: 'leg warmers', socksColor: '#c0c4cc', hands: 'scythe' };
+const sock = readHero({ species: 'lion', look: worn }, KITS.sock), plain = readHero({ species: 'lion', look: worn });
+assert.deepEqual([sock.look.hat, sock.look.cape, sock.look.scarfForm, sock.look.socks, sock.look.socksColor, sock.look.hands], ['hood', 'capelet', 'wrapped twice', 'leg warmers', '#c0c4cc', 'scythe']);
+assert.deepEqual([plain.look.hat, plain.look.cape, plain.look.scarfForm, plain.look.socks, plain.look.hands], [null, null, 'draped', null, 'gloves']);
+// the Sock Clan soldier starts as the designer's owl: black, hooded, in over-knee socks, with a scythe
+const llama = newVillain('sock', undefined, 1);
+assert.deepEqual([SOCK_KINDS, llama.species, llama.params.bodyColor, llama.params.fleeceColor, llama.look.hands, llama.look.capeStitch], [5, 'llama', '#141414', '#464444', 'gloves', 'garter']);
+const dragon = newVillain('sock', undefined, 4);
+// a dragon has no coat colour of its own, so picking its fur adds no stray key to its save
+assert.ok(!('undefined' in setFur(newVillain('sock', undefined, 4), '#141414').params));
+assert.deepEqual([dragon.species, dragon.params.bodyColor, dragon.look.socks, dragon.look.hands, dragon.look.trick], ['dragon', '#b51a00', 'over-knee', 'sword', 'flame']);
+const mouse = newVillain('sock', undefined, 3);
+assert.deepEqual([mouse.species, mouse.look.sweater, mouse.look.sweaterWork, mouse.look.scarf, mouse.look.hands], ['mouse', 'cropped', 'fair isle', 'kerchief', 'hammer']);
+const lion = newVillain('sock', undefined, 2);
+assert.deepEqual([lion.species, lion.params.bodyColor, lion.look.socks, lion.look.socksColor, lion.look.hands], ['lion', '#b51a00', 'crew', '#b51a00', 'yarn']);
+const owl = newVillain('sock');
+assert.deepEqual([owl.species, owl.params.bodyColor, owl.params.featherColor, owl.params.facePaint, owl.look.hat, owl.look.socks, owl.look.hands],
+  ['owl', '#141414', '#464444', 'heart', 'hood', 'over-knee', 'scythe']);
+assert.deepEqual(readHero(JSON.parse(JSON.stringify(owl)), KITS.sock), owl, 'and saves and loads as it is');
+// The Sweater starts as the designer's lion, its silver scarf wrapped twice
+const boss = newVillain('sweater');
+assert.deepEqual([boss.species, boss.look.scarf, boss.look.scarfForm, boss.look.scarfColor, boss.look.hat, boss.look.cape], ['lion', 'trailing', 'wrapped twice', '#c0c4cc', 'earflap', 'cape']);
+// every garment it offers builds, on the Sock Clan's and The Sweater's starting looks
+for (const who of ['sock', 'sweater']) {
+  for (const [kind, list] of Object.entries(KITS[who].wear)) for (const v of list) {
+    const villain = newVillain(who);
+    villain.look[kind] = v;
+    assert.doesNotThrow(() => buildHero(villain, KITS[who].palette), `${who} in ${kind} ${v}`);
+  }
+}
 console.log('hero ok');

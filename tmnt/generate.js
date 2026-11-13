@@ -10,14 +10,14 @@ import { FT, JUMP_FT, PIECES, joins } from './pieces.js';
  * @typedef {import('../spinoff/match.js').Floor} Floor
  * @typedef {{ x: number, z: number, h: number }} Cursor  where the next piece starts, and its heading (degrees from x toward z)
  * @typedef {Floor & { y0: number, y1: number, h: number, kind: string }} Climb  the climb's face, up from y0 to y1 along heading h
- * @typedef {{ x0: number, z0: number, y0: number, x1: number, z1: number, y1: number, kind: string, box: Box }} Path
- *   a ride or stairs, `box` the ground it stands on
+ * @typedef {{ x0: number, z0: number, y0: number, x1: number, z1: number, y1: number, kind: string, h: number, top?: number, box: Box }} Path
+ *   a ride or stairs, running along heading h, `box` the ground it stands on
  * @typedef {{ x0: number, x1: number, z0: number, z1: number }} Box
  * @typedef {{ x: number, z: number, y: number, h: number, arm: number, span: number, kind: string }} Pivot
  *   a swing's or a bar's: it swings along heading h, the bar `span` long across that
  * @typedef {{ x: number, z: number }} Spot
  * @typedef {Omit<import('../spinoff/match.js').Stage, 'floors'> & { floors: Floor[], climbs: Climb[], rides: Path[],
- *   stairs: Path[], swings: Pivot[], bridges: Floor[], bursts: Spot[], covers: Spot[], structures: string[][],
+ *   stairs: Path[], swings: Pivot[], bridges: (Floor & { h: number })[], bursts: Spot[], covers: Spot[], structures: string[][],
  *   spans: { x0: number, x1: number }[], seconds: number }} Level
  */
 
@@ -90,11 +90,11 @@ export function structure(r) {
 
 const stringSeconds = (ids) => ids.reduce((t, id) => t + secondsOf(PIECES[id]), 0);
 
-/** A structure taking no more than `seconds`, trying the seed's next draws till one does. */
-function shortStructure(r, seconds) {
+/** A structure taking no more than `seconds` that is `ok`, trying the seed's next draws till one is. */
+function shortStructure(r, seconds, ok = (_ids) => true) {
   for (;;) {
     const ids = structure(r);
-    if (stringSeconds(ids) <= seconds) return ids;
+    if (stringSeconds(ids) <= seconds && ok(ids)) return ids;
   }
 }
 
@@ -149,14 +149,14 @@ function place(L, p, c) {
   const at = (v) => v * FT, top = (d) => ({ kind: /** @type {const} */ ('deck'), ...strip(c, at(d.x0), at(d.x1)), y: r3(at(d.y)) });
   L.floors.push(...(p.decks ?? []).map(top));
   if (p.bridge) {
-    const b = top(p.bridge);
+    const b = { ...top(p.bridge), h: c.h };
     L.floors.push(b);
     L.bridges.push(b);
   }
   for (const k of p.climbs ?? []) L.climbs.push({ ...strip(c, at(k.x0), at(k.x1)), y0: r3(at(k.y0)), y1: r3(at(k.y1)), h: c.h, kind: k.kind });
   const path = (q, kind) => {
     const a = along(c, at(q.x0)), b = along(c, at(q.x1));
-    return { x0: a.x, z0: a.z, y0: r3(at(q.y0)), x1: b.x, z1: b.z, y1: r3(at(q.y1)), kind, box: strip(c, at(q.x0), at(q.x1)) };
+    return { x0: a.x, z0: a.z, y0: r3(at(q.y0)), x1: b.x, z1: b.z, y1: r3(at(q.y1)), kind, h: c.h, ...(q.top === undefined ? {} : { top: r3(at(q.top)) }), box: strip(c, at(q.x0), at(q.x1)) };
   };
   L.rides.push(...(p.rides ?? []).map((q) => path(q, q.kind)));
   L.stairs.push(...(p.stairs ?? []).map((q) => path(q, 'stairs')));
@@ -184,11 +184,11 @@ function lay(r, ids, x) {
 
 /** A structure from x, turned till it shuts the ground: a few seeded turnings of each of the seed's structures, the
  *  next structure when none of them does; never stretched across the band (a deck stays 7 ft deep, as a real one). */
-function build(L, r, x) {
+function build(L, r, x, ok) {
   // room for it in the time budget, with a ground stretch after it
   const room = SECONDS.max - L.seconds - GAP.max - FIGHT_SECONDS;
   for (;;) {
-    const ids = shortStructure(r, room);
+    const ids = shortStructure(r, room, ok);
     for (let i = 0; i < TRIES; i++) {
       const { T, x0, x1 } = lay(r, ids, x);
       if (blocks(standing(T), x0, x1)) return keep(L, T, ids, x0, x1);
@@ -255,6 +255,10 @@ export function forSim(L) {
   return { ...L, floors: [ground, ...[...rest, ...solids].map(past)] };
 }
 
+// REUSE-SPEC.md §Level 1: a fire pole and a climbing grid in every level (decided 2026-11-12): the way down off its
+// first structure, the way up onto its second
+const MUST = [(ids) => ids.at(-1) === 'pole', (ids) => ids[0] === 'grid'];
+
 /**
  * Level 1 for this seed: ground, then structures turning through the band with ground between, until it takes
  * `SECONDS.min` to `max`.
@@ -263,7 +267,7 @@ export function forSim(L) {
 export function generateLevel(seed) {
   const r = rng(seed), L = emptyLevel();
   let x = gap(L, r, 0);
-  while (L.seconds < SECONDS.min) x = gap(L, r, build(L, r, x));
+  while (L.seconds < SECONDS.min) x = gap(L, r, build(L, r, x, MUST[L.structures.length]));
   L.floors.unshift({ kind: 'ground', x0: 0, x1: r3(x), z0: BAND.z0, z1: BAND.z1, y: 0 });
   Object.assign(L.ringOut, { x1: r3(x + 2) });
   L.seconds = r3(L.seconds);

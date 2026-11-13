@@ -201,6 +201,11 @@ function eyeBottom(j) {
   return Number.isFinite(low) ? j.neck.worldToLocal(new THREE.Vector3(0, low, 0)).y : Infinity;
 }
 
+function eyeMiddle(j) {
+  const ys = (j.eye ?? []).map(({ node }) => new THREE.Box3().setFromObject(node)).filter((box) => !box.isEmpty()).map((box) => box.getCenter(new THREE.Vector3()).y);
+  return ys.length ? j.neck.worldToLocal(new THREE.Vector3(0, Math.max(...ys), 0)).y : Infinity;
+}
+
 function neckCoat(neck, r) {
   _inv.copy(neck.matrixWorld).invert();
   const coat = { coatTop: 0, coatR: 0 };
@@ -227,6 +232,35 @@ function shoulderTop(j, armR) {
   return j.chest.worldToLocal(j.upperArm[0].node.getWorldPosition(new THREE.Vector3())).y + armR;
 }
 
+const isUnder = (o, joint) => { for (let p = o; p; p = p.parent) if (p === joint) return true; return false; };
+
+/** Each point of the head's own surface (not its clothes), in the neck's frame: a merged character's by its head bone. */
+function eachHeadPoint(built, fn) {
+  const { head, neck } = built.joints, v = new THREE.Vector3();
+  built.root.traverse((o) => {
+    if (!o.isMesh || o.userData.garment || !o.geometry.attributes.position) return;
+    const bone = o.isSkinnedMesh ? o.skeleton.bones.indexOf(head) : -1, { position, skinIndex } = o.geometry.attributes;
+    if (o.isSkinnedMesh ? bone < 0 : !isUnder(o, head)) return;
+    for (let i = 0; i < position.count; i++) {
+      if (!o.isSkinnedMesh || skinIndex.getX(i) === bone) fn(neck.worldToLocal(v.fromBufferAttribute(position, i).applyMatrix4(o.matrixWorld)));
+    }
+  });
+}
+
+/** How far ahead of the neck the face comes below the eyes' middle, near its midline: the muzzle or beak a face wrap
+ *  goes round (not the mane, out at the sides). Worked out only when a scarf asks. */
+function faceFront(built, eyeMid) {
+  const P = built.params, low = P.neckLength - P.headRadius * 0.4;
+  let front = P.headRadius;
+  eachHeadPoint(built, (p) => { if (Math.abs(p.x) < P.headRadius * 0.4 && p.y > low && p.y < eyeMid) front = Math.max(front, p.z); });
+  return front;
+}
+
+function withFace(fit, built) {
+  let face = null;
+  return Object.defineProperty(fit, 'face', { get: () => (face ??= faceFront(built, fit.neck.eyeMid)) });
+}
+
 export function bodyFit(built) {
   built.root.updateMatrixWorld(true);
   const { joints: j, params: P } = built;
@@ -234,7 +268,7 @@ export function bodyFit(built) {
   const chestWorld = j.chest.getWorldPosition(new THREE.Vector3());
   const floor = j.chest.worldToLocal(new THREE.Vector3(chestWorld.x, 0, chestWorld.z)).y;
   const armR = Math.max(extent(arm, 'x'), extent(arm, 'z'));
-  return {
+  return withFace({
     P, joints: j, holds: built.holds, floor, root: floorOf(built.root),
     height: new THREE.Box3().setFromObject(built.root).getSize(new THREE.Vector3()).y,
     head: [extent(head, 'x'), head.max.y, Math.max(-head.min.z, P.headRadius)],
@@ -243,9 +277,9 @@ export function bodyFit(built) {
     shoulderX: P.torsoW * (P.shoulderOut + (built.bulge ?? 0)) + armR, shoulderY: shoulderTop(j, armR),
     arm: { r: armR, upper: P.upperArmLen, fore: P.forearmLen, foreR: P.limbThick * 1.05 * LIMB_TAPER },
     neck: { r: P.neckThick, len: P.neckLength, y: P.torsoH - P.headOverlap, overlap: P.headOverlap,
-      headY: P.neckLength + P.headRadius * 0.62, ...neckCoat(j.neck, P.neckThick), eyeBottom: eyeBottom(j) },
+      headY: P.neckLength + P.headRadius * 0.62, ...neckCoat(j.neck, P.neckThick), eyeBottom: eyeBottom(j), eyeMid: eyeMiddle(j) },
     leg: { thighR: P.limbThick, shinR: P.limbThick * LIMB_TAPER, femur: femurOf(P), tibia: tibiaOf(P) },
-  };
+  }, built);
 }
 
 function sheet(fn, segU, segV, { closedU = false, mask = null, cut = null, from = null } = {}) {
@@ -1084,12 +1118,28 @@ const SHORT_ENDS = 0.4;
 
 const endBend = (fit, floor, top = fit.neck.y) => Math.max(1e-3, Math.min(fit.torso[1] * 0.4, (top - floor) * 0.5));
 
+// tmnt/REUSE-SPEC.md §Bad guys, the face wrap: a wrapped scarf with `cover` (0..1; 0, an ordinary scarf) climbs the
+// face, ninja style: its top edge from the chin (just above 0) to the middle of the eyes (1). Each wrap climbs
+// MASK_CLIMB of the band's height, and the band is made tall enough for its wraps to get there.
+const MASK_CLIMB = 0.75;
+function faceLine(fit, cover) {
+  const chin = neckBand(fit, 0)[1], eyes = Number.isFinite(fit.neck.eyeMid) ? fit.neck.eyeMid : fit.neck.headY;
+  return lerp(chin, Math.max(chin, eyes), cover);
+}
+const maskHeight = (fit, cover, wraps) => Math.max(0, faceLine(fit, cover) - narrowNeck(fit)[0]) / (1 + MASK_CLIMB * wraps);
+
+/** A face wrap goes round the muzzle, not through it: out to the face's front ahead, less to the sides and below the chin. */
+function faceBulge(fit, pad) {
+  const chin = fit.neck.y + neckBand(fit, 0)[1], front = Math.min(fit.face, Math.max(...fit.skull) * 2) + pad;
+  return (ang, y) => front * Math.max(0, Math.cos(ang)) ** 1.5 * clamp((y - chin) / (fit.skull[1] * 0.3) + 1, 0, 1);
+}
+
 function scarfBand(fit, f, spec, girth) {
   const { neck: nk, joints: { neck, chest } } = fit;
-  const width = (spec.width ?? 1) * Math.max(0.05, fit.torso[0] * 0.38) * f.fit, flatT = f.thick * 1.2;
-  const hug = (BAND_WRAPS[f.form] ?? 1) > 0;
-  const dims = hug ? { width, flatT, H: width * 0.8, T: f.thick * 0.9 * Math.max(1, Math.sqrt(spec.tube ?? 1)) }
-    : { width, flatT, H: Math.min(width, girth * 2.6), T: girth };
+  const wraps = BAND_WRAPS[f.form] ?? 1, hug = wraps > 0, cover = hug ? f.cover ?? 0 : 0, flatT = f.thick * 1.2;
+  const width = Math.max((spec.width ?? 1) * Math.max(0.05, fit.torso[0] * 0.38) * f.fit, cover ? maskHeight(fit, cover, wraps) / 0.8 : 0);
+  const dims = hug ? { width, flatT, cover, H: width * 0.8, T: f.thick * 0.9 * Math.max(1, Math.sqrt(spec.tube ?? 1)) }
+    : { width, flatT, cover, H: Math.min(width, girth * 2.6), T: girth };
   const band = bandSpine(fit, f, spec, dims);
   const shape = bandShape(fit, band, { ...dims, hug }), { fn } = shape;
   const short = Math.max(...spec.ends) * f.fit < SHORT_ENDS;
@@ -1162,18 +1212,19 @@ function tipAnchors(curve, { joint, size, floor }) {
   return [[0, -1], [1, 1]].map(([t, away]) => ({ joint, p: curve.getPointAt(t), d: curve.getTangentAt(t).multiplyScalar(away), size, floor }));
 }
 
-function wrapRise(fit, y0, H, wraps) {
+function wrapRise(fit, y0, H, wraps, cover = 0) {
+  if (cover) return clamp(fit.neck.y + faceLine(fit, cover) - H / 2 - y0, 0, H * MASK_CLIMB * wraps);
   const top = fit.neck.y + fit.neck.eyeBottom - H / 2;
   const [bottom, narrowTop] = narrowNeck(fit);
   return clamp(Math.min(top - y0, narrowTop - bottom), 0, H * 0.5 * wraps);
 }
 
-function bandWrap(clear, [y0, rise], [a0, a1], out, { hoop = 0, lean = { side: 0, front: 0, dz: 0 } } = {}) {
+function bandWrap(clear, [y0, rise], [a0, a1], out, { hoop = 0, lean = { side: 0, front: 0, dz: 0 }, face = null } = {}) {
   const steps = Math.ceil(((a1 - a0) / TAU) * 16);
   return Array.from({ length: steps + 1 }, (_, i) => {
     const ang = lerp(a0, a1, i / steps);
     const y = y0 + rise * (i / steps) - slumpAt(lean, ang);
-    const R = Math.max(clear(y), hoop) + out * ((ang - a0) / TAU);
+    const R = Math.max(clear(y), hoop, face ? face(ang, y) : 0) + out * ((ang - a0) / TAU);
     return new THREE.Vector3(R * Math.sin(ang), y, R * Math.cos(ang) + lean.dz);
   });
 }
@@ -1185,10 +1236,10 @@ function loopRest(fit, seat, body, [fitted, underEyes]) {
   return { mid, hoop, lean: slumpOf(body, mid, hoop, held) };
 }
 
-function bandSeat(fit, clear, { H, wraps }, seat) {
+function bandSeat(fit, clear, { H, wraps, cover }, seat) {
   const { neck: nk, torso } = fit;
   let y0 = nk.y + creaseY(fit, H / 2);
-  const rise = wrapRise(fit, y0, H, wraps) * (1 - seat.big);
+  const rise = wrapRise(fit, y0, H, wraps, cover) * (1 - seat.big);
   y0 = Math.max(y0, lerp(y0, nk.y + nk.eyeBottom - H / 2 - rise, seat.small * 0.8));
   if (!seat.big) return { y0, rise, hoop: 0, lean: undefined };
   const hoop = clear(y0) * seat.loose, bottom = Math.max(torso[1] * 0.5, y0 - torso[1] * 0.6), rest = restAt(clear, y0, hoop, { bottom, fit, shoulder: fit.shoulderY });
@@ -1213,17 +1264,18 @@ function bandArc(a, b, wraps, R) {
   return [a0, a1 + TAU * wraps];
 }
 
-function bandSpine(fit, f, spec, { width, H, T }) {
+function bandSpine(fit, f, spec, { width, H, T, cover }) {
   const { torso, neck: nk } = fit;
   const tuck = f.form === 'tucked' ? 0.35 : 1, wraps = BAND_WRAPS[f.form] ?? 1;
   const x = torso[0] * (spec.cross ? 0.05 : 0.28) + (wraps ? 0 : width * 0.5);
   const seat = scarfSeat(f), clear = (y, toward) => loopRadius(fit, y - nk.y, T * 1.15 * seat.snug, toward);
-  const { y0, rise, hoop, lean } = bandSeat(fit, clear, { H, wraps }, seat);
+  const { y0, rise, hoop, lean } = bandSeat(fit, clear, { H, wraps, cover }, seat);
   const endTop = Math.min(nk.y, torso[1] * 0.9, seat.big ? y0 - H : Infinity);
   const [endA, endB] = spec.ends.map((k, i) => endPath(fit, f, i ? -x : x, k * torso[1] * f.fit * tuck, { back: spec.back?.[i], top: endTop }));
   const [a0, arcEnd] = bandArc(endA[0], endB[0], wraps, clear(y0));
   const a1 = spec.cross && wraps ? arcEnd - TAU : arcEnd;
-  const wrap = bandWrap(clear, [y0, rise], [a0, a1], wraps ? T * 2.3 : 0, { hoop, lean });
+  // wraps that climb the face lie side by side, so they step out only by the quarter they overlap
+  const wrap = bandWrap(clear, [y0, rise], [a0, a1], wraps ? T * 2.3 * (cover ? 1 - MASK_CLIMB : 1) : 0, { hoop, lean, face: cover ? faceBulge(fit, T) : null });
   const legA = [...endA].reverse(), dropA = bandDrop(clear, wrap[0], endA[0]).reverse(), dropB = bandDrop(clear, wrap.at(-1), endB[0]);
   return {
     spine: [...legA, ...dropA, ...wrap, ...dropB, ...endB],

@@ -58,7 +58,10 @@ function wearRow(kind) {
   const worn = look[again(kind)[0]];
   const tiles = [null, ...kit.wear[kind]].map((v) => button(kind, v ?? '', v === current ? `${v}, ${worn}, tap again to change` : v ?? 'none',
     svg(v ? textured(picture(v), kind === 'scarf' ? '' : stitch) : NONE, v ? colour : '#9a8f84'), v === current)).join('');
-  return row(ROW_ICON[kind], kind, pictures(tiles), colours(swatchRow(`${kind}Color`, colour)));
+  // a villain's wrapped scarf climbs the face: how far (REUSE-SPEC.md §Bad guys)
+  const cover = kind === 'scarf' && kit.mask
+    ? `<label class="choices">🥷 <input type="range" min="0" max="1" step="0.05" value="${look.scarfCover}" data-cover aria-label="how much of the face a wrapped scarf covers"></label>` : '';
+  return row(ROW_ICON[kind], kind, pictures(tiles), colours(swatchRow(`${kind}Color`, colour)), cover);
 }
 
 function handsRow() {
@@ -138,6 +141,13 @@ panel.addEventListener('click', (e) => {
   if (!b) return;
   const set = ACTIONS[b.dataset.action] ?? ((v) => { hero.look[b.dataset.action] = v; });
   commit(set(b.dataset.value) === true);
+});
+
+panel.addEventListener('change', (e) => {
+  const input = /** @type {HTMLInputElement} */ (e.target);
+  if (!input.matches('[data-cover]')) return;
+  hero.look.scarfCover = Number(input.value);
+  commit(false);
 });
 
 document.getElementById('dice').addEventListener('click', () => {

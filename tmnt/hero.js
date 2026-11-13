@@ -42,7 +42,7 @@ export const handsOf = (species) => (species === 'mouse' ? CANE : DEFAULT_HANDS)
 /** @returns {Hero['look']} */
 const blankLook = (base = GREEN) => ({
   hat: null, hatColor: base, hatStitch: 'stockinette', cape: null, capeColor: base, capeStitch: 'stockinette', bag: null, bagColor: base,
-  scarfForm: 'draped', sweaterWork: 'solid', glasses: false, hands: DEFAULT_HANDS, trick: TRICKS[DEFAULT_HANDS][0], gloves: base,
+  scarfForm: 'draped', scarfCover: 0, sweaterWork: 'solid', glasses: false, hands: DEFAULT_HANDS, trick: TRICKS[DEFAULT_HANDS][0], gloves: base,
   ...Object.fromEntries(Object.keys(WEAR).flatMap((k) => [[k, null], [`${k}Color`, base], [`${k}Stitch`, 'stockinette']])),
 });
 
@@ -100,13 +100,14 @@ const ALL_WEAR = Object.freeze({
 
 /** What a chooser offers and a save keeps: a hero's, or a villain's (everything).
  *  @typedef {{ key: string, wear: Record<string, readonly string[]>, cloth: readonly { hex: string, name: string }[],
- *   fur: readonly { hex: string, name: string }[], forms: readonly string[], hands: readonly string[], palette: string[], base: string }} Kit */
+ *   fur: readonly { hex: string, name: string }[], forms: readonly string[], hands: readonly string[], palette: string[], base: string,
+ *   mask: boolean }} Kit  `mask`: a wrapped scarf can cover the face (`look.scarfCover`, 0..1; characters/garments.js) */
 /** @type {Kit} */
-const HERO_KIT = Object.freeze({ key: HERO_KEY, wear: WEAR, cloth: CLOTH, fur: COLOURS, forms: SCARF_FORMS, hands: HERO_HANDS, palette: PALETTE, base: GREEN });
+const HERO_KIT = Object.freeze({ key: HERO_KEY, wear: WEAR, cloth: CLOTH, fur: COLOURS, forms: SCARF_FORMS, hands: HERO_HANDS, palette: PALETTE, base: GREEN, mask: false });
 /** @returns {Kit} */
 const villainKit = (key) => Object.freeze({
   key, wear: ALL_WEAR, cloth: ALL_CLOTH, fur: ALL_CLOTH, forms: FORMS, hands: [...new Set([...HERO_HANDS, ...HANDS])],
-  palette: VILLAIN_COLOURS.map((c) => c.hex), base: BLACK,
+  palette: VILLAIN_COLOURS.map((c) => c.hex), base: BLACK, mask: true,
 });
 export const KITS = Object.freeze({ hero: HERO_KIT, sock: villainKit('tmnt.sock.v1'), sweater: villainKit('tmnt.sweater.v1') });
 
@@ -134,11 +135,12 @@ const VILLAINS = {
       sweater: 'cropped', sweaterColor: '#8154ff', sweaterWork: 'fair isle', socks: 'over-knee', socksColor: RED, hands: 'sword', trick: 'flame',
       gloves: RED, bagColor: WHITE, bagStitch: 'rib' } },
   ],
-  // The Sweater, nearly as the designer wants it (2026-11-12; its scarf is to cover half its face): a lion in its
-  // natural fur, a black earflap hat, a purple cape, a silver trailing scarf wrapped twice, a black fair isle vest
+  // The Sweater's outfit, as the designer made it (2026-11-12): a black earflap hat, a purple cape, a black fair isle
+  // vest, and a silver trailing scarf wrapped twice up over half its face. Which animal is open (the kids vote); a
+  // lion in its natural fur till then
   sweater: [{ species: 'lion', look: {
     hat: 'earflap', hatColor: BLACK, hatStitch: 'waffle', cape: 'cape', capeColor: PURPLE, capeStitch: 'single crochet', scarf: 'trailing',
-    scarfColor: SILVER, scarfForm: 'wrapped twice', sweater: 'vest', sweaterColor: BLACK, sweaterWork: 'fair isle', socks: 'over-knee',
+    scarfColor: SILVER, scarfForm: 'wrapped twice', scarfCover: 1, sweater: 'vest', sweaterColor: BLACK, sweaterWork: 'fair isle', socks: 'over-knee',
     socksColor: BLACK, trick: 'atomicBall', gloves: BLACK, bagColor: '#ff3b7f',
   } }],
 };
@@ -175,6 +177,7 @@ function readLook(raw, kit) {
     Object.assign(look, { [kind]: one(kind, list), [`${kind}Color`]: colour(`${kind}Color`), [`${kind}Stitch`]: one(`${kind}Stitch`, TEXTURES) });
   }
   look.glasses = r.glasses === true;
+  look.scarfCover = kit.mask ? Math.min(1, Math.max(0, Number(r.scarfCover) || 0)) : 0;
   Object.assign(look, { sweaterWork: one('sweaterWork', SWEATER_WORKS), scarfForm: one('scarfForm', kit.forms), hands: one('hands', kit.hands), gloves: colour('gloves') });
   look.trick = one('trick', TRICKS[look.hands]);
   return look;

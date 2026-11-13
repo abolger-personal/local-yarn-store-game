@@ -542,15 +542,27 @@ does that job), and its socks are over-knee (the brainstormed rank idea had over
 - **hats** (the existing ones);
 - **no sweaters**: the sweater is The Sweater's.
 
-**The Sweater, designed** (2026-11-12, made in the villain designer, "almost right"; `VILLAINS.sweater` in
-`tmnt/hero.js`): **a lion in its natural fur**, a black earflap hat in waffle stitch, a purple cape, **a silver
-trailing scarf wrapped twice**, a black fair isle vest, black over-knee socks, black gloves (the atomic ball). That
-answers "which animal is The Sweater?" for now. **Still wrong: the scarf.** It is to **cover half the face or more**,
+**The Sweater, designed** (decided 2026-11-12, made in the villain designer; the scarf fixed the same day, below; `VILLAINS.sweater` in
+`tmnt/hero.js`): **the outfit is decided, the animal is not.** A black earflap hat in waffle stitch, a purple cape,
+**a silver trailing scarf wrapped twice**, a black fair isle vest, black over-knee socks, black gloves (the atomic
+ball). It was made on a lion in its natural fur, and the code starts it as one, but **which animal The Sweater is
+stays open until the designer's kids vote** (2026-11-12): it looks villainously cute as every animal tried so far.
+**Still wrong: the scarf.** It is to **cover half the face or more**,
 ninja style. Measured 2026-11-12 on this lion: the scarf's top sits a little below the eyes (0.63 up, the eyes'
 bottom edge at 0.69, the head's top at 0.99), so only the chin is covered. The scarf's size dial (`fit`, 0.2 to 1.6,
 fixed at 1 in the games) can't fix it: a bigger fit makes the scarf loose and it settles onto the shoulders, and
 the wrap is held to the narrow part of the neck and never passes the bottom of the eyes (`wrapRise` in
 `characters/garments.js`). Planned 2026-11-12: a face-covering wrap, the new scarf form below.
+
+**The face wrap** (decided and built 2026-11-12; "cover half the face, these cartoon characters are three quarters
+eyes"): a wrapped scarf takes **`cover`**, 0 to 1 (`cover` on the scarf item in `characters/garments.js`; a
+villain's `look.scarfCover`). At 0 it is the scarf as before, everywhere. Above 0 the wraps climb the face instead of
+stacking on the neck: the top edge runs from the chin to **the middle of the eyes** at 1; the band is made tall
+enough for its wraps to reach, each climbing three quarters of its height; and it goes round the muzzle or beak
+(measured from the head's own surface near its midline), not through it. Measured on The Sweater's lion at 1: the top
+0.02 under the eyes' middle, 0.08 clear of the muzzle. **To tune it:** the Dress Up screen's scarf folder has a
+"face cover" slider (under "as made"), and the villain designer's scarf row has a 🥷 slider. The Sweater starts at 1.
+Heroes can't have it. **Playtest 2026-11-12: the slider is great, and its top value is right for The Sweater.**
 
 **The Sweater** (decided 2026-11-09) is **gigantic**, in a gigantic silver and purple `sweater`, a silver hat and a
 purple capelet (`capelet` is one of the fighters' capes). Gigantic means everything scales up together: things are
@@ -565,7 +577,8 @@ Sweater. Heroes don't get them. The design is open.
 - **Are weapons unlocked?** Unlocks from the fighting game carry over, or start fresh?
 - **Which scarf colour does each player get?** One of the four at random, or each tablet in a room a different
   one, so a full room reads as the four turtles? A fifth player in taxi yellow would be the April.
-- **Which animal is The Sweater?** Or a random one each time?
+- **Which animal is The Sweater?** Or a random one each time? Open until the designer's kids vote (2026-11-12);
+  the outfit is decided (§Bad guys) and works on every animal tried.
 - **What should The Sweater's gauntlets look like,** and how do they attack?
 - **Purple is a hero colour and a bad-guy colour.** Purple is one of the turtles' four, and the Sock Clan and The
   Sweater wear it too. Is that fine, as long as black and silver stay bad-guy only?

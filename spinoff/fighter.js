@@ -202,7 +202,7 @@ export const outfitOf = (look, palette = []) => ({
   shawl: wear('shawl', look.cape, look.capeColor, look.capeStitch),
   bag: wear('bag', look.bag, look.bagColor),
   // tmnt/REUSE-SPEC.md §Hero chooser: a hero's scarf, sweater and socks; a fighter's look has none
-  scarf: { ...wear('scarf', look.scarf, look.scarfColor, look.scarfStitch), ...(look.scarfForm && { form: look.scarfForm }) },
+  scarf: { ...wear('scarf', look.scarf, look.scarfColor, look.scarfStitch), ...(look.scarfForm && { form: look.scarfForm }), ...(look.scarfCover && { cover: look.scarfCover }) },
   sweater: worked(wear('sweater', look.sweater, look.sweaterColor, look.sweaterStitch), look.sweaterWork, palette),
   socks: wear('socks', look.socks, look.socksColor, look.socksStitch),
 });

@@ -163,6 +163,20 @@ assert.deepEqual(readHero(JSON.parse(JSON.stringify(owl)), KITS.sock), owl, 'and
 // The Sweater starts as the designer's lion, its silver scarf wrapped twice
 const boss = newVillain('sweater');
 assert.deepEqual([boss.species, boss.look.scarf, boss.look.scarfForm, boss.look.scarfColor, boss.look.hat, boss.look.cape], ['lion', 'trailing', 'wrapped twice', '#c0c4cc', 'earflap', 'cape']);
+// its scarf climbs the face: the top edge about the middle of its eyes; without the cover, below them, as any scarf
+const scarfTop = (cover) => {
+  const v = newVillain('sweater');
+  Object.assign(v.look, { scarfCover: cover, hat: null, cape: null, sweater: null, socks: null });
+  const b = buildHero(v, KITS.sweater.palette), eye = b.joints.eye[0];
+  b.root.updateMatrixWorld(true);
+  let top = -Infinity;
+  b.root.traverse((o) => { if (o.isMesh && o.material?.userData?.family === 'garment') top = Math.max(top, new THREE.Box3().setFromObject(o).max.y); });
+  return top - eye.node.getWorldPosition(new THREE.Vector3()).y;
+};
+assert.equal(boss.look.scarfCover, 1);
+assert.ok(Math.abs(scarfTop(1)) < 0.04, `the face wrap's top is at the eyes' middle (${scarfTop(1).toFixed(3)} off)`);
+assert.ok(scarfTop(0) < -0.07, `an ordinary wrapped scarf stays below the eyes (${scarfTop(0).toFixed(3)})`);
+assert.equal(readHero({ species: 'lion', look: { scarfCover: 1 } }).look.scarfCover, 0, 'a hero has no face wrap');
 // every garment it offers builds, on the Sock Clan's and The Sweater's starting looks
 for (const who of ['sock', 'sweater']) {
   for (const [kind, list] of Object.entries(KITS[who].wear)) for (const v of list) {

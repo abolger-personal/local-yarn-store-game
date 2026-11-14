@@ -173,7 +173,9 @@ const scarfTop = (cover) => {
   b.root.traverse((o) => { if (o.isMesh && o.material?.userData?.family === 'garment') top = Math.max(top, new THREE.Box3().setFromObject(o).max.y); });
   return top - eye.node.getWorldPosition(new THREE.Vector3()).y;
 };
-assert.equal(boss.look.scarfCover, 1);
+assert.equal(boss.look.scarfCover, 1.5);
+assert.ok(scarfTop(1.5) > scarfTop(1) + 0.04, `past 1 the wrap climbs on over the eyes (${scarfTop(1.5).toFixed(3)})`);
+assert.equal(readHero({ species: 'lion', look: { scarfCover: 9 } }, KITS.sweater).look.scarfCover, 1.5, 'a saved cover is held to the slider\'s top');
 assert.ok(Math.abs(scarfTop(1)) < 0.04, `the face wrap's top is at the eyes' middle (${scarfTop(1).toFixed(3)} off)`);
 assert.ok(scarfTop(0) < -0.07, `an ordinary wrapped scarf stays below the eyes (${scarfTop(0).toFixed(3)})`);
 assert.equal(readHero({ species: 'lion', look: { scarfCover: 1 } }).look.scarfCover, 0, 'a hero has no face wrap');
@@ -186,3 +188,15 @@ for (const who of ['sock', 'sweater']) {
   }
 }
 console.log('hero ok');
+
+// playtest 2026-11-14 (the chooser lagged on tablets): no animal's hero is far heavier to draw than the others; the
+// turtle's unwelded plastron made it 288,000 points, outline and all
+for (const species of SPECIES) {
+  let points = 0;
+  buildHero(newHero(() => 0.3, species)).root.traverse((o) => { if (o.isMesh) points += o.geometry.attributes.position.count; });
+  assert.ok(points < 150000, `${species}: a hero is ${points} points to draw`);
+}
+
+// playtest 2026-11-14: Raphael with his scarf off kept a red mask's place but got a purple one (the fur's opposite)
+const bare = newHero(() => 3.5 / PRESETS);
+assert.equal(facePaintColorOf(faceOf({ ...bare, look: { ...bare.look, scarf: null } }).params), bare.look.gloves, 'scarf off, the mask is the hands\' colour');

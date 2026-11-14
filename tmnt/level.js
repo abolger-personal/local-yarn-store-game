@@ -214,22 +214,41 @@ function getOff() {
   using = null;
 }
 
-// REUSE-SPEC.md §Pizza: a slice is eaten by getting to it; 🍕 counts them
-const SLICE_REACH = 0.65, eaten = new Set();
+// REUSE-SPEC.md §Pizza: a slice is eaten by getting to it; 🍕 counts them; an eaten one is back a while later
+const SLICE_REACH = 0.65, SLICE_BACK = 20 * TICK_HZ, eaten = new Map();
+let ate = 0;
 function eat(f) {
   level.slices.forEach((s, i) => {
+    if (state.tick - eaten.get(i) >= SLICE_BACK) eaten.delete(i);
     if (eaten.has(i) || Math.hypot(f.x - s.x, f.y + (f.height ?? 0.86) / 2 - s.y, f.z - s.z) > SLICE_REACH) return;
-    eaten.add(i);
-    el('slices').textContent = `🍕 ${eaten.size}`;
+    eaten.set(i, state.tick);
+    el('slices').textContent = `🍕 ${++ate}`;
   });
 }
+
+// REUSE-SPEC.md §Pizza: a tap on a slice is for the slice, not the ground the finger's line comes down on far behind it
+// (playtest 2026-11-14: off a swing it couldn't be got): off a bar or a swing the hero flies through it. Only there: on
+// foot it sent the hero to the spot under the slice, inside a slide or a bridge, where it can't go (playtest: taps stopped working)
+const SLICE_TAP = 60, _seen = new THREE.Vector3();
+let sliceTapped = null;
+function sliceAt(e) {
+  const box = stage.renderer.domElement.getBoundingClientRect();
+  const off = (s) => Math.hypot(((_seen.set(s.x, s.y, s.z).project(camera).x + 1) / 2) * box.width + box.left - e.clientX, ((1 - _seen.y) / 2) * box.height + box.top - e.clientY);
+  return level.slices.find((s, i) => !eaten.has(i) && off(s) <= SLICE_TAP) ?? null;
+}
+stage.renderer.domElement.addEventListener('pointerdown', (e) => { sliceTapped = using?.step === onSwing ? sliceAt(e) : null; });
+function aimSlice(input) {
+  if (sliceTapped && tapped && input.target?.x !== undefined) input.target = { x: sliceTapped.x, z: sliceTapped.z };
+}
+const tapOf = (input, f) => (sliceTapped ? { ...input.target, y: sliceTapped.y - (f.height ?? 0.86) / 2 } : input.target);
 
 /** After each tick: onto and along the equipment, the bridge rocking, and never off the front or back of the band.
  *  @param {any} input this tick's, from the controls */
 function afterTick(input) {
   const f = state.fighters[0];
-  Object.assign(cmd, { tap: tapped && input.target?.x !== undefined ? input.target : null, jump: Boolean(input.target?.jump), punch: input.punch, kick: input.kick });
+  Object.assign(cmd, { tap: tapped && input.target?.x !== undefined ? tapOf(input, f) : null, jump: Boolean(input.target?.jump), punch: input.punch, kick: input.kick });
   tapped = false;
+  sliceTapped = null;
   using ??= getOn(f) || null;
   if (using && !using.step(f, using.k)) getOff();
   steer(f, input.target);
@@ -270,6 +289,7 @@ stage.run((dt) => {
     state.t0 = state.tick;
     const input = controls.take(snap);
     pickDismount(input);
+    aimSlice(input);
     doubleTap(input);
     SIM.tick(state, { [ME]: input });
     afterTick(input);

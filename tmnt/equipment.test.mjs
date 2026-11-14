@@ -111,3 +111,18 @@ stairsOff(rise, off);
 stairsOff(rise, over);
 assert.ok(off.y === 0.9 && off.vy === 0 && over.y === 1.68, 'off the low end you are at its foot; off the high end nothing changes');
 console.log('equipment ok');
+
+// playtest 2026-11-14: a tapped pizza slice is up in the air, and a launch at it goes through it, not under it
+{
+  const up = { x: 2.5, z: 0, y: 2.67 }, flyer = body({}), hold = startSwing([bar], flyer);
+  for (let i = 0; i < 20; i++) swingStep(flyer, hold, { tap: null, jump: false }, [bar]);
+  swingStep(flyer, hold, { tap: up, jump: false }, [bar]);
+  while (swingStep(flyer, hold, { tap: null, jump: false }, [bar]));
+  let miss = 9;
+  for (let n = 0; n < 120; n++) {
+    flyer.vy -= 30 / 60;
+    Object.assign(flyer, { x: flyer.x + flyer.vx / 60, y: flyer.y + flyer.vy / 60 });
+    miss = Math.min(miss, Math.hypot(flyer.x - up.x, flyer.y - up.y));
+  }
+  assert.ok(miss < 0.2, `a launch at a slice in the air misses it by ${miss.toFixed(2)}`);
+}

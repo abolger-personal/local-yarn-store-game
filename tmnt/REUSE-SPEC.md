@@ -419,6 +419,12 @@ Decided and built 2026-11-12 (the designer: "the characters have no idea what th
   are no opponents in a level yet, and it needs deciding what a bad guy holding pizza does with it.
 - Not built: anything the slices are for (a score, an unlock, the attack item); a slice count on finishing; reaching
   the giant pizza doing anything of its own (the gate beside it ends the level).
+- **Slices come back** (decided and built 2026-11-14, the designer: the kids are having fun staying on a level): an
+  eaten slice is back in its place 20 seconds later, and 🍕 keeps counting up.
+- **A tap on a slice is for the slice** (decided and built 2026-11-14, playtest: a kid on a swing tapped the
+  pizza and never got it; the tap counted as the ground far behind it). Within a finger's width of a slice on
+  screen, a launch off a bar or a swing flies through it. On foot a tap is the ground as before: walking to the
+  spot under a slice put the target inside a slide or a bridge, and taps seemed to stop working (playtest the same day).
 
 ### Level 2
 
@@ -587,8 +593,8 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
   - **April** (the fifth default), leggy: **an orange llama** (amended 2026-11-09) in her jumpsuit (the yellow
     pullover), white over-knee boots, a blue drawstring bag, a heart on her cheek, and her microphone.
 - **The face** (decided 2026-11-10): none, the mask (rings round the eyes), a heart, or **black-rimmed glasses**;
-  not the NFL eye black, which doesn't show on a turtle. The mask is the scarf's colour, so a turtle's sync up (the
-  fur's complement with no scarf), and narrow on a turtle's big eyes (`faceOf`). Glasses are a rim round the front
+  not the NFL eye black, which doesn't show on a turtle. The mask is the scarf's colour, so a turtle's sync up (with
+  no scarf, the hands' colour, decided 2026-11-14: the fur's complement made a scarfless Raphael's purple), and narrow on a turtle's big eyes (`faceOf`). Glasses are a rim round the front
   of each eye, and a bridge when the eyes are far enough apart (`buildHero`). **All four turtles start in their
   masks** (amended 2026-11-10, the kids asked), Donatello's glasses over his; the face row still picks one or the other.
 - 🎲 any animal, colours and pieces. **🍕 a preset** (decided 2026-11-10): **six presets**, the four turtles, April and
@@ -712,7 +718,9 @@ enough for its wraps to reach, each climbing three quarters of its height; and i
 (measured from the head's own surface near its midline), not through it. Measured on The Sweater's lion at 1: the top
 0.02 under the eyes' middle, 0.08 clear of the muzzle. **To tune it:** the Dress Up screen's scarf folder has a
 "face cover" slider (under "as made"), and the villain designer's scarf row has a 🥷 slider. The Sweater starts at 1.
-Heroes can't have it. **Playtest 2026-11-12: the slider is great, and its top value is right for The Sweater.**
+Heroes can't have it. **Playtest 2026-11-12: the slider is great, and its top value is right for The Sweater.** **Playtest 2026-11-14, a
+kid: "The Sweater's eyes need to be covered more"**: the slider now runs to 1.5, where the wrap climbs on past the
+eyes' middle to the hat, leaving only the tops of the eyes; The Sweater starts there.
 
 **The Sweater** (decided 2026-11-09) is **gigantic**, in a gigantic silver and purple `sweater`, a silver hat and a
 purple capelet (`capelet` is one of the fighters' capes). Gigantic means everything scales up together: things are

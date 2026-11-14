@@ -40,6 +40,13 @@
   <button id="kick" aria-label="kick"><span class="emoji">🦶</span></button>
   <button id="drop" class="hidden" aria-label="put the block down"><span class="emoji">⬇️</span></button>
 </div>
+<!-- playtest 2026-11-14: a level that stops taking taps on a tablet, where there's no console: any error shows on the page -->
+<pre id="oops" style="position:fixed;left:0;right:0;bottom:0;margin:0;padding:4px 8px;font:12px/1.3 monospace;color:#fff;background:#b00c;white-space:pre-wrap;z-index:99;pointer-events:none" hidden></pre>
+<script>
+  const oops = (text) => { const o = document.getElementById('oops'); o.hidden = false; if (o.textContent.length < 600) o.textContent += text + '\n'; };
+  addEventListener('error', (e) => oops((e.message || 'failed to load ' + (e.target?.src || e.target?.href || '?')) + ' ' + (e.filename || '').split('/').pop() + ':' + (e.lineno || '')), true);
+  addEventListener('unhandledrejection', (e) => oops('promise: ' + (e.reason?.message ?? e.reason)));
+</script>
 <script type="importmap">
 {
   "imports": {

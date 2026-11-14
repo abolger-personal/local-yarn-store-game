@@ -358,7 +358,7 @@ function addUsedFolder(folder, type, redress) {
   folder.add(u, 'forceFit').name('force fit').onChange(redress);
   folder.add(u, 'fit', FIT_RANGE[0], FIT_RANGE[1], 0.01).name('  fit').onFinishChange(redress);
   // tmnt/REUSE-SPEC.md §Bad guys: a wrapped scarf up over the face, to the middle of the eyes at 1
-  if (type === 'scarf') folder.add(Object.assign(u, { cover: u.cover ?? 0 }), 'cover', 0, 1, 0.01).name('face cover (wrapped; 0 = off)').onFinishChange(redress);
+  if (type === 'scarf') folder.add(Object.assign(u, { cover: u.cover ?? 0 }), 'cover', 0, 1.5, 0.01).name('face cover (wrapped; 0 = off, 1 = mid eyes)').onFinishChange(redress);
   folder.add({ f: () => clearUsed(type) }, 'f').name('back to pattern');
   folder.close();
 }

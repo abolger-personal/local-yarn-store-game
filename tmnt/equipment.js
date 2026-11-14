@@ -133,7 +133,7 @@ export function bridgeLift(f, b, sway) {
 // jump, so a launch from a bar lands you on a deck).
 export const SWING = Object.freeze({ reach: 0.45, tap: 0.7, near: 1.3, spin: 11, launch: 7.5, up: JUMP_SPEED * 1.25 });
 /** How long a launch is in the air, seconds, coming down `drop` lower than it left (none: FLIGHT). */
-export const airTime = (drop = 0) => (SWING.up + Math.sqrt(SWING.up ** 2 + 2 * GRAVITY * Math.max(0, drop))) / GRAVITY;
+export const airTime = (drop = 0) => (SWING.up + Math.sqrt(Math.max(0, SWING.up ** 2 + 2 * GRAVITY * drop))) / GRAVITY;
 export const FLIGHT = airTime();
 // ticks after a launch in which the bar just left can't be caught again (the other can, straight away)
 const LEFT_FOR = 30;

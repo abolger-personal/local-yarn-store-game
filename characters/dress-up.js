@@ -30,7 +30,7 @@ function freshUse() {
   return {
     ownTool: false, tool: 5, weight: AS, fibre: AS,
     ownColours: false, colorCount: 2, ...Object.fromEntries(Array.from({ length: MAX_COLOURS }, (_, i) => [`color${i + 1}`, defaultItem('hat')[`color${i + 1}`]])),
-    colourwork: AS, stitch: AS, edge: AS, accessory: AS, forceFit: false, fit: 1,
+    colourwork: AS, stitch: AS, edge: AS, accessory: AS, forceFit: false, fit: 1, cover: 0,
   };
 }
 function freshUsed() { return Object.fromEntries(Object.keys(GARMENTS).map((t) => [t, freshUse()])); }
@@ -53,6 +53,7 @@ function usedOf(type) {
     for (let i = 1; i <= MAX_COLOURS; i++) out[`color${i}`] = u[`color${i}`];
   }
   if (u.forceFit) out.fit = u.fit;
+  if (u.cover) out.cover = u.cover;
   return out;
 }
 const madeOf = (type) => madeItem(state.patterns[type], usedOf(type));
@@ -356,6 +357,8 @@ function addUsedFolder(folder, type, redress) {
   folder.add(u, 'accessory', [AS, ...accessoriesOf(type)]).onChange(redress);
   folder.add(u, 'forceFit').name('force fit').onChange(redress);
   folder.add(u, 'fit', FIT_RANGE[0], FIT_RANGE[1], 0.01).name('  fit').onFinishChange(redress);
+  // tmnt/REUSE-SPEC.md §Bad guys: a wrapped scarf up over the face, to the middle of the eyes at 1
+  if (type === 'scarf') folder.add(Object.assign(u, { cover: u.cover ?? 0 }), 'cover', 0, 1, 0.01).name('face cover (wrapped; 0 = off)').onFinishChange(redress);
   folder.add({ f: () => clearUsed(type) }, 'f').name('back to pattern');
   folder.close();
 }

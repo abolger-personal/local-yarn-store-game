@@ -1,0 +1,188 @@
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { LOOK } from '../characters/garments.js';
+import { POSES, facePaintColorOf } from '../characters/npc.js';
+import { CANE, MIC, NEEDLES, SCISSORS, SPECIES, STAFF, YARN_BALLS, stepFighter, animateFighter, buildFighter, disposeFighter, isBadGuyCloth, isBadGuyFur, outfitOf } from '../spinoff/fighter.js';
+import { CLOTH, COLOURS, PALETTE, PRESETS, buildHero, faceOf, popFromQuery, SCARF_FORMS, SWEATER_WORKS, TURTLE_COLOURS, WEAR, KITS, SOCK_KINDS, newHero, newVillain, randomHero, readHero } from './hero.js';
+import { setFur } from '../spinoff/fighter.js';
+
+LOOK.viewPx = 0;
+
+for (const { hex, name } of CLOTH) {
+  assert.ok(!isBadGuyCloth(hex) && !isBadGuyFur(hex), `${name} is a hero colour, not a bad guy's`);
+}
+
+// REUSE-SPEC.md §Hero chooser: six presets, the four turtles in their scarves, April and Master Splinter
+const presets = Array.from({ length: PRESETS }, (_, i) => newHero(() => (i + 0.5) / PRESETS));
+assert.equal(PRESETS, 6);
+presets.slice(0, 4).forEach(({ species, look }, i) => {
+  assert.equal(species, 'turtle');
+  assert.equal(look.scarfColor, TURTLE_COLOURS[i].hex, 'each turtle in his own colour');
+});
+const [april, splinter] = presets.slice(4).map(({ species, look }) => ({ species, ...look }));
+assert.deepEqual([april.species, april.sweaterColor, april.socksColor, april.hands, april.trick], ['llama', COLOURS[5].hex, '#ffffff', MIC, 'sparkle'], 'April: a taxi yellow jumpsuit, white boots, her microphone throwing stars');
+assert.deepEqual([splinter.species, splinter.sweater, splinter.hands], ['mouse', 'vest', CANE], 'Master Splinter: a vest and his cane');
+
+// the trust boundary: no hats or capes, no Sock Clan scarf, no colour outside the hero colours
+const hero = readHero({
+  species: 'mouse', params: { bodyColor: '#fefefe' },
+  look: { hat: 'beanie', cape: 'cape', scarf: 'long', scarfForm: 'wrapped twice', scarfColor: '#c0c0c0', socks: 'nope', bagColor: '#fefefe', hands: 'sword' },
+});
+assert.equal(hero.look.hat, null);
+assert.equal(hero.look.cape, null);
+assert.equal(hero.look.scarf, 'long');
+assert.ok(SCARF_FORMS.includes(hero.look.scarfForm) && hero.look.scarfForm !== 'wrapped twice');
+assert.ok(CLOTH.some((c) => c.hex === hero.look.scarfColor), "a silver scarf snaps to a hero colour");
+assert.equal(hero.look.socks, null);
+assert.equal(hero.look.hands, 'gloves', "the fighters' sword isn't a hero's");
+assert.equal(hero.look.bagColor, '#ffffff', 'white clothes');
+assert.ok(COLOURS.some((c) => c.hex === hero.params.bodyColor), 'white fur snaps to a hero colour');
+assert.equal(readHero({ species: 'hydra' }), null);
+
+// every piece a hero can pick dresses every animal
+for (const species of SPECIES) {
+  for (const kind of Object.keys(WEAR)) {
+    for (const v of WEAR[kind]) {
+      const built = buildFighter({ ...newHero(() => 0, species), look: { ...newHero(() => 0).look, scarf: null, [kind]: v } });
+      assert.ok(built.garments.some((m) => m.userData.worn.includes(kind)), `${species} wears the ${v} ${kind}`);
+      disposeFighter(built);
+    }
+  }
+}
+// the sweater, tapped again, in each colourwork: its own colour first, then the other hero colours
+const jumpsuit = presets[4];
+for (const work of SWEATER_WORKS) {
+  const sweater = outfitOf({ ...jumpsuit.look, sweaterWork: work }, PALETTE).sweater;
+  assert.equal(sweater.color1, jumpsuit.look.sweaterColor, `${work}: the picked colour leads`);
+  assert.equal(sweater.colourwork, work);
+  assert.equal(sweater.colorCount, work === 'solid' ? 1 : PALETTE.length);
+  disposeFighter(buildFighter({ ...jumpsuit, look: { ...jumpsuit.look, sweaterWork: work } }, PALETTE));
+}
+assert.equal(outfitOf({ ...jumpsuit.look, sweaterWork: 'stripes' }).sweater.colorCount, 1, 'a fighter (no palette) keeps a one-colour sweater');
+// Raphael (red) has his knitting needles and red socks; the mouse is Master Splinter, with his cane, hanging down to the floor at rest
+const raph = newHero(() => 0.65);
+assert.deepEqual([raph.look.scarfColor, raph.look.hands, raph.look.socksColor], [COLOURS[3].hex, NEEDLES, COLOURS[3].hex]);
+assert.equal(newHero(() => 0, 'mouse').look.hands, CANE);
+for (const species of SPECIES) {
+  const built = buildFighter({ ...newHero(() => 0, species), look: { ...newHero(() => 0).look, hands: CANE } });
+  let low = Infinity, dir = null;
+  // a whole idle cycle: the knob's lowest is what touches down
+  for (let i = 0; i < 180; i++) {
+    animateFighter(built, 1 / 60);
+    built.root.updateMatrixWorld(true);
+    low = Math.min(low, built.sword.localToWorld(new THREE.Vector3(0, 0, built.sword.userData.tip)).y);
+    dir = new THREE.Vector3(0, 0, 1).transformDirection(built.sword.matrixWorld);
+  }
+  assert.ok(dir.y < -0.95, `${species}: the cane hangs straight down (${dir.y.toFixed(2)})`);
+  // one cane for everyone: a hand higher than the cane is long (the turtle) leaves it hovering
+  assert.ok(low > -0.005 && low < 0.1, `${species}: the hook off the floor, not far (${low.toFixed(3)})`);
+  assert.equal(built.sword.scale.x, 1, `${species}: the same cane as everyone's`);
+  disposeFighter(built);
+}
+// Donatello (purple): a cowl, a fanny pack and his bo staff, a giant drop spindle held in both hands
+const donnie = newHero(() => 0.45).look;
+assert.deepEqual([donnie.scarf, donnie.bag, donnie.socks, donnie.hands], ['cowl', 'crossbody pouch', 'knee-high', STAFF]);
+// Leonardo (blue): high boots and a half of his scissors in each hand, gone again when he puts them down
+const leo = buildFighter(newHero(() => 0.25));
+const pair = leo.sword.userData.pair;
+assert.ok(pair?.parent && leo.sword.parent !== pair.parent, 'a half in each hand');
+// at rest the halves cross in front of him, like his katanas: each blade's tip past the middle
+for (let i = 0; i < 60; i++) animateFighter(leo, 1 / 60);
+leo.root.updateMatrixWorld(true);
+for (const half of [leo.sword, pair]) {
+  const grip = leo.root.worldToLocal(half.getWorldPosition(new THREE.Vector3()));
+  const tip = leo.root.worldToLocal(half.localToWorld(new THREE.Vector3(0, 0, leo.sword.userData.tip)));
+  assert.ok(Math.sign(tip.x) !== Math.sign(grip.x) && tip.z > grip.z, `the blades cross in front (${grip.x.toFixed(2)} → ${tip.x.toFixed(2)})`);
+}
+assert.deepEqual([newHero(() => 0.25).look.hands, newHero(() => 0.25).look.socks], [SCISSORS, 'over-knee']);
+// mid-punch they uncross, each half out on its own side, so neither cuts through him
+stepFighter(leo, 1 / 60, POSES.rest, 0, { name: 'jab', arm: -1, step: 0.4 });
+leo.root.updateMatrixWorld(true);
+for (const half of [leo.sword, pair]) {
+  const grip = leo.root.worldToLocal(half.getWorldPosition(new THREE.Vector3()));
+  const tip = leo.root.worldToLocal(half.localToWorld(new THREE.Vector3(0, 0, leo.sword.userData.tip)));
+  assert.equal(Math.sign(tip.x), Math.sign(grip.x), `uncrossed mid-punch (${grip.x.toFixed(2)} → ${tip.x.toFixed(2)})`);
+}
+disposeFighter(leo);
+assert.equal(pair.parent, null, 'the left half goes with the right');
+for (const species of SPECIES) {
+  const built = buildFighter({ ...newHero(() => 0.45, species), look: newHero(() => 0.45).look });
+  assert.ok(built.sword.userData.both && built.sword.children.length >= 4, `${species}: a two-handed spindle, wood and yarn`);
+  disposeFighter(built);
+}
+// Michelangelo (orange) has his balls of yarn: hanging from the hand a ball apart, off the floor, flung out by a punch
+const mikey = buildFighter(newHero(() => 0.05));
+assert.equal(newHero(() => 0.05).look.hands, YARN_BALLS);
+for (let i = 0; i < 180; i++) animateFighter(mikey, 1 / 60);
+const hand = mikey.root.worldToLocal(mikey.sword.getWorldPosition(new THREE.Vector3())), balls = mikey.sword.userData.balls;
+for (const b of balls) assert.ok(b.p.y < hand.y && b.p.y >= 0.04 && Math.abs(b.p.distanceTo(hand) - b.len) < 0.01, `a ball hangs on its strand (${b.p.distanceTo(hand).toFixed(3)} of ${b.len})`);
+assert.ok(balls[0].p.distanceTo(balls[1].p) >= 0.084 - 1e-6, 'the balls a ball apart');
+const rest = balls.map((b) => b.p.clone());
+let flung = 0;
+for (let i = 0; i <= 30; i++) {
+  stepFighter(mikey, 1 / 60, POSES.rest, 0, { name: 'cross', arm: -1, step: i / 60 });
+  flung = Math.max(flung, ...balls.map((b, j) => b.p.distanceTo(rest[j])));
+}
+assert.ok(flung > 0.2, `a cross flings the yarn (${flung.toFixed(2)})`);
+disposeFighter(mikey);
+// the face: no NFL eye black; the mask in the scarf's colour, narrow on a turtle; Donatello in black-rimmed glasses
+assert.equal(readHero({ species: 'owl', params: { facePaint: 'slashes' } }).params.facePaint, 'none');
+presets.slice(0, 4).forEach((t) => assert.equal(t.params.facePaint, 'rings', 'every turtle starts in his mask'));
+assert.ok(presets[2].look.glasses, 'Donatello\'s glasses over his mask');
+const masked = newHero(() => 0.65);
+masked.params.facePaint = 'rings';
+assert.equal(facePaintColorOf(faceOf(masked).params), masked.look.scarfColor, 'the mask the scarf\'s colour');
+assert.ok(faceOf(masked).params.facePaintSize < 0.5, 'a narrow mask on a turtle');
+const nerd = buildHero(newHero(() => 0.45)), head = nerd.joints.eye[0].node.parent;
+assert.equal(head.children.filter((o) => o instanceof THREE.Mesh && o.material.color?.getHexString() === '141414').length, 2, 'a rim round each eye');
+disposeFighter(nerd);
+for (let i = 0; i < 6; i++) disposeFighter(buildHero(randomHero()));
+// the glow and shadow to try: off without the address saying so, clamped when it does
+assert.deepEqual(popFromQuery(''), { glow: 0, shadow: 0 });
+assert.deepEqual(popFromQuery('?glow=2&shadow=-1'), { glow: 1, shadow: 0 });
+// the villain designer keeps what a hero's save drops: a hat, a cape, the scarf wrapped twice, the villains' colours
+const worn = { hat: 'hood', hatColor: '#141414', cape: 'capelet', scarf: 'chunky wrap', scarfForm: 'wrapped twice', socks: 'leg warmers', socksColor: '#c0c4cc', hands: 'scythe' };
+const sock = readHero({ species: 'lion', look: worn }, KITS.sock), plain = readHero({ species: 'lion', look: worn });
+assert.deepEqual([sock.look.hat, sock.look.cape, sock.look.scarfForm, sock.look.socks, sock.look.socksColor, sock.look.hands], ['hood', 'capelet', 'wrapped twice', 'leg warmers', '#c0c4cc', 'scythe']);
+assert.deepEqual([plain.look.hat, plain.look.cape, plain.look.scarfForm, plain.look.socks, plain.look.hands], [null, null, 'draped', null, 'gloves']);
+// the Sock Clan soldier starts as the designer's owl: black, hooded, in over-knee socks, with a scythe
+const llama = newVillain('sock', undefined, 1);
+assert.deepEqual([SOCK_KINDS, llama.species, llama.params.bodyColor, llama.params.fleeceColor, llama.look.hands, llama.look.capeStitch], [5, 'llama', '#141414', '#464444', 'gloves', 'garter']);
+const dragon = newVillain('sock', undefined, 4);
+// a dragon has no coat colour of its own, so picking its fur adds no stray key to its save
+assert.ok(!('undefined' in setFur(newVillain('sock', undefined, 4), '#141414').params));
+assert.deepEqual([dragon.species, dragon.params.bodyColor, dragon.look.socks, dragon.look.hands, dragon.look.trick], ['dragon', '#b51a00', 'over-knee', 'sword', 'flame']);
+const mouse = newVillain('sock', undefined, 3);
+assert.deepEqual([mouse.species, mouse.look.sweater, mouse.look.sweaterWork, mouse.look.scarf, mouse.look.hands], ['mouse', 'cropped', 'fair isle', 'kerchief', 'hammer']);
+const lion = newVillain('sock', undefined, 2);
+assert.deepEqual([lion.species, lion.params.bodyColor, lion.look.socks, lion.look.socksColor, lion.look.hands], ['lion', '#b51a00', 'crew', '#b51a00', 'yarn']);
+const owl = newVillain('sock');
+assert.deepEqual([owl.species, owl.params.bodyColor, owl.params.featherColor, owl.params.facePaint, owl.look.hat, owl.look.socks, owl.look.hands],
+  ['owl', '#141414', '#464444', 'heart', 'hood', 'over-knee', 'scythe']);
+assert.deepEqual(readHero(JSON.parse(JSON.stringify(owl)), KITS.sock), owl, 'and saves and loads as it is');
+// The Sweater starts as the designer's lion, its silver scarf wrapped twice
+const boss = newVillain('sweater');
+assert.deepEqual([boss.species, boss.look.scarf, boss.look.scarfForm, boss.look.scarfColor, boss.look.hat, boss.look.cape], ['lion', 'trailing', 'wrapped twice', '#c0c4cc', 'earflap', 'cape']);
+// its scarf climbs the face: the top edge about the middle of its eyes; without the cover, below them, as any scarf
+const scarfTop = (cover) => {
+  const v = newVillain('sweater');
+  Object.assign(v.look, { scarfCover: cover, hat: null, cape: null, sweater: null, socks: null });
+  const b = buildHero(v, KITS.sweater.palette), eye = b.joints.eye[0];
+  b.root.updateMatrixWorld(true);
+  let top = -Infinity;
+  b.root.traverse((o) => { if (o.isMesh && o.material?.userData?.family === 'garment') top = Math.max(top, new THREE.Box3().setFromObject(o).max.y); });
+  return top - eye.node.getWorldPosition(new THREE.Vector3()).y;
+};
+assert.equal(boss.look.scarfCover, 1);
+assert.ok(Math.abs(scarfTop(1)) < 0.04, `the face wrap's top is at the eyes' middle (${scarfTop(1).toFixed(3)} off)`);
+assert.ok(scarfTop(0) < -0.07, `an ordinary wrapped scarf stays below the eyes (${scarfTop(0).toFixed(3)})`);
+assert.equal(readHero({ species: 'lion', look: { scarfCover: 1 } }).look.scarfCover, 0, 'a hero has no face wrap');
+// every garment it offers builds, on the Sock Clan's and The Sweater's starting looks
+for (const who of ['sock', 'sweater']) {
+  for (const [kind, list] of Object.entries(KITS[who].wear)) for (const v of list) {
+    const villain = newVillain(who);
+    villain.look[kind] = v;
+    assert.doesNotThrow(() => buildHero(villain, KITS[who].palette), `${who} in ${kind} ${v}`);
+  }
+}
+console.log('hero ok');

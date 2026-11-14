@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 70 1000 540">
+  <title>Teenage Mitten Knitting Turtles: Turtles in Twine, The Sweater's Revenge</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Luckiest+Guy&amp;display=block');
+    .toon { font-family: 'Luckiest Guy', 'Arial Black', Impact, sans-serif; text-anchor: middle; }
+    .ink { stroke: #141414; stroke-width: 5; stroke-linejoin: round; stroke-linecap: round; }
+    .line { fill: none; stroke-linecap: round; }
+  </style>
+  <defs>
+    <radialGradient id="silver" cx="0.38" cy="0.32" r="0.75">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.35" stop-color="#d9dce2"/>
+      <stop offset="1" stop-color="#868c97"/>
+    </radialGradient>
+    <clipPath id="ball"><circle cx="500" cy="340" r="260"/></clipPath>
+    <!-- the cartoon's lumpy letters: wobble every edge, outline included -->
+    <filter id="lumpy" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7"/>
+      <feDisplacementMap in="SourceGraphic" scale="6" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <!-- stockinette: columns of Vs, each V two leaning loops, so the letters read as knitted -->
+    <pattern id="knit" width="18" height="14" patternUnits="userSpaceOnUse">
+      <rect width="18" height="14" fill="#3f9632"/>
+      <g fill="#6fcb57" stroke="#2a6e20" stroke-width="1.5">
+        <ellipse cx="5.4" cy="7" rx="3.6" ry="7" transform="rotate(-28 5.4 7)"/>
+        <ellipse cx="12.6" cy="7" rx="3.6" ry="7" transform="rotate(28 12.6 7)"/>
+      </g>
+      <path class="line" stroke="#ffffff55" stroke-width="1.5" d="M4 3 L6 8 M14 3 L12 8"/>
+    </pattern>
+    <!-- the big word, a letter at a time along an arch (textPath anchors differ between browsers); drawn twice -->
+    <g id="turtles" class="toon" font-size="190">
+      <text x="146" y="480" textLength="108" lengthAdjust="spacingAndGlyphs" transform="rotate(-15.8 146 410)">T</text>
+      <text x="264" y="452" textLength="108" lengthAdjust="spacingAndGlyphs" transform="rotate(-10.7 264 382)">U</text>
+      <text x="382" y="436" textLength="108" lengthAdjust="spacingAndGlyphs" transform="rotate(-5.4 382 366)">R</text>
+      <text x="500" y="430" textLength="108" lengthAdjust="spacingAndGlyphs" transform="rotate(0.0 500 360)">T</text>
+      <text x="618" y="436" textLength="108" lengthAdjust="spacingAndGlyphs" transform="rotate(5.4 618 366)">L</text>
+      <text x="736" y="452" textLength="108" lengthAdjust="spacingAndGlyphs" transform="rotate(10.7 736 382)">E</text>
+      <text x="854" y="480" textLength="108" lengthAdjust="spacingAndGlyphs" transform="rotate(15.8 854 410)">S</text>
+    </g>
+  </defs>
+
+  <!-- in place of the cartoon's sewer lid, a giant ball of yarn, silver -->
+  <g id="yarn-ball">
+    <path id="yarn-end" class="line" stroke="#141414" stroke-width="16" d="M740 440 C820 470 830 560 900 540 C950 525 940 470 905 480"/>
+    <path class="line" stroke="#c9cdd4" stroke-width="8" d="M740 440 C820 470 830 560 900 540 C950 525 940 470 905 480"/>
+    <circle fill="url(#silver)" cx="500" cy="340" r="260"/>
+    <g id="wraps" clip-path="url(#ball)" class="line">
+      <g stroke="#9aa0aa" stroke-width="7">
+        <ellipse cx="500" cy="340" rx="280" ry="50" transform="rotate(-25 500 340)"/>
+        <ellipse cx="500" cy="340" rx="280" ry="110" transform="rotate(-25 500 340)"/>
+        <ellipse cx="500" cy="340" rx="280" ry="170" transform="rotate(-25 500 340)"/>
+        <ellipse cx="500" cy="340" rx="280" ry="230" transform="rotate(-25 500 340)"/>
+      </g>
+      <g stroke="#f4f5f7" stroke-width="6">
+        <ellipse cx="500" cy="340" rx="280" ry="80" transform="rotate(62 500 340)"/>
+        <ellipse cx="500" cy="340" rx="280" ry="150" transform="rotate(62 500 340)"/>
+        <ellipse cx="500" cy="340" rx="280" ry="215" transform="rotate(62 500 340)"/>
+      </g>
+    </g>
+    <circle class="ink" stroke-width="10" fill="none" cx="500" cy="340" r="260"/>
+  </g>
+
+  <!-- the red banner -->
+  <g id="banner">
+    <path class="ink" stroke-width="12" fill="#e8283a" d="M110 110 H890 L840 205 H160 Z"/>
+    <text class="toon" x="500" y="186" font-size="74" textLength="640" lengthAdjust="spacingAndGlyphs"
+      fill="#ffffff" stroke="#141414" stroke-width="6" paint-order="stroke">TEENAGE MITTEN KNITTING</text>
+  </g>
+
+  <!-- TURTLES: green, thick black outline, knitted all over in place of the cartoon's lumps -->
+  <g id="turtles-word" filter="url(#lumpy)">
+    <use xlink:href="#turtles" fill="#141414" stroke="#141414" stroke-width="26" stroke-linejoin="round"/>
+    <use xlink:href="#turtles" fill="url(#knit)"/>
+  </g>
+
+  <text id="title" class="toon" x="500" y="575" font-size="40" textLength="620" lengthAdjust="spacingAndGlyphs"
+    fill="#ffffff" stroke="#141414" stroke-width="9" paint-order="stroke">TURTLES IN TWINE: THE SWEATER'S REVENGE</text>
+
+</svg>

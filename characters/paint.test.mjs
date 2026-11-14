@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { BASE_PARAMS, createCharacter, getSpecies, speciesIds, setGeometryDetail } from './npc.js';
-import { FRAY_BAND, FUR_RAMP, INK_RAMP, PAINT, inkFrays, paintBright, paintRamp } from './paint.js';
+import { FRAY_BAND, FUR_RAMP, INK_RAMP, PAINT, inkFromQuery, inkFrays, inkOutline, paintBright, paintRamp } from './paint.js';
 import { aimGameCamera } from '../spinoff/stage.js';
 import './species.js';
 
@@ -124,6 +124,28 @@ assert.ok(inkFrays(0, 0.05, PAINT.fray.value), 'the ink never frays');
   console.log(`owl ink, match camera: ${holes.length} of ${solid.size} px fray open, the deepest ${deepest} px in from the outline`);
   assert.ok(holes.length > solid.size * 0.1, `the fray is too faint to see (${holes.length} px)`);
   assert.ok(deepest <= 8, `the fray opens a hole ${deepest} px in from the outline`);
+}
+
+// the ink trial: off without the address saying so, clamped when it does; never round the eyes (the pupils)
+assert.equal(inkFromQuery(''), false);
+assert.deepEqual([PAINT.ink.value, PAINT.edgePool.value], [0, 0], 'off in the games');
+assert.equal(inkFromQuery('?ink=9&pool=-3'), true);
+assert.deepEqual([PAINT.ink.value, PAINT.edgePool.value], [0.02, 0]);
+for (const mergeMeshes of [true, false]) {
+  const inked = createCharacter({ ...BASE_PARAMS, mergeMeshes }, 'turtle');
+  inkOutline(inked.root);
+  const lined = []; inked.root.traverse((o) => { if (o.userData.ink) lined.push(o.parent.material.userData.family); });
+  assert.ok(lined.length && !lined.includes('eye'), `an outline, not on the eyes (${new Set(lined).size} kinds)`);
+}
+// the mask and face paint, open patches with no back to outline, get an ink edge under them, wider all round
+const sizeOf = (o) => new THREE.Box3().setFromBufferAttribute(o.geometry.attributes.position).getSize(new THREE.Vector3());
+for (const facePaint of ['rings', 'heart']) {
+  inkFromQuery('?ink=0.004');
+  const c = createCharacter({ ...BASE_PARAMS, facePaint, mergeMeshes: false }, 'turtle');
+  const paint = c.root.getObjectByName('facePaint'), edge = c.root.getObjectByName('facePaintInk');
+  assert.ok(edge && sizeOf(edge).x > sizeOf(paint).x + 0.004 && sizeOf(edge).y > sizeOf(paint).y + 0.004, `${facePaint}: an ink edge round it`);
+  inkFromQuery('');
+  assert.equal(createCharacter({ ...BASE_PARAMS, facePaint, mergeMeshes: false }, 'turtle').root.getObjectByName('facePaintInk'), undefined, `${facePaint}: none in the games`);
 }
 
 console.log('paint: ok');

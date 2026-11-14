@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Turtles in Twine</title>
+<style>
+  /* as the donut fighters' tap page (spinoff/index.html): no pull-to-refresh, reloading this page drops every room */
+  html, body { margin: 0; height: 100%; height: 100dvh; overflow: hidden; overscroll-behavior: none; background: #f6e7d4; touch-action: none; }
+  #tap { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2vmin; width: 100%; height: 100%; border: 0; background: none; cursor: pointer; }
+  /* the logo is put into the page itself (below), so its own font loads and no second document is made */
+  #logo svg { display: block; width: min(94vw, 150vh); max-height: 74vh; }
+  #tap .emoji { font-size: 14vmin; line-height: 1; }
+  iframe { display: block; width: 100%; height: 100%; height: 100dvh; border: 0; }
+</style>
+<script type="importmap">
+{ "imports": { "trystero": "https://esm.sh/trystero@0.26.0" } }
+</script>
+</head>
+<body>
+<!-- REUSE-SPEC.md §Hero chooser, The logo is the splash screen: the donut fighters' tap page with the logo as the
+     button. The game runs in the frame, so going from screen to screen never leaves fullscreen, and the rooms
+     (spinoff/rooms.js) live here, so it never drops the other tablets. -->
+<button id="tap" aria-label="Turtles in Twine: tap to play">
+  <span id="logo" aria-hidden="true"></span>
+  <span class="emoji" aria-hidden="true">🐢👆</span>
+</button>
+<script>
+  const q = new URLSearchParams(location.search);
+  fetch('logo.svg').then((r) => r.text()).then((svg) => { const logo = document.getElementById('logo'); if (logo) logo.innerHTML = svg; });
+  try {
+    for (const k of ['debug', 'debug_menu']) sessionStorage.setItem(`donut.${k}`, q.get(k) ?? '0');
+  } catch { /* private mode */ }
+  document.getElementById('tap').addEventListener('click', (e) => {
+    document.documentElement.requestFullscreen?.().catch(() => {});
+    window.donutRooms = import('../spinoff/rooms.js');
+    // a game page opened by itself comes back here as ?open=, and opens once tapped; only the game's own pages
+    const open = /^(choose|lobby|level)\.html(\?[^"<>]*)?$/.test(q.get('open') ?? '') ? q.get('open') : 'choose.html';
+    e.currentTarget.outerHTML = `<iframe src="${open}" allow="fullscreen; screen-wake-lock"></iframe>`;
+  });
+</script>
+</body>
+</html>

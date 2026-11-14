@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Turtles in Twine — level map</title>
+<!-- REUSE-SPEC.md §Level 1, Building it, step 1: a generated level drawn flat, side on, to check the generator before
+     there is a level to play. ?seed= picks the level; ← → the seed before and after. -->
+<style>
+  body { margin: 0; font: 14px sans-serif; background: #fbf7f0; color: #141414; }
+  header { position: sticky; left: 0; padding: 10px 16px; display: flex; gap: 12px; align-items: center; }
+  button { font-size: 20px; padding: 4px 14px; }
+  #map { overflow-x: auto; padding: 0 16px 16px; }
+  svg text { font-size: 11px; }
+</style>
+</head>
+<body>
+<header><button id="prev" aria-label="previous seed">←</button><b id="what"></b><button id="next" aria-label="next seed">→</button></header>
+<div id="map"></div>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.186.1/build/three.module.js" } }
+</script>
+<script type="module">
+import { generateLevel } from './generate.js';
+
+const PX = 60, H = 3, q = new URLSearchParams(location.search);
+let seed = Number(q.get('seed')) || 1;
+const Y = (y) => (H - y) * PX, X = (x) => x * PX;
+const COLOUR = { slide: '#2a7f6f', pole: '#e0b800', dome: '#9aa0a6', grid: '#f0b648', squiggle: '#f0b648', stairs: '#3a3a3a' };
+
+// from above: z from the back wall (top) to the front (bottom, the camera's side); darker, higher
+const Zp = (z) => (z + 2) * PX + 5, shade = (y) => `hsl(230 20% ${Math.round(80 - y * 25)}%)`;
+const box = (b, fill, extra = '') => `<rect x="${X(b.x0)}" y="${Zp(b.z0)}" width="${X(b.x1 - b.x0)}" height="${(b.z1 - b.z0) * PX}" fill="${fill}" ${extra}/>`;
+function above(L) {
+  const [ground, ...decks] = L.floors;
+  return [
+    box(ground, '#e8dfd2'),
+    ...decks.map((f) => box(f, shade(f.y), 'stroke="#141414" stroke-width="1"')),
+    ...L.climbs.map((c) => box(c, COLOUR[c.kind], 'opacity="0.8"')),
+    ...L.stairs.map((q) => box(q.box, '#6a6a6a', 'opacity="0.8"')),
+    ...L.rides.map((q) => `<line x1="${X(q.x0)}" y1="${Zp(q.z0)}" x2="${X(q.x1)}" y2="${Zp(q.z1)}" stroke="${COLOUR[q.kind]}" stroke-width="6" stroke-linecap="round"/>`),
+    // a bar, or a swing's top beam, across the way it swings
+    ...L.swings.map((q) => {
+      const t = ((q.h + 90) * Math.PI) / 180, dx = (Math.cos(t) * q.span) / 2, dz = (Math.sin(t) * q.span) / 2;
+      return `<line x1="${X(q.x - dx)}" y1="${Zp(q.z - dz)}" x2="${X(q.x + dx)}" y2="${Zp(q.z + dz)}" stroke="${q.kind === 'bar' ? '#f0b648' : '#2f3db8'}" stroke-width="${q.kind === 'bar' ? 4 : 6}" stroke-linecap="round"/>`;
+    }),
+  ];
+}
+
+function draw() {
+  const L = generateLevel(seed), w = L.floors[0].x1;
+  const parts = [
+    `<line x1="0" y1="${Y(0)}" x2="${X(w)}" y2="${Y(0)}" stroke="#8a7f74" stroke-width="3"/>`,
+    ...L.spans.map((sp, i) => `<rect x="${X(sp.x0)}" y="4" width="${X(sp.x1 - sp.x0)}" height="${Y(0) - 4}" fill="#2f3db811"/>`
+      + `<text x="${X(sp.x0) + 4}" y="16">${L.structures[i].join(' › ')}</text>`),
+    ...L.floors.slice(1).map((f) => `<rect x="${X(f.x0)}" y="${Y(f.y)}" width="${X(f.x1 - f.x0)}" height="6" fill="${L.bridges.includes(f) ? '#f0b648' : '#3a3a3a'}"/>`),
+    ...L.climbs.map((c) => `<rect x="${X(c.x0)}" y="${Y(c.y1)}" width="${X(c.x1 - c.x0)}" height="${(c.y1 - c.y0) * PX}" fill="${COLOUR[c.kind]}" opacity="0.7"/>`),
+    ...[...L.rides, ...L.stairs].map((r) => `<line x1="${X(r.x0)}" y1="${Y(r.y0)}" x2="${X(r.x1)}" y2="${Y(r.y1)}" stroke="${COLOUR[r.kind]}" stroke-width="6" stroke-linecap="round"/>`),
+    ...L.swings.map((s) => `<circle cx="${X(s.x)}" cy="${Y(s.y)}" r="${s.arm * PX}" fill="none" stroke="#2f3db8" stroke-dasharray="4 3"/><circle cx="${X(s.x)}" cy="${Y(s.y)}" r="3" fill="#2f3db8"/>`),
+    ...L.bursts.map((b) => `<text x="${X(b.x)}" y="${Y(0) + 16}">🐻</text>`),
+  ];
+  document.getElementById('map').innerHTML = `<svg width="${X(w) + 20}" height="${Y(0) + 24}">${parts.join('')}</svg>`
+    + `<p>From above, the camera at the bottom:</p><svg width="${X(w) + 20}" height="${4 * PX + 10}">${above(L).join('')}</svg>`;
+  document.getElementById('what').textContent = `seed ${seed} · ${L.seconds.toFixed(0)} s · ${L.structures.length} structures · ${w.toFixed(0)} units long`;
+  history.replaceState(null, '', `?seed=${seed}`);
+}
+
+document.getElementById('prev').onclick = () => { seed--; draw(); };
+document.getElementById('next').onclick = () => { seed++; draw(); };
+draw();
+</script>
+</body>
+</html>

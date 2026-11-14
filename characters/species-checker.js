@@ -10,7 +10,7 @@ import { addGround, addLights, cameraKeys, frameObjects, makeViewer, onKeys } fr
 import { danceSlots, freshParams, nextDance, randomOpts, stepSlot } from './slot-motion.js';
 import { aimGameCamera } from '../spinoff/stage.js';
 import { FUR, LOOKS, setFur } from '../spinoff/fighter.js';
-import { PAINT } from './paint.js';
+import { PAINT, inkMaterial, inkOutline } from './paint.js';
 
 console.info('LYS build', BUILD);
 
@@ -89,6 +89,7 @@ function buildSlot(id) {
   slot.params ??= freshParams(slot.speciesId);
   Object.assign(slot.params, state.style);
   const character = createCharacter(slot.params, slot.speciesId);
+  inkOutline(character.root);
   character.root.position.x = slotX(id);
   character.root.rotation.y = slotYaw(id);
   setViewMode(character.root, state.view);
@@ -418,6 +419,9 @@ function addPaintKnobs(folder) {
   folder.add(PAINT.soft, 'value', 0, 0.5, 0.01).name('fur band edge');
   folder.add(PAINT.fray, 'value', 0, 0.8, 0.01).name('ink fray (outline)');
   folder.add(PAINT.feather, 'value', 0, 1, 0.01).name('ink feather rows');
+  folder.add(PAINT.pool, 'value', 0, 1, 0.01).name('ink pool (owl, dark at the edge)');
+  folder.add(PAINT.edgePool, 'value', 0, 1, 0.01).name('fur pool (the rest, checker only)');
+  folder.add(PAINT.ink, 'value', 0, 0.02, 0.0005).name('ink outline (checker only)').onChange((v) => { inkMaterial().visible = v > 0; }).onFinishChange(buildAll);
   folder.add(PAINT.scales, 'value', 0, 1, 0.01).name('scales (dragon)');
   folder.add(PAINT.scaleSize, 'value', 0.3, 3, 0.01).name('scale size');
   folder.close();

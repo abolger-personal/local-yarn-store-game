@@ -18,7 +18,7 @@ import { FT, JUMP_FT, PIECES, joins } from './pieces.js';
  * @typedef {{ x: number, z: number }} Spot
  * @typedef {Omit<import('../spinoff/match.js').Stage, 'floors'> & { floors: Floor[], climbs: Climb[], rides: Path[],
  *   stairs: Path[], swings: Pivot[], bridges: (Floor & { h: number })[], bursts: Spot[], covers: Spot[], structures: string[][],
- *   spans: { x0: number, x1: number }[], seconds: number, slices: { x: number, y: number, z: number }[] }} Level
+ *   spans: { x0: number, x1: number }[], seconds: number, slices: { x: number, y: number, z: number }[], guards: Spot[] }} Level
  */
 
 // REUSE-SPEC.md §Level 1: 90 s to 2 min for the designer, fighting included; structures 3 to 5 s' walk apart
@@ -238,7 +238,7 @@ function gap(L, r, x, always = null) {
 /** @returns {Level} an empty level, its one hero start and shelf at the left end (spinoff/sim.js needs a shelf) */
 const emptyLevel = () => ({
   ...parts(), backWall: BAND.z0, shelves: [{ team: 'heroes', x: 0.5, z: -1.7, y: 0 }], zones: [], puddles: [], bricks: [],
-  ringOut: { x0: -2, x1: 0, z1: 3.5, y: -3 }, starts: [{ x: 1, z: 0 }], structures: [], spans: [], seconds: 0, slices: [],
+  ringOut: { x0: -2, x1: 0, z1: 3.5, y: -3 }, starts: [{ x: 1, z: 0 }], structures: [], spans: [], seconds: 0, slices: [], guards: [],
 });
 
 // a climb is solid to its top, and so is a flight of stairs, to its high end: equipment.js takes a hero up either
@@ -280,10 +280,13 @@ function slicesOf(L) {
 // first structure, the way up onto its second
 const MUST = [(ids) => ids.at(-1) === 'pole', (ids) => ids[0] === 'grid'];
 
+const GUARD_Z = 0.9;
+
 /**
  * A level for this seed: ground, then structures turning through the band with ground between, until it takes
  * `SECONDS.min` to `max`. Level `n` 2 and on (REUSE-SPEC.md §Level 2) has swings or bars on every ground stretch, the
- * swings first, so they can be played with; its ground time can run it a little over.
+ * swings first, so they can be played with; its ground time can run it a little over. Level 3 and on (§Level 3) has a Sock Clan
+ * soldier's post on the ground after every structure, and the shelf the sim wants for their team, out past the gate.
  * @param {number} seed @param {number} [n] @returns {Level}
  */
 export function generateLevel(seed, n = 1) {
@@ -294,5 +297,9 @@ export function generateLevel(seed, n = 1) {
   Object.assign(L.ringOut, { x1: r3(x + 2) });
   L.seconds = r3(L.seconds);
   L.slices = slicesOf(L);
+  if (n >= 3) {
+    L.guards = L.spans.map((s, i) => ({ x: r3((s.x1 + (L.spans[i + 1]?.x0 ?? x)) / 2), z: GUARD_Z }));
+    L.shelves = [...L.shelves, { team: 'badGuys', x: r3(x + 1.5), z: -1.7, y: 0 }];
+  }
   return L;
 }

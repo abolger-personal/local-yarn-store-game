@@ -402,6 +402,77 @@ straight up):
 - **In the air an arrow or a tap steers**, not during a dismount's flight, which goes where it was sent.
 - Only in this game: the donut fighters' jump is unchanged.
 
+### Build my playground
+
+Brainstorm 2026-11-15, from the six-year-old playtester: "I want to build my playground and choose my color", then
+"that swing, and then slide, and then monkey bars, and...". A **playground button** that opens a screen where a kid
+builds a playground and then plays it.
+
+Decided 2026-11-15 (the playtester's answers, passed on by the designer):
+- **Pieces are dragged** to where the builder wants them, not tapped into a line.
+- **A different colour for every piece**, the builder's choice.
+- **The builder chooses where the pizza and the bad guys go.**
+- **A playground is saved** to play again, **and can be played on the other tablets.**
+- **The button is on the level screen, next to the level numbers**, with its own emoji: a wrench or a set of blocks.
+  **Not an emoji newer tablets only have**: the slide emoji (2021) shows as a blank box on some of the tablets, so
+  the stage button that used it is now the carousel horse (fixed the same day).
+
+Decided 2026-11-15 (the designer, after the second round of questions):
+- **No unusable pieces.** A piece that has nowhere to go isn't offered: with no deck to join a slide to, the slide's
+  button is hidden. Dragged onto the screen, a piece **snaps to the closest place it fits**. **Tests** must show a
+  piece such as a slide can be dragged to more than one side of a deck.
+- **Up to 100 pieces** a playground.
+- **Every playground ends with the gate and the giant pizza.**
+- **One playground per kid**, for now (keep it simple).
+- **Invite only.** A kid's playground is one of the levels the **host of a room** can pick, on the level screen:
+  whoever is "home" and choosing the level can choose their own playground.
+
+Notes for planning (mine, 2026-11-15; nothing is planned or built):
+- A level is already a list of piece ids strung together by `tmnt/generate.js`, with rules that keep it walkable
+  (pieces join at matching heights, never overlap, never block the way). Dragging pieces anywhere gives those rules
+  up, so a built playground needs its own: snap to a grid, and a check that the gate can be reached.
+- Colour per piece is new: the scenery's colours are fixed today.
+- Monkey bars to cross hand over hand aren't a piece yet; the bars are for swinging round.
+- Playing it on other tablets needs the playground sent between them: the donut fighters' rooms already send a
+  level's settings to every tablet.
+
+### A big hammer for the turtles
+
+Brainstorm 2026-11-15, for later, from the six-year-old playtester: "why does the ninja turtles never have a big
+hammer, but you could choose whatever color you want and it's not straight". A big hammer a hero can hold, in any
+colour the player picks, and **not straight** (what that means is open: a bent handle, a wonky head?).
+- The donut fighters' Greathammer exists, and the Sock Clan's mouse carries it; the heroes' chooser leaves it out on
+  purpose (§Hero chooser: "not the fighters' sword, scythe or hammer"), so this would change that decision.
+- Its colour today is its own, not the player's.
+- Not decided, not planned, not built.
+
+### Level 3
+
+Decided and built 2026-11-14 (the designer: "it's time to add villains to TMNT in level 3. I want level 3 generated,
+but the bad guys should try to stop you from getting pizza. They should respawn, but way slower than pizza: they
+are allowed back to the playground after a 2:00 time out"). `tmnt/guard.js`, drawn in `tmnt/level.js`.
+- **Generated as level 2** (swings or bars on every ground stretch), plus **a Sock Clan soldier's post on the ground
+  after every structure**, where the launch slices hang. The five saved designs take the posts in turn.
+- **A soldier keeps its post** until a hero comes within 5 of it on or near the ground; then it walks up and
+  punches (half a second to notice, a punch every 0.8 s, as the donut fighters' CPU), and goes back when the hero
+  has gone. It walks at **a quarter of a hero's speed** (decided 2026-11-10).
+- **Combat is the donut fighters', unchanged** (decided 2026-11-15, the designer: "that's been tablet tuned"),
+  ring-outs and all. This replaces the first build's rules of the day before (a hero's damage percent held to 40; a
+  soldier out on one big enough hit anywhere).
+- **A soldier's punch can send a hero back to the start** (decided 2026-11-15, "like the donut fighter game is
+  desired"): a hero knocked off the front of the playground is rung out, and drops in at the start a moment later.
+  Walking, a hero still can't step off the front or back.
+- **A soldier is beaten by being knocked out of the playground**: off the front or an end (the donut fighters'
+  ring-out), or into the back fence, which it goes over. Playtest 2026-11-15: the six-year-old had no trouble, with
+  about five kicks.
+- **It stands, sad, behind the back fence where it went out** (decided 2026-11-15, "so kids can see what they did
+  with the ring out"; the first build sent the ones rung out off the front to the far end of the level). It tumbles
+  there over the fence.
+- **It is allowed back after 2:00**, at its post.
+- **Only soldiers within 14 of the hero are drawn** and animated: each is as heavy to draw as a hero.
+- Brainstorm, not built: stealing pizza (§Pizza); soldiers on the equipment and out of the bear cave; a dismount's
+  one-hit knockout (§Dismounts); what a soldier's hit costs a hero beyond the knock; soldiers in multiplayer.
+
 ### Pizza
 
 Decided and built 2026-11-12 (the designer: "the characters have no idea what they should be going for"):
@@ -419,7 +490,17 @@ Decided and built 2026-11-12 (the designer: "the characters have no idea what th
   are no opponents in a level yet, and it needs deciding what a bad guy holding pizza does with it.
 - Not built: anything the slices are for (a score, an unlock, the attack item); a slice count on finishing; reaching
   the giant pizza doing anything of its own (the gate beside it ends the level).
-
+- **Slices come back** (decided and built 2026-11-14, the designer: the kids are having fun staying on a level): an
+  eaten slice is back in its place 20 seconds later, and 🍕 keeps counting up.
+- **The giant pizza can be got** (decided and built 2026-11-15, playtest on levels 1 to 3: "it's hard to get the big
+  pizza at the end"; it hung up by the back fence and nothing got it). It now stands low in front of the gate, so
+  walking out walks into it: it's eaten, and counts as a whole pizza, eight slices.
+- **A tap on a slice is for the slice** (decided and built 2026-11-14, reworked 2026-11-15; playtests: a kid on a
+  swing tapped the pizza and never got it, and taps on slices on foot did nothing). A tap within a finger's width
+  (60 px) of a slice on screen means that slice, not the ground far behind it, and not nothing where the finger's
+  line meets no ground at all. Off a bar or a swing the launch flies through it. On foot the hero walks to stand
+  under it (up on the deck or bridge, if the slice is over one), then jumps for it and jumps again in the air. If
+  it can't get under it, it stays put, as for any spot it can't walk to.
 ### Level 2
 
 Built 2026-11-12, the designer's ask: **a generated level 2 to work on the swings**, since a level 1 seed can have
@@ -587,8 +668,8 @@ Built 2026-11-09: `tmnt/choose.html` on `tmnt/choose.js` and `tmnt/hero.js`, ove
   - **April** (the fifth default), leggy: **an orange llama** (amended 2026-11-09) in her jumpsuit (the yellow
     pullover), white over-knee boots, a blue drawstring bag, a heart on her cheek, and her microphone.
 - **The face** (decided 2026-11-10): none, the mask (rings round the eyes), a heart, or **black-rimmed glasses**;
-  not the NFL eye black, which doesn't show on a turtle. The mask is the scarf's colour, so a turtle's sync up (the
-  fur's complement with no scarf), and narrow on a turtle's big eyes (`faceOf`). Glasses are a rim round the front
+  not the NFL eye black, which doesn't show on a turtle. The mask is the scarf's colour, so a turtle's sync up (with
+  no scarf, the hands' colour, decided 2026-11-14: the fur's complement made a scarfless Raphael's purple), and narrow on a turtle's big eyes (`faceOf`). Glasses are a rim round the front
   of each eye, and a bridge when the eyes are far enough apart (`buildHero`). **All four turtles start in their
   masks** (amended 2026-11-10, the kids asked), Donatello's glasses over his; the face row still picks one or the other.
 - 🎲 any animal, colours and pieces. **🍕 a preset** (decided 2026-11-10): **six presets**, the four turtles, April and
@@ -712,7 +793,9 @@ enough for its wraps to reach, each climbing three quarters of its height; and i
 (measured from the head's own surface near its midline), not through it. Measured on The Sweater's lion at 1: the top
 0.02 under the eyes' middle, 0.08 clear of the muzzle. **To tune it:** the Dress Up screen's scarf folder has a
 "face cover" slider (under "as made"), and the villain designer's scarf row has a 🥷 slider. The Sweater starts at 1.
-Heroes can't have it. **Playtest 2026-11-12: the slider is great, and its top value is right for The Sweater.**
+Heroes can't have it. **Playtest 2026-11-12: the slider is great, and its top value is right for The Sweater.** **Playtest 2026-11-14, a
+kid: "The Sweater's eyes need to be covered more"**: the slider now runs to 1.5, where the wrap climbs on past the
+eyes' middle to the hat, leaving only the tops of the eyes; The Sweater starts there.
 
 **The Sweater** (decided 2026-11-09) is **gigantic**, in a gigantic silver and purple `sweater`, a silver hat and a
 purple capelet (`capelet` is one of the fighters' capes). Gigantic means everything scales up together: things are

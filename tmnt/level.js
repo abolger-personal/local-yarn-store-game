@@ -12,8 +12,9 @@ import { SIM } from '../spinoff/sim.js';
 import { aimGameCamera, makeStage } from '../spinoff/stage.js';
 import { BRIDGE, bridgeLift, bridgeSlide, climbStep, airSpan, dismountOf, dismountTime, onBridge, onStairs, rideStep, stairDip, stairsOff, startClimb, startRide, startSwing, swingStep, tappedPivot } from './equipment.js';
 import { BAND, climbsOf, forSim, generateLevel } from './generate.js';
-import { buildHero, faceOf, loadHero } from './hero.js';
-import { GATE, outdoors, playground, pizzaTime, sway, swingSeats } from './scenery.js';
+import { GUARD, createGuard, guardTick } from './guard.js';
+import { KITS, buildHero, faceOf, loadHero, newVillain } from './hero.js';
+import { GATE, PIE, outdoors, playground, pizzaTime, sway, swingSeats } from './scenery.js';
 
 // REUSE-SPEC.md §Level 1, Building it, step 2: the hero walks a generated level on the donut fighters' sim
 // (spinoff/sim.js), with their keys and taps; decks are floors, so walking, jumping and falling off work already.
@@ -34,8 +35,16 @@ scene.add(...playground(level));
 const built = buildHero(mine), g = new THREE.Group().add(built.root), shadow = makeShadow(scene);
 scene.add(g);
 const solid = /** @type {any} */ (forSim(level));
-// the donut fighters' later levels' rules: double jump on
-const state = SIM.createMatch([entrantOf(faceOf(mine), built, { id: ME, team: 'heroes' })], solid, { match: { ...MATCH, doubleJump: true } });
+// REUSE-SPEC.md §Level 3: a Sock Clan soldier at each of the level's posts, each of the five designs in turn
+const socks = level.guards.map((post, i) => {
+  const who = newVillain('sock', undefined, i), made = buildHero(who, KITS.sock.palette), body = new THREE.Group().add(made.root);
+  scene.add(body);
+  return Object.assign(createGuard(`sock${i}`, post), { who, built: made, body, shown: null, flew: null });
+});
+// the donut fighters' later levels' rules: double jump on; bad guys a quarter as fast
+const state = SIM.createMatch([entrantOf(faceOf(mine), built, { id: ME, team: 'heroes' }), ...socks.map((s) => entrantOf(faceOf(s.who), s.built, { id: s.id, team: 'badGuys' }))],
+  solid, { match: { ...MATCH, doubleJump: true, badGuyPace: GUARD.pace } });
+for (const s of socks) Object.assign(state.fighters.find((f) => f.id === s.id), { x: s.post.x, z: s.post.z });
 const controls = createControls(ME, solid);
 attachControls(controls, { camera, canvas: stage.renderer.domElement, buttons: { punch: el('punch'), kick: el('kick'), drop: el('drop') }, keyHelp: el('keys') });
 
@@ -214,41 +223,124 @@ function getOff() {
   using = null;
 }
 
-// REUSE-SPEC.md §Pizza: a slice is eaten by getting to it; 🍕 counts them
-const SLICE_REACH = 0.65, eaten = new Set();
+// REUSE-SPEC.md §Pizza: a slice is eaten by getting to it; 🍕 counts them; an eaten one is back a while later
+const SLICE_REACH = 0.65, SLICE_BACK = 20 * TICK_HZ, eaten = new Map();
+let ate = 0, pieEaten = false;
+// the giant pizza at the end is a whole pizza, eight slices, got by walking into it on the way out the gate
+const PIE_REACH = 1, PIE_SLICES = 8;
+function eatPie(f) {
+  if (pieEaten || Math.hypot(f.x - (ground.x1 - PIE.back), f.z) > PIE_REACH || f.y > PIE.y + PIE_REACH) return;
+  pieEaten = true;
+  el('slices').textContent = `🍕 ${(ate += PIE_SLICES)}`;
+}
 function eat(f) {
+  eatPie(f);
   level.slices.forEach((s, i) => {
+    if (state.tick - eaten.get(i) >= SLICE_BACK) eaten.delete(i);
     if (eaten.has(i) || Math.hypot(f.x - s.x, f.y + (f.height ?? 0.86) / 2 - s.y, f.z - s.z) > SLICE_REACH) return;
-    eaten.add(i);
-    el('slices').textContent = `🍕 ${eaten.size}`;
+    eaten.set(i, state.tick);
+    el('slices').textContent = `🍕 ${++ate}`;
   });
+}
+
+// REUSE-SPEC.md §Pizza: a tap on a slice is for the slice, not the ground the finger's line comes down on far behind it,
+// or nothing at all where that line meets no ground (playtest 2026-11-14 and 15). Off a bar or a swing the hero flies
+// through it; on foot it goes to stand under it (on the deck or bridge there, if one is) and jumps for it, twice.
+const SLICE_TAP = 60, HOP_NEAR = 0.35, _seen = new THREE.Vector3();
+let sliceTapped = null, sliceWant = null, hops = 0;
+function sliceAt(e) {
+  const box = stage.renderer.domElement.getBoundingClientRect();
+  const off = (s) => Math.hypot(((_seen.set(s.x, s.y, s.z).project(camera).x + 1) / 2) * box.width + box.left - e.clientX, ((1 - _seen.y) / 2) * box.height + box.top - e.clientY);
+  const near = level.slices.filter((s, i) => !eaten.has(i) && off(s) <= SLICE_TAP).sort((p, q) => off(p) - off(q));
+  return near[0] ?? null;
+}
+stage.renderer.domElement.addEventListener('pointerdown', (e) => { sliceTapped = sliceAt(e); });
+/** Where to stand to jump for slice `s`: under it, on the highest floor there that is below it. */
+function standUnder(s) {
+  const y = Math.max(0, ...solid.floors.filter((o) => s.x >= o.x0 && s.x <= o.x1 && s.z >= o.z0 && s.z <= o.z1 && o.y <= s.y).map((o) => o.y));
+  return y > 0 ? { x: s.x, z: s.z, y } : { x: s.x, z: s.z };
+}
+/** Under the slice it was sent for, the hero jumps, and again in the air; then it's the player's turn again. */
+function hopFor(input, f) {
+  if (!sliceWant || using || input.target) return;
+  if (hops > 1 || eaten.has(level.slices.indexOf(sliceWant))) { sliceWant = null; return; }
+  const first = hops === 0;
+  if (Math.hypot(f.x - sliceWant.x, f.z - sliceWant.z) > HOP_NEAR || f.onGround !== first) return;
+  input.target = { jump: true };
+  hops++;
+}
+function aimSlice(input) {
+  if (!tapped) { hopFor(input, state.fighters[0]); return; }
+  Object.assign(input, sliceTapped && { target: using?.step === onSwing ? { x: sliceTapped.x, z: sliceTapped.z } : standUnder(sliceTapped) });
+  sliceWant = sliceTapped;
+  hops = 0;
+}
+const tapOf = (input, f) => (sliceTapped ? { ...input.target, y: sliceTapped.y - (f.height ?? 0.86) / 2 } : input.target);
+
+// REUSE-SPEC.md §Level 3: a soldier rung out tumbles over the back fence where it went out, and stands there, sad, for
+// its time out
+const SAD_Z = BAND.z0 - 1.3, SAD = { ...POSES.rest, headPitch: 0.5, spineBend: 0.25 }, FLY = { seconds: 0.7, high: 2.5 }, SOCK_SEEN = 14;
+function sockTick() {
+  for (const o of guardTick(state, socks, SAD_Z)) socks.find((s) => s.id === o.id).flew = { ...o, t: 0 };
+}
+const sockInputs = (now) => Object.fromEntries(socks.map((s) => [s.id, s.input(now)]));
+const mix = (a, b, k) => a + (b - a) * k;
+/** A soldier where the sim has it; just sent over, tumbling there over the fence. */
+function flySock(s, f, dt) {
+  const was = s.flew.t < 1 ? s.flew : null, k = was ? (was.t += dt / FLY.seconds) : 1;
+  s.flew = was;
+  if (!was) return;
+  s.body.position.set(mix(was.x, f.x, k), mix(was.y, f.y, k) + 4 * FLY.high * k * (1 - k), mix(was.z, f.z, k));
+  s.body.rotation.x = -k * 2 * Math.PI;
+}
+function drawSock(s, f, dt) {
+  const away = f.respawn > 0;
+  s.body.position.set(f.x, f.y, f.z);
+  s.body.rotation.set(0, away ? 0 : Math.PI / 2 - f.facing, 0);
+  if (s.flew) flySock(s, f, dt);
+  s.shown = shownStrike(s.shown, f.move === 'punch' ? strikeOf('punch', 0, f.facing, f.step) : null);
+  const pose = away ? SAD : MOVE_POSES[f.move] ?? (f.onGround ? POSES.rest : MOVE_POSES.air);
+  stepFighter(s.built, dt, pose, away || !f.onGround ? 0 : Math.hypot(f.vx, f.vz), s.shown);
+}
+/** The soldiers near enough the camera to see; the rest aren't drawn or moved (a tablet can't draw them all). */
+function drawSocks(fighters, dt, x) {
+  for (const s of socks) {
+    const f = fighters.find((o) => o.id === s.id);
+    s.body.visible = Math.abs(f.x - x) < SOCK_SEEN;
+    if (s.body.visible) drawSock(s, f, dt);
+  }
 }
 
 /** After each tick: onto and along the equipment, the bridge rocking, and never off the front or back of the band.
  *  @param {any} input this tick's, from the controls */
 function afterTick(input) {
   const f = state.fighters[0];
-  Object.assign(cmd, { tap: tapped && input.target?.x !== undefined ? input.target : null, jump: Boolean(input.target?.jump), punch: input.punch, kick: input.kick });
+  Object.assign(cmd, { tap: tapped && input.target?.x !== undefined ? tapOf(input, f) : null, jump: Boolean(input.target?.jump), punch: input.punch, kick: input.kick });
   tapped = false;
+  sliceTapped = null;
   using ??= getOn(f) || null;
   if (using && !using.step(f, using.k)) getOff();
   steer(f, input.target);
+  sockTick();
   rockBridge(f);
   eat(f);
   const now = onStairs(flights, f);
   if (flight && !now) stairsOff(flight, f);
   flight = now;
-  f.z = Math.min(BAND.z1 - f.r, Math.max(BAND.z0 + f.r, f.z));
+  // walking, never off the front or back; knocked, a hero can go off the front, and is back at the start (the donut
+  // fighters' ring-out, wanted: playtest 2026-11-15)
+  if (!f.stun) f.z = Math.min(BAND.z1 - f.r, Math.max(BAND.z0 + f.r, f.z));
   throughGate(f);
 }
 
 // REUSE-SPEC.md §Level 1: the level ends out the iron gate, on the way to school (decided 2026-11-12)
 // ponytail: school isn't a level yet, so the gate leads back to the lobby; the fence either side of it isn't solid
 function throughGate(f) {
-  if (out || f.x < ground.x1 - 0.4) return;
-  if (Math.abs(f.z) > GATE - f.r) { f.x = ground.x1 - 0.4; return; }
+  if (f.x < ground.x1 - 0.4) return;
+  // held at the gate for a moment on the way out, so the giant pizza is seen to be eaten
+  if (out || Math.abs(f.z) > GATE - f.r) { f.x = ground.x1 - 0.4; return; }
   out = true;
-  location.href = 'lobby.html';
+  setTimeout(() => { location.href = 'lobby.html'; }, 1200);
 }
 
 /** What sways under the hero: the climb it's on, the bridges it stands on. */
@@ -270,15 +362,17 @@ stage.run((dt) => {
     state.t0 = state.tick;
     const input = controls.take(snap);
     pickDismount(input);
+    aimSlice(input);
     doubleTap(input);
-    SIM.tick(state, { [ME]: input });
+    SIM.tick(state, { [ME]: input, ...sockInputs(snap) });
     afterTick(input);
     snap = SIM.snapshot(state);
   }
   const f = snap.fighters.find((o) => o.id === ME);
   drawHero(f, dt, snap.tick);
+  drawSocks(snap.fighters, dt, f.x);
   sway(swaying(f), snap.tick / TICK_HZ);
-  pizzaTime(snap.tick / TICK_HZ, eaten);
+  pizzaTime(snap.tick / TICK_HZ, eaten, pieEaten);
   follow(f, dt);
 });
 el('leave').addEventListener('click', () => { location.href = 'lobby.html'; });

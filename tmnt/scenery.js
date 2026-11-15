@@ -264,11 +264,13 @@ function slice(at) {
   return g;
 }
 
-// the giant pizza at the end, glowing, facing the camera
+// the giant pizza at the end, in front of the gate, low enough to walk into (playtest 2026-11-15: up by the fence it
+// couldn't be got)
+export const PIE = Object.freeze({ back: 1.5, y: 1.4 });
 let pie = null;
 function bigPizza(ground) {
   pie = new THREE.Group().add(glow(5), card('pizza.svg', 2.4));
-  pie.position.set(ground.x1 - 0.4, 2.4, ground.z0 + 0.5);
+  pie.position.set(ground.x1 - PIE.back, PIE.y, 0);
   return pie;
 }
 
@@ -279,15 +281,16 @@ function sign(ground) {
   return new THREE.Group().add(board, block([0.08, 1.4, 0.08], IRON, [ground.x0 + 2, 0, ground.z0 + 0.46]));
 }
 
-/** The slices turn and bob at `t` seconds, those in `taken` (by their place in the level's list) gone; the giant pizza bobs. */
-export function pizzaTime(t, taken) {
+/** The slices turn and bob at `t` seconds, those in `taken` (by their place in the level's list) gone; the giant pizza
+ *  bobs, till it is `eaten`. */
+export function pizzaTime(t, taken, eaten = false) {
   slices.forEach((s, i) => {
     s.g.visible = !taken.has(i);
     s.turn.rotation.y = t * 2 + i;
     s.g.position.y = s.y + Math.sin(t * 3 + i) * 0.05;
   });
   if (shine) shine.rotation = t * 0.6;
-  if (pie) pie.position.y = 2.4 + Math.sin(t * 1.5) * 0.08;
+  if (pie) Object.assign(pie, { visible: !eaten }).position.y = PIE.y + Math.sin(t * 1.5) * 0.08;
 }
 
 /** Everything of level `L` to see, but the heroes. @param {Level} L */

@@ -13,11 +13,12 @@ setGeometryDetail('med');
 const mine = loadHero();
 if (!mine) location.replace('choose.html');
 
-// the playground's stage is a slide (the donut fighters' breakfast is a pancake)
-const STAGE_PICTURE = { playground: '🛝' };
+// the playground's stage is a carousel horse (the donut fighters' breakfast is a pancake): the slide emoji is from
+// 2021 and shows as a blank box on older tablets (playtest 2026-11-15)
+const STAGE_PICTURE = { playground: '🎠' };
 // ponytail: both open, a new generated one each play; level 2 has swings or bars on every ground stretch (REUSE-SPEC.md
 // §Level 2); unlocks come with the progress code
-const LEVELS = { playground: [1, 2] };
+const LEVELS = { playground: [1, 2, 3] };
 const DIAL = 9;
 let picked = { stage: '', level: 0 };
 

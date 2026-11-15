@@ -3,6 +3,23 @@
 What's new in Turtles in Twine: The Sweater's Revenge, the Teenage Mitten Knitting Turtles' co-op side scroller, the
 L.Y.S. spinoff's spinoff.
 
+## 0.0.2
+
+### The playground
+- **Level 3: the Sock Clan.** A soldier guards the pizza after every climbing frame and comes for you if you get
+  close. Knock it out of the playground and it tumbles over the back fence, where it stands looking sad for two
+  minutes before it's allowed back. Watch out: its punch can knock you out too, back to the start.
+- **Get the giant pizza.** It's right in front of the gate now. Walk into it on your way out and it's yours: eight
+  slices at once.
+- **Pizza comes back.** A slice you ate is back in its place 20 seconds later, so you can stay and play.
+- **Tap the pizza to go for it.** Tap a slice while you're on a swing or a bar and you fly right through it. On
+  foot, your hero walks under it and jumps for it.
+
+### Heroes
+- **A smoother chooser on tablets.** Turtles are much lighter to draw.
+- **The Sweater hides more of its face.** Its scarf wraps up to its hat, so only the tops of its eyes show.
+- **The mask keeps its colour.** Take a turtle's scarf off and the mask matches the hands, not purple.
+
 ## 0.0.1
 
 ### The playground

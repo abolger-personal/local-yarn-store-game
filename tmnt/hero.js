@@ -4,6 +4,8 @@ import { PAINT, inkMaterial, inkOutline } from '../characters/paint.js';
 import { COLOURWORKS, FORMS, GARMENTS } from '../characters/garments.js';
 import { BAGS, CAPES, CLOTH as RIOT, HANDS, CANE, MIC, NEEDLES, SCISSORS, STAFF, YARN_BALLS, SPECIES, TEXTURES, TRICKS, buildFighter, nearestSwatch, readFighter, setFur } from '../spinoff/fighter.js';
 
+// REUSE-SPEC.md §Bad guys, the face wrap: past 1 (the eyes' middle) a wrap climbs on over the eyes (playtest 2026-11-14)
+export const COVER_MAX = 1.5;
 const HERO_KEY = 'tmnt.hero.v1';
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -101,7 +103,7 @@ const ALL_WEAR = Object.freeze({
 /** What a chooser offers and a save keeps: a hero's, or a villain's (everything).
  *  @typedef {{ key: string, wear: Record<string, readonly string[]>, cloth: readonly { hex: string, name: string }[],
  *   fur: readonly { hex: string, name: string }[], forms: readonly string[], hands: readonly string[], palette: string[], base: string,
- *   mask: boolean }} Kit  `mask`: a wrapped scarf can cover the face (`look.scarfCover`, 0..1; characters/garments.js) */
+ *   mask: boolean }} Kit  `mask`: a wrapped scarf can cover the face (`look.scarfCover`, 0..COVER_MAX; characters/garments.js) */
 /** @type {Kit} */
 const HERO_KIT = Object.freeze({ key: HERO_KEY, wear: WEAR, cloth: CLOTH, fur: COLOURS, forms: SCARF_FORMS, hands: HERO_HANDS, palette: PALETTE, base: GREEN, mask: false });
 /** @returns {Kit} */
@@ -140,7 +142,7 @@ const VILLAINS = {
   // lion in its natural fur till then
   sweater: [{ species: 'lion', look: {
     hat: 'earflap', hatColor: BLACK, hatStitch: 'waffle', cape: 'cape', capeColor: PURPLE, capeStitch: 'single crochet', scarf: 'trailing',
-    scarfColor: SILVER, scarfForm: 'wrapped twice', scarfCover: 1, sweater: 'vest', sweaterColor: BLACK, sweaterWork: 'fair isle', socks: 'over-knee',
+    scarfColor: SILVER, scarfForm: 'wrapped twice', scarfCover: COVER_MAX, sweater: 'vest', sweaterColor: BLACK, sweaterWork: 'fair isle', socks: 'over-knee',
     socksColor: BLACK, trick: 'atomicBall', gloves: BLACK, bagColor: '#ff3b7f',
   } }],
 };
@@ -177,7 +179,7 @@ function readLook(raw, kit) {
     Object.assign(look, { [kind]: one(kind, list), [`${kind}Color`]: colour(`${kind}Color`), [`${kind}Stitch`]: one(`${kind}Stitch`, TEXTURES) });
   }
   look.glasses = r.glasses === true;
-  look.scarfCover = kit.mask ? Math.min(1, Math.max(0, Number(r.scarfCover) || 0)) : 0;
+  look.scarfCover = kit.mask ? Math.min(COVER_MAX, Math.max(0, Number(r.scarfCover) || 0)) : 0;
   Object.assign(look, { sweaterWork: one('sweaterWork', SWEATER_WORKS), scarfForm: one('scarfForm', kit.forms), hands: one('hands', kit.hands), gloves: colour('gloves') });
   look.trick = one('trick', TRICKS[look.hands]);
   return look;
@@ -203,11 +205,12 @@ export function saveHero(h, kit = HERO_KIT) {
   try { localStorage.setItem(kit.key, JSON.stringify(h)); } catch {}
 }
 
-// REUSE-SPEC.md §Hero chooser: the mask (rings) in the scarf's colour, so a turtle's sync up; on a turtle's big eyes, narrow
+// REUSE-SPEC.md §Hero chooser: the mask (rings) in the scarf's colour, so a turtle's sync up (scarf off, the hands' colour:
+// playtest 2026-11-14, Raphael's went purple); on a turtle's big eyes, narrow
 const MASK_ON = Object.freeze({ turtle: 0.35 });
 /** The hero as it's built: the mask's colour and size set from the scarf and the animal. @param {Hero} hero @returns {Hero} */
 export function faceOf(hero) {
-  const { look, species } = hero, params = /** @type {Record<string, any>} */ ({ ...hero.params, facePaintColor: look.scarf ? look.scarfColor : '' });
+  const { look, species } = hero, params = /** @type {Record<string, any>} */ ({ ...hero.params, facePaintColor: look.scarf ? look.scarfColor : look.gloves });
   if (params.facePaint === 'rings') params.facePaintSize = MASK_ON[species] ?? params.facePaintSize;
   return { ...hero, params };
 }

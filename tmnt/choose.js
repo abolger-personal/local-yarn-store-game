@@ -3,7 +3,7 @@ import { SPECIES, TEXTURES, TRICKS, animateFighter, disposeFighter, setFur, step
 import { FACE_ICON, ICON, NONE, TRICK_ICON, svg, textured } from '../spinoff/icons.js';
 import { makeStage } from '../spinoff/stage.js';
 import { debugging } from '../spinoff/net.js';
-import { FACES, KITS, PRESETS, buildHero, faceOf, handsOf, SWEATER_WORKS, addPop, loadHero, newHero, newVillain, popFromQuery, randomHero, saveHero } from './hero.js';
+import { COVER_MAX, FACES, KITS, PRESETS, buildHero, faceOf, handsOf, SWEATER_WORKS, addPop, loadHero, newHero, newVillain, popFromQuery, randomHero, saveHero } from './hero.js';
 
 // REUSE-SPEC.md §Level 1: the heroes' glow and shadow to try, ?glow=0.6&shadow=0.4
 const pop = popFromQuery();
@@ -60,7 +60,7 @@ function wearRow(kind) {
     svg(v ? textured(picture(v), kind === 'scarf' ? '' : stitch) : NONE, v ? colour : '#9a8f84'), v === current)).join('');
   // a villain's wrapped scarf climbs the face: how far (REUSE-SPEC.md §Bad guys)
   const cover = kind === 'scarf' && kit.mask
-    ? `<label class="choices">🥷 <input type="range" min="0" max="1" step="0.05" value="${look.scarfCover}" data-cover aria-label="how much of the face a wrapped scarf covers"></label>` : '';
+    ? `<label class="choices">🥷 <input type="range" min="0" max="${COVER_MAX}" step="0.05" value="${look.scarfCover}" data-cover aria-label="how much of the face a wrapped scarf covers"></label>` : '';
   return row(ROW_ICON[kind], kind, pictures(tiles), colours(swatchRow(`${kind}Color`, colour)), cover);
 }
 

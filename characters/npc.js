@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeMotion, integrate, compose, tailStep, POSE_KEYS, POSES } from './motion.js';
 import { INK_SEEN_FROM, PAINT, inkEdgeMaterial, paintMaterial } from './paint.js';
 import { named, skinZ } from './faces.js';
@@ -705,7 +705,8 @@ export function skinDecal(head, kind, [x, y], size, lift) {
     const n = new THREE.Vector3(x / head[0] ** 2, y / head[1] ** 2, at.z / head[2] ** 2).normalize();
     const across = new THREE.Vector3().crossVectors(UP, n).normalize(), up = new THREE.Vector3().crossVectors(n, across);
     const [name, ...args] = [kind].flat();
-    const g = subdivide(new THREE.ShapeGeometry(DECALS[name](...args), 8).toNonIndexed(), 3), pos = g.attributes.position, q = new THREE.Vector3();
+    // welded: the split leaves every corner once a triangle, 69,000 points on a plastron (playtest 2026-11-14: tablets lagged)
+    const g = mergeVertices(subdivide(new THREE.ShapeGeometry(DECALS[name](...args), 8).toNonIndexed(), 3)), pos = g.attributes.position, q = new THREE.Vector3();
     for (let i = 0; i < pos.count; i++) {
       q.copy(at).addScaledVector(across, pos.getX(i) * size).addScaledVector(up, pos.getY(i) * size);
       q.multiplyScalar(1 / Math.hypot(q.x / head[0], q.y / head[1], q.z / head[2]));

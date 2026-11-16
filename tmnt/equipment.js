@@ -8,7 +8,7 @@ import { DT, GRAVITY } from '../spinoff/world.js';
 // - riding the slides and the fire pole down: step or jump onto the top and you're carried to the bottom.
 
 /** How fast a hero climbs, game units a second (generate.js budgets the same). */
-export const CLIMB_SPEED = 1.2;
+const CLIMB_SPEED = 1.2;
 // how close to the face a hero's edge has to be to take hold (walking into a wall stops a little short, the route-finder's
 // grid); how far from its foot's height it can start
 const REACH = 0.3, FOOT = 0.15;
@@ -61,9 +61,11 @@ export function climbStep(f, k) {
 }
 
 /** How fast a slide or the fire pole carries a hero down, game units a second. */
-export const RIDE_SPEED = 4;
+const RIDE_SPEED = 4;
 // the pole half that (playtest 2026-11-12: the pole was too fast, the slides fine)
 const POLE_SPEED = 2;
+/** How fast each kind of ride goes, where it isn't a slide's speed: monkey bars are hand over hand. */
+const SPEEDS = { pole: POLE_SPEED, monkey: 1.6 };
 // how close to a ride's top a hero gets on: half a slide's breadth, and its height give or take a little
 const GRAB = 0.6, GRAB_Y = 0.3;
 
@@ -92,7 +94,7 @@ export function startRide(rides, f) {
 /** One tick down ride `k` for sim fighter `f`: along it, top to bottom, and off at the bottom. True while still riding. @param {Ride} k */
 export function rideStep(f, k) {
   const { p } = k;
-  k.t = Math.min(1, k.t + ((p.kind === 'pole' ? POLE_SPEED : RIDE_SPEED) * DT) / k.len);
+  k.t = Math.min(1, k.t + ((SPEEDS[p.kind] ?? RIDE_SPEED) * DT) / k.len);
   Object.assign(f, { freeze: 2, vx: 0, vy: 0, vz: 0, onGround: false,
     x: p.x0 + (p.x1 - p.x0) * k.t, y: p.y0 + (p.y1 - p.y0) * k.t, z: p.z0 + (p.z1 - p.z0) * k.t });
   if (k.t < 1) return true;
@@ -103,7 +105,16 @@ export function rideStep(f, k) {
 // REUSE-SPEC.md §The pieces, the clatter bridge (playtest 2026-11-12: the wobble was cute but no trouble): it rocks
 // from side to side under whoever is on it, far enough that they slide across it, and off its side if they aren't
 // careful. How fast it rocks (radians a second), how far it rolls (radians), how fast a hero slides at full roll.
-export const BRIDGE = Object.freeze({ rate: 2.5, roll: 0.25, slide: 1.5 });
+// It rocks harder the longer someone stands on it (playtest 2026-11-15: wobblier, "after 3-6 sways I should fall off"):
+// `harder` more of its full roll a second, up to `most`, so crossing at a walk is easy and standing about isn't.
+// The slide alone never took them off (playtest 2026-11-15: most bridges have a deck or the playground's edge at a
+// side), so it keeps them on its planks, and rocking that hard (`tip`: five seconds of standing about, four sways) it
+// tips them off: tossed `high` over the decks beside it, `toss` seconds in the air, to the nearest open ground, looked
+// for `round` the bridge at spots `clear` of every deck.
+export const BRIDGE = Object.freeze({ rate: 2.5, roll: 0.25, slide: 1.5, harder: 0.3, most: 2.5, tip: 1.5, high: 1.2, toss: 0.7, round: 3, clear: 0.35 });
+
+/** How hard a bridge is rocking a tick on from `rock`: harder with someone `on` it, settling without. */
+export const bridgeRock = (rock, on) => (on ? Math.min(BRIDGE.most, rock + BRIDGE.harder * DT) : rock * 0.95);
 
 /** Is sim fighter `f` standing on bridge `b`? */
 export const onBridge = (f, b) => f.onGround && Math.abs(f.y - b.y) < 0.05 && f.x > b.x0 && f.x < b.x1 && f.z > b.z0 && f.z < b.z1;
@@ -111,11 +122,42 @@ export const onBridge = (f, b) => f.onGround && Math.abs(f.y - b.y) < 0.05 && f.
 /** Across bridge `b`, toward the side that goes down when it rolls the positive way (scenery.js turns it the same). */
 const acrossOf = (b) => ({ x: -Math.sin((b.h * Math.PI) / 180), z: Math.cos((b.h * Math.PI) / 180) });
 
-/** One tick on rocking bridge `b`, `sway` (-1..1) of its full roll: the fighter slides across it, downhill. */
+const EDGE = 0.02;
+/** One tick on rocking bridge `b`, `sway` (-1..1) of its full roll: the fighter slides across it, downhill, as far as its edge. */
 export function bridgeSlide(f, b, sway) {
   const a = acrossOf(b), d = BRIDGE.slide * sway * DT;
-  f.x += a.x * d;
-  f.z += a.z * d;
+  f.x = Math.min(b.x1 - EDGE, Math.max(b.x0 + EDGE, f.x + a.x * d));
+  f.z = Math.min(b.z1 - EDGE, Math.max(b.z0 + EDGE, f.z + a.z * d));
+}
+
+/** The open ground nearest `f` round bridge `b`: in `band`, clear of every raised floor. Null if there's none. */
+function fallSpot(f, b, floors, band) {
+  const { round, clear } = BRIDGE, up = floors.filter((o) => o.y > 0);
+  let best = null;
+  for (let x = b.x0 - round; x <= b.x1 + round; x += 0.25) {
+    for (let z = band.z0 + clear; z <= band.z1 - clear; z += 0.25) {
+      const d = Math.hypot(x - f.x, z - f.z);
+      if (best && d >= best.d) continue;
+      if (!up.some((o) => x > o.x0 - clear && x < o.x1 + clear && z > o.z0 - clear && z < o.z1 + clear)) best = { x, z, d };
+    }
+  }
+  return best;
+}
+
+/** Bridge `b` tips fighter `f` off: the toss to ride with `tipStep`, or null if there's no open ground to land on. */
+export function startTip(f, b, floors, band) {
+  const to = fallSpot(f, b, floors, band);
+  return to && { x0: f.x, y0: f.y, z0: f.z, to, t: 0 };
+}
+
+/** One tick of a toss off a bridge: through the air, over anything, down onto the ground. True while still in the air. */
+export function tipStep(f, k) {
+  k.t = Math.min(1, k.t + DT / BRIDGE.toss);
+  Object.assign(f, { freeze: 2, vx: 0, vy: 0, vz: 0, onGround: false, x: k.x0 + (k.to.x - k.x0) * k.t, z: k.z0 + (k.to.z - k.z0) * k.t,
+    y: k.y0 * (1 - k.t) + 4 * BRIDGE.high * k.t * (1 - k.t) });
+  if (k.t < 1) return true;
+  letGo(f);
+  return false;
 }
 
 /** How far the planks under `f` have risen (or dropped) with the roll, to draw it standing on them. */
@@ -270,7 +312,7 @@ export function stairsOff(c, f) {
 // is the buttons pressed while on it (built 2026-11-12, the designer to confirm which buttons): none, her beam
 // dismount; 🥊, the floor Biles; 🦶, the triple-double; 🥊🥊, the beam dismount into the wolf turn; 🦶🦶, the vault.
 // Never at random: the same buttons, the same move.
-export const DISMOUNTS = Object.freeze({ p: 'biles', k: 'biles-ii', pp: 'biles-wolf', kk: 'biles-ii-vault', pk: 'biles-beam' });
+const DISMOUNTS = Object.freeze({ p: 'biles', k: 'biles-ii', pp: 'biles-wolf', kk: 'biles-ii-vault', pk: 'biles-beam' });
 /** The dismount for the buttons pressed on the bar (`keys`, oldest first): the last two if they pair, else the last. */
 export const dismountOf = (keys) => DISMOUNTS[keys.slice(-2)] ?? DISMOUNTS[keys.slice(-1)];
 

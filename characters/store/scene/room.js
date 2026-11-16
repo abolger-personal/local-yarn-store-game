@@ -16,7 +16,7 @@ const LOOK = {
   seam: '#8a6440',
 };
 
-export const WAINSCOT_H = 0.9;
+const WAINSCOT_H = 0.9;
 
 function canvasTexture(w, h, paint) {
   const c = document.createElement('canvas');

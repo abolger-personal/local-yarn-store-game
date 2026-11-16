@@ -143,7 +143,7 @@ const uniform = (value) => ({ value });
 // DESIGN-DECISIONS.md "Thickness comes from an edge pass": the shop and the demo both start here
 export const CARD_LOOK = Object.freeze({ shade: 0.28, edgeColor: '#1b1418', edgeGrow: 1.07 });
 
-export function notionMaterial(texture, shade = 0) {
+function notionMaterial(texture, shade = 0) {
   const material = new THREE.MeshBasicMaterial({
     map: texture,
     transparent: false,

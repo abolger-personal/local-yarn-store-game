@@ -9,7 +9,7 @@
     "serve": "python3 serve.py 8765",
     "typecheck": "tsc -p jsconfig.json",
     "selfcheck": "node tools/run-tests.mjs fast",
-    "check": "npm run lint && npm run typecheck && npm run selfcheck && node tools/selectors.mjs && node tools/sideeffects.mjs",
+    "check": "npm run lint && npm run typecheck && npm run selfcheck && node tools/selectors.mjs && node tools/sideeffects.mjs && node tools/exports.mjs",
     "check:slow": "node tools/run-tests.mjs slow",
     "check:all": "npm run check && npm run check:slow",
     "check:full": "FULL=1 SEEDS=50 npm run check:all"

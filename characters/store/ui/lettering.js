@@ -1,5 +1,5 @@
 export const CELL = 28;
-export const STROKE = 4.4;
+const STROKE = 4.4;
 export const INK = '#1c1712';
 const KEYLINE = '#4a2f0c', KEY = 1.2;
 const GAP = 7, SPACE = 18;

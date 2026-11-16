@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { MATCH } from '../spinoff/combat.js';
 import { createControls } from '../spinoff/controls.js';
+import { TICK_HZ } from '../spinoff/match.js';
 import { SIM } from '../spinoff/sim.js';
-import { BRIDGE, FLIGHT, SWING, airSpan, airTime, dismountOf, dismountTime, bridgeLift, bridgeSlide, climbStep, onBridge, rideStep, startClimb, startRide, onStairs, stairDip, stairsOff, startSwing, swingStep, tappedPivot } from './equipment.js';
-import { forSim } from './generate.js';
+import { BRIDGE, bridgeRock, FLIGHT, SWING, airSpan, airTime, dismountOf, dismountTime, bridgeLift, bridgeSlide, climbStep, onBridge, startTip, tipStep, rideStep, startClimb, startRide, onStairs, stairDip, stairsOff, startSwing, swingStep, tappedPivot } from './equipment.js';
+import { BAND, forSim, generateLevel } from './generate.js';
 
 // a dome 1.575 up (7 ft), from the ground to the tall tower's deck, across the band, and a slide down off the deck's
 // far end; a hero holding → from the left
@@ -126,3 +127,34 @@ console.log('equipment ok');
   }
   assert.ok(miss < 0.2, `a launch at a slice in the air misses it by ${miss.toFixed(2)}`);
 }
+
+// playtest 2026-11-15: standing in the middle of the bridge, a hero is tipped off it onto open ground after 3 to 6 sways,
+// on every bridge of real levels in the real sim (a deck or the playground's edge at its side or not); till then the
+// slide keeps to the planks, and walking straight across (under a second) it barely moves
+{
+  const who = { id: 'me', team: 'heroes', height: 0.86, width: 0.3, reach: 0.3, look: { dough: '#e8c38e', frosting: '#1fd18b', stripe: false }, hands: 'gloves' };
+  const SWAY = (Math.PI / BRIDGE.rate) * TICK_HZ;
+  for (const seed of [1, 2, 3, 7]) {
+    const level = generateLevel(seed, 1);
+    for (const b of level.bridges) {
+      const s = SIM.createMatch([who], /** @type {any} */ (forSim(level)), { match: MATCH }), me = s.fighters[0], mid = (b.z0 + b.z1) / 2;
+      Object.assign(me, { x: (b.x0 + b.x1) / 2, y: b.y, z: mid, onGround: true });
+      let rock = 0, toss = null, at = 0, moved = 0;
+      for (let i = 0; i < 10 * TICK_HZ && !(at && !toss && me.onGround); i++) {
+        s.t0 = s.tick;
+        SIM.tick(s, { me: null });
+        if (toss && !tipStep(me, toss)) toss = null;
+        const on = onBridge(me, b);
+        rock = bridgeRock(rock, on);
+        if (on && rock >= BRIDGE.tip) { toss = startTip(me, b, level.floors, BAND); at = i; }
+        else if (on) bridgeSlide(me, b, Math.sin((s.tick / TICK_HZ) * BRIDGE.rate) * rock);
+        assert.ok(at || on, `seed ${seed}: the slide keeps a hero on the planks till the tip`);
+        if (i === 45) moved = Math.abs(me.z - mid);
+      }
+      assert.ok(at >= 3 * SWAY && at <= 6 * SWAY, `seed ${seed}: tipped after ${(at / SWAY).toFixed(1)} sways`);
+      assert.ok(me.onGround && me.y < 0.05 && !level.floors.some((o) => o.y > 0 && me.x > o.x0 && me.x < o.x1 && me.z > o.z0 && me.z < o.z1), `seed ${seed}: down on open ground`);
+      assert.ok(moved < 0.2, `crossing takes under a second: slid ${moved.toFixed(2)} by then`);
+    }
+  }
+}
+assert.ok(bridgeRock(1, false) < 1, 'it settles with nobody on it');

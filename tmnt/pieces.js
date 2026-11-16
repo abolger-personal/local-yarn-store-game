@@ -13,10 +13,10 @@ export const DROP_FT = 1.5;
 export const POLE_OUT = 2;
 
 /**
- * @typedef {{ x0: number, x1: number, y: number }} Deck  a top to stand on
+ * @typedef {{ x0: number, x1: number, y: number, rungs?: boolean }} Deck  a top to stand on; `rungs`: monkey bars' top, open under
  * @typedef {{ x0: number, x1: number, y0: number, y1: number, kind: 'dome'|'grid'|'squiggle' }} Climb  up from y0 to y1
- * @typedef {{ x0: number, y0: number, x1: number, y1: number, kind: 'slide'|'pole', top?: number }} Ride
- *   down, from (x0, y0) to (x1, y1); a pole stands up to `top`, grabbed anywhere up it
+ * @typedef {{ x0: number, y0: number, x1: number, y1: number, kind: 'slide'|'pole'|'monkey', top?: number }} Ride
+ *   down, from (x0, y0) to (x1, y1); a pole stands up to `top`, grabbed anywhere up it; monkey bars are swung along, level
  * @typedef {{ x0: number, y0: number, x1: number, y1: number }} Stairs  walked up or down
  * @typedef {{ x: number, y: number, arm: number, span: number, kind: 'swing'|'bar' }} Swing
  *   round a pivot at (x, y), `arm` out; the bar or the swing's top beam `span` long, across the way it swings
@@ -51,6 +51,10 @@ export const PIECES = Object.freeze({
   stepUps: { id: 'stepUps', w: 7.5, in: 0, out: 4, decks: [{ x0: 0.5, x1: 2.5, y: 1 }, { x0: 3, x1: 5, y: 2 }, { x0: 5.5, x1: 7.5, y: 3 }] },
   // on the ground between structures: the two uneven bars and a pair of arch swings
   bars: { id: 'bars', w: 6, in: 0, out: 0, swings: [{ x: 2, y: 3, arm: 1.4, span: 5, kind: 'bar' }, { x: 4, y: 3.5, arm: 1.4, span: 5, kind: 'bar' }] },
+  // REUSE-SPEC.md §Build my playground, monkey bars (2026-11-15): a step at each end, the bars 4 ft over them. Walk off the
+  // step under the bars to swing across, hand over hand, from either end; jump from a step to climb on top and walk over
+  monkeyBars: { id: 'monkeyBars', w: 11, in: 0, out: 0, decks: [{ x0: 0, x1: 1.5, y: 2.5 }, { x0: 1.5, x1: 9.5, y: 6.5, rungs: true }, { x0: 9.5, x1: 11, y: 2.5 }],
+    rides: [{ x0: 1.5, y0: 2.5, x1: 10, y1: 2.5, kind: 'monkey' }, { x0: 9.5, y0: 2.5, x1: 1, y1: 2.5, kind: 'monkey' }] },
   swings: { id: 'swings', w: 14, in: 0, out: 0, swings: [{ x: 3.5, y: 9.5, arm: 7.5, span: 6, kind: 'swing' }, { x: 10.5, y: 9.5, arm: 7.5, span: 6, kind: 'swing' }] },
 });
 

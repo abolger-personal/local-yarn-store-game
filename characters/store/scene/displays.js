@@ -183,7 +183,7 @@ export function buildDisplays(n) {
   touchView();
 }
 
-export const hasSurface = (d) => d.form !== 'floor' && !d.tilt;
+const hasSurface = (d) => d.form !== 'floor' && !d.tilt;
 
 function addSurface(d, w, depth) {
   if (!hasSurface(d)) return;
@@ -223,7 +223,7 @@ function addLevel(d, s, w, depth) {
   node.add(glass);
 }
 
-export const hasPlinth = (d) => d.plinthY > 0 && !d.tilt;
+const hasPlinth = (d) => d.plinthY > 0 && !d.tilt;
 
 function addPlinth(d, w, depth) {
   if (!hasPlinth(d)) return;

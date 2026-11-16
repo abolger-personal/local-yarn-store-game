@@ -6,6 +6,9 @@ import { FT, POLE_OUT } from './pieces.js';
 // bars in the playground's colours (§Level 1, What it looks like), the field far behind. Plain shapes, no ink yet.
 /** @typedef {import('./generate.js').Level} Level */
 
+// a part's own `colour` (REUSE-SPEC.md §Build my playground: the builder's, a piece) stands in for its usual one: a
+// deck's sides and posts, its top in a darker shade, a slide, a pole, a dome, a climb's and a bridge's posts, a swing's
+// or a bar's frame, monkey bars
 const C = Object.freeze({
   post: '#2f3db8', rail: '#f0b648', deck: '#3a3a3a', panel: '#2f7a50', dome: '#9aa0a6', pole: '#f0d000',
   slide: '#2a7f6f', violet: '#6b55d9', rubber: '#7085b8', teal: '#5e9e8f', terracotta: '#c48a5e',
@@ -72,11 +75,38 @@ function rod(a, b, r, color) {
  * Where a structure turns, decks overlap at the same height (playtest 2026-11-10: they flickered), so the `i`th is
  * lifted and drawn in a hair from its neighbours, too little to see.
  */
+const _shade = new THREE.Color();
+/** A colour's darker shade, for the top of a deck in its piece's colour. */
+const darker = (colour) => `#${_shade.set(colour).multiplyScalar(0.55).getHexString()}`;
+
+/** Monkey bars' top: a post at each corner, a rail along each side, rungs across; open underneath to look at. */
+// neighbouring pieces put a post on the same corner (1,877 in 120 levels); drawn twice in two colours, they flickered
+// (playtest 2026-11-15), so a corner's post is drawn once, the tallest asked for, in its colour
+let posts = new Map();
+const post = (x, z, h, color) => {
+  const key = `${x.toFixed(3)} ${z.toFixed(3)}`;
+  if (!(posts.get(key)?.h >= h)) posts.set(key, { x, z, h, color });
+};
+
+function monkeyTop(f) {
+  const g = new THREE.Group(), color = f.colour ?? C.post, V = (x, y, z) => new THREE.Vector3(x, y, z), along = f.h === 0;
+  for (const [x, z] of [[f.x0, f.z0], [f.x0, f.z1], [f.x1, f.z0], [f.x1, f.z1]]) post(x, z, f.y, color);
+  const n = Math.max(2, Math.round((along ? f.x1 - f.x0 : f.z1 - f.z0) / 0.22));
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, x = f.x0 + (f.x1 - f.x0) * t, z = f.z0 + (f.z1 - f.z0) * t;
+    g.add(along ? rod(V(x, f.y, f.z0), V(x, f.y, f.z1), 0.025, color) : rod(V(f.x0, f.y, z), V(f.x1, f.y, z), 0.025, color));
+  }
+  g.add(along ? rod(V(f.x0, f.y, f.z0), V(f.x1, f.y, f.z0), 0.03, color) : rod(V(f.x0, f.y, f.z0), V(f.x0, f.y, f.z1), 0.03, color));
+  g.add(along ? rod(V(f.x0, f.y, f.z1), V(f.x1, f.y, f.z1), 0.03, color) : rod(V(f.x1, f.y, f.z0), V(f.x1, f.y, f.z1), 0.03, color));
+  return g;
+}
+
 function deck(f, i) {
+  if (f.rungs) return monkeyTop(f);
   const w = f.x1 - f.x0, d = f.z1 - f.z0, cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, g = new THREE.Group(), k = i % 4;
   const lift = k * 0.003, inset = POST + k * 0.008;
-  g.add(block([w, SLAB, d], C.deck, [cx, f.y - SLAB + lift, cz]), block([w - inset, f.y - SLAB, d - inset], C.rail, [cx, 0, cz], 'slots', 2));
-  for (const [x, z] of [[f.x0, f.z0], [f.x0, f.z1], [f.x1, f.z0], [f.x1, f.z1]]) g.add(block([POST, f.y + RAIL, POST], C.post, [x, 0, z]));
+  g.add(block([w, SLAB, d], f.colour ? darker(f.colour) : C.deck, [cx, f.y - SLAB + lift, cz]), block([w - inset, f.y - SLAB, d - inset], f.colour ?? C.rail, [cx, 0, cz], 'slots', 2));
+  for (const [x, z] of [[f.x0, f.z0], [f.x0, f.z1], [f.x1, f.z0], [f.x1, f.z1]]) post(x, z, f.y + RAIL, f.colour ?? C.post);
   return g;
 }
 
@@ -106,7 +136,7 @@ function bridge(b) {
     hang.add(block([len / 8 - 0.02, 0.04, w], C.deck, [m.x, m.y, 0]));
     for (const z of [-w / 2, w / 2]) for (const y of [0.22, 0.45]) hang.add(rod(at(i / 8, y, z), at((i + 1) / 8, y, z), 0.015, C.rail));
   }
-  for (const x of [-len / 2, len / 2]) for (const z of [-w / 2, w / 2]) g.add(block([POST, b.y + RAIL, POST], C.post, [x, -b.y, z]));
+  for (const x of [b.x0, b.x1]) for (const z of [b.z0, b.z1]) post(x, z, b.y + RAIL, b.colour ?? C.post);
   g.position.set((b.x0 + b.x1) / 2, b.y, (b.z0 + b.z1) / 2);
   g.rotation.y = (-b.h * Math.PI) / 180;
   sways(b, (v) => { hang.rotation.x = v * BRIDGE.roll; }, BRIDGE.rate);
@@ -130,14 +160,14 @@ function net(c) {
 function climb(c) {
   const w = c.x1 - c.x0, d = c.z1 - c.z0, cx = (c.x0 + c.x1) / 2, cz = (c.z0 + c.z1) / 2;
   if (c.kind === 'dome') {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(C.dome));
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(c.colour ?? C.dome));
     m.scale.set(w, (c.y1 - c.y0) * 2, d);
     m.position.set(cx, c.y0, cz);
     return m;
   }
   if (c.kind === 'grid') return net(c);
   const g = new THREE.Group(), rungs = Math.max(2, Math.round((c.y1 - c.y0) / (1.2 * FT)));
-  for (const z of [c.z0, c.z1]) g.add(block([POST, c.y1 - c.y0, POST], C.post, [cx, c.y0, z]));
+  for (const z of [c.z0, c.z1]) g.add(block([POST, c.y1 - c.y0, POST], c.colour ?? C.post, [cx, c.y0, z]));
   for (let i = 1; i <= rungs; i++) g.add(rod(new THREE.Vector3(cx, c.y0 + (i * (c.y1 - c.y0)) / rungs, c.z0), new THREE.Vector3(cx, c.y0 + (i * (c.y1 - c.y0)) / rungs, c.z1), 0.025, C.rail));
   return g;
 }
@@ -146,7 +176,8 @@ function climb(c) {
 function pole(p) {
   const t = (p.h * Math.PI) / 180, { top } = p, head = new THREE.Vector3(p.x0, top, p.z0);
   const out = POLE_OUT * FT, back = new THREE.Vector3(p.x0 - Math.cos(t) * out, top, p.z0 - Math.sin(t) * out), g = new THREE.Group();
-  g.add(rod(new THREE.Vector3(p.x1, p.y1, p.z1), head, 0.04, C.pole), rod(head, back, 0.04, C.pole), rod(back, new THREE.Vector3(back.x, p.y0, back.z), 0.04, C.pole));
+  const color = p.colour ?? C.pole;
+  g.add(rod(new THREE.Vector3(p.x1, p.y1, p.z1), head, 0.04, color), rod(head, back, 0.04, color), rod(back, new THREE.Vector3(back.x, p.y0, back.z), 0.04, color));
   return g;
 }
 
@@ -154,8 +185,10 @@ function pole(p) {
 function path(p) {
   const a = new THREE.Vector3(p.x0, p.y0, p.z0), b = new THREE.Vector3(p.x1, p.y1, p.z1);
   if (p.kind === 'pole') return pole(p);
+  // monkey bars are swung along under their rungs, which their top draws
+  if (p.kind === 'monkey') return new THREE.Group();
   const v = new THREE.Vector3().subVectors(b, a), breadth = p.kind === 'stairs' ? 1.2 : 1.1;
-  const m = new THREE.Mesh(new THREE.BoxGeometry(breadth, SLAB, v.length()), mat(p.kind === 'stairs' ? C.deck : C.slide));
+  const m = new THREE.Mesh(new THREE.BoxGeometry(breadth, SLAB, v.length()), mat(p.colour ?? (p.kind === 'stairs' ? C.deck : C.slide)));
   m.position.copy(a).addScaledVector(v, 0.5);
   m.lookAt(b);
   return m;
@@ -165,7 +198,7 @@ function path(p) {
 function swing(s) {
   const t = ((s.h + 90) * Math.PI) / 180, half = new THREE.Vector3(Math.cos(t), 0, Math.sin(t)).multiplyScalar(s.span / 2);
   const top = new THREE.Vector3(s.x, s.y, s.z), g = new THREE.Group(), ends = [top.clone().sub(half), top.clone().add(half)];
-  const color = s.kind === 'bar' ? C.rail : C.post;
+  const color = s.colour ?? (s.kind === 'bar' ? C.rail : C.post);
   g.add(rod(ends[0], ends[1], s.kind === 'bar' ? 0.025 : 0.04, color));
   for (const e of ends) g.add(rod(e, new THREE.Vector3(e.x, 0, e.z), 0.04, color));
   if (s.kind === 'swing') g.add(seat(s, top));
@@ -198,7 +231,9 @@ function floor(ground) {
   for (let x = ground.x0 + 2, i = 0; x < ground.x1; x += 3.1, i++) {
     const blob = new THREE.Mesh(new THREE.CircleGeometry(1 + (i % 3) * 0.3, 24), mat([C.teal, C.terracotta][i % 2], 'crumb', 2));
     blob.rotation.x = -Math.PI / 2;
-    blob.position.set(x, 0.001, ((i * 1.7) % 3) - 1.5);
+    blob.position.set(x, 0, ((i * 1.7) % 3) - 1.5);
+    // drawn over the rubber by depth offset, not height: 1 mm up was under a tablet's depth precision and flickered
+    Object.assign(blob.material, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
     g.add(blob);
   }
   return g;
@@ -251,14 +286,17 @@ function glow(size) {
   shine ??= new THREE.SpriteMaterial({ map: Object.assign(new THREE.TextureLoader().load('shine.svg'), { colorSpace: THREE.SRGBColorSpace }), transparent: true, depthWrite: false });
   const sprite = new THREE.Sprite(shine);
   sprite.scale.setScalar(size);
+  // drawn before its pizza, and writing no depth, so it never covers the part of the pizza that turns or tips behind it
+  sprite.renderOrder = -1;
   return sprite;
 }
 
 const slices = [];
 /** A slice to find, turning where it hangs. */
 function slice(at) {
-  const g = new THREE.Group(), turn = card('slice.svg', 0.8);
-  g.add(glow(1.7), turn);
+  // 0.65 of their first size, shine and all (playtest 2026-11-15: too big)
+  const g = new THREE.Group(), turn = card('slice.svg', 0.8 * 0.65);
+  g.add(glow(1.7 * 0.65), turn);
   g.position.set(at.x, at.y, at.z);
   slices.push({ g, turn, y: at.y });
   return g;
@@ -296,7 +334,9 @@ export function pizzaTime(t, taken, eaten = false) {
 /** Everything of level `L` to see, but the heroes. @param {Level} L */
 export function playground(L) {
   const [ground, ...decks] = L.floors;
-  return [floor(ground), field(ground), fence(ground), sign(ground), bigPizza(ground), ...L.slices.map(slice), ...decks.filter((f) => !L.bridges.includes(/** @type {any} */ (f))).map(deck), ...L.bridges.map(bridge), ...L.climbs.map(climb), ...[...L.stairs, ...L.rides].map(path), ...L.swings.map(swing)];
+  posts = new Map();
+  const parts = [floor(ground), field(ground), fence(ground), sign(ground), bigPizza(ground), ...L.slices.map(slice), ...decks.filter((f) => !L.bridges.includes(/** @type {any} */ (f))).map(deck), ...L.bridges.map(bridge), ...L.climbs.map(climb), ...[...L.stairs, ...L.rides].map(path), ...L.swings.map(swing)];
+  return [...parts, new THREE.Group().add(...[...posts.values()].map((p) => block([POST, p.h, POST], p.color, [p.x, 0, p.z])))];
 }
 
 /** Outdoors (playtest 2026-11-10): a blue sky fading to a pale horizon behind the field, and sunlight and skylight on the

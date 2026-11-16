@@ -10,7 +10,8 @@ import { TICK_HZ } from '../spinoff/match.js';
 import { countStrike, newCombo } from '../spinoff/punches.js';
 import { SIM } from '../spinoff/sim.js';
 import { aimGameCamera, makeStage } from '../spinoff/stage.js';
-import { BRIDGE, bridgeLift, bridgeSlide, climbStep, airSpan, dismountOf, dismountTime, onBridge, onStairs, rideStep, stairDip, stairsOff, startClimb, startRide, startSwing, swingStep, tappedPivot } from './equipment.js';
+import { BRIDGE, bridgeLift, bridgeRock, bridgeSlide, climbStep, airSpan, dismountOf, dismountTime, onBridge, onStairs, rideStep, stairDip, stairsOff, startClimb, startRide, startSwing, startTip, swingStep, tappedPivot, tipStep } from './equipment.js';
+import { builtLevel, loadPlayground } from './builder.js';
 import { BAND, climbsOf, forSim, generateLevel } from './generate.js';
 import { GUARD, createGuard, guardTick } from './guard.js';
 import { KITS, buildHero, faceOf, loadHero, newVillain } from './hero.js';
@@ -24,11 +25,16 @@ setGeometryDetail('med');
 const mine = loadHero();
 if (!mine) location.replace('choose.html');
 const query = new URLSearchParams(location.search), seed = Number(query.get('seed')) || 1;
-const level = generateLevel(seed, Number(query.get('level')) || 1), ground = level.floors[0];
+// REUSE-SPEC.md §Build my playground: ?built is the playground this tablet's kid made
+const level = query.has('built') ? builtLevel(loadPlayground()) : generateLevel(seed, Number(query.get('level')) || 1), ground = level.floors[0];
 const ME = 'me';
 const el = (id) => document.getElementById(id);
 
 const stage = makeStage(el('stage')), { scene, camera } = stage;
+// the camera sits about 9 back and nothing comes within 5 of it: a near plane at 1, not the stage's 0.01, is a hundred
+// times the depth precision, so pieces a few millimetres apart don't flicker on a tablet (playtest 2026-11-15)
+camera.near = 1;
+camera.updateProjectionMatrix();
 outdoors(scene);
 scene.add(...playground(level));
 
@@ -117,13 +123,16 @@ function danceBody(sweep, dt) {
   el('kick').style.setProperty('--fill', String(sweepCharge()));
 }
 
-// the bridge under the hero rocks harder the longer they're on it (to full in about a second), and they slide with it
+// the bridge under the hero rocks harder the longer they're on it (equipment.js), and they slide with it
 let rock = 0;
 const rockNow = (tick) => Math.sin((tick / TICK_HZ) * BRIDGE.rate) * rock;
 function rockBridge(f) {
   const b = level.bridges.find((o) => onBridge(f, o));
-  rock += ((b ? 1 : 0) - rock) * 0.03;
-  if (b) bridgeSlide(f, b, rockNow(state.tick));
+  rock = bridgeRock(rock, Boolean(b));
+  if (!b) return;
+  const toss = rock >= BRIDGE.tip && !using && startTip(f, b, level.floors, BAND);
+  if (toss) using = { step: tipStep, k: toss };
+  else bridgeSlide(f, b, rockNow(state.tick));
 }
 
 /** How far above or below the sim's flat floor the hero is drawn: down a flight's slope (eased), with a bridge's roll. */
@@ -131,6 +140,12 @@ function standing(f, dt, tick) {
   const under = level.bridges.find((b) => onBridge(f, b)), stairs = onStairs(flights, f);
   dip += ((stairs ? stairDip(stairs, f) : 0) - dip) * Math.min(1, dt * 14);
   return dip + (under ? bridgeLift(f, under, rockNow(tick)) : 0);
+}
+
+/** Standing, on the equipment or in the air; under monkey bars, arms up. */
+function standPose(f) {
+  if (using?.k.p?.kind === 'monkey') return POSES.reach;
+  return f.onGround || (using && using.step !== tipStep) ? POSES.rest : MOVE_POSES.air;
 }
 
 /** The hero where the sim has it, turned toward where it faces, walking, in the air, punching, kicking, spinning. */
@@ -142,7 +157,7 @@ function drawHero(f, dt, tick) {
   if (f.turn === 'flip' && stompTurn(f)) holdMiddle(g, f.height / 2, (o) => o.rotateX(-stompTurn(f)));
   const speed = f.onGround ? Math.hypot(f.vx, f.vz) : 0, sweep = sweepFrame(f) ?? dismountFrame(f, tick);
   /** @type {any} */ (built).spring = sweep && DANCES[sweep.perf.name];
-  stepFighter(built, dt, sweep?.d.pose ?? (f.onGround || using ? POSES.rest : MOVE_POSES.air), speed, strikeNow(f, tick));
+  stepFighter(built, dt, sweep?.d.pose ?? standPose(f), speed, strikeNow(f, tick));
   danceBody(sweep, dt);
   placeShadow(solid, shadow, f, 0.42);
   shadow.position.y += dip;
@@ -376,3 +391,6 @@ stage.run((dt) => {
   follow(f, dt);
 });
 el('leave').addEventListener('click', () => { location.href = 'lobby.html'; });
+// REUSE-SPEC.md §Build my playground: on a built playground the wrench goes back to the builder, as its ▶️ comes here
+el('edit').classList.toggle('hidden', !query.has('built'));
+el('edit').addEventListener('click', () => { location.href = 'build.html'; });

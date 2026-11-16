@@ -128,10 +128,25 @@ render();
 await new Promise((r) => { requestAnimationFrame(() => setTimeout(r)); });
 const stage = makeStage(document.getElementById('stage'));
 
+// the last few designs stay built, so 🍕 round to one already seen is a swap, not a build (2026-11-15: a build is most
+// of a swap's wait on a slow tablet)
+const KEPT = 8, kept = new Map();
+function builtFor(h) {
+  const key = `${role}|${JSON.stringify(h)}`, old = kept.get(key), made = old ?? buildHero(h, kit.palette);
+  if (!old) addPop(made, h, pop);
+  kept.delete(key);
+  kept.set(key, made);
+  if (kept.size > KEPT) {
+    const [oldest, gone] = kept.entries().next().value;
+    kept.delete(oldest);
+    disposeFighter(gone);
+  }
+  return made;
+}
+
 function rebuild(reframe) {
-  if (built) { stage.scene.remove(built.root); disposeFighter(built); }
-  built = buildHero(hero, kit.palette);
-  addPop(built, hero, pop);
+  if (built) stage.scene.remove(built.root);
+  built = builtFor(hero);
   stage.scene.add(built.root);
   if (reframe) stage.frame([built.root], { margin: 1.5 });
 }
@@ -157,11 +172,20 @@ document.getElementById('dice').addEventListener('click', () => {
 
 // REUSE-SPEC.md §Hero chooser: 🍕 the presets in turn, from a random one, so two taps never give the same
 let preset = Math.floor(Math.random() * PRESETS);
+// each preset is made once a visit (its shell or mane shade is drawn at random), so coming round to it again finds it
+// built; a villain's 🍕: its starting looks in turn (the Sock Clan's soldiers)
+const presets = new Map();
+function presetHero(n) {
+  const key = `${role}|${n}`;
+  if (!presets.has(key)) presets.set(key, role === 'hero' ? newHero(() => (n + 0.5) / PRESETS) : newVillain(role, undefined, n));
+  return structuredClone(presets.get(key));
+}
 document.getElementById('preset').addEventListener('click', () => {
   preset = (preset + 1) % PRESETS;
-  // a villain's 🍕: its starting looks in turn (the Sock Clan's soldiers)
-  hero = role === 'hero' ? newHero(() => (preset + 0.5) / PRESETS) : newVillain(role, undefined, preset);
+  hero = presetHero(preset);
   commit(true);
+  // the next one is built while this one is looked at, so the next tap doesn't wait for it
+  (window.requestIdleCallback ?? setTimeout)(() => builtFor(presetHero((preset + 1) % PRESETS)));
 });
 
 // 👍 saves and goes on to pick where to play, as the donut fighters' does

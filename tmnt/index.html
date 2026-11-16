@@ -37,7 +37,7 @@
     document.documentElement.requestFullscreen?.().catch(() => {});
     window.donutRooms = import('../spinoff/rooms.js');
     // a game page opened by itself comes back here as ?open=, and opens once tapped; only the game's own pages
-    const open = /^(choose|lobby|level)\.html(\?[^"<>]*)?$/.test(q.get('open') ?? '') ? q.get('open') : 'choose.html';
+    const open = /^(choose|lobby|level|build)\.html(\?[^"<>]*)?$/.test(q.get('open') ?? '') ? q.get('open') : 'choose.html';
     e.currentTarget.outerHTML = `<iframe src="${open}" allow="fullscreen; screen-wake-lock"></iframe>`;
   });
 </script>

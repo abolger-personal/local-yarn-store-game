@@ -3,7 +3,7 @@ import { SHAPE_UNITS } from './catalog.js';
 
 export const TIERS = Object.freeze(['chunky', 'low', 'med']);
 /** @param {number|string} t */
-export const tierIndex = (t) => (typeof t === 'number' ? t : Math.max(0, TIERS.indexOf(t)));
+const tierIndex = (t) => (typeof t === 'number' ? t : Math.max(0, TIERS.indexOf(t)));
 
 /**
  * @template T
@@ -89,7 +89,7 @@ export function buildFamily(name, tier = 1) {
   return seat(make(tierIndex(tier)));
 }
 
-export const FAMILY_FOOTPRINT = Object.freeze({
+const FAMILY_FOOTPRINT = Object.freeze({
   ball:    [1, 1],
   cake:    [1, 1],
   cone:    [1, 1],
@@ -176,7 +176,7 @@ export const familyExtent = memo((name, tier) => {
 });
 
 // YARN-ASSET-SPIKE.md §14: squash to meet the layer grid, never stretch.
-export const SETTLE_MIN = 0.82;
+const SETTLE_MIN = 0.82;
 
 function meshVolume(g) {
   const p = g.attributes.position, idx = g.index, n = idx ? idx.count : p.count;
@@ -199,7 +199,7 @@ const SCALED_TO_UNITS = ['ball', 'cone'];
 /** YARN.md "Units": shrink ball and cone inside their footprints until drawn volume follows their units;
  * the skein fills its footprint.
  * @param {string} family @param {number|string} [tier] */
-export const unitScale = (family, tier = 1) => (!SCALED_TO_UNITS.includes(family) ? 1 : Math.cbrt(
+const unitScale = (family, tier = 1) => (!SCALED_TO_UNITS.includes(family) ? 1 : Math.cbrt(
   Math.min(...SCALED_TO_UNITS.map((n) => volumePerUnit(n, tier))) / volumePerUnit(family, tier)));
 
 /**
@@ -220,7 +220,7 @@ export function yarnFit(family, footW, footD,
 }
 
 /** @param {string} name @param {number|string} [tier] */
-export function familyAspect(name, tier = 1) {
+function familyAspect(name, tier = 1) {
   const d = familyExtent(name, tier);
   const m = Math.max(...d);
   return d.map((v) => v / m);
@@ -236,7 +236,7 @@ const DOWN = new THREE.Vector3(0, -1, 0);
 
 const RELIEF_N = 48;
 
-export const familyRelief = memo((name, tier) => {
+const familyRelief = memo((name, tier) => {
   const geo = buildFamily(name, tier);
   const b = geo.boundingBox.clone();
   const { top, bottom } = castRelief(geo, b);

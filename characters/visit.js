@@ -361,12 +361,9 @@ export const consideredHere = (npc, display, items) =>
     return acc;
   }, []);
 
-export const holdsTarget = (display, items, target) =>
-  items.some((it) => available(it) && it.display === display.id && matchesTarget(it, target));
-
 // TODO(spec): placeholder weights, VISIT-POC-TODO.md spec gap 2
 
-export function attractiveness(npc, display, items) {
+function attractiveness(npc, display, items) {
   if (!items.some((it) => available(it) && it.display === display.id)) return 0;
   const t = npc.traits;
   let a = 0.20;

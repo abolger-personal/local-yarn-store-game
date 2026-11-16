@@ -30,7 +30,8 @@ const FIGHT_SECONDS = 6;
 const CLIMB = 1.2, SWING_SECONDS = 2;
 // REUSE-SPEC.md §Level 1: long structures, fewer to a level (decided 2026-11-10), pieces to a string
 const STRING = Object.freeze({ min: 7, max: 14 });
-const GROUND_PIECES = ['bars', 'swings'];
+// what a ground stretch between structures can have in its middle (monkey bars from 2026-11-15)
+const GROUND_PIECES = ['swings', 'bars', 'monkeyBars'];
 const MAIN = Object.values(PIECES).filter((p) => !GROUND_PIECES.includes(p.id));
 // REUSE-SPEC.md §Level 1, Building it: the band, and how broad a structure's pieces are across their run (7 ft)
 export const BAND = Object.freeze({ z0: -2, z1: 2 });
@@ -41,7 +42,7 @@ const TURNS = [0, 90, -90];
 // tries at turning a structure so it shuts the ground, before trying another structure
 const TRIES = 10;
 
-const r3 = (v) => Math.round(v * 1000) / 1000;
+export const r3 = (v) => Math.round(v * 1000) / 1000;
 
 /** How many pieces it takes, at least, to get from `h` ft up down to the ground. */
 const DOWN = (() => {
@@ -63,7 +64,7 @@ export function secondsOf(p) {
 }
 
 /** From the ground a structure starts with a way up, or a jump onto a deck or the bridge, not onto a climb or stairs. */
-const landsOn = (p) => p.in <= JUMP_FT && (Boolean(p.bridge) || (p.decks ?? []).some((d) => d.y === p.in));
+export const landsOn = (p) => p.in <= JUMP_FT && (Boolean(p.bridge) || (p.decks ?? []).some((d) => d.y === p.in));
 
 /** The pieces that can come next after `ids`, leaving `out` ft up, with room left to get back down. */
 function nextPieces(ids, out) {
@@ -100,10 +101,10 @@ function shortStructure(r, seconds, ok = (_ids) => true) {
 
 const dirOf = (h) => ({ x: r3(Math.cos((h * Math.PI) / 180)), z: r3(Math.sin((h * Math.PI) / 180)) });
 /** The point `a` (game units) along the cursor's heading. */
-const along = (c, a) => ({ x: r3(c.x + dirOf(c.h).x * a), z: r3(c.z + dirOf(c.h).z * a) });
+export const along = (c, a) => ({ x: r3(c.x + dirOf(c.h).x * a), z: r3(c.z + dirOf(c.h).z * a) });
 
 /** The box over `a0..a1` along the cursor's heading, `breadth` across, trimmed to the band where it meets an edge. */
-function strip(c, a0, a1, breadth = BREADTH) {
+export function strip(c, a0, a1, breadth = BREADTH) {
   const m = along(c, (a0 + a1) / 2), l = (a1 - a0) / 2, b = breadth / 2, [hx, hz] = c.h === 0 ? [l, b] : [b, l];
   return { x0: r3(m.x - hx), x1: r3(m.x + hx), z0: r3(Math.max(BAND.z0, m.z - hz)), z1: r3(Math.min(BAND.z1, m.z + hz)) };
 }
@@ -132,11 +133,11 @@ export function blocks(floors, x0, x1) {
 }
 
 /** Does a piece `len` long from cursor `c` keep its run inside the band? */
-const fits = (c, len) => Math.abs(along(c, len).z) <= BAND.z1 + 1e-6;
+export const fits = (c, len) => Math.abs(along(c, len).z) <= BAND.z1 + 1e-6;
 
 /** The cursor turned to heading `h`: round a corner, the next piece starts off the last one's side, back from its end,
  *  so they share an edge and neither lies over the other (playtest 2026-11-12: slides and bridges half inside decks). */
-function corner(c, h) {
+export function corner(c, h) {
   if (h === c.h) return c;
   const from = dirOf(c.h), to = dirOf(h), half = BREADTH / 2;
   return { x: r3(c.x + (to.x - from.x) * half), z: r3(c.z + (to.z - from.z) * half), h };
@@ -153,8 +154,8 @@ function turn(r, c, len) {
 }
 
 /** Piece `p` laid from cursor `c` into level parts `L`; returns the cursor at its far end. */
-function place(L, p, c) {
-  const at = (v) => v * FT, top = (d) => ({ kind: /** @type {const} */ ('deck'), ...strip(c, at(d.x0), at(d.x1)), y: r3(at(d.y)) });
+export function place(L, p, c) {
+  const at = (v) => v * FT, top = (d) => ({ kind: /** @type {const} */ ('deck'), ...strip(c, at(d.x0), at(d.x1)), y: r3(at(d.y)), ...(d.rungs && { rungs: true, h: c.h }) });
   L.floors.push(...(p.decks ?? []).map(top));
   if (p.bridge) {
     const b = { ...top(p.bridge), h: c.h };
@@ -183,7 +184,7 @@ const parts = () => ({ floors: [], climbs: [], rides: [], stairs: [], swings: []
 /** Everything of a structure seen from above: what stands, and its slides. */
 const footprint = (T) => [...standing(T), ...T.rides.filter((q) => q.kind === 'slide').map((q) => q.box)];
 /** How much ground two boxes share. */
-const shared = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0));
+export const shared = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0));
 
 /** Structure `ids` from x, turning as the seed says; `tidy` if no piece lies over another (doubling back can); its parts and how far along x it reaches. */
 function lay(r, ids, x) {
@@ -225,7 +226,7 @@ function keep(L, T, ids, x0, x1) {
 /** A ground stretch, 3 to 5 s' walk, sometimes with the bars or the swings in the middle (`always`: with that one);
  *  returns where it ends. */
 function gap(L, r, x, always = null) {
-  const seconds = GAP.min + r() * (GAP.max - GAP.min), len = seconds * WALK_SPEED, drawn = PIECES[GROUND_PIECES[Math.floor(r() * 2)]];
+  const seconds = GAP.min + r() * (GAP.max - GAP.min), len = seconds * WALK_SPEED, drawn = PIECES[GROUND_PIECES[Math.floor(r() * GROUND_PIECES.length)]];
   const extra = always ? PIECES[always] : drawn, some = r() < 0.5;
   L.seconds += seconds + FIGHT_SECONDS;
   if (always || some) {
@@ -236,7 +237,7 @@ function gap(L, r, x, always = null) {
 }
 
 /** @returns {Level} an empty level, its one hero start and shelf at the left end (spinoff/sim.js needs a shelf) */
-const emptyLevel = () => ({
+export const emptyLevel = () => ({
   ...parts(), backWall: BAND.z0, shelves: [{ team: 'heroes', x: 0.5, z: -1.7, y: 0 }], zones: [], puddles: [], bricks: [],
   ringOut: { x0: -2, x1: 0, z1: 3.5, y: -3 }, starts: [{ x: 1, z: 0 }], structures: [], spans: [], seconds: 0, slices: [], guards: [],
 });
@@ -266,10 +267,12 @@ export function forSim(L) {
 // the middle of every rocking bridge, at the top of every fire pole (jump for it), and up where a launch off each
 // pair of bars or swings flies. Worked out from the level, so every tablet has the same.
 const SLICE = Object.freeze({ up: 0.5, pole: 0.25, flight: { on: 2.5, y: 3.1 } });
-function slicesOf(L) {
+export function slicesOf(L) {
   const at = (x, y, z) => ({ x: r3(x), y: r3(y), z: r3(z) }), slides = L.rides.filter((q) => q.kind === 'slide'), poles = L.rides.filter((q) => q.kind === 'pole');
+  // monkey bars are two rides, there and back: one slice, under the middle, got by swinging across
+  const monkeys = L.rides.filter((q) => q.kind === 'monkey').filter((_, i) => i % 2 === 0);
   return [
-    ...slides.map((q) => at((q.x0 + q.x1) / 2, (q.y0 + q.y1) / 2 + SLICE.up, (q.z0 + q.z1) / 2)),
+    ...[...slides, ...monkeys].map((q) => at((q.x0 + q.x1) / 2, (q.y0 + q.y1) / 2 + SLICE.up, (q.z0 + q.z1) / 2)),
     ...L.bridges.map((b) => at((b.x0 + b.x1) / 2, b.y + SLICE.up, (b.z0 + b.z1) / 2)),
     ...poles.map((q) => at(q.x0, q.top - SLICE.pole, q.z0)),
     ...L.swings.filter((_, i) => i % 2).map((p) => at(p.x + SLICE.flight.on, SLICE.flight.y, p.z)),
@@ -290,7 +293,7 @@ const GUARD_Z = 0.9;
  * @param {number} seed @param {number} [n] @returns {Level}
  */
 export function generateLevel(seed, n = 1) {
-  const r = rng(seed), L = emptyLevel(), ground = () => (n >= 2 ? ['swings', 'bars'][L.structures.length % 2] : null);
+  const r = rng(seed), L = emptyLevel(), ground = () => (n >= 2 ? GROUND_PIECES[L.structures.length % GROUND_PIECES.length] : null);
   let x = gap(L, r, 0, ground());
   while (L.seconds < SECONDS.min) x = gap(L, r, build(L, r, x, MUST[L.structures.length]), ground());
   L.floors.unshift({ kind: 'ground', x0: 0, x1: r3(x), z0: BAND.z0, z1: BAND.z1, y: 0 });

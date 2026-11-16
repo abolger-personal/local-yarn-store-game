@@ -20,6 +20,9 @@ const STAGE_PICTURE = { playground: '🎠' };
 // §Level 2); unlocks come with the progress code
 const LEVELS = { playground: [1, 2, 3] };
 const DIAL = 9;
+// REUSE-SPEC.md §Build my playground: next to the level numbers; a wrench, which every tablet has. No span round it:
+// a span in the dial is an empty place's dashed ring (spinoff.css)
+const BUILD_BUTTON = '<button data-build aria-label="build my playground">🔧</button>';
 let picked = { stage: '', level: 0 };
 
 const show = (ids, on) => { for (const id of [ids].flat()) document.getElementById(id).classList.toggle('hidden', !on); };
@@ -37,7 +40,7 @@ function pickStage(name) {
   show('stage-list', false);
   show('dial', true);
   document.getElementById('dial').innerHTML = Array.from({ length: DIAL }, (_, i) => i + 1)
-    .map((n) => (open.has(n) ? `<button data-level="${n}" aria-label="level ${n}">${n}</button>` : '<span></span>')).join('');
+    .map((n) => (open.has(n) ? `<button data-level="${n}" aria-label="level ${n}">${n}</button>` : { [open.size + 1]: BUILD_BUTTON }[n] ?? '<span></span>')).join('');
 }
 
 function pickLevel(n, b) {
@@ -56,7 +59,11 @@ on('pick-go', () => {
   location.href = `level.html?stage=${picked.stage}&level=${picked.level}&seed=${seed}`;
 });
 on('stage-list', (e) => { const b = tapped(e); if (b) pickStage(b.dataset.stage); });
-on('dial', (e) => { const b = tapped(e); if (b) pickLevel(Number(b.dataset.level), b); });
+on('dial', (e) => {
+  const b = tapped(e);
+  if (b?.dataset.build !== undefined) location.href = 'build.html';
+  else if (b) pickLevel(Number(b.dataset.level), b);
+});
 
 if (mine) {
   const stage = makeStage(document.getElementById('stage')), floor = makeGridLines(floorGrid(), 0, '#c9ae8c'), hero = buildHero(mine);

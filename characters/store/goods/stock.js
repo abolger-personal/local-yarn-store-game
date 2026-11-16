@@ -26,7 +26,7 @@ const PACKAGES = {
 
 const packageFor = (name) => pick(PACKAGES[name] ?? [[1, 1]], simRng);
 
-export const YARN_COLORS = YARN_PALETTE.map((p) => p.hex);
+const YARN_COLORS = YARN_PALETTE.map((p) => p.hex);
 
 export const colourOf = (yarn) => YARN_COLORS[yarn.colorIndex % YARN_COLORS.length];
 

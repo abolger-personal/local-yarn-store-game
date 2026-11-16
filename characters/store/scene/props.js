@@ -6,7 +6,7 @@ import { growPlant } from './plants.js';
 import { mergeMeshes } from './wood.js';
 import { mulberry32 } from '../core/util.js';
 
-export const PROP_SLOTS = [
+const PROP_SLOTS = [
   { id: 'lamp-a', kind: 'floor-lamp', x: -4.55, z: 0.8 },
   { id: 'lamp-b', kind: 'floor-lamp', x: 4.55, z: 0.1 },
   // STORE-SCENE.md §Props: the seeds and the one potted corner

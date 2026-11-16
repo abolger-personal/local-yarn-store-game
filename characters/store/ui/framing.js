@@ -29,7 +29,7 @@ const FIT = 1.08;          // STORE-SCENE.md §Camera
 let saved = null;
 let side = null;
 
-export function restoreLimits() {
+function restoreLimits() {
   if (!saved) return;
   Object.assign(controls, saved);
   saved = null;

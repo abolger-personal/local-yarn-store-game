@@ -80,9 +80,17 @@ const _shade = new THREE.Color();
 const darker = (colour) => `#${_shade.set(colour).multiplyScalar(0.55).getHexString()}`;
 
 /** Monkey bars' top: a post at each corner, a rail along each side, rungs across; open underneath to look at. */
+// neighbouring pieces put a post on the same corner (1,877 in 120 levels); drawn twice in two colours, they flickered
+// (playtest 2026-11-15), so a corner's post is drawn once, the tallest asked for, in its colour
+let posts = new Map();
+const post = (x, z, h, color) => {
+  const key = `${x.toFixed(3)} ${z.toFixed(3)}`;
+  if (!(posts.get(key)?.h >= h)) posts.set(key, { x, z, h, color });
+};
+
 function monkeyTop(f) {
   const g = new THREE.Group(), color = f.colour ?? C.post, V = (x, y, z) => new THREE.Vector3(x, y, z), along = f.h === 0;
-  for (const [x, z] of [[f.x0, f.z0], [f.x0, f.z1], [f.x1, f.z0], [f.x1, f.z1]]) g.add(block([POST, f.y, POST], color, [x, 0, z]));
+  for (const [x, z] of [[f.x0, f.z0], [f.x0, f.z1], [f.x1, f.z0], [f.x1, f.z1]]) post(x, z, f.y, color);
   const n = Math.max(2, Math.round((along ? f.x1 - f.x0 : f.z1 - f.z0) / 0.22));
   for (let i = 0; i <= n; i++) {
     const t = i / n, x = f.x0 + (f.x1 - f.x0) * t, z = f.z0 + (f.z1 - f.z0) * t;
@@ -98,7 +106,7 @@ function deck(f, i) {
   const w = f.x1 - f.x0, d = f.z1 - f.z0, cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, g = new THREE.Group(), k = i % 4;
   const lift = k * 0.003, inset = POST + k * 0.008;
   g.add(block([w, SLAB, d], f.colour ? darker(f.colour) : C.deck, [cx, f.y - SLAB + lift, cz]), block([w - inset, f.y - SLAB, d - inset], f.colour ?? C.rail, [cx, 0, cz], 'slots', 2));
-  for (const [x, z] of [[f.x0, f.z0], [f.x0, f.z1], [f.x1, f.z0], [f.x1, f.z1]]) g.add(block([POST, f.y + RAIL, POST], f.colour ?? C.post, [x, 0, z]));
+  for (const [x, z] of [[f.x0, f.z0], [f.x0, f.z1], [f.x1, f.z0], [f.x1, f.z1]]) post(x, z, f.y + RAIL, f.colour ?? C.post);
   return g;
 }
 
@@ -128,7 +136,7 @@ function bridge(b) {
     hang.add(block([len / 8 - 0.02, 0.04, w], C.deck, [m.x, m.y, 0]));
     for (const z of [-w / 2, w / 2]) for (const y of [0.22, 0.45]) hang.add(rod(at(i / 8, y, z), at((i + 1) / 8, y, z), 0.015, C.rail));
   }
-  for (const x of [-len / 2, len / 2]) for (const z of [-w / 2, w / 2]) g.add(block([POST, b.y + RAIL, POST], b.colour ?? C.post, [x, -b.y, z]));
+  for (const x of [b.x0, b.x1]) for (const z of [b.z0, b.z1]) post(x, z, b.y + RAIL, b.colour ?? C.post);
   g.position.set((b.x0 + b.x1) / 2, b.y, (b.z0 + b.z1) / 2);
   g.rotation.y = (-b.h * Math.PI) / 180;
   sways(b, (v) => { hang.rotation.x = v * BRIDGE.roll; }, BRIDGE.rate);
@@ -223,7 +231,9 @@ function floor(ground) {
   for (let x = ground.x0 + 2, i = 0; x < ground.x1; x += 3.1, i++) {
     const blob = new THREE.Mesh(new THREE.CircleGeometry(1 + (i % 3) * 0.3, 24), mat([C.teal, C.terracotta][i % 2], 'crumb', 2));
     blob.rotation.x = -Math.PI / 2;
-    blob.position.set(x, 0.001, ((i * 1.7) % 3) - 1.5);
+    blob.position.set(x, 0, ((i * 1.7) % 3) - 1.5);
+    // drawn over the rubber by depth offset, not height: 1 mm up was under a tablet's depth precision and flickered
+    Object.assign(blob.material, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
     g.add(blob);
   }
   return g;
@@ -284,8 +294,9 @@ function glow(size) {
 const slices = [];
 /** A slice to find, turning where it hangs. */
 function slice(at) {
-  const g = new THREE.Group(), turn = card('slice.svg', 0.8);
-  g.add(glow(1.7), turn);
+  // 0.65 of their first size, shine and all (playtest 2026-11-15: too big)
+  const g = new THREE.Group(), turn = card('slice.svg', 0.8 * 0.65);
+  g.add(glow(1.7 * 0.65), turn);
   g.position.set(at.x, at.y, at.z);
   slices.push({ g, turn, y: at.y });
   return g;
@@ -323,7 +334,9 @@ export function pizzaTime(t, taken, eaten = false) {
 /** Everything of level `L` to see, but the heroes. @param {Level} L */
 export function playground(L) {
   const [ground, ...decks] = L.floors;
-  return [floor(ground), field(ground), fence(ground), sign(ground), bigPizza(ground), ...L.slices.map(slice), ...decks.filter((f) => !L.bridges.includes(/** @type {any} */ (f))).map(deck), ...L.bridges.map(bridge), ...L.climbs.map(climb), ...[...L.stairs, ...L.rides].map(path), ...L.swings.map(swing)];
+  posts = new Map();
+  const parts = [floor(ground), field(ground), fence(ground), sign(ground), bigPizza(ground), ...L.slices.map(slice), ...decks.filter((f) => !L.bridges.includes(/** @type {any} */ (f))).map(deck), ...L.bridges.map(bridge), ...L.climbs.map(climb), ...[...L.stairs, ...L.rides].map(path), ...L.swings.map(swing)];
+  return [...parts, new THREE.Group().add(...[...posts.values()].map((p) => block([POST, p.h, POST], p.color, [p.x, 0, p.z])))];
 }
 
 /** Outdoors (playtest 2026-11-10): a blue sky fading to a pale horizon behind the field, and sunlight and skylight on the

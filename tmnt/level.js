@@ -31,6 +31,10 @@ const ME = 'me';
 const el = (id) => document.getElementById(id);
 
 const stage = makeStage(el('stage')), { scene, camera } = stage;
+// the camera sits about 9 back and nothing comes within 5 of it: a near plane at 1, not the stage's 0.01, is a hundred
+// times the depth precision, so pieces a few millimetres apart don't flicker on a tablet (playtest 2026-11-15)
+camera.near = 1;
+camera.updateProjectionMatrix();
 outdoors(scene);
 scene.add(...playground(level));
 

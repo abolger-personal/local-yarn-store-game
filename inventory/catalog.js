@@ -28,7 +28,7 @@ export const PATTERN_NAMES = Object.freeze(Object.keys(PATTERN_TYPES));
 const STOCKED = PATTERN_NAMES.filter((t) => !PATTERN_TYPES[t].decor);
 
 // PATTERNS.md: always 2x2x1.
-export const PATTERN_FOOTPRINT = Object.freeze([2, 2]);
+const PATTERN_FOOTPRINT = Object.freeze([2, 2]);
 
 export const YARN_MATERIALS = Object.freeze([
   'wool', 'cotton', 'alpaca', 'silk', 'acrylic', 'linen', 'mohair', 'bamboo',
@@ -213,7 +213,7 @@ export const CRAFT_TERMS = Object.freeze({
   knitting: /purl|knit|stockinette|cable|garter|\bribb?(ed|ing)?\b|needle|cast on|cast off|bind off|yarn.?over/i,
   crochet: /hook|chain|crochet|granny|amigurumi|slip stitch|treble/i,
 });
-export const craftOfTitle = (title) => CRAFTS.find((c) => CRAFT_TERMS[c].test(title)) ?? null;
+const craftOfTitle = (title) => CRAFTS.find((c) => CRAFT_TERMS[c].test(title)) ?? null;
 
 // ponytail: a design's spec follows its list ORDER, so append new titles; key the seed on the title once saves span reloads.
 function design({ type, silhouette, title }, g) {

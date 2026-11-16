@@ -16,6 +16,10 @@ export const GUARD = Object.freeze({
 });
 /** A knocked soldier this near the back fence has gone over it. */
 const FENCE_NEAR = 0.05;
+/** A hero knocked and not yet back up: the next punch waits `every` after they are (a hero pinned at the back fence
+ *  was punched again the moment they stood, seen in simulation 2026-11-15). */
+const REELING = new Set(['hurt', 'launched', 'tripped']);
+const heldTill = (snap, b) => (snap.fighters.some((f) => f.id === b.hit && (REELING.has(f.move) || !f.onGround)) ? Math.max(b.next, snap.tick + GUARD.every) : b.next);
 const IDLE = Object.freeze({ target: null, punch: false, kick: false });
 const flat = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
@@ -33,7 +37,7 @@ function inReach(me, kid) {
 
 /** One soldier's brain. @param {string} id @param {Post} post */
 export function createGuard(id, post) {
-  const b = { want: '', since: 0, sent: '', next: 0 };
+  const b = { want: '', since: 0, sent: '', next: 0, hit: '' };
   return {
     id, post, away: false,
     /** @param {Snapshot} snap */
@@ -43,10 +47,11 @@ export function createGuard(id, post) {
       const kid = intruder(snap, post), home = flat(me, post) > GUARD.home ? { x: post.x, z: post.z } : { stop: true };
       const target = kid ? { thing: 'fighter', id: kid.id } : home, key = JSON.stringify(target);
       if (key !== b.want) Object.assign(b, { want: key, since: snap.tick });
+      b.next = heldTill(snap, b);
       if (snap.tick - b.since < GUARD.react) return IDLE;
       const send = key !== b.sent, punch = Boolean(kid) && me.onGround && snap.tick >= b.next && inReach(me, kid);
       b.sent = key;
-      if (punch) b.next = snap.tick + GUARD.every;
+      if (punch) Object.assign(b, { next: snap.tick + GUARD.every, hit: kid.id });
       return { target: send ? target : null, punch, kick: false };
     },
   };

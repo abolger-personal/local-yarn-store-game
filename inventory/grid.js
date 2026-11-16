@@ -41,7 +41,7 @@ export const dropLayer = (g, keys) => keys.reduce((m, k) => Math.max(m, g.piles[
 export const fits = (g, keys, layers = 1) =>
   keys !== null && dropLayer(g, keys) + layers <= g.headroom && restsOnCentres(g, keys);
 
-export function restsOnCentres(g, keys) {
+function restsOnCentres(g, keys) {
   if (!g.round) return true;
   const L = dropLayer(g, keys);
   if (L === 0) return true;

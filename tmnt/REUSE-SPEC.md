@@ -49,12 +49,12 @@ elites); **Purl Power!** (Turtle Power) on the title screen.
   up changes how you attack for a while instead (§From the walk-round photos), and falling off a deck leaves you dizzy,
   not hurt (§Building it). Brainstorm 2026-11-12: what a bad guy's hit does to a hero.
 - **Bad guys are beaten by leaving the playground** (decided 2026-11-12): a ring-out, as in the donut fighters, sends
-  a bad guy **over the iron fence along the back** (§The pieces), where they **stand, sad**, watching. Not built yet:
-  there are no bad guys in the level so far. **For now** (decided 2026-11-12): the donut fighters' **damage percent**
+  a bad guy **over the iron fence along the back** (§The pieces), where they **stand, sad**, watching. Built
+  2026-11-14 with level 3's Sock Clan soldiers (§Level 3). **For now** (decided 2026-11-12): the donut fighters' **damage percent**
   as it is (hits build it up, and knockback grows with it); **a big enough hit in any direction** sends them over the
   back. If that's too easy, narrow which hits count or make the bad guys tougher.
 - **Todo: the trailing scarf's physics** (2026-11-12). Trailing behind a hero that can backflip looks odd, and not in a
-  good way. Not started.
+  good way. Not started. Planned 2026-11-15 for 0.0.4, with making long scarves flow (§To do for 0.0.4).
 - **Side scrolling in 2.5D** (decided 2026-11-09): keep the donut fighters' depth band you walk around in; the
   camera scrolls along the level (x) only.
 - **The level generator** (decided 2026-11-09): use the donut fighters' (`spinoff/generate.js`, a pure function of
@@ -112,6 +112,8 @@ should know it. Turned into a 2D side scroll in the 2.5D band.
   **Built for the chooser to try** (2026-11-10): `tmnt/choose.html?glow=0.6&shadow=0.4` (each 0 to 1; off without
   them), the glow in the scarf's colour (the gloves' with no scarf), the shadow a dark halo, both soft and behind
   the hero (`addPop` in `hero.js`). The level's fade slider comes with the level.
+  **Solved by the ink outline** (decided 2026-11-15): the heroes' outline is what lifts them off the playground; no
+  glow or shadow behind them in play. **The glow is saved for special moves**, later (brainstorm 2026-11-15).
 - **The swings move and heroes ride them** (decided 2026-11-10): jump on, swing, and be **launched**; a swing can go
   **all the way round, 360°**, though real ones can't.
 - **No hurry, no going back** (decided 2026-11-10): the game never pushes the players along. The camera follows
@@ -343,7 +345,7 @@ Decided 2026-11-12:
 - **"Cowl-a-bunga!" appears in large letters** when a hero does a dismount (decided 2026-11-12). Built the same
   day on every launch off a bar or a swing, since that is the only dismount so far: the logo's lettering, green
   with a black outline, across the screen for about a second. It moves to the named dismounts when they exist.
-- Not built: there are no enemies in a level yet.
+- Not built: the one-hit knockout. Level 3 has soldiers now (§Level 3), so nothing blocks it.
 
 **Built 2026-11-12** (playtest: "I see Cowl-a-bunga but dismounts aren't working": only the launch and the shout
 existed). Coming off a bar or a swing now plays a Biles move through the flight, its own jump and travel left out
@@ -441,8 +443,8 @@ Decided 2026-11-15 (the designer, after the second round of questions):
   can stand; the level it makes is walkable in the sim.
 - **Saved on the tablet**, one playground (`tmnt.playground.v1`), and played as `level.html?built=1`: the ground
   runs on past the last piece to the gate and the giant pizza; slices hang where the generator would hang them.
-- Known limits: a slide is too long to run across the playground from the middle lane, so it turns only from a lane
-  near the back or front; pieces can only be taken away last first.
+- Known limit: a slide is too long to run across the playground from the middle lane, so it turns only from a lane
+  near the back or front.
 - **Step 2, a colour for every piece, built 2026-11-15**: a row of twelve colours over the pieces. The one tapped is
   the colour in hand: the next piece dragged on is that colour, and **a piece on the playground, tapped, turns that
   colour**. In play it colours the piece's main part: a deck's sides, a slide, the fire pole, the dome, a climb's
@@ -493,8 +495,10 @@ Decided and built 2026-11-15:
 
 Brainstorm 2026-11-15, for later. Not decided, not planned, not built.
 - **A see-saw**, as a ground piece.
-- **Food trucks along the back wall** that pitch things into play: lemonade, pizza, ice cream.
-- **A rest option** that turns the bad guys off on a level but lets the kids run around, like a pause.
+- **Food trucks along the back wall** that pitch things into play: lemonade, pizza, ice cream. Planned 2026-11-15 for
+  0.0.4 as a jump-timing challenge (§To do for 0.0.4).
+- **A rest option** that turns the bad guys off on a level but lets the kids run around, like a pause. Planned
+  2026-11-15 for 0.0.4: the bad guys wait outside the fence (§To do for 0.0.4).
 
 ### A big hammer for the turtles
 
@@ -529,6 +533,8 @@ edge at one side or both, and the slide stopped there. Decided and built:
 Decided and built 2026-11-14 (the designer: "it's time to add villains to TMNT in level 3. I want level 3 generated,
 but the bad guys should try to stop you from getting pizza. They should respawn, but way slower than pizza: they
 are allowed back to the playground after a 2:00 time out"). `tmnt/guard.js`, drawn in `tmnt/level.js`.
+**Moving to level 4** (planned 2026-11-15 for 0.0.4, §To do for 0.0.4): level 3 gets soldiers that don't hit back,
+and level 5 soldiers that steal pizza.
 - **Generated as level 2** (swings or bars on every ground stretch), plus **a Sock Clan soldier's post on the ground
   after every structure**, where the launch slices hang. The five saved designs take the posts in turn.
 - **A soldier keeps its post** until a hero comes within 5 of it on or near the ground; then it walks up and
@@ -548,7 +554,7 @@ are allowed back to the playground after a 2:00 time out"). `tmnt/guard.js`, dra
   there over the fence.
 - **It is allowed back after 2:00**, at its post.
 - **Only soldiers within 14 of the hero are drawn** and animated: each is as heavy to draw as a hero.
-- Brainstorm, not built: stealing pizza (§Pizza); soldiers on the equipment and out of the bear cave; a dismount's
+- Brainstorm, not built: soldiers on the equipment and out of the bear cave; a dismount's
   one-hit knockout (§Dismounts); what a soldier's hit costs a hero beyond the knock; soldiers in multiplayer.
 
 ### Pizza
@@ -564,8 +570,21 @@ Decided and built 2026-11-12 (the designer: "the characters have no idea what th
   it), and up where a launch off each pair of bars or swings flies. They turn, in front of a shine (`tmnt/shine.svg`: inked rays and sparkles, turning slowly; playtest 2026-11-12, the soft glow was "not so cute", the turning 2D slice "very cute"); getting to one eats it, and
   🍕 at the top of the screen counts them. Worked out from the level (`slicesOf` in `tmnt/generate.js`), so every
   tablet has the same.
-- **Pizza can be stolen from opponents** (decided 2026-11-12), as donuts are in the donut fighters. Not built: there
-  are no opponents in a level yet, and it needs deciding what a bad guy holding pizza does with it.
+- **Pizza can be stolen from opponents** (decided 2026-11-12), as donuts are in the donut fighters. **A bad guy who steals
+  pizza eats it and does a rude victory dance** (decided 2026-11-15, the designer: "obviously"), probably the booty
+  shake (§Open questions). Not built; planned 2026-11-15 for level 5 in 0.0.4 (§To do for 0.0.4).
+  - **How a steal goes** (decided 2026-11-15): **a big hit** knocks **one slice** out of a hero; the 🍕 count drops
+    by one and the slice flies with the hit, as a donut does in the donut fighters. **The hero can win it back**:
+    get to it first, or knock the bad guy before it's eaten. **A hero with no slices can't be robbed.**
+  - **Tuned by playtest**: how far the slice is knocked. The further it flies, the easier it is to win back. What
+    counts as a big hit is also tuned there: every soldier punch reaches the donut fighters' launch speed, so
+    "launched" alone isn't enough to tell.
+  - **A struggling hero gets a better chance on its own** (2026-11-15, kept on purpose by the designer): knockback
+    grows with damage percent, and the slice flies with the hit, so a hero who has been hit a lot drops a slice
+    further from the thief and can more easily win it back. No special rule for it; keep the slice's flight tied
+    to the hit's knockback when tuning so this isn't lost.
+  - Drawn with the flat slice we have (brainstorm 2026-11-15): held up facing the camera; eaten in a few drawings
+    (bitten, crust, gone) in the same ink, with crumbs; then the dance.
 - Not built: anything the slices are for (a score, an unlock, the attack item); a slice count on finishing; reaching
   the giant pizza doing anything of its own (the gate beside it ends the level).
 - **Slices come back** (decided and built 2026-11-14, the designer: the kids are having fun staying on a level): an
@@ -902,13 +921,14 @@ the yarn theme the way the Shredder's claws fit his. Till then The Sweater's des
 Left open at the end of the 2026-11-15 session. Strike each off here when it's done.
 
 For the designer to look at (built, tested by numbers, not yet seen by eye):
-- [ ] **The bridge's toss** (§The bridge tips you off): does being tossed off after four sways look and feel right?
-- [ ] **The pizza and its starburst** (§Pizza): a spinning slice was half hidden behind its shine; the shine is now drawn
-  first. Check on the first slice passed.
-- [ ] **The coarser decals** (§The chooser's speed): `DECAL_SPLITS` 2, on trial. Is the turtle's plastron too rough? If
-  so, back to 3 in characters/npc.js.
-- [ ] **The bars' picture in the builder** (§Build my playground): two bars across posts, recognisable but small. Big
-  enough?
+- [x] **The bridge's toss** (§The bridge tips you off): does being tossed off after four sways look and feel right?
+  Yes (the designer, 2026-11-15).
+- [x] **The pizza and its starburst** (§Pizza): a spinning slice was half hidden behind its shine; the shine is now drawn
+  first. Fixed (the designer, 2026-11-15). The slices and their shine are now 0.65 of that size, the same shape
+  (playtest 2026-11-15: too big). Approved (the designer, 2026-11-15).
+- [x] **The coarser decals** (§The chooser's speed): `DECAL_SPLITS` 2 kept: the plastron and its fine ink outlines are
+  cute (the designer, 2026-11-15).
+- [x] **The bars' picture in the builder** (§Build my playground): big enough (the designer, 2026-11-15).
 
 Bugs and unknowns:
 - [ ] **Tablets freezing at the very start of a level** (seen on two tablets, 2026-11-14: taps, punch and kick all
@@ -917,7 +937,18 @@ Bugs and unknowns:
   it was entered, frozen from the start or after a first tap.
 - [ ] **A first visit to each 🍕 hero is only half as quick as hoped** (§The chooser's speed): about 60 ms of work
   down to 35 ms, where building the next one ahead should have made it near nothing. Why isn't known.
-- [ ] **A hero pinned at the back edge by a soldier is punched over and over** (seen in simulation, level 3).
+- [x] **A hero pinned at the back edge by a soldier is punched over and over** (seen in simulation, level 3). Fixed
+  2026-11-15: a soldier's next punch waits 0.8 s after the hero it hit is back on their feet, time to run (tested in
+  `guard.test.mjs`). Launched over 1.2 m, the hero had left the soldier's sight, so it never waited, and punched again
+  a sixth of a second after they landed.
+- [x] **The ground flickered blue under its orange and sea-green spots** (the designer, 2026-11-15). The spots lay 1 mm
+  over the slate-blue rubber, finer than a tablet's depth buffer tells apart; they are now drawn on it by depth offset.
+  Fixed, seen on a tablet (the designer, 2026-11-15).
+- [x] **Neighbouring playground pieces flickered the same way** (the designer, 2026-11-15). Two causes, both measured:
+  neighbours put a post on the same corner (1,877 in 120 generated levels), drawn twice and in two colours once the
+  builder colours pieces; and decks overlapping at a turn sit only 3 mm apart. Fixed 2026-11-15: a corner's post is
+  drawn once, the tallest, in its colour (`tmnt/scenery.test.mjs`), and the level's camera has its near plane at 1,
+  not 0.01, a hundred times the depth precision. Not yet seen on a tablet.
 
 Decided, not built:
 - [ ] **The builder chooses where pizza and bad guys go** (§Build my playground, decided 2026-11-15).
@@ -925,10 +956,39 @@ Decided, not built:
   rooms exist yet).
 
 Housekeeping:
-- [ ] **29 unused exports in characters/, inventory/ and spinoff/** (`node tools/exports.mjs characters inventory
-  spinoff tmnt` lists them); the check only enforces tmnt/ so far.
+- [x] **29 unused exports in characters/, inventory/ and spinoff/** (`node tools/exports.mjs characters inventory
+  spinoff tmnt` lists them). Done 2026-11-15: 27 are no longer exported, `holdsTarget` (characters/visit.js, never
+  called) is gone. `SHOTS_HAND_TUNED` stays on purpose, the selfie search's training set
+  (ai_planning_sessions/characters/SELFIES.md), so the check still enforces only tmnt/.
 - [ ] **The main checkout** (the one port 8888 serves) is on the old branch tmnt-0.0.1 with loose copies of this work;
   tidy it onto main when the kids aren't playing from it.
+
+## To do for 0.0.4
+
+Planned 2026-11-15 by the designer, for 0.0.4. Details still to be worked out with the designer before building.
+
+- [ ] **Climbing and crawling rigs** (planned 2026-11-15): proper climbing and crawling animations for every species,
+  made and checked in the species checker (`characters/species-checker.html`). Climbing is for the dome, the grid,
+  the loop ladder and the bars' steps; crawling is for under decks and into the bear cave (§The pieces).
+- [ ] **The food trucks' jump-timing challenge** (planned 2026-11-15, from §For later's food trucks): three trucks, **ice
+  cream, lemonade and pizza**, each with windows and a character in a chef's outfit launching food out of them. The
+  heroes **time their jumps to catch** what's launched. Open: where the trucks stand (along the back wall, per the
+  brainstorm, or their own level), what a catch is worth, and whether a miss costs anything.
+- [ ] **Rest** (planned 2026-11-15, from §For later's rest option): a rest puts **all the bad guys outside the fence for
+  a while**, as a soldier's time out does (§Level 3), and the kids run around the playground freely. Open: who starts
+  a rest and how (a button? the host only?), how long it lasts, and how the bad guys come back.
+- [ ] **Long trailing scarves that really flow** (planned 2026-11-15): the long trailing scarves (Leonardo's, and any
+  long tail) should stream and ripple behind a running, jumping hero. Takes in the 2026-11-12 todo on the trailing
+  scarf's physics (§The game: odd behind a backflip). **Motion, not texture** (decided 2026-11-15): the tail lags,
+  swings and ripples; the knit's texture stays as it is, since it doesn't read at the size heroes are drawn.
+- [ ] **The bad guys, a level at a time** (planned 2026-11-15, the designer: "let's level the whole thing"). Each
+  level adds one thing the soldiers do:
+  - **Level 3: soldiers that don't hit back.** They are there to be knocked over the fence, and do nothing to a
+    hero. Open: do they still walk up to a hero who comes near, and get in the way?
+  - **Level 4: today's level 3**, soldiers that punch (§Level 3), moved up unchanged.
+  - **Level 5: soldiers that steal pizza** (§Pizza: a big hit knocks one slice loose, the hero can win it back, a
+    hero with none can't be robbed, the thief eats it and dances). How far a slice flies and what counts as a big
+    hit are tuned by playtest.
 
 ## Open questions
 
@@ -943,4 +1003,6 @@ Housekeeping:
 - **Purple is a hero colour and a bad-guy colour.** Purple is one of the turtles' four, and the Sock Clan and The
   Sweater wear it too. Is that fine, as long as black and silver stay bad-guy only?
 - **Where does "Turtleneck" go?** A power move, a pickup, a level name, or The Sweater's last form?
-- **What does the booty shake do here?** It is a taunt in the fighting game, still open there too.
+- **What does the booty shake do here?** It is a taunt in the fighting game, still open there too. Probably the rude
+  victory dance a bad guy does after eating stolen pizza (the designer, 2026-11-15; §Pizza). Is it bad guys only, or
+  do heroes get it too?

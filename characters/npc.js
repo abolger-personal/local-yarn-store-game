@@ -1413,7 +1413,7 @@ export const round3 = (n) => Math.round(n * 1000) / 1000;
  * @param {Record<string, any>} P
  * @param {Record<string, number[]>} [ranges]
  */
-export function randomiseBase(P, ranges = BASE_RANDOM_RANGES) {
+function randomiseBase(P, ranges = BASE_RANDOM_RANGES) {
   for (const [key, [a, b]] of Object.entries(ranges)) P[key] = round3(rand(a, b));
   P.bodyColor = randomFur();
   P.heldColor = randHex(ACCENT_SAT, ACCENT_LIGHT);

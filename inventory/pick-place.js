@@ -224,8 +224,8 @@ function columnHit(g, c, r, top) {
 
 // ponytail: yaw is stored per item, not derived from hash(itemId, slotIndex) as
 // DESIGN-DECISIONS.md §5 specifies; derive it once items have stable ids.
-export const YAW_SCATTER = 0.22 * Math.PI;
-export const YAW_SETTLE = 0.12 * Math.PI;
+const YAW_SCATTER = 0.22 * Math.PI;
+const YAW_SETTLE = 0.12 * Math.PI;
 
 export const scatterYaw = (rng = Math.random) => (rng() - 0.5) * YAW_SCATTER;
 

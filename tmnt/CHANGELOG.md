@@ -3,12 +3,17 @@
 What's new in Turtles in Twine: The Sweater's Revenge, the Teenage Mitten Knitting Turtles' co-op side scroller, the
 L.Y.S. spinoff's spinoff.
 
-## 0.0.3 (in progress)
+## 0.0.3
 
 ### The playground
 - **The whole pizza shows.** A spinning slice was half hidden behind its own starburst. Not any more.
 - **A bridge that tips you off.** Run across and you're fine. Stand around on it and after four sways it tosses
   you off onto the ground.
+- **Smaller slices.** The pizza slices to find, and their sparkles, are a bit smaller.
+- **No more flicker.** The orange and green spots on the ground don't flash blue any more, and pieces that
+  stand side by side don't flicker where they meet.
+- **A fairer Sock Clan.** A soldier who knocks you down waits till you're up and lets you get away, instead of
+  punching you again and again against the back fence.
 
 ### Choosing your hero
 - **Quicker 🍕.** Flipping through the ready-made heroes is faster, and coming back round to one you've seen is

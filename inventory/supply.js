@@ -48,7 +48,7 @@ export const resolveOrder = (order, rng = Math.random) =>
   order.flatMap((slot) => resolveTemplate(slot.template, rng));
 
 // DESIGN-DECISIONS.md §6, "Delivery".
-export const WEIGHT_INTRO = Object.freeze({ worsted: 1, dk: 1, bulky: 5, fingering: 8 });
+const WEIGHT_INTRO = Object.freeze({ worsted: 1, dk: 1, bulky: 5, fingering: 8 });
 const knownBy = (day) => Object.keys(WEIGHT_INTRO).filter((w) => WEIGHT_INTRO[w] <= day);
 const newOn = (day) => Object.keys(WEIGHT_INTRO).filter((w) => WEIGHT_INTRO[w] === day);
 

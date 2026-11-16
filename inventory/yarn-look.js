@@ -28,7 +28,7 @@ function oklabToLinear(l, c, h) {
   ];
 }
 
-export function oklch(l, c, h, target = new THREE.Color()) {
+function oklch(l, c, h, target = new THREE.Color()) {
   const [r, g, b] = oklabToLinear(l, c, h).map((v) => Math.max(0, v));
   return target.setRGB(r, g, b, THREE.LinearSRGBColorSpace);
 }
@@ -36,7 +36,7 @@ export function oklch(l, c, h, target = new THREE.Color()) {
 const inGamut = (l, c, h) => oklabToLinear(l, c, h).every((v) => v >= -1e-4 && v <= 1 + 1e-4);
 
 // YARN-ASSET-SPIKE.md §14: out of gamut, reduce chroma and keep hue and lightness.
-export function oklchClamped(l, c, h, target = new THREE.Color()) {
+function oklchClamped(l, c, h, target = new THREE.Color()) {
   if (inGamut(l, c, h)) return oklch(l, c, h, target);
   let lo = 0, hi = c;
   for (let i = 0; i < 12; i++) {
@@ -46,10 +46,10 @@ export function oklchClamped(l, c, h, target = new THREE.Color()) {
   return oklch(l, lo, h, target);
 }
 
-export const YARN_ANCHORS = Object.freeze([12, 38, 74, 128, 172, 208, 262, 318]);
+const YARN_ANCHORS = Object.freeze([12, 38, 74, 128, 172, 208, 262, 318]);
 
 // DESIGN-DECISIONS.md §5, Anti-camouflage
-export const CHARACTER_RANGE = Object.freeze({ lMin: 0.44, lMax: 0.64, cMax: 0.055 });
+const CHARACTER_RANGE = Object.freeze({ lMin: 0.44, lMax: 0.64, cMax: 0.055 });
 
 // YARN-ASSET-SPIKE.md §14: palette families and their shares.
 export const YARN_FAMILIES = Object.freeze([

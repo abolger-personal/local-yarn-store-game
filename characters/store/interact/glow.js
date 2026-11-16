@@ -156,7 +156,7 @@ export function ghost(item) {
   else if (full) ghostNoRoom(full);
 }
 
-export function fullUnderPointer() {
+function fullUnderPointer() {
   const disp = byId(aim.hovered);
   return disp && drag.index !== EMPTY && !firstFreeSlot(disp, items[drag.index]) ? disp : null;
 }

@@ -65,4 +65,22 @@ assert.ok(run(5) >= 0 && sock.z === SAD_Z && Math.abs(sock.x - post.x) < 0.5 && 
 Object.assign(me, { x: post.x, z: 3.6, onGround: false });
 run(3);
 assert.ok(me.out > 0 && me.x < 2, 'a hero rung out is back at the start');
+
+// a hero pinned at the back fence gets a punch's interval on their feet after every knock, to run (seen 2026-11-15:
+// launched out of the soldier's sight and back, they were punched again a sixth of a second after getting up)
+{
+  const g = createGuard('sock0', post), p = SIM.createMatch([body('me', 'heroes'), body('sock0', 'badGuys')], /** @type {any} */ (forSim(level)), { match: { ...MATCH, badGuyPace: GUARD.pace } });
+  const [kid, soldier] = p.fighters;
+  Object.assign(kid, { x: post.x, z: BAND.z0 + 0.2 });
+  Object.assign(soldier, { x: post.x, z: BAND.z0 + 0.8 });
+  let up = 0, knocks = 0;
+  for (let i = 0; i < 30 * TICK_HZ; i++) {
+    p.t0 = p.tick;
+    SIM.tick(p, { me: null, sock0: g.input(SIM.snapshot(p)) });
+    const down = kid.stun > 0 || !kid.onGround || Boolean(kid.pending);
+    if (down && up > 0 && knocks++) assert.ok(up >= GUARD.every, `knock ${knocks}: only ${up} ticks up before the next punch`);
+    up = down ? 0 : up + 1;
+  }
+  assert.ok(knocks > 10, `it kept punching the hero who stayed (${knocks})`);
+}
 console.log('guard ok');

@@ -86,3 +86,15 @@ not a truncation: with `Math.trunc` the generator's state grows past 2^53 and th
 diverges after ~4.9 million draws. Presets are a starting point to measure, not to adopt.
 
 Run: `npm run lint` and `npm run check`.
+
+## Unused exports (`tools/exports.mjs`)
+
+Part of `npm run check`. Fails when a file in `tmnt/` exports a name no other file mentions: delete it, or drop its
+`export`. It matches names as words, not real imports. `import-x/no-unused-modules` would be the lint rule, but it is a
+no-op on ESLint 10. Only `tmnt/` is checked: `node tools/exports.mjs characters inventory spinoff tmnt` listed 29 more
+in the older folders on 2026-11-15, not yet cleaned up.
+
+## Headless files (`HEADLESS` in `eslint.config.js`)
+
+The games' rules files (the sim, the level generator, the builder, the equipment, the guards) may not import three.js:
+the tests run them under node.

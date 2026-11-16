@@ -34,7 +34,7 @@ export const PAINTS = Object.freeze(['none', 'rings', 'heart']);
 export const FACES = Object.freeze([...PAINTS, 'glasses']);
 const DEFAULT_HANDS = 'gloves';
 // REUSE-SPEC.md §Hero chooser: the gloves and the heroes' own; not the fighters' sword, scythe or hammer
-export const HERO_HANDS = Object.freeze([DEFAULT_HANDS, SCISSORS, NEEDLES, STAFF, YARN_BALLS, MIC, CANE]);
+const HERO_HANDS = Object.freeze([DEFAULT_HANDS, SCISSORS, NEEDLES, STAFF, YARN_BALLS, MIC, CANE]);
 // REUSE-SPEC.md §Hero chooser: the mouse is Master Splinter, with his cane
 export const handsOf = (species) => (species === 'mouse' ? CANE : DEFAULT_HANDS);
 

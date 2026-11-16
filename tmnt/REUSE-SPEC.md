@@ -427,7 +427,45 @@ Decided 2026-11-15 (the designer, after the second round of questions):
 - **Invite only.** A kid's playground is one of the levels the **host of a room** can pick, on the level screen:
   whoever is "home" and choosing the level can choose their own playground.
 
-Notes for planning (mine, 2026-11-15; nothing is planned or built):
+**Step 1, built 2026-11-15** (`tmnt/builder.js` the rules, `tmnt/build.js` and `build.html` the page):
+- **The button** is a wrench, 🔧, in the level picker's next free place after the level numbers.
+- **The page**: the playground from above, scrolling along; under it the pieces, each drawn from the side from its
+  own numbers. **Drag one on and it snaps** to the nearest place it fits, shown dashed while it's dragged; **tapped**,
+  it goes nearest the middle of what's showing. ↩️ takes the last piece away, 🗑️ starts again, ▶️ plays it.
+- **Where a piece fits**: one that starts on the ground (or on a deck low enough to jump onto), anywhere free along
+  the ground, in three lanes; one that starts up high, off the end or either side of a piece that leaves you that
+  high. A slide, a pole or stairs needs a deck at exactly its own height; a deck can be a jump up or a step down.
+  Never over another piece, never off the playground. **A piece with nowhere to fit has no button.**
+- **Tested**: a slide isn't offered till its deck is there, and then fits more than one side of it; which side follows
+  the finger; no two pieces overlap; a saved playground reads back, and one that was tampered with keeps only what
+  can stand; the level it makes is walkable in the sim.
+- **Saved on the tablet**, one playground (`tmnt.playground.v1`), and played as `level.html?built=1`: the ground
+  runs on past the last piece to the gate and the giant pizza; slices hang where the generator would hang them.
+- Known limits: a slide is too long to run across the playground from the middle lane, so it turns only from a lane
+  near the back or front; pieces can only be taken away last first.
+- **Step 2, a colour for every piece, built 2026-11-15**: a row of twelve colours over the pieces. The one tapped is
+  the colour in hand: the next piece dragged on is that colour, and **a piece on the playground, tapped, turns that
+  colour**. In play it colours the piece's main part: a deck's sides, a slide, the fire pole, the dome, a climb's
+  and the bridge's posts, a swing's or the bars' frame. Deck tops, chains and seats stay as they are. Saved with the
+  piece; a piece with none is the playground's usual colours.
+- **After the playtest of 2026-11-15** (decided and built the same day):
+  - **Twelve colours is enough for now.** A deck's **posts** take the colour too, and its **top a darker shade** of
+    it. **The builder remembers the colour in hand** between visits.
+  - **One piece can be taken away** (the playtester: "she needs to be able to take a single piece away"): tap a piece
+    on the playground and it is picked, outlined in white; 🗑️ takes it away, **and anything that stood on it**, since
+    that would have nowhere to stand. With a piece picked, a colour tapped recolours it. 🗑️ no longer clears the
+    whole playground; ↩️ still takes the last piece.
+  - **Monkey bars** (`monkeyBars`): a step at each end, the bars 4 ft over the steps. **Walk off a step under the
+    bars and the hero swings across**, hand over hand, arms up, to the other step, **from either end** (decided
+    2026-11-15); **jump from a step and it's up on top**, to walk over. Under the bars is shut to a hero on the
+    ground, as under any deck. **In the generated levels too** (decided 2026-11-15): a ground stretch can have them
+    as it can the swings or the bars, and levels 2 and 3 take the three in turn. **A pizza slice hangs under the
+    middle**, got by swinging across. Open: a real hand-over-hand swing to draw.
+  - **♻️ starts again** (decided 2026-11-15): the whole playground cleared, on its own button, apart from 🗑️.
+- **Not built yet**: placing pizza and bad guys; choosing
+  it as a room's host for the other tablets (there are no Turtles rooms yet).
+
+Notes for planning (mine, 2026-11-15):
 - A level is already a list of piece ids strung together by `tmnt/generate.js`, with rules that keep it walkable
   (pieces join at matching heights, never overlap, never block the way). Dragging pieces anywhere gives those rules
   up, so a built playground needs its own: snap to a grid, and a check that the gate can be reached.
@@ -435,6 +473,28 @@ Notes for planning (mine, 2026-11-15; nothing is planned or built):
 - Monkey bars to cross hand over hand aren't a piece yet; the bars are for swinging round.
 - Playing it on other tablets needs the playground sent between them: the donut fighters' rooms already send a
   level's settings to every tablet.
+
+#### Playtest changes, 2026-11-15 (second round)
+
+Decided and built 2026-11-15:
+- **↩️ takes back the last change, whatever it was**: a piece put down, a colour, the 🗑️, and ♻️ start again, so a
+  playground cleared by a slip comes back. The last 30 changes are kept, for the visit to the game (through a trip
+  to play and back; not once the game is closed).
+- **A 🔧 on a built playground while playing it** goes straight back to the builder, as the builder's ▶️ goes to play.
+- **The pieces' pictures say what they are**: monkey bars are a ladder on its side; the bridge sags, in planks, hung
+  from a rail; the bars are a bar across two posts (they read as lollipops); the dome curves up and over with the
+  bear cave's mouth beside it (it read as the ladder). Each picture is cut to its piece's height, so low pieces
+  aren't drawn tiny.
+
+- **Arrows page the tray of pieces** (⬅️ ➡️ either side of it, greyed at its ends): its scroll bar was too small to
+  grab on a tablet. Built 2026-11-15.
+
+### For later, from the 2026-11-15 playtest
+
+Brainstorm 2026-11-15, for later. Not decided, not planned, not built.
+- **A see-saw**, as a ground piece.
+- **Food trucks along the back wall** that pitch things into play: lemonade, pizza, ice cream.
+- **A rest option** that turns the bad guys off on a level but lets the kids run around, like a pause.
 
 ### A big hammer for the turtles
 
@@ -445,6 +505,24 @@ colour the player picks, and **not straight** (what that means is open: a bent h
   purpose (§Hero chooser: "not the fighters' sword, scythe or hammer"), so this would change that decision.
 - Its colour today is its own, not the player's.
 - Not decided, not planned, not built.
+
+### The bridge tips you off
+
+Decided and built 2026-11-15 (playtest: "bridge needs to be a little wobblier, after 3-6 sways I should fall off it").
+The bridge rocks **harder the longer someone stands on it**: from still, 0.3 of its full roll more each second, up to
+two and a half times it; with nobody on, it settles. A hero standing in the middle is slid off the side after 3 to
+6 sways, whenever in the rock it stepped on (tested); one walking straight across, under a second, barely moves.
+Falling off is still on purpose (2026-11-12).
+
+Amended 2026-11-15, after a playtest ("you don't fall off the bridge when you should... kept on the bridge by ropes"):
+the slide never took a hero off. Counted over 587 bridges in generated levels, 482 have a deck or the playground's
+edge at one side or both, and the slide stopped there. Decided and built:
+- The slide **keeps to the planks**: it carries a hero from side to side, never off.
+- After **five seconds of standing on it (four sways)** the bridge **tips the hero off**: tossed through the air, over
+  whatever is beside it, down onto the nearest open ground. The same on every bridge, whatever is at its sides.
+- Walking straight across is as before: under a second, barely a slide.
+- Tested in the real sim on the bridges of real levels (`equipment.test.mjs`); all 587 counted bridges put a standing
+  hero on the ground.
 
 ### Level 3
 
@@ -736,6 +814,16 @@ round the eyes, so no line on the pupils (2026-11-10). Saved characters can be c
 so they share `localStorage`. The fighters' keys are `lys.fighter.v1` and `lys.progress.v1`; the hero is
 `tmnt.hero.v1`, so a hero never overwrites a fighter.
 
+### The chooser's speed, 2026-11-15
+
+Built 2026-11-15, after a report of slow loads and 2 to 3 second 🍕 swaps in Chrome at 20x CPU slowdown:
+- **The last 8 designs stay built**, each 🍕 preset is made once a visit (its shell or mane shade no longer changes
+  each time round), and the next preset is built while the current one is looked at. Measured unthrottled in Chrome:
+  a swap to a preset seen before went from about 60 ms of work to 2 ms; a first visit from about 60 ms to about 35 ms.
+- **Decals split twice, not three times** (`DECAL_SPLITS`, characters/npc.js), **on trial**: the chooser's load at 20x
+  went from 3.3 s to about 2.5 s warm; the plastron's curve is coarser and wants a look.
+- Not done: skipping the lighting set-up as the donut fighters' tap page does (untested on a tablet's graphics chip).
+
 ## Bad guys
 
 All CPU (decided 2026-11-09). Their colours are purple, black and silver.
@@ -808,6 +896,39 @@ Sweater. Heroes don't get them. The design is open.
 2026-11-12, the designer's: probably **rakes or combs, or something else cutely villainous**, worn as claws. Brainstorm
 2026-11-12: **wool combs or hand carders**, the real spiked tools for untangling fleece, one on each paw; they fit
 the yarn theme the way the Shredder's claws fit his. Till then The Sweater's design has bare black gloves.
+
+## To do, open after 2026-11-15
+
+Left open at the end of the 2026-11-15 session. Strike each off here when it's done.
+
+For the designer to look at (built, tested by numbers, not yet seen by eye):
+- [ ] **The bridge's toss** (§The bridge tips you off): does being tossed off after four sways look and feel right?
+- [ ] **The pizza and its starburst** (§Pizza): a spinning slice was half hidden behind its shine; the shine is now drawn
+  first. Check on the first slice passed.
+- [ ] **The coarser decals** (§The chooser's speed): `DECAL_SPLITS` 2, on trial. Is the turtle's plastron too rough? If
+  so, back to 3 in characters/npc.js.
+- [ ] **The bars' picture in the builder** (§Build my playground): two bars across posts, recognisable but small. Big
+  enough?
+
+Bugs and unknowns:
+- [ ] **Tablets freezing at the very start of a level** (seen on two tablets, 2026-11-14: taps, punch and kick all
+  dead). Not reproduced in Chrome; the round clock and the left-edge ring-out are ruled out. level.html has a red
+  strip (`#oops`) that prints the error next time. Still to learn: is the picture still moving, which level and how
+  it was entered, frozen from the start or after a first tap.
+- [ ] **A first visit to each 🍕 hero is only half as quick as hoped** (§The chooser's speed): about 60 ms of work
+  down to 35 ms, where building the next one ahead should have made it near nothing. Why isn't known.
+- [ ] **A hero pinned at the back edge by a soldier is punched over and over** (seen in simulation, level 3).
+
+Decided, not built:
+- [ ] **The builder chooses where pizza and bad guys go** (§Build my playground, decided 2026-11-15).
+- [ ] **The room's host shares their playground with the other tablets** (invite only, decided 2026-11-15; no Turtles
+  rooms exist yet).
+
+Housekeeping:
+- [ ] **29 unused exports in characters/, inventory/ and spinoff/** (`node tools/exports.mjs characters inventory
+  spinoff tmnt` lists them); the check only enforces tmnt/ so far.
+- [ ] **The main checkout** (the one port 8888 serves) is on the old branch tmnt-0.0.1 with loose copies of this work;
+  tidy it onto main when the kids aren't playing from it.
 
 ## Open questions
 

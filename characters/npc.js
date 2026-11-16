@@ -695,6 +695,9 @@ function subdivide(g, times) {
     .setIndex([...Array(p.length / 3).keys()]);
 }
 
+// how many times a decal's triangles are split to follow the skin's curve: 2 not 3 (2026-11-15, the chooser's load on a
+// slow tablet: a third off the turtle's build), on trial till the plastron's curve is looked at
+const DECAL_SPLITS = 2;
 /**
  * Unit shape `kind` (DECALS; or [kind, ...its args]) `size` across, upright, wrapped onto head ellipsoid `head` round
  * the skin over (x, y), `lift` proud.
@@ -706,7 +709,7 @@ export function skinDecal(head, kind, [x, y], size, lift) {
     const across = new THREE.Vector3().crossVectors(UP, n).normalize(), up = new THREE.Vector3().crossVectors(n, across);
     const [name, ...args] = [kind].flat();
     // welded: the split leaves every corner once a triangle, 69,000 points on a plastron (playtest 2026-11-14: tablets lagged)
-    const g = mergeVertices(subdivide(new THREE.ShapeGeometry(DECALS[name](...args), 8).toNonIndexed(), 3)), pos = g.attributes.position, q = new THREE.Vector3();
+    const g = mergeVertices(subdivide(new THREE.ShapeGeometry(DECALS[name](...args), 8).toNonIndexed(), DECAL_SPLITS)), pos = g.attributes.position, q = new THREE.Vector3();
     for (let i = 0; i < pos.count; i++) {
       q.copy(at).addScaledVector(across, pos.getX(i) * size).addScaledVector(up, pos.getY(i) * size);
       q.multiplyScalar(1 / Math.hypot(q.x / head[0], q.y / head[1], q.z / head[2]));

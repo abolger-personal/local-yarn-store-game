@@ -85,17 +85,19 @@ for (const seed of [1, 2, 3]) {
   const { x } = SIM.snapshot(s).fighters[0];
   assert.ok(x < first.x1, `seed ${seed}: on foot, no way past the first structure (got to ${x.toFixed(2)}, it ends at ${first.x1})`);
 }
-// pizza slices: one for every slide, bridge and fire pole and every pair of bars or swings, in the level, off the ground
+// pizza slices: one for every slide, bridge, fire pole and monkey bars (two rides, there and back) and every pair of bars or swings, in the level, off the ground
 for (let seed = 0; seed < 20; seed++) {
   const L = generateLevel(seed, 2), [ground] = L.floors;
-  assert.equal(L.slices.length, L.rides.length + L.bridges.length + L.swings.length / 2, `seed ${seed}: a slice at each`);
+  const monkey = L.rides.filter((q) => q.kind === 'monkey').length;
+  assert.equal(L.slices.length, L.rides.length - monkey / 2 + L.bridges.length + L.swings.length / 2, `seed ${seed}: a slice at each`);
   assert.ok(L.slices.every((s) => s.y > 0.4 && s.x > ground.x0 && s.x < ground.x1 + 3 && s.z >= ground.z0 && s.z <= ground.z1), `seed ${seed}: slices in the level`);
 }
-// level 2: swings or bars on every ground stretch, the swings first; level 1 is as it was
+// level 2: swings, bars or monkey bars on every ground stretch, the swings first; level 1 is as it was
 for (let seed = 0; seed < 20; seed++) {
   const two = generateLevel(seed, 2), kinds = two.swings.map((p) => p.kind);
   assert.ok(kinds[0] === 'swing' && kinds.includes('bar'), `seed ${seed}: level 2 opens on the swings and has the bars`);
-  assert.ok(two.swings.length >= 2 * (two.structures.length + 1), `seed ${seed}: something to swing on at every ground stretch`);
+  // (monkey bars are two rides, there and back, as swings and bars are two pivots)
+  assert.ok(two.swings.length + two.rides.filter((q) => q.kind === 'monkey').length >= 2 * (two.structures.length + 1), `seed ${seed}: something to swing on at every ground stretch`);
   assert.deepEqual(generateLevel(seed, 1), generateLevel(seed));
 }
 console.log('generate ok', generateLevel(1).structures.map((s) => s.join('>')).join(' | '), generateLevel(1).seconds, 's');

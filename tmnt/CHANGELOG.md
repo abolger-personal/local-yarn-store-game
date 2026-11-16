@@ -3,6 +3,32 @@
 What's new in Turtles in Twine: The Sweater's Revenge, the Teenage Mitten Knitting Turtles' co-op side scroller, the
 L.Y.S. spinoff's spinoff.
 
+## 0.0.3 (in progress)
+
+### The playground
+- **The whole pizza shows.** A spinning slice was half hidden behind its own starburst. Not any more.
+- **A bridge that tips you off.** Run across and you're fine. Stand around on it and after four sways it tosses
+  you off onto the ground.
+
+### Choosing your hero
+- **Quicker 🍕.** Flipping through the ready-made heroes is faster, and coming back round to one you've seen is
+  instant. The chooser opens a little sooner too.
+
+### Build my playground
+- **Make your own playground.** Tap the 🔧 next to the level numbers. Drag swings, slides, bridges and climbing
+  frames onto the ground and they snap into place. Then press ▶️ and play it. Your playground is saved on your
+  tablet.
+- **Every piece in your colour.** Tap a colour, then drag a piece on, or tap one that's already there to repaint
+  it. Tap a piece and press 🗑️ to take just that one away.
+- **Monkey bars.** Walk off the step to swing across, or jump up and walk along the top. They're in the
+  playground levels too, with pizza hanging under the middle.
+- **Oops-proof.** ↩️ takes back your last change, even ♻️ start again, so a playground cleared by mistake comes
+  back.
+- **Build, play, build.** While you play your playground, tap the 🔧 to go straight back to building it.
+- **Arrows for more pieces.** ⬅️ and ➡️ flip through the pieces, no tiny scroll bar to grab.
+- **Clearer pictures on the pieces.** The monkey bars, the bridge, the bars and the bear cave each look like
+  themselves now.
+
 ## 0.0.2
 
 ### The playground

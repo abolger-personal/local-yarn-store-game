@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Turtles in Twine — build my playground</title>
+<!-- every page runs inside the tap page (index.html), which keeps fullscreen and the rooms -->
+<script>if (top === self) location.replace(`./?open=${encodeURIComponent(location.pathname.split('/').pop() + location.search)}`);</script>
+<link rel="stylesheet" href="../spinoff/spinoff.css" />
+<style>
+  /* REUSE-SPEC.md §Build my playground: the plan from above, scrolling along; the pieces to drag under it */
+  body.build { display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr); height: 100dvh; margin: 0; overflow: hidden; }
+  #plan-wrap { overflow-x: auto; overflow-y: hidden; touch-action: pan-x; background: #c5e8a4; }
+  #plan { display: block; height: 100%; }
+  #plan .piece rect { stroke: #141414; stroke-width: 0.04; }
+  #plan .picked rect { stroke: #fff; stroke-width: 0.12; stroke-dasharray: 0.2 0.12; }
+  #bar button:disabled { opacity: 0.35; }
+  #plan .hint { fill: #fff8; stroke: #141414; stroke-width: 0.06; stroke-dasharray: 0.15 0.1; }
+  #bar { display: flex; flex-wrap: wrap; min-width: 0; gap: 8px; padding: 8px; align-items: center; background: #f6e7d4; }
+  #tray { display: flex; gap: 8px; overflow-x: auto; flex: 1; min-width: 0; touch-action: pan-x; padding: 2px; }
+  #tray button { flex: none; width: 84px; height: 64px; padding: 4px; touch-action: none; }
+  /* playtest 2026-11-15: the tray's scroll bar was too small to grab, so arrows page it */
+  #bar .more { flex: none; width: 44px; min-width: 0; height: 64px; padding: 0; }
+  #tray { scrollbar-width: none; scroll-behavior: smooth; }
+  #paints { display: flex; gap: 6px; flex: 0 0 100%; overflow-x: auto; padding: 2px; }
+  #paints button { flex: none; width: 40px; height: 40px; min-width: 0; padding: 0; border-radius: 50%; border: 3px solid #e7d6c1; }
+  #paints button[aria-pressed="true"] { border-color: #141414; transform: scale(1.12); }
+  #tray svg, #ghost svg { width: 100%; height: 100%; }
+  #ghost { position: fixed; width: 96px; height: 72px; margin: -36px 0 0 -48px; pointer-events: none; opacity: 0.85; z-index: 5; }
+  #bar .menu { display: flex; gap: 8px; flex: none; }
+</style>
+</head>
+<body class="build">
+<div id="plan-wrap" aria-label="my playground, from above"><svg id="plan" xmlns="http://www.w3.org/2000/svg"></svg></div>
+<div id="bar">
+  <div id="paints" aria-label="colours: tap one, then a piece"></div>
+  <button id="back" class="more" aria-label="earlier pieces"><span class="emoji">⬅️</span></button>
+  <div id="tray" aria-label="pieces: drag one onto the playground"></div>
+  <button id="on" class="more" aria-label="more pieces"><span class="emoji">➡️</span></button>
+  <div class="menu">
+    <button id="undo" aria-label="take back the last change"><span class="emoji">↩️</span></button>
+    <button id="bin" aria-label="take the picked piece away"><span class="emoji">🗑️</span></button>
+    <button id="clear" aria-label="start again"><span class="emoji">♻️</span></button>
+    <button id="bye" aria-label="wave bye, back"><span class="emoji">👋</span></button>
+    <button id="go" aria-label="play my playground"><span class="emoji">▶️</span></button>
+  </div>
+</div>
+<div id="ghost" hidden></div>
+<script type="module" src="build.js"></script>
+</body>
+</html>

@@ -89,6 +89,10 @@ const UNICORN = {
   'unicorn/no-late-event-control': 'error',         // stopPropagation() deferred out of the handler
 };
 
+// The rules of each game, run under node by the tests and (the fighters') on the host tablet: no three.js in them.
+const HEADLESS = ['spinoff/sim.js', 'spinoff/walk.js', 'spinoff/world.js', 'spinoff/match.js', 'spinoff/combat.js',
+  'tmnt/guard.js', 'tmnt/generate.js', 'tmnt/builder.js', 'tmnt/equipment.js', 'tmnt/pieces.js'];
+
 export default [
   js.configs.recommended,
   {
@@ -165,7 +169,7 @@ export default [
   },
   {
     // DESIGN-DECISIONS.md: the simulation stays headless. Inert until src/sim exists.
-    files: ['src/sim/**/*.js', 'src/sim/**/*.ts'],
+    files: ['src/sim/**/*.js', 'src/sim/**/*.ts', ...HEADLESS],
     rules: {
       'no-restricted-imports': ['error', {
         paths: [{ name: 'three', message: 'src/sim must stay headless - no three.js imports.' }],
